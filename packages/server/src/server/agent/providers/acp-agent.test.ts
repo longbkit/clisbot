@@ -1319,6 +1319,74 @@ describe("ACPAgentSession Zed parity", () => {
     expect(session.getPendingPermissions()).toEqual([]);
   });
 
+  test("observed ACP auto-accept waits for shared durable admission before native allow", async () => {
+    const session = createSessionWithConfig({ featureValues: { auto_accept: true } });
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    const admission = Promise.withResolvers<void>();
+    session.setAutomaticPermissionResponder(async (id, response) => {
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: "permission_requested",
+          request: expect.objectContaining({ id }),
+        }),
+      );
+      await admission.promise;
+      await session.respondToPermission(id, response);
+    });
+    let resolved = false;
+    const permission = session
+      .requestPermission({
+        sessionId: "session-1",
+        toolCall: { toolCallId: "tool-observed", title: "Edit", kind: "edit", status: "pending" },
+        options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }],
+      })
+      .then((result) => {
+        resolved = true;
+        return result;
+      });
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+    expect(session.getPendingPermissions()).toHaveLength(1);
+    admission.resolve();
+    await expect(permission).resolves.toEqual({
+      outcome: { outcome: "selected", optionId: "allow" },
+    });
+    expect(session.getPendingPermissions()).toEqual([]);
+  });
+
+  test("failed observed ACP auto-accept retains a live request without native forwarding", async () => {
+    const session = createSessionWithConfig({ featureValues: { auto_accept: true } });
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    session.setAutomaticPermissionResponder(async () => {
+      throw new Error("ENOSPC");
+    });
+    let resolved = false;
+    const permission = session
+      .requestPermission({
+        sessionId: "session-1",
+        toolCall: { toolCallId: "tool-failed", title: "Edit", kind: "edit", status: "pending" },
+        options: [
+          { optionId: "allow", name: "Allow", kind: "allow_once" },
+          { optionId: "deny", name: "Deny", kind: "reject_once" },
+        ],
+      })
+      .then((result) => {
+        resolved = true;
+        return result;
+      });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+    const request = session.getPendingPermissions()[0]!;
+    expect(request).toBeTruthy();
+    await session.respondToPermission(request.id, { behavior: "deny" });
+    await expect(permission).resolves.toEqual({
+      outcome: { outcome: "selected", optionId: "deny" },
+    });
+  });
+
   test("does not auto-accept ACP chooser requests", async () => {
     const session = createSessionWithConfig({
       provider: "kimi-acp",

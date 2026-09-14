@@ -1,3 +1,4 @@
+import type { SessionAuthorship } from "@getpaseo/protocol/session-authorship";
 import type { PrHint } from "@/git/pr-hint";
 import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { type HostProjectListItem } from "@/projects/host-project-model";
@@ -35,7 +36,8 @@ export interface SidebarStatusWorkspacePlacement extends SidebarWorkspacePlaceme
   statusEnteredAt: Date | null;
 }
 
-export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
+export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement, SessionAuthorship {
+  createdAt?: string;
   workspaceDirectory: string;
   workspaceDirectoryLabel: string;
   // Raw user-set title (null when the name is derived from branch/directory).
@@ -154,6 +156,13 @@ export function createSidebarWorkspaceEntry(input: {
   const effectiveStatus = deriveEffectiveWorkspaceStatus(input);
   return {
     workspaceKey: `${input.serverId}:${input.workspace.id}`,
+    createdBy: input.workspace.createdBy,
+    createdAt: input.workspace.createdAt,
+    lastInteractionBy: input.workspace.lastInteractionBy,
+    authorshipStatus: input.workspace.authorshipStatus,
+    lastInteractionAt: input.workspace.lastInteractionAt,
+    participantActors: input.workspace.participantActors,
+    channels: input.workspace.channels,
     serverId: input.serverId,
     workspaceId: input.workspace.id,
     projectViewKey,

@@ -1,3 +1,4 @@
+import { sessionActorKey } from "@getpaseo/protocol/session-authorship";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantBlockSpacing, getGapBetweenStreamItems } from "./spacing";
@@ -23,6 +24,9 @@ export interface StreamLayoutItem {
   toolSequence: StreamToolSequence;
   isFirstInUserGroup: boolean;
   isLastInUserGroup: boolean;
+  /** First displayed item of the agent's response to the prompt above: a
+   *  response may open with a tool or thinking before its first text. */
+  isFirstInResponseGroup: boolean;
   isLastInToolSequence: boolean;
   frameOrder: StreamFrameChildOrder;
   phase: "streaming" | "complete";
@@ -187,6 +191,22 @@ function isToolSequenceItem(
   return item?.kind === "tool_call" || item?.kind === "thought" || item?.kind === "todo_list";
 }
 
+// Agent-response item kinds: a response may lead with tools, thinking, a todo
+// list, or an activity log (errors) before or between its assistant text. The
+// first displayed item of a response — the one above a prompt, structural
+// item, or the top of the timeline — opens the group.
+const RESPONSE_GROUP_KINDS = new Set<StreamItem["kind"]>([
+  "assistant_message",
+  "tool_call",
+  "thought",
+  "todo_list",
+  "activity_log",
+]);
+
+export function isResponseGroupItem(item: StreamItem | null | undefined): item is StreamItem {
+  return item !== null && item !== undefined && RESPONSE_GROUP_KINDS.has(item.kind);
+}
+
 function getToolSequence(input: {
   item: StreamItem;
   aboveItem: StreamItem | null;
@@ -260,6 +280,7 @@ function areLayoutItemsEquivalent(previous: StreamLayoutItem, next: StreamLayout
     previous.toolSequence === next.toolSequence &&
     previous.isFirstInUserGroup === next.isFirstInUserGroup &&
     previous.isLastInUserGroup === next.isLastInUserGroup &&
+    previous.isFirstInResponseGroup === next.isFirstInResponseGroup &&
     previous.isLastInToolSequence === next.isLastInToolSequence &&
     previous.frameOrder === next.frameOrder &&
     previous.phase === next.phase
@@ -318,6 +339,8 @@ function layoutSegmentItem(
     hasFooterBelow: completedFooter !== null || (input.hasAuxiliaryFooter && belowItem === null),
   });
 
+  const isFirstInResponseGroup = isResponseGroupItem(item) && !isResponseGroupItem(aboveItem);
+
   return shareLayoutItem({
     item,
     aboveItem,
@@ -326,8 +349,9 @@ function layoutSegmentItem(
     assistantSpacing,
     completedFooter,
     toolSequence: getToolSequence({ item, aboveItem, belowItem }),
-    isFirstInUserGroup: item.kind === "user_message" && aboveItem?.kind !== "user_message",
-    isLastInUserGroup: item.kind === "user_message" && belowItem?.kind !== "user_message",
+    isFirstInUserGroup: item.kind === "user_message" && !sameUserMessageAuthor(item, aboveItem),
+    isLastInUserGroup: item.kind === "user_message" && !sameUserMessageAuthor(item, belowItem),
+    isFirstInResponseGroup,
     isLastInToolSequence:
       isToolSequenceItem(item) &&
       !(isToolSequenceItem(belowItem) && continuesTurn(item, belowItem)),
@@ -414,4 +438,10 @@ export function layoutStream(input: StreamLayoutInput): StreamLayout {
     liveHead,
     auxiliaryTurnFooter,
   };
+}
+
+function sameUserMessageAuthor(left: StreamItem, right?: StreamItem | null): boolean {
+  if (left.kind !== "user_message" || right?.kind !== "user_message") return false;
+  if (!left.sender || !right.sender) return left.sender === right.sender;
+  return sessionActorKey(left.sender) === sessionActorKey(right.sender);
 }

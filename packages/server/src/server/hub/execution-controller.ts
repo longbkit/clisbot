@@ -152,6 +152,7 @@ export class HubExecutionController {
       if (!isAbsolute(message.cwd)) throw new Error("Hub agent cwd must be absolute");
       const result = await this.agents.create({
         executionId: message.executionId,
+        sessionIdentity: message.sessionIdentity,
         reuseAgentId: message.reuseAgentId,
         provider: message.provider,
         cwd: message.cwd,

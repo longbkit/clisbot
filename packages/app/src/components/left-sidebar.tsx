@@ -74,6 +74,7 @@ import { openHostOverview } from "@/navigation/settings-navigation";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
+import { SidebarMetadataNotice } from "./sidebar/empty-states";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
 import { AutomationSidebarItem } from "@/clisbot/hub/automation-sidebar-item";
 import { PluginSidebarItems } from "@/plugins";
@@ -722,6 +723,7 @@ function MobileSidebar({
           </Pressable>
         </WindowChromeSafeArea>
 
+        <SidebarMetadataNotice />
         {isInitialLoad && !hasActiveHostFilter ? (
           <SidebarAgentListSkeleton />
         ) : (
@@ -930,6 +932,7 @@ function DesktopSidebar({
           </View>
         </View>
 
+        <SidebarMetadataNotice />
         {isInitialLoad && !hasActiveHostFilter ? (
           <SidebarAgentListSkeleton />
         ) : (

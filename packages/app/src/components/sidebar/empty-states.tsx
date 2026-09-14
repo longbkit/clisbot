@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
+import { useSidebarModel } from "./sidebar-model";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 
 /**
@@ -18,13 +19,17 @@ export function SidebarFilterEmptyState() {
   const { t } = useTranslation();
   const clearLabelFilter = useSidebarViewStore((state) => state.clearLabelFilter);
   const clearProjectFilters = useSidebarViewStore((state) => state.clearProjectFilters);
+  const clearUserFilters = useSidebarViewStore((state) => state.clearUserFilters);
+  const clearChannelFilters = useSidebarViewStore((state) => state.clearChannelFilters);
   // Clears every filter that can empty the list, not just the one that did. The card names no
   // filter, so a Clear that undid only one of two active filters would leave it on screen looking
   // like it had failed.
   const clearFilters = useCallback(() => {
     clearLabelFilter();
     clearProjectFilters();
-  }, [clearLabelFilter, clearProjectFilters]);
+    clearUserFilters();
+    clearChannelFilters();
+  }, [clearLabelFilter, clearProjectFilters, clearUserFilters, clearChannelFilters]);
 
   return (
     <View style={styles.container} testID="sidebar-filter-empty-state">
@@ -34,6 +39,20 @@ export function SidebarFilterEmptyState() {
         {t("sidebar.filterEmpty.clear")}
       </Button>
     </View>
+  );
+}
+
+export function SidebarMetadataNotice() {
+  const { metadataRecoveryNotice } = useSidebarModel();
+  if (!metadataRecoveryNotice) return null;
+  return (
+    <Text
+      style={styles.description}
+      accessibilityLiveRegion="polite"
+      testID="sidebar-metadata-notice"
+    >
+      {metadataRecoveryNotice}
+    </Text>
   );
 }
 

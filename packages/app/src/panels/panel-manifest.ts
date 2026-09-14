@@ -1,3 +1,4 @@
+import { sessionActorKey } from "@getpaseo/protocol/session-authorship";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 export type PaneHost = "main" | "explorer";
@@ -13,6 +14,11 @@ type PanelManifestByKind = {
 };
 
 const manifests = {
+  user_profile: {
+    kind: "user_profile",
+    supportedHosts: ["main", "explorer"],
+    resourceKey: (target) => sessionActorKey(target.actor),
+  },
   new_tab: {
     kind: "new_tab",
     supportedHosts: ["main", "explorer"],

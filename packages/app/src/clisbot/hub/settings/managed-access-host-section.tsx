@@ -46,7 +46,9 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
       setPending(true);
       setError(null);
       try {
-        await patchConfig({ managedAccess: { mode: enabled ? "external" : "off" } });
+        await patchConfig({
+          managedAccess: { mode: enabled ? "external" : "off" },
+        });
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Unable to update managed access.");
       } finally {

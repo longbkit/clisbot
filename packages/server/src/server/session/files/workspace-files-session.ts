@@ -21,6 +21,11 @@ import type {
   SessionOutboundMessage,
 } from "../../messages.js";
 import { FileUploadStore } from "../../file-upload/index.js";
+import {
+  attachSessionFiles,
+  resolveLinkedSessionFile,
+  type ResolveForkSource,
+} from "../../file-upload/session-files.js";
 import type { DownloadTokenStore } from "../../file-download/token-store.js";
 import {
   createExplorerEntry,
@@ -54,6 +59,10 @@ export interface WorkspaceFilesSessionOptions {
   paseoHome: string;
   logger: pino.Logger;
   fileObserver?: FileObserver;
+  sessionStorageEnabled?: () => boolean;
+  resolveAgentDirectory?: (agentId: string) => Promise<string>;
+  resolveAgentReadDirectory?: (agentId: string) => Promise<string>;
+  resolveForkSource?: ResolveForkSource;
 }
 
 /**
@@ -71,11 +80,15 @@ export class WorkspaceFilesSession {
   private readonly fileObserver: FileObserver;
   private readonly fileSubscriptions = new Map<string, () => void>();
 
-  constructor(options: WorkspaceFilesSessionOptions) {
+  constructor(private readonly options: WorkspaceFilesSessionOptions) {
     this.host = options.host;
     this.downloadTokenStore = options.downloadTokenStore;
     this.logger = options.logger;
-    this.fileUploads = new FileUploadStore({ paseoHome: options.paseoHome });
+    this.fileUploads = new FileUploadStore({
+      paseoHome: options.paseoHome,
+      sessionStorageEnabled: options.sessionStorageEnabled,
+      resolveAgentDirectory: options.resolveAgentDirectory,
+    });
     this.fileObserver = options.fileObserver ?? workspaceFileObserver;
   }
 
@@ -220,6 +233,11 @@ export class WorkspaceFilesSession {
   dispose(): void {
     for (const unsubscribe of this.fileSubscriptions.values()) unsubscribe();
     this.fileSubscriptions.clear();
+    void this.fileUploads
+      .dispose()
+      .catch((error) =>
+        this.logger.error({ err: error }, "Failed to clean up disconnected uploads"),
+      );
   }
 
   async handleFileExplorerRequest(request: FileExplorerRequest, source?: object): Promise<void> {
@@ -360,6 +378,38 @@ export class WorkspaceFilesSession {
     this.fileUploads.beginUpload(request);
   }
 
+  async attachMessageFiles(
+    agentId: string,
+    messageId: string,
+    attachments?: AgentAttachment[],
+    images?: { data: string; mimeType: string }[],
+  ): Promise<{
+    attachments?: AgentAttachment[];
+    images?: { data: string; mimeType: string }[];
+  }> {
+    if (
+      !this.options.sessionStorageEnabled?.() ||
+      (!images?.length &&
+        !attachments?.some(
+          (item) =>
+            item.type === "uploaded_file" ||
+            (item.type === "text" && item.contextKind === "chat_history" && item.sourceSession),
+        ))
+    )
+      return { attachments, images };
+    if (!this.options.resolveAgentDirectory) throw new Error("Session file storage is unavailable");
+    const result = await attachSessionFiles({
+      directory: await this.options.resolveAgentDirectory(agentId),
+      messageId,
+      attachments,
+      images,
+      ownsUpload: (file) => this.fileUploads.ownsUploadedFile(file),
+      resolveForkSource: this.options.resolveForkSource,
+    });
+    await this.fileUploads.releaseLinkedUploads(attachments ?? []);
+    return result;
+  }
+
   ownsUploadedFileAttachments(attachments: readonly AgentAttachment[]): boolean {
     return attachments.every(
       (attachment) =>
@@ -403,23 +453,30 @@ export class WorkspaceFilesSession {
     }
   }
 
-  async handleFileDownloadTokenRequest(request: FileDownloadTokenRequest): Promise<void> {
+  async handleFileDownloadTokenRequest(
+    request: FileDownloadTokenRequest,
+    source?: object,
+    supportsSessionFiles = false,
+  ): Promise<void> {
     const { cwd: workspaceCwd, path: requestedPath, requestId } = request;
     const cwd = workspaceCwd.trim();
     if (!cwd) {
-      this.host.emit({
-        type: "file_download_token_response",
-        payload: {
-          cwd: workspaceCwd,
-          path: requestedPath,
-          token: null,
-          fileName: null,
-          mimeType: null,
-          size: null,
-          error: "cwd is required",
-          requestId,
+      this.host.emit(
+        {
+          type: "file_download_token_response",
+          payload: {
+            cwd: workspaceCwd,
+            path: requestedPath,
+            token: null,
+            fileName: null,
+            mimeType: null,
+            size: null,
+            error: "cwd is required",
+            requestId,
+          },
         },
-      });
+        source,
+      );
       return;
     }
 
@@ -429,10 +486,15 @@ export class WorkspaceFilesSession {
     );
 
     try {
-      const info = await getDownloadableFileInfo({
-        root: cwd,
-        relativePath: requestedPath,
-      });
+      let root = cwd;
+      let relativePath = requestedPath;
+      if (request.agentId) {
+        if (!supportsSessionFiles || !this.options.resolveAgentReadDirectory)
+          throw new Error("Session file downloads are unavailable");
+        root = await this.options.resolveAgentReadDirectory(request.agentId);
+        relativePath = (await resolveLinkedSessionFile(root, requestedPath)).relativePath;
+      }
+      const info = await getDownloadableFileInfo({ root, relativePath });
 
       const entry = this.downloadTokenStore.issueToken({
         path: info.path,
@@ -442,37 +504,43 @@ export class WorkspaceFilesSession {
         size: info.size,
       });
 
-      this.host.emit({
-        type: "file_download_token_response",
-        payload: {
-          cwd,
-          path: info.path,
-          token: entry.token,
-          fileName: entry.fileName,
-          mimeType: entry.mimeType,
-          size: entry.size,
-          error: null,
-          requestId,
+      this.host.emit(
+        {
+          type: "file_download_token_response",
+          payload: {
+            cwd,
+            path: info.path,
+            token: entry.token,
+            fileName: entry.fileName,
+            mimeType: entry.mimeType,
+            size: entry.size,
+            error: null,
+            requestId,
+          },
         },
-      });
+        source,
+      );
     } catch (error) {
       this.logger.error(
         { err: error, cwd, path: requestedPath },
         `Failed to issue download token for workspace ${cwd}`,
       );
-      this.host.emit({
-        type: "file_download_token_response",
-        payload: {
-          cwd,
-          path: requestedPath,
-          token: null,
-          fileName: null,
-          mimeType: null,
-          size: null,
-          error: getErrorMessage(error),
-          requestId,
+      this.host.emit(
+        {
+          type: "file_download_token_response",
+          payload: {
+            cwd,
+            path: requestedPath,
+            token: null,
+            fileName: null,
+            mimeType: null,
+            size: null,
+            error: getErrorMessage(error),
+            requestId,
+          },
         },
-      });
+        source,
+      );
     }
   }
 }

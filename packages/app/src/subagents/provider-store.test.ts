@@ -1,11 +1,22 @@
-import { afterEach, describe, expect, test } from "vitest";
-import { providerSubagentKey, useProviderSubagentStore } from "./provider-store";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import {
+  providerSubagentKey,
+  setProviderSubagentTimelineReading,
+  useProviderSubagentStore,
+} from "./provider-store";
 
 const SERVER_ID = "server-1";
 const PARENT_ID = "parent-1";
 const SUBAGENT_ID = "child-1";
 
+beforeEach(() => {
+  setProviderSubagentTimelineReading(SERVER_ID, PARENT_ID, SUBAGENT_ID, true);
+});
+
 afterEach(() => {
+  useProviderSubagentStore
+    .getState()
+    .applyUpdate(SERVER_ID, { kind: "remove", parentAgentId: PARENT_ID, subagentId: SUBAGENT_ID });
   useProviderSubagentStore.setState({
     descriptors: new Map(),
     timelines: new Map(),

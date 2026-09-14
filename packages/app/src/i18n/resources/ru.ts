@@ -200,6 +200,7 @@ export const ru: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Агент",
     empty: "Начните общаться с этим агентом...",
     scrollToBottom: "Прокрутить вниз",
     historyLoadFailed: "Не удалось загрузить историю агента",
@@ -283,6 +284,9 @@ export const ru: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "Вы",
+    },
     diagram: {
       diagram: "Диаграмма",
       zoomIn: "Увеличить масштаб",

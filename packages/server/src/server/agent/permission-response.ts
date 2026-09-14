@@ -1,3 +1,4 @@
+import type { SessionOperationIdentity } from "./session-authorship.js";
 import type { Logger } from "pino";
 
 import type { AgentPermissionResponse, AgentPermissionResult } from "./agent-sdk-types.js";
@@ -8,6 +9,11 @@ export interface PermissionResponseAgentManager extends AgentRunController {
     agentId: string,
     requestId: string,
     response: AgentPermissionResponse,
+    context?: SessionOperationIdentity & {
+      responseId?: string;
+      receivedAt?: string;
+      requestGeneration?: string;
+    },
   ): Promise<AgentPermissionResult | void>;
 }
 
@@ -17,6 +23,11 @@ export interface RespondToAgentPermissionParams {
   requestId: string;
   response: AgentPermissionResponse;
   logger: Logger;
+  context?: SessionOperationIdentity & {
+    responseId?: string;
+    receivedAt?: string;
+    requestGeneration?: string;
+  };
 }
 
 export async function respondToAgentPermission(
@@ -28,7 +39,12 @@ export async function respondToAgentPermission(
     `Handling permission response for agent ${agentId}, request ${requestId}`,
   );
 
-  const result = await agentManager.respondToPermission(agentId, requestId, response);
+  const result = await agentManager.respondToPermission(
+    agentId,
+    requestId,
+    response,
+    params.context,
+  );
   logger.debug({ agentId }, `Permission response forwarded to agent ${agentId}`);
 
   if (result?.followUpPrompt) {

@@ -1,3 +1,4 @@
+import type { SessionActor } from "./session-authorship.js";
 import type { AgentAttachment } from "./messages.js";
 
 export type AgentProvider = string;
@@ -348,7 +349,13 @@ export interface AgentTaskItem {
 }
 
 export type AgentTimelineItem =
-  | { type: "user_message"; text: string; messageId?: string; clientMessageId?: string }
+  | {
+      type: "user_message";
+      text: string;
+      messageId?: string;
+      clientMessageId?: string;
+      sender?: SessionActor;
+    }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
   | ToolCallTimelineItem
@@ -359,15 +366,29 @@ export type AgentTimelineItem =
 export type AgentStreamEvent =
   | { type: "thread_started"; sessionId: string; provider: AgentProvider }
   | { type: "turn_started"; provider: AgentProvider; turnId?: string }
-  | { type: "turn_completed"; provider: AgentProvider; usage?: AgentUsage; turnId?: string }
-  | { type: "usage_updated"; provider: AgentProvider; usage: AgentUsage; turnId?: string }
+  | {
+      type: "turn_completed";
+      provider: AgentProvider;
+      usage?: AgentUsage;
+      turnId?: string;
+    }
+  | {
+      type: "usage_updated";
+      provider: AgentProvider;
+      usage: AgentUsage;
+      turnId?: string;
+    }
   | {
       type: "mode_changed";
       provider: AgentProvider;
       currentModeId: string | null;
       availableModes: AgentMode[];
     }
-  | { type: "model_changed"; provider: AgentProvider; runtimeInfo: AgentRuntimeInfo }
+  | {
+      type: "model_changed";
+      provider: AgentProvider;
+      runtimeInfo: AgentRuntimeInfo;
+    }
   | {
       type: "thinking_option_changed";
       provider: AgentProvider;
@@ -381,7 +402,12 @@ export type AgentStreamEvent =
       diagnostic?: string;
       turnId?: string;
     }
-  | { type: "turn_canceled"; provider: AgentProvider; reason: string; turnId?: string }
+  | {
+      type: "turn_canceled";
+      provider: AgentProvider;
+      reason: string;
+      turnId?: string;
+    }
   | {
       type: "timeline";
       item: AgentTimelineItem;

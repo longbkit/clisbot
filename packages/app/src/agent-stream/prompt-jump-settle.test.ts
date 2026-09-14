@@ -191,3 +191,16 @@ describe("prompt jump settle", () => {
     expect(viewport.requestedTargets()).toEqual(["new"]);
   });
 });
+
+it("restores a partially clipped reading row at its saved viewport offset", () => {
+  const frames = createFakeFrameScheduler();
+  const viewport = createFakeViewport();
+  const controller = createController(viewport, frames);
+  viewport.setTargetTop("reading", 100);
+  controller.start("reading", -32);
+  frames.runNextFrame();
+  expect(viewport.scrollWrites()).toEqual([232]);
+  viewport.setTargetTop("reading", -12);
+  frames.runNextFrame();
+  expect(viewport.scrollWrites()).toEqual([232, 252]);
+});

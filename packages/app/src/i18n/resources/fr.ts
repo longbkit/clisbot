@@ -202,6 +202,7 @@ export const fr: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Agent",
     empty: "Commencez à discuter avec cet agent...",
     scrollToBottom: "Faire défiler vers le bas",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
@@ -285,6 +286,9 @@ export const fr: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "Vous",
+    },
     diagram: {
       diagram: "Diagramme",
       zoomIn: "Zoomer",

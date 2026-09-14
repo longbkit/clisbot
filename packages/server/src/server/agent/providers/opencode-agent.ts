@@ -1,3 +1,4 @@
+import type { AutomaticPermissionResponder } from "../agent-sdk-types.js";
 import {
   createOpencodeClient,
   type AssistantMessage as OpenCodeAssistantMessage,
@@ -3288,6 +3289,16 @@ async function listOpenCodeChildSessions(
 }
 
 class OpenCodeAgentSession implements AgentSession {
+  private automaticPermissionResponder?: AutomaticPermissionResponder;
+  setAutomaticPermissionResponder(responder: AutomaticPermissionResponder): void {
+    this.automaticPermissionResponder = responder;
+  }
+  private respondToAutomaticPermission(requestId: string, response: AgentPermissionResponse) {
+    return this.automaticPermissionResponder
+      ? this.automaticPermissionResponder(requestId, response)
+      : this.respondToPermission(requestId, response);
+  }
+
   readonly provider = "opencode" as const;
   readonly capabilities = OPENCODE_CAPABILITIES;
 
@@ -3562,7 +3573,7 @@ class OpenCodeAgentSession implements AgentSession {
     const requestIds = Array.from(this.pendingPermissions.keys());
     for (const requestId of requestIds) {
       if (!this.pendingPermissions.has(requestId)) continue;
-      await this.respondToPermission(requestId, {
+      await this.respondToAutomaticPermission(requestId, {
         behavior: "deny",
         message: "The user answered with a message instead of approving. Their message follows.",
       });

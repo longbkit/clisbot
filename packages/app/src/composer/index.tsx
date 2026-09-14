@@ -1681,7 +1681,11 @@ function ComposerContentImpl({
 
       setIsUploadingFile(true);
       try {
-        const uploaded = await uploadFileAttachments({ client, files });
+        const uploaded = await uploadFileAttachments({
+          client,
+          files,
+          ...(hasAgent ? { agentId } : {}),
+        });
         addFiles(uploaded);
       } catch (error) {
         console.error("[Composer] Failed to upload file:", error);
@@ -1692,7 +1696,7 @@ function ComposerContentImpl({
         setIsUploadingFile(false);
       }
     },
-    [addFiles, client, t],
+    [addFiles, agentId, hasAgent, client, t],
   );
 
   const handlePickFile = useCallback(async () => {

@@ -1,3 +1,4 @@
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import type {
   AgentProviderNotice,
   AgentTaskItem,
@@ -208,6 +209,10 @@ export type AgentPromptContentBlock =
 export type AgentPromptInput = string | AgentPromptContentBlock[];
 
 export interface AgentRunOptions {
+  /** Daemon-owned admission snapshot; never forwarded to providers. */
+  sessionIdentity?: import("./session-authorship.js").SessionOperationIdentity;
+  sessionReceivedAt?: string;
+  sessionSubmission?: import("./session-storage/message-submissions.js").MessageSubmission;
   outputSchema?: unknown;
   resumeFrom?: AgentPersistenceHandle;
   maxThinkingTokens?: number;
@@ -391,7 +396,13 @@ export interface CompactionTimelineItem {
 }
 
 export type AgentTimelineItem =
-  | { type: "user_message"; text: string; messageId?: string; clientMessageId?: string }
+  | {
+      type: "user_message";
+      text: string;
+      messageId?: string;
+      clientMessageId?: string;
+      sender?: SessionActor;
+    }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
   | ToolCallTimelineItem
@@ -633,7 +644,14 @@ export interface AgentPermissionResult {
   followUpPrompt?: AgentPromptInput;
 }
 
+/** Provider policy decisions use this hook; explicit adapter forwarding bypasses it. */
+export type AutomaticPermissionResponder = (
+  requestId: string,
+  response: AgentPermissionResponse,
+) => Promise<AgentPermissionResult | void>;
+
 export interface AgentSession {
+  setAutomaticPermissionResponder?(responder: AutomaticPermissionResponder): void;
   readonly provider: AgentProvider;
   readonly id: string | null;
   readonly capabilities: AgentCapabilityFlags;

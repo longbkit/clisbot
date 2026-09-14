@@ -1,3 +1,4 @@
+import { FileAgentTimelineStore } from "./session-storage/file-agent-timeline-store.js";
 import { expect, test, vi } from "vitest";
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -626,6 +627,7 @@ async function startAndSteerThroughManager(
     activeTurnBehavior: behavior,
     runOptions: { clientMessageId: "replacement-client" },
   });
+  await manager.waitForAgentRunStart(agent.id);
   return { manager, agentId: agent.id, workdir };
 }
 
@@ -10183,4 +10185,615 @@ test("onWorkspaceStateMayHaveChanged is not called for running shell tool calls"
   await manager.runAgent(snapshot.id, { text: "merge it" });
 
   expect(onWorkspaceStateMayHaveChanged).not.toHaveBeenCalled();
+});
+
+test("durable canonical events and append completion wait for the committed write", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-durable-ack-"));
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let writing = false;
+  class DelayedStore extends RecordingTimelineStore {
+    override async bulkInsert(agentId: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      writing = true;
+      await gate;
+      await super.bulkInsert(agentId, rows);
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    durableTimelineStore: new DelayedStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const canonical: AgentManagerEvent[] = [];
+  const unsubscribe = manager.subscribe((event) => {
+    if (event.type === "agent_stream" && event.event.type === "timeline" && event.seq !== undefined)
+      canonical.push(event);
+  });
+  let acknowledged = false;
+  try {
+    const append = manager
+      .appendTimelineItem(agent.id, { type: "assistant_message", text: "durable" })
+      .then(() => {
+        acknowledged = true;
+        return undefined;
+      });
+    await vi.waitFor(() => expect(writing).toBe(true));
+    expect(acknowledged).toBe(false);
+    expect(canonical).toHaveLength(0);
+    release();
+    await append;
+    expect(canonical).toHaveLength(1);
+    expect(acknowledged).toBe(true);
+  } finally {
+    release();
+    unsubscribe();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("a failed durable write rejects append and never certifies its canonical cursor", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-durable-failure-"));
+  class FailingStore extends RecordingTimelineStore {
+    override async bulkInsert(): Promise<void> {
+      throw new Error("disk full");
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    durableTimelineStore: new FailingStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const canonical: AgentManagerEvent[] = [];
+  const unsubscribe = manager.subscribe((event) => {
+    if (event.type === "agent_stream" && event.event.type === "timeline" && event.seq !== undefined)
+      canonical.push(event);
+  });
+  try {
+    await expect(
+      manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "lost" }),
+    ).rejects.toThrow("disk full");
+    expect(canonical).toHaveLength(0);
+    expect(manager.getAgent(agent.id)?.lastError).toContain("not saved");
+    await expect(
+      manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "later" }),
+    ).rejects.toThrow("disk full");
+    expect(canonical).toHaveLength(0);
+  } finally {
+    unsubscribe();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("slow journal admission bounds provider events before the manager promise queue", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-event-budget-"));
+  let release!: () => void;
+  let writing = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class DelayedStore extends RecordingTimelineStore {
+    override async bulkInsert(id: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      writing = true;
+      await gate;
+      await super.bulkInsert(id, rows);
+    }
+  }
+  const session = new TestAgentSession({ provider: "codex", cwd: workdir });
+  const client = new (class extends TestAgentClient {
+    override async createSession(): Promise<AgentSession> {
+      return session;
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: new DelayedStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "user_message", text: "first" },
+    });
+    await vi.waitFor(() => expect(writing).toBe(true));
+    for (let index = 0; index < 100; index += 1)
+      session.pushEvent({
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "x".repeat(128 * 1024), messageId: `${index}` },
+      });
+    expect(manager.pendingSessionEventBytes).toBeGreaterThan(0);
+    expect(manager.pendingSessionEventBytes).toBeLessThanOrEqual(8 * 1024 * 1024);
+    expect(manager.getAgent(agent.id)?.lastError).toContain("pending provider event byte limit");
+    release();
+    await manager.flush();
+    expect(manager.pendingSessionEventBytes).toBe(0);
+  } finally {
+    release();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("failed canonical prompt persistence interrupts and settles an accepted foreground run", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-accepted-write-failure-"));
+  class FailingStore extends RecordingTimelineStore {
+    override async bulkInsert(): Promise<void> {
+      throw new Error("disk full");
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    durableTimelineStore: new FailingStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    const stream = await manager.streamAgent(agent.id, "prompt", {
+      clientMessageId: "client-submission",
+    });
+    await expect(stream.next()).rejects.toThrow("disk full");
+    expect(manager.hasInFlightRun(agent.id)).toBe(false);
+    expect(manager.getAgent(agent.id)?.lifecycle).toBe("error");
+    expect(manager.getAgent(agent.id)?.lastError).toContain("not saved");
+  } finally {
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("real session journals create before first write and survive restart and feature-off interaction", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-real-journal-"));
+  const base = join(workdir, "agents");
+  const registry = new AgentStorage(base, logger, { sessionLayout: true });
+  await registry.initialize();
+  const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    const actor = {
+      kind: "user" as const,
+      id: "known-user",
+      hubOrigin: "https://hub",
+      organizationId: "org",
+      memberId: "member",
+    };
+    await manager.appendTimelineItem(agent.id, {
+      type: "user_message",
+      text: "before",
+      clientMessageId: "before",
+      sender: actor,
+    });
+    const epoch = (await manager.fetchTimelineForRead(agent.id)).epoch;
+    await manager.closeAgent(agent.id);
+    const record = (await registry.get(agent.id))!;
+    await registry.upsert({
+      ...record,
+      archivedAt: "2026-09-11T00:00:00Z",
+      requiresAttention: true,
+    });
+
+    const offRegistry = new AgentStorage(base, logger);
+    await offRegistry.initialize();
+    expect(offRegistry.hasSessionLayout).toBe(true);
+    const offStore = new FileAgentTimelineStore((id) => offRegistry.getSessionDirectory(id));
+    const offManager = new AgentManager({
+      clients: { codex: new TestAgentClient() },
+      registry: offRegistry,
+      durableTimelineStore: offStore,
+      agentSessionStorage: false,
+      logger,
+    });
+    const archivedPage = await offManager.fetchTimelineForRead(agent.id, { limit: 40 });
+    expect(archivedPage.epoch).toBe(epoch);
+    expect(archivedPage.rows[0].item).toMatchObject({ sender: actor });
+    expect(offManager.getAgent(agent.id)).toBeNull();
+    await offManager.clearAgentAttention(agent.id);
+    expect((await offRegistry.get(agent.id))?.requiresAttention).toBe(false);
+    expect(offManager.getAgent(agent.id)).toBeNull();
+
+    await offRegistry.upsert({ ...(await offRegistry.get(agent.id))!, archivedAt: null });
+    await offManager.resumeAgentFromPersistence(
+      { provider: "codex", sessionId: "native" },
+      { cwd: workdir },
+      agent.id,
+    );
+    await offManager.appendTimelineItem(agent.id, {
+      type: "user_message",
+      text: "during off",
+      clientMessageId: "during-off",
+    });
+    await offManager.closeAgent(agent.id);
+    expect(offManager.sessionStorageEnabled).toBe(false);
+
+    const restartedStore = new FileAgentTimelineStore((id) => offRegistry.getSessionDirectory(id));
+    const restarted = new AgentManager({
+      registry: offRegistry,
+      durableTimelineStore: restartedStore,
+      agentSessionStorage: true,
+      logger,
+    });
+    const page = await restarted.fetchTimelineForRead(agent.id, { limit: 40 });
+    expect(page.epoch).toBe(epoch);
+    expect(page.rows.map((row) => row.seq)).toEqual([1, 2]);
+    expect(page.rows[1].item).not.toHaveProperty("sender");
+    expect(restarted.getAgent(agent.id)).toBeNull();
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("internal ephemeral agents do not require durable session records", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-internal-journal-"));
+  const registry = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await registry.initialize();
+  const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent(
+      { provider: "codex", cwd: workdir, internal: true },
+      undefined,
+      { workspaceId: undefined },
+    );
+    await manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "ephemeral" });
+    expect(await registry.get(agent.id)).toBeNull();
+    await manager.closeAgent(agent.id);
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("trusted operation identity snapshots creator and immutable messages before deferred provider work", async () => {
+  const { withSessionOperationIdentity } = await import("./session-operation-context.js");
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-identity-"));
+  const registry = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await registry.initialize();
+  const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+  let providerCalls = 0;
+  const seenOptions: (AgentRunOptions | undefined)[] = [];
+  class IdentityClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      const session = new TestAgentSession(config);
+      const start = session.startTurn.bind(session);
+      session.startTurn = async (_prompt?: AgentPromptInput, options?: AgentRunOptions) => {
+        providerCalls += 1;
+        seenOptions.push(options);
+        return start();
+      };
+      return session;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new IdentityClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    logger,
+  });
+  const creator = {
+    kind: "user" as const,
+    id: "slack:A",
+    displayName: "Creator",
+    hubOrigin: "https://hub.example",
+    organizationId: "org",
+    connectionId: "channel",
+  };
+  const sender = { ...creator, id: "slack:B", displayName: "Sender" };
+  try {
+    const agent = await withSessionOperationIdentity({ actor: creator }, () =>
+      manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+        workspaceId: undefined,
+      }),
+    );
+    const options = await withSessionOperationIdentity({ actor: sender }, () =>
+      manager.admitMessageSubmission(agent.id, "hello", { clientMessageId: "delivery" }),
+    );
+    sender.displayName = "Renamed after admission";
+    await manager.runAgent(agent.id, "hello", options.options);
+    const rows = await store.getCommittedRows(agent.id);
+    expect(rows.find((row) => row.item.type === "user_message")?.item).toMatchObject({
+      sender: { id: "slack:B", displayName: "Sender" },
+    });
+    expect((await registry.get(agent.id))?.createdBy).toEqual(creator);
+    expect((await registry.get(agent.id))?.lastMessageBy?.id).toBe("slack:B");
+    expect(seenOptions[0]).not.toHaveProperty("sessionIdentity");
+    expect(seenOptions[0]).not.toHaveProperty("sessionSubmission");
+    const retry = await withSessionOperationIdentity(
+      { actor: { ...sender, displayName: "Sender" } },
+      () => manager.admitMessageSubmission(agent.id, "hello", { clientMessageId: "delivery" }),
+    );
+    expect(retry.duplicate).toBe(true);
+    await expect(
+      withSessionOperationIdentity({ actor: sender }, () =>
+        manager.admitMessageSubmission(agent.id, "hello", { clientMessageId: "delivery" }),
+      ),
+    ).rejects.toThrow("immutable");
+    expect(providerCalls).toBe(1);
+    await manager.closeAgent(agent.id);
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}, 20_000);
+
+test("automatic provider permission hook durably captures system response before adapter forwarding", async () => {
+  const { withSessionOperationIdentity } = await import("./session-operation-context.js");
+  const workdir = mkdtempSync(join(tmpdir(), "automatic-permission-"));
+  const registry = new AgentStorage(join(workdir, "records"), logger);
+  const store = new FileAgentTimelineStore(async () => join(workdir, "journal"));
+  let agentId = "";
+  class AutomaticSession extends TestAgentSession {
+    responder?: import("./agent-sdk-types.js").AutomaticPermissionResponder;
+    setAutomaticPermissionResponder(
+      responder: import("./agent-sdk-types.js").AutomaticPermissionResponder,
+    ) {
+      this.responder = responder;
+    }
+    override async respondToPermission(
+      requestId?: string,
+      response?: AgentPermissionResponse,
+    ): Promise<void> {
+      expect((await store.fetchPermissionResponses(agentId)).records[0]).toMatchObject({
+        status: "pending",
+        respondedBy: { kind: "system", id: "daemon:test-daemon:provider:codex:permission-policy" },
+      });
+      this.pushEvent({
+        type: "permission_resolved",
+        provider: "codex",
+        requestId: requestId!,
+        resolution: response!,
+      });
+    }
+  }
+  let native!: AutomaticSession;
+  class AutomaticClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      native = new AutomaticSession(config);
+      return native;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new AutomaticClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    serverId: "test-daemon",
+    logger,
+  });
+  try {
+    agentId = (
+      await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+        workspaceId: undefined,
+      })
+    ).id;
+    native.pushEvent({
+      type: "permission_requested",
+      provider: "codex",
+      request: { id: "policy-request", kind: "tool", provider: "codex", name: "tool" },
+    });
+    await withSessionOperationIdentity({ actor: { kind: "user", id: "unrelated-human" } }, () =>
+      native.responder!("policy-request", { behavior: "deny" }),
+    );
+    expect((await store.fetchPermissionResponses(agentId)).records[0]).toMatchObject({
+      status: "applied",
+      respondedBy: { kind: "system" },
+    });
+    expect((await registry.get(agentId))?.lastMessageBy).toBeUndefined();
+    expect((await registry.get(agentId))?.lastInteractionBy?.kind).toBe("system");
+    native.pushEvent({ type: "turn_started", provider: "codex", turnId: "cancelled-turn" });
+    native.pushEvent({
+      type: "permission_requested",
+      provider: "codex",
+      turnId: "cancelled-turn",
+      request: { id: "cancelled-request", kind: "tool", provider: "codex", name: "tool" },
+    });
+    await manager.flush();
+    vi.spyOn(native, "interrupt").mockImplementation(async () => {
+      native.pushEvent({ type: "turn_canceled", provider: "codex", turnId: "cancelled-turn" });
+    });
+    await manager.cancelAgentRun(agentId);
+    await manager.flush();
+    expect(manager.getAgent(agentId)?.pendingPermissions.size).toBe(0);
+    expect((await store.fetchPermissionResponses(agentId)).records).toHaveLength(1);
+    await manager.closeAgent(agentId);
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}, 20_000);
+
+test("durable manager preserves provider tool content beyond legacy display limits through restart", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-large-tool-"));
+  const registry = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await registry.initialize();
+  const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry,
+    durableTimelineStore: store,
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const output = "完整 output 🙂\n".repeat(12_000);
+  const item: AgentTimelineItem = {
+    type: "tool_call",
+    callId: "large-tool",
+    name: "shell",
+    status: "completed",
+    detail: { type: "shell", command: "read full output", output, exitCode: 0 },
+    error: null,
+  };
+  const events: AgentManagerEvent[] = [];
+  const unsubscribe = manager.subscribe((event) => events.push(event), {
+    agentId: agent.id,
+    replayState: false,
+  });
+  try {
+    client.sessions[0]!.pushEvent({ type: "timeline", provider: "codex", item });
+    await manager.flush();
+    expect((await store.fetchCommitted(agent.id)).rows[0]?.item).toEqual(item);
+    expect(
+      events.find((event) => event.type === "agent_stream" && event.event.type === "timeline"),
+    ).toMatchObject({ event: { item }, seq: 1 });
+    await manager.closeAgent(agent.id);
+    const reopened = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+    expect((await reopened.fetchCommitted(agent.id)).rows[0]?.item).toEqual(item);
+    await reopened.flush();
+  } finally {
+    unsubscribe();
+    if (manager.getAgent(agent.id)) await manager.closeAgent(agent.id);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("permission tool anchors remain scoped to committed sources across rewind and reused tool IDs", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "permission-anchor-"));
+  const registry = new AgentStorage(join(workdir, "records"), logger);
+  const store = new FileAgentTimelineStore(async () => join(workdir, "journal"));
+  class AnchorSession extends TestAgentSession {
+    override readonly capabilities = { ...TEST_CAPABILITIES, supportsRewindConversation: true };
+    async revertConversation(): Promise<void> {}
+  }
+  let native!: AnchorSession;
+  class AnchorClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      native = new AnchorSession(config);
+      return native;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new AnchorClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    const pushTool = (turnId: string) =>
+      native.pushEvent({
+        type: "timeline",
+        provider: "codex",
+        turnId,
+        item: {
+          type: "tool_call",
+          callId: "reused-tool",
+          name: "tool",
+          status: "running",
+          error: null,
+          detail: { type: "plain_text", text: "tool" },
+        },
+      });
+    const request = async (id: string, turnId: string) => {
+      native.pushEvent({
+        type: "permission_requested",
+        provider: "codex",
+        turnId,
+        request: {
+          id,
+          kind: "tool",
+          provider: "codex",
+          name: "tool",
+          metadata: { toolCallId: "reused-tool" },
+        },
+      });
+      await manager.flush();
+      await manager.respondToPermission(agent.id, id, { behavior: "allow" }, { responseId: id });
+    };
+    native.pushEvent({ type: "turn_started", provider: "codex", turnId: "first" });
+    pushTool("first");
+    await request("old-decision", "first");
+    const old = await store.readPermissionResponse(agent.id, "old-decision");
+    expect(old?.toolCallCursor).toEqual({ epoch: await store.getEpoch(agent.id), seq: 1 });
+    native.pushEvent({ type: "turn_completed", provider: "codex", turnId: "first" });
+    await manager.flush();
+    await manager.rewind(agent.id, "provider-message", "conversation");
+    expect(await store.getEpoch(agent.id)).not.toBe(old?.toolCallCursor?.epoch);
+    native.pushEvent({ type: "turn_started", provider: "codex", turnId: "second" });
+    await request("before-source", "second");
+    expect(
+      (await store.readPermissionResponse(agent.id, "before-source"))?.toolCallCursor,
+    ).toBeUndefined();
+    pushTool("second");
+    await request("new-decision", "second");
+    const current = await store.readPermissionResponse(agent.id, "new-decision");
+    expect(current?.toolCallCursor).toEqual({ epoch: await store.getEpoch(agent.id), seq: 1 });
+    expect((await store.readPermissionResponse(agent.id, "old-decision"))?.toolCallCursor).toEqual(
+      old?.toolCallCursor,
+    );
+    await manager.closeAgent(agent.id);
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}, 20_000);
+
+test("rollout-off durable reads do not install automatic permission capture", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "rollout-off-policy-"));
+  const registry = new AgentStorage(join(workdir, "records"), logger);
+  const store = new FileAgentTimelineStore(async () => join(workdir, "journal"));
+  let installed = 0;
+  class ReadOnlySession extends TestAgentSession {
+    setAutomaticPermissionResponder(): void {
+      installed += 1;
+    }
+  }
+  class ReadOnlyClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      return new ReadOnlySession(config);
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new ReadOnlyClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: false,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    expect(installed).toBe(0);
+    await manager.closeAgent(agent.id);
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
 });

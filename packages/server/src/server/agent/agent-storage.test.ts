@@ -195,6 +195,19 @@ describe("AgentStorage", () => {
     expect(persisted.config?.providerOptions).toEqual({ allowedTools: ["Read"] });
   });
 
+  test("snapshots an upsert before publishing it to the in-memory cache", async () => {
+    await storage.applySnapshot(createManagedAgent({ id: "immutable-agent" }));
+    const record = await storage.get("immutable-agent");
+    expect(record).not.toBeNull();
+    const accepted = { ...record!, config: { ...record!.config, model: "accepted" } };
+    const write = storage.upsert(accepted);
+    accepted.config.model = "mutated after admission";
+    await write;
+    expect((await storage.get("immutable-agent"))?.config?.model).toBe("accepted");
+    const reopened = new AgentStorage(storagePath, logger);
+    expect((await reopened.get("immutable-agent"))?.config?.model).toBe("accepted");
+  });
+
   test("applySnapshot stores and reloads featureValues when present", async () => {
     await storage.applySnapshot(
       createManagedAgent({
@@ -520,27 +533,24 @@ describe("AgentStorage", () => {
     // Create a valid record file in two different project directories to simulate
     // storage migrations/duplication. Only one copy will be referenced in-memory,
     // but deletion should remove *all* copies on disk.
-    const recordA = await (async () => {
-      await storage.applySnapshot(
-        createManagedAgent({
-          id: agentId,
-          cwd: "/tmp/project-a",
-          provider: "codex",
-        }),
-      );
-      const record = await storage.get(agentId);
-      expect(record).not.toBeNull();
-      return record!;
-    })();
+    await storage.applySnapshot(
+      createManagedAgent({
+        id: agentId,
+        cwd: "/tmp/project-a",
+        provider: "codex",
+      }),
+    );
+    expect(await storage.get(agentId)).not.toBeNull();
 
+    // A migration/duplication leaves a byte-identical copy in a sibling project dir.
+    // The registry dedupes identical copies on load and deletion removes every copy.
+    // (A differing copy would be a conflicting record and is rejected on load instead.)
+    const originalPath = path.join(storagePath, "tmp-project-a", `${agentId}.json`);
+    const originalBytes = await fs.readFile(originalPath);
     const projectDirB = path.join(storagePath, "tmp-project-b");
     await fs.mkdir(projectDirB, { recursive: true });
     const duplicatePathB = path.join(projectDirB, `${agentId}.json`);
-    await fs.writeFile(
-      duplicatePathB,
-      JSON.stringify({ ...recordA, cwd: "/tmp/project-b" }, null, 2),
-      "utf8",
-    );
+    await fs.writeFile(duplicatePathB, originalBytes);
 
     // Force a reload so the registry has to discover from disk (and may choose either copy).
     const reloaded = new AgentStorage(storagePath, logger);

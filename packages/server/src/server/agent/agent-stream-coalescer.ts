@@ -27,6 +27,7 @@ export interface AgentStreamCoalescerOptions {
   timers: AgentStreamCoalescerTimers;
   now?: () => number;
   onFlush: (payload: AgentStreamCoalescerFlush) => void;
+  reserveEvent?: (agentId: string, event: AgentStreamEvent) => () => void;
 }
 
 interface PendingTextEntry {
@@ -49,6 +50,7 @@ type PendingAgentStreamEntry = PendingTextEntry | PendingToolCallEntry;
 interface PendingAgentStreamBuffer {
   agentId: string;
   entries: PendingAgentStreamEntry[];
+  releases: (() => void)[];
   toolCallEntryIndexes: Map<string, number>;
   timer: ReturnType<typeof setTimeout> | null;
   flushing: boolean;
@@ -91,12 +93,14 @@ export class AgentStreamCoalescer {
   private readonly timers: AgentStreamCoalescerTimers;
   private readonly windowMs: number;
   private readonly now: () => number;
+  private readonly reserveEvent: AgentStreamCoalescerOptions["reserveEvent"];
 
   constructor(options: AgentStreamCoalescerOptions) {
     this.windowMs = options.windowMs ?? AGENT_STREAM_COALESCE_DEFAULT_WINDOW_MS;
     this.timers = options.timers;
     this.now = options.now ?? Date.now;
     this.onFlush = options.onFlush;
+    this.reserveEvent = options.reserveEvent;
   }
 
   handle(agentId: string, event: AgentStreamEvent): boolean {
@@ -108,8 +112,15 @@ export class AgentStreamCoalescer {
       return true;
     }
 
+    const release = this.reserveEvent?.(agentId, event);
     const buffer = this.getOrCreateBuffer(agentId);
-    this.appendToBuffer(buffer, event);
+    try {
+      this.appendToBuffer(buffer, event);
+    } catch (error) {
+      release?.();
+      throw error;
+    }
+    if (release) buffer.releases.push(release);
 
     if (isTerminalToolCall(event.item)) {
       this.flushBuffer(agentId);
@@ -161,6 +172,7 @@ export class AgentStreamCoalescer {
     const buffer: PendingAgentStreamBuffer = {
       agentId,
       entries: [],
+      releases: [],
       toolCallEntryIndexes: new Map(),
       timer: null,
       flushing: false,
@@ -233,7 +245,9 @@ export class AgentStreamCoalescer {
     }
 
     const entries = buffer.entries;
+    const releases = buffer.releases;
     buffer.entries = [];
+    buffer.releases = [];
     buffer.toolCallEntryIndexes.clear();
     buffer.flushing = true;
     buffer.lastFlushAt = this.now();
@@ -254,6 +268,7 @@ export class AgentStreamCoalescer {
         });
       }
     } finally {
+      for (const release of releases) release();
       buffer.flushing = false;
     }
   }

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import { useFetchQuery } from "@/data/query";
-import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
 import type { HubHostManagement } from "@/types/host-connection";
 import { useHubAccount } from "./account-provider";
 import { HubAccessTicketSchema, HubDaemonsSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
+import { orphanedManagedHosts } from "./managed-host-reconciliation";
 import { hubResourceQueryKey } from "./query-keys";
 import {
   hubHostSynchronizationKey,
@@ -28,7 +29,11 @@ export function HubHostSynchronization() {
   const organizationId = signedIn?.organization.id ?? null;
   const daemons = useFetchQuery({
     queryKey: hubResourceQueryKey(
-      { origin: hubOrigin, organizationId, accountId: signedIn?.account.id ?? null },
+      {
+        origin: hubOrigin,
+        organizationId,
+        accountId: signedIn?.account.id ?? null,
+      },
       "daemons",
     ),
     queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
@@ -38,6 +43,49 @@ export function HubHostSynchronization() {
     refetchInterval: 60_000,
     staleTimeMs: 0,
   });
+  const hosts = useHosts();
+  const projectedDaemonIds = useMemo(
+    () =>
+      new Set(
+        (daemons.data?.daemons ?? [])
+          .filter((daemon) => daemon.connectionOffer !== null)
+          .map((daemon) => daemon.id),
+      ),
+    [daemons.data],
+  );
+  // A Host left by a previous enrollment has no binding to unmount, so its
+  // removal never fires. Reconcile the whole Hub-managed set on every Host or
+  // projection change instead of relying on unmount alone.
+  useEffect(() => {
+    if (
+      !hub.enabled ||
+      organizationId === null ||
+      hubOrigin === null ||
+      daemons.data === undefined ||
+      daemons.isPlaceholderData
+    ) {
+      return;
+    }
+    const store = getHostRuntimeStore();
+    for (const management of orphanedManagedHosts({
+      hosts,
+      projectedDaemonIds,
+      hubOrigin,
+      organizationId,
+    })) {
+      void enqueueManagedHostMutation(() =>
+        store.removeManagedHost(management).then(() => undefined),
+      );
+    }
+  }, [
+    daemons.data,
+    daemons.isPlaceholderData,
+    hosts,
+    hub.enabled,
+    hubOrigin,
+    organizationId,
+    projectedDaemonIds,
+  ]);
 
   if (
     !hub.enabled ||
@@ -101,7 +149,12 @@ function HubHostBinding({
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
       relay: { endpoint: offer.relay.endpoint, useTls: offer.relay.useTls },
       ...(offer.direct
-        ? { direct: { endpoint: offer.direct.endpoint, useTls: offer.direct.useTls } }
+        ? {
+            direct: {
+              endpoint: offer.direct.endpoint,
+              useTls: offer.direct.useTls,
+            },
+          }
         : {}),
     }),
     [
@@ -135,17 +188,21 @@ function HubHostBinding({
       organizationId,
       daemonId,
     };
-    const unregister = hubManagedHostRequiresAccessTicket(managedAccessMode)
-      ? registerHostAccessTicketResolver(synchronizedOffer.serverId, issueAccessTicket, management)
-      : () => undefined;
+    // Even off-mode Hub Hosts need a current account binding. Off skips ticket
+    // issuance, not ownership of the app's automatically supplied connection.
+    const unregister = registerHostAccessTicketResolver(
+      synchronizedOffer.serverId,
+      hubManagedHostRequiresAccessTicket(managedAccessMode)
+        ? issueAccessTicket
+        : async () => undefined,
+      management,
+    );
     void enqueueManagedHostMutation(async () => {
       if (disposed) return;
       const existing = store
         .getHosts()
         .find(
-          (host) =>
-            host.serverId === synchronizedOffer.serverId &&
-            sameManagement(host.management, management),
+          (host) => host.serverId === synchronizedOffer.serverId && host.management !== undefined,
         );
       const profile = await store.upsertManagedConnectionFromOffer({
         offer: synchronizedOffer,
@@ -154,7 +211,7 @@ function HubHostBinding({
       });
       if (profile === null) {
         throw new Error(
-          "This connection belongs to another Hub. Check the Host's Connections settings.",
+          "A saved Host conflicts with this Hub's connection details. Check the Host's Connections settings.",
         );
       }
       if (!disposed && existing) await store.restartHostConnection(synchronizedOffer.serverId);
@@ -194,9 +251,16 @@ function HubHostBinding({
       const profile = await getHostRuntimeStore().upsertManagedConnectionFromOffer({
         offer: synchronizedOffer,
         label,
-        management: { kind: "hub", hubOrigin, organizationId, daemonId, daemonSlug: label },
+        management: {
+          kind: "hub",
+          hubOrigin,
+          organizationId,
+          daemonId,
+          daemonSlug: label,
+        },
       });
-      if (profile === null) throw new Error("This connection belongs to another Hub.");
+      if (profile === null)
+        throw new Error("A saved Host conflicts with this Hub's connection details.");
     }).catch((error: unknown) => {
       if (!disposed) {
         setHubHostSynchronizationFailure(synchronizationKey, {
@@ -225,13 +289,4 @@ function HubHostBinding({
     };
   }, [daemonId, hubOrigin, organizationId]);
   return null;
-}
-
-function sameManagement(left: HubHostManagement | undefined, right: HubHostManagement): boolean {
-  return (
-    left?.kind === "hub" &&
-    left.hubOrigin === right.hubOrigin &&
-    left.organizationId === right.organizationId &&
-    left.daemonId === right.daemonId
-  );
 }

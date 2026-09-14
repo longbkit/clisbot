@@ -623,6 +623,10 @@ export function resolveConfigFromPersisted(
     mcpDebug: env.MCP_DEBUG === "1",
     isDev: resolvePaseoNodeEnv(env) === "development",
     agentStoragePath: path.join(paseoHome, "agents"),
+    agentSessionStorage: resolveAgentSessionStorageFeature(
+      env.PASEO_AGENT_SESSION_STORAGE,
+      persisted.features,
+    ),
     staticDir: "public",
     agentClients: {},
     relayEnabled: relay.enabled,
@@ -656,6 +660,14 @@ export function resolveConfigFromPersisted(
       startupPersisted: persisted,
     },
   };
+}
+
+function resolveAgentSessionStorageFeature(
+  environment: string | undefined,
+  features: { agentSessionStorage?: boolean } | undefined,
+): boolean {
+  if (environment === "0") return false;
+  return environment === "1" || features?.agentSessionStorage === true;
 }
 
 export function loadConfig(

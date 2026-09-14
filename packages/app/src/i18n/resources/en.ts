@@ -197,6 +197,7 @@ export const en = {
     },
   },
   agentStream: {
+    agent: "Agent",
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
     historyLoadFailed: "Couldn't load agent history",
@@ -279,6 +280,9 @@ export const en = {
     },
   },
   message: {
+    sender: {
+      you: "You",
+    },
     diagram: {
       diagram: "Diagram",
       zoomIn: "Zoom in",

@@ -1,0 +1,179 @@
+35c21f030e1a866de7dfb5a3e2f71d2675eaae7f
+CHANGELOG.md
+docs/architecture.md
+docs/hub.md
+package-lock.json
+package.json
+packages/app/package.json
+packages/app/src/components/add-project-flow.tsx
+packages/app/src/components/left-sidebar.tsx
+packages/app/src/components/settings/headings/settings-section.tsx
+packages/app/src/contexts/session-context.tsx
+packages/app/src/runtime/host-runtime.test.ts
+packages/app/src/runtime/host-runtime.ts
+packages/app/src/screens/settings-screen.tsx
+packages/cli/package.json
+packages/cli/src/commands/hub/init.ts
+packages/cli/src/output/render.test.ts
+packages/cli/src/output/render.ts
+packages/client/package.json
+packages/client/src/daemon-client.test.ts
+packages/desktop/package.json
+packages/expo-two-way-audio/package.json
+packages/highlight/package.json
+packages/plugin/package.json
+packages/protocol/package.json
+packages/protocol/src/messages.ts
+packages/relay/package.json
+packages/server/package.json
+packages/server/src/server/agent/agent-manager.ts
+packages/server/src/server/agent/provider-snapshot-manager.ts
+packages/server/src/server/authorization/index.ts
+packages/server/src/server/bootstrap.ts
+packages/server/src/server/file-upload/index.test.ts
+packages/server/src/server/file-upload/index.ts
+packages/server/src/server/hub/execution-controller.test.ts
+packages/server/src/server/session.test.ts
+packages/server/src/server/session.ts
+packages/server/src/server/session/files/workspace-files-session.test.ts
+packages/server/src/server/session/files/workspace-files-session.ts
+packages/server/src/server/session/provider/provider-catalog-session.test.ts
+packages/server/src/server/session/provider/provider-catalog-session.ts
+packages/server/src/server/websocket-server.ts
+packages/server/src/terminal/terminal-session-controller.ts
+packages/website/package.json
+public-docs/hub/index.md
+public-docs/hub/quickstart.md
+
+Auto-merging .github/workflows/ci.yml
+Auto-merging CHANGELOG.md
+CONFLICT (content): Merge conflict in CHANGELOG.md
+Auto-merging CLAUDE.md
+Auto-merging docs/architecture.md
+CONFLICT (content): Merge conflict in docs/architecture.md
+Auto-merging docs/data-model.md
+Auto-merging docs/design.md
+Auto-merging docs/development.md
+Auto-merging docs/glossary.md
+Auto-merging docs/hub.md
+CONFLICT (content): Merge conflict in docs/hub.md
+Auto-merging docs/permissions.md
+Auto-merging docs/testing.md
+Auto-merging docs/timeline-sync.md
+Auto-merging package-lock.json
+CONFLICT (content): Merge conflict in package-lock.json
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Auto-merging packages/app/package.json
+CONFLICT (content): Merge conflict in packages/app/package.json
+Auto-merging packages/app/src/app/_layout.tsx
+Auto-merging packages/app/src/components/add-project-flow.tsx
+CONFLICT (content): Merge conflict in packages/app/src/components/add-project-flow.tsx
+Auto-merging packages/app/src/components/left-sidebar.tsx
+CONFLICT (content): Merge conflict in packages/app/src/components/left-sidebar.tsx
+Auto-merging packages/app/src/components/settings/headings/settings-section.tsx
+CONFLICT (content): Merge conflict in packages/app/src/components/settings/headings/settings-section.tsx
+Auto-merging packages/app/src/contexts/session-context.tsx
+CONFLICT (content): Merge conflict in packages/app/src/contexts/session-context.tsx
+Auto-merging packages/app/src/data/push-router.test.ts
+Auto-merging packages/app/src/navigation/settings-navigation.ts
+Auto-merging packages/app/src/runtime/host-runtime.test.ts
+CONFLICT (content): Merge conflict in packages/app/src/runtime/host-runtime.test.ts
+Auto-merging packages/app/src/runtime/host-runtime.ts
+CONFLICT (content): Merge conflict in packages/app/src/runtime/host-runtime.ts
+Auto-merging packages/app/src/screens/settings-screen.tsx
+CONFLICT (content): Merge conflict in packages/app/src/screens/settings-screen.tsx
+Auto-merging packages/app/src/screens/settings/host-page.tsx
+Auto-merging packages/app/src/screens/settings/providers-section.test.tsx
+Auto-merging packages/app/src/stores/session-store.test.ts
+Auto-merging packages/app/src/stores/session-store.ts
+Auto-merging packages/cli/package.json
+CONFLICT (content): Merge conflict in packages/cli/package.json
+Auto-merging packages/cli/src/cli.ts
+Auto-merging packages/cli/src/commands/hub/deploy-contract.test.ts
+Auto-merging packages/cli/src/commands/hub/index.ts
+Auto-merging packages/cli/src/commands/hub/init-flow.test.ts
+Auto-merging packages/cli/src/commands/hub/init.ts
+CONFLICT (content): Merge conflict in packages/cli/src/commands/hub/init.ts
+Auto-merging packages/cli/src/output/render.test.ts
+CONFLICT (add/add): Merge conflict in packages/cli/src/output/render.test.ts
+Auto-merging packages/cli/src/output/render.ts
+CONFLICT (content): Merge conflict in packages/cli/src/output/render.ts
+Auto-merging packages/client/package.json
+CONFLICT (content): Merge conflict in packages/client/package.json
+Auto-merging packages/client/src/daemon-client.test.ts
+CONFLICT (content): Merge conflict in packages/client/src/daemon-client.test.ts
+Auto-merging packages/client/src/daemon-client.ts
+Auto-merging packages/desktop/package.json
+CONFLICT (content): Merge conflict in packages/desktop/package.json
+Auto-merging packages/desktop/src/main.ts
+Auto-merging packages/expo-two-way-audio/package.json
+CONFLICT (content): Merge conflict in packages/expo-two-way-audio/package.json
+Auto-merging packages/highlight/package.json
+CONFLICT (content): Merge conflict in packages/highlight/package.json
+Auto-merging packages/plugin/package.json
+CONFLICT (content): Merge conflict in packages/plugin/package.json
+Auto-merging packages/protocol/package.json
+CONFLICT (content): Merge conflict in packages/protocol/package.json
+Auto-merging packages/protocol/src/messages.ts
+CONFLICT (content): Merge conflict in packages/protocol/src/messages.ts
+Auto-merging packages/protocol/src/messages.wire-compat.test.ts
+Auto-merging packages/relay/package.json
+CONFLICT (content): Merge conflict in packages/relay/package.json
+Auto-merging packages/server/package.json
+CONFLICT (content): Merge conflict in packages/server/package.json
+Auto-merging packages/server/src/server/agent/agent-manager.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/agent/agent-manager.ts
+Auto-merging packages/server/src/server/agent/create-agent/create.ts
+Auto-merging packages/server/src/server/agent/provider-snapshot-manager.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/agent/provider-snapshot-manager.ts
+Auto-merging packages/server/src/server/agent/providers/codex-app-server-agent.test.ts
+Auto-merging packages/server/src/server/agent/providers/codex-app-server-agent.ts
+Auto-merging packages/server/src/server/authorization/index.test.ts
+Auto-merging packages/server/src/server/authorization/index.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/authorization/index.ts
+Auto-merging packages/server/src/server/authorization/operation-permissions.ts
+Auto-merging packages/server/src/server/bootstrap.smoke.test.ts
+Auto-merging packages/server/src/server/bootstrap.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/bootstrap.ts
+Auto-merging packages/server/src/server/config.ts
+Auto-merging packages/server/src/server/daemon-config-store.ts
+Auto-merging packages/server/src/server/file-upload/index.test.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/file-upload/index.test.ts
+Auto-merging packages/server/src/server/file-upload/index.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/file-upload/index.ts
+Auto-merging packages/server/src/server/hub/execution-controller.test.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/hub/execution-controller.test.ts
+Auto-merging packages/server/src/server/hub/execution-controller.ts
+Auto-merging packages/server/src/server/hub/test-utils/relationship-harness.ts
+Auto-merging packages/server/src/server/persisted-config.ts
+Auto-merging packages/server/src/server/session.test.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session.test.ts
+Auto-merging packages/server/src/server/session.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session.ts
+Auto-merging packages/server/src/server/session/files/workspace-files-session.test.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session/files/workspace-files-session.test.ts
+Auto-merging packages/server/src/server/session/files/workspace-files-session.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session/files/workspace-files-session.ts
+Auto-merging packages/server/src/server/session/provider/provider-catalog-session.test.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session/provider/provider-catalog-session.test.ts
+Auto-merging packages/server/src/server/session/provider/provider-catalog-session.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/session/provider/provider-catalog-session.ts
+Auto-merging packages/server/src/server/session/workspace-provisioning/workspace-provisioning-service.ts
+Auto-merging packages/server/src/server/websocket-server.browser-tools.test.ts
+Auto-merging packages/server/src/server/websocket-server.notifications.test.ts
+Auto-merging packages/server/src/server/websocket-server.relay-reconnect.test.ts
+Auto-merging packages/server/src/server/websocket-server.terminal-notifications.test.ts
+Auto-merging packages/server/src/server/websocket-server.ts
+CONFLICT (content): Merge conflict in packages/server/src/server/websocket-server.ts
+Auto-merging packages/server/src/terminal/terminal-session-controller.test.ts
+Auto-merging packages/server/src/terminal/terminal-session-controller.ts
+CONFLICT (content): Merge conflict in packages/server/src/terminal/terminal-session-controller.ts
+Auto-merging packages/website/package.json
+CONFLICT (content): Merge conflict in packages/website/package.json
+Auto-merging public-docs/hub/daemons.md
+Auto-merging public-docs/hub/index.md
+CONFLICT (content): Merge conflict in public-docs/hub/index.md
+Auto-merging public-docs/hub/quickstart.md
+CONFLICT (content): Merge conflict in public-docs/hub/quickstart.md
+Auto-merging public-docs/hub/security.md

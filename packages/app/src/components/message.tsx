@@ -1,3 +1,8 @@
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import { ActorAvatar, SessionActorAvatar } from "@/clisbot/session-storage/actor";
+import { actorLabel } from "@/clisbot/session-storage/actor-presentation";
+import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
+import { useMessageSender } from "@/clisbot/session-storage/message-sender";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { TaskListRow } from "@/components/task-list-row";
 import {
@@ -48,7 +53,7 @@ import {
   FileSymlink,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { ICON_SIZE, SPACING, type Theme } from "@/styles/theme";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import Animated, {
   Easing,
@@ -121,6 +126,8 @@ export type { InlinePathTarget } from "@/assistant-file-links";
 export type { AssistantForkTarget };
 
 interface UserMessageProps {
+  sender?: SessionActor;
+  workspaceId?: string;
   serverId?: string;
   agentId?: string;
   messageId?: string;
@@ -198,6 +205,21 @@ const SCROLL_EDGE_EPSILON = 0.5;
 // Font size for stream metadata (timestamps, durations, live elapsed timer).
 // Lives between theme.fontSize.sm (12) and theme.fontSize.base (14); no token.
 export const STREAM_METADATA_FONT_SIZE = 13;
+
+/**
+ * A markdown block keeps its own top margin, and the assistant container adds
+ * its own padding, so a reply would start well below the sender's face. The
+ * reply that sits directly under a name row gives both up — the name row
+ * already separates it — so the face meets the first line of text.
+ */
+function leadingMarkdownMargin(block: string): number {
+  const firstLine = block.split("\n").find((line) => line.trim().length > 0) ?? "";
+  if (/^#{1,2}\s/.test(firstLine)) return SPACING[6];
+  if (/^#{3,4}\s/.test(firstLine)) return SPACING[4];
+  if (/^#{5,6}\s/.test(firstLine)) return SPACING[3];
+  return 0;
+}
+
 type ScrollAxis = "x" | "y";
 
 function ensureWebToolCallShimmerKeyframes() {
@@ -332,9 +354,16 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
     ...(isWeb ? { userSelect: "text" as const } : {}),
   },
   content: {
-    alignItems: "flex-end",
     maxWidth: "100%",
+    flexShrink: 1,
+    minWidth: 0,
     cursor: "auto",
+  },
+  contentLeft: {
+    alignItems: "flex-start",
+  },
+  contentRight: {
+    alignItems: "flex-end",
   },
   containerSpacing: {
     marginBottom: theme.spacing[1],
@@ -348,11 +377,17 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
   bubble: {
     backgroundColor: theme.colors.surface3,
     borderRadius: theme.borderRadius["2xl"],
-    borderTopRightRadius: theme.borderRadius.sm,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[4],
     minWidth: 0,
     flexShrink: 1,
+  },
+  /** The tail corner points at the sender's side of the row. */
+  bubbleLeftTail: {
+    borderTopLeftRadius: theme.borderRadius.sm,
+  },
+  bubbleRightTail: {
+    borderTopRightRadius: theme.borderRadius.sm,
   },
   text: {
     color: theme.colors.foreground,
@@ -392,6 +427,9 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     marginTop: theme.spacing[2],
   },
+  trailingRowLeft: {
+    alignSelf: "flex-start",
+  },
   trailingRowHidden: {
     opacity: 0,
   },
@@ -421,62 +459,41 @@ function UserMessageImagePill({ image, onOpen, accessibilityLabel }: UserMessage
   );
 }
 
-export const UserMessage = memo(function UserMessage({
-  serverId,
-  agentId,
-  messageId,
+interface UserMessageBodyProps {
+  message: string;
+  images: UserMessageImageAttachment[];
+  attachments: AgentAttachment[];
+  formattedTimestamp: string;
+  showTrailingRow: boolean;
+  /** True when the row is on the reader's side (own message). */
+  alignRight: boolean;
+  capabilities?: AgentCapabilityFlags;
+  messageId?: string;
+  rewoundText: string;
+  rewindIsPending: boolean;
+  onRewind: (input: { mode: RewindMode; rewoundText: string }) => Promise<void>;
+  onOpenImage: (image: UserMessageImageAttachment) => void;
+}
+
+function UserMessageBody({
   message,
-  images = [],
-  attachments = [],
-  timestamp,
+  images,
+  attachments,
+  formattedTimestamp,
+  showTrailingRow,
+  alignRight,
   capabilities,
-  client,
-  isFirstInGroup = true,
-  isLastInGroup = true,
-  isPending = false,
-  disableOuterSpacing,
-}: UserMessageProps) {
-  const isCompact = useIsCompactFormFactor();
+  messageId,
+  rewoundText,
+  rewindIsPending,
+  onRewind,
+  onOpenImage,
+}: UserMessageBodyProps) {
   const { t } = useTranslation();
-  const [isHovered, setIsHovered] = useState(false);
-  const [lightboxMetadata, setLightboxMetadata] = useState<UserMessageImageAttachment | null>(null);
-  const handleLightboxClose = useCallback(() => setLightboxMetadata(null), []);
-  const lightboxSource = useMemo<ImageLightboxSource | null>(
-    () => (lightboxMetadata ? { type: "attachment", metadata: lightboxMetadata } : null),
-    [lightboxMetadata],
-  );
-  const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
+  const getContent = useCallback(() => message, [message]);
   const hasText = message.trim().length > 0;
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
-  const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
-  const formattedTimestamp = useMemo(
-    () => formatMessageTimestamp(new Date(timestamp)),
-    [timestamp],
-  );
-  const rewindMutation = useRewindAgentMutation({ serverId, agentId, client, messageId });
-
-  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
-  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
-  const getMessageContent = useCallback(() => message, [message]);
-  const handleRewind = useCallback(
-    (input: { mode: RewindMode; rewoundText: string }) => {
-      return rewindMutation.rewindAgent(input);
-    },
-    [rewindMutation],
-  );
-
-  const containerStyle = useMemo(
-    () => [
-      userMessageStylesheet.container,
-      !resolvedDisableOuterSpacing && [
-        isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
-        isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,
-        !isFirstInGroup || !isLastInGroup ? userMessageStylesheet.containerSpacing : null,
-      ],
-    ],
-    [resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
-  );
   const imagePreviewContainerStyle = useMemo(
     () => [
       userMessageStylesheet.imagePreviewContainer,
@@ -494,82 +511,194 @@ export const UserMessage = memo(function UserMessage({
   const trailingRowStyle = useMemo(
     () => [
       userMessageStylesheet.trailingRow,
+      alignRight ? null : userMessageStylesheet.trailingRowLeft,
       showTrailingRow
         ? userMessageStylesheet.trailingRowVisible
         : userMessageStylesheet.trailingRowHidden,
     ],
-    [showTrailingRow],
+    [alignRight, showTrailingRow],
   );
+  // The tail corner points at the sender's side of the row.
+  const bubbleStyle = useMemo(
+    () => [
+      userMessageStylesheet.bubble,
+      alignRight ? userMessageStylesheet.bubbleRightTail : userMessageStylesheet.bubbleLeftTail,
+    ],
+    [alignRight],
+  );
+  return (
+    <>
+      <View style={bubbleStyle}>
+        {hasImages ? (
+          <View style={imagePreviewContainerStyle}>
+            {images.map((image) => (
+              <UserMessageImagePill
+                key={image.id}
+                image={image}
+                onOpen={onOpenImage}
+                accessibilityLabel={t("composer.attachments.openImage")}
+              />
+            ))}
+          </View>
+        ) : null}
+        {hasAttachments ? (
+          <View style={attachmentPreviewContainerStyle}>
+            {attachments.map((attachment, index) => {
+              const content = getAgentAttachmentPillContent(attachment, t);
+              return (
+                <AttachmentFrame
+                  key={`${attachment.type}:${"number" in attachment ? attachment.number : index}`}
+                >
+                  <AttachmentLabel
+                    icon={content.icon}
+                    title={content.title}
+                    subtitle={content.subtitle}
+                  />
+                </AttachmentFrame>
+              );
+            })}
+          </View>
+        ) : null}
+        {hasText ? (
+          <Text selectable style={userMessageStylesheet.text}>
+            {message}
+          </Text>
+        ) : null}
+      </View>
+      {hasText ? (
+        <View
+          style={trailingRowStyle}
+          pointerEvents={showTrailingRow ? "auto" : "none"}
+          testID="user-message-trailing-row"
+        >
+          <Text style={userMessageStylesheet.timestampText} testID="user-message-timestamp">
+            {formattedTimestamp}
+          </Text>
+          {capabilities && messageId ? (
+            <RewindMenu
+              capabilities={capabilities}
+              isPending={rewindIsPending}
+              rewoundText={rewoundText}
+              onRewind={onRewind}
+            />
+          ) : null}
+          <TurnCopyButton
+            getContent={getContent}
+            containerStyle={userMessageStylesheet.copyButton}
+            accessibilityLabel={t("message.actions.copyMessage")}
+          />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+export const UserMessage = memo(function UserMessage({
+  sender,
+  workspaceId,
+  serverId,
+  agentId,
+  messageId,
+  message,
+  images = [],
+  attachments = [],
+  timestamp,
+  capabilities,
+  client,
+  isFirstInGroup = true,
+  isLastInGroup = true,
+  isPending = false,
+  disableOuterSpacing,
+}: UserMessageProps) {
+  const isCompact = useIsCompactFormFactor();
+  const [isHovered, setIsHovered] = useState(false);
+  const [lightboxMetadata, setLightboxMetadata] = useState<UserMessageImageAttachment | null>(null);
+  const handleLightboxClose = useCallback(() => setLightboxMetadata(null), []);
+  const lightboxSource = useMemo<ImageLightboxSource | null>(
+    () => (lightboxMetadata ? { type: "attachment", metadata: lightboxMetadata } : null),
+    [lightboxMetadata],
+  );
+  const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
+  const hasText = message.trim().length > 0;
+  const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
+  const formattedTimestamp = useMemo(
+    () => formatMessageTimestamp(new Date(timestamp)),
+    [timestamp],
+  );
+  const rewindMutation = useRewindAgentMutation({ serverId, agentId, client, messageId });
+  const handleRewind = useCallback(
+    (input: { mode: RewindMode; rewoundText: string }) => {
+      return rewindMutation.rewindAgent(input);
+    },
+    [rewindMutation],
+  );
+  // The signed-in account reads the conversation like a group chat: anyone
+  // else's message gets the left avatar row; own messages stay right.
+  const senderResolution = useMessageSender(sender);
+  const resolvedSender = senderResolution.state === "ready" ? senderResolution.actor : null;
+  const alignRight = senderResolution.isOwn || senderResolution.state === "unknown";
+  // Unknown senders keep the right-hand layout without a name or avatar.
+  const senderName = resolvedSender ? actorLabel(resolvedSender) : null;
+
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const face = useMemo(() => {
+    if (!resolvedSender) return null;
+    return serverId && workspaceId ? (
+      <SessionActorAvatar actor={resolvedSender} serverId={serverId} workspaceId={workspaceId} />
+    ) : (
+      <ActorAvatar actor={resolvedSender} />
+    );
+  }, [resolvedSender, serverId, workspaceId]);
+
+  const containerStyle = useMemo(
+    () => [
+      userMessageStylesheet.container,
+      !resolvedDisableOuterSpacing && [
+        isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
+        isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,
+        !isFirstInGroup || !isLastInGroup ? userMessageStylesheet.containerSpacing : null,
+      ],
+    ],
+    [resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
+  );
+  const body = (
+    <UserMessageBody
+      message={message}
+      images={images}
+      attachments={attachments}
+      formattedTimestamp={formattedTimestamp}
+      showTrailingRow={showTrailingRow}
+      alignRight={alignRight}
+      capabilities={capabilities}
+      messageId={messageId}
+      rewoundText={message}
+      rewindIsPending={rewindMutation.isPending}
+      onRewind={handleRewind}
+      onOpenImage={setLightboxMetadata}
+    />
+  );
+  const contentStyle = alignRight
+    ? [userMessageStylesheet.content, userMessageStylesheet.contentRight]
+    : [userMessageStylesheet.content, userMessageStylesheet.contentLeft];
 
   return (
     <View style={containerStyle} testID="user-message" aria-busy={isPending}>
-      <View
-        style={userMessageStylesheet.content}
-        onPointerEnter={handlePointerEnter}
-        onPointerLeave={handlePointerLeave}
+      <ActorResponseRow
+        face={face}
+        name={senderName}
+        loading={senderResolution.state === "loading"}
+        opensGroup={isFirstInGroup}
+        alignRight={alignRight}
       >
-        <View style={userMessageStylesheet.bubble}>
-          {hasImages ? (
-            <View style={imagePreviewContainerStyle}>
-              {images.map((image) => (
-                <UserMessageImagePill
-                  key={image.id}
-                  image={image}
-                  onOpen={setLightboxMetadata}
-                  accessibilityLabel={t("composer.attachments.openImage")}
-                />
-              ))}
-            </View>
-          ) : null}
-          {hasAttachments ? (
-            <View style={attachmentPreviewContainerStyle}>
-              {attachments.map((attachment, index) => {
-                const content = getAgentAttachmentPillContent(attachment, t);
-                return (
-                  <AttachmentFrame
-                    key={`${attachment.type}:${"number" in attachment ? attachment.number : index}`}
-                  >
-                    <AttachmentLabel
-                      icon={content.icon}
-                      title={content.title}
-                      subtitle={content.subtitle}
-                    />
-                  </AttachmentFrame>
-                );
-              })}
-            </View>
-          ) : null}
-          {hasText ? (
-            <Text selectable style={userMessageStylesheet.text}>
-              {message}
-            </Text>
-          ) : null}
+        <View
+          style={contentStyle}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
+        >
+          {body}
         </View>
-        {hasText ? (
-          <View
-            style={trailingRowStyle}
-            pointerEvents={showTrailingRow ? "auto" : "none"}
-            testID="user-message-trailing-row"
-          >
-            <Text style={userMessageStylesheet.timestampText} testID="user-message-timestamp">
-              {formattedTimestamp}
-            </Text>
-            {capabilities && messageId ? (
-              <RewindMenu
-                capabilities={capabilities}
-                isPending={rewindMutation.isPending}
-                rewoundText={message}
-                onRewind={handleRewind}
-              />
-            ) : null}
-            <TurnCopyButton
-              getContent={getMessageContent}
-              containerStyle={userMessageStylesheet.copyButton}
-              accessibilityLabel={t("message.actions.copyMessage")}
-            />
-          </View>
-        ) : null}
-      </View>
+      </ActorResponseRow>
       <AttachmentLightbox source={lightboxSource} onClose={handleLightboxClose} />
     </View>
   );
@@ -753,6 +882,8 @@ interface AssistantMessageProps {
   serverId?: string;
   client?: DaemonClient | null;
   spacing?: "default" | "compactTop" | "compactBottom" | "compactBoth";
+  /** True when a sender name row sits directly above this reply. */
+  underSenderName?: boolean;
   phase: MarkdownPhase;
 }
 
@@ -1362,16 +1493,21 @@ function NativeShimmerPeakSvg({ gradientId }: { gradientId: string }) {
 
 interface AssistantMessageBlockContainerProps {
   block: string;
+  marginTop: number;
   marginBottom: number;
   children: ReactNode;
 }
 
 function AssistantMessageBlockContainer({
   block,
+  marginTop,
   marginBottom,
   children,
 }: AssistantMessageBlockContainerProps) {
-  const style = useMemo(() => (marginBottom > 0 ? { marginBottom } : undefined), [marginBottom]);
+  const style = useMemo(
+    () => (marginTop !== 0 || marginBottom > 0 ? { marginTop, marginBottom } : undefined),
+    [marginTop, marginBottom],
+  );
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { width, height } = event.nativeEvent.layout;
@@ -1497,6 +1633,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   serverId,
   client,
   spacing = "default",
+  underSenderName = false,
   phase,
 }: AssistantMessageProps) {
   const { t } = useTranslation();
@@ -1956,12 +2093,12 @@ export const AssistantMessage = memo(function AssistantMessage({
   const assistantContainerStyle = useMemo(
     () => [
       assistantMessageStylesheet.container,
-      (spacing === "compactTop" || spacing === "compactBoth") &&
+      (spacing === "compactTop" || spacing === "compactBoth" || underSenderName) &&
         assistantMessageStylesheet.containerCompactTop,
       (spacing === "compactBottom" || spacing === "compactBoth") &&
         assistantMessageStylesheet.containerCompactBottom,
     ],
-    [spacing],
+    [spacing, underSenderName],
   );
   const revealDataSet = useMemo(
     () =>
@@ -1977,6 +2114,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         <AssistantMessageBlockContainer
           key={key}
           block={block}
+          marginTop={index === 0 && underSenderName ? -leadingMarkdownMargin(block) : 0}
           marginBottom={index < keyedBlocks.length - 1 ? 12 : 0}
         >
           <MemoizedMarkdownBlock
@@ -2603,7 +2741,10 @@ function renderExpandableBadgeIcon({
 }: {
   isError: boolean;
   isActive: boolean;
-  ThemedIcon: ComponentType<{ size?: number; uniProps?: typeof foregroundColorMapping }> | null;
+  ThemedIcon: ComponentType<{
+    size?: number;
+    uniProps?: typeof foregroundColorMapping;
+  }> | null;
 }): ReactNode {
   if (isError) {
     return (

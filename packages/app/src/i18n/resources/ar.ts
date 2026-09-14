@@ -200,6 +200,7 @@ export const ar: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Agent",
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
@@ -281,6 +282,9 @@ export const ar: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "أنت",
+    },
     diagram: {
       diagram: "مخطط",
       zoomIn: "تكبير",

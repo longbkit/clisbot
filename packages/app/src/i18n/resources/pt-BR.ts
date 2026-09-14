@@ -200,6 +200,7 @@ export const ptBR: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Agente",
     empty: "Comece a conversar com este agente...",
     scrollToBottom: "Rolar para o fim",
     historyLoadFailed: "Não foi possível carregar o histórico do agente",
@@ -284,6 +285,9 @@ export const ptBR: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "Você",
+    },
     diagram: {
       diagram: "Diagrama",
       zoomIn: "Aproximar",

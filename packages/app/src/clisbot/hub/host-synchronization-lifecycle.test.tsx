@@ -10,6 +10,17 @@ const adapters = vi.hoisted(() => ({
   restart: vi.fn(async () => undefined),
   upsert: vi.fn(async () => ({ serverId: "server" })),
   remove: vi.fn(async () => true),
+  hosts: [
+    {
+      serverId: "server",
+      management: {
+        kind: "hub" as const,
+        hubOrigin: "https://hub.example.test",
+        organizationId: "org",
+        daemonId: "daemon",
+      },
+    },
+  ],
 }));
 vi.mock("@/data/query", () => ({
   useFetchQuery: () => ({
@@ -42,25 +53,28 @@ vi.mock("@/runtime/host-session-access", () => ({
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
-    getHosts: () => [
-      {
-        serverId: "server",
-        management: {
-          kind: "hub",
-          hubOrigin: "https://hub.example.test",
-          organizationId: "org",
-          daemonId: "daemon",
-        },
-      },
-    ],
+    getHosts: () => adapters.hosts,
     upsertManagedConnectionFromOffer: adapters.upsert,
     restartHostConnection: adapters.restart,
     removeManagedHost: adapters.remove,
   }),
+  useHosts: () => adapters.hosts,
 }));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  adapters.slug = "sandbox";
+  adapters.hosts = [
+    {
+      serverId: "server",
+      management: {
+        kind: "hub" as const,
+        hubOrigin: "https://hub.example.test",
+        organizationId: "org",
+        daemonId: "daemon",
+      },
+    },
+  ];
 });
 it("syncs a renamed daemon without replacing its ticket resolver or reconnecting", async () => {
   vi.stubGlobal("React", React);
@@ -79,4 +93,36 @@ it("syncs a renamed daemon without replacing its ticket resolver or reconnecting
   );
   expect(adapters.restart).toHaveBeenCalledTimes(1);
   expect(adapters.register).toHaveBeenCalledTimes(1);
+});
+
+it("evicts a Hub-managed Host whose daemon is no longer projected", async () => {
+  vi.stubGlobal("React", React);
+  adapters.remove.mockClear();
+  adapters.hosts = [
+    {
+      serverId: "server",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://hub.example.test",
+        organizationId: "org",
+        daemonId: "daemon",
+      },
+    },
+    {
+      serverId: "old-server",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://hub.example.test",
+        organizationId: "org",
+        daemonId: "old-daemon",
+      },
+    },
+  ];
+  render(<HubHostSynchronization />);
+  await waitFor(() =>
+    expect(adapters.remove).toHaveBeenCalledWith(
+      expect.objectContaining({ daemonId: "old-daemon" }),
+    ),
+  );
+  expect(adapters.remove).not.toHaveBeenCalledWith(expect.objectContaining({ daemonId: "daemon" }));
 });

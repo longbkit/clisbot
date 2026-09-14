@@ -90,3 +90,9 @@ packages/protocol/src/generated/validation/*.aot.ts
 packages/desktop/.cache/
 packages/desktop/src-tauri/resources/managed-runtime/
 app.json
+
+# vitest browser-mode attachments (screenshots written by tests)
+**/.vitest-attachments/
+
+# ad-hoc provider probe scripts
+**/.oc-probe.mjs

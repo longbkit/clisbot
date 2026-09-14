@@ -1,3 +1,5 @@
+import { withSessionOperationIdentity } from "../agent/session-operation-context.js";
+import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
 import type {
   AgentSnapshotPayload,
   AgentStreamEventPayload,
@@ -18,6 +20,7 @@ import { serializeAgentSnapshot, serializeAgentStreamEvent } from "../messages.j
 import { daemonExecutionKey, type DaemonAgentOwner } from "../agent/agent-owner.js";
 
 export interface HubExecutionAgentCreateInput {
+  sessionIdentity?: VerifiedSessionOperationIdentity;
   executionId: string;
   reuseAgentId?: string;
   provider: string;
@@ -56,6 +59,7 @@ export type OwnedAgentEvent =
     };
 
 interface DaemonExecutionsOptions {
+  hubOrigin?: string;
   daemonId: string;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
@@ -109,7 +113,26 @@ export class DaemonExecutions implements HubExecutionAgents {
     }
 
     const authorityGeneration = this.authorityGeneration;
-    const create = this.createOrResolve(owner, input, authorityGeneration).finally(() => {
+    const identity =
+      this.agentManager.sessionStorageEnabled && input.sessionIdentity && this.options.hubOrigin
+        ? {
+            actor: {
+              ...input.sessionIdentity.actor,
+              hubOrigin: new URL(this.options.hubOrigin).origin,
+            },
+            ...(input.sessionIdentity.channel
+              ? {
+                  channel: {
+                    ...input.sessionIdentity.channel,
+                    hubOrigin: new URL(this.options.hubOrigin).origin,
+                  },
+                }
+              : {}),
+          }
+        : {};
+    const create = withSessionOperationIdentity(identity, () =>
+      this.createOrResolve(owner, input, authorityGeneration),
+    ).finally(() => {
       if (this.pendingCreates.get(key) === create) {
         this.pendingCreates.delete(key);
       }
@@ -208,6 +231,7 @@ export class DaemonExecutions implements HubExecutionAgents {
         provider: input.model ? `${input.provider}/${input.model}` : input.provider,
         title: input.prompt,
         initialPrompt: input.prompt,
+        clientMessageId: `hub-execution:${input.executionId}`,
         promptFailure: "throw",
         cwd: input.cwd,
         projectId: input.projectId,
@@ -239,6 +263,7 @@ export class DaemonExecutions implements HubExecutionAgents {
       requireExecutionWorkspaceId(result.liveSnapshot);
       await this.requireProjectPlacement(result.liveSnapshot.workspaceId, input.projectId);
     } catch (error) {
+      if (createdAgentId) await this.agentStorage.preparePermanentDelete(createdAgentId);
       try {
         if (createdAgentId && this.agentManager.getAgent(createdAgentId)) {
           try {
@@ -333,6 +358,7 @@ export class DaemonExecutions implements HubExecutionAgents {
       agentStorage: this.agentStorage,
       logger: this.options.logger,
       activeTurnBehavior: "interrupt",
+      runOptions: { clientMessageId: `hub-execution:${input.executionId}` },
     });
     this.requireAuthority(authorityGeneration, "agent reuse");
     return { executionId: owner.executionId, agent: serializeAgentSnapshot(agent) };

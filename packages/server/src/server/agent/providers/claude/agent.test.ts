@@ -17,7 +17,12 @@ import {
 } from "./agent.js";
 import { claudeProjectDirSync } from "./project-dir.js";
 import { streamSession } from "../test-utils/session-stream-adapter.js";
-import type { AgentSession, AgentTimelineItem, AgentStreamEvent } from "../../agent-sdk-types.js";
+import type {
+  AgentPermissionResponse,
+  AgentSession,
+  AgentTimelineItem,
+  AgentStreamEvent,
+} from "../../agent-sdk-types.js";
 
 interface TestClaudeSession {
   translateMessageToEvents(message: SDKMessage): AgentStreamEvent[];
@@ -955,6 +960,67 @@ describe("ClaudeAgentSession features", () => {
       expect(rewindReachedLiveInput).toBe(false);
     } finally {
       unsubscribe();
+      await session.close();
+    }
+  });
+
+  test("automatic steer denials wait for admission and retain new requests when admission fails", async () => {
+    const { queryFactory } = createQueryMock();
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+    const internal = session as unknown as {
+      handlePermissionRequest(
+        name: string,
+        input: Record<string, unknown>,
+        options: Record<string, unknown>,
+      ): Promise<PermissionResult>;
+    };
+    let release!: () => void;
+    const admission = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const responder = vi.fn(async (id: string, response: AgentPermissionResponse) => {
+      await admission;
+      await session.respondToPermission(id, response);
+    });
+    session.setAutomaticPermissionResponder?.(responder);
+    try {
+      const { turnId } = await session.startTurn("first turn");
+      const input = queryFactory.mock.calls[0]?.[0].prompt as AsyncIterable<SDKUserMessage>;
+      await input[Symbol.asyncIterator]().next();
+      const first = internal.handlePermissionRequest(
+        "Write",
+        { file_path: "FIRST.md" },
+        { toolUseID: "first" },
+      );
+      const steer = session.steerActiveTurn!("review instead", {
+        expectedTurnId: turnId,
+        clearPendingPermissions: true,
+      });
+      expect(responder).toHaveBeenCalledOnce();
+      expect(session.getPendingPermissions()).toHaveLength(1);
+      release();
+      await expect(steer).resolves.toEqual({ status: "accepted" });
+      await expect(first).resolves.toMatchObject({ behavior: "deny" });
+      responder.mockRejectedValueOnce(new Error("Injected admission fsync failure"));
+      const second = internal.handlePermissionRequest(
+        "Write",
+        { file_path: "SECOND.md" },
+        { toolUseID: "second" },
+      );
+      await vi.waitFor(() => expect(responder).toHaveBeenCalledTimes(2));
+      expect(session.getPendingPermissions()).toHaveLength(1);
+      await session.respondToPermission(session.getPendingPermissions()[0]!.id, {
+        behavior: "deny",
+        message: "test cleanup",
+      });
+      await expect(second).resolves.toMatchObject({ behavior: "deny", message: "test cleanup" });
+    } finally {
+      release();
       await session.close();
     }
   });

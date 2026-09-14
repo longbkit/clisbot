@@ -1,3 +1,4 @@
+import type { SessionAuthorship } from "@getpaseo/protocol/session-authorship";
 import equal from "fast-deep-equal";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
@@ -71,7 +72,7 @@ export interface AgentRuntimeInfo {
   extra?: Record<string, unknown>;
 }
 
-export interface Agent {
+export interface Agent extends SessionAuthorship {
   serverId: string;
   id: string;
   provider: AgentProvider;
@@ -104,7 +105,8 @@ export interface Agent {
   projectPlacement?: ProjectPlacementPayload | null;
 }
 
-export interface WorkspaceDescriptor {
+export interface WorkspaceDescriptor extends SessionAuthorship {
+  createdAt?: string;
   id: string;
   projectId: string;
   projectDisplayName: string;
@@ -140,6 +142,12 @@ export function normalizeWorkspaceDescriptor(
       : null;
   return {
     id: normalizeWorkspaceOpaqueId(payload.id) ?? payload.id,
+    createdBy: payload.createdBy,
+    createdAt: payload.createdAt,
+    lastInteractionBy: payload.lastInteractionBy,
+    lastInteractionAt: payload.lastInteractionAt,
+    participantActors: payload.participantActors,
+    channels: payload.channels,
     projectId: payload.projectId,
     projectDisplayName: payload.projectDisplayName,
     projectCustomName: payload.projectCustomName ?? null,
@@ -607,7 +615,14 @@ interface SessionStoreActions {
     value:
       | Map<string, Array<{ id: string; text: string; attachments: ComposerAttachment[] }>>
       | ((
-          prev: Map<string, Array<{ id: string; text: string; attachments: ComposerAttachment[] }>>,
+          prev: Map<
+            string,
+            Array<{
+              id: string;
+              text: string;
+              attachments: ComposerAttachment[];
+            }>
+          >,
         ) => Map<string, Array<{ id: string; text: string; attachments: ComposerAttachment[] }>>),
   ) => void;
 

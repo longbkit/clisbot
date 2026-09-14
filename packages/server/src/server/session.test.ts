@@ -284,6 +284,8 @@ vi.mock("./worktree-bootstrap.js", async (importOriginal) => {
 });
 
 interface SessionForTestOptions {
+  hubRelationships?: SessionOptions["hubRelationships"];
+  accountActor?: SessionOptions["accountActor"];
   permissions?: readonly DaemonPermission[];
   resourceAuthorization?: SessionResourceAuthorization;
   agentManager?: { [K in keyof SessionOptions["agentManager"]]?: unknown };
@@ -364,6 +366,8 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
 
   const sessionOptions: SessionOptions = {
     clientId: "test-client",
+    hubRelationships: options.hubRelationships,
+    accountActor: options.accountActor,
     onMessage: (message) => messages.push(message),
     ...(options.targetedMessages
       ? {
@@ -5728,4 +5732,564 @@ test("managed terminal creation explains missing privilege only for visible work
       error: "Resource not found",
     },
   });
+});
+
+test("channel operation tickets cross a real shared WebSocket and authenticated Hub HTTP redemption without actor leakage", async () => {
+  const { createServer } = await import("node:http");
+  const { createHash } = await import("node:crypto");
+  const { WebSocketServer } = await import("ws");
+  const { SessionInboundMessageSchema } = await import("@getpaseo/protocol/messages");
+  const { SessionOperationTickets } =
+    await import("../../../hub/src/managed-access/session-operation-tickets.js");
+  const { consumeDaemonAccessTicket } = await import("../../../hub/src/managed-access/http.js");
+  const { createChannelOperationTicketResolver } =
+    await import("../../../hub/src/channels/daemon/session-operation.js");
+  const { connectChannelDaemon } = await import("../../../hub/src/channels/daemon/client.js");
+  const { DirectHubRelationshipRemote } = await import("./hub/relationship-remote.js");
+  const { currentSessionOperationIdentity } = await import("./agent/session-operation-context.js");
+  const tickets = {
+    sessionOperations: new SessionOperationTickets(),
+  } as import("../../../hub/src/managed-access/tickets.js").AccessTicketService;
+  const daemon = {
+    id: "00000000-0000-4000-8000-000000000001",
+    status: "active",
+    credentialVerifier: createHash("sha256").update("enrolled-secret").digest("base64url"),
+  };
+  const database = {
+    findDaemonById: async (id: string) => (id === daemon.id ? daemon : undefined),
+    findDaemonForOrganization: async () => daemon,
+  } as unknown as import("../../../hub/src/db/types.js").Database;
+  let redemptions = 0;
+  const hub = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const result = await consumeDaemonAccessTicket(
+      new Request("http://hub/api/daemons/access-tickets/consume", {
+        method: "POST",
+        headers: {
+          authorization: request.headers.authorization ?? "",
+          "x-paseo-daemon-id": String(request.headers["x-paseo-daemon-id"]),
+        },
+        body,
+      }),
+      database,
+      tickets,
+    );
+    redemptions += 1;
+    response
+      .writeHead(result.status, { "content-type": "application/json" })
+      .end(await result.text());
+  });
+  await new Promise<void>((resolve) => hub.listen(0, "127.0.0.1", resolve));
+  const hubOrigin = `http://127.0.0.1:${(hub.address() as import("node:net").AddressInfo).port}`;
+  const observed: {
+    before: string | undefined;
+    after: string | undefined;
+    responder: string | undefined;
+  }[] = [];
+  const remote = new DirectHubRelationshipRemote();
+  const messages: unknown[] = [];
+  const session = createSessionForTest({
+    messages,
+    agentManager: {
+      sessionStorageEnabled: true,
+      respondToPermission: async (
+        _agent: string,
+        _request: string,
+        _response: unknown,
+        context: import("./agent/session-authorship.js").SessionOperationIdentity,
+      ) => {
+        const before = currentSessionOperationIdentity()?.actor?.id;
+        await new Promise<void>((resolve) => setTimeout(resolve, before === "slack:A" ? 15 : 1));
+        observed.push({
+          before,
+          after: currentSessionOperationIdentity()?.actor?.id,
+          responder: context.actor?.id,
+        });
+      },
+    },
+    hubRelationships: {
+      consumeSessionOperation: (input: {
+        sessionOperationTicket: string;
+        clientId: string;
+        digest: string;
+      }) =>
+        remote.consumeSessionOperation({
+          ...input,
+          daemonId: daemon.id,
+          hubOrigin,
+          credential: "enrolled-secret",
+        }),
+    } as SessionOptions["hubRelationships"],
+  });
+  const wire = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+  await new Promise<void>((resolve) => wire.once("listening", resolve));
+  wire.on("connection", (socket) =>
+    socket.on("message", (bytes) => {
+      const frame = JSON.parse(bytes.toString());
+      if (frame.type === "hello")
+        socket.send(
+          JSON.stringify({
+            type: "session",
+            message: {
+              type: "status",
+              payload: {
+                status: "server_info",
+                serverId: "daemon",
+                features: { agentSessionStorage: true },
+              },
+            },
+          }),
+        );
+      if (frame.type === "session")
+        void session.handleMessage(SessionInboundMessageSchema.parse(frame.message));
+    }),
+  );
+  const resolveTicket = createChannelOperationTicketResolver(
+    {
+      database,
+      tickets,
+      hubOrigin,
+      access: {
+        resolveChannelMember: async () => undefined,
+      } as unknown as import("../../../hub/src/access/store.js").AccessStore,
+    },
+    {
+      organizationId: "org",
+      daemonReference: daemon.id,
+      connectionId: "connection",
+      clientId: "test-client",
+    },
+  );
+  const client = connectChannelDaemon({
+    url: `ws://127.0.0.1:${(wire.address() as import("node:net").AddressInfo).port}`,
+    clientId: "test-client",
+    resolveSessionOperationTicket: resolveTicket,
+  });
+  try {
+    await client.waitForConnected();
+    await Promise.all(
+      ["A", "B", "C"].map((id) =>
+        client.respondToAgentPermission(
+          "agent",
+          `request-${id}`,
+          { behavior: "allow" },
+          {
+            source: {
+              channel: "slack",
+              accountId: "account",
+              senderIdentity: `slack:${id}`,
+              text: "approve",
+              mentionedBot: true,
+              conversation: {
+                kind: "channel",
+                id: "channel",
+                rootConversationId: "channel",
+                threadId: null,
+              },
+            },
+          },
+        ),
+      ),
+    );
+    await vi.waitFor(() => expect(observed).toHaveLength(3));
+    expect(redemptions).toBe(3);
+    expect(observed.sort((a, b) => a.before!.localeCompare(b.before!))).toEqual(
+      ["A", "B", "C"].map((id) => ({
+        before: `slack:${id}`,
+        after: `slack:${id}`,
+        responder: `slack:${id}`,
+      })),
+    );
+    await session.handleMessage({
+      type: "agent_permission_response",
+      agentId: "agent",
+      requestId: "forged",
+      response: { behavior: "allow" },
+      sessionOperationTicket: "forged",
+    });
+    expect(observed).toHaveLength(3);
+    expect(messages).toContainEqual(expect.objectContaining({ type: "rpc_error" }));
+  } finally {
+    client.stop();
+    for (const socket of wire.clients) socket.terminate();
+    await new Promise<void>((resolve) => wire.close(() => resolve()));
+    await session.cleanup();
+    hub.closeAllConnections();
+    await new Promise<void>((resolve) => hub.close(() => resolve()));
+  }
+}, 20_000);
+
+test("verified account attribution is feature gated and ignores arbitrary actor fields", async () => {
+  const { SessionInboundMessageSchema } = await import("@getpaseo/protocol/messages");
+  const actor = {
+    kind: "user" as const,
+    id: "verified",
+    memberId: "member",
+    organizationId: "org",
+    hubOrigin: "https://hub.example",
+  };
+  for (const enabled of [false, true]) {
+    const respond = vi.fn().mockResolvedValue(undefined);
+    const session = createSessionForTest({
+      accountActor: actor,
+      agentManager: { sessionStorageEnabled: enabled, respondToPermission: respond },
+    });
+    try {
+      await session.handleMessage(
+        SessionInboundMessageSchema.parse({
+          type: "agent_permission_response",
+          agentId: "agent",
+          requestId: "request",
+          requestGeneration: "observed-generation",
+          response: { behavior: "allow" },
+          actor: { kind: "user", id: "forged" },
+        }),
+      );
+      expect(respond).toHaveBeenCalledWith(
+        "agent",
+        "request",
+        { behavior: "allow" },
+        expect.objectContaining({
+          actor: enabled ? actor : undefined,
+          requestGeneration: "observed-generation",
+        }),
+      );
+    } finally {
+      await session.cleanup();
+    }
+  }
+});
+
+test("permission history is capability gated, authorized, and reads archived records without provider hydration", async () => {
+  const record: import("@getpaseo/protocol/session-authorship").AgentPermissionResponseRecord = {
+    id: "response",
+    timestamp: "2026-09-11T00:00:00Z",
+    request: { id: "request", kind: "tool", provider: "codex", name: "tool" },
+    response: { behavior: "allow" },
+    status: "applied",
+    respondedBy: { kind: "user", id: "C" },
+  };
+  for (const mode of ["allowed", "denied", "legacy"] as const) {
+    const messages: unknown[] = [];
+    const fetch = vi.fn().mockResolvedValue({ records: [record] });
+    const resume = vi.fn();
+    let event: ((event: import("./agent/agent-manager.js").AgentManagerEvent) => void) | undefined;
+    const session = createSessionForTest({
+      messages,
+      permissions: mode === "denied" ? [] : OWNER_PERMISSIONS,
+      agentStorage: {
+        get: vi.fn().mockResolvedValue({ id: "archived", archivedAt: "2026-09-10" }),
+      },
+      agentManager: {
+        sessionStorageEnabled: false,
+        sessionStorageReadable: true,
+        fetchPermissionResponses: fetch,
+        resumeAgent: resume,
+        subscribe: (listener: typeof event) => {
+          event = listener;
+          return () => {};
+        },
+      },
+    });
+    if (mode !== "legacy") session.updateClientCapabilities({ agent_session_storage: true });
+    try {
+      await session.handleMessage({
+        type: "agent.permissionResponses.fetch.request",
+        requestId: "history",
+        agentId: "archived",
+        limit: 2,
+      });
+      event?.({ type: "permission_response", agentId: "archived", record });
+      expect(fetch).toHaveBeenCalledTimes(mode === "allowed" ? 1 : 0);
+      expect(resume).not.toHaveBeenCalled();
+      const history = messages.filter((message) =>
+        (message as { type: string }).type.startsWith("agent.permissionResponses."),
+      );
+      expect(history).toHaveLength(mode === "allowed" ? 2 : 0);
+      if (mode === "allowed")
+        expect(history).toContainEqual({
+          type: "agent.permissionResponses.fetch.response",
+          payload: { requestId: "history", agentId: "archived", records: [record], error: null },
+        });
+    } finally {
+      await session.cleanup();
+    }
+  }
+});
+
+test("permanent delete persists its intent before the first destructive timeline action", async () => {
+  const { promises: fs } = await import("node:fs");
+  const { AgentStorage } = await import("./agent/agent-storage.js");
+  const { sessionDeletionIntentPath } = await import("./agent/session-storage/deletion-intents.js");
+  const { deleteSessionDirectory } = await import("./file-upload/session-files.js");
+  const home = mkdtempSync(join(tmpdir(), "session-delete-entrypoint-"));
+  const base = join(home, "agents");
+  await fs.mkdir(base);
+  await fs.writeFile(
+    join(base, "agent.json"),
+    JSON.stringify({
+      id: "agent",
+      provider: "codex",
+      cwd: home,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+    }),
+  );
+  const storage = new AgentStorage(base, pino({ level: "silent" }), { sessionLayout: true });
+  await storage.initialize();
+  const directory = await storage.getSessionDirectory("agent");
+  const timeline = join(directory, "events-000001.jsonl");
+  await fs.writeFile(timeline, "committed-history");
+  const messages: SessionOutboundMessage[] = [];
+  const deleteAgentState = vi.fn(async () => {
+    expect(
+      JSON.parse(await fs.readFile(sessionDeletionIntentPath(directory), "utf8")),
+    ).toMatchObject({ version: 1, target: "agent" });
+    await fs.rm(timeline);
+    throw new Error("Injected stop after first destructive timeline action");
+  });
+  const session = createSessionForTest({
+    paseoHome: home,
+    messages,
+    agentManager: {
+      getAgent: vi.fn(() => null),
+      closeAgent: vi.fn().mockResolvedValue(undefined),
+      flush: vi.fn().mockResolvedValue(undefined),
+      deleteAgentState,
+    },
+    agentStorage: {
+      get: storage.get.bind(storage),
+      list: storage.list.bind(storage),
+      preparePermanentDelete: storage.preparePermanentDelete.bind(storage),
+      remove: storage.remove.bind(storage),
+    },
+  });
+  try {
+    await session.handleMessage({
+      type: "delete_agent_request",
+      agentId: "agent",
+      requestId: "delete",
+    });
+    expect(deleteAgentState).toHaveBeenCalledOnce();
+    expect(
+      messages.some(
+        (message) =>
+          message.type === "rpc_error" && message.payload.error.includes("Injected stop"),
+      ),
+    ).toBe(true);
+    expect(await new AgentStorage(base, pino({ level: "silent" })).list()).toEqual([]);
+    await expect(fs.stat(directory)).rejects.toMatchObject({ code: "ENOENT" });
+  } finally {
+    await session.cleanup();
+    await deleteSessionDirectory(directory);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("permission generation is scoped to capable sources without mutating the live request", async () => {
+  const targetedMessages: Array<{ source: object; message: SessionOutboundMessage }> = [];
+  let listener: ((event: AgentManagerEvent) => void) | undefined;
+  const session = createSessionForTest({
+    targetedMessages,
+    agentManager: {
+      subscribe: (callback: (event: AgentManagerEvent) => void) => {
+        listener = callback;
+        return () => {};
+      },
+    },
+  });
+  const capable = {};
+  const legacy = {};
+  session.updateClientCapabilities({ [CLIENT_CAPS.agentSessionStorage]: true }, capable);
+  session.updateClientCapabilities(null, legacy);
+  const request = {
+    id: "reused-provider-id",
+    provider: "codex" as const,
+    kind: "tool" as const,
+    name: "tool",
+    metadata: { paseoPermissionGeneration: "live-generation", unrelated: "preserved" },
+  };
+  try {
+    listener?.({
+      type: "agent_stream",
+      agentId: "agent",
+      event: { type: "permission_requested", provider: "codex", request },
+    });
+    expect(targetedMessages).toHaveLength(2);
+    const metadataFor = (source: object) => {
+      const message = targetedMessages.find((entry) => entry.source === source)?.message;
+      if (message?.type !== "agent_stream" || message.payload.event.type !== "permission_requested")
+        throw new Error("Expected permission event");
+      return message.payload.event.request.metadata;
+    };
+    expect(metadataFor(capable)).toEqual({
+      paseoPermissionGeneration: "live-generation",
+      unrelated: "preserved",
+    });
+    expect(metadataFor(legacy)).toEqual({ unrelated: "preserved" });
+    expect(request.metadata.paseoPermissionGeneration).toBe("live-generation");
+  } finally {
+    await session.cleanup();
+  }
+});
+
+test("deferred document requests scope capable sources and archived owning agents", async () => {
+  const targetedMessages: Array<{ source: object; message: SessionOutboundMessage }> = [];
+  const messages: SessionOutboundMessage[] = [];
+  const project = { ...createProjectRecord("/work/a"), projectId: "project-a" };
+  const workspace = {
+    workspaceId: "workspace-a",
+    projectId: "project-a",
+    cwd: "/work/a",
+    archivedAt: null,
+  };
+  const records = new Map([
+    [
+      "archived",
+      {
+        id: "archived",
+        provider: "codex",
+        cwd: "/work/a",
+        workspaceId: "workspace-a",
+        archivedAt: "2026-01-01",
+      },
+    ],
+    [
+      "denied",
+      {
+        id: "denied",
+        provider: "codex",
+        cwd: "/work/b",
+        workspaceId: "workspace-b",
+        archivedAt: "2026-01-01",
+      },
+    ],
+  ]);
+  const readTimelinePayload = vi.fn(
+    async (_agentId: string, _options: unknown, subagentId?: string) => {
+      if (subagentId === "foreign-child") throw new Error("Provider subagent not found");
+      return { text: "retained document", nextOffset: null, totalBytes: 17 };
+    },
+  );
+  const readTimelineSourceRanges = vi
+    .fn()
+    .mockResolvedValue({ ranges: [{ startSeq: 7, endSeq: 7 }], nextOffset: null, totalCount: 1 });
+  const resumeAgent = vi.fn();
+  const session = createSessionForTest({
+    targetedMessages,
+    messages,
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map([
+        ["project-a", { privileges: new Set(["project.use"] as const), agentConfigurations: [] }],
+      ]),
+      leaseId: "document-test",
+      leaseExpiresAt: Date.now() + 60000,
+    },
+    projectRegistry: { list: vi.fn().mockResolvedValue([project]) },
+    workspaceRegistry: {
+      get: vi.fn(async (id: string) =>
+        id === "workspace-a"
+          ? workspace
+          : { ...workspace, workspaceId: "workspace-b", projectId: "project-b", cwd: "/work/b" },
+      ),
+      list: vi.fn().mockResolvedValue([workspace]),
+    },
+    agentStorage: {
+      get: vi.fn(async (id: string) => records.get(id) ?? null),
+      list: vi.fn().mockResolvedValue([...records.values()]),
+    },
+    agentManager: {
+      getAgent: vi.fn(() => null),
+      sessionStorageEnabled: false,
+      sessionStorageReadable: true,
+      readTimelinePayload,
+      readTimelineSourceRanges,
+      resumeAgent,
+    },
+  });
+  const capable = {};
+  const legacy = {};
+  session.updateClientCapabilities({ [CLIENT_CAPS.agentSessionStorage]: true }, capable);
+  session.updateClientCapabilities(null, legacy);
+  const request = {
+    type: "agent.timeline.payload.get.request" as const,
+    requestId: "document",
+    agentId: "archived",
+    epoch: "recorded-epoch",
+    id: "a".repeat(64),
+    offset: 0,
+    limit: 64,
+  };
+  try {
+    await session.handleMessage(request, legacy);
+    expect(readTimelinePayload).not.toHaveBeenCalled();
+    expect(targetedMessages).toEqual([]);
+    await session.handleMessage(request, capable);
+    expect(readTimelinePayload).toHaveBeenCalledWith(
+      "archived",
+      expect.objectContaining({ epoch: "recorded-epoch", id: request.id }),
+      undefined,
+    );
+    expect(targetedMessages).toContainEqual({
+      source: capable,
+      message: {
+        type: "agent.timeline.payload.get.response",
+        payload: expect.objectContaining({
+          agentId: "archived",
+          text: "retained document",
+          error: null,
+        }),
+      },
+    });
+    await session.handleMessage(
+      {
+        ...request,
+        type: "agent.timeline.source_ranges.get.request",
+        requestId: "ranges",
+        subagentId: "known-child",
+        seq: 7,
+      },
+      capable,
+    );
+    expect(readTimelineSourceRanges).toHaveBeenCalledWith(
+      "archived",
+      expect.objectContaining({ seq: 7 }),
+      "known-child",
+    );
+    await session.handleMessage(
+      { ...request, requestId: "foreign-child", subagentId: "foreign-child" },
+      capable,
+    );
+    expect(targetedMessages).toContainEqual({
+      source: capable,
+      message: {
+        type: "agent.timeline.payload.get.response",
+        payload: expect.objectContaining({ error: "Provider subagent not found" }),
+      },
+    });
+    const calls = readTimelinePayload.mock.calls.length;
+    await session.handleMessage(
+      { ...request, agentId: "denied", requestId: "denied-document" },
+      capable,
+    );
+    await session.handleMessage(
+      {
+        ...request,
+        type: "agent.timeline.source_ranges.get.request",
+        agentId: "denied",
+        requestId: "denied-ranges",
+      },
+      capable,
+    );
+    expect(readTimelinePayload).toHaveBeenCalledTimes(calls);
+    expect(readTimelineSourceRanges).toHaveBeenCalledTimes(1);
+    expect(messages.filter((message) => message.type === "rpc_error")).toHaveLength(2);
+    expect(targetedMessages.every((entry) => entry.source === capable)).toBe(true);
+    expect(resumeAgent).not.toHaveBeenCalled();
+  } finally {
+    await session.cleanup();
+  }
 });

@@ -1,3 +1,7 @@
+import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-session-authorship.js";
+import { deleteSessionDirectory } from "./file-upload/session-files.js";
+import { startSessionFileMaintenance } from "./file-upload/session-file-maintenance.js";
+import { FileAgentTimelineStore } from "./agent/session-storage/file-agent-timeline-store.js";
 import express from "express";
 import { createServer as createHTTPServer, type IncomingMessage, type ServerResponse } from "http";
 import { constants, existsSync, unlinkSync } from "fs";
@@ -415,6 +419,7 @@ export interface PaseoDaemonConfig {
   isDev?: boolean;
   agentClients: Partial<Record<AgentProvider, AgentClient>>;
   agentStoragePath: string;
+  agentSessionStorage?: boolean;
   relayEnabled?: boolean;
   relayEnabledMutable?: boolean;
   relayEndpoint?: string;
@@ -632,6 +637,30 @@ function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDae
   }
 
   return initialConfig;
+}
+
+/**
+ * All the durable-session-storage wiring in one place, so `createPaseoDaemon` carries a single
+ * branch for the feature instead of one per injection point.
+ */
+function createSessionStorageWiring(
+  config: { agentSessionStorage?: boolean },
+  agentStorage: AgentStorage,
+) {
+  const timelineStorage = new FileAgentTimelineStore((agentId) =>
+    agentStorage.getSessionDirectory(agentId),
+  );
+  // Keep the selected backend after rollout; disabling authorship does not stop journal writes.
+  const durable = config.agentSessionStorage === true || agentStorage.hasSessionLayout;
+  return {
+    timelineStorage,
+    durable,
+    agentManagerOptions: {
+      agentSessionStorage: config.agentSessionStorage === true,
+      durableTimelineReader: timelineStorage,
+      ...(durable ? { durableTimelineStore: timelineStorage } : {}),
+    },
+  };
 }
 
 export async function createPaseoDaemon(
@@ -922,7 +951,18 @@ export async function createPaseoDaemon(
     serviceProxyListenTarget = parseListenString(config.serviceProxy.standaloneListen);
   }
 
-  const agentStorage = new AgentStorage(config.agentStoragePath, logger);
+  const agentStorage = new AgentStorage(config.agentStoragePath, logger, {
+    sessionLayout: config.agentSessionStorage === true,
+    removeSessionData: (_id, directory) => deleteSessionDirectory(directory),
+  });
+  await agentStorage.initialize();
+  const stopSessionFileMaintenance = startSessionFileMaintenance({
+    agentRoot: config.agentStoragePath,
+    temporaryRoot: config.paseoHome,
+    onError: (err, directory) =>
+      logger.warn({ err, directory }, "Session draft maintenance failed"),
+  });
+  const sessionStorage = createSessionStorageWiring(config, agentStorage);
   const projectRegistry = new FileBackedProjectRegistry(
     path.join(config.paseoHome, "projects", "projects.json"),
     logger,
@@ -978,9 +1018,11 @@ export async function createPaseoDaemon(
   });
   const initialAgentManagerState = providerSnapshotManager.getAgentManagerProviderState();
   const agentManager = new AgentManager({
+    serverId,
     clients: initialAgentManagerState.clients,
     providerDefinitions: initialAgentManagerState.providerDefinitions,
     registry: agentStorage,
+    ...sessionStorage.agentManagerOptions,
     appendSystemPrompt: config.appendSystemPrompt,
     onWorkspaceStateMayHaveChanged: ({ cwd }) => {
       workspaceGitService.onWorkspaceStateMayHaveChanged(cwd);
@@ -994,7 +1036,12 @@ export async function createPaseoDaemon(
     agentManager,
     agentStorage,
   );
-  await agentStorage.initialize();
+  if (sessionStorage.durable)
+    await recoverStoredSessionAuthorship(
+      agentStorage,
+      sessionStorage.timelineStorage,
+      agentManager,
+    );
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
   await bootstrapWorkspaceRegistries({
     serverId,
@@ -1280,9 +1327,10 @@ export async function createPaseoDaemon(
       if (!wsServer) throw new Error("WebSocket server is not running");
       wsServer.updatePrincipalPermissions(principalId, permissions);
     },
-    createExecutionAgents: (daemonId) =>
+    createExecutionAgents: (daemonId, hubOrigin) =>
       new DaemonExecutions({
         daemonId,
+        hubOrigin,
         agentManager,
         agentStorage,
         createAgent,
@@ -1873,6 +1921,7 @@ export async function createPaseoDaemon(
   };
 
   const stop = async () => {
+    await stopSessionFileMaintenance();
     await pluginRuntime.stopAllPlugins();
     stopHubProjectPublishing();
     await hubRelationships.stop();

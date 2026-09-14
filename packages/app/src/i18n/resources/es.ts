@@ -200,6 +200,7 @@ export const es: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Agente",
     empty: "Comience a chatear con este agente...",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
@@ -284,6 +285,9 @@ export const es: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "Tú",
+    },
     diagram: {
       diagram: "Diagrama",
       zoomIn: "Acercar",

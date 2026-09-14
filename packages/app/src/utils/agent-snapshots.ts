@@ -1,3 +1,4 @@
+import { copySessionMetadata } from "@/clisbot/session-storage/directory";
 import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
@@ -45,6 +46,7 @@ export function derivePendingPermissionKey(
 
 export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
   return {
+    ...copySessionMetadata(agent),
     id: agent.id,
     provider: agent.provider,
     cwd: agent.cwd,
@@ -91,6 +93,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
   const activeTurn = normalizeActiveTurn(snapshot, lastUserMessageAt);
 
   return {
+    ...copySessionMetadata(snapshot),
     serverId,
     id: snapshot.id,
     provider: snapshot.provider,

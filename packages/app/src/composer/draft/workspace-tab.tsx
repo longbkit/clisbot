@@ -656,6 +656,7 @@ export function WorkspaceDraftAgentTab({
           <View style={styles.streamContainer}>
             <AgentStreamView
               agentId={tabId}
+              historyAgentId={null}
               serverId={serverId}
               context={draftAgent}
               streamItems={submittedStreamItems}

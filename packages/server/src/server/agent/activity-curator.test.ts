@@ -440,3 +440,34 @@ second line'`,
     ).toThrow("Selected assistant message is no longer available.");
   });
 });
+
+it("pins the fork file anchor to the selected durable boundary", () => {
+  const rows: AgentTimelineRow[] = [
+    {
+      seq: 1,
+      timestamp: "2026-01-01",
+      item: { type: "user_message", text: "with file", clientMessageId: "m1" },
+    },
+    {
+      seq: 2,
+      timestamp: "2026-01-01",
+      item: { type: "assistant_message", text: "first", messageId: "assistant1" },
+    },
+    {
+      seq: 3,
+      timestamp: "2026-01-01",
+      item: { type: "user_message", text: "later file", clientMessageId: "m2" },
+    },
+  ];
+  const result = buildAgentForkContextAttachment({
+    rows,
+    sourceSession: { agentId: "source", epoch: "durable-epoch" },
+    boundaryMessageId: "assistant1",
+  });
+  expect(result.attachment.sourceSession).toEqual({
+    agentId: "source",
+    epoch: "durable-epoch",
+    seq: 2,
+  });
+  expect(result.attachment.text).not.toContain("later file");
+});

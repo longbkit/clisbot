@@ -18,6 +18,8 @@ export interface TimelineProjectionEntry {
   seqStart: number;
   seqEnd: number;
   sourceSeqRanges: TimelineSeqRange[];
+  deferredPayload?: { id: string; byteLength: number; format: "timeline_item_json" };
+  sourceSeqRangesRef?: { id: string; count: number };
   collapsed: TimelineProjectionKind[];
 }
 
@@ -30,6 +32,8 @@ interface ProjectedWindowSelection {
 }
 
 export interface ProjectedTimelinePageSelection {
+  pagingMode?: "source_ranges";
+  contextEntries?: TimelineProjectionEntry[];
   entries: TimelineProjectionEntry[];
   startSeq: number | null;
   endSeq: number | null;
@@ -264,6 +268,13 @@ export function projectTimelineRows(input: {
     return canonical;
   }
 
+  return projectTimelineEntries(canonical);
+}
+
+/** Also used by the durable derived index to update only an affected entry. */
+export function projectTimelineEntries(
+  canonical: readonly TimelineProjectionEntry[],
+): TimelineProjectionEntry[] {
   const toolCollapsed = collapseToolLifecycle(canonical);
   const assistantMerged = mergeAssistantChunks(toolCollapsed);
   return mergeReasoningChunks(assistantMerged);

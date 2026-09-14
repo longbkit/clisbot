@@ -9,7 +9,7 @@ export type SidebarGroupMode = "project" | "status";
 
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
-const SIDEBAR_VIEW_STORE_VERSION = 6;
+const SIDEBAR_VIEW_STORE_VERSION = 7;
 
 /**
  * The key standing for "this workspace carries no labels at all".
@@ -61,6 +61,12 @@ interface SidebarViewStoreState {
    */
   projectFilters: string[];
   labelFilter: SidebarLabelFilter;
+  userFilters: string[];
+  channelFilters: string[];
+  toggleUserFilter: (key: string) => void;
+  clearUserFilters: () => void;
+  toggleChannelFilter: (key: string) => void;
+  clearChannelFilters: () => void;
   setGroupMode: (mode: SidebarGroupMode) => void;
   toggleHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
@@ -77,6 +83,8 @@ interface SidebarViewPersistedState {
   hostFilters: string[];
   projectFilters: string[];
   labelFilter: SidebarLabelFilter;
+  userFilters: string[];
+  channelFilters: string[];
 }
 
 const PersistedSidebarGroupModeSchema = z.enum(["project", "status", "label"]);
@@ -90,6 +98,8 @@ const SidebarViewPersistedStateSchema = z.strictObject({
   projectFilters: z.array(z.string()).optional(),
   groupModeByServerId: z.record(z.string(), PersistedSidebarGroupModeSchema).optional(),
   labelFilter: SidebarLabelFilterSchema.optional(),
+  userFilters: z.array(z.string()).optional(),
+  channelFilters: z.array(z.string()).optional(),
 });
 
 type SidebarViewStorageState = z.infer<typeof SidebarViewPersistedStateSchema>;
@@ -126,6 +136,8 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
+      userFilters: [],
+      channelFilters: [],
     };
   }
   const state = result.data;
@@ -137,6 +149,8 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
+      userFilters: [],
+      channelFilters: [],
     };
   }
 
@@ -144,6 +158,8 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
     groupMode: state.groupMode === "status" ? "status" : "project",
     hostFilters: readHostFilters(state),
     projectFilters: state.projectFilters ?? [],
+    userFilters: state.userFilters ?? [],
+    channelFilters: state.channelFilters ?? [],
     labelFilter: state.labelFilter
       ? normalizeSidebarLabelFilter(state.labelFilter)
       : emptyLabelFilter(),
@@ -182,6 +198,18 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
+      userFilters: [],
+      channelFilters: [],
+      toggleUserFilter: (key) =>
+        set((state) => ({
+          userFilters: toggleFilterEntry(state.userFilters, key),
+        })),
+      clearUserFilters: () => set({ userFilters: [] }),
+      toggleChannelFilter: (key) =>
+        set((state) => ({
+          channelFilters: toggleFilterEntry(state.channelFilters, key),
+        })),
+      clearChannelFilters: () => set({ channelFilters: [] }),
       setGroupMode: (mode) => set({ groupMode: mode }),
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
@@ -232,6 +260,8 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
         hostFilters: state.hostFilters,
         projectFilters: state.projectFilters,
         labelFilter: state.labelFilter,
+        userFilters: state.userFilters,
+        channelFilters: state.channelFilters,
       }),
       migrate: migrateSidebarViewState,
     },

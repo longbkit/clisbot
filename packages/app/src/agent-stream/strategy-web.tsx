@@ -1123,6 +1123,15 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
         scheduleStickToBottom();
       },
       scrollToMessage,
+      getMessageOffset: (itemId) => {
+        const container = scrollContainerRef.current;
+        const target = container?.querySelector<HTMLElement>(
+          `[data-history-row-id="${CSS.escape(itemId)}"]`,
+        );
+        return container && target
+          ? target.getBoundingClientRect().top - container.getBoundingClientRect().top
+          : undefined;
+      },
     };
     viewportRef.current = handle;
     return () => {

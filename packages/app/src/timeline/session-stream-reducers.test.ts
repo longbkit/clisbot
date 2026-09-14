@@ -4230,6 +4230,75 @@ describe("processAgentStreamEvents", () => {
   });
 });
 
+it("enriches an already-painted canonical user with an author when tail sequence is unchanged", () => {
+  const cached = processTimelineResponse({
+    ...baseTimelineInput,
+    isInitializing: true,
+    payload: {
+      agentId: "agent-1",
+      direction: "tail",
+      projection: "projected",
+      reset: false,
+      epoch: "epoch-1",
+      window: { minSeq: 1, maxSeq: 1, nextSeq: 2 },
+      startCursor: { seq: 1 },
+      endCursor: { seq: 1 },
+      hasNewer: false,
+      hasOlder: false,
+      error: null,
+      entries: [
+        {
+          provider: "claude",
+          item: { type: "user_message", messageId: "same-message", text: "hello" },
+          timestamp: "2026-09-11T00:00:00.000Z",
+          seqStart: 1,
+          seqEnd: 1,
+        },
+      ],
+    },
+  });
+  const sender = {
+    kind: "user" as const,
+    id: "actor",
+    hubOrigin: "https://hub.example",
+    organizationId: "org",
+    connectionId: "connection",
+    displayName: "Saved actor",
+  };
+  const restored = processTimelineResponse({
+    ...baseTimelineInput,
+    currentTail: cached.tail,
+    currentHead: cached.head,
+    currentCursor: cached.cursor ?? undefined,
+    payload: {
+      agentId: "agent-1",
+      direction: "tail",
+      projection: "projected",
+      reset: false,
+      epoch: "epoch-1",
+      window: { minSeq: 1, maxSeq: 1, nextSeq: 2 },
+      startCursor: { seq: 1 },
+      endCursor: { seq: 1 },
+      hasNewer: false,
+      hasOlder: false,
+      error: null,
+      entries: [
+        {
+          provider: "claude",
+          item: { type: "user_message", messageId: "same-message", text: "hello", sender },
+          timestamp: "2026-09-11T00:00:00.000Z",
+          seqStart: 1,
+          seqEnd: 1,
+        },
+      ],
+    },
+  });
+  expect(restored.commit).toBe("apply");
+  expect(restored.tail).toHaveLength(1);
+  expect(restored.tail[0]).toMatchObject({ id: cached.tail[0]?.id, sender });
+  expect(restored.cursor).toEqual(cached.cursor);
+});
+
 describe("createAgentStreamReducerQueue", () => {
   function createManualScheduler() {
     let nextId = 1;
@@ -4405,5 +4474,115 @@ describe("createAgentStreamReducerQueue", () => {
 
     expect(commits).toEqual(["agent-1:queued"]);
     expect(scheduler.size).toBe(0);
+  });
+});
+
+describe("source-range projected context", () => {
+  it("accepts context-only coverage without certifying the old anchor on reconnect or reset", () => {
+    const context = {
+      ...makeToolCallTimelineEntry(1, "ancient", "completed", {
+        type: "unknown",
+        input: {},
+        output: null,
+      }),
+      seqEnd: 100,
+      sourceSeqRanges: [
+        { startSeq: 1, endSeq: 1 },
+        { startSeq: 100, endSeq: 100 },
+      ],
+    };
+    const payload: ProcessTimelineResponseInput["payload"] = {
+      ...baseTimelineInput.payload,
+      direction: "tail",
+      pagingMode: "source_ranges",
+      window: { minSeq: 1, maxSeq: 100, nextSeq: 101 },
+      startCursor: { seq: 100 },
+      endCursor: { seq: 100 },
+      entries: [],
+      contextEntries: [context],
+      hasOlder: true,
+    };
+    const tail = processTimelineResponse({
+      ...baseTimelineInput,
+      isInitializing: true,
+      hasActiveInitDeferred: true,
+      payload,
+    });
+    expect(tail.cursor).toEqual({ epoch: "epoch-1", startSeq: 100, endSeq: 100 });
+    expect(tail.tail).toHaveLength(1);
+    expect(tail.older).toBe("available");
+    const resumed = processTimelineResponse({
+      ...baseTimelineInput,
+      payload,
+      currentTail: tail.tail,
+      currentCursor: tail.cursor!,
+    });
+    expect(resumed.cursor).toEqual(tail.cursor);
+    expect(resumed.tail).toHaveLength(1);
+    const reset = processTimelineResponse({
+      ...baseTimelineInput,
+      payload: { ...payload, epoch: "new", reset: true },
+      currentTail: tail.tail,
+      currentCursor: tail.cursor!,
+    });
+    expect(reset.cursor).toEqual({ epoch: "new", startSeq: 100, endSeq: 100 });
+    expect(reset.tail).toHaveLength(1);
+  });
+  it("keeps an ancient tool anchored once while before pages recover its omitted middle", () => {
+    const context = {
+      ...makeToolCallTimelineEntry(1, "ancient", "completed", {
+        type: "unknown",
+        input: {},
+        output: null,
+      }),
+      seqEnd: 100,
+      sourceSeqRanges: [
+        { startSeq: 1, endSeq: 1 },
+        { startSeq: 100, endSeq: 100 },
+      ],
+    };
+    const entry = (seq: number) => ({
+      ...makeTimelineEntry(seq, `${seq}`),
+      item: { type: "assistant_message", text: `${seq}`, messageId: `${seq}` },
+    });
+    const tail = processTimelineResponse({
+      ...baseTimelineInput,
+      payload: {
+        ...baseTimelineInput.payload,
+        direction: "tail",
+        pagingMode: "source_ranges",
+        window: { minSeq: 1, maxSeq: 100, nextSeq: 101 },
+        startCursor: { seq: 97 },
+        endCursor: { seq: 100 },
+        entries: [entry(97), entry(98), entry(99)],
+        contextEntries: [context],
+        hasOlder: true,
+      },
+    });
+    expect(tail.cursor).toEqual({ epoch: "epoch-1", startSeq: 97, endSeq: 100 });
+    const toolId = tail.tail[0].id;
+    expect(tail.tail[0].timelineCursor?.seqStart).toBe(1);
+    const before = processTimelineResponse({
+      ...baseTimelineInput,
+      currentTail: tail.tail,
+      currentCursor: tail.cursor!,
+      payload: {
+        ...baseTimelineInput.payload,
+        direction: "before",
+        pagingMode: "source_ranges",
+        window: { minSeq: 1, maxSeq: 100, nextSeq: 101 },
+        startCursor: { seq: 1 },
+        endCursor: { seq: 96 },
+        entries: [context, ...Array.from({ length: 95 }, (_, index) => entry(index + 2))],
+        contextEntries: [],
+        hasNewer: true,
+      },
+    });
+    expect(before.cursor?.startSeq).toBe(1);
+    expect(before.tail.filter((item) => item.kind === "tool_call")).toHaveLength(1);
+    expect(before.tail[0].id).toBe(toolId);
+    expect(before.tail.map((item) => item.timelineCursor?.seqStart)).toEqual(
+      Array.from({ length: 99 }, (_, index) => index + 1),
+    );
   });
 });

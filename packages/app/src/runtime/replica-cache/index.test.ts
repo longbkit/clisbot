@@ -295,6 +295,74 @@ describe("ReplicaCache", () => {
     expect((await cache.readTimeline(SERVER_ID, "agent-1"))?.items).toEqual([timelineItem("New")]);
   });
 
+  it("preserves scoped author snapshots in cached agents, workspaces and timeline pages", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const sender = {
+      kind: "user" as const,
+      id: "actor",
+      hubOrigin: "https://hub.example",
+      organizationId: "org",
+      connectionId: "connection",
+      displayName: "Snapshot name",
+    };
+    const state = directory();
+    const cachedAgent = state.agents.get("agent-1")!;
+    cachedAgent.createdBy = sender;
+    cachedAgent.lastMessageBy = sender;
+    const workspace = state.workspaces.get("workspace-1")!;
+    workspace.createdBy = sender;
+    workspace.participantActors = [sender];
+    workspace.createdAt = "2026-07-18T08:00:00.000Z";
+    const item: StreamItem = {
+      kind: "user_message",
+      id: "canonical-user",
+      sender,
+      text: "hello",
+      timestamp: new Date("2026-07-18T08:02:00.000Z"),
+      timelineCursor: { epoch: "epoch-1", seq: 12 },
+    };
+    writer.commitDirectory(SERVER_ID, state);
+    writer.commitTimeline(SERVER_ID, "agent-1", { ...timeline(), items: [item] });
+    await writer.flush();
+    const reader = createCache(storage);
+    const restored = await reader.readDirectory(SERVER_ID);
+    expect(restored?.agents.get("agent-1")?.createdBy).toEqual(sender);
+    expect(restored?.agents.get("agent-1")?.lastMessageBy).toEqual(sender);
+    expect(restored?.workspaces.get("workspace-1")?.participantActors).toEqual([sender]);
+    expect(restored?.workspaces.get("workspace-1")?.createdAt).toBe(workspace.createdAt);
+    expect((await reader.readTimeline(SERVER_ID, "agent-1"))?.items).toEqual([item]);
+  });
+
+  it("round-trips deferred document identity without fabricating indirect source coverage", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const item: StreamItem = {
+      kind: "assistant_message",
+      id: "large",
+      text: "Document available",
+      timestamp: new Date("2026-07-18T08:02:00.000Z"),
+      timelineCursor: {
+        epoch: "epoch-1",
+        seqStart: 1,
+        seq: 12,
+        sourceSeqRanges: [],
+        sourceSeqRangesRef: { id: "ranges", count: 200 },
+        deferredPayload: { id: "payload", byteLength: 100000, format: "timeline_item_json" },
+      },
+    };
+    writer.commitTimeline(SERVER_ID, "agent-1", {
+      agentId: "agent-1",
+      items: [item],
+      range: { epoch: "epoch-1", startSeq: 12, endSeq: 12 },
+      hasOlder: true,
+    });
+    await writer.flush();
+    const restored = await createCache(storage).readTimeline(SERVER_ID, "agent-1");
+    expect(restored?.items).toEqual([item]);
+    expect(restored?.range).toEqual({ epoch: "epoch-1", startSeq: 12, endSeq: 12 });
+  });
+
   it("round-trips plugin timeline items", async () => {
     const storage = new MemoryStorage();
     const writer = createCache(storage);

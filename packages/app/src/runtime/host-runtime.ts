@@ -502,7 +502,9 @@ function probeIntervalForConnection(
   return PROBE_MAX_BACKOFF_MS;
 }
 
-function createDefaultDeps(): HostRuntimeControllerDeps {
+function createDefaultDeps(
+  onManagedHostRevoked: (management: HubHostManagement) => void = () => undefined,
+): HostRuntimeControllerDeps {
   const browserHostAvailable =
     typeof getDesktopHost()?.browser?.executeAutomationCommand === "function";
   const browserAutomationCapabilities = browserHostAvailable
@@ -531,15 +533,18 @@ function createDefaultDeps(): HostRuntimeControllerDeps {
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: nativePerformanceTrace,
-        ...(hostRequiresSessionAdmission(host.serverId)
-          ? {
-              resolveAccessTicket: async () => {
-                const ticket = await resolveHostAccessTicket(host.serverId, clientId);
-                if (ticket === undefined) throw new Error("Host session admission is unavailable");
-                return ticket;
-              },
-            }
-          : {}),
+        // Admission is resolved per hello, not per client: Hub binding
+        // registration races host hydration, so a client born before its
+        // binding must still present a ticket once admission is required.
+        resolveAccessTicket: async () => {
+          return resolveHostAccessTicket(host.serverId, clientId, host.management);
+        },
+        onAccessRevoked: () => {
+          if (host.management) onManagedHostRevoked(host.management);
+        },
+        onResourceAccessDenied: () => {
+          if (host.management) onManagedHostRevoked(host.management);
+        },
       } satisfies Omit<DaemonClientConfig, "url">;
       if (connection.type === "directSocket" || connection.type === "directPipe") {
         return new DaemonClient({
@@ -825,7 +830,7 @@ export class HostRuntimeController {
       return;
     }
 
-    if (hostRequiresSessionAdmission(this.host.serverId)) {
+    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
       await this.runSessionAdmissionConnectionCycle(requestVersion);
       return;
     }
@@ -1478,7 +1483,11 @@ export class HostRuntimeStore {
     replicaRowStore?: ReplicaRowStore;
     revokePushNotifications?: typeof revokePushNotifications;
   }) {
-    this.deps = input?.deps ?? createDefaultDeps();
+    this.deps =
+      input?.deps ??
+      createDefaultDeps((management) => {
+        void this.removeManagedHost(management);
+      });
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
@@ -1939,20 +1948,25 @@ export class HostRuntimeStore {
           useTls: input.offer.direct.useTls ?? true,
         }
       : null;
-    const existingManualHost = this.hosts.find(
-      (host) => host.serverId === input.offer.serverId && host.management === undefined,
+    // An authenticated projection may replace a stale enrollment on this Hub.
+    // Require the same daemon identity; an endpoint match alone is insufficient.
+    const refreshedHost = this.hosts.find(
+      (host) =>
+        host.serverId === input.offer.serverId &&
+        (host.management?.hubOrigin === input.management.hubOrigin ||
+          host.management === undefined) &&
+        host.connections.some(
+          (connection) =>
+            connection.type === "relay" &&
+            connection.daemonPublicKeyB64 === input.offer.daemonPublicKeyB64,
+        ),
     );
-    if (existingManualHost !== undefined) {
-      // Keep user-owned TCP/SSH/relay choices and lifecycle intact. The Hub
-      // binding independently installs admission ticket resolution for this
-      // serverId while the account is signed in.
-      return existingManualHost;
-    }
     const conflictingHost = this.hosts.find(
       (host) =>
         (host.serverId === input.offer.serverId ||
           hostHasConnection(host, relayConnection) ||
           (directConnection !== null && hostHasConnection(host, directConnection))) &&
+        host !== refreshedHost &&
         !sameHubManagement(host.management, input.management),
     );
     if (conflictingHost) return null;
@@ -2588,6 +2602,26 @@ export function useHostRuntimeIsConnected(serverId: string): boolean {
     () => isHostRuntimeConnected(store.getSnapshot(serverId)),
     () => isHostRuntimeConnected(store.getSnapshot(serverId)),
   );
+}
+
+/** Server ids whose live connection is currently authorized and online. */
+export function useHostRuntimeConnectedServerIds(serverIds: readonly string[]): string[] {
+  const store = getHostRuntimeStore();
+  const connectedKey = useSyncExternalStore(
+    (onStoreChange) => {
+      const unsubscribers = serverIds.map((serverId) => store.subscribe(serverId, onStoreChange));
+      return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+    },
+    () =>
+      serverIds
+        .filter((serverId) => isHostRuntimeConnected(store.getSnapshot(serverId)))
+        .join("\u0000"),
+    () =>
+      serverIds
+        .filter((serverId) => isHostRuntimeConnected(store.getSnapshot(serverId)))
+        .join("\u0000"),
+  );
+  return useMemo(() => (connectedKey ? connectedKey.split("\u0000") : []), [connectedKey]);
 }
 
 export function useHostRuntimeConnectionStatus(serverId: string): HostRuntimeConnectionStatus {

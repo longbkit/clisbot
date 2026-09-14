@@ -1478,7 +1478,7 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
-  it("reuses a manually added Host with the same daemon identity without adopting it", async () => {
+  it("adopts an existing Host when the Hub proves the same daemon identity", async () => {
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage(),
       deps: makeDeps({}, []),
@@ -1496,13 +1496,13 @@ describe("HostRuntimeStore", () => {
       management,
     });
     expect(profile?.serverId).toBe("srv_offer");
-    expect(store.getHosts()[0]).not.toHaveProperty("management");
+    expect(store.getHosts()[0]?.management).toEqual(management);
     expect(store.getHosts()[0]?.label).toBe("Manual Host");
     expect(store.getHosts()[0]?.connections).toHaveLength(1);
     store.syncHosts([]);
   });
 
-  it("does not merge a managed offer into a manual Host using the same relay connection", async () => {
+  it("does not merge a managed offer into an unrelated Host using the same relay connection", async () => {
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage(),
       deps: makeDeps({}, []),

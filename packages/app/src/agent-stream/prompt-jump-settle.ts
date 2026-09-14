@@ -13,7 +13,7 @@ export interface PromptJumpSettleViewport {
 }
 
 export interface PromptJumpSettleController {
-  start(itemId: string): void;
+  start(itemId: string, topInset?: number): void;
   cancel(): void;
   isActive(): boolean;
 }
@@ -23,8 +23,12 @@ const REQUIRED_STABLE_FRAMES = 2;
 const FRAME_BUDGET = 24;
 export const PROMPT_JUMP_TOP_INSET_PX = 8;
 
-function distanceFromLandingPosition(targetTop: number, containerTop: number): number {
-  return targetTop - containerTop - PROMPT_JUMP_TOP_INSET_PX;
+function distanceFromLandingPosition(
+  targetTop: number,
+  containerTop: number,
+  topInset: number,
+): number {
+  return targetTop - containerTop - topInset;
 }
 
 export function createPromptJumpSettleController(input: {
@@ -33,6 +37,7 @@ export function createPromptJumpSettleController(input: {
   cancelFrame: (frameId: number) => void;
 }): PromptJumpSettleController {
   let activeItemId: string | null = null;
+  let activeTopInset = PROMPT_JUMP_TOP_INSET_PX;
   let frameId: number | null = null;
   let sampledFrames = 0;
   let stableFrames = 0;
@@ -60,7 +65,11 @@ export function createPromptJumpSettleController(input: {
     sampledFrames += 1;
     const targetTop = input.viewport.findTargetTop(itemId);
     if (targetTop !== null) {
-      const delta = distanceFromLandingPosition(targetTop, input.viewport.getContainerTop());
+      const delta = distanceFromLandingPosition(
+        targetTop,
+        input.viewport.getContainerTop(),
+        activeTopInset,
+      );
       if (Math.abs(delta) <= POSITION_TOLERANCE_PX) {
         stableFrames += 1;
         if (stableFrames >= REQUIRED_STABLE_FRAMES) {
@@ -78,6 +87,7 @@ export function createPromptJumpSettleController(input: {
           remainingDelta = distanceFromLandingPosition(
             adjustedTargetTop,
             input.viewport.getContainerTop(),
+            activeTopInset,
           );
         }
         const maxScrollTop = Math.max(0, after.scrollHeight - after.clientHeight);
@@ -97,8 +107,9 @@ export function createPromptJumpSettleController(input: {
   }
 
   return {
-    start(itemId) {
+    start(itemId, topInset = PROMPT_JUMP_TOP_INSET_PX) {
       finish();
+      activeTopInset = topInset;
       activeItemId = itemId;
       unsubscribeFromUserIntent = input.viewport.subscribeToUserIntent(finish);
       scheduleNextFrame();

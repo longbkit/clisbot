@@ -1,3 +1,8 @@
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { useSessionStore } from "@/stores/session-store";
+import { useShallow } from "zustand/react/shallow";
+import { sessionMetadataOptions } from "@/clisbot/session-storage/directory";
+import { actorLabel } from "@/clisbot/session-storage/actor";
 import {
   useCallback,
   useMemo,
@@ -25,6 +30,8 @@ import {
   Settings2,
   Tag,
   Type,
+  UserRound,
+  Hash,
 } from "lucide-react-native";
 import {
   MenuItem,
@@ -105,6 +112,11 @@ const ROW_ITEM_ICONS: Record<SidebarRowItem, OptionIcon> = {
   changeRequest: withUnistyles(GitPullRequest),
   services: withUnistyles(Globe),
   labels: withUnistyles(Tag),
+  createdUser: withUnistyles(UserRound),
+  updatedUser: withUnistyles(UserRound),
+  channels: withUnistyles(Hash),
+  createdTime: withUnistyles(Clock),
+  updatedTime: withUnistyles(Clock),
 };
 
 // These mark how much of the row an option spends, not what CI is, so they are the shapes each
@@ -135,6 +147,11 @@ const TITLE_SOURCE_LABEL_KEYS: Record<WorkspaceTitleSource, string> = {
 };
 
 const ROW_ITEM_LABEL_KEYS: Record<SidebarRowItem, string> = {
+  createdUser: "Created user",
+  updatedUser: "Updated user",
+  channels: "Channels",
+  createdTime: "Created time",
+  updatedTime: "Updated time",
   branch: "sidebar.display.show.branch",
   project: "sidebar.display.show.project",
   host: "sidebar.display.show.host",
@@ -165,6 +182,21 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
   const { t } = useTranslation();
   const preferences = useSidebarDisplayPreferences();
   const hosts = useHosts();
+  const metadataHosts = useSessionStore(
+    useShallow((state) =>
+      Object.values(state.sessions)
+        .filter((session) => sessionStorageReadable(session.serverInfo))
+        .map((session) => session.workspaces),
+    ),
+  );
+  const metadataOptions = useMemo(
+    () => sessionMetadataOptions(metadataHosts.flatMap((workspaces) => [...workspaces.values()])),
+    [metadataHosts],
+  );
+  const showMetadataFilter =
+    metadataHosts.length > 0 ||
+    preferences.userFilters.length > 0 ||
+    preferences.channelFilters.length > 0;
   // `allProjects`, never `projects`: the model's `projects` is already filtered, so a picker fed
   // from it would lose the row that undoes the filter as soon as the filter narrowed to one.
   const { allProjects, resolvedProjectFilters } = useSidebarModel();
@@ -269,10 +301,52 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
         ),
       });
     }
+    if (showMetadataFilter) {
+      definitions.push({
+        id: "userFilter",
+        title: "User",
+        content: (
+          <MetadataFilterPage
+            options={
+              new Map(
+                [...metadataOptions.users].map(([key, actor]) => [
+                  key,
+                  `${actorLabel(actor)} · ${actor.id} · ${actor.hubOrigin ?? ""} / ${actor.organizationId ?? ""} / ${actor.connectionId ?? ""}`,
+                ]),
+              )
+            }
+            selected={preferences.userFilters}
+            toggle={preferences.toggleUserFilter}
+            clear={preferences.clearUserFilters}
+          />
+        ),
+      });
+      definitions.push({
+        id: "channelFilter",
+        title: "Channel",
+        content: (
+          <MetadataFilterPage
+            options={
+              new Map(
+                [...metadataOptions.channels].map(([key, channel]) => [
+                  key,
+                  `${channel.displayName || channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`,
+                ]),
+              )
+            }
+            selected={preferences.channelFilters}
+            toggle={preferences.toggleChannelFilter}
+            clear={preferences.clearChannelFilters}
+          />
+        ),
+      });
+    }
     return definitions;
   }, [
     t,
     preferences,
+    showMetadataFilter,
+    metadataOptions,
     hosts,
     showHostFilter,
     showProjectFilter,
@@ -356,6 +430,25 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
                 testID="sidebar-display-label-filter"
               >
                 {t("workspaceLabels.title")}
+              </MenuSubTrigger>
+            </>
+          ) : null}
+          {showMetadataFilter ? (
+            <>
+              <MenuSeparator />
+              <MenuSubTrigger
+                id="userFilter"
+                indicator={preferences.userFilters.length > 0}
+                testID="sidebar-display-user-filter"
+              >
+                User
+              </MenuSubTrigger>
+              <MenuSubTrigger
+                id="channelFilter"
+                indicator={preferences.channelFilters.length > 0}
+                testID="sidebar-display-channel-filter"
+              >
+                Channel
               </MenuSubTrigger>
             </>
           ) : null}
@@ -770,3 +863,56 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 8,
   },
 }));
+
+function MetadataFilterPage({
+  options,
+  selected,
+  toggle,
+  clear,
+}: {
+  options: ReadonlyMap<string, string>;
+  selected: readonly string[];
+  toggle: (key: string) => void;
+  clear: () => void;
+}): ReactElement {
+  const entries = new Map(options);
+  for (const key of selected) if (!entries.has(key)) entries.set(key, key);
+  return (
+    <>
+      {[...entries].map(([key, label]) => (
+        <MetadataFilterItem
+          key={key}
+          value={key}
+          label={label}
+          selected={selected.includes(key)}
+          toggle={toggle}
+        />
+      ))}
+      {selected.length > 0 ? (
+        <>
+          <MenuSeparator />
+          <MenuItem onSelect={clear}>Clear filter</MenuItem>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function MetadataFilterItem({
+  value,
+  label,
+  selected,
+  toggle,
+}: {
+  value: string;
+  label: string;
+  selected: boolean;
+  toggle: (key: string) => void;
+}): ReactElement {
+  const handleSelect = useCallback(() => toggle(value), [toggle, value]);
+  return (
+    <MenuItem selected={selected} closeOnSelect={false} onSelect={handleSelect}>
+      {label}
+    </MenuItem>
+  );
+}

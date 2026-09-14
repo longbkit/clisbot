@@ -15,6 +15,8 @@ import type { PushNotificationSender } from "../push/index.js";
 import type { AgentProfile } from "@getpaseo/protocol/messages";
 
 interface TestPaseoDaemonOptions {
+  createDaemon?: typeof createPaseoDaemon;
+  agentSessionStorage?: boolean;
   daemonVersion?: string;
   desktopManaged?: boolean;
   downloadTokenTtlMs?: number;
@@ -99,7 +101,7 @@ export async function createTestPaseoDaemon(
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const { config, paseoHomeRoot, paseoHome, staticDir } = await prepareTestDaemonConfig(options);
     const logger = options.logger ?? pino({ level: "silent" });
-    const daemon = await createPaseoDaemon(config, logger, {
+    const daemon = await (options.createDaemon ?? createPaseoDaemon)(config, logger, {
       serverFeatureOverrides: {
         daemonStatusRpc: options.daemonStatusRpcCapability,
         relayConfig: options.relayConfigCapability,
@@ -169,6 +171,7 @@ async function prepareTestDaemonConfig(
   const staticDir = options.staticDir ?? (await mkdtemp(path.join(os.tmpdir(), "paseo-static-")));
   const listenHost = options.listen ?? "127.0.0.1";
   const config: PaseoDaemonConfig = {
+    agentSessionStorage: options.agentSessionStorage,
     listen: `${listenHost}:0`,
     paseoHome,
     daemonVersion: options.daemonVersion,

@@ -1,3 +1,4 @@
+import { copySessionAuthorship } from "./session-authorship.js";
 import type {
   AgentListItemPayload,
   AgentSnapshotPayload,
@@ -70,6 +71,7 @@ export function toStoredAgentRecord(
   const runtimeInfo = sanitizeRuntimeInfo(agent.runtimeInfo);
 
   return {
+    ...copySessionAuthorship(agent),
     id: agent.id,
     provider: agent.provider,
     cwd: agent.cwd,
@@ -109,6 +111,7 @@ export function toAgentPayload(
   });
 
   const payload: AgentSnapshotPayload = {
+    ...copySessionAuthorship(agent),
     id: agent.id,
     provider: agent.provider,
     cwd: agent.cwd,
@@ -218,6 +221,7 @@ export function buildStoredAgentPayload(
   );
 
   return {
+    ...copySessionAuthorship(record),
     id: record.id,
     provider: record.provider,
     cwd: record.cwd,
@@ -250,6 +254,7 @@ export function buildStoredAgentPayload(
 
 export function toAgentListItemPayload(agent: AgentSnapshotPayload): AgentListItemPayload {
   return {
+    ...copySessionAuthorship(agent),
     id: agent.id,
     shortId: agent.id.slice(0, 7),
     title: agent.title,

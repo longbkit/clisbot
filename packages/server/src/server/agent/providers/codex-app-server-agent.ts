@@ -1,3 +1,4 @@
+import type { AutomaticPermissionResponder } from "../agent-sdk-types.js";
 import {
   getAgentStreamEventTurnId,
   type AgentPermissionAction,
@@ -3276,6 +3277,16 @@ interface ConsumedRootCompaction {
 }
 
 export class CodexAppServerAgentSession implements AgentSession {
+  private automaticPermissionResponder?: AutomaticPermissionResponder;
+  setAutomaticPermissionResponder(responder: AutomaticPermissionResponder): void {
+    this.automaticPermissionResponder = responder;
+  }
+  private respondToAutomaticPermission(requestId: string, response: AgentPermissionResponse) {
+    return this.automaticPermissionResponder
+      ? this.automaticPermissionResponder(requestId, response)
+      : this.respondToPermission(requestId, response);
+  }
+
   readonly provider = CODEX_PROVIDER;
   readonly capabilities = CODEX_APP_SERVER_CAPABILITIES;
 
@@ -3700,8 +3711,32 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private emitSyntheticPlanApprovalRequest(planText: string): void {
-    this.dismissPendingPlanApprovals("Superseded by a newer plan");
+    const hasPendingPlan = [...this.pendingPermissionHandlers.values()].some(
+      (request) => request.kind === "plan",
+    );
+    if (this.automaticPermissionResponder && hasPendingPlan) {
+      void this.dismissPendingPlanApprovals("Superseded by a newer plan")
+        .then(() => this.addSyntheticPlanApprovalRequest(planText))
+        .catch((error: unknown) => {
+          this.emitEvent({
+            type: "timeline",
+            provider: CODEX_PROVIDER,
+            item: {
+              type: "error",
+              message: error instanceof Error ? error.message : String(error),
+            },
+          });
+        });
+      return;
+    }
+    // Legacy adapters retain their synchronous plan replacement when storage is disabled.
+    for (const [id, pending] of this.pendingPermissionHandlers)
+      if (pending.kind === "plan")
+        this.resolvePlanPermission(id, { behavior: "deny", message: "Superseded by a newer plan" });
+    this.addSyntheticPlanApprovalRequest(planText);
+  }
 
+  private addSyntheticPlanApprovalRequest(planText: string): void {
     const requestId = `permission-${randomUUID()}`;
     const request: AgentPermissionRequest = {
       id: requestId,
@@ -4158,9 +4193,8 @@ export class CodexAppServerAgentSession implements AgentSession {
     };
     this.pendingForegroundStart = pendingStart;
 
-    this.dismissPendingPlanApprovals("Dismissed by a new prompt");
-
     try {
+      await this.dismissPendingPlanApprovals("Dismissed by a new prompt");
       await this.connect();
       if (!this.client) {
         throw new Error("Codex client not initialized");
@@ -4567,13 +4601,15 @@ export class CodexAppServerAgentSession implements AgentSession {
     }
   }
 
-  private dismissPendingPlanApprovals(message: string): void {
+  private async dismissPendingPlanApprovals(message: string): Promise<void> {
     const requestIds = Array.from(this.pendingPermissionHandlers)
       .filter(([, pending]) => pending.kind === "plan")
       .map(([requestId]) => requestId);
 
     for (const requestId of requestIds) {
-      this.resolvePlanPermission(requestId, { behavior: "deny", message });
+      if (this.automaticPermissionResponder)
+        await this.respondToAutomaticPermission(requestId, { behavior: "deny", message });
+      else this.resolvePlanPermission(requestId, { behavior: "deny", message });
     }
   }
 
@@ -4581,7 +4617,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const requestIds = Array.from(this.pendingPermissionHandlers.keys());
     for (const requestId of requestIds) {
       if (!this.pendingPermissionHandlers.has(requestId)) continue;
-      await this.respondToPermission(requestId, {
+      await this.respondToAutomaticPermission(requestId, {
         behavior: "deny",
         message: "The user answered with a message instead of approving. Their message follows.",
       });

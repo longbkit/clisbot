@@ -1,3 +1,4 @@
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import { WebSocket, WebSocketServer } from "ws";
 import type { IncomingMessage, Server as HTTPServer } from "http";
 import { isAbsolute, join, relative, resolve as resolvePath } from "path";
@@ -126,6 +127,7 @@ export interface ExternalSocketMetadata {
 }
 
 export interface SessionAdmission {
+  actor?: SessionActor;
   principalId: string;
   permissions: readonly DaemonPermission[];
   projects?: ReadonlyMap<string, ProjectAuthorization>;
@@ -523,6 +525,7 @@ interface BrowserToolsRegistration {
 }
 
 interface SocketSessionOptions {
+  accountActor?: SessionActor;
   clientId: string;
   appVersion: string | null;
   clientCapabilities: Record<string, unknown> | null;
@@ -1397,6 +1400,7 @@ export class VoiceAssistantWebSocketServer {
       appVersion,
       clientCapabilities,
       permissions: admission.permissions,
+      accountActor: admission.actor,
       ...(admission.resourceMode !== undefined &&
       admission.projects !== undefined &&
       admission.leaseId !== undefined &&
@@ -1496,6 +1500,7 @@ export class VoiceAssistantWebSocketServer {
   private createSocketSession(options: SocketSessionOptions): Session {
     return new Session({
       clientId: options.clientId,
+      accountActor: options.accountActor,
       appVersion: options.appVersion,
       clientCapabilities: options.clientCapabilities,
       permissions: options.permissions,
@@ -1646,10 +1651,21 @@ export class VoiceAssistantWebSocketServer {
       return;
     }
 
-    if (this.requiresManagedAccess(pending.identity, pluginId)) {
+    const requiresManagedAccess = this.requiresManagedAccess(pending.identity, pluginId);
+    const resolveOptionalIdentity =
+      this.agentManager.sessionStorageEnabled &&
+      message.accessTicket !== undefined &&
+      this.isManagedAccessSubject(pending.identity, pluginId);
+    if (requiresManagedAccess || resolveOptionalIdentity) {
       if (pending.helloInFlight) return;
       pending.helloInFlight = true;
-      void this.admitManagedAccess({ ws, message, pending, clientId }).then((admitted) => {
+      void this.admitManagedAccess({
+        ws,
+        message,
+        pending,
+        clientId,
+        identityOnly: !requiresManagedAccess,
+      }).then((admitted) => {
         if (!admitted) return;
         return this.completeHello({
           ws,
@@ -1750,6 +1766,7 @@ export class VoiceAssistantWebSocketServer {
   }
 
   private async admitManagedAccess(params: {
+    identityOnly?: boolean;
     ws: WebSocketLike;
     message: WSHelloMessage;
     pending: PendingConnection;
@@ -1774,7 +1791,9 @@ export class VoiceAssistantWebSocketServer {
         peer: pending.identity.peer as "loopback" | "external",
       });
       if (this.pendingConnections.get(ws) !== pending) return false;
-      pending.admission = admission;
+      pending.admission = params.identityOnly
+        ? { ...pending.admission, actor: admission.actor }
+        : admission;
       return true;
     } catch (error) {
       pending.connectionLogger.warn(
@@ -1851,6 +1870,8 @@ export class VoiceAssistantWebSocketServer {
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
+        ...(this.agentManager.sessionStorageEnabled ? { agentSessionStorage: true } : {}),
+        ...(this.agentManager.sessionStorageReadable ? { agentSessionStorageRead: true } : {}),
         // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
         directorySync: true,
         // COMPAT(workspaceLabels): added in v0.5.0, remove after 2027-08-14.

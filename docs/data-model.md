@@ -1,6 +1,6 @@
 # Data Model
 
-Đang cân nhắc: [thông tin workspace](features/workspace-organization/README.md) và [người tạo/người gửi](audits/2026-09-08-workspace-placement-and-session-authorship.md).
+Session persistence and user/channel metadata: [agent session storage](features/agent-session-storage/README.md) — durable storage is implemented; the wider AC/W set is not yet fully accepted. Under consideration: [workspace naming and reuse](features/workspace-organization/README.md).
 
 ## Project identity
 

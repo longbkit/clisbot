@@ -69,6 +69,7 @@ import {
   type AgentMetadata,
   type AgentMode,
   type AgentModelDefinition,
+  type AutomaticPermissionResponder,
   type AgentPermissionRequest,
   type AgentPermissionRequestKind,
   type AgentPermissionResponse,
@@ -1425,6 +1426,11 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   private readonly agentId?: string;
   private readonly launchEnv?: Record<string, string>;
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
+  private automaticPermissionResponder?: AutomaticPermissionResponder;
+  setAutomaticPermissionResponder(responder: AutomaticPermissionResponder): void {
+    this.automaticPermissionResponder = responder;
+  }
+
   private readonly pendingPermissions = new Map<string, PendingPermission>();
   private pendingUserMessage: PendingUserMessage | null = null;
   private submittedUserMessageTurnId: string | null = null;
@@ -2231,17 +2237,17 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
     const canAutoAccept =
       isACPAutoAcceptEnabled(this.config) && !isACPChooserRequest(params.options);
-    if (canAutoAccept) {
-      const allowOption = selectPermissionOption(params.options, { behavior: "allow" });
-      if (allowOption) {
-        this.logger.info(
-          { toolCallId: params.toolCall.toolCallId, optionId: allowOption.optionId },
-          "Auto-accepting ACP permission request",
-        );
-        return {
-          outcome: { outcome: "selected", optionId: allowOption.optionId },
-        };
-      }
+    const allowOption = canAutoAccept
+      ? selectPermissionOption(params.options, { behavior: "allow" })
+      : undefined;
+    if (allowOption && !this.automaticPermissionResponder) {
+      this.logger.info(
+        { toolCallId: params.toolCall.toolCallId, optionId: allowOption.optionId },
+        "Auto-accepting ACP permission request",
+      );
+      return {
+        outcome: { outcome: "selected", optionId: allowOption.optionId },
+      };
     }
 
     // Match Zed acp.rs:3189-3220 when Paseo is not handling the request locally.
@@ -2270,6 +2276,15 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       request,
       turnId: this.activeForegroundTurnId ?? undefined,
     });
+    if (allowOption && this.automaticPermissionResponder) {
+      void this.automaticPermissionResponder(requestId, {
+        behavior: "allow",
+        selectedActionId: allowOption.optionId,
+      }).catch((error: unknown) => {
+        // Retain the pending request for an explicit response; never allow after failed admission.
+        this.logger.error({ err: error, requestId }, "ACP automatic permission admission failed");
+      });
+    }
     return promise;
   }
 

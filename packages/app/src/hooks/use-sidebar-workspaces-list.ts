@@ -5,7 +5,12 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useHostProjects } from "@/projects/host-projects";
-import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
+import {
+  getHostRuntimeStore,
+  useHostRegistryLoaded,
+  useHostRuntimeConnectedServerIds,
+  useHosts,
+} from "@/runtime/host-runtime";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
@@ -102,6 +107,7 @@ export function useSidebarWorkspacesList(options?: {
   const allHosts = useHosts();
   const hostRegistryLoaded = useHostRegistryLoaded();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
+  const connectedServerIds = useHostRuntimeConnectedServerIds(allServerIds);
 
   const storeHostFilters = useSidebarViewStore((state) => state.hostFilters);
   const hostFilters = options?.hostFilters ?? storeHostFilters;
@@ -136,7 +142,9 @@ export function useSidebarWorkspacesList(options?: {
 
   const persistedProjectOrder = useSidebarOrderStore((state) => state.projectOrder ?? EMPTY_ORDER);
 
-  const directoryServerIds = useWorkspaceDirectoryServerIds(serverIds);
+  const directoryServerIds = useWorkspaceDirectoryServerIds(
+    serverIds.filter((serverId) => connectedServerIds.includes(serverId)),
+  );
 
   const hostProjects = useHostProjects(directoryServerIds);
 

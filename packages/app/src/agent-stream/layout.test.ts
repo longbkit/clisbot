@@ -547,3 +547,74 @@ describe("layoutStream", () => {
     },
   );
 });
+
+for (const platform of ["web", "android"] as const) {
+  it(`${platform} marks the first displayed item of each response as the response group start`, () => {
+    const prompt = userMessage("prompt", 1);
+    const firstAssistant = assistantMessage("assistant-1", 2);
+    const secondAssistant = assistantMessage("assistant-2", 3);
+    const toolAfter = toolCall("tool", 4);
+    const nextPrompt = userMessage("prompt-2", 5);
+    const nextAssistant = assistantMessage("assistant-3", 6);
+    const layout = layoutFor({
+      platform,
+      tail: [prompt, firstAssistant, secondAssistant, toolAfter, nextPrompt, nextAssistant],
+    });
+    expect(findLayoutItem(layout, firstAssistant.id).isFirstInResponseGroup).toBe(true);
+    expect(findLayoutItem(layout, secondAssistant.id).isFirstInResponseGroup).toBe(false);
+    expect(findLayoutItem(layout, nextAssistant.id).isFirstInResponseGroup).toBe(true);
+    expect(findLayoutItem(layout, toolAfter.id).isFirstInResponseGroup).toBe(false);
+    expect(findLayoutItem(layout, prompt.id).isFirstInResponseGroup).toBe(false);
+  });
+
+  it(`${platform} puts the response group start on the first displayed item when a response opens with a tool`, () => {
+    const toolFirst = toolCall("tool-first", 1);
+    const thinking = thought("thinking", 2);
+    const firstAssistant = assistantMessage("assistant-first", 3);
+    const layout = layoutFor({
+      platform,
+      tail: [userMessage("prompt", 0), toolFirst, thinking, firstAssistant],
+    });
+    expect(findLayoutItem(layout, toolFirst.id).isFirstInResponseGroup).toBe(true);
+    expect(findLayoutItem(layout, thinking.id).isFirstInResponseGroup).toBe(false);
+    expect(findLayoutItem(layout, firstAssistant.id).isFirstInResponseGroup).toBe(false);
+  });
+
+  it(`${platform} keeps the response group start at the top of a truncated timeline`, () => {
+    const layout = layoutFor({
+      platform,
+      tail: [assistantMessage("orphan", 1)],
+    });
+    expect(findLayoutItem(layout, "orphan").isFirstInResponseGroup).toBe(true);
+  });
+
+  it(`${platform} sees the response group start across the history/live-head boundary`, () => {
+    const layout = layoutFor({
+      platform,
+      isTurnActive: true,
+      tail: [userMessage("prompt", 1), toolCall("tool-t", 2)],
+      head: [assistantMessage("a2", 3)],
+    });
+    // "a2" is the newest item; its above-neighbor is the tool, so the tool
+    // opens the displayed response even though the pair straddles segments.
+    expect(findLayoutItem(layout, "a2").isFirstInResponseGroup).toBe(false);
+    expect(findLayoutItem(layout, "tool-t").isFirstInResponseGroup).toBe(true);
+  });
+
+  it(`${platform} separates adjacent messages by scoped author, including unknown history`, () => {
+    const a = { kind: "user" as const, id: "same", hubOrigin: "https://a" };
+    const b = { ...a, hubOrigin: "https://b" };
+    const layout = layoutFor({
+      platform,
+      tail: [
+        { ...userMessage("a", 0), sender: a },
+        { ...userMessage("b", 1), sender: b },
+        userMessage("unknown", 2),
+      ],
+    });
+    for (const id of ["a", "b", "unknown"]) {
+      expect(findLayoutItem(layout, id).isFirstInUserGroup).toBe(true);
+      expect(findLayoutItem(layout, id).isLastInUserGroup).toBe(true);
+    }
+  });
+}

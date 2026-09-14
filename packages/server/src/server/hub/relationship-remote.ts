@@ -1,3 +1,8 @@
+import { SessionActorSchema } from "@getpaseo/protocol/session-authorship";
+import {
+  SessionOperationIdentitySchema,
+  type VerifiedSessionOperationIdentity,
+} from "@getpaseo/protocol/session-operation";
 import { WebSocket } from "ws";
 import { z } from "zod";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
@@ -110,6 +115,12 @@ export interface HubSocketConnection {
 }
 
 export interface HubRelationshipRemote {
+  consumeSessionOperation?(
+    input: Omit<HubAccessTicketConsumption, "accessTicket"> & {
+      sessionOperationTicket: string;
+      digest: string;
+    },
+  ): Promise<VerifiedSessionOperationIdentity>;
   enroll(input: HubEnrollment): Promise<HubEnrollmentResult>;
   updatePermissions(input: HubPermissionUpdate): Promise<{ permissions: string[] }>;
   revoke(input: HubRevocation): Promise<void>;
@@ -142,6 +153,7 @@ const EnrollmentResultSchema = z.object({
 });
 
 const AccessTicketAdmissionSchema = z.object({
+  actor: SessionActorSchema.optional(),
   leaseId: z.string().uuid(),
   principalId: z.string().min(1),
   permissions: z.array(z.string()),
@@ -260,7 +272,38 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         signal,
       });
       if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
-      return parseAccessAdmission(await response.json());
+      return stampAdmissionOrigin(parseAccessAdmission(await response.json()), input.hubOrigin);
+    });
+  }
+
+  async consumeSessionOperation(
+    input: Omit<HubAccessTicketConsumption, "accessTicket"> & {
+      sessionOperationTicket: string;
+      digest: string;
+    },
+  ): Promise<VerifiedSessionOperationIdentity> {
+    return this.withRequestTimeout(async (signal) => {
+      const response = await fetch(`${input.hubOrigin}/api/daemons/access-tickets/consume`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${input.credential}`,
+          "x-paseo-daemon-id": input.daemonId,
+        },
+        body: JSON.stringify({
+          sessionOperationTicket: input.sessionOperationTicket,
+          clientId: input.clientId,
+          digest: input.digest,
+        }),
+        signal,
+      });
+      if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
+      const identity = SessionOperationIdentitySchema.parse(await response.json());
+      const hubOrigin = new URL(input.hubOrigin).origin;
+      return {
+        actor: { ...identity.actor, hubOrigin },
+        ...(identity.channel ? { channel: { ...identity.channel, hubOrigin } } : {}),
+      };
     });
   }
 
@@ -277,7 +320,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         signal,
       });
       if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
-      return parseAccessAdmission(await response.json());
+      return stampAdmissionOrigin(parseAccessAdmission(await response.json()), input.hubOrigin);
     });
   }
 
@@ -387,6 +430,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
 function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
   const admission = AccessTicketAdmissionSchema.parse(value);
   return {
+    actor: admission.actor,
     leaseId: admission.leaseId,
     principalId: admission.principalId,
     permissions: parseDaemonPermissions(admission.permissions),
@@ -402,4 +446,13 @@ function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
     ),
     leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
   };
+}
+
+function stampAdmissionOrigin(
+  admission: ManagedAccessAdmission,
+  origin: string,
+): ManagedAccessAdmission {
+  return admission.actor
+    ? { ...admission, actor: { ...admission.actor, hubOrigin: new URL(origin).origin } }
+    : admission;
 }

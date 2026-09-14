@@ -1,3 +1,4 @@
+import { aggregateWorkspaceAuthorship } from "./agent/session-authorship.js";
 import { resolve } from "node:path";
 import type pino from "pino";
 import type {
@@ -247,10 +248,21 @@ export class WorkspaceDirectory {
         }),
       ),
     );
+    const authorshipAgentsByWorkspaceId = new Map<string, AgentSnapshotPayload[]>();
+    for (const agent of agents) {
+      if (!agent.workspaceId || !this.deps.isProviderVisibleToClient(agent.provider)) continue;
+      const entries = authorshipAgentsByWorkspaceId.get(agent.workspaceId) ?? [];
+      entries.push(agent);
+      authorshipAgentsByWorkspaceId.set(agent.workspaceId, entries);
+    }
     for (let i = 0; i < includedWorkspaces.length; i += 1) {
       const workspaceId = includedWorkspaces[i].workspaceId;
       descriptorsByWorkspaceId.set(workspaceId, {
         ...workspaceDescriptors[i],
+        ...aggregateWorkspaceAuthorship(
+          includedWorkspaces[i],
+          authorshipAgentsByWorkspaceId.get(workspaceId) ?? [],
+        ),
         archivingAt: this.archivingByWorkspaceId.get(workspaceId) ?? null,
       });
     }

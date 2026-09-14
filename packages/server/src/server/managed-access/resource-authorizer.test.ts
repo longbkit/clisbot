@@ -56,7 +56,7 @@ function workspace(workspaceId: string, projectId: string, cwd: string): Persist
 
 function createHarness(
   privileges: readonly ProjectPrivilege[],
-  paths: { projectA?: string; projectB?: string } = {},
+  paths: { projectA?: string; projectB?: string; archivedAgent?: boolean } = {},
 ) {
   const projectA = paths.projectA ?? "/work/a";
   const projectB = paths.projectB ?? "/work/b";
@@ -73,6 +73,7 @@ function createHarness(
         provider: "codex",
         cwd: projectA,
         workspaceId: "workspace-a",
+        ...(paths.archivedAgent ? { archivedAt: "2026-01-01T00:00:00Z" } : {}),
         config: {
           provider: "codex",
           cwd: projectA,
@@ -937,4 +938,19 @@ describe("managed resource denial explanations", () => {
       ).resolves.toBe("resource_not_found");
     }
   });
+});
+
+it("authorizes retained file tokens by the owning archived Agent, never the supplied cwd", async () => {
+  const authorizer = createHarness(["project.use"], { archivedAgent: true });
+  const request = {
+    type: "file_download_token_request" as const,
+    requestId: "download",
+    cwd: "/work/a",
+    path: "uploads/file/file.txt",
+  };
+  await expect(authorizer.allowsInbound({ ...request, agentId: "agent-a" })).resolves.toBe(true);
+  await expect(authorizer.allowsInbound({ ...request, agentId: "agent-b" })).resolves.toBe(false);
+  await expect(authorizer.allowsInbound({ ...request, agentId: "agent-legacy" })).resolves.toBe(
+    false,
+  );
 });

@@ -1,3 +1,4 @@
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import type {
   DaemonClient,
   FetchAgentsEntry,
@@ -384,7 +385,16 @@ export class DirectorySync {
   ): Promise<Awaited<ReturnType<DaemonClient["fetchAgentTimeline"]>>> {
     const { client } = this.requireOnline();
     const token = this.agents.captureTimeline(agentId);
-    const page = await fetchAgentTimelineOnce(client, agentId, request);
+    const sourceRanges = sessionStorageReadable(
+      useSessionStore.getState().sessions[this.serverId]?.serverInfo,
+    );
+    const page = await fetchAgentTimelineOnce(
+      client,
+      agentId,
+      sourceRanges && request?.projection !== "canonical"
+        ? { ...request, pagingMode: "source_ranges" }
+        : request,
+    );
     if (page.agent && this.agents.submitTimelineAgent(token, page.agent)) {
       this.revision += 1;
       this.persistDirectory();

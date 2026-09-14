@@ -1,4 +1,5 @@
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import { nameInitials } from "@/utils/name-initials";
 
 export interface HubSidebarAccountPresentation {
   accessibilityLabel: string;
@@ -16,11 +17,7 @@ export function resolveHubSidebarAccountPresentation(input: {
   const { account } = input;
   const name = account.name.trim();
   const email = account.email.trim();
-  const words = name.split(/\s+/u).filter(Boolean);
-  const first = words.at(0)?.at(0);
-  const last = words.length > 1 ? words.at(-1)?.at(0) : undefined;
-  const fallback = email.at(0);
-  const initials = `${first ?? fallback ?? "?"}${last ?? ""}`.toUpperCase();
+  const initials = nameInitials(name, email.at(0));
   const tooltip = name || email || "Hub account";
 
   return {

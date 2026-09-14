@@ -227,6 +227,7 @@ function selectForkContextRows(input: {
   boundaryMessageId?: string | null;
 }): {
   items: AgentTimelineItem[];
+  endSeq: number;
   boundaryCursor: { epoch: string; seq: number } | null;
   boundaryMessageId: string | null;
 } {
@@ -236,6 +237,7 @@ function selectForkContextRows(input: {
     const projected = projectTimelineRows({ rows: input.rows, mode: "projected" });
     return {
       items: projected.map((entry) => entry.item),
+      endSeq: input.rows.at(-1)?.seq ?? 0,
       boundaryCursor: null,
       boundaryMessageId: null,
     };
@@ -264,6 +266,7 @@ function selectForkContextRows(input: {
 
   return {
     items: projected.map((entry) => entry.item),
+    endSeq: selectedRows.at(-1)?.seq ?? 0,
     boundaryCursor,
     boundaryMessageId,
   };
@@ -293,6 +296,7 @@ function buildForkContextText(input: {
 
 export function buildAgentForkContextAttachment(input: {
   rows: readonly AgentTimelineRow[];
+  sourceSession?: { agentId: string; epoch: string };
   cursorBoundary?: ForkCursorBoundary | null;
   boundaryMessageId?: string | null;
   agentTitle?: string | null;
@@ -323,6 +327,9 @@ export function buildAgentForkContextAttachment(input: {
       type: "text",
       mimeType: "text/plain",
       contextKind: "chat_history",
+      ...(input.sourceSession
+        ? { sourceSession: { ...input.sourceSession, seq: selected.endSeq } }
+        : {}),
       title: "Chat history",
       text: buildForkContextText({
         body,

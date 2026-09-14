@@ -1,3 +1,4 @@
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import type { DaemonPermission } from "../authorization/index.js";
 import type { ManagedAccessMode as ProtocolManagedAccessMode } from "@getpaseo/protocol/managed-access";
 // One definition of the product privilege vocabulary, shared with the Hub via a
@@ -31,6 +32,7 @@ export interface SessionResourceAuthorization {
 
 /** Hub-resolved authority. The daemon evaluates exact leaves, never Hub roles. */
 export interface ManagedAccessAdmission extends SessionResourceAuthorization {
+  actor?: SessionActor;
   principalId: string;
   permissions: readonly DaemonPermission[];
 }

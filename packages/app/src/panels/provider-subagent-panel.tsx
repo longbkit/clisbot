@@ -1,25 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useShallow } from "zustand/react/shallow";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import { AgentStreamView } from "@/agent-stream/view";
 import { getProviderIcon } from "@/components/provider-icons";
 import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
 import { usePaneContext } from "@/panels/pane-context";
 import { definePanel, type PanelDescriptor } from "@/panels/panel-registry";
 import { useSessionStore } from "@/stores/session-store";
+import { useSubagentTimelineHistory } from "@/subagents/use-subagent-timeline-history";
 import {
   providerSubagentKey,
   providerSubagentLifecycleStatus,
   refreshProviderSubagents,
+  setProviderSubagentTimelineReading,
   useProviderSubagentStore,
 } from "@/subagents/provider-store";
 import { useTranslation } from "react-i18next";
 import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { TIMELINE_FETCH_PAGE_SIZE } from "@/timeline/timeline-fetch-policy";
 import type { TurnPresentation } from "@/timeline/turn-liveness";
 
 const EMPTY_PERMISSIONS = new Map<string, PendingPermission>();
@@ -88,59 +91,42 @@ function ProviderSubagentPanel() {
   const serverInfo = useSessionStore((state) => state.sessions[serverId]?.serverInfo ?? null);
   // COMPAT(providerSubagents): added in v0.2.11, remove after 2027-01-12.
   const supported = serverInfo?.features?.providerSubagents === true;
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const readable = sessionStorageReadable(serverInfo);
+  const isActive = useRetainedPanelActive();
+  const history = useSubagentTimelineHistory({
+    client,
+    serverId,
+    parentAgentId: target.parentAgentId,
+    subagentId: target.subagentId,
+    supported,
+    readable,
+    isActive,
+  });
+
+  useEffect(() => {
+    setProviderSubagentTimelineReading(serverId, target.parentAgentId, target.subagentId, isActive);
+    return () =>
+      setProviderSubagentTimelineReading(serverId, target.parentAgentId, target.subagentId, false);
+  }, [serverId, target.parentAgentId, target.subagentId, isActive]);
+
+  const reportReadingPosition = useCallback(
+    (rowId: string | null) => {
+      setProviderSubagentTimelineReading(
+        serverId,
+        target.parentAgentId,
+        target.subagentId,
+        isActive,
+        rowId,
+      );
+    },
+    [serverId, target.parentAgentId, target.subagentId, isActive],
+  );
 
   useEffect(() => {
     if (!client || !supported) return;
     void refreshProviderSubagents(client, serverId, target.parentAgentId).catch(() => undefined);
   }, [client, serverId, supported, target.parentAgentId]);
 
-  useEffect(() => {
-    if (!client || !supported) return;
-    void client
-      .fetchProviderSubagentTimeline(target.parentAgentId, target.subagentId, {
-        direction: "tail",
-        limit: TIMELINE_FETCH_PAGE_SIZE,
-      })
-      .then((payload) => {
-        useProviderSubagentStore.getState().replaceTimeline(serverId, payload);
-        return undefined;
-      })
-      .catch(() => undefined);
-  }, [client, serverId, supported, target.parentAgentId, target.subagentId]);
-
-  const loadOlder = useCallback((): boolean => {
-    if (!client || !supported || isLoadingOlder || !timeline?.hasOlder || !timeline.epoch) {
-      return false;
-    }
-    const firstSeq = timeline.rows.size ? Math.min(...timeline.rows.keys()) : null;
-    if (firstSeq === null) return false;
-    setIsLoadingOlder(true);
-    void client
-      .fetchProviderSubagentTimeline(target.parentAgentId, target.subagentId, {
-        direction: "before",
-        cursor: { epoch: timeline.epoch, seq: firstSeq },
-        limit: TIMELINE_FETCH_PAGE_SIZE,
-      })
-      .then((payload) => {
-        useProviderSubagentStore.getState().replaceTimeline(serverId, payload);
-        return undefined;
-      })
-      .catch(() => undefined)
-      .finally(() => setIsLoadingOlder(false));
-    return true;
-  }, [
-    client,
-    isLoadingOlder,
-    serverId,
-    supported,
-    target.parentAgentId,
-    target.subagentId,
-    timeline,
-  ]);
-  const firstTimelineSeq = timeline?.rows.size ? Math.min(...timeline.rows.keys()) : null;
-  const progressKey =
-    timeline?.epoch && firstTimelineSeq !== null ? `${timeline.epoch}:${firstTimelineSeq}` : null;
   const subtitle = descriptor?.subtitle?.trim();
 
   const streamContext = useMemo<AgentScreenAgent>(
@@ -154,15 +140,6 @@ function ProviderSubagentPanel() {
       projectPlacement: parent?.projectPlacement,
     }),
     [descriptor, parent, serverId, streamId],
-  );
-  const historyPagination = useMemo(
-    () => ({
-      hasOlder: timeline?.hasOlder === true,
-      isLoadingOlder,
-      progressKey,
-      onLoadOlder: loadOlder,
-    }),
-    [isLoadingOlder, loadOlder, progressKey, timeline?.hasOlder],
   );
   const turnPresentation = useMemo<TurnPresentation>(
     () => ({
@@ -195,18 +172,27 @@ function ProviderSubagentPanel() {
           </Text>
         </View>
       ) : null}
+      {history.historyError || timeline?.error ? (
+        <Text style={styles.unsupportedText} accessibilityRole="alert">
+          {history.historyError ?? timeline?.error}
+        </Text>
+      ) : null}
       <AgentStreamView
         agentId={streamId}
+        historyAgentId={null}
+        timelineAgentId={target.parentAgentId}
+        timelineSubagentId={target.subagentId}
         serverId={serverId}
         context={streamContext}
         streamItems={timeline?.tail ?? EMPTY_STREAM_ITEMS}
         streamHead={timeline?.head ?? EMPTY_STREAM_ITEMS}
         turnPresentation={turnPresentation}
         pendingPermissions={EMPTY_PERMISSIONS}
-        isAuthoritativeHistoryReady
+        isAuthoritativeHistoryReady={timeline?.historyReady === true}
+        onReadingPositionChange={reportReadingPosition}
         onOpenWorkspaceFile={openFileInWorkspace}
         readOnly
-        historyPagination={historyPagination}
+        historyPagination={history}
       />
     </View>
   );

@@ -1,4 +1,7 @@
+import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
+import type { ProjectedTimelinePageSelection } from "./timeline-projection.js";
+import type { TimelinePromptIndex } from "./timeline-prompt-index.js";
 
 export interface AgentTimelineRow {
   seq: number;
@@ -16,6 +19,8 @@ export interface AgentTimelineCursor {
 export type AgentTimelineFetchDirection = "tail" | "before" | "after";
 
 export interface AgentTimelineFetchOptions {
+  pagingMode?: "source_ranges";
+  allowDeferredPayloads?: true;
   direction?: AgentTimelineFetchDirection;
   cursor?: AgentTimelineCursor;
   /**
@@ -31,6 +36,23 @@ export interface AgentTimelineWindow {
   maxSeq: number;
   nextSeq: number;
 }
+export interface TimelineDocumentReadOptions {
+  epoch: string;
+  id: string;
+  offset?: number;
+  limit?: number;
+  seq?: number;
+}
+export interface TimelineDocumentPage {
+  text: string;
+  nextOffset: number | null;
+  totalBytes: number;
+}
+export interface TimelineSourceRangePage {
+  ranges: { startSeq: number; endSeq: number }[];
+  nextOffset: number | null;
+  totalCount: number;
+}
 
 export interface AgentTimelineFetchResult {
   epoch: string;
@@ -45,6 +67,58 @@ export interface AgentTimelineFetchResult {
 }
 
 export interface AgentTimelineStore {
+  listPromptIndex?(agentId: string): Promise<TimelinePromptIndex>;
+  readProjectedPayload?(
+    agentId: string,
+    options: TimelineDocumentReadOptions,
+  ): Promise<TimelineDocumentPage>;
+  readProjectedSourceRanges?(
+    agentId: string,
+    options: TimelineDocumentReadOptions,
+  ): Promise<TimelineSourceRangePage>;
+  setAuthorshipRecoveryRefill?(refill: () => Promise<readonly string[]>): void;
+  requestAuthorshipRecoverySweep?(): void;
+  scheduleAuthorshipRecovery?(agentId: string, prioritize?: boolean): boolean;
+  recoverAuthorship?(
+    agentId: string,
+  ): Promise<import("./session-storage/session-summary.js").DurableSessionSummary>;
+  writeMessageSubmission?(
+    agentId: string,
+    record: import("./session-storage/message-submissions.js").MessageSubmission,
+  ): Promise<{
+    record: import("./session-storage/message-submissions.js").MessageSubmission;
+    created: boolean;
+  }>;
+  fetchProjectedCommitted?(
+    agentId: string,
+    options?: AgentTimelineFetchOptions,
+  ): Promise<AgentTimelineFetchResult & ProjectedTimelinePageSelection>;
+  getUserMessageByProviderId?(agentId: string, id: string): Promise<AgentTimelineRow | null>;
+  replaceCommitted?(
+    agentId: string,
+    rows: readonly AgentTimelineRow[],
+    options?: { epoch?: string },
+  ): Promise<string>;
+  resetCommitted?(agentId: string, options?: { epoch?: string }): Promise<string>;
+  getEpoch?(agentId: string): Promise<string>;
+  getSubmittedUserMessage?(
+    agentId: string,
+    clientMessageId: string,
+  ): Promise<AgentTimelineRow | null>;
+  readPermissionResponse?(
+    agentId: string,
+    id: string,
+  ): Promise<AgentPermissionResponseRecord | null>;
+  appendPermissionResponse?(
+    agentId: string,
+    record: AgentPermissionResponseRecord,
+    identity?: import("./session-authorship.js").SessionOperationIdentity,
+  ): Promise<void>;
+  fetchPermissionResponses?(
+    agentId: string,
+    options?: { cursor?: number; limit?: number },
+  ): Promise<{ records: AgentPermissionResponseRecord[]; nextCursor?: number }>;
+  flush?(): Promise<void>;
   appendCommitted(
     agentId: string,
     item: AgentTimelineItem,

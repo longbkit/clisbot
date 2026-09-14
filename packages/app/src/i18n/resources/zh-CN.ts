@@ -200,6 +200,7 @@ export const zhCN: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "Agent",
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",
@@ -281,6 +282,9 @@ export const zhCN: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "你",
+    },
     diagram: {
       diagram: "图表",
       zoomIn: "放大",

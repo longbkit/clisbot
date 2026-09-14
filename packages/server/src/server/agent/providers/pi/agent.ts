@@ -1,3 +1,4 @@
+import type { AutomaticPermissionResponder } from "../../agent-sdk-types.js";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -1218,6 +1219,16 @@ function createRuntime(
 }
 
 export class PiRpcAgentSession implements AgentSession {
+  private automaticPermissionResponder?: AutomaticPermissionResponder;
+  setAutomaticPermissionResponder(responder: AutomaticPermissionResponder): void {
+    this.automaticPermissionResponder = responder;
+  }
+  private respondToAutomaticPermission(requestId: string, response: AgentPermissionResponse) {
+    return this.automaticPermissionResponder
+      ? this.automaticPermissionResponder(requestId, response)
+      : this.respondToPermission(requestId, response);
+  }
+
   readonly provider: AgentProvider;
   readonly capabilities: AgentCapabilityFlags;
 
@@ -1427,7 +1438,7 @@ export class PiRpcAgentSession implements AgentSession {
     const requestIds = Array.from(this.pendingExtensionUiRequests.keys());
     for (const requestId of requestIds) {
       if (!this.pendingExtensionUiRequests.has(requestId)) continue;
-      await this.respondToPermission(requestId, {
+      await this.respondToAutomaticPermission(requestId, {
         behavior: "deny",
         message: "The user answered with a message instead of approving. Their message follows.",
       });

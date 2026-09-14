@@ -1,0 +1,242 @@
+{
+  "startedAt": "2026-09-12T01:44:59.563Z",
+  "endedAt": "2026-09-12T01:46:03.821Z",
+  "sourceStart": {
+    "head": "3e4df80f43ad78218486ac1b3414f98fc71c6b17",
+    "upstream": "fa93c4290eaa87ae58452ab6e2012f85ae6e0c6b",
+    "status": "M CLAUDE.md\n D docs/audits/2026-09-08-workspace-placement-and-session-authorship.md\n M docs/data-model.md\n M docs/features/workspace-organization/README.md\n M docs/hub.md\n M docs/timeline-sync.md\n M packages/app/e2e/support/global-setup.ts\n M packages/app/src/agent-stream/layout.test.ts\n M packages/app/src/agent-stream/layout.ts\n M packages/app/src/agent-stream/prompt-jump-settle.test.ts\n M packages/app/src/agent-stream/prompt-jump-settle.ts\n M packages/app/src/agent-stream/strategy-native.tsx\n M packages/app/src/agent-stream/strategy-web.tsx\n M packages/app/src/agent-stream/strategy.ts\n M packages/app/src/agent-stream/use-scroll-to-message.web.ts\n M packages/app/src/agent-stream/view.tsx\n M packages/app/src/attachments/service.ts\n M packages/app/src/components/left-sidebar.tsx\n M packages/app/src/components/message.tsx\n M packages/app/src/components/sidebar-workspace-list.tsx\n M packages/app/src/components/sidebar/display-preferences/menu.tsx\n M packages/app/src/components/sidebar/display-preferences/model.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.test.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.ts\n M packages/app/src/components/sidebar/empty-states.tsx\n M packages/app/src/components/sidebar/sidebar-model.tsx\n M packages/app/src/components/sidebar/sidebar-workspace-row-content.tsx\n M packages/app/src/composer/actions.ts\n M packages/app/src/composer/draft/workspace-tab.tsx\n M packages/app/src/composer/index.tsx\n M packages/app/src/contexts/session-context.tsx\n M packages/app/src/hooks/sidebar-workspaces-view-model.ts\n M packages/app/src/hooks/use-settings/storage.ts\n M packages/app/src/panels/panel-manifest.ts\n M packages/app/src/panels/provider-subagent-panel.tsx\n M packages/app/src/panels/register-panels.ts\n M packages/app/src/runtime/directory-sync/index.ts\n M packages/app/src/runtime/replica-cache/index.test.ts\n M packages/app/src/runtime/replica-cache/index.ts\n M packages/app/src/screens/workspace/workspace-screen.tsx\n M packages/app/src/screens/workspace/workspace-tab-menu.ts\n M packages/app/src/stores/session-store.ts\n M packages/app/src/stores/sidebar-view-store.test.ts\n M packages/app/src/stores/sidebar-view-store.ts\n M packages/app/src/stores/workspace-layout-store.ts\n M packages/app/src/subagents/provider-store.test.ts\n M packages/app/src/subagents/provider-store.ts\n M packages/app/src/timeline/replica.test.ts\n M packages/app/src/timeline/session-stream-reducers.test.ts\n M packages/app/src/timeline/session-stream-reducers.ts\n M packages/app/src/timeline/viewed-timeline-sync.ts\n M packages/app/src/tool-calls/detail-level/grouping.ts\n M packages/app/src/types/stream.ts\n M packages/app/src/utils/agent-snapshots.ts\n M packages/app/src/workspace-tabs/identity.ts\n M packages/app/src/workspace-tabs/model.ts\n M packages/app/test-stubs/lucide-react-native.ts\n M packages/app/vitest.config.ts\n M packages/client/src/daemon-client.test.ts\n M packages/client/src/daemon-client.ts\n M packages/hub/src/app.ts\n M packages/hub/src/application-runtime.ts\n M packages/hub/src/channels/approvals/index.ts\n M packages/hub/src/channels/bindings/bindings.test.ts\n M packages/hub/src/channels/bindings/index.ts\n M packages/hub/src/channels/commands-lifecycle-queue.test.ts\n M packages/hub/src/channels/commands-lifecycle-queue.ts\n M packages/hub/src/channels/commands-lifecycle.test.ts\n M packages/hub/src/channels/commands-lifecycle.ts\n M packages/hub/src/channels/daemon/client.ts\n M packages/hub/src/channels/daemon/types.ts\n M packages/hub/src/channels/daemon/ws-client.ts\n M packages/hub/src/channels/execution.ts\n M packages/hub/src/channels/plane/types.ts\n M packages/hub/src/channels/supervisor/index.ts\n M packages/hub/src/channels/supervisor/types.ts\n M packages/hub/src/daemons/lifecycle.ts\n M packages/hub/src/daemons/protocol.ts\n M packages/hub/src/daemons/registry.ts\n M packages/hub/src/hub/protocol.ts\n M packages/hub/src/managed-access/http.ts\n M packages/hub/src/managed-access/tickets.ts\n M packages/hub/src/management-api/index.ts\n M packages/hub/src/public-operations/index.ts\n M packages/hub/src/public-operations/types.ts\n M packages/hub/src/triggers/channel/provider.ts\n M packages/hub/src/triggers/manual/provider.ts\n M packages/hub/src/triggers/manual/source.test.ts\n M packages/hub/src/triggers/manual/source.ts\n M packages/protocol/src/agent-types.ts\n M packages/protocol/src/client-capabilities.ts\n M packages/protocol/src/messages.ts\n M packages/server/src/server/agent/activity-curator.test.ts\n M packages/server/src/server/agent/activity-curator.ts\n M packages/server/src/server/agent/agent-manager.test.ts\n M packages/server/src/server/agent/agent-manager.ts\n M packages/server/src/server/agent/agent-projections.ts\n M packages/server/src/server/agent/agent-prompt.ts\n M packages/server/src/server/agent/agent-run-state.ts\n M packages/server/src/server/agent/agent-sdk-types.ts\n M packages/server/src/server/agent/agent-storage.test.ts\n M packages/server/src/server/agent/agent-storage.ts\n M packages/server/src/server/agent/agent-stream-coalescer.ts\n M packages/server/src/server/agent/agent-timeline-store-types.ts\n M packages/server/src/server/agent/agent-timeline-store.ts\n M packages/server/src/server/agent/create-agent/create.ts\n M packages/server/src/server/agent/permission-response.ts\n M packages/server/src/server/agent/provider-registry.ts\n M packages/server/src/server/agent/provider-subagents/store.ts\n M packages/server/src/server/agent/providers/acp-agent.test.ts\n M packages/server/src/server/agent/providers/acp-agent.ts\n M packages/server/src/server/agent/providers/claude/agent.test.ts\n M packages/server/src/server/agent/providers/claude/agent.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.test.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.ts\n M packages/server/src/server/agent/providers/opencode-agent.ts\n M packages/server/src/server/agent/providers/pi/agent.test.ts\n M packages/server/src/server/agent/providers/pi/agent.ts\n M packages/server/src/server/agent/timeline-projection.ts\n M packages/server/src/server/authorization/operation-permissions.ts\n M packages/server/src/server/bootstrap.ts\n M packages/server/src/server/config.ts\n M packages/server/src/server/file-download/token-store.ts\n M packages/server/src/server/file-upload/index.ts\n M packages/server/src/server/hub/daemon-executions.test.ts\n M packages/server/src/server/hub/daemon-executions.ts\n M packages/server/src/server/hub/execution-controller.ts\n M packages/server/src/server/hub/relationship-controller.ts\n M packages/server/src/server/hub/relationship-remote.ts\n M packages/server/src/server/hub/test-utils/relationship-harness.ts\n M packages/server/src/server/managed-access/resource-authorizer.test.ts\n M packages/server/src/server/managed-access/resource-authorizer.ts\n M packages/server/src/server/managed-access/types.ts\n M packages/server/src/server/persisted-config.ts\n M packages/server/src/server/session.test.ts\n M packages/server/src/server/session.ts\n M packages/server/src/server/session/files/workspace-files-session.ts\n M packages/server/src/server/test-utils/paseo-daemon.ts\n M packages/server/src/server/websocket-server.ts\n M packages/server/src/server/workspace-directory.ts\n M packages/server/src/server/workspace-registry.ts\n?? docs/features/agent-session-storage/\n?? packages/app/e2e/browser/session-profile.ui-contract.spec.ts\n?? packages/app/e2e/support/static-app-server.ts\n?? packages/app/scripts/verify-e2e-static-app.ts\n?? packages/app/src/agent-stream/deferred-timeline-item.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.test.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.ts\n?? packages/app/src/clisbot/session-storage/\n?? packages/app/src/subagents/projected-timeline.test.ts\n?? packages/app/src/subagents/projected-timeline.ts\n?? packages/app/src/subagents/timeline-retention.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.test.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.ts\n?? packages/app/src/timeline/timeline-page-retention.test.ts\n?? packages/app/src/timeline/timeline-page-retention.ts\n?? packages/app/src/timeline/timeline-retention-owner.ts\n?? packages/app/test-stubs/expo-router.ts\n?? packages/hub/src/channels/daemon/session-operation.test.ts\n?? packages/hub/src/channels/daemon/session-operation.ts\n?? packages/hub/src/managed-access/automation-session-identity.ts\n?? packages/hub/src/managed-access/session-operation-tickets.test.ts\n?? packages/hub/src/managed-access/session-operation-tickets.ts\n?? packages/protocol/src/session-authorship.ts\n?? packages/protocol/src/session-operation.ts\n?? packages/server/scripts/rollback-session-layout.ts\n?? packages/server/scripts/session-storage-benchmark/\n?? packages/server/src/server/agent/permission-generation-projection.ts\n?? packages/server/src/server/agent/permission-response-journal.test.ts\n?? packages/server/src/server/agent/permission-response-journal.ts\n?? packages/server/src/server/agent/provider-subagents/admission.test.ts\n?? packages/server/src/server/agent/provider-subagents/metadata-limits.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.test.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.ts\n?? packages/server/src/server/agent/session-authorship.test.ts\n?? packages/server/src/server/agent/session-authorship.ts\n?? packages/server/src/server/agent/session-operation-context.ts\n?? packages/server/src/server/agent/session-storage/\n?? packages/server/src/server/file-download/token-store.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.test.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.ts\n?? packages/server/src/server/file-upload/session-files.test.ts\n?? packages/server/src/server/file-upload/session-files.ts\n?? packages/server/src/server/official-session-storage-matrix.test.ts\n?? packages/server/src/server/session-file-download-transport.test.ts\n?? packages/server/src/server/session/files/session-file-download.test.ts\n?? scripts/rehearse-agent-session-storage-merge.mjs\n?? scripts/stage-session-storage-official-app.mjs\n?? scripts/stage-session-storage-official-artifacts.mjs",
+    "trackedDiffSha256": "5ea3b35fffa3fed544d6400f58d185000ca1e67aee799c71fd0a7cb8f9c47714",
+    "untrackedContentSha256": "9dd753986792eb144d17e7982391ba4e732513a40f002d1d55f88663c448a161"
+  },
+  "sourceEnd": {
+    "head": "3e4df80f43ad78218486ac1b3414f98fc71c6b17",
+    "upstream": "fa93c4290eaa87ae58452ab6e2012f85ae6e0c6b",
+    "status": "M CLAUDE.md\n D docs/audits/2026-09-08-workspace-placement-and-session-authorship.md\n M docs/data-model.md\n M docs/features/workspace-organization/README.md\n M docs/hub.md\n M docs/timeline-sync.md\n M packages/app/e2e/support/global-setup.ts\n M packages/app/src/agent-stream/layout.test.ts\n M packages/app/src/agent-stream/layout.ts\n M packages/app/src/agent-stream/prompt-jump-settle.test.ts\n M packages/app/src/agent-stream/prompt-jump-settle.ts\n M packages/app/src/agent-stream/strategy-native.tsx\n M packages/app/src/agent-stream/strategy-web.tsx\n M packages/app/src/agent-stream/strategy.ts\n M packages/app/src/agent-stream/use-scroll-to-message.web.ts\n M packages/app/src/agent-stream/view.tsx\n M packages/app/src/attachments/service.ts\n M packages/app/src/components/left-sidebar.tsx\n M packages/app/src/components/message.tsx\n M packages/app/src/components/sidebar-workspace-list.tsx\n M packages/app/src/components/sidebar/display-preferences/menu.tsx\n M packages/app/src/components/sidebar/display-preferences/model.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.test.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.ts\n M packages/app/src/components/sidebar/empty-states.tsx\n M packages/app/src/components/sidebar/sidebar-model.tsx\n M packages/app/src/components/sidebar/sidebar-workspace-row-content.tsx\n M packages/app/src/composer/actions.ts\n M packages/app/src/composer/draft/workspace-tab.tsx\n M packages/app/src/composer/index.tsx\n M packages/app/src/contexts/session-context.tsx\n M packages/app/src/hooks/sidebar-workspaces-view-model.ts\n M packages/app/src/hooks/use-settings/storage.ts\n M packages/app/src/panels/panel-manifest.ts\n M packages/app/src/panels/provider-subagent-panel.tsx\n M packages/app/src/panels/register-panels.ts\n M packages/app/src/runtime/directory-sync/index.ts\n M packages/app/src/runtime/replica-cache/index.test.ts\n M packages/app/src/runtime/replica-cache/index.ts\n M packages/app/src/screens/workspace/workspace-screen.tsx\n M packages/app/src/screens/workspace/workspace-tab-menu.ts\n M packages/app/src/stores/session-store.ts\n M packages/app/src/stores/sidebar-view-store.test.ts\n M packages/app/src/stores/sidebar-view-store.ts\n M packages/app/src/stores/workspace-layout-store.ts\n M packages/app/src/subagents/provider-store.test.ts\n M packages/app/src/subagents/provider-store.ts\n M packages/app/src/timeline/replica.test.ts\n M packages/app/src/timeline/session-stream-reducers.test.ts\n M packages/app/src/timeline/session-stream-reducers.ts\n M packages/app/src/timeline/viewed-timeline-sync.ts\n M packages/app/src/tool-calls/detail-level/grouping.ts\n M packages/app/src/types/stream.ts\n M packages/app/src/utils/agent-snapshots.ts\n M packages/app/src/workspace-tabs/identity.ts\n M packages/app/src/workspace-tabs/model.ts\n M packages/app/test-stubs/lucide-react-native.ts\n M packages/app/vitest.config.ts\n M packages/client/src/daemon-client.test.ts\n M packages/client/src/daemon-client.ts\n M packages/hub/src/app.ts\n M packages/hub/src/application-runtime.ts\n M packages/hub/src/channels/approvals/index.ts\n M packages/hub/src/channels/bindings/bindings.test.ts\n M packages/hub/src/channels/bindings/index.ts\n M packages/hub/src/channels/commands-lifecycle-queue.test.ts\n M packages/hub/src/channels/commands-lifecycle-queue.ts\n M packages/hub/src/channels/commands-lifecycle.test.ts\n M packages/hub/src/channels/commands-lifecycle.ts\n M packages/hub/src/channels/daemon/client.ts\n M packages/hub/src/channels/daemon/types.ts\n M packages/hub/src/channels/daemon/ws-client.ts\n M packages/hub/src/channels/execution.ts\n M packages/hub/src/channels/plane/types.ts\n M packages/hub/src/channels/supervisor/index.ts\n M packages/hub/src/channels/supervisor/types.ts\n M packages/hub/src/daemons/lifecycle.ts\n M packages/hub/src/daemons/protocol.ts\n M packages/hub/src/daemons/registry.ts\n M packages/hub/src/hub/protocol.ts\n M packages/hub/src/managed-access/http.ts\n M packages/hub/src/managed-access/tickets.ts\n M packages/hub/src/management-api/index.ts\n M packages/hub/src/public-operations/index.ts\n M packages/hub/src/public-operations/types.ts\n M packages/hub/src/triggers/channel/provider.ts\n M packages/hub/src/triggers/manual/provider.ts\n M packages/hub/src/triggers/manual/source.test.ts\n M packages/hub/src/triggers/manual/source.ts\n M packages/protocol/src/agent-types.ts\n M packages/protocol/src/client-capabilities.ts\n M packages/protocol/src/messages.ts\n M packages/server/src/server/agent/activity-curator.test.ts\n M packages/server/src/server/agent/activity-curator.ts\n M packages/server/src/server/agent/agent-manager.test.ts\n M packages/server/src/server/agent/agent-manager.ts\n M packages/server/src/server/agent/agent-projections.ts\n M packages/server/src/server/agent/agent-prompt.ts\n M packages/server/src/server/agent/agent-run-state.ts\n M packages/server/src/server/agent/agent-sdk-types.ts\n M packages/server/src/server/agent/agent-storage.test.ts\n M packages/server/src/server/agent/agent-storage.ts\n M packages/server/src/server/agent/agent-stream-coalescer.ts\n M packages/server/src/server/agent/agent-timeline-store-types.ts\n M packages/server/src/server/agent/agent-timeline-store.ts\n M packages/server/src/server/agent/create-agent/create.ts\n M packages/server/src/server/agent/permission-response.ts\n M packages/server/src/server/agent/provider-registry.ts\n M packages/server/src/server/agent/provider-subagents/store.ts\n M packages/server/src/server/agent/providers/acp-agent.test.ts\n M packages/server/src/server/agent/providers/acp-agent.ts\n M packages/server/src/server/agent/providers/claude/agent.test.ts\n M packages/server/src/server/agent/providers/claude/agent.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.test.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.ts\n M packages/server/src/server/agent/providers/opencode-agent.ts\n M packages/server/src/server/agent/providers/pi/agent.test.ts\n M packages/server/src/server/agent/providers/pi/agent.ts\n M packages/server/src/server/agent/timeline-projection.ts\n M packages/server/src/server/authorization/operation-permissions.ts\n M packages/server/src/server/bootstrap.ts\n M packages/server/src/server/config.ts\n M packages/server/src/server/file-download/token-store.ts\n M packages/server/src/server/file-upload/index.ts\n M packages/server/src/server/hub/daemon-executions.test.ts\n M packages/server/src/server/hub/daemon-executions.ts\n M packages/server/src/server/hub/execution-controller.ts\n M packages/server/src/server/hub/relationship-controller.ts\n M packages/server/src/server/hub/relationship-remote.ts\n M packages/server/src/server/hub/test-utils/relationship-harness.ts\n M packages/server/src/server/managed-access/resource-authorizer.test.ts\n M packages/server/src/server/managed-access/resource-authorizer.ts\n M packages/server/src/server/managed-access/types.ts\n M packages/server/src/server/persisted-config.ts\n M packages/server/src/server/session.test.ts\n M packages/server/src/server/session.ts\n M packages/server/src/server/session/files/workspace-files-session.ts\n M packages/server/src/server/test-utils/paseo-daemon.ts\n M packages/server/src/server/websocket-server.ts\n M packages/server/src/server/workspace-directory.ts\n M packages/server/src/server/workspace-registry.ts\n?? docs/features/agent-session-storage/\n?? packages/app/e2e/browser/session-profile.ui-contract.spec.ts\n?? packages/app/e2e/support/static-app-server.ts\n?? packages/app/scripts/verify-e2e-static-app.ts\n?? packages/app/src/agent-stream/deferred-timeline-item.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.test.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.ts\n?? packages/app/src/clisbot/session-storage/\n?? packages/app/src/subagents/projected-timeline.test.ts\n?? packages/app/src/subagents/projected-timeline.ts\n?? packages/app/src/subagents/timeline-retention.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.test.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.ts\n?? packages/app/src/timeline/timeline-page-retention.test.ts\n?? packages/app/src/timeline/timeline-page-retention.ts\n?? packages/app/src/timeline/timeline-retention-owner.ts\n?? packages/app/test-stubs/expo-router.ts\n?? packages/hub/src/channels/daemon/session-operation.test.ts\n?? packages/hub/src/channels/daemon/session-operation.ts\n?? packages/hub/src/managed-access/automation-session-identity.ts\n?? packages/hub/src/managed-access/session-operation-tickets.test.ts\n?? packages/hub/src/managed-access/session-operation-tickets.ts\n?? packages/protocol/src/session-authorship.ts\n?? packages/protocol/src/session-operation.ts\n?? packages/server/scripts/rollback-session-layout.ts\n?? packages/server/scripts/session-storage-benchmark/\n?? packages/server/src/server/agent/permission-generation-projection.ts\n?? packages/server/src/server/agent/permission-response-journal.test.ts\n?? packages/server/src/server/agent/permission-response-journal.ts\n?? packages/server/src/server/agent/provider-subagents/admission.test.ts\n?? packages/server/src/server/agent/provider-subagents/metadata-limits.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.test.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.ts\n?? packages/server/src/server/agent/session-authorship.test.ts\n?? packages/server/src/server/agent/session-authorship.ts\n?? packages/server/src/server/agent/session-operation-context.ts\n?? packages/server/src/server/agent/session-storage/\n?? packages/server/src/server/file-download/token-store.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.test.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.ts\n?? packages/server/src/server/file-upload/session-files.test.ts\n?? packages/server/src/server/file-upload/session-files.ts\n?? packages/server/src/server/official-session-storage-matrix.test.ts\n?? packages/server/src/server/session-file-download-transport.test.ts\n?? packages/server/src/server/session/files/session-file-download.test.ts\n?? scripts/rehearse-agent-session-storage-merge.mjs\n?? scripts/stage-session-storage-official-app.mjs\n?? scripts/stage-session-storage-official-artifacts.mjs",
+    "trackedDiffSha256": "5ea3b35fffa3fed544d6400f58d185000ca1e67aee799c71fd0a7cb8f9c47714",
+    "untrackedContentSha256": "9dd753986792eb144d17e7982391ba4e732513a40f002d1d55f88663c448a161"
+  },
+  "root": "/tmp/session-derived-allocation-stage13",
+  "count": 1000,
+  "dataset": "Half continuous Unicode reply chunks; half alternating user rows and one ancient tool with distinct growing metadata fields/ranges. Bulk20 durable acknowledgements; every canonical row verified.",
+  "environment": {
+    "node": "v22.23.2",
+    "execArgv": ["--expose-gc", "--import", "tsx"],
+    "platform": "linux",
+    "kernel": "6.8.0-101-generic",
+    "architecture": "x64",
+    "cpu": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "totalMemoryBytes": 8326955008,
+    "filesystem": "/      overlay overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1469/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1460/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1459/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1458/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1457/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1456/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1455/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1454/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1453/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1452/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1451/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1450/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1449/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1448/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1446/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1444/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1443/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1442/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1441/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1440/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1439/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1438/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1437/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1436/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1435/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1434/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1433/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1432/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1431/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1372/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1371/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1370/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1369/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1368/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1367/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1366/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1365/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1470/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1470/work,nouserxattr",
+    "cache": "Fresh owner; OS page cache warmed by writes; no device cache flush",
+    "build": "Production TypeScript via tsx, not a packaged production daemon; no provider or browser process"
+  },
+  "phases": [
+    {
+      "name": "durable bulk append and derived projection",
+      "milliseconds": 56028.43842,
+      "operations": 1000,
+      "logicalBytes": 1668195,
+      "operationsPerSecond": 17.84807908626342,
+      "logicalBytesPerSecond": 29774.076291309208,
+      "acknowledgementMs": {
+        "count": 50,
+        "p50": 947.0847739999999,
+        "p95": 2250.935255000004,
+        "max": 3823.863403999996
+      },
+      "eventLoopMs": {
+        "p95": 11.952127,
+        "max": 49.217535,
+        "mean": 10.372879691851853
+      },
+      "memory": {
+        "start": {
+          "rss": 102764544,
+          "heapTotal": 20815872,
+          "heapUsed": 10434296,
+          "external": 3505300,
+          "arrayBuffers": 445840
+        },
+        "peakHeapUsed": 29595800,
+        "peakRss": 125800448,
+        "end": {
+          "rss": 125800448,
+          "heapTotal": 50962432,
+          "heapUsed": 23601280,
+          "external": 3169167,
+          "arrayBuffers": 664998
+        },
+        "afterGc": {
+          "rss": 125931520,
+          "heapTotal": 50962432,
+          "heapUsed": 11781552,
+          "external": 3235510,
+          "arrayBuffers": 33283
+        }
+      },
+      "processIo": {
+        "rchar": 11152756,
+        "wchar": 12525627,
+        "syscr": 193452,
+        "syscw": 186517,
+        "read_bytes": 2527232,
+        "write_bytes": 70500352,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 19990506,
+        "systemCPUTime": 32096157,
+        "maxRSS": 122980,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 29422,
+        "majorPageFault": 7,
+        "swappedOut": 0,
+        "fsRead": 7944,
+        "fsWrite": 138080,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 357881,
+        "involuntaryContextSwitches": 1072
+      },
+      "detail": {
+        "nodeIo": {
+          "readBytes": 9087330,
+          "reads": 21299,
+          "opens": 2085,
+          "writes": 16480,
+          "writeBytes": 11164915,
+          "syncs": 992,
+          "syncMeanMs": 4.391991253024245,
+          "syncMaxMs": 46.46269200000006
+        }
+      }
+    },
+    {
+      "name": "cold valid-index descriptors and bounded document/range reads",
+      "milliseconds": 2229.1515179999988,
+      "operations": 0,
+      "logicalBytes": 0,
+      "operationsPerSecond": 0,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "eventLoopMs": {
+        "p95": 10.780671,
+        "max": 30.932991,
+        "mean": 10.166816880733945
+      },
+      "memory": {
+        "start": {
+          "rss": 126062592,
+          "heapTotal": 47030272,
+          "heapUsed": 11739744,
+          "external": 2537452,
+          "arrayBuffers": 33283
+        },
+        "peakHeapUsed": 29710640,
+        "peakRss": 132702208,
+        "end": {
+          "rss": 129073152,
+          "heapTotal": 47554560,
+          "heapUsed": 24218984,
+          "external": 3925778,
+          "arrayBuffers": 1392484
+        },
+        "afterGc": {
+          "rss": 129073152,
+          "heapTotal": 47816704,
+          "heapUsed": 11863304,
+          "external": 3992121,
+          "arrayBuffers": 1388969
+        }
+      },
+      "processIo": {
+        "rchar": 3212104,
+        "wchar": 70079,
+        "syscr": 10996,
+        "syscw": 8758,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 21030910,
+        "systemCPUTime": 33374207,
+        "maxRSS": 131692,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 32368,
+        "majorPageFault": 7,
+        "swappedOut": 0,
+        "fsRead": 7944,
+        "fsWrite": 138080,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 376229,
+        "involuntaryContextSwitches": 1122
+      },
+      "detail": {
+        "nodeIo": {
+          "readBytes": 3113412,
+          "reads": 2150,
+          "opens": 1006,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        },
+        "replyPayloadBytes": 1280038,
+        "toolPayloadBytes": 259663
+      }
+    }
+  ],
+  "disk": {
+    "canonicalAndPrivateIndexes": {
+      "files": 8,
+      "directories": 3,
+      "logicalBytes": 1798059,
+      "allocatedBytes": 1839104
+    },
+    "otherProjection": {
+      "files": 11,
+      "directories": 6,
+      "logicalBytes": 545871,
+      "allocatedBytes": 602112
+    },
+    "derivedDocuments": {
+      "files": 15919,
+      "directories": 1,
+      "logicalBytes": 8032569,
+      "allocatedBytes": 67215360
+    }
+  },
+  "extrapolation": {
+    "warning": "Arithmetic size/row extrapolation only; tree height, key diversity and update pattern change growth. No 100k completion claim.",
+    "at100kRows": {
+      "canonicalAndPrivateIndexes": {
+        "files": 800,
+        "allocatedBytes": 183910400
+      },
+      "otherProjection": {
+        "files": 1100,
+        "allocatedBytes": 60211200
+      },
+      "derivedDocuments": {
+        "files": 1591900,
+        "allocatedBytes": 6721536000
+      }
+    }
+  },
+  "instrumentation": "Successful public promises.fs open/writeFile and FileHandle write/writeFile/sync calls only; internal Node opens, failed wx dedup attempts and stream internals excluded. File blocks*512 is filesystem allocated space including node/directory overhead, not physical device write amplification. OS /proc phase deltas include metric reads. 25ms memory samples include harness."
+}

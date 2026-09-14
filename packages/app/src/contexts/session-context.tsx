@@ -485,6 +485,16 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
           throw error;
         }
       },
+      fetchAdjacentPage: async (agentId, request) => {
+        await getHostRuntimeStore().fetchAgentTimeline(serverId, agentId, {
+          direction: request.direction,
+          cursor: request.cursor,
+          limit: 40,
+          requestId: request.requestId,
+          signal: request.signal,
+          mergeWindow: request.mergeWindow,
+        });
+      },
       fetchLatestTail: async (agentId) => {
         forcedTimelineTailReplacements.current.add(agentId);
         try {

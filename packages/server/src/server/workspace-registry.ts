@@ -1,3 +1,5 @@
+import { currentSessionOperationIdentity } from "./agent/session-operation-context.js";
+import { SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
 import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
@@ -41,6 +43,7 @@ const PersistedProjectRecordSchema = z.object({
 });
 
 const PersistedWorkspaceRecordSchema = z.object({
+  ...SessionAuthorshipShape,
   workspaceId: z.string(),
   projectId: z.string(),
   cwd: z.string(),
@@ -675,8 +678,12 @@ export function createPersistedWorkspaceRecord(input: {
   pinnedAt?: string | null;
   labels?: string[];
 }): PersistedWorkspaceRecord {
+  const identity = currentSessionOperationIdentity();
   return PersistedWorkspaceRecordSchema.parse({
     ...input,
+    createdBy: identity?.actor,
+    participantActors: identity?.actor ? [identity.actor] : undefined,
+    channels: identity?.channel ? [identity.channel] : undefined,
     title: input.title ?? null,
     branch: input.branch ?? null,
     worktreeRoot: input.worktreeRoot ?? null,

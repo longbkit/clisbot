@@ -180,6 +180,20 @@ survives", not sync frequency. Maintain it by:
   `packages/hub/src/e2e/harness/source-paseo.ts` (dev-only E2E harness).
   Re-verify this list at every sync.
 
+Measure the overlap by upstream lines _replaced_, not lines added — an additive
+hunk almost always merges clean. Resolve which upstream a file answers to first:
+`packages/hub` maps to the **root** of `getpaseo/hub`, and each
+`packages/channels/*/upstream-sync.json` carries a per-file `verbatim` /
+`fusion-owned` status. Testing a path against `upstream/main` alone reports both
+of those as "not upstream", which is wrong. A worked ledger of that measurement,
+with a per-module why / what-if-unchanged / verdict, is
+[agent session storage: upstream blast radius][session-storage-blast-radius].
+Two rules it demonstrates: push a change down into a fusion-original folder rather
+than into an upstream file whenever both would work, and treat a failing
+upstream test as a missing feature gate rather than a stale assertion.
+
+[session-storage-blast-radius]: ../../features/agent-session-storage/upstream-blast-radius.md
+
 ## When a vendor base becomes right
 
 If a day comes when Clisbot must pin an old upstream release

@@ -1,3 +1,7 @@
+import {
+  matchesSessionMetadata,
+  sessionMetadataRecoveryNotice,
+} from "@/clisbot/session-storage/directory";
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import {
   useSidebarWorkspacesList,
@@ -33,6 +37,7 @@ interface SidebarModel extends SidebarWorkspacesListResult {
    * narrowing the filter deletes the rows that would undo it.
    */
   allProjects: SidebarProjectEntry[];
+  metadataRecoveryNotice: string | null;
   /** The project filter as it is actually being applied — see `resolveActiveProjectFilters`. */
   resolvedProjectFilters: readonly string[];
   hasProjectsBeforeFilter: boolean;
@@ -56,6 +61,9 @@ export function SidebarModelProvider({
 }) {
   const list = useSidebarWorkspacesList({ enabled: active });
   const groupMode = useSidebarViewStore((state) => state.groupMode);
+  const userFilters = useSidebarViewStore((state) => state.userFilters);
+  const channelFilters = useSidebarViewStore((state) => state.channelFilters);
+  const hasMetadataFilter = userFilters.length > 0 || channelFilters.length > 0;
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
@@ -95,7 +103,8 @@ export function SidebarModelProvider({
   // anything; the label filter reads `labels`, which only exists on an entry. Hydration opens a
   // live session-store subscription over every workspace on every visible host, so widening this
   // for a filter that does not need it costs a retained-but-inactive sidebar real work.
-  const needsWorkspaceEntries = groupMode !== "project" || hasActiveLabelFilter;
+  const needsWorkspaceEntries =
+    groupMode !== "project" || hasActiveLabelFilter || hasMetadataFilter;
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
     active !== false || needsWorkspaceEntries,
@@ -105,9 +114,12 @@ export function SidebarModelProvider({
       workspaces: [...workspaceEntriesByKey.values()],
       projectFilters: resolvedProjectFilters,
     });
-    const filtered = filterWorkspacesByLabels({ workspaces: byProject, ...labelFilter });
+    const filtered = filterWorkspacesByLabels({
+      workspaces: byProject,
+      ...labelFilter,
+    }).filter((workspace) => matchesSessionMetadata(workspace, userFilters, channelFilters));
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
-  }, [labelFilter, resolvedProjectFilters, workspaceEntriesByKey]);
+  }, [labelFilter, userFilters, channelFilters, resolvedProjectFilters, workspaceEntriesByKey]);
   const visibleWorkspaceKeys = useMemo(
     () => new Set(filteredWorkspaceEntriesByKey.keys()),
     [filteredWorkspaceEntriesByKey],
@@ -122,7 +134,7 @@ export function SidebarModelProvider({
       const included = new Set(resolvedProjectFilters);
       projects = projects.filter((project) => included.has(project.viewKey));
     }
-    if (hasActiveLabelFilter) {
+    if (hasActiveLabelFilter || hasMetadataFilter) {
       projects = projects.flatMap((project) => {
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
@@ -133,6 +145,7 @@ export function SidebarModelProvider({
     return projects;
   }, [
     hasActiveLabelFilter,
+    hasMetadataFilter,
     hasActiveProjectFilter,
     resolvedProjectFilters,
     list.projects,
@@ -164,9 +177,14 @@ export function SidebarModelProvider({
     ],
   );
   const projection = useMemo(() => buildSidebarProjection(projectionInput), [projectionInput]);
+  const metadataRecoveryNotice = useMemo(
+    () => sessionMetadataRecoveryNotice(workspaceEntriesByKey.values(), hasMetadataFilter),
+    [workspaceEntriesByKey, hasMetadataFilter],
+  );
   const value = useMemo(
     () => ({
       ...list,
+      metadataRecoveryNotice,
       projects: filteredProjects,
       allProjects: list.projects,
       resolvedProjectFilters,
@@ -181,6 +199,7 @@ export function SidebarModelProvider({
       shortcutModel: projection.shortcutModel,
     }),
     [
+      metadataRecoveryNotice,
       resolvedProjectFilters,
       collapsedProjectKeys,
       groupMode,

@@ -14,6 +14,11 @@ describe("parseSidebarRowItems", () => {
       changeRequest: true,
       services: true,
       labels: true,
+      createdUser: false,
+      updatedUser: false,
+      channels: true,
+      createdTime: false,
+      updatedTime: false,
     });
   });
 

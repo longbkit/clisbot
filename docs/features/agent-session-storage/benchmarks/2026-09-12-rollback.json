@@ -1,0 +1,18 @@
+{
+  "home": "/tmp/session-storage-rollback-proof-zQp2ma",
+  "command": [
+    "/usr/local/bin/node",
+    "--import",
+    "tsx",
+    "/home/node/projects/clisbot-paseoclaw-fusion/packages/server/scripts/rollback-session-layout.ts",
+    "/tmp/session-storage-rollback-proof-zQp2ma/agents",
+    "--daemon-stopped"
+  ],
+  "stdout": "Rolled back 1 session records; journals and uploads retained.",
+  "oldReaderCount": 1,
+  "exactOriginalRecordBytesRetained": true,
+  "uploadsRetained": true,
+  "currentJournalReadableAfterRollback": true,
+  "epoch": "b232676f-0154-4fb6-993b-5632f2aee25c",
+  "limitation": "HEAD AgentStorage source executed with shared installed dependencies. Not a packaged old daemon/browser launch, and old code cannot read new journal APIs."
+}

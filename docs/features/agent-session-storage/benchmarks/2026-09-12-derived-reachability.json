@@ -1,0 +1,127 @@
+{
+  "current": {
+    "files": 1830,
+    "logicalBytes": 608483,
+    "allocatedBytes": 7553024,
+    "kinds": {
+      "sequence": 513,
+      "field_map": 509,
+      "text": 780,
+      "branch": 26,
+      "projected_snapshot": 2
+    },
+    "kindBytes": {
+      "sequence": 272503,
+      "field_map": 219513,
+      "text": 109572,
+      "branch": 6239,
+      "projected_snapshot": 656
+    }
+  },
+  "persistedJournalRevisionRoots": {
+    "files": 2749,
+    "logicalBytes": 1071788,
+    "allocatedBytes": 11317248,
+    "kinds": {
+      "sequence": 954,
+      "field_map": 868,
+      "text": 798,
+      "branch": 86,
+      "projected_snapshot": 43
+    },
+    "kindBytes": {
+      "sequence": 521250,
+      "field_map": 406460,
+      "text": 111174,
+      "branch": 20720,
+      "projected_snapshot": 12184
+    }
+  },
+  "allSnapshotRoots": {
+    "files": 9392,
+    "logicalBytes": 4367160,
+    "allocatedBytes": 38645760,
+    "kinds": {
+      "field_map": 1362,
+      "branch": 756,
+      "sequence": 5628,
+      "projected_snapshot": 663,
+      "text": 983
+    },
+    "kindBytes": {
+      "field_map": 732895,
+      "branch": 182579,
+      "sequence": 3018908,
+      "projected_snapshot": 170624,
+      "text": 262154
+    }
+  },
+  "currentUnreachableButPersistedSnapshotReachable": {
+    "files": 919,
+    "logicalBytes": 463305,
+    "allocatedBytes": 3764224,
+    "kinds": {
+      "sequence": 441,
+      "field_map": 359,
+      "branch": 60,
+      "projected_snapshot": 41,
+      "text": 18
+    },
+    "kindBytes": {
+      "sequence": 248747,
+      "field_map": 186947,
+      "branch": 14481,
+      "projected_snapshot": 11528,
+      "text": 1602
+    }
+  },
+  "unreachableFromAnySnapshot": {
+    "files": 6527,
+    "logicalBytes": 3665409,
+    "allocatedBytes": 26734592,
+    "kinds": {
+      "field_map": 4721,
+      "sequence": 1779,
+      "branch": 27
+    },
+    "kindBytes": {
+      "field_map": 2460117,
+      "sequence": 1198820,
+      "branch": 6472
+    }
+  },
+  "allFiles": {
+    "files": 15919,
+    "logicalBytes": 8032569,
+    "allocatedBytes": 65380352,
+    "kinds": {
+      "field_map": 6083,
+      "branch": 783,
+      "sequence": 7407,
+      "projected_snapshot": 663,
+      "text": 983
+    },
+    "kindBytes": {
+      "field_map": 3193012,
+      "branch": 189051,
+      "sequence": 4217728,
+      "projected_snapshot": 170624,
+      "text": 262154
+    }
+  },
+  "snapshotFiles": 663,
+  "notes": "Current-unreachable is not automatically garbage: historical snapshot IDs remain readable for this epoch. Persisted projection journal revisions identify snapshot roots potentially exposed by completed bulk operations; all snapshot files include unexposed intermediate per-row snapshots. No node deletion performed.",
+  "snapshotWorkloadGroups": {
+    "assistantText": {
+      "snapshots": 475,
+      "firstCanonicalSeq": 26,
+      "lastCanonicalSeq": 500
+    },
+    "toolMetadataAndRanges": {
+      "snapshots": 188,
+      "firstCanonicalSeq": 626,
+      "lastCanonicalSeq": 1000
+    }
+  },
+  "operationAttribution": "Snapshot seqEnd permits workload grouping:475 assistant concatenation snapshots and188 tool metadata/range snapshots. Unreferenced intermediate node origin cannot be uniquely recovered because content-addressed deduplication shares nodes and files have no call-site/operation history. Intermediate field-map/sequence/branch nodes are consistent with set/concat path-copy and rotations; exact write/fsync per category requires instrumentation rerun."
+}

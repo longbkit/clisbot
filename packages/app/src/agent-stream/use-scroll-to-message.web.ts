@@ -88,7 +88,7 @@ export function useScrollToMessage({
   }, [active, settleController]);
 
   const scrollToMessage = useCallback(
-    (itemId: string) => {
+    (itemId: string, topInset = PROMPT_JUMP_TOP_INSET_PX) => {
       if (!active) return;
       const container = scrollContainerRef.current;
       if (!container) return;
@@ -100,11 +100,9 @@ export function useScrollToMessage({
       );
       if (mounted) {
         const delta =
-          mounted.getBoundingClientRect().top -
-          container.getBoundingClientRect().top -
-          PROMPT_JUMP_TOP_INSET_PX;
+          mounted.getBoundingClientRect().top - container.getBoundingClientRect().top - topInset;
         container.scrollTop += delta;
-        settleController.start(itemId);
+        settleController.start(itemId, topInset);
         onNearBottomChange(false);
         return;
       }
@@ -112,7 +110,7 @@ export function useScrollToMessage({
       const index = historyVirtualized.findIndex((item) => item.id === itemId);
       if (index >= 0) {
         rowVirtualizer.scrollToIndex(index, { align: "start" });
-        settleController.start(itemId);
+        settleController.start(itemId, topInset);
         onNearBottomChange(false);
       }
     },

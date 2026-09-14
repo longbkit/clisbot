@@ -1,6 +1,6 @@
 # Timeline sync
 
-Đang cân nhắc: [giữ thông tin người gửi khi mở lại hội thoại](audits/2026-09-08-workspace-placement-and-session-authorship.md).
+Durable timeline and sender metadata: [agent session storage](features/agent-session-storage/README.md) — the durable timeline is implemented; the wider AC/W set is not yet fully accepted.
 
 Agent chat delivery has two paths:
 
@@ -235,3 +235,33 @@ canonical assistant prefix, it stays in the head lane. No row may be returned in
 - App viewed-agent synchronization: `packages/app/src/timeline/viewed-timeline-sync.ts`
 - App stream/timeline reducer: `packages/app/src/timeline/session-stream-reducers.ts`
 - Session wiring: `packages/app/src/contexts/session-context.tsx`
+
+## Optional source-range projected pages
+
+A client advertising `agent_session_storage` may request `pagingMode: "source_ranges"`
+when that daemon advertises `features.agentSessionStorageRead: true` (or the older
+combined `features.agentSessionStorage: true` flag). The daemon checks the readable
+backend and client capability for the requesting connection. Absent negotiation, projected and canonical
+queries keep their existing overlap and ownership behavior.
+
+In this mode the canonical-to-display index selects up to the requested number of
+projected snapshots by walking exact source references from the requested boundary.
+`startCursor` through `endCursor` certify only the contiguous canonical interval
+consumed by that walk. `entries` hold snapshots anchored in that interval;
+`contextEntries` hold touched snapshots anchored earlier, such as a tool opened near
+sequence 1 and updated near sequence 100,000. Their exact `sourceSeqRanges` identify
+source ownership but do not certify intervening holes or move either page cursor.
+A valid page can have empty `entries` and nonempty `contextEntries` with nonempty
+cursor coverage. `hasOlder` and `hasNewer` derive from coverage, not snapshot anchors.
+
+Before/after traversal resumes from these explicit cursors. The app merges context
+and ordinary snapshots by their canonical anchor within an epoch, retaining exact
+source ranges on the existing timeline items. Context is counted in the same payload
+budget as ordinary entries. A later page containing the original anchor reconciles
+the same presentation instead of adding another tool. Epoch replacement invalidates
+both coverage and context. Fork anchors remain the unchanged epoch/sequence contract.
+
+The legacy extreme-overlap path can still expand an ancient tool's min/max envelope
+through the whole history; its memory/performance limitation is not solved by this
+optional mode. The new mode's integration and performance tests are tracked in the
+agent-session-storage implementation record.

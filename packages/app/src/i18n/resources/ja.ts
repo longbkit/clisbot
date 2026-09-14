@@ -200,6 +200,7 @@ export const ja: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "エージェント",
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
@@ -284,6 +285,9 @@ export const ja: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "あなた",
+    },
     diagram: {
       diagram: "図",
       zoomIn: "拡大",

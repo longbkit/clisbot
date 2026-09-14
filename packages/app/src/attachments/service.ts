@@ -3,6 +3,9 @@ import { getAttachmentStore } from "@/attachments/store";
 import type { AttachmentMetadata, SaveAttachmentInput } from "@/attachments/types";
 
 const activePersistence = new Set<Promise<AttachmentMetadata>>();
+/** Bound client-side encoding before base64 expands data in memory. */
+export const MAX_SEND_ATTACHMENT_COUNT = 32;
+export const MAX_SEND_ATTACHMENT_BYTES = 32 * 1024 * 1024;
 const persistedDuringGarbageCollection = new Set<string>();
 let pendingGarbageCollections = 0;
 let garbageCollectionTail: Promise<void> = Promise.resolve();
@@ -99,29 +102,43 @@ export async function encodeAttachmentsForSend(
     return undefined;
   }
 
-  const store = await getAttachmentStore();
-  const encoded = await Promise.all(
-    attachments.map(async (attachment) => {
-      try {
-        const data = await store.encodeBase64({ attachment });
-        return {
-          data,
-          mimeType: attachment.mimeType,
-        };
-      } catch (error) {
-        console.error("[attachments] Failed to encode attachment for send", {
-          id: attachment.id,
-          error,
-        });
-        return null;
-      }
-    }),
-  );
+  if (attachments.length > MAX_SEND_ATTACHMENT_COUNT) {
+    throw new Error(`Too many attachments (maximum ${MAX_SEND_ATTACHMENT_COUNT}).`);
+  }
+  const knownBytes = attachments.reduce((total, attachment) => {
+    const size = attachment.byteSize;
+    return typeof size === "number" && Number.isFinite(size) && size >= 0 ? total + size : total;
+  }, 0);
+  if (knownBytes > MAX_SEND_ATTACHMENT_BYTES) {
+    throw new Error(`Attachments exceed the ${MAX_SEND_ATTACHMENT_BYTES} byte send limit.`);
+  }
 
-  const valid = encoded.filter(
-    (entry): entry is { data: string; mimeType: string } => entry !== null,
-  );
-  return valid.length > 0 ? valid : undefined;
+  const store = await getAttachmentStore();
+  const encoded: Array<{ data: string; mimeType: string }> = [];
+  let encodedBytes = 0;
+  // Encode sequentially so the base64 strings do not all peak concurrently.
+  for (const attachment of attachments) {
+    let data: string;
+    try {
+      data = await store.encodeBase64({ attachment });
+    } catch (error) {
+      console.error("[attachments] Failed to encode attachment for send", {
+        id: attachment.id,
+        error,
+      });
+      throw new Error(`Unable to encode attachment ${attachment.fileName ?? attachment.id}.`, {
+        cause: error,
+      });
+    }
+    encodedBytes += data.length;
+    if (encodedBytes > MAX_SEND_ATTACHMENT_BYTES * 2) {
+      throw new Error(
+        `Encoded attachments exceed the ${MAX_SEND_ATTACHMENT_BYTES * 2} byte send limit.`,
+      );
+    }
+    encoded.push({ data, mimeType: attachment.mimeType });
+  }
+  return encoded.length > 0 ? encoded : undefined;
 }
 
 export async function resolveAttachmentPreviewUrl(attachment: AttachmentMetadata): Promise<string> {

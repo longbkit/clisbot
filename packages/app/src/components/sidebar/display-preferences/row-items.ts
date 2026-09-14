@@ -19,6 +19,11 @@ export const SIDEBAR_ROW_ITEMS = [
   "changeRequest",
   "services",
   "labels",
+  "createdUser",
+  "channels",
+  "updatedUser",
+  "createdTime",
+  "updatedTime",
 ] as const;
 
 export type SidebarRowItem = (typeof SIDEBAR_ROW_ITEMS)[number];
@@ -33,6 +38,11 @@ export const DEFAULT_SIDEBAR_ROW_ITEMS: SidebarRowItems = {
   changeRequest: true,
   services: true,
   labels: true,
+  createdUser: false,
+  channels: true,
+  updatedUser: false,
+  createdTime: false,
+  updatedTime: false,
 };
 
 /**

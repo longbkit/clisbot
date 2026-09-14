@@ -54,7 +54,12 @@ export interface ComposerSendClient {
       attachments: ReturnType<typeof splitComposerAttachmentsForSubmit>["attachments"];
     },
   ) => Promise<void>;
-  uploadFile: (input: { fileName: string; mimeType: string; bytes: Uint8Array }) => Promise<{
+  uploadFile: (input: {
+    agentId?: string;
+    fileName: string;
+    mimeType: string;
+    bytes: Uint8Array;
+  }) => Promise<{
     requestId: string;
     file: {
       type: "uploaded_file";
@@ -123,12 +128,16 @@ export async function pickAndPersistImages(input: {
 
 export async function uploadFileAttachments(input: {
   client: ComposerSendClient;
+  agentId?: string;
   files: Array<{ fileName: string; mimeType: string; bytes: Uint8Array }>;
 }): Promise<Extract<ComposerAttachment, { kind: "file" }>[]> {
   const result: Extract<ComposerAttachment, { kind: "file" }>[] = [];
 
   for (const file of input.files) {
-    const response = await input.client.uploadFile(file);
+    const response = await input.client.uploadFile({
+      ...file,
+      ...(input.agentId ? { agentId: input.agentId } : {}),
+    });
     if (response.error || !response.file) {
       throw new Error(response.error ?? "Upload failed.");
     }

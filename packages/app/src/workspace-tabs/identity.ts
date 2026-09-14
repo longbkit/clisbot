@@ -1,3 +1,4 @@
+import { SessionActorSchema, sessionActorKey } from "@getpaseo/protocol/session-authorship";
 import { normalizeWorkspaceFileLocation, workspaceFileLocationsEqual } from "@/workspace/file-open";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
@@ -6,6 +7,10 @@ export function normalizeWorkspaceTabTarget(
 ): WorkspaceTabTarget | null {
   if (!value || typeof value !== "object" || typeof value.kind !== "string") {
     return null;
+  }
+  if (value.kind === "user_profile") {
+    const actor = SessionActorSchema.safeParse(value.actor);
+    return actor.success ? { kind: "user_profile", actor: actor.data } : null;
   }
   if (value.kind === "draft") {
     const draftId = trimNonEmpty(value.draftId);
@@ -131,6 +136,9 @@ function secondaryWorkspaceTabTargetsEqual(
   left: WorkspaceTabTarget,
   right: WorkspaceTabTarget,
 ): boolean {
+  if (left.kind === "user_profile" && right.kind === "user_profile") {
+    return sessionActorKey(left.actor) === sessionActorKey(right.actor);
+  }
   if (left.kind === "browser" && right.kind === "browser") {
     return left.browserId === right.browserId;
   }
@@ -194,6 +202,9 @@ function recordsShallowEqual(
 export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): string {
   if (target.kind === "new_tab") {
     throw new Error("New tabs do not have deterministic target identities");
+  }
+  if (target.kind === "user_profile") {
+    return `user_profile_${sessionActorKey(target.actor)}`;
   }
   if (target.kind === "draft") {
     return target.draftId;

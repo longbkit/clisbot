@@ -29,6 +29,25 @@ export default defineConfig({
       },
       {
         extends: true,
+        resolve: {
+          // Component browser tests have no Expo router host. Route contracts run
+          // through Playwright/Metro; avoid scanning native Expo navigation here.
+          alias: [
+            {
+              find: /^expo-router$/,
+              replacement: path.resolve(__dirname, "test-stubs/expo-router.ts"),
+            },
+            // The package's index.js resolves to js/MaskedView.js, which ships
+            // `import type` syntax its own toolchain strips but esbuild's
+            // dependency optimizer rejects. Point at the plain-JS web entry.
+            {
+              find: /^@react-native-masked-view\/masked-view$/,
+              replacement: resolvePackageEntry(
+                "@react-native-masked-view/masked-view/js/MaskedView.web.js",
+              ),
+            },
+          ],
+        },
         test: {
           name: "browser",
           fileParallelism: false,
@@ -65,9 +84,17 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
-    include: ["react/jsx-runtime", "i18next", "zod"],
+    // react-native-web must be pre-optimized at startup: the react-native alias
+    // shim re-exports it by bare specifier from a source file, so the optimizer
+    // would otherwise discover it mid-test and reload the browser, breaking vi.mock.
+    include: ["react-native-web", "react/jsx-runtime", "react/jsx-dev-runtime", "i18next", "zod"],
     exclude: ["react-native-reanimated"],
   },
+  // The app tsconfig sets "jsx": "react-native", which esbuild does not understand and
+  // falls back to the classic transform for — emitting bare `React.createElement` calls in
+  // files that only import React types. Pin the automatic runtime so JSX transforms are
+  // deterministic; `react/jsx-runtime` is pre-optimized above.
+  esbuild: { jsx: "automatic" },
   // The globals a React Native bundler defines, which esbuild is no longer there to supply for
   // the package excluded above.
   define: {
@@ -108,12 +135,35 @@ export default defineConfig({
         find: /^react-native\/Libraries\/Renderer\/shims\/ReactFabric$/,
         replacement: path.resolve(__dirname, "test-stubs/react-native-fabric-shim.ts"),
       },
-      // Point to the ESM build so Vite can transform its imports and apply the
+      // Same prefix-shadowing hazard for the native spec shims that
+      // react-native-gesture-handler's prebundle follows.
+      {
+        find: /^react-native\/Libraries\/Utilities\/codegenNativeComponent$/,
+        replacement: path.resolve(__dirname, "test-stubs/rn-codegen-native-component.ts"),
+      },
+      {
+        find: /^react-native\/Libraries\/Pressability\/PressabilityDebug$/,
+        replacement: path.resolve(__dirname, "test-stubs/rn-pressability-debug.tsx"),
+      },
+      {
+        find: /^react-native\/Libraries\/ReactNative\/ReactFabricPublicInstance\/ReactFabricPublicInstance$/,
+        replacement: path.resolve(__dirname, "test-stubs/rn-react-fabric-public-instance.ts"),
+      },
+      {
+        find: /^react-native\/Libraries\/Renderer\/shims\/ReactNativeViewConfigRegistry$/,
+        replacement: path.resolve(__dirname, "test-stubs/rn-view-config-registry.ts"),
+      },
+      {
+        find: /^react-native\/Libraries\/Renderer\/shims\/ReactNative$/,
+        replacement: path.resolve(__dirname, "test-stubs/rn-renderer-shims-react-native.ts"),
+      },
+      // Point at the shim (which re-exports the ESM web build plus inert
+      // native-module seams) so Vite can transform its imports and apply the
       // react alias below (the CJS build uses require('react') which bypasses
       // Vite alias resolution).
       {
         find: "react-native",
-        replacement: path.resolve(rootNodeModules, "react-native-web/dist/index.js"),
+        replacement: path.resolve(__dirname, "test-stubs/react-native-web-plus.ts"),
       },
       { find: "react", replacement: resolvePackageEntry("react") },
       {
@@ -153,6 +203,31 @@ export default defineConfig({
       {
         find: /^expo-linking$/,
         replacement: path.resolve(__dirname, "test-stubs/expo-linking.ts"),
+      },
+      // The real packages resolve to Expo module source that needs the native
+      // runtime (globalThis.expo); the DOM covers the app's browser usage, and
+      // no native module exists for the optional lookups.
+      {
+        find: /^expo-clipboard$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-clipboard.ts"),
+      },
+      {
+        find: /^expo-constants$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-constants.ts"),
+      },
+      // Source-only package: bundling its real source drags in expo-modules-core.
+      // Must precede the bare expo-file-system alias (string find matches by prefix).
+      {
+        find: /^expo-file-system\/legacy$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-file-system-legacy.ts"),
+      },
+      {
+        find: /^expo-file-system$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-file-system.ts"),
+      },
+      {
+        find: /^expo-modules-core$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-modules-core.ts"),
       },
       {
         find: /^lucide-react-native$/,

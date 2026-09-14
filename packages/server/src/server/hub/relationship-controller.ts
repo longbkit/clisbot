@@ -1,3 +1,4 @@
+import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
@@ -134,6 +135,11 @@ export interface HubRelationshipStatus {
 }
 
 export interface HubRelationshipManagement {
+  consumeSessionOperation?(input: {
+    sessionOperationTicket: string;
+    clientId: string;
+    digest: string;
+  }): Promise<VerifiedSessionOperationIdentity>;
   connect(input: {
     hubUrl: string;
     token: string;
@@ -191,7 +197,7 @@ export interface HubRelationshipControllerOptions {
     principalId: string,
     permissions: readonly DaemonPermission[],
   ) => void;
-  createExecutionAgents: (daemonId: string) => HubExecutionAgents;
+  createExecutionAgents: (daemonId: string, hubOrigin?: string) => HubExecutionAgents;
   listProjects?: () => Promise<readonly HubProject[]>;
   getConnectionOffer?: () => Promise<ConnectionOffer | null>;
   getManagedAccessMode?: () => ManagedAccessMode;
@@ -385,6 +391,25 @@ export class HubRelationshipController implements HubRelationshipManagement {
       credential: this.record.credential.secret,
       accessTicket: input.accessTicket,
       clientId: input.clientId,
+    });
+  }
+
+  async consumeSessionOperation(input: {
+    sessionOperationTicket: string;
+    clientId: string;
+    digest: string;
+  }): Promise<VerifiedSessionOperationIdentity> {
+    if (
+      !this.record ||
+      this.record.state !== "active" ||
+      !this.options.remote.consumeSessionOperation
+    )
+      throw new Error("Trusted Hub session identity is unavailable");
+    return this.options.remote.consumeSessionOperation({
+      ...input,
+      daemonId: this.record.relationship.daemonId,
+      hubOrigin: this.record.relationship.hubOrigin,
+      credential: this.record.credential.secret,
     });
   }
 
@@ -597,7 +622,7 @@ export class HubRelationshipController implements HubRelationshipManagement {
 
   private executionAgentsFor(daemonId: string): HubExecutionAgents {
     if (this.executionAgents?.daemonId === daemonId) return this.executionAgents.value;
-    const value = this.options.createExecutionAgents(daemonId);
+    const value = this.options.createExecutionAgents(daemonId, this.record?.relationship.hubOrigin);
     this.executionAgents = { daemonId, value };
     return value;
   }

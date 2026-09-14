@@ -1,8 +1,9 @@
 import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
 import { selectAgentTimelineState, useSessionStore } from "@/stores/session-store";
-import type { AssistantMessageItem, StreamItem, TodoEntry } from "@/types/stream";
+import type { AssistantMessageItem, StreamItem, TodoEntry, TimelinePosition } from "@/types/stream";
 import type { TurnLivenessTransition } from "@/timeline/turn-liveness";
 import type { TimelineItemTransform } from "@/plugins/timeline";
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import {
   applyStreamEvent,
   flushHeadToTail,
@@ -123,6 +124,8 @@ function timelineCursorEquals(left: TimelineCursor, right: TimelineCursor): bool
 }
 
 interface TimelineResponseEntry {
+  deferredPayload?: TimelinePosition["deferredPayload"];
+  sourceSeqRangesRef?: TimelinePosition["sourceSeqRangesRef"];
   seqStart: number;
   seqEnd: number;
   sourceSeqRanges?: TimelineSeqRange[];
@@ -144,6 +147,8 @@ export interface ProcessTimelineResponseInput {
     startCursor: { seq: number } | null;
     endCursor: { seq: number } | null;
     entries: TimelineResponseEntry[];
+    pagingMode?: "source_ranges";
+    contextEntries?: TimelineResponseEntry[];
     error: string | null;
     hasNewer: boolean;
     hasOlder: boolean;
@@ -174,6 +179,8 @@ export interface ProcessTimelineResponseOutput {
 }
 
 interface TimelineUnit {
+  deferredPayload?: TimelineResponseEntry["deferredPayload"];
+  sourceSeqRangesRef?: TimelineResponseEntry["sourceSeqRangesRef"];
   seq: number;
   seqEnd: number;
   sourceSeqRanges: TimelineSeqRange[];
@@ -189,6 +196,60 @@ interface TimelinePathResult {
   older: "available" | "none" | "unchanged";
   sideEffects: TimelineReducerSideEffect[];
   acknowledgedClientMessageIds: string[];
+}
+
+function streamLanesUnchanged(
+  currentTail: StreamItem[],
+  currentHead: StreamItem[],
+  nextTail: StreamItem[],
+  nextHead: StreamItem[],
+): boolean {
+  return currentTail === nextTail && currentHead === nextHead;
+}
+
+function enrichUserMessageActors(
+  items: StreamItem[],
+  units: TimelineUnit[],
+  epoch: string,
+): StreamItem[] {
+  const authored = units.filter(
+    (unit) =>
+      unit.event.type === "timeline" &&
+      unit.event.item.type === "user_message" &&
+      unit.event.item.sender,
+  );
+  if (authored.length === 0) return items;
+  let changed = false;
+  const next = items.map((item) => {
+    if (item.kind !== "user_message") return item;
+    const match = authored.find((unit) => {
+      if (unit.event.type !== "timeline" || unit.event.item.type !== "user_message") return false;
+      const incoming = unit.event.item;
+      if (incoming.clientMessageId && item.clientMessageId === incoming.clientMessageId)
+        return true;
+      if (incoming.messageId && item.messageId === incoming.messageId) return true;
+      return item.timelineCursor?.epoch === epoch && item.timelineCursor.seq === unit.seqEnd;
+    });
+    if (!match || match.event.type !== "timeline" || match.event.item.type !== "user_message")
+      return item;
+    const sender = match.event.item.sender;
+    if (JSON.stringify(item.sender) === JSON.stringify(sender)) return item;
+    changed = true;
+    return { ...item, sender };
+  });
+  return changed ? next : items;
+}
+
+/** A referenced range list is paged separately; an empty one falls back to the entry's own span. */
+function entrySourceRanges(entry: {
+  seqStart: number;
+  seqEnd: number;
+  sourceSeqRanges?: { startSeq: number; endSeq: number }[];
+  sourceSeqRangesRef?: { id: string; count: number };
+}): { startSeq: number; endSeq: number }[] {
+  if (entry.sourceSeqRangesRef) return [];
+  if (entry.sourceSeqRanges && entry.sourceSeqRanges.length > 0) return entry.sourceSeqRanges;
+  return [{ startSeq: entry.seqStart, endSeq: entry.seqEnd }];
 }
 
 function matchesProjectedRow(existing: StreamItem, incoming: StreamItem): boolean {
@@ -1090,6 +1151,11 @@ function deriveCanonicalAcknowledgements(params: {
 function selectEntriesOwnedByTimelinePage(
   payload: ProcessTimelineResponseInput["payload"],
 ): TimelineResponseEntry[] {
+  if (payload.pagingMode === "source_ranges") {
+    return [...payload.entries, ...(payload.contextEntries ?? [])].sort(
+      (left, right) => left.seqStart - right.seqStart,
+    );
+  }
   // COMPAT(projectedBeforePageOwnership): added in v0.2.6, remove after 2027-02-02
   // once the supported daemon floor paginates projected before pages.
   if (
@@ -1126,6 +1192,95 @@ function resolveOlderTimelineAvailability(input: {
     (range) => range.startSeq === cursor.startSeq,
   );
   return (connectedRetainedRange?.hasOlder ?? payload.hasOlder) ? "available" : "none";
+}
+
+/** A context snapshot retains its real anchor while the page cursor certifies only coverage. */
+function attachSourcePositions(
+  items: StreamItem[],
+  units: TimelineUnit[],
+  epoch: string,
+): StreamItem[] {
+  const positions = new Map(
+    units.map((unit) => [
+      unit.seqEnd,
+      {
+        epoch,
+        seq: unit.seqEnd,
+        seqStart: unit.seq,
+        sourceSeqRanges: unit.sourceSeqRanges,
+        deferredPayload: unit.deferredPayload,
+        sourceSeqRangesRef: unit.sourceSeqRangesRef,
+      },
+    ]),
+  );
+  let changed = false;
+  const next = items.map((item) => {
+    const position =
+      item.timelineCursor?.epoch === epoch ? positions.get(item.timelineCursor.seq) : undefined;
+    if (!position) return item;
+    const previous = item.timelineCursor;
+    if (
+      previous?.deferredPayload?.id === position.deferredPayload?.id &&
+      previous?.sourceSeqRangesRef?.id === position.sourceSeqRangesRef?.id &&
+      previous?.seqStart === position.seqStart &&
+      previous.sourceSeqRanges?.length === position.sourceSeqRanges.length &&
+      previous.sourceSeqRanges.every(
+        (range, index) =>
+          range.startSeq === position.sourceSeqRanges[index].startSeq &&
+          range.endSeq === position.sourceSeqRanges[index].endSeq,
+      )
+    )
+      return item;
+    changed = true;
+    return { ...item, timelineCursor: position };
+  });
+  return changed ? next : items;
+}
+
+function positionSourceRangeLanes(
+  result: TimelinePathResult,
+  units: TimelineUnit[],
+  payload: ProcessTimelineResponseInput["payload"],
+) {
+  if (payload.pagingMode !== "source_ranges")
+    return { nextTail: result.tail, nextHead: result.head };
+  return {
+    nextTail: attachSourcePositions(result.tail, units, payload.epoch),
+    nextHead: attachSourcePositions(result.head, units, payload.epoch),
+  };
+}
+
+function mergeSourceRangePage(
+  page: StreamItem[],
+  current: StreamItem[],
+  epoch: string,
+): StreamItem[] {
+  const groups = new Map<number, StreamItem[]>();
+  const unpositioned: StreamItem[] = [];
+  for (const item of current) {
+    if (item.timelineCursor?.epoch !== epoch) {
+      unpositioned.push(item);
+      continue;
+    }
+    const anchor = item.timelineCursor.seqStart ?? item.timelineCursor.seq;
+    const group = groups.get(anchor) ?? [];
+    group.push(item);
+    groups.set(anchor, group);
+  }
+  const incoming = new Map<number, StreamItem[]>();
+  for (const item of page) {
+    if (!item.timelineCursor) continue;
+    const anchor = item.timelineCursor.seqStart ?? item.timelineCursor.seq;
+    const group = incoming.get(anchor) ?? [];
+    const existing = groups.get(anchor)?.[group.length];
+    group.push(existing?.kind === item.kind ? { ...item, id: existing.id } : item);
+    incoming.set(anchor, group);
+  }
+  for (const [anchor, group] of incoming) groups.set(anchor, group);
+  return [...groups]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([, group]) => group)
+    .concat(unpositioned);
 }
 
 function applyAcceptedTimelinePage(input: {
@@ -1173,13 +1328,20 @@ function applyAcceptedTimelinePage(input: {
     },
   );
   return {
-    tail: mergeOlderTimelinePage({
-      page: olderTail,
-      currentTail,
-      epoch: payload.epoch,
-      startSeq: payload.startCursor?.seq ?? acceptedUnits[0]?.seq ?? 0,
-      endSeq: payload.endCursor?.seq ?? acceptedUnits.at(-1)?.seqEnd ?? 0,
-    }),
+    tail:
+      payload.pagingMode === "source_ranges"
+        ? mergeSourceRangePage(
+            attachSourcePositions(olderTail, acceptedUnits, payload.epoch),
+            currentTail,
+            payload.epoch,
+          )
+        : mergeOlderTimelinePage({
+            page: olderTail,
+            currentTail,
+            epoch: payload.epoch,
+            startSeq: payload.startCursor?.seq ?? acceptedUnits[0]?.seq ?? 0,
+            endSeq: payload.endCursor?.seq ?? acceptedUnits.at(-1)?.seqEnd ?? 0,
+          }),
     head: currentHead,
     acknowledgedClientMessageIds: [],
   };
@@ -1252,6 +1414,15 @@ function applyTimelineIncrementalPath(args: {
   };
 }
 
+function deferredDisplayItem(entry: TimelineResponseEntry): Record<string, unknown> {
+  if (!entry.deferredPayload) return entry.item;
+  // These fields only keep existing item-kind hydration alive; the normal renderer is bypassed.
+  if (["assistant_message", "user_message", "reasoning"].includes(String(entry.item.type)))
+    return { ...entry.item, text: "Document available" };
+  if (entry.item.type === "error") return { ...entry.item, message: "Document available" };
+  return entry.item;
+}
+
 export function processTimelineResponse(
   input: ProcessTimelineResponseInput,
 ): ProcessTimelineResponseOutput {
@@ -1292,14 +1463,13 @@ export function processTimelineResponse(
   const timelineUnits = selectEntriesOwnedByTimelinePage(payload).map((entry) => ({
     seq: entry.seqStart,
     seqEnd: entry.seqEnd,
-    sourceSeqRanges:
-      entry.sourceSeqRanges && entry.sourceSeqRanges.length > 0
-        ? entry.sourceSeqRanges
-        : [{ startSeq: entry.seqStart, endSeq: entry.seqEnd }],
+    deferredPayload: entry.deferredPayload,
+    sourceSeqRangesRef: entry.sourceSeqRangesRef,
+    sourceSeqRanges: entrySourceRanges(entry),
     event: {
       type: "timeline",
       provider: entry.provider,
-      item: entry.item,
+      item: deferredDisplayItem(entry),
       ...(entry.turnId ? { turnId: entry.turnId } : {}),
     } as AgentStreamEventPayload,
     timestamp: new Date(entry.timestamp),
@@ -1344,8 +1514,8 @@ export function processTimelineResponse(
   let timelineResult: TimelinePathResult;
   if (discard) {
     timelineResult = {
-      tail: currentTail,
-      head: currentHead,
+      tail: enrichUserMessageActors(currentTail, timelineUnits, payload.epoch),
+      head: enrichUserMessageActors(currentHead, timelineUnits, payload.epoch),
       cursor: currentCursor,
       cursorChanged: false,
       older: "unchanged",
@@ -1403,8 +1573,7 @@ export function processTimelineResponse(
     });
   }
 
-  const nextTail = timelineResult.tail;
-  const nextHead = timelineResult.head;
+  const { nextTail, nextHead } = positionSourceRangeLanes(timelineResult, timelineUnits, payload);
   const nextCursor = timelineResult.cursor;
   const cursorChanged = timelineResult.cursorChanged;
   sideEffects.push(...timelineResult.sideEffects);
@@ -1431,7 +1600,10 @@ export function processTimelineResponse(
     timelineResponseComplete;
 
   const initResolution: "resolve" | "reject" | null = shouldResolveDeferredInit ? "resolve" : null;
-  const commit = discard ? "discard" : "apply";
+  const commit =
+    discard && streamLanesUnchanged(currentTail, currentHead, nextTail, nextHead)
+      ? "discard"
+      : "apply";
 
   return {
     commit,
@@ -1462,6 +1634,13 @@ export interface ProcessAgentStreamEventInput {
   hasAuthoritativeBaseline?: boolean;
   timestamp: Date;
   transformTimelineItem?: TimelineItemTransform;
+  /**
+   * COMPAT(agentSessionStorageRead): off against an upstream host. Live rows then carry
+   * only `{ epoch, seq }`, exactly as upstream produces them. On, each live row also
+   * accumulates the source range it was built from so it can be jumped to and retained
+   * like a fetched row.
+   */
+  trackSourcePositions?: boolean;
 }
 
 export interface ProcessAgentStreamEventOutput {
@@ -1499,6 +1678,8 @@ export interface ProcessAgentStreamEventsInput {
   hasAuthoritativeBaseline?: boolean;
   isDetached?: boolean;
   transformTimelineItem?: TimelineItemTransform;
+  /** COMPAT(agentSessionStorageRead): see ProcessAgentStreamEventInput.trackSourcePositions. */
+  trackSourcePositions?: boolean;
 }
 
 export type AgentStreamReducerSnapshot = Omit<ProcessAgentStreamEventsInput, "events">;
@@ -1596,6 +1777,37 @@ function processTimelineSequencingGate(input: {
   };
 }
 
+function preserveLiveSourcePositions(
+  items: StreamItem[],
+  previous: ReadonlyMap<string, StreamItem>,
+  position: { epoch: string; seq: number } | undefined,
+  enabled: boolean | undefined,
+): StreamItem[] {
+  if (!position || !enabled) return items;
+  return items.map((item) => {
+    if (item.timelineCursor?.epoch !== position.epoch || item.timelineCursor.seq !== position.seq)
+      return item;
+    const before = previous.get(item.id)?.timelineCursor;
+    const carried =
+      before?.epoch === position.epoch
+        ? (before.sourceSeqRanges ?? [{ startSeq: before.seq, endSeq: before.seq }])
+        : [];
+    // Copied because the last range is widened in place below.
+    const ranges = carried.map((range) => Object.assign({}, range));
+    const last = ranges.at(-1);
+    if (last && position.seq <= last.endSeq + 1) last.endSeq = Math.max(last.endSeq, position.seq);
+    else ranges.push({ startSeq: position.seq, endSeq: position.seq });
+    return {
+      ...item,
+      timelineCursor: {
+        ...position,
+        seqStart: before?.epoch === position.epoch ? (before.seqStart ?? before.seq) : position.seq,
+        sourceSeqRanges: ranges,
+      },
+    };
+  });
+}
+
 export function processAgentStreamEvent(
   input: ProcessAgentStreamEventInput,
 ): ProcessAgentStreamEventOutput {
@@ -1676,10 +1888,21 @@ export function processAgentStreamEvent(
     });
   }
   const { tail, head, changedTail, changedHead } = streamResult;
+  const previousItems = new Map([...currentTail, ...currentHead].map((item) => [item.id, item]));
 
   return {
-    tail,
-    head,
+    tail: preserveLiveSourcePositions(
+      tail,
+      previousItems,
+      timelineCursor,
+      input.trackSourcePositions,
+    ),
+    head: preserveLiveSourcePositions(
+      head,
+      previousItems,
+      timelineCursor,
+      input.trackSourcePositions,
+    ),
     changedTail,
     changedHead,
     cursor: sequencing.nextTimelineCursor,
@@ -1731,6 +1954,7 @@ export function processAgentStreamEvents(
       hasAuthoritativeBaseline: input.hasAuthoritativeBaseline,
       timestamp: reducerEvent.timestamp,
       transformTimelineItem: input.transformTimelineItem,
+      trackSourcePositions: input.trackSourcePositions,
     });
 
     tail = result.tail;
@@ -1879,6 +2103,11 @@ export interface CreateSessionAgentStreamReducerQueueInput {
   recoverTimelineGap: (agentId: string, cursor: { epoch: string; endSeq: number }) => void;
   reprojectTimeline: (agentId: string) => void;
   onCommitted?: (agentId: string) => void;
+  admitCommit?: (
+    agentId: string,
+    result: ProcessAgentStreamEventOutput,
+    events: AgentStreamReducerEvent[],
+  ) => ProcessAgentStreamEventOutput;
   transformTimelineItem?: TimelineItemTransform;
 }
 
@@ -1953,9 +2182,11 @@ export function createSessionAgentStreamReducerQueue(
         hasAuthoritativeBaseline: timeline.status === "synced",
         isDetached: timeline.status === "synced" && timeline.newer === "available",
         transformTimelineItem: input.transformTimelineItem,
+        trackSourcePositions: sessionStorageReadable(session?.serverInfo),
       };
     },
     commit: (agentId, result, events) => {
+      if (input.admitCommit) result = input.admitCommit(agentId, result, events);
       if (
         result.changedTail ||
         result.changedHead ||

@@ -1900,8 +1900,11 @@ export function SidebarWorkspaceList({
   const onToggleWorkspacePin = useSidebarWorkspacePinController();
   const getPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.getPinnedWorkspaceOrder);
   const setPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.setPinnedWorkspaceOrder);
-  const hasActiveLabelFilter = useSidebarViewStore((state) =>
-    hasActiveSidebarLabelFilter(state.labelFilter),
+  const hasActiveLabelFilter = useSidebarViewStore(
+    (state) =>
+      hasActiveSidebarLabelFilter(state.labelFilter) ||
+      state.userFilters.length > 0 ||
+      state.channelFilters.length > 0,
   );
   const handlePinnedWorkspaceReorder = useCallback(
     (reorderedWorkspaces: SidebarWorkspacePlacement[]) => {

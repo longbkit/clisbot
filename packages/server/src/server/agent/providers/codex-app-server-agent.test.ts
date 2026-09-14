@@ -5979,6 +5979,21 @@ describe("Codex denied plan approvals", () => {
     });
   });
 
+  test("synthetic plan cancellation waits for automatic permission admission and retains pending on failure", async () => {
+    const { session, events } = createPlanSession();
+    const pending = session.getPendingPermissions()[0]!;
+    session.setAutomaticPermissionResponder(async () => {
+      throw new Error("permission journal unavailable");
+    });
+    await expect(
+      castInternals<{ dismissPendingPlanApprovals: (message: string) => Promise<void> }>(
+        session,
+      ).dismissPendingPlanApprovals("new prompt"),
+    ).rejects.toThrow("permission journal unavailable");
+    expect(session.getPendingPermissions()[0]?.id).toBe(pending.id);
+    expect(planApprovalRows(events)).toEqual([]);
+  });
+
   test("a plan superseded by a new prompt records the same decision", () => {
     const { session, events } = createPlanSession();
 

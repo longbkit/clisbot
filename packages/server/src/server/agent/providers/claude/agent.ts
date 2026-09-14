@@ -90,6 +90,7 @@ import {
 import {
   getAgentStreamEventTurnId,
   type AgentPermissionAction,
+  type AutomaticPermissionResponder,
   type AgentCapabilityFlags,
   type AgentClient,
   type AgentCreateSessionOptions,
@@ -2053,6 +2054,11 @@ class ClaudeAgentSession implements AgentSession {
   private toolUseIndexToId = new Map<number, string>();
   private toolUseInputBuffers = new Map<string, string>();
   private pendingPermissions = new Map<string, PendingPermission>();
+  private automaticPermissionResponder?: AutomaticPermissionResponder;
+
+  setAutomaticPermissionResponder(responder: AutomaticPermissionResponder): void {
+    this.automaticPermissionResponder = responder;
+  }
   private activeForegroundTurnId: string | null = null;
   private autonomousTurn: AutonomousTurnState | null = null;
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
@@ -2290,7 +2296,7 @@ class ClaudeAgentSession implements AgentSession {
     }
 
     // Capture both ends of the live SDK stream before creating or delivering the message. There
-    // is deliberately no await below: a finished A cannot make this input point at a later B.
+    // is no await before enqueueing: a finished A cannot make this input point at a later B.
     const query = this.activeForegroundQuery;
     const input = this.activeForegroundInput;
     if (!query || !input || this.query !== query || this.input !== input) {
@@ -2307,15 +2313,15 @@ class ClaudeAgentSession implements AgentSession {
     ) {
       return { status: "unavailable" };
     }
-    this.enqueueSteer(input, message, options.clearPendingPermissions === true);
+    await this.enqueueSteer(input, message, options.clearPendingPermissions === true);
     return { status: "accepted" };
   }
 
-  private enqueueSteer(
+  private async enqueueSteer(
     input: AsyncMessageInput<SDKUserMessage>,
     message: SDKUserMessage,
     clearPendingPermissions: boolean,
-  ): void {
+  ): Promise<void> {
     const uuid = message.uuid;
     if (uuid) this.queuedSteerUuids.add(uuid);
     if (uuid && clearPendingPermissions) {
@@ -2324,7 +2330,7 @@ class ClaudeAgentSession implements AgentSession {
     try {
       input.push(message);
       if (clearPendingPermissions) {
-        this.denyPendingPermissionsSupersededBySteer();
+        await this.denyPendingPermissionsSupersededBySteer();
       }
     } catch (error) {
       if (uuid) {
@@ -2566,8 +2572,15 @@ class ClaudeAgentSession implements AgentSession {
     };
   }
 
-  private denyPendingPermissionsSupersededBySteer(): void {
+  private async denyPendingPermissionsSupersededBySteer(): Promise<void> {
     for (const [requestId, pending] of this.pendingPermissions) {
+      if (this.automaticPermissionResponder) {
+        await this.automaticPermissionResponder(requestId, {
+          behavior: "deny",
+          message: STEER_SUPERSEDED_PERMISSION_MESSAGE,
+        });
+        continue;
+      }
       this.pendingPermissions.delete(requestId);
       pending.cleanup?.();
       pending.resolve(
@@ -4620,7 +4633,7 @@ class ClaudeAgentSession implements AgentSession {
       request,
     });
 
-    if (this.permissionClearingSteerUuids.size > 0) {
+    if (this.permissionClearingSteerUuids.size > 0 && !this.automaticPermissionResponder) {
       return this.resolveDeniedPermission(request, {
         behavior: "deny",
         message: STEER_SUPERSEDED_PERMISSION_MESSAGE,
@@ -4667,6 +4680,15 @@ class ClaudeAgentSession implements AgentSession {
         reject,
         cleanup,
       });
+      if (this.permissionClearingSteerUuids.size > 0 && this.automaticPermissionResponder) {
+        void this.automaticPermissionResponder(requestId, {
+          behavior: "deny",
+          message: STEER_SUPERSEDED_PERMISSION_MESSAGE,
+        }).catch((error: unknown) => {
+          // Admission failure leaves the request pending; no native decision was forwarded.
+          this.logger.error({ err: error, requestId }, "Automatic permission admission failed");
+        });
+      }
     });
   };
 

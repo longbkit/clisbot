@@ -53,6 +53,7 @@ export function renderWorkspaceRouteGate(input: {
         />
       );
     case "unreachable":
+    case "reconnecting":
       return (
         <WorkspaceUnreachable
           state={input.state}
@@ -77,13 +78,12 @@ export function renderWorkspaceRouteGate(input: {
         />
       );
     case "ready":
-    case "reconnecting":
       return null;
   }
 }
 
 function getWorkspaceHostStateTitle(
-  state: Extract<WorkspaceRouteState, { kind: "unreachable" }>,
+  state: Extract<WorkspaceRouteState, { kind: "unreachable" | "reconnecting" }>,
   t: ReturnType<typeof useTranslation>["t"],
 ): string {
   if (state.connectionStatus === "connecting" || state.connectionStatus === "idle") {
@@ -203,7 +203,7 @@ function WorkspaceUnreachable({
   onRetry,
   onManageHost,
 }: {
-  state: Extract<WorkspaceRouteState, { kind: "unreachable" }>;
+  state: Extract<WorkspaceRouteState, { kind: "unreachable" | "reconnecting" }>;
   onRetry: () => void;
   onManageHost: () => void;
 }) {

@@ -1,0 +1,2717 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-09-14T03:45:38.386Z",
+  "endedAt": "2026-09-14T03:54:54.383Z",
+  "smoke": false,
+  "sourceStart": {
+    "head": "3e4df80f43ad78218486ac1b3414f98fc71c6b17",
+    "upstream": "fa93c4290eaa87ae58452ab6e2012f85ae6e0c6b",
+    "status": "M CLAUDE.md\n D docs/audits/2026-09-08-workspace-placement-and-session-authorship.md\n M ../../channels/README.md\n M docs/data-model.md\nAM docs/features/agent-session-storage/README.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-diagnostic.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-diagnostic.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-rollback.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-upstream-baseline-merge-tree.txt\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-upstream-rehearsal.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-allocation-frozen.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-allocation.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-reachability.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-frozen.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-frozen.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-rollback.json\nAM docs/features/agent-session-storage/goal-final-report.md\nA  docs/features/agent-session-storage/goal-matrix.md\nAM docs/features/agent-session-storage/implementation.md\nA  docs/features/agent-session-storage/lane-gate1-auth-compat.md\nA  docs/features/agent-session-storage/lane-storage-plan-rebuild.md\nAM docs/features/agent-session-storage/lane-ui-route-evidence.md\nA  docs/features/agent-session-storage/out-of-layer-changes.md\n M docs/features/workspace-organization/README.md\n M docs/guides/user-guide/hosts/connect-and-manage.md\n M docs/hub.md\n M docs/timeline-sync.md\nA  packages/app/e2e/browser/sidebar-session-metadata.ui-contract.spec.ts\n M packages/app/e2e/support/global-setup.ts\n M packages/app/src/agent-stream/layout.test.ts\n M packages/app/src/agent-stream/layout.ts\n M packages/app/src/agent-stream/prompt-jump-settle.test.ts\n M packages/app/src/agent-stream/prompt-jump-settle.ts\n M packages/app/src/agent-stream/strategy-native.tsx\n M packages/app/src/agent-stream/strategy-web.tsx\n M packages/app/src/agent-stream/strategy.ts\n M packages/app/src/agent-stream/use-scroll-to-message.web.ts\n M packages/app/src/agent-stream/view.tsx\n M packages/app/src/attachments/service.ts\n M packages/app/src/clisbot/hub/host-synchronization-lifecycle.test.tsx\n M packages/app/src/clisbot/hub/host-synchronization.tsx\n M packages/app/src/clisbot/hub/settings/managed-access-host-section.tsx\n M packages/app/src/clisbot/hub/sidebar-account-presentation.ts\n M packages/app/src/components/left-sidebar.tsx\n M packages/app/src/components/message.tsx\n M packages/app/src/components/sidebar-workspace-list.tsx\n M packages/app/src/components/sidebar/display-preferences/menu.tsx\n M packages/app/src/components/sidebar/display-preferences/model.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.test.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.ts\n M packages/app/src/components/sidebar/empty-states.tsx\n M packages/app/src/components/sidebar/sidebar-model.tsx\n M packages/app/src/components/sidebar/sidebar-workspace-row-content.tsx\n M packages/app/src/composer/actions.ts\n M packages/app/src/composer/draft/workspace-tab.tsx\n M packages/app/src/composer/index.tsx\n M packages/app/src/contexts/session-context.tsx\n M packages/app/src/hooks/sidebar-workspaces-view-model.ts\n M packages/app/src/hooks/use-settings/storage.ts\n M packages/app/src/hooks/use-sidebar-workspaces-list.ts\n M packages/app/src/i18n/resources/ar.ts\n M packages/app/src/i18n/resources/en.ts\n M packages/app/src/i18n/resources/es.ts\n M packages/app/src/i18n/resources/fr.ts\n M packages/app/src/i18n/resources/ja.ts\n M packages/app/src/i18n/resources/ko.ts\n M packages/app/src/i18n/resources/pt-BR.ts\n M packages/app/src/i18n/resources/ru.ts\n M packages/app/src/i18n/resources/zh-CN.ts\n M packages/app/src/panels/panel-manifest.ts\n M packages/app/src/panels/provider-subagent-panel.tsx\n M packages/app/src/panels/register-panels.ts\n M packages/app/src/runtime/directory-sync/index.ts\n M packages/app/src/runtime/host-runtime.test.ts\n M packages/app/src/runtime/host-runtime.ts\n M packages/app/src/runtime/host-session-access.ts\n M packages/app/src/runtime/replica-cache/index.test.ts\n M packages/app/src/runtime/replica-cache/index.ts\n M packages/app/src/screens/workspace/workspace-route-state-views.tsx\n M packages/app/src/screens/workspace/workspace-screen.tsx\n M packages/app/src/screens/workspace/workspace-tab-menu.ts\n M packages/app/src/stores/session-store.ts\n M packages/app/src/stores/sidebar-view-store.test.ts\n M packages/app/src/stores/sidebar-view-store.ts\n M packages/app/src/stores/workspace-layout-store.ts\n M packages/app/src/subagents/provider-store.test.ts\n M packages/app/src/subagents/provider-store.ts\n M packages/app/src/timeline/replica.test.ts\n M packages/app/src/timeline/session-stream-reducers.test.ts\n M packages/app/src/timeline/session-stream-reducers.ts\n M packages/app/src/timeline/viewed-timeline-sync.ts\n M packages/app/src/tool-calls/detail-level/grouping.ts\n M packages/app/src/types/stream.ts\n M packages/app/src/utils/agent-snapshots.ts\n M packages/app/src/workspace-tabs/identity.ts\n M packages/app/src/workspace-tabs/model.ts\n M packages/app/test-stubs/lucide-react-native.ts\n M packages/app/vitest.config.ts\n M packages/client/src/daemon-client.test.ts\n M packages/client/src/daemon-client.ts\n M packages/hub/src/app.ts\n M packages/hub/src/application-runtime.ts\n M packages/hub/src/channels/approvals/harness.ts\n M packages/hub/src/channels/approvals/index.ts\n M packages/hub/src/channels/bindings/bindings.test.ts\n M packages/hub/src/channels/bindings/index.ts\n M packages/hub/src/channels/commands-lifecycle-queue.test.ts\n M packages/hub/src/channels/commands-lifecycle-queue.ts\n M packages/hub/src/channels/commands-lifecycle.test.ts\n M packages/hub/src/channels/commands-lifecycle.ts\n M packages/hub/src/channels/config/compile.test.ts\n M packages/hub/src/channels/config/compile.ts\n M packages/hub/src/channels/config/schema.ts\n M packages/hub/src/channels/control-plane.test.ts\n M packages/hub/src/channels/daemon/client.test.ts\n M packages/hub/src/channels/daemon/client.ts\n M packages/hub/src/channels/daemon/test-support.ts\n M packages/hub/src/channels/daemon/types.ts\n M packages/hub/src/channels/daemon/ws-client.ts\n M packages/hub/src/channels/execution.ts\n M packages/hub/src/channels/execution/execution.test.ts\n M packages/hub/src/channels/plane/route-execution-limiter.test.ts\n M packages/hub/src/channels/plane/types.ts\n M packages/hub/src/channels/policy.test.ts\n M packages/hub/src/channels/policy/access-plane.test.ts\n M packages/hub/src/channels/relay/relay.test.ts\n M packages/hub/src/channels/streaming/producer.test.ts\n M packages/hub/src/channels/supervisor/index.ts\n M packages/hub/src/channels/supervisor/sim-boot.integration.test.ts\n M packages/hub/src/channels/supervisor/types.ts\nA  packages/hub/src/channels/workspace-organization.test.ts\nAM packages/hub/src/channels/workspace-organization.ts\n M packages/hub/src/daemons/lifecycle.ts\n M packages/hub/src/daemons/protocol.ts\n M packages/hub/src/daemons/registry.ts\n M packages/hub/src/hub/protocol.ts\n M packages/hub/src/managed-access/http.ts\n M packages/hub/src/managed-access/tickets.ts\n M packages/hub/src/management-api/index.ts\n M packages/hub/src/public-operations/index.ts\n M packages/hub/src/public-operations/types.ts\n M packages/hub/src/test-utils/fake-daemon.ts\n M packages/hub/src/triggers/channel/provider.ts\n M packages/hub/src/triggers/manual/provider.ts\n M packages/hub/src/triggers/manual/source.test.ts\n M packages/hub/src/triggers/manual/source.ts\n M packages/protocol/src/agent-types.ts\n M packages/protocol/src/client-capabilities.ts\n M packages/protocol/src/messages.ts\nAM packages/server/scripts/session-storage-benchmark/README.md\nA  packages/server/scripts/session-storage-benchmark/derived-allocation.ts\nA  packages/server/scripts/session-storage-benchmark/directory.ts\nA  packages/server/scripts/session-storage-benchmark/fixtures.ts\nA  packages/server/scripts/session-storage-benchmark/metrics.ts\nA  packages/server/scripts/session-storage-benchmark/rollback-check.ts\nAM packages/server/scripts/session-storage-benchmark/run.ts\nA  packages/server/scripts/session-storage-benchmark/source-state.ts\nAM packages/server/scripts/session-storage-benchmark/timeline.ts\nA  packages/server/scripts/session-storage-benchmark/tsconfig.json\nAM packages/server/scripts/session-storage-benchmark/whole-daemon-steady-state.ts\n M packages/server/src/server/agent/activity-curator.test.ts\n M packages/server/src/server/agent/activity-curator.ts\n M packages/server/src/server/agent/agent-manager.test.ts\n M packages/server/src/server/agent/agent-manager.ts\n M packages/server/src/server/agent/agent-projections.ts\n M packages/server/src/server/agent/agent-prompt.ts\n M packages/server/src/server/agent/agent-run-state.ts\n M packages/server/src/server/agent/agent-sdk-types.ts\nM  packages/server/src/server/agent/agent-storage.test.ts\n M packages/server/src/server/agent/agent-storage.ts\n M packages/server/src/server/agent/agent-stream-coalescer.ts\n M packages/server/src/server/agent/agent-timeline-store-types.ts\n M packages/server/src/server/agent/agent-timeline-store.ts\n M packages/server/src/server/agent/create-agent/create.ts\n M packages/server/src/server/agent/permission-response.ts\n M packages/server/src/server/agent/provider-registry.ts\n M packages/server/src/server/agent/provider-subagents/store.ts\n M packages/server/src/server/agent/providers/acp-agent.test.ts\n M packages/server/src/server/agent/providers/acp-agent.ts\n M packages/server/src/server/agent/providers/claude/agent.test.ts\n M packages/server/src/server/agent/providers/claude/agent.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.test.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.ts\n M packages/server/src/server/agent/providers/opencode-agent.ts\n M packages/server/src/server/agent/providers/pi/agent.test.ts\n M packages/server/src/server/agent/providers/pi/agent.ts\nAM packages/server/src/server/agent/session-storage/projected-timeline.test.ts\nAM packages/server/src/server/agent/session-storage/storage-review.test.ts\n M packages/server/src/server/agent/timeline-projection.ts\n M packages/server/src/server/authorization/operation-permissions.ts\n M packages/server/src/server/bootstrap.ts\n M packages/server/src/server/config.ts\n M packages/server/src/server/file-download/token-store.ts\n M packages/server/src/server/file-upload/index.ts\nA  packages/server/src/server/file-upload/session-files.test.ts\n M packages/server/src/server/hub/daemon-executions.test.ts\n M packages/server/src/server/hub/daemon-executions.ts\n M packages/server/src/server/hub/execution-controller.ts\n M packages/server/src/server/hub/relationship-controller.ts\n M packages/server/src/server/hub/relationship-remote.ts\n M packages/server/src/server/hub/test-utils/relationship-harness.ts\n M packages/server/src/server/managed-access/resource-authorizer.test.ts\n M packages/server/src/server/managed-access/resource-authorizer.ts\n M packages/server/src/server/managed-access/types.ts\n M packages/server/src/server/persisted-config.ts\n M packages/server/src/server/session.test.ts\n M packages/server/src/server/session.ts\n M packages/server/src/server/session/files/workspace-files-session.ts\n M packages/server/src/server/test-utils/paseo-daemon.ts\n M packages/server/src/server/websocket-server.ts\n M packages/server/src/server/workspace-directory.ts\n M packages/server/src/server/workspace-registry.ts\n?? docs/features/agent-session-storage/iteration-acceptance-matrix.md\n?? packages/app/.vitest-attachments/0eeda52bc5c95c4e18a1bb0e054099171ebfaad2.png\n?? packages/app/.vitest-attachments/1609c650b7922a36e2257332b7fe00e163ef41fa.png\n?? packages/app/.vitest-attachments/1efd6334ef2df5c640bae53081bffd21794c913a.png\n?? packages/app/.vitest-attachments/3eb8ca1a422ca44fbc7872845eca36c64ddb78e6.png\n?? packages/app/.vitest-attachments/46b35545280e5a9ed6fa4d9bae647efbbfb822ed.png\n?? packages/app/.vitest-attachments/48294b844638abe1304585d82152d35dc526454e.png\n?? packages/app/.vitest-attachments/50f8c32308f90b8fd7eba6a76604a1edf52a7a03.png\n?? packages/app/.vitest-attachments/61e0bc69b13933fb71d5b36c5e9ffcb27acc35dd.png\n?? packages/app/.vitest-attachments/8f642b54128aa21eab80c1aaa441da599c4878a7.png\n?? packages/app/.vitest-attachments/addfded175330a8a3eadd21b909fd331421ade22.png\n?? packages/app/.vitest-attachments/c454396708ce423cd80a5247c200ccb08df007dd.png\n?? packages/app/.vitest-attachments/dc0e8145195f125d047d63c5d60a39cd0c38b8b3.png\n?? packages/app/.vitest-attachments/f450677f0e55bc6b9ef1783350c4a216648a4891.png\n?? packages/app/e2e/browser/session-profile.ui-contract.spec.ts\n?? packages/app/e2e/support/static-app-server.ts\n?? packages/app/scripts/verify-e2e-static-app.ts\n?? packages/app/src/agent-stream/deferred-timeline-item.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.test.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.ts\n?? packages/app/src/clisbot/hub/managed-host-reconciliation.test.ts\n?? packages/app/src/clisbot/hub/managed-host-reconciliation.ts\n?? packages/app/src/clisbot/session-storage/\n?? packages/app/src/subagents/projected-timeline.test.ts\n?? packages/app/src/subagents/projected-timeline.ts\n?? packages/app/src/subagents/timeline-retention.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.test.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.ts\n?? packages/app/src/timeline/timeline-page-retention.test.ts\n?? packages/app/src/timeline/timeline-page-retention.ts\n?? packages/app/src/timeline/timeline-retention-owner.ts\n?? packages/app/src/utils/name-initials.test.ts\n?? packages/app/src/utils/name-initials.ts\n?? packages/app/test-stubs/expo-clipboard.ts\n?? packages/app/test-stubs/expo-constants.ts\n?? packages/app/test-stubs/expo-file-system-legacy.ts\n?? packages/app/test-stubs/expo-file-system.ts\n?? packages/app/test-stubs/expo-modules-core.ts\n?? packages/app/test-stubs/expo-router.ts\n?? packages/app/test-stubs/react-native-web-plus.ts\n?? packages/app/test-stubs/react-native-web.d.ts\n?? packages/app/test-stubs/rn-codegen-native-component.ts\n?? packages/app/test-stubs/rn-pressability-debug.tsx\n?? packages/app/test-stubs/rn-react-fabric-public-instance.ts\n?? packages/app/test-stubs/rn-renderer-shims-react-native.ts\n?? packages/app/test-stubs/rn-view-config-registry.ts\n?? packages/hub/src/channels/daemon/session-operation.test.ts\n?? packages/hub/src/channels/daemon/session-operation.ts\n?? packages/hub/src/managed-access/automation-session-identity.ts\n?? packages/hub/src/managed-access/session-operation-tickets.test.ts\n?? packages/hub/src/managed-access/session-operation-tickets.ts\n?? packages/protocol/src/session-authorship.ts\n?? packages/protocol/src/session-operation.ts\n?? packages/server/.oc-probe.mjs\n?? packages/server/scripts/rollback-session-layout.ts\n?? packages/server/src/server/agent/permission-generation-projection.ts\n?? packages/server/src/server/agent/permission-response-journal.test.ts\n?? packages/server/src/server/agent/permission-response-journal.ts\n?? packages/server/src/server/agent/provider-subagents/admission.test.ts\n?? packages/server/src/server/agent/provider-subagents/metadata-limits.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.test.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.ts\n?? packages/server/src/server/agent/session-authorship.test.ts\n?? packages/server/src/server/agent/session-authorship.ts\n?? packages/server/src/server/agent/session-operation-context.ts\n?? packages/server/src/server/agent/session-storage/authorship-recovery-queue.ts\n?? packages/server/src/server/agent/session-storage/deletion-intents.test.ts\n?? packages/server/src/server/agent/session-storage/deletion-intents.ts\n?? packages/server/src/server/agent/session-storage/durable-file.ts\n?? packages/server/src/server/agent/session-storage/file-agent-timeline-store.ts\n?? packages/server/src/server/agent/session-storage/iteration-acceptance.test.ts\n?? packages/server/src/server/agent/session-storage/layout.ts\n?? packages/server/src/server/agent/session-storage/message-submissions.test.ts\n?? packages/server/src/server/agent/session-storage/message-submissions.ts\n?? packages/server/src/server/agent/session-storage/paged-journal.ts\n?? packages/server/src/server/agent/session-storage/pending-event-budget.test.ts\n?? packages/server/src/server/agent/session-storage/pending-event-budget.ts\n?? packages/server/src/server/agent/session-storage/permission-index.ts\n?? packages/server/src/server/agent/session-storage/projected-timeline.ts\n?? packages/server/src/server/agent/session-storage/recover-session-authorship.ts\n?? packages/server/src/server/agent/session-storage/session-event-index.ts\n?? packages/server/src/server/agent/session-storage/session-event-log.ts\n?? packages/server/src/server/agent/session-storage/session-location.test.ts\n?? packages/server/src/server/agent/session-storage/session-summary.test.ts\n?? packages/server/src/server/agent/session-storage/session-summary.ts\n?? packages/server/src/server/agent/session-storage/storage.test.ts\n?? packages/server/src/server/agent/session-storage/timeline-retention.test.ts\n?? packages/server/src/server/agent/session-storage/timeline-retention.ts\n?? packages/server/src/server/file-download/token-store.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.test.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.ts\n?? packages/server/src/server/file-upload/session-files.ts\n?? packages/server/src/server/official-session-storage-matrix.test.ts\n?? packages/server/src/server/session-file-download-transport.test.ts\n?? packages/server/src/server/session/files/session-file-download.test.ts\n?? scripts/rehearse-agent-session-storage-merge.mjs\n?? scripts/stage-session-storage-official-app.mjs\n?? scripts/stage-session-storage-official-artifacts.mjs",
+    "trackedDiffSha256": "54094d5af7e420a9cd30138b8eb762f0b94aa24e5f9d4312314a4eada4f5cb52",
+    "untrackedContentSha256": "8d6ab398c721faf801eb86de4ac7deed3c009e5926a24f2a1a28e4bff2094a6e"
+  },
+  "sourceEnd": {
+    "head": "3e4df80f43ad78218486ac1b3414f98fc71c6b17",
+    "upstream": "fa93c4290eaa87ae58452ab6e2012f85ae6e0c6b",
+    "status": "M CLAUDE.md\n D docs/audits/2026-09-08-workspace-placement-and-session-authorship.md\n M ../../channels/README.md\n M docs/data-model.md\nAM docs/features/agent-session-storage/README.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-diagnostic.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-diagnostic.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-rollback.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-upstream-baseline-merge-tree.txt\nA  docs/features/agent-session-storage/benchmarks/2026-09-11-upstream-rehearsal.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-allocation-frozen.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-allocation.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-derived-reachability.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-frozen.json\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-frozen.md\nA  docs/features/agent-session-storage/benchmarks/2026-09-12-rollback.json\nAM docs/features/agent-session-storage/goal-final-report.md\nA  docs/features/agent-session-storage/goal-matrix.md\nAM docs/features/agent-session-storage/implementation.md\nA  docs/features/agent-session-storage/lane-gate1-auth-compat.md\nA  docs/features/agent-session-storage/lane-storage-plan-rebuild.md\nAM docs/features/agent-session-storage/lane-ui-route-evidence.md\nA  docs/features/agent-session-storage/out-of-layer-changes.md\n M docs/features/workspace-organization/README.md\n M docs/guides/user-guide/hosts/connect-and-manage.md\n M docs/hub.md\n M docs/timeline-sync.md\nA  packages/app/e2e/browser/sidebar-session-metadata.ui-contract.spec.ts\n M packages/app/e2e/support/global-setup.ts\n M packages/app/src/agent-stream/layout.test.ts\n M packages/app/src/agent-stream/layout.ts\n M packages/app/src/agent-stream/prompt-jump-settle.test.ts\n M packages/app/src/agent-stream/prompt-jump-settle.ts\n M packages/app/src/agent-stream/strategy-native.tsx\n M packages/app/src/agent-stream/strategy-web.tsx\n M packages/app/src/agent-stream/strategy.ts\n M packages/app/src/agent-stream/use-scroll-to-message.web.ts\n M packages/app/src/agent-stream/view.tsx\n M packages/app/src/attachments/service.ts\n M packages/app/src/clisbot/hub/host-synchronization-lifecycle.test.tsx\n M packages/app/src/clisbot/hub/host-synchronization.tsx\n M packages/app/src/clisbot/hub/settings/managed-access-host-section.tsx\n M packages/app/src/clisbot/hub/sidebar-account-presentation.ts\n M packages/app/src/components/left-sidebar.tsx\n M packages/app/src/components/message.tsx\n M packages/app/src/components/sidebar-workspace-list.tsx\n M packages/app/src/components/sidebar/display-preferences/menu.tsx\n M packages/app/src/components/sidebar/display-preferences/model.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.test.ts\n M packages/app/src/components/sidebar/display-preferences/row-items.ts\n M packages/app/src/components/sidebar/empty-states.tsx\n M packages/app/src/components/sidebar/sidebar-model.tsx\n M packages/app/src/components/sidebar/sidebar-workspace-row-content.tsx\n M packages/app/src/composer/actions.ts\n M packages/app/src/composer/draft/workspace-tab.tsx\n M packages/app/src/composer/index.tsx\n M packages/app/src/contexts/session-context.tsx\n M packages/app/src/hooks/sidebar-workspaces-view-model.ts\n M packages/app/src/hooks/use-settings/storage.ts\n M packages/app/src/hooks/use-sidebar-workspaces-list.ts\n M packages/app/src/i18n/resources/ar.ts\n M packages/app/src/i18n/resources/en.ts\n M packages/app/src/i18n/resources/es.ts\n M packages/app/src/i18n/resources/fr.ts\n M packages/app/src/i18n/resources/ja.ts\n M packages/app/src/i18n/resources/ko.ts\n M packages/app/src/i18n/resources/pt-BR.ts\n M packages/app/src/i18n/resources/ru.ts\n M packages/app/src/i18n/resources/zh-CN.ts\n M packages/app/src/panels/panel-manifest.ts\n M packages/app/src/panels/provider-subagent-panel.tsx\n M packages/app/src/panels/register-panels.ts\n M packages/app/src/runtime/directory-sync/index.ts\n M packages/app/src/runtime/host-runtime.test.ts\n M packages/app/src/runtime/host-runtime.ts\n M packages/app/src/runtime/host-session-access.ts\n M packages/app/src/runtime/replica-cache/index.test.ts\n M packages/app/src/runtime/replica-cache/index.ts\n M packages/app/src/screens/workspace/workspace-route-state-views.tsx\n M packages/app/src/screens/workspace/workspace-screen.tsx\n M packages/app/src/screens/workspace/workspace-tab-menu.ts\n M packages/app/src/stores/session-store.ts\n M packages/app/src/stores/sidebar-view-store.test.ts\n M packages/app/src/stores/sidebar-view-store.ts\n M packages/app/src/stores/workspace-layout-store.ts\n M packages/app/src/subagents/provider-store.test.ts\n M packages/app/src/subagents/provider-store.ts\n M packages/app/src/timeline/replica.test.ts\n M packages/app/src/timeline/session-stream-reducers.test.ts\n M packages/app/src/timeline/session-stream-reducers.ts\n M packages/app/src/timeline/viewed-timeline-sync.ts\n M packages/app/src/tool-calls/detail-level/grouping.ts\n M packages/app/src/types/stream.ts\n M packages/app/src/utils/agent-snapshots.ts\n M packages/app/src/workspace-tabs/identity.ts\n M packages/app/src/workspace-tabs/model.ts\n M packages/app/test-stubs/lucide-react-native.ts\n M packages/app/vitest.config.ts\n M packages/client/src/daemon-client.test.ts\n M packages/client/src/daemon-client.ts\n M packages/hub/src/app.ts\n M packages/hub/src/application-runtime.ts\n M packages/hub/src/channels/approvals/harness.ts\n M packages/hub/src/channels/approvals/index.ts\n M packages/hub/src/channels/bindings/bindings.test.ts\n M packages/hub/src/channels/bindings/index.ts\n M packages/hub/src/channels/commands-lifecycle-queue.test.ts\n M packages/hub/src/channels/commands-lifecycle-queue.ts\n M packages/hub/src/channels/commands-lifecycle.test.ts\n M packages/hub/src/channels/commands-lifecycle.ts\n M packages/hub/src/channels/config/compile.test.ts\n M packages/hub/src/channels/config/compile.ts\n M packages/hub/src/channels/config/schema.ts\n M packages/hub/src/channels/control-plane.test.ts\n M packages/hub/src/channels/daemon/client.test.ts\n M packages/hub/src/channels/daemon/client.ts\n M packages/hub/src/channels/daemon/test-support.ts\n M packages/hub/src/channels/daemon/types.ts\n M packages/hub/src/channels/daemon/ws-client.ts\n M packages/hub/src/channels/execution.ts\n M packages/hub/src/channels/execution/execution.test.ts\n M packages/hub/src/channels/plane/route-execution-limiter.test.ts\n M packages/hub/src/channels/plane/types.ts\n M packages/hub/src/channels/policy.test.ts\n M packages/hub/src/channels/policy/access-plane.test.ts\n M packages/hub/src/channels/relay/relay.test.ts\n M packages/hub/src/channels/streaming/producer.test.ts\n M packages/hub/src/channels/supervisor/index.ts\n M packages/hub/src/channels/supervisor/sim-boot.integration.test.ts\n M packages/hub/src/channels/supervisor/types.ts\nA  packages/hub/src/channels/workspace-organization.test.ts\nAM packages/hub/src/channels/workspace-organization.ts\n M packages/hub/src/daemons/lifecycle.ts\n M packages/hub/src/daemons/protocol.ts\n M packages/hub/src/daemons/registry.ts\n M packages/hub/src/hub/protocol.ts\n M packages/hub/src/managed-access/http.ts\n M packages/hub/src/managed-access/tickets.ts\n M packages/hub/src/management-api/index.ts\n M packages/hub/src/public-operations/index.ts\n M packages/hub/src/public-operations/types.ts\n M packages/hub/src/test-utils/fake-daemon.ts\n M packages/hub/src/triggers/channel/provider.ts\n M packages/hub/src/triggers/manual/provider.ts\n M packages/hub/src/triggers/manual/source.test.ts\n M packages/hub/src/triggers/manual/source.ts\n M packages/protocol/src/agent-types.ts\n M packages/protocol/src/client-capabilities.ts\n M packages/protocol/src/messages.ts\nAM packages/server/scripts/session-storage-benchmark/README.md\nA  packages/server/scripts/session-storage-benchmark/derived-allocation.ts\nA  packages/server/scripts/session-storage-benchmark/directory.ts\nA  packages/server/scripts/session-storage-benchmark/fixtures.ts\nA  packages/server/scripts/session-storage-benchmark/metrics.ts\nA  packages/server/scripts/session-storage-benchmark/rollback-check.ts\nAM packages/server/scripts/session-storage-benchmark/run.ts\nA  packages/server/scripts/session-storage-benchmark/source-state.ts\nAM packages/server/scripts/session-storage-benchmark/timeline.ts\nA  packages/server/scripts/session-storage-benchmark/tsconfig.json\nAM packages/server/scripts/session-storage-benchmark/whole-daemon-steady-state.ts\n M packages/server/src/server/agent/activity-curator.test.ts\n M packages/server/src/server/agent/activity-curator.ts\n M packages/server/src/server/agent/agent-manager.test.ts\n M packages/server/src/server/agent/agent-manager.ts\n M packages/server/src/server/agent/agent-projections.ts\n M packages/server/src/server/agent/agent-prompt.ts\n M packages/server/src/server/agent/agent-run-state.ts\n M packages/server/src/server/agent/agent-sdk-types.ts\nM  packages/server/src/server/agent/agent-storage.test.ts\n M packages/server/src/server/agent/agent-storage.ts\n M packages/server/src/server/agent/agent-stream-coalescer.ts\n M packages/server/src/server/agent/agent-timeline-store-types.ts\n M packages/server/src/server/agent/agent-timeline-store.ts\n M packages/server/src/server/agent/create-agent/create.ts\n M packages/server/src/server/agent/permission-response.ts\n M packages/server/src/server/agent/provider-registry.ts\n M packages/server/src/server/agent/provider-subagents/store.ts\n M packages/server/src/server/agent/providers/acp-agent.test.ts\n M packages/server/src/server/agent/providers/acp-agent.ts\n M packages/server/src/server/agent/providers/claude/agent.test.ts\n M packages/server/src/server/agent/providers/claude/agent.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.test.ts\n M packages/server/src/server/agent/providers/codex-app-server-agent.ts\n M packages/server/src/server/agent/providers/opencode-agent.ts\n M packages/server/src/server/agent/providers/pi/agent.test.ts\n M packages/server/src/server/agent/providers/pi/agent.ts\nAM packages/server/src/server/agent/session-storage/projected-timeline.test.ts\nAM packages/server/src/server/agent/session-storage/storage-review.test.ts\n M packages/server/src/server/agent/timeline-projection.ts\n M packages/server/src/server/authorization/operation-permissions.ts\n M packages/server/src/server/bootstrap.ts\n M packages/server/src/server/config.ts\n M packages/server/src/server/file-download/token-store.ts\n M packages/server/src/server/file-upload/index.ts\nA  packages/server/src/server/file-upload/session-files.test.ts\n M packages/server/src/server/hub/daemon-executions.test.ts\n M packages/server/src/server/hub/daemon-executions.ts\n M packages/server/src/server/hub/execution-controller.ts\n M packages/server/src/server/hub/relationship-controller.ts\n M packages/server/src/server/hub/relationship-remote.ts\n M packages/server/src/server/hub/test-utils/relationship-harness.ts\n M packages/server/src/server/managed-access/resource-authorizer.test.ts\n M packages/server/src/server/managed-access/resource-authorizer.ts\n M packages/server/src/server/managed-access/types.ts\n M packages/server/src/server/persisted-config.ts\n M packages/server/src/server/session.test.ts\n M packages/server/src/server/session.ts\n M packages/server/src/server/session/files/workspace-files-session.ts\n M packages/server/src/server/test-utils/paseo-daemon.ts\n M packages/server/src/server/test-utils/session-stubs.ts\n M packages/server/src/server/websocket-server.ts\n M packages/server/src/server/workspace-directory.ts\n M packages/server/src/server/workspace-registry.ts\n?? docs/features/agent-session-storage/iteration-acceptance-matrix.md\n?? packages/app/.vitest-attachments/0eeda52bc5c95c4e18a1bb0e054099171ebfaad2.png\n?? packages/app/.vitest-attachments/1609c650b7922a36e2257332b7fe00e163ef41fa.png\n?? packages/app/.vitest-attachments/1efd6334ef2df5c640bae53081bffd21794c913a.png\n?? packages/app/.vitest-attachments/3eb8ca1a422ca44fbc7872845eca36c64ddb78e6.png\n?? packages/app/.vitest-attachments/46b35545280e5a9ed6fa4d9bae647efbbfb822ed.png\n?? packages/app/.vitest-attachments/48294b844638abe1304585d82152d35dc526454e.png\n?? packages/app/.vitest-attachments/50f8c32308f90b8fd7eba6a76604a1edf52a7a03.png\n?? packages/app/.vitest-attachments/61e0bc69b13933fb71d5b36c5e9ffcb27acc35dd.png\n?? packages/app/.vitest-attachments/8f642b54128aa21eab80c1aaa441da599c4878a7.png\n?? packages/app/.vitest-attachments/addfded175330a8a3eadd21b909fd331421ade22.png\n?? packages/app/.vitest-attachments/c454396708ce423cd80a5247c200ccb08df007dd.png\n?? packages/app/.vitest-attachments/dc0e8145195f125d047d63c5d60a39cd0c38b8b3.png\n?? packages/app/.vitest-attachments/f450677f0e55bc6b9ef1783350c4a216648a4891.png\n?? packages/app/e2e/browser/session-profile.ui-contract.spec.ts\n?? packages/app/e2e/support/static-app-server.ts\n?? packages/app/scripts/verify-e2e-static-app.ts\n?? packages/app/src/agent-stream/deferred-timeline-item.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.test.tsx\n?? packages/app/src/agent-stream/use-reading-anchor.ts\n?? packages/app/src/clisbot/hub/managed-host-reconciliation.test.ts\n?? packages/app/src/clisbot/hub/managed-host-reconciliation.ts\n?? packages/app/src/clisbot/session-storage/\n?? packages/app/src/subagents/projected-timeline.test.ts\n?? packages/app/src/subagents/projected-timeline.ts\n?? packages/app/src/subagents/timeline-retention.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.test.ts\n?? packages/app/src/timeline/timeline-directional-prefetch.ts\n?? packages/app/src/timeline/timeline-page-retention.test.ts\n?? packages/app/src/timeline/timeline-page-retention.ts\n?? packages/app/src/timeline/timeline-retention-owner.ts\n?? packages/app/src/utils/name-initials.test.ts\n?? packages/app/src/utils/name-initials.ts\n?? packages/app/test-stubs/expo-clipboard.ts\n?? packages/app/test-stubs/expo-constants.ts\n?? packages/app/test-stubs/expo-file-system-legacy.ts\n?? packages/app/test-stubs/expo-file-system.ts\n?? packages/app/test-stubs/expo-modules-core.ts\n?? packages/app/test-stubs/expo-router.ts\n?? packages/app/test-stubs/react-native-web-plus.ts\n?? packages/app/test-stubs/react-native-web.d.ts\n?? packages/app/test-stubs/rn-codegen-native-component.ts\n?? packages/app/test-stubs/rn-pressability-debug.tsx\n?? packages/app/test-stubs/rn-react-fabric-public-instance.ts\n?? packages/app/test-stubs/rn-renderer-shims-react-native.ts\n?? packages/app/test-stubs/rn-view-config-registry.ts\n?? packages/hub/src/channels/bindings/stored-route.ts\n?? packages/hub/src/channels/config/inheritance.ts\n?? packages/hub/src/channels/daemon/session-operation.test.ts\n?? packages/hub/src/channels/daemon/session-operation.ts\n?? packages/hub/src/managed-access/automation-session-identity.ts\n?? packages/hub/src/managed-access/session-operation-tickets.test.ts\n?? packages/hub/src/managed-access/session-operation-tickets.ts\n?? packages/protocol/src/session-authorship.ts\n?? packages/protocol/src/session-operation.ts\n?? packages/server/.oc-probe.mjs\n?? packages/server/scripts/rollback-session-layout.ts\n?? packages/server/src/server/agent/permission-generation-projection.ts\n?? packages/server/src/server/agent/permission-response-journal.test.ts\n?? packages/server/src/server/agent/permission-response-journal.ts\n?? packages/server/src/server/agent/provider-subagents/admission.test.ts\n?? packages/server/src/server/agent/provider-subagents/metadata-limits.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.test.ts\n?? packages/server/src/server/agent/provider-subagents/persistence.ts\n?? packages/server/src/server/agent/session-authorship.test.ts\n?? packages/server/src/server/agent/session-authorship.ts\n?? packages/server/src/server/agent/session-operation-context.ts\n?? packages/server/src/server/agent/session-storage/authorship-recovery-queue.ts\n?? packages/server/src/server/agent/session-storage/deletion-intents.test.ts\n?? packages/server/src/server/agent/session-storage/deletion-intents.ts\n?? packages/server/src/server/agent/session-storage/durable-file.ts\n?? packages/server/src/server/agent/session-storage/file-agent-timeline-store.ts\n?? packages/server/src/server/agent/session-storage/iteration-acceptance.test.ts\n?? packages/server/src/server/agent/session-storage/layout.ts\n?? packages/server/src/server/agent/session-storage/message-submissions.test.ts\n?? packages/server/src/server/agent/session-storage/message-submissions.ts\n?? packages/server/src/server/agent/session-storage/paged-journal.ts\n?? packages/server/src/server/agent/session-storage/pending-event-budget.test.ts\n?? packages/server/src/server/agent/session-storage/pending-event-budget.ts\n?? packages/server/src/server/agent/session-storage/permission-index.ts\n?? packages/server/src/server/agent/session-storage/projected-timeline.ts\n?? packages/server/src/server/agent/session-storage/recover-session-authorship.ts\n?? packages/server/src/server/agent/session-storage/session-event-index.ts\n?? packages/server/src/server/agent/session-storage/session-event-log.ts\n?? packages/server/src/server/agent/session-storage/session-location.test.ts\n?? packages/server/src/server/agent/session-storage/session-summary.test.ts\n?? packages/server/src/server/agent/session-storage/session-summary.ts\n?? packages/server/src/server/agent/session-storage/storage.test.ts\n?? packages/server/src/server/agent/session-storage/timeline-retention.test.ts\n?? packages/server/src/server/agent/session-storage/timeline-retention.ts\n?? packages/server/src/server/file-download/token-store.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.test.ts\n?? packages/server/src/server/file-upload/session-file-activity.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.test.ts\n?? packages/server/src/server/file-upload/session-file-maintenance.ts\n?? packages/server/src/server/file-upload/session-files.ts\n?? packages/server/src/server/official-session-storage-matrix.test.ts\n?? packages/server/src/server/session-file-download-transport.test.ts\n?? packages/server/src/server/session/files/session-file-download.test.ts\n?? scripts/rehearse-agent-session-storage-merge.mjs\n?? scripts/stage-session-storage-official-app.mjs\n?? scripts/stage-session-storage-official-artifacts.mjs",
+    "trackedDiffSha256": "6891fd019a8c47ac04b3b4aaa10bf3f68bba745d7e7d254516cd97299a0b9104",
+    "untrackedContentSha256": "4d6ff9f7c25e1bb5df8597c4368b672cda4f2dd045b2a3483958a76955f66d0c"
+  },
+  "environment": {
+    "node": "v22.23.2",
+    "execArgv": ["--expose-gc", "--import", "tsx"],
+    "platform": "linux",
+    "architecture": "x64",
+    "kernel": "6.8.0-101-generic",
+    "cpu": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "totalMemoryBytes": 8326955008,
+    "cgroupMemoryMax": "7516192768",
+    "filesystem": "/      overlay overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1469/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1460/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1459/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1458/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1457/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1456/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1455/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1454/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1453/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1452/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1451/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1450/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1449/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1448/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1446/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1444/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1443/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1442/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1441/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1440/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1439/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1438/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1437/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1436/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1435/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1434/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1433/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1432/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1431/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1372/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1371/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1370/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1369/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1368/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1367/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1366/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1365/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1470/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1470/work,nouserxattr",
+    "sourceExecution": "Production TypeScript via tsx; no browser or provider process in these timings",
+    "storageMedium": "Container mount reported above; physical device and SSD status not established",
+    "network": "No network transport",
+    "cache": "New store owner for cold reads; OS cache remains warm from fixture writes"
+  },
+  "datasets": {
+    "rows": [1000, 10000],
+    "sessions": [1000, 10000],
+    "writerCount": 10,
+    "writerRows": 1000,
+    "samples": 20,
+    "cycles": 6,
+    "mixedRowBlock": "20 rows: user+sender+attachment path, running/completed tool, reasoning, chunks sharing message IDs",
+    "attachments": "Actual 1KiB uploads/fixture.txt per timeline; ownership/admission not benchmarked"
+  },
+  "limits": {
+    "queueBytes": 16777216,
+    "batchBytes": 1048576,
+    "concurrentIo": 4,
+    "segmentBytes": 8388608,
+    "indexPageRows": 256,
+    "readPageBytes": 8388608,
+    "fileStoreOwners": 128,
+    "fileStoreQueuedOperations": 1024,
+    "projectionOperationBytes": 16777216,
+    "projectionGlobalBytes": 33554432
+  },
+  "instrumentation": "25ms memory samples include harness; post-GC heap requires --expose-gc. /proc/self/io deltas include metric reads and cached syscalls. read_bytes/write_bytes are OS-attributed block IO. Node read counters cover readFile/FileHandle.read, not createReadStream. resourceUsage cumulative.",
+  "baseline": {
+    "root": "/tmp/session-storage-baseline-3e4df80-20260914",
+    "head": "3e4df80f43ad78218486ac1b3414f98fc71c6b17",
+    "scope": "Same legacy metadata and eager in-memory projection only; prior HEAD has no durable journal API. Provider startup not simulated."
+  },
+  "exclusions": [
+    "daemon ingress/staged/steer/provider queues",
+    "uploads/subagent caches and deletion tombstones",
+    "provider processes",
+    "app render/directory wire timing",
+    "production/browser/desktop/mobile/relay latency",
+    "cold OS cache"
+  ],
+  "phases": [
+    {
+      "name": "baseline.metadata.legacy.load.1000",
+      "milliseconds": 203.97616900000003,
+      "operations": 1000,
+      "logicalBytes": 0,
+      "operationsPerSecond": 4902.5334915472395,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 203.57108300000027,
+        "p95": 203.57108300000027,
+        "max": 203.57108300000027
+      },
+      "eventLoopMs": {
+        "p95": 52.330495,
+        "max": 52.330495,
+        "mean": 25.54382628571429
+      },
+      "memory": {
+        "start": {
+          "rss": 176672768,
+          "heapTotal": 90902528,
+          "heapUsed": 54087392,
+          "external": 3115822,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 64365584,
+        "peakRss": 180342784,
+        "end": {
+          "rss": 180342784,
+          "heapTotal": 91164672,
+          "heapUsed": 58154680,
+          "external": 4358501,
+          "arrayBuffers": 26537
+        },
+        "afterGc": {
+          "rss": 180342784,
+          "heapTotal": 91688960,
+          "heapUsed": 54305352,
+          "external": 2653053,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 1108839,
+        "wchar": 160,
+        "syscr": 1027,
+        "syscw": 20,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 3039307,
+        "systemCPUTime": 1099514,
+        "maxRSS": 176116,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 42800,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 8232,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 6184,
+        "involuntaryContextSwitches": 793
+      },
+      "detail": {
+        "operation": {
+          "count": 1000,
+          "baselineStripsNewAuthorshipFields": true
+        },
+        "nodeIo": {
+          "readBytes": 1106918,
+          "reads": 1002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.legacy.load.1000",
+      "milliseconds": 1539.6980290000001,
+      "operations": 1000,
+      "logicalBytes": 1107691,
+      "operationsPerSecond": 649.4780022869016,
+      "logicalBytesPerSecond": 719420.9378311803,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 1527.9521350000005,
+        "p95": 1527.9521350000005,
+        "max": 1527.9521350000005
+      },
+      "eventLoopMs": {
+        "p95": 14.147583,
+        "max": 35.586047,
+        "mean": 11.09346289051095
+      },
+      "memory": {
+        "start": {
+          "rss": 183300096,
+          "heapTotal": 91951104,
+          "heapUsed": 54331224,
+          "external": 4819946,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 67959424,
+        "peakRss": 187363328,
+        "end": {
+          "rss": 187363328,
+          "heapTotal": 93065216,
+          "heapUsed": 66213032,
+          "external": 3172729,
+          "arrayBuffers": 612556
+        },
+        "afterGc": {
+          "rss": 186257408,
+          "heapTotal": 91951104,
+          "heapUsed": 54679200,
+          "external": 3239072,
+          "arrayBuffers": 502153
+        }
+      },
+      "processIo": {
+        "rchar": 1144392,
+        "wchar": 19061,
+        "syscr": 3441,
+        "syscw": 2382,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 4253435,
+        "systemCPUTime": 1790429,
+        "maxRSS": 182972,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 49183,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 8328,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 15666,
+        "involuntaryContextSwitches": 3831
+      },
+      "detail": {
+        "operation": {
+          "count": 1000,
+          "metadataRetained": true
+        },
+        "nodeIo": {
+          "readBytes": 1106920,
+          "reads": 1002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.migrate.1000",
+      "milliseconds": 37471.957485,
+      "operations": 1000,
+      "logicalBytes": 1107691,
+      "operationsPerSecond": 26.686622933971343,
+      "logicalBytesPerSecond": 29560.532044353648,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 37443.10016,
+        "p95": 37443.10016,
+        "max": 37443.10016
+      },
+      "eventLoopMs": {
+        "p95": 17.072127,
+        "max": 92.405759,
+        "mean": 11.59879808356546
+      },
+      "memory": {
+        "start": {
+          "rss": 186347520,
+          "heapTotal": 92213248,
+          "heapUsed": 54669800,
+          "external": 4814027,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 74718912,
+        "peakRss": 187920384,
+        "end": {
+          "rss": 184934400,
+          "heapTotal": 97521664,
+          "heapUsed": 74718912,
+          "external": 3273573,
+          "arrayBuffers": 713400
+        },
+        "afterGc": {
+          "rss": 183840768,
+          "heapTotal": 94572544,
+          "heapUsed": 54848800,
+          "external": 3339916,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 1712391,
+        "wchar": 164793,
+        "syscr": 22962,
+        "syscw": 20576,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 10193999,
+        "systemCPUTime": 8361512,
+        "maxRSS": 184964,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 57094,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 8424,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 69731,
+        "involuntaryContextSwitches": 13441
+      },
+      "detail": {
+        "operation": {
+          "rawBytesSampleVerified": true
+        },
+        "nodeIo": {
+          "readBytes": 1109184,
+          "reads": 1004,
+          "opens": 5010,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 5010,
+          "syncMeanMs": 4.603682455888264,
+          "syncMaxMs": 198.75480900000548
+        }
+      }
+    },
+    {
+      "name": "current.metadata.session-layout.load.1000",
+      "milliseconds": 1188.7772859999968,
+      "operations": 1000,
+      "logicalBytes": 1107691,
+      "operationsPerSecond": 841.2004601507862,
+      "logicalBytesPerSecond": 931790.1789048845,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 1176.8807820000002,
+        "p95": 1176.8807820000002,
+        "max": 1176.8807820000002
+      },
+      "eventLoopMs": {
+        "p95": 16.711679,
+        "max": 38.961151,
+        "mean": 11.36512
+      },
+      "memory": {
+        "start": {
+          "rss": 183918592,
+          "heapTotal": 92737536,
+          "heapUsed": 54821504,
+          "external": 4823149,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 68300328,
+        "peakRss": 185753600,
+        "end": {
+          "rss": 185753600,
+          "heapTotal": 93851648,
+          "heapUsed": 67274776,
+          "external": 3212369,
+          "arrayBuffers": 652196
+        },
+        "afterGc": {
+          "rss": 184696832,
+          "heapTotal": 92737536,
+          "heapUsed": 54975200,
+          "external": 3278712,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 1146793,
+        "wchar": 25717,
+        "syscr": 4259,
+        "syscw": 3214,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 11236269,
+        "systemCPUTime": 8614982,
+        "maxRSS": 184964,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 64099,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 8536,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 82322,
+        "involuntaryContextSwitches": 21011
+      },
+      "detail": {
+        "operation": {
+          "count": 1000
+        },
+        "nodeIo": {
+          "readBytes": 1106924,
+          "reads": 1002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.warm-directory-aggregation.1000",
+      "milliseconds": 268.1213710000011,
+      "operations": 20,
+      "logicalBytes": 0,
+      "operationsPerSecond": 74.59308418947298,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 8.951743999998143,
+        "p95": 35.00237500000367,
+        "max": 35.627042000000074
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 190685184,
+          "heapTotal": 94310400,
+          "heapUsed": 57163288,
+          "external": 3191667,
+          "arrayBuffers": 25295
+        },
+        "peakHeapUsed": 62308944,
+        "peakRss": 191864832,
+        "end": {
+          "rss": 191864832,
+          "heapTotal": 94310400,
+          "heapUsed": 62308944,
+          "external": 2585468,
+          "arrayBuffers": 25295
+        },
+        "afterGc": {
+          "rss": 191864832,
+          "heapTotal": 94310400,
+          "heapUsed": 57173664,
+          "external": 2651811,
+          "arrayBuffers": 91638
+        }
+      },
+      "processIo": {
+        "rchar": 474,
+        "wchar": 48,
+        "syscr": 8,
+        "syscw": 6,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 12602896,
+        "systemCPUTime": 9046531,
+        "maxRSS": 187368,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 72078,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 8640,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 92669,
+        "involuntaryContextSwitches": 22035
+      },
+      "detail": {
+        "operation": {
+          "workspaceCount": 50,
+          "participantSnapshots": 2000,
+          "channelReferences": 750,
+          "includesArchivedSessions": true,
+          "scope": "AgentStorage metadata + production authorship aggregation, excludes git/provider/wire/UI directory stages"
+        },
+        "nodeIo": {
+          "readBytes": 234,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "baseline.metadata.legacy.load.10000",
+      "milliseconds": 4521.495930999998,
+      "operations": 10000,
+      "logicalBytes": 0,
+      "operationsPerSecond": 2211.6574144054016,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 4521.336814000002,
+        "p95": 4521.336814000002,
+        "max": 4521.336814000002
+      },
+      "eventLoopMs": {
+        "p95": 1161.822207,
+        "max": 1161.822207,
+        "mean": 620.6818986666666
+      },
+      "memory": {
+        "start": {
+          "rss": 192323584,
+          "heapTotal": 94048256,
+          "heapUsed": 55250928,
+          "external": 3320132,
+          "arrayBuffers": 751623
+        },
+        "peakHeapUsed": 156389752,
+        "peakRss": 320380928,
+        "end": {
+          "rss": 320380928,
+          "heapTotal": 189485056,
+          "heapUsed": 156389752,
+          "external": 19528782,
+          "arrayBuffers": 16968609
+        },
+        "afterGc": {
+          "rss": 318889984,
+          "heapTotal": 99553280,
+          "heapUsed": 55370480,
+          "external": 19595125,
+          "arrayBuffers": 14745409
+        }
+      },
+      "processIo": {
+        "rchar": 11097973,
+        "wchar": 185,
+        "syscr": 10024,
+        "syscw": 20,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 16688195,
+        "systemCPUTime": 12701534,
+        "maxRSS": 313384,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 111192,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 88752,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 147057,
+        "involuntaryContextSwitches": 33007
+      },
+      "detail": {
+        "operation": {
+          "count": 10000,
+          "baselineStripsNewAuthorshipFields": true
+        },
+        "nodeIo": {
+          "readBytes": 11095928,
+          "reads": 10002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.legacy.load.10000",
+      "milliseconds": 7669.2158009999985,
+      "operations": 10000,
+      "logicalBytes": 11105691,
+      "operationsPerSecond": 1303.9142800879442,
+      "logicalBytesPerSecond": 1448086.9085144163,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 7555.103937,
+        "p95": 7555.103937,
+        "max": 7555.103937
+      },
+      "eventLoopMs": {
+        "p95": 14.139391,
+        "max": 52.297727,
+        "mean": 10.763814710413694
+      },
+      "memory": {
+        "start": {
+          "rss": 319832064,
+          "heapTotal": 92475392,
+          "heapUsed": 55341232,
+          "external": 4838306,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 101315592,
+        "peakRss": 337408000,
+        "end": {
+          "rss": 337408000,
+          "heapTotal": 123707392,
+          "heapUsed": 101315592,
+          "external": 3493482,
+          "arrayBuffers": 933309
+        },
+        "afterGc": {
+          "rss": 323477504,
+          "heapTotal": 94834688,
+          "heapUsed": 55431640,
+          "external": 2651611,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 11373725,
+        "wchar": 184808,
+        "syscr": 33365,
+        "syscw": 23096,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 20990161,
+        "systemCPUTime": 15532069,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 135643,
+        "majorPageFault": 0,
+        "swappedOut": 0,
+        "fsRead": 0,
+        "fsWrite": 88864,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 240780,
+        "involuntaryContextSwitches": 72722
+      },
+      "detail": {
+        "operation": {
+          "count": 10000,
+          "metadataRetained": true
+        },
+        "nodeIo": {
+          "readBytes": 11095928,
+          "reads": 10002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.migrate.10000",
+      "milliseconds": 340793.88156,
+      "operations": 10000,
+      "logicalBytes": 11105691,
+      "operationsPerSecond": 29.34324980901808,
+      "logicalBytesPerSecond": 32587.706531476382,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 340257.792282,
+        "p95": 340257.792282,
+        "max": 340257.792282
+      },
+      "eventLoopMs": {
+        "p95": 15.884287,
+        "max": 713.555967,
+        "mean": 11.598952987882914
+      },
+      "memory": {
+        "start": {
+          "rss": 323530752,
+          "heapTotal": 93261824,
+          "heapUsed": 55405000,
+          "external": 4832387,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 98942912,
+        "peakRss": 326152192,
+        "end": {
+          "rss": 234127360,
+          "heapTotal": 113786880,
+          "heapUsed": 98942912,
+          "external": 2870905,
+          "arrayBuffers": 310732
+        },
+        "afterGc": {
+          "rss": 220958720,
+          "heapTotal": 82776064,
+          "heapUsed": 54449984,
+          "external": 2931981,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 16823933,
+        "wchar": 1685991,
+        "syscr": 232606,
+        "syscw": 210537,
+        "read_bytes": 48623616,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 62429233,
+        "systemCPUTime": 62749446,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 166452,
+        "majorPageFault": 1133,
+        "swappedOut": 0,
+        "fsRead": 95040,
+        "fsWrite": 88984,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 770413,
+        "involuntaryContextSwitches": 165640
+      },
+      "detail": {
+        "operation": {
+          "rawBytesSampleVerified": true
+        },
+        "nodeIo": {
+          "readBytes": 11098199,
+          "reads": 10004,
+          "opens": 50100,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 50100,
+          "syncMeanMs": 3.8022213415767996,
+          "syncMaxMs": 253.759887000022
+        }
+      }
+    },
+    {
+      "name": "current.metadata.session-layout.load.10000",
+      "milliseconds": 29123.353330000013,
+      "operations": 10000,
+      "logicalBytes": 11105691,
+      "operationsPerSecond": 343.36705278025056,
+      "logicalBytesPerSecond": 381332.8387758154,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 28871.646735999966,
+        "p95": 28871.646735999966,
+        "max": 28871.646735999966
+      },
+      "eventLoopMs": {
+        "p95": 15.294463,
+        "max": 45.055999,
+        "mean": 11.170221240525908
+      },
+      "memory": {
+        "start": {
+          "rss": 222449664,
+          "heapTotal": 77533184,
+          "heapUsed": 54426488,
+          "external": 4860954,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 97873280,
+        "peakRss": 251289600,
+        "end": {
+          "rss": 251289600,
+          "heapTotal": 125321216,
+          "heapUsed": 97873280,
+          "external": 3200463,
+          "arrayBuffers": 645557
+        },
+        "afterGc": {
+          "rss": 237924352,
+          "heapTotal": 97456128,
+          "heapUsed": 54460360,
+          "external": 3266806,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 11760790,
+        "wchar": 310201,
+        "syscr": 49681,
+        "syscw": 38757,
+        "read_bytes": 49917952,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 71073371,
+        "systemCPUTime": 70708893,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 187609,
+        "majorPageFault": 1393,
+        "swappedOut": 0,
+        "fsRead": 197368,
+        "fsWrite": 89120,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 896541,
+        "involuntaryContextSwitches": 207531
+      },
+      "detail": {
+        "operation": {
+          "count": 10000
+        },
+        "nodeIo": {
+          "readBytes": 11095947,
+          "reads": 10002,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.metadata.warm-directory-aggregation.10000",
+      "milliseconds": 2418.694230999972,
+      "operations": 20,
+      "logicalBytes": 0,
+      "operationsPerSecond": 8.268924506315667,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 104.78712699998869,
+        "p95": 206.49844699999085,
+        "max": 285.6961269999738
+      },
+      "eventLoopMs": {
+        "p95": 9.936895,
+        "max": 9.936895,
+        "mean": 9.9328
+      },
+      "memory": {
+        "start": {
+          "rss": 240369664,
+          "heapTotal": 114323456,
+          "heapUsed": 74934168,
+          "external": 2918908,
+          "arrayBuffers": 25295
+        },
+        "peakHeapUsed": 86871216,
+        "peakRss": 244432896,
+        "end": {
+          "rss": 244432896,
+          "heapTotal": 116682752,
+          "heapUsed": 86871216,
+          "external": 2580201,
+          "arrayBuffers": 25295
+        },
+        "afterGc": {
+          "rss": 244432896,
+          "heapTotal": 114585600,
+          "heapUsed": 74812520,
+          "external": 2646544,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 559,
+        "wchar": 74,
+        "syscr": 10,
+        "syscw": 8,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 77941753,
+        "systemCPUTime": 73763703,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 196685,
+        "majorPageFault": 1405,
+        "swappedOut": 0,
+        "fsRead": 197808,
+        "fsWrite": 89256,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1013342,
+        "involuntaryContextSwitches": 258085
+      },
+      "detail": {
+        "operation": {
+          "workspaceCount": 500,
+          "participantSnapshots": 20000,
+          "channelReferences": 7500,
+          "includesArchivedSessions": true,
+          "scope": "AgentStorage metadata + production authorship aggregation, excludes git/provider/wire/UI directory stages"
+        },
+        "nodeIo": {
+          "readBytes": 260,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "baseline.timeline.full-load.1000",
+      "milliseconds": 34.24513599998318,
+      "operations": 1000,
+      "logicalBytes": 267519,
+      "operationsPerSecond": 29201.227292555977,
+      "logicalBytesPerSecond": 7811883.124077283,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 0.5281149999937043,
+        "p95": 0.5281149999937043,
+        "max": 0.5281149999937043
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 243879936,
+          "heapTotal": 97193984,
+          "heapUsed": 54521768,
+          "external": 4890134,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 55767400,
+        "peakRss": 244142080,
+        "end": {
+          "rss": 244142080,
+          "heapTotal": 97468416,
+          "heapUsed": 55767400,
+          "external": 2648392,
+          "arrayBuffers": 91438
+        },
+        "afterGc": {
+          "rss": 243945472,
+          "heapTotal": 92475392,
+          "heapUsed": 54528736,
+          "external": 2714735,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 493,
+        "wchar": 40,
+        "syscr": 8,
+        "syscw": 5,
+        "read_bytes": 77824,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 78571700,
+        "systemCPUTime": 73763703,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 202139,
+        "majorPageFault": 1472,
+        "swappedOut": 0,
+        "fsRead": 199312,
+        "fsWrite": 89392,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1013757,
+        "involuntaryContextSwitches": 258390
+      },
+      "detail": {
+        "operation": {
+          "canonicalRowsRetained": 1000,
+          "durableAcknowledgement": false,
+          "projection": "not measured in parity phase",
+          "excludesProviderHistoryLoad": true
+        },
+        "nodeIo": {
+          "readBytes": 260,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "baseline.timeline.eager-projection-stress.1000",
+      "milliseconds": 52.76813200005563,
+      "operations": 1,
+      "logicalBytes": 0,
+      "operationsPerSecond": 18.950831914969925,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 51.14627599995583,
+        "p95": 51.14627599995583,
+        "max": 51.14627599995583
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 244195328,
+          "heapTotal": 92737536,
+          "heapUsed": 54526304,
+          "external": 4880556,
+          "arrayBuffers": 387068
+        },
+        "peakHeapUsed": 57893904,
+        "peakRss": 244195328,
+        "end": {
+          "rss": 244195328,
+          "heapTotal": 92737536,
+          "heapUsed": 57893904,
+          "external": 2648392,
+          "arrayBuffers": 91438
+        },
+        "afterGc": {
+          "rss": 244195328,
+          "heapTotal": 92737536,
+          "heapUsed": 54573536,
+          "external": 2714735,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 493,
+        "wchar": 40,
+        "syscr": 8,
+        "syscw": 5,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 79055224,
+        "systemCPUTime": 73763703,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 206594,
+        "majorPageFault": 1481,
+        "swappedOut": 0,
+        "fsRead": 199616,
+        "fsWrite": 89528,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1014128,
+        "involuntaryContextSwitches": 258926
+      },
+      "detail": {
+        "operation": {
+          "canonicalRowsRetained": 1000,
+          "diagnosticOnly": true
+        },
+        "nodeIo": {
+          "readBytes": 260,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.seed.1000",
+      "milliseconds": 1204.622183999978,
+      "operations": 1000,
+      "logicalBytes": 267522,
+      "operationsPerSecond": 830.1357996575117,
+      "logicalBytesPerSecond": 222079.58939597686,
+      "acknowledgementMs": {
+        "count": 4,
+        "p50": 154.51775100000668,
+        "p95": 608.5850370000117,
+        "max": 608.5850370000117
+      },
+      "eventLoopMs": {
+        "p95": 17.842175,
+        "max": 41.484287,
+        "mean": 12.22054268041237
+      },
+      "memory": {
+        "start": {
+          "rss": 244150272,
+          "heapTotal": 92737536,
+          "heapUsed": 54575128,
+          "external": 4883401,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 68260872,
+        "peakRss": 244281344,
+        "end": {
+          "rss": 244281344,
+          "heapTotal": 92737536,
+          "heapUsed": 68260872,
+          "external": 3782690,
+          "arrayBuffers": 1225736
+        },
+        "afterGc": {
+          "rss": 244281344,
+          "heapTotal": 92999680,
+          "heapUsed": 54929752,
+          "external": 3849033,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 375594,
+        "wchar": 520075,
+        "syscr": 1156,
+        "syscw": 2107,
+        "read_bytes": 225280,
+        "write_bytes": 536576,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 79837059,
+        "systemCPUTime": 73868911,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 212075,
+        "majorPageFault": 1496,
+        "swappedOut": 0,
+        "fsRead": 200328,
+        "fsWrite": 90728,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1016846,
+        "involuntaryContextSwitches": 259902
+      },
+      "detail": {
+        "operation": {
+          "batchRows": 256,
+          "includesDurableCanonicalAndDerivedAcknowledgement": true
+        },
+        "nodeIo": {
+          "readBytes": 352671,
+          "reads": 10,
+          "opens": 22,
+          "writes": 1005,
+          "writeBytes": 511254,
+          "syncs": 14,
+          "syncMeanMs": 13.522184999992273,
+          "syncMaxMs": 76.45707499998389
+        }
+      }
+    },
+    {
+      "name": "current.timeline.cold-owner-valid-index-tail.1000",
+      "milliseconds": 470.5932529999991,
+      "operations": 20,
+      "logicalBytes": 571900,
+      "operationsPerSecond": 42.49954684326942,
+      "logicalBytesPerSecond": 1215274.5419832892,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 20.967666000011377,
+        "p95": 35.758007999975234,
+        "max": 37.5482980000088
+      },
+      "eventLoopMs": {
+        "p95": 16.842751,
+        "max": 22.478847,
+        "mean": 11.782707199999999
+      },
+      "memory": {
+        "start": {
+          "rss": 244674560,
+          "heapTotal": 93261824,
+          "heapUsed": 55070384,
+          "external": 5268299,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 69644704,
+        "peakRss": 245198848,
+        "end": {
+          "rss": 245198848,
+          "heapTotal": 94048256,
+          "heapUsed": 63275504,
+          "external": 2988864,
+          "arrayBuffers": 402785
+        },
+        "afterGc": {
+          "rss": 245198848,
+          "heapTotal": 93523968,
+          "heapUsed": 55228376,
+          "external": 3055207,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 3519880,
+        "wchar": 64796,
+        "syscr": 357,
+        "syscw": 280,
+        "read_bytes": 536576,
+        "write_bytes": 65536,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 80642528,
+        "systemCPUTime": 73940699,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 218162,
+        "majorPageFault": 1544,
+        "swappedOut": 0,
+        "fsRead": 202072,
+        "fsWrite": 91000,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1017998,
+        "involuntaryContextSwitches": 260704
+      },
+      "detail": {
+        "operation": {
+          "pageSize": 40,
+          "cold": "new owner; warm OS cache"
+        },
+        "nodeIo": {
+          "readBytes": 3511640,
+          "reads": 62,
+          "opens": 42,
+          "writes": 1,
+          "writeBytes": 62559,
+          "syncs": 2,
+          "syncMeanMs": 6.304200499987928,
+          "syncMaxMs": 7.408419999992475
+        }
+      }
+    },
+    {
+      "name": "current.timeline.warm-owner-tail-and-before.1000",
+      "milliseconds": 367.7558539999882,
+      "operations": 20,
+      "logicalBytes": 0,
+      "operationsPerSecond": 54.38390655774753,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 5.502044999971986,
+        "p95": 10.64705299999332,
+        "max": 11.572979999997187
+      },
+      "eventLoopMs": {
+        "p95": 13.008895,
+        "max": 15.237119,
+        "mean": 10.736360727272727
+      },
+      "memory": {
+        "start": {
+          "rss": 245211136,
+          "heapTotal": 93261824,
+          "heapUsed": 55217112,
+          "external": 4916639,
+          "arrayBuffers": 25095
+        },
+        "peakHeapUsed": 68644520,
+        "peakRss": 245211136,
+        "end": {
+          "rss": 245211136,
+          "heapTotal": 93261824,
+          "heapUsed": 64917224,
+          "external": 3353312,
+          "arrayBuffers": 767233
+        },
+        "afterGc": {
+          "rss": 245211136,
+          "heapTotal": 93523968,
+          "heapUsed": 55296880,
+          "external": 3419655,
+          "arrayBuffers": 571412
+        }
+      },
+      "processIo": {
+        "rchar": 5771753,
+        "wchar": 3488,
+        "syscr": 590,
+        "syscw": 436,
+        "read_bytes": 32768,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 81488719,
+        "systemCPUTime": 73983967,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 224631,
+        "majorPageFault": 1545,
+        "swappedOut": 0,
+        "fsRead": 202136,
+        "fsWrite": 91152,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1019380,
+        "involuntaryContextSwitches": 261290
+      },
+      "detail": {
+        "operation": {
+          "pageSize": 40,
+          "beforeLatenciesMs": [
+            12.369955999951344, 7.88205499999458, 7.698611999978311, 19.47672400000738,
+            6.650116000033449, 19.340239999990445, 13.783485000021756, 9.06326700001955,
+            13.779838000016753, 7.049300999962725, 5.049560000014026, 18.30096100002993,
+            7.4515709999832325, 14.166509000002407, 14.225298000033945, 7.874178999976721,
+            11.746073000016622, 10.45001599995885, 6.732860999996774, 10.986925999983214
+          ],
+          "beforeP95Ms": 19.340239999990445
+        },
+        "nodeIo": {
+          "readBytes": 5763590,
+          "reads": 144,
+          "opens": 142,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.rebuild-canonical-index.1000",
+      "milliseconds": 54.30125100002624,
+      "operations": 1,
+      "logicalBytes": 0,
+      "operationsPerSecond": 18.41578198630298,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 48.63435999996727,
+        "p95": 48.63435999996727,
+        "max": 48.63435999996727
+      },
+      "eventLoopMs": {
+        "p95": 17.203199,
+        "max": 17.203199,
+        "mean": 12.735488
+      },
+      "memory": {
+        "start": {
+          "rss": 245387264,
+          "heapTotal": 93523968,
+          "heapUsed": 55283232,
+          "external": 4919602,
+          "arrayBuffers": 2333523
+        },
+        "peakHeapUsed": 59222160,
+        "peakRss": 245780480,
+        "end": {
+          "rss": 245780480,
+          "heapTotal": 93884416,
+          "heapUsed": 59222160,
+          "external": 3215930,
+          "arrayBuffers": 622371
+        },
+        "afterGc": {
+          "rss": 245440512,
+          "heapTotal": 93523968,
+          "heapUsed": 55198448,
+          "external": 3282273,
+          "arrayBuffers": 25095
+        }
+      },
+      "processIo": {
+        "rchar": 466768,
+        "wchar": 62560,
+        "syscr": 39,
+        "syscw": 32,
+        "read_bytes": 65536,
+        "write_bytes": 65536,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 81958923,
+        "systemCPUTime": 74011923,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 229534,
+        "majorPageFault": 1549,
+        "swappedOut": 0,
+        "fsRead": 202264,
+        "fsWrite": 91440,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1019874,
+        "involuntaryContextSwitches": 261606
+      },
+      "detail": {
+        "operation": {
+          "destructiveIndexRemovalOnly": true,
+          "acknowledgedCanonicalRows": 1000
+        },
+        "nodeIo": {
+          "readBytes": 465681,
+          "reads": 5,
+          "opens": 4,
+          "writes": 1,
+          "writeBytes": 62312,
+          "syncs": 2,
+          "syncMeanMs": 7.881332499964628,
+          "syncMaxMs": 9.022149999975227
+        }
+      }
+    },
+    {
+      "name": "baseline.timeline.full-load.10000",
+      "milliseconds": 34.955821999988984,
+      "operations": 10000,
+      "logicalBytes": 2713691,
+      "operationsPerSecond": 286075.37823036034,
+      "logicalBytesPerSecond": 77632017.92253248,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 3.296870000020135,
+        "p95": 3.296870000020135,
+        "max": 3.296870000020135
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 245374976,
+          "heapTotal": 93523968,
+          "heapUsed": 55193680,
+          "external": 4929410,
+          "arrayBuffers": 2335851
+        },
+        "peakHeapUsed": 67171624,
+        "peakRss": 248127488,
+        "end": {
+          "rss": 248127488,
+          "heapTotal": 96243712,
+          "heapUsed": 67171624,
+          "external": 2693189,
+          "arrayBuffers": 99630
+        },
+        "afterGc": {
+          "rss": 245407744,
+          "heapTotal": 93786112,
+          "heapUsed": 55198648,
+          "external": 2759532,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 493,
+        "wchar": 40,
+        "syscr": 8,
+        "syscw": 5,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 82430005,
+        "systemCPUTime": 74117768,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 236374,
+        "majorPageFault": 1549,
+        "swappedOut": 0,
+        "fsRead": 202264,
+        "fsWrite": 91600,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1020183,
+        "involuntaryContextSwitches": 261830
+      },
+      "detail": {
+        "operation": {
+          "canonicalRowsRetained": 10000,
+          "durableAcknowledgement": false,
+          "projection": "not measured in parity phase",
+          "excludesProviderHistoryLoad": true
+        },
+        "nodeIo": {
+          "readBytes": 260,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "baseline.timeline.eager-projection-stress.10000",
+      "milliseconds": 101.36847600003239,
+      "operations": 1,
+      "logicalBytes": 0,
+      "operationsPerSecond": 9.86499984472175,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 93.47125400003279,
+        "p95": 93.47125400003279,
+        "max": 93.47125400003279
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 245506048,
+          "heapTotal": 93786112,
+          "heapUsed": 55196424,
+          "external": 4939975,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 68837192,
+        "peakRss": 245506048,
+        "end": {
+          "rss": 245506048,
+          "heapTotal": 97718272,
+          "heapUsed": 68837192,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "afterGc": {
+          "rss": 245506048,
+          "heapTotal": 94310400,
+          "heapUsed": 55210408,
+          "external": 2693189,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 501,
+        "wchar": 48,
+        "syscr": 9,
+        "syscw": 6,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 83049908,
+        "systemCPUTime": 74152540,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 242591,
+        "majorPageFault": 1549,
+        "swappedOut": 0,
+        "fsRead": 202264,
+        "fsWrite": 91768,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1020502,
+        "involuntaryContextSwitches": 261998
+      },
+      "detail": {
+        "operation": {
+          "canonicalRowsRetained": 10000,
+          "diagnosticOnly": true
+        },
+        "nodeIo": {
+          "readBytes": 260,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.seed.10000",
+      "milliseconds": 7075.766730000032,
+      "operations": 10000,
+      "logicalBytes": 2713730,
+      "operationsPerSecond": 1413.274402843401,
+      "logicalBytesPerSecond": 383524.5145228223,
+      "acknowledgementMs": {
+        "count": 40,
+        "p50": 179.80323600000702,
+        "p95": 277.71867999999085,
+        "max": 294.3319110000157
+      },
+      "eventLoopMs": {
+        "p95": 24.133631,
+        "max": 48.857087,
+        "mean": 12.104235986254295
+      },
+      "memory": {
+        "start": {
+          "rss": 245506048,
+          "heapTotal": 93786112,
+          "heapUsed": 55242192,
+          "external": 4942820,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 73892832,
+        "peakRss": 249450496,
+        "end": {
+          "rss": 247066624,
+          "heapTotal": 94654464,
+          "heapUsed": 59740448,
+          "external": 3605608,
+          "arrayBuffers": 47443
+        },
+        "afterGc": {
+          "rss": 246861824,
+          "heapTotal": 94711808,
+          "heapUsed": 57148992,
+          "external": 2707345,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 3743130,
+        "wchar": 16503418,
+        "syscr": 11163,
+        "syscw": 20887,
+        "read_bytes": 966656,
+        "write_bytes": 16654336,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 86428403,
+        "systemCPUTime": 75604681,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 256953,
+        "majorPageFault": 1593,
+        "swappedOut": 0,
+        "fsRead": 204152,
+        "fsWrite": 124472,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1044371,
+        "involuntaryContextSwitches": 268562
+      },
+      "detail": {
+        "operation": {
+          "batchRows": 256,
+          "includesDurableCanonicalAndDerivedAcknowledgement": true
+        },
+        "nodeIo": {
+          "readBytes": 3572844,
+          "reads": 81,
+          "opens": 199,
+          "writes": 10040,
+          "writeBytes": 16416671,
+          "syncs": 120,
+          "syncMeanMs": 5.258776616667456,
+          "syncMaxMs": 12.061971999995876
+        }
+      }
+    },
+    {
+      "name": "current.timeline.cold-owner-valid-index-tail.10000",
+      "milliseconds": 1871.373768999998,
+      "operations": 20,
+      "logicalBytes": 579980,
+      "operationsPerSecond": 10.687335865933056,
+      "logicalBytesPerSecond": 309922.05277619266,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 86.36108800000511,
+        "p95": 144.42455400002655,
+        "max": 158.94456199998967
+      },
+      "eventLoopMs": {
+        "p95": 47.251455,
+        "max": 69.140479,
+        "mean": 22.533095024390242
+      },
+      "memory": {
+        "start": {
+          "rss": 247697408,
+          "heapTotal": 94711808,
+          "heapUsed": 57145528,
+          "external": 3101286,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 85812232,
+        "peakRss": 258703360,
+        "end": {
+          "rss": 252223488,
+          "heapTotal": 105156608,
+          "heapUsed": 74835160,
+          "external": 2765490,
+          "arrayBuffers": 171931
+        },
+        "afterGc": {
+          "rss": 247902208,
+          "heapTotal": 96808960,
+          "heapUsed": 57012048,
+          "external": 2831833,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 15239902,
+        "wchar": 649857,
+        "syscr": 516,
+        "syscw": 427,
+        "read_bytes": 32768,
+        "write_bytes": 647168,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 88793432,
+        "systemCPUTime": 75731814,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 279678,
+        "majorPageFault": 1638,
+        "swappedOut": 0,
+        "fsRead": 206192,
+        "fsWrite": 125912,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1046014,
+        "involuntaryContextSwitches": 270257
+      },
+      "detail": {
+        "operation": {
+          "pageSize": 40,
+          "cold": "new owner; warm OS cache"
+        },
+        "nodeIo": {
+          "readBytes": 15220760,
+          "reads": 62,
+          "opens": 42,
+          "writes": 1,
+          "writeBytes": 646447,
+          "syncs": 2,
+          "syncMeanMs": 15.470315000013215,
+          "syncMaxMs": 25.270713000034448
+        }
+      }
+    },
+    {
+      "name": "current.timeline.warm-owner-tail-and-before.10000",
+      "milliseconds": 1425.1225729999715,
+      "operations": 20,
+      "logicalBytes": 0,
+      "operationsPerSecond": 14.033880579056971,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 20,
+        "p50": 29.930845999973826,
+        "p95": 41.89628700003959,
+        "max": 52.11821599997347
+      },
+      "eventLoopMs": {
+        "p95": 33.193983,
+        "max": 49.217535,
+        "mean": 19.727985777777775
+      },
+      "memory": {
+        "start": {
+          "rss": 248033280,
+          "heapTotal": 95760384,
+          "heapUsed": 56999568,
+          "external": 4946987,
+          "arrayBuffers": 435003
+        },
+        "peakHeapUsed": 70455008,
+        "peakRss": 248033280,
+        "end": {
+          "rss": 248033280,
+          "heapTotal": 95760384,
+          "heapUsed": 58873272,
+          "external": 2685337,
+          "arrayBuffers": 91778
+        },
+        "afterGc": {
+          "rss": 248033280,
+          "heapTotal": 96022528,
+          "heapUsed": 57018696,
+          "external": 2751680,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 5861154,
+        "wchar": 3554,
+        "syscr": 621,
+        "syscw": 443,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 89887085,
+        "systemCPUTime": 75773478,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 285909,
+        "majorPageFault": 1638,
+        "swappedOut": 0,
+        "fsRead": 206192,
+        "fsWrite": 126096,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1047302,
+        "involuntaryContextSwitches": 271426
+      },
+      "detail": {
+        "operation": {
+          "pageSize": 40,
+          "beforeLatenciesMs": [
+            48.30354100000113, 33.741153999988455, 37.132952000014484, 36.35594200005289,
+            18.917780000017956, 18.625545999966562, 16.594266000029165, 70.59365200001048,
+            40.94100499997148, 39.443352000031155, 38.114483000012115, 49.84111799998209,
+            50.5895849999506, 55.21846000000369, 57.463247999956366, 60.84742000000551,
+            32.4709440000006, 35.380021000048146, 29.618634000013117, 36.448203999956604
+          ],
+          "beforeP95Ms": 60.84742000000551
+        },
+        "nodeIo": {
+          "readBytes": 5843558,
+          "reads": 144,
+          "opens": 142,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.rebuild-canonical-index.10000",
+      "milliseconds": 252.87422499997774,
+      "operations": 1,
+      "logicalBytes": 0,
+      "operationsPerSecond": 3.9545351053476803,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 1,
+        "p50": 251.7339889999712,
+        "p95": 251.7339889999712,
+        "max": 251.7339889999712
+      },
+      "eventLoopMs": {
+        "p95": 165.412863,
+        "max": 165.412863,
+        "mean": 40.39748266666666
+      },
+      "memory": {
+        "start": {
+          "rss": 247902208,
+          "heapTotal": 96022528,
+          "heapUsed": 57008632,
+          "external": 4949950,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 80234056,
+        "peakRss": 256946176,
+        "end": {
+          "rss": 256946176,
+          "heapTotal": 105136128,
+          "heapUsed": 80234056,
+          "external": 3982861,
+          "arrayBuffers": 1389302
+        },
+        "afterGc": {
+          "rss": 247914496,
+          "heapTotal": 96284672,
+          "heapUsed": 56975848,
+          "external": 2693189,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 3689211,
+        "wchar": 646511,
+        "syscr": 54,
+        "syscw": 41,
+        "read_bytes": 0,
+        "write_bytes": 647168,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 90499556,
+        "systemCPUTime": 75774549,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 294436,
+        "majorPageFault": 1638,
+        "swappedOut": 0,
+        "fsRead": 206192,
+        "fsWrite": 127552,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1047762,
+        "involuntaryContextSwitches": 271755
+      },
+      "detail": {
+        "operation": {
+          "destructiveIndexRemovalOnly": true,
+          "acknowledgedCanonicalRows": 10000
+        },
+        "nodeIo": {
+          "readBytes": 3687422,
+          "reads": 5,
+          "opens": 4,
+          "writes": 1,
+          "writeBytes": 646199,
+          "syncs": 2,
+          "syncMeanMs": 9.125158000009833,
+          "syncMaxMs": 11.595932000025641
+        }
+      }
+    },
+    {
+      "name": "current.timeline.10-concurrent-writers",
+      "milliseconds": 45179.718073000025,
+      "operations": 10000,
+      "logicalBytes": 2665180,
+      "operationsPerSecond": 221.33825589266186,
+      "logicalBytesPerSecond": 58990.62928400046,
+      "acknowledgementMs": {
+        "count": 10000,
+        "p50": 35.87752800004091,
+        "p95": 101.32014500000514,
+        "max": 682.6467080000439
+      },
+      "eventLoopMs": {
+        "p95": 24.002559,
+        "max": 208.797695,
+        "mean": 13.911118211271944
+      },
+      "memory": {
+        "start": {
+          "rss": 248000512,
+          "heapTotal": 95498240,
+          "heapUsed": 56974408,
+          "external": 4952295,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 78348256,
+        "peakRss": 248262656,
+        "end": {
+          "rss": 248262656,
+          "heapTotal": 101527552,
+          "heapUsed": 61474888,
+          "external": 2833115,
+          "arrayBuffers": 239556
+        },
+        "afterGc": {
+          "rss": 248393728,
+          "heapTotal": 98119680,
+          "heapUsed": 63842984,
+          "external": 2899458,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 7648703,
+        "wchar": 13599435,
+        "syscr": 24322,
+        "syscw": 23365,
+        "read_bytes": 225280,
+        "write_bytes": 55091200,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 114377205,
+        "systemCPUTime": 82270922,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 302611,
+        "majorPageFault": 1654,
+        "swappedOut": 0,
+        "fsRead": 206832,
+        "fsWrite": 235344,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1171267,
+        "involuntaryContextSwitches": 321874
+      },
+      "detail": {
+        "operation": {
+          "writers": 10,
+          "rowsPerWriter": 1000,
+          "perWriterOutstandingCalls": 1,
+          "droppedOrEarlyAcknowledgedRows": 0,
+          "scope": "FileStore only; daemon/provider queue layers excluded"
+        },
+        "nodeIo": {
+          "readBytes": 7048481,
+          "reads": 10042,
+          "opens": 20701,
+          "writes": 10320,
+          "writeBytes": 13494850,
+          "syncs": 10661,
+          "syncMeanMs": 9.468236009661382,
+          "syncMaxMs": 266.64017700002296
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.0",
+      "milliseconds": 1061.9964429999236,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 150.65963832047555,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 5.271563000045717,
+        "p95": 15.092964000068605,
+        "max": 27.30605600005947
+      },
+      "eventLoopMs": {
+        "p95": 12.386303,
+        "max": 14.417919,
+        "mean": 10.625727353535353
+      },
+      "memory": {
+        "start": {
+          "rss": 248184832,
+          "heapTotal": 97718272,
+          "heapUsed": 55704488,
+          "external": 2773671,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66805600,
+        "peakRss": 248184832,
+        "end": {
+          "rss": 248184832,
+          "heapTotal": 97718272,
+          "heapUsed": 66805600,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 248184832,
+          "heapTotal": 94048256,
+          "heapUsed": 55674072,
+          "external": 3251372,
+          "arrayBuffers": 575756
+        }
+      },
+      "processIo": {
+        "rchar": 234292,
+        "wchar": 16693,
+        "syscr": 2610,
+        "syscw": 2086,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 115988686,
+        "systemCPUTime": 83171970,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 308134,
+        "majorPageFault": 1658,
+        "swappedOut": 0,
+        "fsRead": 207032,
+        "fsWrite": 238104,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1186492,
+        "involuntaryContextSwitches": 324948
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.1",
+      "milliseconds": 989.3396359999897,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 161.72403710306992,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 4.7616309999721125,
+        "p95": 14.229524000082165,
+        "max": 28.45382699999027
+      },
+      "eventLoopMs": {
+        "p95": 12.337151,
+        "max": 13.893631,
+        "mean": 10.672573217391305
+      },
+      "memory": {
+        "start": {
+          "rss": 248123392,
+          "heapTotal": 94310400,
+          "heapUsed": 55668376,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66719880,
+        "peakRss": 248254464,
+        "end": {
+          "rss": 248254464,
+          "heapTotal": 94310400,
+          "heapUsed": 66719880,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 248254464,
+          "heapTotal": 94310400,
+          "heapUsed": 55716096,
+          "external": 3251372,
+          "arrayBuffers": 585378
+        }
+      },
+      "processIo": {
+        "rchar": 233644,
+        "wchar": 16693,
+        "syscr": 2608,
+        "syscw": 2086,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 116864478,
+        "systemCPUTime": 83340208,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 315629,
+        "majorPageFault": 1658,
+        "swappedOut": 0,
+        "fsRead": 207032,
+        "fsWrite": 238304,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1191023,
+        "involuntaryContextSwitches": 325942
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.2",
+      "milliseconds": 374.9285740000196,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 426.747949064004,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 1.2895560000324622,
+        "p95": 6.439651999971829,
+        "max": 11.546317999949679
+      },
+      "eventLoopMs": {
+        "p95": 12.042239,
+        "max": 12.681215,
+        "mean": 10.503197257142856
+      },
+      "memory": {
+        "start": {
+          "rss": 248229888,
+          "heapTotal": 94572544,
+          "heapUsed": 55667200,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66708576,
+        "peakRss": 248229888,
+        "end": {
+          "rss": 248098816,
+          "heapTotal": 94572544,
+          "heapUsed": 66708576,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 248098816,
+          "heapTotal": 94834688,
+          "heapUsed": 55731640,
+          "external": 3251372,
+          "arrayBuffers": 591733
+        }
+      },
+      "processIo": {
+        "rchar": 225868,
+        "wchar": 16693,
+        "syscr": 2584,
+        "syscw": 2086,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 117599821,
+        "systemCPUTime": 83449751,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 321673,
+        "majorPageFault": 1663,
+        "swappedOut": 0,
+        "fsRead": 207264,
+        "fsWrite": 238512,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1196083,
+        "involuntaryContextSwitches": 328374
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.3",
+      "milliseconds": 460.230401000008,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 347.65195791574234,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 1.304202999919653,
+        "p95": 9.587142999982461,
+        "max": 14.860840999986976
+      },
+      "eventLoopMs": {
+        "p95": 12.124159,
+        "max": 14.254079,
+        "mean": 10.408122181818182
+      },
+      "memory": {
+        "start": {
+          "rss": 247619584,
+          "heapTotal": 95096832,
+          "heapUsed": 55677848,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66710032,
+        "peakRss": 247619584,
+        "end": {
+          "rss": 247619584,
+          "heapTotal": 95096832,
+          "heapUsed": 66710032,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 247619584,
+          "heapTotal": 95096832,
+          "heapUsed": 55754744,
+          "external": 3251372,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 226807,
+        "wchar": 16680,
+        "syscr": 2586,
+        "syscw": 2085,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 118337464,
+        "systemCPUTime": 83547335,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 327495,
+        "majorPageFault": 1663,
+        "swappedOut": 0,
+        "fsRead": 207760,
+        "fsWrite": 238720,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1201110,
+        "involuntaryContextSwitches": 331055
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.4",
+      "milliseconds": 915.8220950000687,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 174.7064204647607,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 4.109255000017583,
+        "p95": 15.629142999998294,
+        "max": 28.88879600004293
+      },
+      "eventLoopMs": {
+        "p95": 14.344191,
+        "max": 18.137087,
+        "mean": 10.982448761904761
+      },
+      "memory": {
+        "start": {
+          "rss": 247459840,
+          "heapTotal": 94834688,
+          "heapUsed": 55697944,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66596408,
+        "peakRss": 247459840,
+        "end": {
+          "rss": 247459840,
+          "heapTotal": 94834688,
+          "heapUsed": 66596408,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 247459840,
+          "heapTotal": 94834688,
+          "heapUsed": 55747016,
+          "external": 3251372,
+          "arrayBuffers": 347524
+        }
+      },
+      "processIo": {
+        "rchar": 232709,
+        "wchar": 16693,
+        "syscr": 2605,
+        "syscw": 2086,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 119245675,
+        "systemCPUTime": 83738235,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 333110,
+        "majorPageFault": 1663,
+        "swappedOut": 0,
+        "fsRead": 207824,
+        "fsWrite": 238936,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1205875,
+        "involuntaryContextSwitches": 333332
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retained-owner-cycle.5",
+      "milliseconds": 766.2685819999315,
+      "operations": 160,
+      "logicalBytes": 0,
+      "operationsPerSecond": 208.8040717817324,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 160,
+        "p50": 3.27654099999927,
+        "p95": 11.628452000091784,
+        "max": 47.89933899999596
+      },
+      "eventLoopMs": {
+        "p95": 12.042239,
+        "max": 31.686655,
+        "mean": 10.561024
+      },
+      "memory": {
+        "start": {
+          "rss": 247570432,
+          "heapTotal": 94572544,
+          "heapUsed": 55691848,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 66661128,
+        "peakRss": 247570432,
+        "end": {
+          "rss": 247570432,
+          "heapTotal": 94572544,
+          "heapUsed": 66661128,
+          "external": 3185029,
+          "arrayBuffers": 591470
+        },
+        "afterGc": {
+          "rss": 247570432,
+          "heapTotal": 93786112,
+          "heapUsed": 55748080,
+          "external": 3251372,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 230401,
+        "wchar": 16680,
+        "syscr": 2597,
+        "syscw": 2085,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 120060508,
+        "systemCPUTime": 83993741,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 338416,
+        "majorPageFault": 1663,
+        "swappedOut": 0,
+        "fsRead": 207824,
+        "fsWrite": 239152,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1210837,
+        "involuntaryContextSwitches": 335207
+      },
+      "detail": {
+        "operation": {
+          "ownersVisited": 160,
+          "residentOwners": 128,
+          "budget": 128
+        },
+        "nodeIo": {
+          "readBytes": 204102,
+          "reads": 482,
+          "opens": 320,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    },
+    {
+      "name": "current.timeline.retention-summary",
+      "milliseconds": 0.4960549999959767,
+      "operations": 0,
+      "logicalBytes": 0,
+      "operationsPerSecond": 0,
+      "logicalBytesPerSecond": 0,
+      "acknowledgementMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "eventLoopMs": {
+        "p95": 0.000511,
+        "max": 0,
+        "mean": null
+      },
+      "memory": {
+        "start": {
+          "rss": 247504896,
+          "heapTotal": 94048256,
+          "heapUsed": 55692760,
+          "external": 2626846,
+          "arrayBuffers": 33287
+        },
+        "peakHeapUsed": 55726672,
+        "peakRss": 247504896,
+        "end": {
+          "rss": 247504896,
+          "heapTotal": 94048256,
+          "heapUsed": 55726672,
+          "external": 2693189,
+          "arrayBuffers": 99630
+        },
+        "afterGc": {
+          "rss": 247504896,
+          "heapTotal": 94048256,
+          "heapUsed": 55698344,
+          "external": 2759532,
+          "arrayBuffers": 33287
+        }
+      },
+      "processIo": {
+        "rchar": 496,
+        "wchar": 40,
+        "syscr": 8,
+        "syscw": 5,
+        "read_bytes": 0,
+        "write_bytes": 0,
+        "cancelled_write_bytes": 0
+      },
+      "resourceUsage": {
+        "userCPUTime": 120734285,
+        "systemCPUTime": 84042190,
+        "maxRSS": 340332,
+        "sharedMemorySize": 0,
+        "unsharedDataSize": 0,
+        "unsharedStackSize": 0,
+        "minorPageFault": 343062,
+        "majorPageFault": 1663,
+        "swappedOut": 0,
+        "fsRead": 207824,
+        "fsWrite": 239376,
+        "ipcSent": 0,
+        "ipcReceived": 0,
+        "signalsCount": 0,
+        "voluntaryContextSwitches": 1211303,
+        "involuntaryContextSwitches": 335994
+      },
+      "detail": {
+        "operation": {
+          "steadyHeap": [55667952, 55667272, 55677920, 55698136, 55691920, 55692840],
+          "steadyRss": [248123392, 248360960, 247619584, 247459840, 247570432, 247504896],
+          "allowedGrowthBytes": 11133590.4,
+          "heapPlateauObserved": true,
+          "exposedGc": true,
+          "scope": "Retained FileStore owners only; not all daemon/app/provider memory"
+        },
+        "nodeIo": {
+          "readBytes": 262,
+          "reads": 2,
+          "opens": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "syncs": 0,
+          "syncMeanMs": null,
+          "syncMaxMs": 0
+        }
+      }
+    }
+  ]
+}

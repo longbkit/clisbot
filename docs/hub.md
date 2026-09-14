@@ -1,6 +1,6 @@
 # Paseo Hub relationship
 
-Đang cân nhắc: [các use case workspace và phạm vi làm trước](features/workspace-organization/README.md).
+User/channel metadata and session persistence: [agent session storage](features/agent-session-storage/README.md) — durable storage is implemented; the wider AC/W set is not yet fully accepted. Under consideration: [workspace naming and reuse](features/workspace-organization/README.md).
 
 Paseo Hub is an explicit opt-in connection from one Paseo daemon to one Hub. Running a daemon does
 not register it with a Hub. The relationship begins only when a user runs

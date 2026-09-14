@@ -128,8 +128,11 @@ export class AgentRunState {
     }
   }
 
-  createTurnStream(turnId: string): ForegroundTurnStream {
-    return new ForegroundTurnStream(turnId);
+  createTurnStream(
+    turnId: string,
+    reserve?: (event: AgentStreamEvent) => () => void,
+  ): ForegroundTurnStream {
+    return new ForegroundTurnStream(turnId, reserve);
   }
 
   addWaiter(agent: ForegroundRunAgentState, waiter: ForegroundTurnWaiter): void {
@@ -218,12 +221,14 @@ export class AgentRunState {
 }
 
 export class ForegroundTurnStream {
-  private readonly queue: AgentStreamEvent[] = [];
+  private readonly queue: { event: AgentStreamEvent; release: () => void }[] = [];
+  private failure: unknown = null;
+  private disposed = false;
   private queueResolve: (() => void) | null = null;
 
   readonly waiter: ForegroundTurnWaiter;
 
-  constructor(turnId: string) {
+  constructor(turnId: string, reserve?: (event: AgentStreamEvent) => () => void) {
     let resolveSettled!: () => void;
     const settledPromise = new Promise<void>((resolvePromise) => {
       resolveSettled = resolvePromise;
@@ -235,7 +240,13 @@ export class ForegroundTurnStream {
       settledPromise,
       resolveSettled,
       callback: (event) => {
-        this.queue.push(event);
+        if (this.failure || this.disposed) return;
+        try {
+          this.queue.push({ event, release: reserve?.(event) ?? (() => undefined) });
+        } catch (error) {
+          this.failure = error;
+          this.dispose();
+        }
         this.wake();
       },
     };
@@ -246,8 +257,10 @@ export class ForegroundTurnStream {
   ): AsyncGenerator<AgentStreamEvent> {
     let done = false;
     while (!done) {
+      if (this.failure) throw this.failure;
       while (this.queue.length > 0) {
-        const event = this.queue.shift()!;
+        const { event, release } = this.queue.shift()!;
+        release();
         yield event;
         if (isTerminalEvent(event)) {
           done = true;
@@ -256,6 +269,7 @@ export class ForegroundTurnStream {
       }
 
       if (!done && this.queue.length === 0) {
+        if (this.failure) throw this.failure;
         if (this.waiter.settled) {
           break;
         }
@@ -264,6 +278,12 @@ export class ForegroundTurnStream {
         });
       }
     }
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    for (const queued of this.queue.splice(0)) queued.release();
+    this.wake();
   }
 
   private wake(): void {

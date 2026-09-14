@@ -16,6 +16,12 @@ import { DEFAULT_SIDEBAR_ROW_ITEMS, type SidebarRowItem, type SidebarRowItems } 
 export type SidebarTrailingChoice = Exclude<SidebarWorkspaceTrailing, "none">;
 
 export interface SidebarDisplayPreferences {
+  userFilters: readonly string[];
+  channelFilters: readonly string[];
+  toggleUserFilter: (key: string) => void;
+  clearUserFilters: () => void;
+  toggleChannelFilter: (key: string) => void;
+  clearChannelFilters: () => void;
   grouping: SidebarGroupMode;
   setGrouping: (mode: SidebarGroupMode) => void;
   titleSource: WorkspaceTitleSource;
@@ -48,6 +54,12 @@ export interface SidebarDisplayPreferences {
  * this for a value and set it; where it lands is this module's problem.
  */
 export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
+  const userFilters = useSidebarViewStore((state) => state.userFilters);
+  const channelFilters = useSidebarViewStore((state) => state.channelFilters);
+  const toggleUserFilter = useSidebarViewStore((state) => state.toggleUserFilter);
+  const clearUserFilters = useSidebarViewStore((state) => state.clearUserFilters);
+  const toggleChannelFilter = useSidebarViewStore((state) => state.toggleChannelFilter);
+  const clearChannelFilters = useSidebarViewStore((state) => state.clearChannelFilters);
   const grouping = useSidebarViewStore((state) => state.groupMode);
   const setGrouping = useSidebarViewStore((state) => state.setGroupMode);
   const hostFilters = useSidebarViewStore((state) => state.hostFilters);
@@ -104,6 +116,12 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
 
   return useMemo(
     () => ({
+      userFilters,
+      channelFilters,
+      toggleUserFilter,
+      clearUserFilters,
+      toggleChannelFilter,
+      clearChannelFilters,
       grouping,
       setGrouping,
       titleSource: workspaceTitleSource,
@@ -125,6 +143,12 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       clearLabelFilter,
     }),
     [
+      userFilters,
+      channelFilters,
+      toggleUserFilter,
+      clearUserFilters,
+      toggleChannelFilter,
+      clearChannelFilters,
       grouping,
       setGrouping,
       workspaceTitleSource,

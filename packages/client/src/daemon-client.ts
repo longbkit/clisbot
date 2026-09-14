@@ -335,9 +335,16 @@ export interface DaemonClientConfig {
   capabilities?: Partial<Record<ClientCapability, unknown>>;
   /**
    * Resolve a one-use credential after the physical transport opens and before
-   * hello is sent. Omit for ordinary Paseo trust and upstream compatibility.
+   * hello is sent. Return `undefined` to send an unticketed hello (ordinary
+   * Paseo trust and upstream compatibility). Admission policy is read at call
+   * time, not client construction, so a client created before its Hub binding
+   * is registered still presents a ticket once admission is required.
    */
-  resolveAccessTicket?: () => Promise<string>;
+  resolveAccessTicket?: () => Promise<string | undefined>;
+  /** Called when managed admission is no longer available for this host. */
+  onAccessRevoked?: () => void;
+  /** Called when the daemon accepts transport admission but denies a resource. */
+  onResourceAccessDenied?: (error: Error) => void;
 }
 
 export interface DaemonClientTrace {
@@ -450,6 +457,7 @@ export interface FileReadResult {
   revision?: string;
 }
 export interface FileUploadInput {
+  agentId?: string;
   fileName: string;
   mimeType: string;
   bytes: Uint8Array | ArrayBuffer;
@@ -565,9 +573,12 @@ export interface FetchAgentTimelineOptions {
   cursor?: FetchAgentTimelineCursor;
   limit?: number;
   projection?: FetchAgentTimelineProjection;
+  pagingMode?: "source_ranges";
+  allowDeferredPayloads?: true;
   mergeWindow?: boolean;
   requestId?: string;
   timeout?: number;
+  signal?: AbortSignal;
 }
 
 export type AgentTimelinePromptIndexPayload = Extract<
@@ -584,11 +595,25 @@ export type ProviderSubagentTimelinePayload = Extract<
   { type: "agent.provider_subagents.timeline.get.response" }
 >["payload"];
 export interface FetchProviderSubagentTimelineOptions {
+  signal?: AbortSignal;
+  pagingMode?: "source_ranges";
+  allowDeferredPayloads?: true;
   direction?: ProviderSubagentTimelinePayload["direction"];
   cursor?: FetchAgentTimelineCursor;
   limit?: number;
   requestId?: string;
   timeout?: number;
+}
+export interface TimelineDocumentReadOptions {
+  epoch: string;
+  id: string;
+  subagentId?: string;
+  offset?: number;
+  limit?: number;
+  seq?: number;
+  requestId?: string;
+  timeout?: number;
+  signal?: AbortSignal;
 }
 
 // COMPAT(daemon-client-object-options): added in v0.1.102; remove after
@@ -1283,6 +1308,21 @@ export class DaemonClient {
             this.pendingGenericTransportErrorTimeout = null;
           }
           const reason = describeTransportClose(event);
+          const closeCode =
+            typeof event === "object" &&
+            event !== null &&
+            "code" in event &&
+            typeof event.code === "number"
+              ? event.code
+              : undefined;
+          if (
+            closeCode === 4401 ||
+            closeCode === 4403 ||
+            /managed access|ticket required|access denied/i.test(reason)
+          ) {
+            this.config.onAccessRevoked?.();
+            this.setReconnectEnabled(false);
+          }
           if (reason) {
             this.lastErrorValue = reason;
           }
@@ -1681,9 +1721,11 @@ export class DaemonClient {
     requestId: string;
     message: SessionInboundMessage;
     timeout?: number;
+    signal?: AbortSignal;
     select: (msg: SessionOutboundMessage) => T | null;
     options?: { skipQueue?: boolean };
   }): Promise<T> {
+    if (params.signal?.aborted) throw new Error("Request canceled");
     const timeout = params.timeout ?? DEFAULT_SESSION_RPC_TIMEOUT_MS;
     const { promise, cancel } = this.waitForWithCancel<RpcWaitResult<T>>(
       (msg) => {
@@ -1708,20 +1750,41 @@ export class DaemonClient {
       { ...params.options, requestId: params.requestId },
     );
 
+    const abort = () => {
+      const error = new Error("Request canceled");
+      cancel(error);
+      const index = this.pendingSendQueue.findIndex(
+        (pending) => pending.message === params.message,
+      );
+      if (index >= 0) {
+        const [pending] = this.pendingSendQueue.splice(index, 1);
+        clearTimeout(pending.timeoutHandle);
+        pending.reject(error);
+      }
+    };
+    params.signal?.addEventListener("abort", abort, { once: true });
+    void promise.catch(() => undefined);
     try {
       await this.sendSessionMessageOrThrow(params.message);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       cancel(err);
       void promise.catch(() => undefined);
+      params.signal?.removeEventListener("abort", abort);
       throw err;
     }
 
-    const result = await promise;
-    if (result.kind === "error") {
-      throw result.error;
+    try {
+      const result = await promise;
+      if (result.kind === "error") {
+        if (result.error.code === "access_denied")
+          this.config.onResourceAccessDenied?.(result.error);
+        throw result.error;
+      }
+      return result.value;
+    } finally {
+      params.signal?.removeEventListener("abort", abort);
     }
-    return result.value;
   }
 
   private async sendCorrelatedRequest<
@@ -1731,6 +1794,7 @@ export class DaemonClient {
     requestId: string;
     message: SessionInboundMessage;
     timeout?: number;
+    signal?: AbortSignal;
     responseType: TResponseType;
     options?: { skipQueue?: boolean };
     selectPayload?: (payload: CorrelatedResponsePayload<TResponseType>) => TResult | null;
@@ -1739,6 +1803,7 @@ export class DaemonClient {
       requestId: params.requestId,
       message: params.message,
       timeout: params.timeout,
+      signal: params.signal,
       options: params.options,
       select: (msg) => {
         const correlated = msg as CorrelatedResponseMessage;
@@ -1765,6 +1830,7 @@ export class DaemonClient {
     message: { type: SessionInboundMessage["type"] } & Record<string, unknown>;
     responseType: TResponseType;
     timeout?: number;
+    signal?: AbortSignal;
     selectPayload?: (payload: CorrelatedResponsePayload<TResponseType>) => TResult | null;
   }): Promise<TResult> {
     const resolvedRequestId = this.createRequestId(params.requestId);
@@ -1777,6 +1843,7 @@ export class DaemonClient {
       message,
       responseType: params.responseType,
       timeout: params.timeout,
+      signal: params.signal,
       options: { skipQueue: true },
       ...(params.selectPayload ? { selectPayload: params.selectPayload } : {}),
     });
@@ -2856,6 +2923,8 @@ export class DaemonClient {
     options: FetchAgentTimelineOptions = {},
   ): Promise<FetchAgentTimelinePayload> {
     const resolvedRequestId = this.createRequestId(options.requestId);
+    // COMPAT(agentSessionStorageRead): options from a cached view must not opt an old host in.
+    const storageReadable = this.lastServerInfoMessage?.features?.agentSessionStorageRead === true;
     const message = SessionInboundMessageSchema.parse({
       type: "fetch_agent_timeline_request",
       agentId,
@@ -2864,6 +2933,10 @@ export class DaemonClient {
       ...(options.cursor ? { cursor: options.cursor } : {}),
       ...(typeof options.limit === "number" ? { limit: options.limit } : {}),
       ...(options.projection ? { projection: options.projection } : {}),
+      ...(storageReadable && options.pagingMode ? { pagingMode: options.pagingMode } : {}),
+      ...(storageReadable && options.allowDeferredPayloads
+        ? { allowDeferredPayloads: true as const }
+        : {}),
       ...(options.mergeWindow === true ? { mergeWindow: true } : {}),
     });
 
@@ -2871,6 +2944,7 @@ export class DaemonClient {
       requestId: resolvedRequestId,
       message,
       timeout: options.timeout,
+      signal: options.signal,
       options: { skipQueue: true },
       select: (msg) => {
         if (msg.type !== "fetch_agent_timeline_response") {
@@ -2917,6 +2991,71 @@ export class DaemonClient {
     return payload;
   }
 
+  /** A host that never advertised the read contract cannot answer a descriptor request. */
+  private assertSessionStorageRead(feature: string): void {
+    if (this.lastServerInfoMessage?.features?.agentSessionStorageRead !== true)
+      throw new Error(`This host does not support ${feature}; update the host to use them.`);
+  }
+
+  async readTimelinePayload(agentId: string, options: TimelineDocumentReadOptions) {
+    this.assertSessionStorageRead("timeline payloads");
+    const requestId = this.createRequestId(options.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "agent.timeline.payload.get.request",
+      agentId,
+      requestId,
+      epoch: options.epoch,
+      id: options.id,
+      subagentId: options.subagentId,
+      offset: options.offset,
+      limit: options.limit,
+    });
+    const payload = await this.sendRequest({
+      requestId,
+      message,
+      timeout: options.timeout,
+      signal: options.signal,
+      options: { skipQueue: true },
+      select: (response) =>
+        response.type === "agent.timeline.payload.get.response" &&
+        response.payload.requestId === requestId
+          ? response.payload
+          : null,
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload;
+  }
+
+  async readTimelineSourceRanges(agentId: string, options: TimelineDocumentReadOptions) {
+    this.assertSessionStorageRead("timeline source ranges");
+    const requestId = this.createRequestId(options.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "agent.timeline.source_ranges.get.request",
+      agentId,
+      requestId,
+      epoch: options.epoch,
+      id: options.id,
+      subagentId: options.subagentId,
+      offset: options.offset,
+      limit: options.limit,
+      seq: options.seq,
+    });
+    const payload = await this.sendRequest({
+      requestId,
+      message,
+      timeout: options.timeout,
+      signal: options.signal,
+      options: { skipQueue: true },
+      select: (response) =>
+        response.type === "agent.timeline.source_ranges.get.response" &&
+        response.payload.requestId === requestId
+          ? response.payload
+          : null,
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload;
+  }
+
   async listProviderSubagents(
     parentAgentId: string,
     options: { requestId?: string; timeout?: number } = {},
@@ -2950,6 +3089,7 @@ export class DaemonClient {
     options: FetchProviderSubagentTimelineOptions = {},
   ): Promise<ProviderSubagentTimelinePayload> {
     const requestId = this.createRequestId(options.requestId);
+    const storageReadable = this.lastServerInfoMessage?.features?.agentSessionStorageRead === true;
     const message = SessionInboundMessageSchema.parse({
       type: "agent.provider_subagents.timeline.get.request",
       parentAgentId,
@@ -2958,11 +3098,16 @@ export class DaemonClient {
       ...(options.direction ? { direction: options.direction } : {}),
       ...(options.cursor ? { cursor: options.cursor } : {}),
       ...(typeof options.limit === "number" ? { limit: options.limit } : {}),
+      ...(storageReadable && options.pagingMode ? { pagingMode: options.pagingMode } : {}),
+      ...(storageReadable && options.allowDeferredPayloads
+        ? { allowDeferredPayloads: true as const }
+        : {}),
     });
     const payload = await this.sendRequest({
       requestId,
       message,
       timeout: options.timeout,
+      signal: options.signal,
       options: { skipQueue: true },
       select: (response) =>
         response.type === "agent.provider_subagents.timeline.get.response" &&
@@ -4490,6 +4635,10 @@ export class DaemonClient {
       requestId: resolvedRequestId,
       message: {
         type: "file.upload.request",
+        // COMPAT(agentSessionStorage): older daemons keep the temporary-upload flow.
+        ...(this.lastServerInfoMessage?.features?.agentSessionStorage && input.agentId
+          ? { agentId: input.agentId }
+          : {}),
         fileName: input.fileName,
         mimeType: input.mimeType,
         size: bytes.byteLength,
@@ -4539,11 +4688,17 @@ export class DaemonClient {
     cwd: string,
     path: string,
     requestId?: string,
+    options?: { agentId?: string },
   ): Promise<FileDownloadTokenPayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
       message: {
         type: "file_download_token_request",
+        ...((this.lastServerInfoMessage?.features?.agentSessionStorageRead ||
+          this.lastServerInfoMessage?.features?.agentSessionStorage) &&
+        options?.agentId
+          ? { agentId: options.agentId }
+          : {}),
         cwd,
         path,
       },
@@ -4871,13 +5026,46 @@ export class DaemonClient {
     agentId: string,
     requestId: string,
     response: AgentPermissionResponse,
+    options: { responseId?: string; requestGeneration?: string } = {},
   ): Promise<void> {
     this.sendSessionMessage({
       type: "agent_permission_response",
       agentId,
       requestId,
       response,
+      ...this.permissionResponseIdentity(options),
     });
+  }
+
+  private permissionResponseIdentity(options: {
+    responseId?: string;
+    requestGeneration?: string;
+  }): { responseId?: string; requestGeneration?: string } {
+    return this.lastServerInfoMessage?.features?.agentSessionStorage === true
+      ? {
+          responseId: options.responseId ?? crypto.randomUUID(),
+          ...(options.requestGeneration ? { requestGeneration: options.requestGeneration } : {}),
+        }
+      : {};
+  }
+
+  async fetchPermissionResponses(
+    agentId: string,
+    options: { cursor?: number; limit?: number; requestId?: string; signal?: AbortSignal } = {},
+  ) {
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: {
+        type: "agent.permissionResponses.fetch.request",
+        agentId,
+        ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        ...(options.limit === undefined ? {} : { limit: options.limit }),
+      },
+      responseType: "agent.permissionResponses.fetch.response",
+      signal: options.signal,
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload;
   }
 
   async getPluginCatalog(): Promise<Array<{ id: string; clientBundle: string }>> {
@@ -5089,12 +5277,14 @@ export class DaemonClient {
     requestId: string,
     response: AgentPermissionResponse,
     timeout = 15000,
+    options: { responseId?: string; requestGeneration?: string } = {},
   ): Promise<AgentPermissionResolvedPayload> {
     const message = SessionInboundMessageSchema.parse({
       type: "agent_permission_response",
       agentId,
       requestId,
       response,
+      ...this.permissionResponseIdentity(options),
     });
     return this.sendRequest({
       requestId,
@@ -5627,9 +5817,16 @@ export class DaemonClient {
     }
 
     try {
-      const accessTicket = this.config.resolveAccessTicket
-        ? await this.config.resolveAccessTicket()
-        : undefined;
+      let accessTicket: string | undefined;
+      try {
+        accessTicket = this.config.resolveAccessTicket
+          ? await this.config.resolveAccessTicket()
+          : undefined;
+      } catch (error) {
+        this.config.onAccessRevoked?.();
+        this.setReconnectEnabled(false);
+        throw error;
+      }
       if (this.transport !== openTransport || this.connectionState.status !== "connecting") {
         return;
       }

@@ -17,6 +17,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ViewStyle,
+  type ViewToken,
 } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -81,6 +82,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     routeBottomAnchorRequest,
     isAuthoritativeHistoryReady,
     onNearBottomChange,
+    onReadingPositionChange,
     onNearHistoryStart,
     isLoadingOlderHistory,
     hasOlderHistory,
@@ -92,6 +94,9 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
   } = props;
   const { renderHistoryMountedRow, renderLiveHeadRow, renderLiveAuxiliary } = renderers;
   const flatListRef = useRef<FlatList<StreamItem>>(null);
+  const readingJump = useRef<{ itemId: string; attempts: number; frame: number | null } | null>(
+    null,
+  );
   const streamViewportMetricsRef = useRef({
     containerKey: "native-virtualized",
     contentHeight: 0,
@@ -331,6 +336,36 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     bottomAnchorController.prepareForStickyContentChange();
   }, [bottomAnchorController, historyRows, segments.liveHead]);
 
+  const retryReadingJump = useStableEvent(
+    (failure: { index: number; averageItemLength: number }) => {
+      const jump = readingJump.current;
+      if (!jump || jump.attempts >= 2) {
+        readingJump.current = null;
+        return;
+      }
+      jump.attempts += 1;
+      flatListRef.current?.scrollToOffset({
+        offset: failure.averageItemLength * failure.index,
+        animated: false,
+      });
+      jump.frame = requestAnimationFrame(() => {
+        jump.frame = null;
+        if (readingJump.current !== jump) return;
+        const index = historyRows.findIndex((item) => item.id === jump.itemId);
+        if (index >= 0)
+          flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 1 });
+      });
+    },
+  );
+  useEffect(
+    () => () => {
+      if (readingJump.current?.frame !== null && readingJump.current?.frame !== undefined)
+        cancelAnimationFrame(readingJump.current.frame);
+      readingJump.current = null;
+    },
+    [agentId],
+  );
+
   useEffect(() => {
     const handle: StreamViewportHandle = {
       scrollToBottom: (reason = "jump-to-bottom") => {
@@ -338,6 +373,13 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
           agentId,
           reason,
         });
+      },
+      scrollToMessage: (itemId) => {
+        const index = historyRows.findIndex((item) => item.id === itemId);
+        if (index < 0) return;
+        bottomAnchorController.detachByUser();
+        readingJump.current = { itemId, attempts: 0, frame: null };
+        flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 1 });
       },
       prepareForViewportChange: () => {
         bottomAnchorController.prepareForStickyViewportChange();
@@ -350,7 +392,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         viewportRef.current = null;
       }
     };
-  }, [agentId, bottomAnchorController, markNativeViewportSettling, viewportRef]);
+  }, [agentId, bottomAnchorController, historyRows, markNativeViewportSettling, viewportRef]);
 
   const isScrollEventNearBottom = useStableEvent(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -556,11 +598,22 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     );
   }, [historyStartPaginationState]);
 
+  const reportViewableItems = useStableEvent(
+    ({ viewableItems }: { viewableItems: ViewToken<StreamItem>[] }) => {
+      // The list is inverted: the highest visible index is the top reading row.
+      const first = viewableItems
+        .filter((item) => item.isViewable)
+        .sort((left, right) => (right.index ?? -1) - (left.index ?? -1))[0];
+      onReadingPositionChange?.(first?.item.id ?? null);
+    },
+  );
+
   // RN's FlatList strictMode keeps its internal renderItem wrapper stable when
   // data or the live header changes, preserving the row identities above.
   return (
     <FlatList
       ref={flatListRef}
+      onScrollToIndexFailed={retryReadingJump}
       data={historyRows}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
@@ -572,6 +625,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
       contentContainerStyle={baseListContentContainerStyle}
       style={listStyle}
       onLayout={handleListLayout}
+      onViewableItemsChanged={reportViewableItems}
       onScroll={handleScroll}
       onScrollBeginDrag={handleScrollBeginDrag}
       onScrollEndDrag={handleScrollEndDrag}

@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { HubRelationshipHarness } from "./test-utils/relationship-harness.js";
 
 let relationship: HubRelationshipHarness | null = null;
@@ -368,3 +368,38 @@ test("failed create never archives a reused worktree", async () => {
   });
   expect(await hub.worktreeState(worktreeCwd!)).toEqual({ exists: true, listed: true });
 });
+
+test("enrolled Hub execution persists creator and message initiator with stamped Hub origin", async () => {
+  const hub = await HubRelationshipHarness.startWithSessionStorage();
+  relationship = hub;
+  await hub.beginConnect().result;
+  hub.connectLatestSocket();
+  const actor = {
+    kind: "automation" as const,
+    id: "workflow",
+    organizationId: "org",
+    displayName: "Scheduled automation",
+    hubOrigin: "https://forged.invalid",
+  };
+  hub.beginOwnedCreate("authorship-create", "authorship-execution", { sessionIdentity: { actor } });
+  const created = await hub.ownedCreateResult("authorship-create");
+  if (created.type !== "hub.execution.agent.create.response" || !created.payload.agentId)
+    throw new Error("Expected Hub-created Agent");
+  const id = created.payload.agentId;
+  await vi.waitFor(async () => {
+    const { record, rows } = await hub.storedSessionAuthorship(id);
+    expect(record?.createdBy).toMatchObject({
+      kind: "automation",
+      id: "workflow",
+      hubOrigin: "https://hub.test",
+    });
+    expect(rows.filter((row) => row.item.type === "user_message")).toEqual([
+      expect.objectContaining({
+        item: expect.objectContaining({
+          clientMessageId: "hub-execution:authorship-execution",
+          sender: expect.objectContaining({ id: "workflow", hubOrigin: "https://hub.test" }),
+        }),
+      }),
+    ]);
+  });
+}, 30_000);

@@ -44,6 +44,15 @@ export interface CreateAgentCommandDependencies {
   terminalManager?: TerminalManager | null;
   providerSnapshotManager: Pick<ProviderSnapshotManager, "resolveCreateConfig">;
   createPaseoWorktree?: CreatePaseoWorktreeWorkflowFn;
+  prepareMessageFiles?: (
+    agentId: string,
+    messageId: string,
+    attachments?: AgentAttachment[],
+    images?: { data: string; mimeType: string }[],
+  ) => Promise<{
+    attachments?: AgentAttachment[];
+    images?: { data: string; mimeType: string }[];
+  }>;
   // Mints a fresh directory workspace for a cwd and returns its id.
   ensureWorkspaceForCreate?: EnsureWorkspaceForCreate;
 }
@@ -78,6 +87,7 @@ export interface CreateAgentFromSessionInput {
 }
 
 export interface CreateAgentFromMcpInput {
+  clientMessageId?: string;
   kind: "mcp";
   provider: string;
   title: string;
@@ -199,6 +209,21 @@ export async function createAgentCommand(
     input.onCreated?.({ agentId: snapshot.id, createdWorktree: resolved.createdWorktree ?? null });
   }
   if (resolved.prompt !== undefined) {
+    if (input.kind === "session" && dependencies.prepareMessageFiles) {
+      const clientMessageId = resolveClientMessageId(resolved.runOptions?.clientMessageId);
+      const files = await dependencies.prepareMessageFiles(
+        snapshot.id,
+        clientMessageId,
+        input.attachments,
+        input.images,
+      );
+      resolved.runOptions = { ...resolved.runOptions, clientMessageId };
+      resolved.prompt = buildAgentPrompt(
+        input.initialPrompt ?? "",
+        files.images,
+        files.attachments,
+      );
+    }
     const sendResult = await sendInitialPrompt(dependencies, resolved, snapshot);
     initialPromptStarted = sendResult.started;
     liveSnapshot = sendResult.liveSnapshot;
@@ -368,6 +393,7 @@ async function resolveMcpCreateAgent(
       env: input.env,
     },
     prompt: trimmedPrompt ? trimmedPrompt : undefined,
+    ...(input.clientMessageId ? { runOptions: { clientMessageId: input.clientMessageId } } : {}),
     setupContinuation,
     createdWorktree,
     background: input.background,

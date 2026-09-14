@@ -1,3 +1,4 @@
+import { SessionActorSchema } from "@getpaseo/protocol/session-authorship";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
@@ -185,6 +186,10 @@ const WorkspaceDraftTabSetupStorageSchema = z.strictObject({
   featureValues: z.record(z.string(), z.union([z.boolean(), z.string(), z.null()])),
 });
 const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("user_profile"),
+    actor: SessionActorSchema,
+  }),
   z.strictObject({ kind: z.literal("new_tab") }),
   z.strictObject({
     kind: z.literal("draft"),
@@ -383,7 +388,11 @@ function migrateVersionOneWorkspaceLayout(input: {
   legacyExplorerPaneId: string | null | undefined;
   rememberedSidePaneId: string | null | undefined;
   ids: WorkspaceLayoutIdSource;
-}): { layout: WorkspaceLayout; explorerPaneId: string; sidePaneId: string | null } {
+}): {
+  layout: WorkspaceLayout;
+  explorerPaneId: string;
+  sidePaneId: string | null;
+} {
   const strippedLayout = stripEphemeralTabsFromLayout(input.layout);
   const legacyExplorerPaneId = resolveExplorerSidebarPaneId(
     strippedLayout,

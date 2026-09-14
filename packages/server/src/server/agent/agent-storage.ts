@@ -1,9 +1,28 @@
-import { promises as fs, type Dirent } from "node:fs";
+import {
+  assertAgentNotDeleted,
+  persistDeletedAgentId,
+  replaySessionDeletionIntents,
+  SessionDeletedError,
+  writeSessionDeletionIntent,
+} from "./session-storage/deletion-intents.js";
+import { deleteSessionDirectory } from "../file-upload/session-file-activity.js";
+import { withSessionStorageIo } from "./session-storage/paged-journal.js";
+import { isDeepStrictEqual } from "node:util";
+import { copySessionAuthorship } from "./session-authorship.js";
+import type { DurableSessionSummary } from "./session-storage/session-summary.js";
+import { SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { Logger } from "pino";
 
 import { writeJsonFileAtomic } from "../atomic-file.js";
+import { writeDurableJson } from "./session-storage/durable-file.js";
+import {
+  assertSessionId,
+  listSessionRecordPaths,
+  moveSessionRecord,
+} from "./session-storage/layout.js";
 import { AgentFeatureSchema, AgentStatusSchema } from "../messages.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
@@ -20,7 +39,13 @@ const SERIALIZABLE_CONFIG_SCHEMA = z
     toolPolicy: z
       .object({
         preapproved: z.array(
-          z.object({ kind: z.literal("mcp"), server: z.string(), tool: z.string() }).strict(),
+          z
+            .object({
+              kind: z.literal("mcp"),
+              server: z.string(),
+              tool: z.string(),
+            })
+            .strict(),
         ),
       })
       .strict()
@@ -43,6 +68,8 @@ const PERSISTENCE_HANDLE_SCHEMA = z
   .optional();
 
 const STORED_AGENT_SCHEMA = z.object({
+  ...SessionAuthorshipShape,
+  authorshipWatermark: z.string().optional(),
   id: z.string(),
   provider: z.string(),
   cwd: z.string(),
@@ -107,7 +134,14 @@ export class AgentStorage {
   private loadPromise: Promise<StoredAgentRecord[]> | null = null;
   private logger: Logger;
 
-  constructor(baseDir: string, logger: Logger) {
+  constructor(
+    baseDir: string,
+    logger: Logger,
+    private readonly options: {
+      sessionLayout?: boolean;
+      removeSessionData?: (agentId: string, directory: string) => Promise<void>;
+    } = {},
+  ) {
     this.baseDir = baseDir;
     this.logger = logger.child({ module: "agent", component: "agent-storage" });
   }
@@ -151,28 +185,38 @@ export class AgentStorage {
   }
 
   async upsert(record: StoredAgentRecord): Promise<void> {
+    const accepted = structuredClone(record);
     await this.load();
-    await this.queueRecordWrite(record);
+    await this.queueRecordWrite(accepted);
   }
 
   private queueRecordWrite(record: StoredAgentRecord): Promise<void> {
-    return this.queueRecordMutation(record.id, () => record);
+    return this.queueRecordMutation(record.id, (existing) =>
+      existing?.authorshipWatermark
+        ? {
+            ...record,
+            ...copySessionAuthorship(existing),
+            authorshipWatermark: existing.authorshipWatermark,
+          }
+        : record,
+    );
   }
 
   private queueRecordMutation(
     agentId: string,
     mutate: (existing: StoredAgentRecord | null) => StoredAgentRecord,
   ): Promise<void> {
+    if (this.deleting.has(agentId))
+      return Promise.reject(new SessionDeletedError(`Agent ${agentId} is being deleted`));
     const prev = this.pendingWrites.get(agentId) ?? Promise.resolve();
-    const next = prev.then(async () => {
-      if (this.deleting.has(agentId)) {
+    const next = prev
+      .catch(() => undefined)
+      .then(async () => {
+        await assertAgentNotDeleted(this.baseDir, agentId);
+        const record = mutate(this.cache.get(agentId) ?? null);
+        await this.writeRecord(record);
         return undefined;
-      }
-
-      const record = mutate(this.cache.get(agentId) ?? null);
-      await this.writeRecord(record);
-      return undefined;
-    });
+      });
 
     const tracked = next.finally(() => {
       if (this.pendingWrites.get(agentId) === tracked) {
@@ -189,14 +233,16 @@ export class AgentStorage {
     const nextPath = this.buildRecordPath(record);
     const previousPath = this.pathById.get(agentId);
 
-    await writeJsonFileAtomic(nextPath, record);
+    await (this.options.sessionLayout || path.basename(nextPath) === "session.json"
+      ? writeDurableJson(nextPath, record)
+      : writeJsonFileAtomic(nextPath, record));
     this.addIndexedPath(agentId, nextPath);
 
     if (previousPath && previousPath !== nextPath) {
       try {
         await fs.unlink(previousPath);
-      } catch {
-        // ignore cleanup errors
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
       this.removeIndexedPath(agentId, previousPath);
     }
@@ -210,10 +256,29 @@ export class AgentStorage {
     this.deleting.add(agentId);
   }
 
-  async remove(agentId: string): Promise<void> {
+  async preparePermanentDelete(agentId: string): Promise<string | null> {
     await this.load();
     this.beginDelete(agentId);
     await (this.pendingWrites.get(agentId) ?? Promise.resolve());
+    if (!this.cache.has(agentId)) {
+      this.deleting.delete(agentId);
+      return null;
+    }
+    const directory = await this.getSessionDirectory(agentId);
+    await writeSessionDeletionIntent(directory, {
+      agentRoot: this.baseDir,
+      paths: [...(this.pathsById.get(agentId) ?? [])],
+    });
+    await persistDeletedAgentId(this.baseDir, agentId);
+    return directory;
+  }
+
+  async remove(agentId: string): Promise<void> {
+    const directory = await this.preparePermanentDelete(agentId);
+    if (directory) {
+      if (this.options.removeSessionData) await this.options.removeSessionData(agentId, directory);
+      else await deleteSessionDirectory(directory);
+    }
     const paths = Array.from(this.pathsById.get(agentId) ?? []);
     await Promise.all(
       paths.map(async (filePath) => {
@@ -222,10 +287,7 @@ export class AgentStorage {
         } catch (error) {
           const code = (error as NodeJS.ErrnoException).code;
           if (code && code !== "ENOENT") {
-            this.logger.warn(
-              { err: error, agentId, filePath },
-              "Failed to remove agent record file",
-            );
+            throw error;
           }
         }
       }),
@@ -235,6 +297,59 @@ export class AgentStorage {
     this.removeOwnerIndex(agentId);
     this.pathById.delete(agentId);
     this.pathsById.delete(agentId);
+    this.deleting.delete(agentId);
+  }
+  get activeDeletionCount(): number {
+    return this.deleting.size;
+  }
+
+  async setAuthorshipStatus(
+    agentId: string,
+    status: "pending" | "recovering" | "error",
+  ): Promise<void> {
+    await this.load();
+    await this.queueRecordMutation(agentId, (record) => {
+      if (!record) throw new Error(`Agent ${agentId} not found`);
+      return {
+        ...record,
+        authorshipStatus: status,
+        lastInteractionBy: undefined,
+        lastInteractionAt: undefined,
+        lastMessageBy: undefined,
+      };
+    });
+  }
+
+  async applyAuthorship(agentId: string, value: DurableSessionSummary): Promise<boolean> {
+    await this.load();
+    const existing = this.cache.get(agentId);
+    if (!existing) {
+      await assertAgentNotDeleted(this.baseDir, agentId);
+      throw new Error(`Agent ${agentId} not found`);
+    }
+    const materialize = (record: StoredAgentRecord) => ({
+      ...copySessionAuthorship(value.summary),
+      createdBy: record.createdBy,
+      participantActors:
+        record.createdBy &&
+        !value.summary.participantActors?.some((actor) =>
+          isDeepStrictEqual(actor, record.createdBy),
+        )
+          ? [record.createdBy, ...(value.summary.participantActors ?? [])]
+          : value.summary.participantActors,
+      channels: value.summary.channels?.length ? value.summary.channels : record.channels,
+    });
+    if (
+      existing.authorshipWatermark &&
+      isDeepStrictEqual(copySessionAuthorship(existing), materialize(existing))
+    )
+      return false;
+    await this.queueRecordMutation(agentId, (record) => {
+      if (!record) throw new Error(`Agent ${agentId} not found`);
+      // This specialized path alone advances authorship. Ordinary snapshots merge the durable fields.
+      return { ...record, ...materialize(record), authorshipWatermark: value.watermark };
+    });
+    return true;
   }
 
   async applySnapshot(
@@ -259,6 +374,10 @@ export class AgentStorage {
       if (existing && existing.archivedAt !== undefined) {
         record.archivedAt = existing.archivedAt;
       }
+      if (existing?.authorshipWatermark)
+        Object.assign(record, copySessionAuthorship(existing), {
+          authorshipWatermark: existing.authorshipWatermark,
+        });
       return record;
     });
   }
@@ -274,9 +393,9 @@ export class AgentStorage {
   }
 
   async flush(): Promise<void> {
-    await this.load().catch(() => undefined);
+    await this.load();
     const writes = Array.from(this.pendingWrites.values());
-    await Promise.allSettled(writes);
+    await Promise.all(writes);
   }
 
   private async load(): Promise<StoredAgentRecord[]> {
@@ -299,72 +418,92 @@ export class AgentStorage {
     this.daemonExecutionKeysByAgentId.clear();
 
     try {
+      await replaySessionDeletionIntents(this.baseDir);
       const records = await this.scanDisk();
       this.loaded = true;
       return records;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        this.loaded = true;
-        return [];
-      }
       this.logger.error({ err: error }, "Failed to load agents");
-      this.loaded = true;
-      return [];
+      this.loadPromise = null;
+      throw error;
     }
   }
 
   private async scanDisk(): Promise<StoredAgentRecord[]> {
-    const records: StoredAgentRecord[] = [];
-    let entries: Dirent[] = [];
-    try {
-      entries = await fs.readdir(this.baseDir, { withFileTypes: true });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
-      }
-      throw error;
-    }
-
-    const rootRecordPaths = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map((entry) => path.join(this.baseDir, entry.name));
-
-    const projectDirs = entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => path.join(this.baseDir, entry.name));
-
-    const projectFileLists = await Promise.all(
-      projectDirs.map(async (projectDir) => {
-        try {
-          const files = await fs.readdir(projectDir, { withFileTypes: true });
-          return files
-            .filter((file) => file.isFile() && file.name.endsWith(".json"))
-            .map((file) => path.join(projectDir, file.name));
-        } catch {
-          return [];
+    const records = new Map<string, StoredAgentRecord>();
+    const directories = new Map<string, string[]>();
+    const files = await listSessionRecordPaths(this.baseDir, (directory) => {
+      const id = path.basename(directory);
+      const candidates = directories.get(id) ?? [];
+      candidates.push(directory);
+      directories.set(id, candidates);
+    });
+    for (let offset = 0; offset < files.length; offset += 16) {
+      const batch = await Promise.allSettled(
+        files.slice(offset, offset + 16).map((filePath) =>
+          withSessionStorageIo(async () => ({
+            filePath,
+            record: await this.readRecordFile(filePath),
+          })),
+        ),
+      );
+      for (const result of batch) {
+        if (result.status === "rejected") throw result.reason;
+        const { filePath, record } = result.value;
+        if (!record) continue;
+        assertSessionId(record.id);
+        await assertAgentNotDeleted(this.baseDir, record.id);
+        const previousPath = this.pathById.get(record.id);
+        if (previousPath) {
+          const [previous, current] = await Promise.all([
+            fs.readFile(previousPath),
+            fs.readFile(filePath),
+          ]);
+          if (!previous.equals(current)) {
+            throw new Error(
+              `Conflicting records for agent ${record.id}: ${previousPath} and ${filePath}`,
+            );
+          }
         }
-      }),
-    );
-
-    const allFilePaths = [...rootRecordPaths, ...projectFileLists.flat()];
-    const loaded = await Promise.all(
-      allFilePaths.map(async (filePath) => {
-        const record = await this.readRecordFile(filePath);
-        return record ? { record, filePath } : null;
-      }),
-    );
-
-    for (const item of loaded) {
-      if (!item) continue;
-      const { record, filePath } = item;
-      records.push(record);
-      this.cache.set(record.id, record);
-      this.indexOwner(record);
-      this.pathById.set(record.id, filePath);
-      this.addIndexedPath(record.id, filePath);
+        let canonicalPath = filePath;
+        if (this.options.sessionLayout) {
+          canonicalPath = this.resolveSessionLayoutPath(filePath, record, directories);
+          await moveSessionRecord(filePath, canonicalPath);
+        } else if (previousPath && path.basename(previousPath) === "session.json") {
+          canonicalPath = previousPath;
+        }
+        records.set(record.id, record);
+        this.cache.set(record.id, record);
+        this.indexOwner(record);
+        this.pathById.set(record.id, canonicalPath);
+        this.addIndexedPath(record.id, canonicalPath);
+        if (!this.options.sessionLayout) this.addIndexedPath(record.id, filePath);
+      }
     }
+    return Array.from(records.values());
+  }
 
-    return records;
+  /** Where a scanned record belongs under the session layout, without moving it yet. */
+  private resolveSessionLayoutPath(
+    filePath: string,
+    record: StoredAgentRecord,
+    directories: Map<string, string[]>,
+  ): string {
+    const candidates = directories.get(record.id) ?? [];
+    if (candidates.length > 1)
+      throw new Error(`Ambiguous retained session directories for agent ${record.id}`);
+    if (path.basename(filePath) === "session.json") {
+      if (path.basename(path.dirname(filePath)) !== record.id)
+        throw new Error(`Session record directory does not match agent ${record.id}`);
+      return filePath;
+    }
+    // Rollback keeps data beside the old record even if its cwd changes later.
+    // An old daemon may move that legacy record; the unique storage-owned ID
+    // directory still locates its retained history without moving only metadata.
+    const directory =
+      candidates[0] ?? path.join(this.baseDir, projectDirNameFromCwd(record.cwd), record.id);
+    directories.set(record.id, [directory]);
+    return path.join(directory, "session.json");
   }
 
   private async readRecordFile(filePath: string): Promise<StoredAgentRecord | null> {
@@ -373,14 +512,35 @@ export class AgentStorage {
       const parsed = JSON.parse(content);
       return parseStoredAgentRecord(parsed);
     } catch (error) {
-      this.logger.error({ err: error, filePath }, "Skipping invalid agent record");
-      return null;
+      this.logger.error({ err: error, filePath }, "Invalid agent record");
+      throw error;
     }
   }
 
   private buildRecordPath(record: StoredAgentRecord): string {
+    assertSessionId(record.id);
+    // Keep an established session directory stable across cwd changes: providers may hold its paths.
+    const existing = this.pathById.get(record.id);
+    if (existing && path.basename(existing) === "session.json") return existing;
     const projectDir = projectDirNameFromCwd(record.cwd);
-    return path.join(this.baseDir, projectDir, `${record.id}.json`);
+    return this.options.sessionLayout
+      ? path.join(this.baseDir, projectDir, record.id, "session.json")
+      : path.join(this.baseDir, projectDir, `${record.id}.json`);
+  }
+
+  get hasSessionLayout(): boolean {
+    return [...this.pathById.values()].some(
+      (recordPath) => path.basename(recordPath) === "session.json",
+    );
+  }
+
+  async getSessionDirectory(agentId: string): Promise<string> {
+    const record = await this.get(agentId);
+    if (!record) throw new Error(`Agent ${agentId} not found`);
+    const recordPath = this.pathById.get(agentId)!;
+    return path.basename(recordPath) === "session.json"
+      ? path.dirname(recordPath)
+      : path.join(path.dirname(recordPath), record.id);
   }
 
   private addIndexedPath(agentId: string, filePath: string): void {

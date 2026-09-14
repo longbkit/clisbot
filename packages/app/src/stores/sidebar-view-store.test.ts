@@ -44,6 +44,8 @@ describe("sidebar view store", () => {
       hostFilters: [],
       projectFilters: [],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -96,6 +98,8 @@ describe("sidebar view store", () => {
       hostFilters: [],
       projectFilters: [],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -110,6 +114,8 @@ describe("sidebar view store", () => {
       hostFilters: ["host-a"],
       projectFilters: [],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -124,6 +130,8 @@ describe("sidebar view store", () => {
       hostFilters: ["host-a", "host-b"],
       projectFilters: [],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -140,6 +148,8 @@ describe("sidebar view store", () => {
       groupMode: "status",
       hostFilters: ["host-a"],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -234,6 +244,8 @@ describe("sidebar view store", () => {
       hostFilters: ["host-a"],
       projectFilters: ["project-a", "project-b"],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -243,6 +255,8 @@ describe("sidebar view store", () => {
       hostFilters: [],
       projectFilters: [],
       labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
     });
   });
 
@@ -288,4 +302,25 @@ describe("sidebar view store", () => {
     );
     expect(storage.reads).toEqual(["sidebar-view"]);
   });
+});
+
+it("persists User/Channel selections across offline catalog changes and clears them explicitly", () => {
+  const state = useSidebarViewStore.getState();
+  state.clearUserFilters();
+  state.clearChannelFilters();
+  state.toggleUserFilter("user-key");
+  state.toggleChannelFilter("channel-key");
+  state.reconcileHostFilters([]);
+  expect(useSidebarViewStore.getState().userFilters).toEqual(["user-key"]);
+  expect(useSidebarViewStore.getState().channelFilters).toEqual(["channel-key"]);
+  const restored = migrateSidebarViewState({
+    userFilters: ["user-key"],
+    channelFilters: ["channel-key"],
+  });
+  expect(restored.userFilters).toEqual(["user-key"]);
+  expect(restored.channelFilters).toEqual(["channel-key"]);
+  state.clearUserFilters();
+  state.clearChannelFilters();
+  expect(useSidebarViewStore.getState().userFilters).toEqual([]);
+  expect(useSidebarViewStore.getState().channelFilters).toEqual([]);
 });

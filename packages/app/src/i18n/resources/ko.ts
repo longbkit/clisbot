@@ -200,6 +200,7 @@ export const ko: TranslationResources = {
     },
   },
   agentStream: {
+    agent: "에이전트",
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
@@ -282,6 +283,9 @@ export const ko: TranslationResources = {
     },
   },
   message: {
+    sender: {
+      you: "나",
+    },
     diagram: {
       diagram: "다이어그램",
       zoomIn: "확대",

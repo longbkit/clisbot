@@ -1,7 +1,10 @@
+import { SessionActorSchema, SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
+import { copySessionMetadata } from "@/clisbot/session-storage/directory";
 import { z } from "zod";
 import {
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
+  AgentTimelineEntryPayloadSchema,
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
@@ -35,6 +38,17 @@ const MAX_TIMELINE_ITEMS = 50;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const IsoDateSchema = z.iso.datetime();
 const TimelinePositionSchema = z.strictObject({
+  deferredPayload: AgentTimelineEntryPayloadSchema.shape.deferredPayload,
+  sourceSeqRangesRef: AgentTimelineEntryPayloadSchema.shape.sourceSeqRangesRef,
+  seqStart: z.number().int().nonnegative().optional(),
+  sourceSeqRanges: z
+    .array(
+      z.strictObject({
+        startSeq: z.number().int().nonnegative(),
+        endSeq: z.number().int().nonnegative(),
+      }),
+    )
+    .optional(),
   epoch: z.string(),
   seq: z.number().int().nonnegative(),
 });
@@ -77,6 +91,7 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...TimelineItemBaseShape,
     kind: z.literal("user_message"),
+    sender: SessionActorSchema.optional(),
     clientMessageId: z.string().optional(),
     messageId: z.string().optional(),
     text: z.string(),
@@ -182,6 +197,7 @@ const StoredProjectPlacementSchema = z.strictObject({
 });
 
 const StoredAgentSnapshotSchema = z.strictObject({
+  ...SessionAuthorshipShape,
   id: z.string(),
   provider: AgentProviderSchema,
   cwd: z.string(),
@@ -247,6 +263,8 @@ const WorkspaceGitRuntimeSchema = z
   .optional();
 
 const StoredWorkspaceSchema = z.strictObject({
+  ...SessionAuthorshipShape,
+  createdAt: IsoDateSchema.optional(),
   id: z.string(),
   projectId: z.string(),
   projectDisplayName: z.string(),
@@ -397,6 +415,7 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
     case "user_message":
       return {
         ...base,
+        sender: item.sender,
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
@@ -467,6 +486,7 @@ function deserializeTimelineItem(item: StoredTimelineItem): StreamItem {
     case "user_message":
       return {
         ...base,
+        sender: item.sender,
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
@@ -546,6 +566,7 @@ function serializeProjectPlacement(agent: Agent): StoredAgent["projectPlacement"
 
 function serializeAgent(agent: Agent): StoredAgent {
   const snapshot = {
+    ...copySessionMetadata(agent),
     id: agent.id,
     provider: agent.provider,
     cwd: agent.cwd,
@@ -613,6 +634,8 @@ function deserializeAgent(serverId: string, stored: StoredAgent): Agent {
 
 function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
   return {
+    ...copySessionMetadata(workspace),
+    createdAt: workspace.createdAt,
     id: workspace.id,
     projectId: workspace.projectId,
     projectDisplayName: workspace.projectDisplayName,

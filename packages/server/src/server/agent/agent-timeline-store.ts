@@ -159,6 +159,11 @@ export class InMemoryAgentTimelineStore {
     this.states.delete(agentId);
   }
 
+  discardCommittedRows(agentId: string, seqs: ReadonlySet<number>): void {
+    const state = this.states.get(agentId);
+    if (state) state.rows = state.rows.filter((row) => !seqs.has(row.seq));
+  }
+
   getItems(agentId: string): AgentTimelineItem[] {
     return this.requireState(agentId).rows.map((row) => row.item);
   }

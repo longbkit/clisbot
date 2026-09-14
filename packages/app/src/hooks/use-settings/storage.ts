@@ -163,6 +163,12 @@ const SidebarRowItemsSchema = z
     changeRequest: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.changeRequest),
     services: z.boolean().optional().catch(undefined),
     labels: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.labels),
+    createdUser: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.createdUser),
+    updatedUser: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.updatedUser),
+    channels: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.channels),
+    createdTime: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.createdTime),
+    updatedTime: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.updatedTime),
+
     // COMPAT(sidebarRowItemsChecks): migrated in v0.3.0, remove after 2027-08-05.
     checks: z.boolean().optional().catch(undefined),
     // COMPAT(sidebarRowItemsScripts): migrated in v0.3.0, remove after 2027-08-05.

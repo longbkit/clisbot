@@ -1824,6 +1824,30 @@ describe("PiRpcAgentSession steering", () => {
     expect(session.getPendingPermissions()).toEqual([]);
   });
 
+  test("automatic permission responder blocks native denial until durable admission succeeds", async () => {
+    const { pi, session, events } = await createSession();
+    const native = pi.latestSession();
+    const { turnId } = await session.startTurn("work");
+    native.emit({
+      type: "extension_ui_request",
+      id: "perm-policy",
+      method: "confirm",
+      title: "Allow command?",
+    });
+    await events.nextPermissionRequest();
+    const admission = vi.fn().mockRejectedValue(new Error("permission journal unavailable"));
+    session.setAutomaticPermissionResponder(admission);
+    await expect(
+      session.steerActiveTurn("answer", { expectedTurnId: turnId, clearPendingPermissions: true }),
+    ).rejects.toThrow("permission journal unavailable");
+    expect(native.extensionUiResponses).toEqual([]);
+    expect(session.getPendingPermissions()).toHaveLength(1);
+    expect(admission).toHaveBeenCalledWith(
+      "perm-policy",
+      expect.objectContaining({ behavior: "deny" }),
+    );
+  });
+
   test("leaves permissions open for a steer without the clearing flag", async () => {
     const { pi, session, events } = await createSession();
     const fakeSession = pi.latestSession();

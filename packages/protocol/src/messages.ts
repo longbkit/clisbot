@@ -1,3 +1,5 @@
+import { SessionOperationIdentitySchema } from "./session-operation.js";
+import { SessionActorSchema, SessionAuthorshipShape } from "./session-authorship.js";
 import { z } from "zod";
 import { TerminalActivitySchema } from "./terminal-activity.js";
 import { CLIENT_CAPS } from "./client-capabilities.js";
@@ -703,6 +705,7 @@ export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknow
     text: z.string(),
     messageId: z.string().optional(),
     clientMessageId: z.string().optional(),
+    sender: SessionActorSchema.optional(),
   }),
   z.object({
     type: z.literal("assistant_message"),
@@ -831,6 +834,7 @@ const AgentActiveTurnPayloadSchema = z.object({
 });
 
 export const AgentSnapshotPayloadSchema = z.object({
+  ...SessionAuthorshipShape,
   id: z.string(),
   provider: AgentProviderSchema,
   cwd: z.string(),
@@ -864,6 +868,7 @@ export const AgentSnapshotPayloadSchema = z.object({
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
 
 export const AgentListItemPayloadSchema = z.object({
+  ...SessionAuthorshipShape,
   id: z.string(),
   shortId: z.string(),
   title: z.string().nullable(),
@@ -1132,6 +1137,10 @@ export const TextAttachmentSchema = z
     type: z.literal("text"),
     mimeType: z.literal("text/plain"),
     contextKind: z.string().optional(),
+    // COMPAT(agentSessionStorage): daemon-owned fork anchor; source authorization is rechecked at submit.
+    sourceSession: z
+      .object({ agentId: z.string(), epoch: z.string(), seq: z.number().int().nonnegative() })
+      .optional(),
     title: z.string().nullable().optional(),
     text: z.string(),
     externalResource: ExternalResourceAttachmentMetadataSchema.optional(),
@@ -1372,6 +1381,8 @@ export const FetchAgentRequestMessageSchema = z.object({
 
 export const SendAgentMessageRequestSchema = z.object({
   type: z.literal("send_agent_message_request"),
+  // COMPAT(sessionOperationIdentity): unreleased Fusion; optional until supported peers explicitly negotiate operation identity (review 2027-03-11).
+  sessionOperationTicket: z.string().optional(),
   requestId: z.string(),
   /** Accepts full ID, unique prefix, or exact full title (server resolves). */
   agentId: z.string(),
@@ -1652,6 +1663,8 @@ export type CreateAgentWorktreeTarget = z.infer<typeof CreateAgentWorktreeTarget
 
 export const CreateAgentRequestMessageSchema = z.object({
   type: z.literal("create_agent_request"),
+  // COMPAT(sessionOperationIdentity): unreleased Fusion; optional until supported peers explicitly negotiate operation identity (review 2027-03-11).
+  sessionOperationTicket: z.string().optional(),
   config: AgentSessionConfigSchema,
   env: z.record(z.string(), z.string()).optional(),
   workspaceId: z.string().optional(),
@@ -1770,6 +1783,35 @@ export const AgentTimelineCursorSchema = z.object({
   seq: z.number().int().nonnegative(),
 });
 
+// COMPAT(agentSessionStorage): unreleased Fusion; keep optional fields and capability gates until supported peers explicitly negotiate session storage (review 2027-03-11).
+const TimelineDocumentScopeShape = {
+  requestId: z.string(),
+  agentId: z.string(),
+  subagentId: z.string().optional(),
+  epoch: z.string(),
+  id: z.string().regex(/^[a-f0-9]{64}$/),
+};
+export const AgentTimelinePayloadGetRequestSchema = z.object({
+  type: z.literal("agent.timeline.payload.get.request"),
+  ...TimelineDocumentScopeShape,
+  offset: z.number().int().nonnegative().optional(),
+  limit: z.number().int().min(4).max(65536).optional(),
+});
+export const AgentTimelineSourceRangesGetRequestSchema = z.object({
+  type: z.literal("agent.timeline.source_ranges.get.request"),
+  ...TimelineDocumentScopeShape,
+  offset: z.number().int().nonnegative().optional(),
+  limit: z.number().int().min(1).max(128).optional(),
+  seq: z.number().int().positive().optional(),
+});
+
+export const AgentPermissionResponsesFetchRequestSchema = z.object({
+  type: z.literal("agent.permissionResponses.fetch.request"),
+  requestId: z.string(),
+  agentId: z.string(),
+  cursor: z.number().int().nonnegative().optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+});
 export const FetchAgentTimelineRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_timeline_request"),
   agentId: z.string(),
@@ -1780,6 +1822,10 @@ export const FetchAgentTimelineRequestMessageSchema = z.object({
   limit: z.number().int().nonnegative().optional(),
   // Default should be projected for app timeline loading.
   projection: z.enum(["projected", "canonical"]).optional(),
+  // COMPAT(agentSessionStorage): source-range pages certify only their cursor interval.
+  pagingMode: z.literal("source_ranges").optional(),
+  // COMPAT(agentSessionStorage): older source-range clients require complete inline items.
+  allowDeferredPayloads: z.literal(true).optional(),
   // Allow the client to merge this bounded page outside its contiguous loaded range.
   mergeWindow: z.boolean().optional(),
 });
@@ -1804,6 +1850,8 @@ export const ProviderSubagentTimelineRequestMessageSchema = z.object({
   direction: z.enum(["tail", "before", "after"]).optional(),
   cursor: AgentTimelineCursorSchema.optional(),
   limit: z.number().int().nonnegative().optional(),
+  pagingMode: z.literal("source_ranges").optional(),
+  allowDeferredPayloads: z.literal(true).optional(),
 });
 
 export const SetAgentTimelineSubscriptionRequestMessageSchema = z.object({
@@ -2057,6 +2105,12 @@ export const SetVoiceModeResponseMessageSchema = z.object({
 
 export const AgentPermissionResponseMessageSchema = z.object({
   type: z.literal("agent_permission_response"),
+  // COMPAT(sessionOperationIdentity): unreleased Fusion; optional until supported peers explicitly negotiate operation identity (review 2027-03-11).
+  sessionOperationTicket: z.string().optional(),
+  // COMPAT(agentSessionStorage): unreleased Fusion; keep optional fields and capability gates until supported peers explicitly negotiate session storage (review 2027-03-11).
+  responseId: z.uuid().optional(),
+  // COMPAT(agentSessionStorage): unreleased Fusion; optional live generation constraint until supported clients explicitly negotiate session storage (review 2027-03-11).
+  requestGeneration: z.string().optional(),
   agentId: z.string(),
   requestId: z.string(),
   response: AgentPermissionResponseSchema,
@@ -2520,6 +2574,8 @@ export const ArchiveWorkspaceRequestSchema = z.object({
 // between an existing local directory and a newly created paseo worktree.
 export const WorkspaceCreateRequestSchema = z.object({
   type: z.literal("workspace.create.request"),
+  // COMPAT(sessionOperationIdentity): unreleased Fusion; optional until supported peers explicitly negotiate operation identity (review 2027-03-11).
+  sessionOperationTicket: z.string().optional(),
   requestId: z.string(),
   // Optional user-set title applied to the created workspace.
   title: z.string().optional(),
@@ -2717,6 +2773,8 @@ export const ProjectIconGetRequestSchema = z.object({
 
 export const FileDownloadTokenRequestSchema = z.object({
   type: z.literal("file_download_token_request"),
+  // COMPAT(agentSessionStorage): omitted for legacy workspace files and older hosts.
+  agentId: z.string().optional(),
   cwd: z.string(),
   path: z.string(),
   requestId: z.string(),
@@ -2724,6 +2782,8 @@ export const FileDownloadTokenRequestSchema = z.object({
 
 export const FileUploadRequestSchema = z.object({
   type: z.literal("file.upload.request"),
+  // COMPAT(agentSessionStorage): optional for official/older clients; gate sending on the host feature.
+  agentId: z.string().optional(),
   fileName: z.string().min(1),
   mimeType: z.string().min(1),
   size: z.number().int().nonnegative(),
@@ -2934,6 +2994,8 @@ export const CaptureTerminalRequestSchema = z.object({
 });
 
 export const HubExecutionAgentCreateRequestSchema = z.object({
+  // COMPAT(agentSessionStorage): unreleased Fusion; optional enrolled-Hub identity until supported daemons explicitly advertise session storage (review 2027-03-11).
+  sessionIdentity: SessionOperationIdentitySchema.optional(),
   type: z.literal("hub.execution.agent.create.request"),
   requestId: z.string(),
   executionId: z.string(),
@@ -3095,6 +3157,9 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   RestartServerRequestMessageSchema,
   DaemonUpdateRequestMessageSchema,
   FetchAgentTimelineRequestMessageSchema,
+  AgentTimelinePayloadGetRequestSchema,
+  AgentTimelineSourceRangesGetRequestSchema,
+  AgentPermissionResponsesFetchRequestSchema,
   AgentTimelineListPromptsRequestMessageSchema,
   ProviderSubagentListRequestMessageSchema,
   ProviderSubagentTimelineRequestMessageSchema,
@@ -3375,6 +3440,10 @@ export const ServerInfoStatusPayloadSchema = z
       .object({
         // COMPAT(projectWorkspaceCreation): absent daemons require workspace.manage.
         projectWorkspaceCreation: z.boolean().optional(),
+        // COMPAT(agentSessionStorage): unreleased Fusion; keep optional fields and capability gates until supported peers explicitly negotiate session storage (review 2027-03-11).
+        agentSessionStorage: z.boolean().optional(),
+        // COMPAT(agentSessionStorageRead): retained reads remain available after rollout is disabled.
+        agentSessionStorageRead: z.boolean().optional(),
         providersSnapshot: z.boolean().optional(),
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
         providersSnapshotCwd: z.boolean().optional(),
@@ -3785,6 +3854,8 @@ export const WorkspaceGitHubRuntimePayloadSchema = z
 
 export const WorkspaceDescriptorPayloadSchema = z
   .object({
+    ...SessionAuthorshipShape,
+    createdAt: z.string().optional(),
     id: z.string(),
     projectId: z.string(),
     projectDisplayName: z.string(),
@@ -4340,9 +4411,65 @@ export const AgentTimelineEntryPayloadSchema = z.object({
   seqStart: z.number().int().nonnegative(),
   seqEnd: z.number().int().nonnegative(),
   sourceSeqRanges: z.array(AgentTimelineSeqRangeSchema),
+  deferredPayload: z
+    .object({
+      id: z.string(),
+      byteLength: z.number().int().nonnegative(),
+      format: z.literal("timeline_item_json"),
+    })
+    .optional(),
+  sourceSeqRangesRef: z.object({ id: z.string(), count: z.number().int().positive() }).optional(),
   collapsed: z.array(z.enum(["assistant_merge", "reasoning_merge", "tool_lifecycle"])),
 });
 
+export const AgentTimelinePayloadGetResponseSchema = z.object({
+  type: z.literal("agent.timeline.payload.get.response"),
+  payload: z.object({
+    ...TimelineDocumentScopeShape,
+    offset: z.number().int().nonnegative(),
+    text: z.string(),
+    nextOffset: z.number().int().nonnegative().nullable(),
+    totalBytes: z.number().int().nonnegative(),
+    error: z.string().nullable(),
+  }),
+});
+export const AgentTimelineSourceRangesGetResponseSchema = z.object({
+  type: z.literal("agent.timeline.source_ranges.get.response"),
+  payload: z.object({
+    ...TimelineDocumentScopeShape,
+    offset: z.number().int().nonnegative(),
+    ranges: z.array(AgentTimelineSeqRangeSchema),
+    nextOffset: z.number().int().nonnegative().nullable(),
+    totalCount: z.number().int().nonnegative(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const AgentPermissionResponseRecordSchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  respondedBy: SessionActorSchema.optional(),
+  request: AgentPermissionRequestPayloadSchema,
+  response: AgentPermissionResponseSchema,
+  toolCallId: z.string().optional(),
+  toolCallCursor: AgentTimelineCursorSchema.optional(),
+  status: z.enum(["pending", "applied", "failed"]),
+  error: z.string().optional(),
+});
+export const AgentPermissionResponsesFetchResponseSchema = z.object({
+  type: z.literal("agent.permissionResponses.fetch.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentId: z.string(),
+    records: z.array(AgentPermissionResponseRecordSchema),
+    nextCursor: z.number().int().nonnegative().optional(),
+    error: z.string().nullable(),
+  }),
+});
+export const AgentPermissionResponsesUpdatedSchema = z.object({
+  type: z.literal("agent.permissionResponses.updated"),
+  payload: z.object({ agentId: z.string(), record: AgentPermissionResponseRecordSchema }),
+});
 export const FetchAgentTimelineResponseMessageSchema = z.object({
   type: z.literal("fetch_agent_timeline_response"),
   payload: z.object({
@@ -4366,6 +4493,9 @@ export const FetchAgentTimelineResponseMessageSchema = z.object({
     hasNewer: z.boolean(),
     mergeWindow: z.boolean().optional(),
     entries: z.array(AgentTimelineEntryPayloadSchema),
+    // Older anchored snapshots touched by this page; they do not expand cursor coverage.
+    pagingMode: z.literal("source_ranges").optional(),
+    contextEntries: z.array(AgentTimelineEntryPayloadSchema).optional(),
     error: z.string().nullable(),
   }),
 });
@@ -4401,6 +4531,8 @@ export const ProviderSubagentDescriptorPayloadSchema = z.object({
   provider: AgentProviderSchema,
   title: z.string().nullable(),
   description: z.string().nullable(),
+  // COMPAT(agentSessionStorage): historical status does not establish a live provider runtime.
+  runtimeAvailable: z.boolean().optional(),
   status: z.enum(["running", "completed", "failed", "canceled"]),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -4442,6 +4574,12 @@ export const ProviderSubagentTimelineResponseMessageSchema = z.object({
       maxSeq: z.number().int().nonnegative(),
       nextSeq: z.number().int().nonnegative(),
     }),
+    // COMPAT(agentSessionStorage): optional projected coverage alongside legacy canonical rows.
+    pagingMode: z.literal("source_ranges").optional(),
+    startCursor: AgentTimelineCursorSchema.nullable().optional(),
+    endCursor: AgentTimelineCursorSchema.nullable().optional(),
+    entries: z.array(AgentTimelineEntryPayloadSchema).optional(),
+    contextEntries: z.array(AgentTimelineEntryPayloadSchema).optional(),
     hasOlder: z.boolean(),
     hasNewer: z.boolean(),
     rows: z.array(
@@ -6400,6 +6538,10 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ArchiveWorkspaceResponseMessageSchema,
   FetchAgentResponseMessageSchema,
   FetchAgentTimelineResponseMessageSchema,
+  AgentPermissionResponsesFetchResponseSchema,
+  AgentTimelinePayloadGetResponseSchema,
+  AgentTimelineSourceRangesGetResponseSchema,
+  AgentPermissionResponsesUpdatedSchema,
   AgentTimelineReplacementMessageSchema,
   AgentTimelineListPromptsResponseMessageSchema,
   ProviderSubagentListResponseMessageSchema,

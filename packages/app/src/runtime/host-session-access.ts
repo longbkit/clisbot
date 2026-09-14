@@ -1,6 +1,6 @@
 import type { HubHostManagement } from "@/types/host-connection";
 
-export type HostAccessTicketResolver = (clientId: string) => Promise<string>;
+export type HostAccessTicketResolver = (clientId: string) => Promise<string | undefined>;
 
 interface HostSessionAccessBinding {
   resolveAccessTicket: HostAccessTicketResolver;
@@ -45,11 +45,22 @@ export function hostRequiresSessionAdmission(serverId: string): boolean {
   return registry().has(serverId);
 }
 
-export function resolveHostAccessTicket(
+export async function resolveHostAccessTicket(
   serverId: string,
   clientId: string,
+  management?: HubHostManagement,
 ): Promise<string | undefined> {
-  return registry().get(serverId)?.resolveAccessTicket(clientId) ?? Promise.resolve(undefined);
+  const binding = registry().get(serverId);
+  // A persisted Hub offer is connection information, not a current login.
+  if (
+    management &&
+    (binding?.management?.hubOrigin !== management.hubOrigin ||
+      binding?.management?.organizationId !== management.organizationId ||
+      binding?.management?.daemonId !== management.daemonId)
+  ) {
+    throw new Error("Sign in to the Hub managing this Host to connect.");
+  }
+  return binding?.resolveAccessTicket(clientId);
 }
 
 export function hostSessionHubManagement(serverId: string): HubHostManagement | undefined {

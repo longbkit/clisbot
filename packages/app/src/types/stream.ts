@@ -1,9 +1,14 @@
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import type {
   AgentProvider,
   AgentTimelineItem,
   ToolCallDetail,
 } from "@getpaseo/protocol/agent-types";
-import type { AgentAttachment, AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type {
+  AgentAttachment,
+  AgentStreamEventPayload,
+  SessionOutboundMessage,
+} from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { extractTaskEntriesFromToolCall } from "../utils/tool-call-parsers";
 import { splitMarkdownBlocks } from "@/utils/split-markdown-blocks";
@@ -90,6 +95,7 @@ export type StreamItem =
 export type UserMessageImageAttachment = AttachmentMetadata;
 
 export interface UserMessageItem {
+  sender?: SessionActor;
   kind: "user_message";
   id: string;
   clientMessageId?: string;
@@ -103,6 +109,7 @@ export interface UserMessageItem {
 }
 
 export interface UserMessageInput {
+  sender?: SessionActor;
   id?: string;
   clientMessageId?: string;
   messageId?: string;
@@ -121,6 +128,7 @@ export function createUserMessage(input: UserMessageInput): UserMessageItem {
   }
   return {
     kind: "user_message",
+    ...(input.sender ? { sender: input.sender } : {}),
     id,
     ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
     ...(input.messageId ? { messageId: input.messageId } : {}),
@@ -257,11 +265,13 @@ function produceUserMessage(
   const presentation = presentationPolicy === "incoming" ? incoming : existing;
   const merged = createUserMessage({
     ...presentation,
+    sender: incoming.sender ?? existing.sender,
     clientMessageId: incoming.clientMessageId ?? existing.clientMessageId,
     messageId: incoming.messageId ?? existing.messageId,
     timelineCursor: incoming.timelineCursor ?? existing.timelineCursor,
   });
   if (
+    existing.sender === merged.sender &&
     existing.id === merged.id &&
     existing.clientMessageId === merged.clientMessageId &&
     existing.messageId === merged.messageId &&
@@ -693,7 +703,15 @@ export interface AssistantMessageItem {
   blockIndex?: number;
 }
 
+type WireTimelineEntry = Extract<
+  SessionOutboundMessage,
+  { type: "fetch_agent_timeline_response" }
+>["payload"]["entries"][number];
 export interface TimelinePosition {
+  deferredPayload?: WireTimelineEntry["deferredPayload"];
+  sourceSeqRangesRef?: WireTimelineEntry["sourceSeqRangesRef"];
+  seqStart?: number;
+  sourceSeqRanges?: { startSeq: number; endSeq: number }[];
   epoch: string;
   seq: number;
 }
@@ -869,6 +887,7 @@ function appendUserMessage(
   clientMessageId?: string,
   timelineCursor?: TimelinePosition,
   turnId?: string,
+  sender?: SessionActor,
 ): StreamItem[] {
   const { chunk, hasContent } = normalizeChunk(text);
   if (!hasContent) {
@@ -883,6 +902,7 @@ function appendUserMessage(
     timelineCursor,
     turnId,
     text: chunk,
+    sender,
     timestamp,
   });
   return upsertUserMessage(state, nextItem);
@@ -1469,6 +1489,7 @@ function reduceTimelineEvent(
           item.clientMessageId,
           timelineCursor,
           event.turnId,
+          item.sender,
         ),
       );
     case "assistant_message":

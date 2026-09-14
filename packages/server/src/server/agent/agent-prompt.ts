@@ -21,7 +21,8 @@ export type AgentRunController = Pick<
   | "replaceAgentRun"
   | "steerOrReplaceActiveTurn"
   | "streamAgent"
->;
+> &
+  Partial<Pick<AgentManager, "admitMessageSubmission">>;
 
 export interface StartAgentRunOptions {
   replaceRunning?: boolean;
@@ -85,6 +86,23 @@ export async function startAgentRun(
   logger: Logger,
   options?: StartAgentRunOptions,
 ): Promise<{ disposition: PromptDispatchDisposition }> {
+  const admission = await agentManager.admitMessageSubmission?.(
+    agentId,
+    prompt,
+    options?.runOptions,
+  );
+  if (admission?.duplicate) return { disposition: "out_of_band" };
+  if (admission) options = { ...options, runOptions: admission.options };
+  return startAdmittedAgentRun(agentManager, agentId, prompt, logger, options);
+}
+
+async function startAdmittedAgentRun(
+  agentManager: AgentRunController,
+  agentId: string,
+  prompt: AgentPromptInput,
+  logger: Logger,
+  options?: StartAgentRunOptions,
+): Promise<{ disposition: PromptDispatchDisposition }> {
   const snapshot = agentManager.getAgent(agentId);
   logger.trace(
     {
@@ -101,7 +119,7 @@ export async function startAgentRun(
   // Out-of-band commands (e.g. /goal pause) must run WITHOUT canceling an
   // in-flight turn — replaceAgentRun would interrupt the running turn. The
   // intercept lives at this layer so it covers every prompt entrypoint.
-  if (agentManager.tryRunOutOfBand(agentId, prompt, options?.runOptions)) {
+  if (await agentManager.tryRunOutOfBand(agentId, prompt, options?.runOptions)) {
     return { disposition: "out_of_band" };
   }
   const steered = await steerOrReplaceActiveRun(agentManager, agentId, prompt, options);
@@ -483,7 +501,11 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
         return;
       }
 
-      if (event.type === "timeline_replacement") {
+      if (
+        event.type === "timeline_replacement" ||
+        event.type === "permission_response" ||
+        event.type === "session_authorship"
+      ) {
         return;
       }
 

@@ -600,9 +600,7 @@ export class ManagedResourceAuthorizer {
     }
 
     if (WORKSPACE_FILE_MESSAGES.has(message.type)) {
-      return "cwd" in message && typeof message.cwd === "string"
-        ? this.allowsWorkspaceRoot(message.cwd)
-        : false;
+      return this.allowsWorkspaceFileInbound(message);
     }
 
     const agentLifecycle = await this.allowsAgentLifecycleInbound(message);
@@ -639,6 +637,15 @@ export class ManagedResourceAuthorizer {
     }
     if (checks.length === 0) return true;
     return (await Promise.all(checks)).every(Boolean);
+  }
+
+  /** Session-file downloads are agent-scoped; every other workspace-file op is rooted at a cwd. */
+  private async allowsWorkspaceFileInbound(message: SessionInboundMessage): Promise<boolean> {
+    if (message.type === "file_download_token_request" && message.agentId)
+      return this.allowsAgent(message.agentId);
+    return "cwd" in message && typeof message.cwd === "string"
+      ? this.allowsWorkspaceRoot(message.cwd)
+      : false;
   }
 
   private async allowsAgentLifecycleInbound(

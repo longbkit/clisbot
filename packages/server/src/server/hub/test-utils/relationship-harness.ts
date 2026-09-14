@@ -513,6 +513,10 @@ export class HubRelationshipHarness {
     return this.launch(false);
   }
 
+  static async startWithSessionStorage(): Promise<HubRelationshipHarness> {
+    return this.launch(false, undefined, true);
+  }
+
   static async startWithAgentMcp(): Promise<HubRelationshipHarness> {
     return this.launch(true);
   }
@@ -526,9 +530,11 @@ export class HubRelationshipHarness {
   private static async launch(
     mcpEnabled: boolean,
     agentClients?: Partial<Record<AgentProvider, AgentClient>>,
+    sessionStorage = false,
   ): Promise<HubRelationshipHarness> {
     const harness = new HubRelationshipHarness(mcpEnabled, agentClients);
     await harness.createHome();
+    if (sessionStorage) harness.config.agentSessionStorage = true;
     await harness.startDaemon();
     return harness;
   }
@@ -757,6 +763,12 @@ export class HubRelationshipHarness {
     return socket.sent.slice();
   }
 
+  async storedSessionAuthorship(agentId: string) {
+    const record = await this.daemon!.agentStorage.get(agentId);
+    const rows = await this.daemon!.agentManager.getTimelineRows(agentId);
+    return { record, rows };
+  }
+
   holdAgentCreation(): void {
     this.codex.holdCreation();
   }
@@ -765,6 +777,7 @@ export class HubRelationshipHarness {
     requestId: string,
     executionId = "execution-race",
     options: {
+      sessionIdentity?: import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity;
       provider?: AgentProvider;
       model?: string;
       projectId?: string;

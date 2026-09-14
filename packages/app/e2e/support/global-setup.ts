@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { startStaticAppServer } from "./static-app-server";
 import { killProcessTree } from "./helpers/spawn-node";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -124,7 +125,16 @@ export async function waitForMetro(port: number, options: WaitForServerOptions):
 
 export async function warmMetro(port: number): Promise<void> {
   const origin = `http://127.0.0.1:${port}`;
-  const documentResponse = await fetch(origin, { signal: AbortSignal.timeout(120_000) });
+  const configuredTimeout = process.env.E2E_METRO_WARMUP_TIMEOUT_MS;
+  const warmupTimeoutMs = configuredTimeout === undefined ? 120_000 : Number(configuredTimeout);
+  if (
+    !Number.isSafeInteger(warmupTimeoutMs) ||
+    warmupTimeoutMs < 1_000 ||
+    warmupTimeoutMs > 600_000
+  ) {
+    throw new Error("E2E_METRO_WARMUP_TIMEOUT_MS must be an integer from 1000 through 600000");
+  }
+  const documentResponse = await fetch(origin, { signal: AbortSignal.timeout(warmupTimeoutMs) });
   if (!documentResponse.ok) {
     throw new Error(`Metro document warmup failed with HTTP ${documentResponse.status}`);
   }
@@ -138,7 +148,7 @@ export async function warmMetro(port: number): Promise<void> {
   for (const source of scriptSources) {
     const scriptUrl = new URL(source, origin);
     if (scriptUrl.origin !== origin) continue;
-    const response = await fetch(scriptUrl, { signal: AbortSignal.timeout(120_000) });
+    const response = await fetch(scriptUrl, { signal: AbortSignal.timeout(warmupTimeoutMs) });
     if (!response.ok) {
       throw new Error(
         `Metro bundle warmup failed for ${scriptUrl.pathname}: HTTP ${response.status}`,
@@ -152,16 +162,23 @@ function startMetro(port: number, buffer: ReturnType<typeof createLineBuffer>): 
   const appDir = path.resolve(__dirname, "../..");
   const expoCli = require.resolve("expo/bin/cli");
   // Spawns Node directly to bypass Windows .cmd shim execution restrictions without shell: true.
-  const child = spawn(process.execPath, [expoCli, "start", "--web", "--port", String(port)], {
-    cwd: appDir,
-    env: {
-      ...process.env,
-      BROWSER: "none",
-      ...(process.env.E2E_DESKTOP_RUNTIME === "1" ? { PASEO_WEB_PLATFORM: "electron" } : {}),
+  const metroWorkerArgs = process.env.E2E_METRO_MAX_WORKERS
+    ? ["--max-workers", process.env.E2E_METRO_MAX_WORKERS]
+    : [];
+  const child = spawn(
+    process.execPath,
+    [expoCli, "start", "--web", "--port", String(port), ...metroWorkerArgs],
+    {
+      cwd: appDir,
+      env: {
+        ...process.env,
+        BROWSER: "none",
+        ...(process.env.E2E_DESKTOP_RUNTIME === "1" ? { PASEO_WEB_PLATFORM: "electron" } : {}),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: false,
     },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
-  });
+  );
   const log = (chunk: Buffer, stream: "stdout" | "stderr") => {
     for (const line of chunk.toString().split("\n").filter(Boolean)) {
       buffer.add(`[${stream}] ${line}`);
@@ -187,6 +204,19 @@ export default async function globalSetup() {
   }
   const repoRoot = path.resolve(__dirname, "../../../..");
   await loadHarnessEnvironment(repoRoot);
+
+  if (process.env.E2E_STATIC_APP_DIR) {
+    const server = await startStaticAppServer(
+      path.resolve(process.env.E2E_STATIC_APP_DIR),
+      await getAvailableE2EPort(),
+    );
+    process.env.E2E_METRO_PORT = String(server.port);
+    console.log(`[e2e] Static exported app listening on port ${server.port}`);
+    return async () => {
+      await server.close();
+      console.log("[e2e] Static app server stopped");
+    };
+  }
 
   const metroPort = await getAvailableE2EPort();
   const metroOutput = createLineBuffer();

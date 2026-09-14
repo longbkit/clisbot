@@ -334,6 +334,35 @@ test("resolves an access ticket only after transport open and includes it in hel
   await connecting;
 });
 
+test("sends an unticketed hello when admission resolves to undefined", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "ordinary_trust_unit_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+    resolveAccessTicket: async () => undefined,
+  });
+  clients.push(client);
+
+  const connecting = client.connect();
+  mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+  await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+  const hello = JSON.parse(assertStr(mock.sent[0]));
+  expect(hello.type).toBe("hello");
+  expect(hello).not.toHaveProperty("accessTicket");
+  mock.triggerMessage(
+    JSON.stringify({
+      type: "session",
+      message: {
+        type: "status",
+        payload: { status: "server_info", serverId: "server-1" },
+      },
+    }),
+  );
+  await connecting;
+});
+
 test("Hub management requires daemon support before dispatching requests", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({
@@ -1194,6 +1223,133 @@ test("preserves legacy fetchAgent id overload", async () => {
 
   await expect(responsePromise).rejects.toThrow("legacy fetch sentinel");
 });
+
+test.each([
+  { features: undefined, enabled: false },
+  { features: { agentSessionStorage: true }, enabled: false },
+  { features: { agentSessionStorage: true, agentSessionStorageRead: false }, enabled: false },
+  { features: { agentSessionStorageRead: true, agentSessionStorage: false }, enabled: true },
+])(
+  "gates timeline extensions on connected daemon read capability: $features",
+  async ({ features, enabled }) => {
+    useHeartbeatClock();
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_unit_test",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connection = client.connect();
+    mock.triggerOpen({ features });
+    await connection;
+
+    const options = {
+      direction: "before" as const,
+      cursor: { epoch: "epoch-1", seq: 42 },
+      limit: 20,
+      pagingMode: "source_ranges" as const,
+      allowDeferredPayloads: true as const,
+      timeout: 10,
+    };
+    const main = expect(
+      client.fetchAgentTimeline("agent-1", {
+        ...options,
+        requestId: "main",
+        projection: "projected",
+        mergeWindow: true,
+      }),
+    ).rejects.toThrow();
+    const child = expect(
+      client.fetchProviderSubagentTimeline("agent-1", "child-1", {
+        ...options,
+        requestId: "child",
+      }),
+    ).rejects.toThrow();
+    const common = {
+      direction: "before",
+      cursor: options.cursor,
+      limit: 20,
+      ...(enabled ? { pagingMode: "source_ranges", allowDeferredPayloads: true } : {}),
+    };
+    expect(parseSentFrame(mock.sent[0])).toEqual({
+      type: "fetch_agent_timeline_request",
+      agentId: "agent-1",
+      requestId: "main",
+      projection: "projected",
+      mergeWindow: true,
+      ...common,
+    });
+    expect(parseSentFrame(mock.sent[1])).toEqual({
+      type: "agent.provider_subagents.timeline.get.request",
+      parentAgentId: "agent-1",
+      subagentId: "child-1",
+      requestId: "child",
+      ...common,
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    await Promise.all([main, child]);
+  },
+);
+
+test.each([
+  { features: undefined, supported: false },
+  { features: { agentSessionStorage: true }, supported: false },
+  { features: { agentSessionStorageRead: true }, supported: true },
+])(
+  "refuses timeline document requests unless the connected daemon advertises them: $features",
+  async ({ features, supported }) => {
+    useHeartbeatClock();
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_unit_test",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connection = client.connect();
+    mock.triggerOpen({ features });
+    await connection;
+
+    const options = {
+      epoch: "epoch-1",
+      id: "a".repeat(64),
+      requestId: "doc",
+      timeout: 10,
+    };
+    if (!supported) {
+      // No frame may reach a host that never advertised the contract, and the caller
+      // learns immediately instead of waiting out a timeout.
+      await expect(client.readTimelinePayload("agent-1", options)).rejects.toThrow(
+        "does not support timeline payloads",
+      );
+      await expect(client.readTimelineSourceRanges("agent-1", options)).rejects.toThrow(
+        "does not support timeline source ranges",
+      );
+      expect(mock.sent).toHaveLength(0);
+      return;
+    }
+    const payload = expect(client.readTimelinePayload("agent-1", options)).rejects.toThrow();
+    const ranges = expect(
+      client.readTimelineSourceRanges("agent-1", { ...options, requestId: "ranges" }),
+    ).rejects.toThrow();
+    expect(parseSentFrame(mock.sent[0])).toMatchObject({
+      type: "agent.timeline.payload.get.request",
+      agentId: "agent-1",
+      epoch: "epoch-1",
+    });
+    expect(parseSentFrame(mock.sent[1])).toMatchObject({
+      type: "agent.timeline.source_ranges.get.request",
+      agentId: "agent-1",
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    await Promise.all([payload, ranges]);
+  },
+);
 
 test("honors explicit fetchAgentTimeline timeout below the session RPC default", async () => {
   useHeartbeatClock();
@@ -6139,3 +6295,50 @@ test("RPC denial messages remain user-facing while retaining structured diagnost
   );
   await assertion;
 });
+
+test.each(["connected", "connecting"] as const)(
+  "permission history abort releases %s request resources",
+  async (status) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "permission_abort",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connecting = client.connect();
+    if (status === "connected") {
+      mock.triggerOpen();
+      await connecting;
+    }
+    const controller = new AbortController();
+    const result = client.fetchPermissionResponses("agent-1", {
+      requestId: "abort-history",
+      signal: controller.signal,
+    });
+    const rejected = expect(result).rejects.toThrow("Request canceled");
+    controller.abort();
+    await rejected;
+    const internal = client as unknown as {
+      waiters: Set<{ requestId?: string }>;
+      pendingSendQueue: Array<{ message: { requestId?: string } }>;
+    };
+    expect([...internal.waiters].some((waiter) => waiter.requestId === "abort-history")).toBe(
+      false,
+    );
+    expect(
+      internal.pendingSendQueue.some((pending) => pending.message.requestId === "abort-history"),
+    ).toBe(false);
+    if (status === "connecting") {
+      mock.triggerOpen();
+      await connecting;
+    }
+    const permissionFrames = mock.sent.filter(
+      (frame) =>
+        typeof frame === "string" && frame.includes("agent.permissionResponses.fetch.request"),
+    );
+    expect(permissionFrames).toHaveLength(status === "connected" ? 1 : 0);
+  },
+);
