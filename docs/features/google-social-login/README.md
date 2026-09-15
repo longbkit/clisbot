@@ -291,10 +291,14 @@ origin; native and desktop clients hold OAuth tokens rather than the session coo
 
 The existing active-organization flow remains authoritative:
 
-- a session starts with no active organization and the user selects one
-  (`organizationRequired`), even with a single membership. Two sessions are the
-  exception: the bootstrap owner's, and the session whose sign-in completed
-  admission, which starts in the organization admission granted;
+- a session with no active organization starts in the Member's only
+  organization (Clisbot; upstream asks even with a single membership). With two
+  or more memberships, or a pending invitation, the user selects one
+  (`organizationRequired`). The session whose sign-in completed admission starts
+  in the organization admission granted. An active organization whose membership
+  went stale fails closed instead of switching. Removing a member clears that
+  session's organization, so a removed Member with exactly one remaining
+  organization continues in it;
 - the selected organization becomes `session.activeOrganizationId`.
 
 CLI login stores an organization-scoped credential. `hub connect` uses that

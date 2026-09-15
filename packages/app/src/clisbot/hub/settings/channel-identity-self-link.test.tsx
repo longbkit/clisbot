@@ -195,7 +195,7 @@ describe("Channel identity recovery", () => {
       const ui = render(accountView());
       if (!connectionId) {
         expect(fixture.get).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole("button", { name: "Your Channel identities" }));
+        fireEvent.click(screen.getByRole("button", { name: "Manage identities" }));
       }
       await screen.findByRole("option", { name: "Slack · Support workspace" });
       const select = screen.getByLabelText("Connection") as HTMLSelectElement;
@@ -213,7 +213,7 @@ describe("Channel identity recovery", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "Back to Account" }));
       ui.rerender(accountView());
-      expect(screen.getByRole("button", { name: "Your Channel identities" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Create link code" })).toBeNull();
       expect(fixture.scroll).toHaveBeenCalled();

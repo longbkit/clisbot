@@ -4,6 +4,8 @@
 
 Mở Hub trong Paseo web app tại **Settings → Account**. App native và desktop mở cùng trang này trên trình duyệt để đăng nhập rồi quay lại app.
 
+Màn **Welcome** (khi chưa có Host nào) cũng có ô **Paseo Hub** để đăng nhập, bên cạnh các cách thêm Host trực tiếp. Đăng nhập ở đây xong, nếu tổ chức đã có Host bạn dùng được thì app vào thẳng workspace; nếu chưa có hoặc tài khoản còn thiếu bước (chọn tổ chức, đổi mật khẩu…) thì app mở **Settings → Account** để bạn làm tiếp.
+
 ## Người vận hành: bật Google và chọn cách đăng ký
 
 Đặt các biến sau trong môi trường chạy Hub rồi restart Hub:

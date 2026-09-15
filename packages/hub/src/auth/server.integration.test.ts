@@ -94,6 +94,19 @@ describe("account and organization boundary", () => {
     assert.equal(await alice.selectUnavailableOrganization(acme), 404);
   });
 
+  it("starts a new session in the Member's only organization", async () => {
+    const hub = await startAccounts(postgres);
+    const alice = await hub.signUp("Alice", "alice@example.com");
+    const acme = await alice.createOrganization("Acme");
+
+    const second = await hub.signIn(alice.email);
+    assert.equal((await second.requireActiveState()).organization.id, acme);
+
+    await alice.createOrganization("Elsewhere");
+    const third = await hub.signIn(alice.email);
+    assert.equal((await third.state()).status, "organizationRequired");
+  });
+
   it("resolves PostgreSQL resources from the authenticated active organization", async () => {
     const hub = await startAccounts(postgres);
     const alice = await hub.signUp("Alice", "alice@example.com");

@@ -19,6 +19,11 @@ export function OrganizationTitle({ name }: { name: string }) {
   );
 }
 
+/** An organization role as shown to people: `owner` → `Owner`. */
+export function roleLabel(role: string): string {
+  return role.length === 0 ? role : `${role[0]?.toUpperCase() ?? ""}${role.slice(1)}`;
+}
+
 /** A label/value row under an organization title. */
 export function DetailRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (

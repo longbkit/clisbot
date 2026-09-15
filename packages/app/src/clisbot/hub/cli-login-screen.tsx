@@ -24,6 +24,7 @@ import { HubSettingsContent } from "./settings";
 import { openCliLoginForm, type CliLoginFormState } from "./cli-login-form";
 import { buildHubSettingsRoute } from "./navigation";
 import { CliAuthorizationSummary, type CliAuthorizationSubject } from "./cli-authorization-summary";
+import { roleLabel } from "./organization-identity";
 
 const CliAuthorizationSchema = z.object({
   expiresAt: z.string().datetime(),
@@ -396,10 +397,6 @@ function useApprover(hub: ReturnType<typeof useHubAccount>) {
     () => (email && role ? { email, roleLabel: roleLabel(role) } : null),
     [email, role],
   );
-}
-
-function roleLabel(role: string): string {
-  return role.length === 0 ? role : `${role[0]?.toUpperCase() ?? ""}${role.slice(1)}`;
 }
 
 const styles = StyleSheet.create((theme) => ({

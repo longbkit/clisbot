@@ -26,6 +26,7 @@ import { openExternalUrl } from "@/utils/open-external-url";
 import { isFdroidBuild } from "@/constants/build-profile";
 import { isWeb, isNative } from "@/constants/platform";
 import { isElectronRuntime } from "@/desktop/host";
+import { HubWelcomeSignIn } from "@/clisbot/hub/welcome-sign-in";
 
 interface WelcomeAction {
   key: "scan-qr" | "direct-connection" | "remote-ssh" | "paste-pairing-link";
@@ -297,6 +298,9 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
               </Pressable>
             ) : null}
           </View>
+
+          {/* COMPAT(clisbot-welcome-hub-sign-in): Hub sign-in beside adding a Host directly. */}
+          <HubWelcomeSignIn />
 
           <View style={styles.actions}>
             {actions.map((action) => (

@@ -17,6 +17,8 @@ import { EmailRegistrationButton, EmailRegistrationCompletion } from "./email-re
 import { GoogleFirstInstanceSetup, GoogleFirstSignIn } from "./google-sign-in";
 import { ProfileSettings } from "./profile-settings";
 import { OrganizationHeader } from "./organization-header";
+import { OrganizationSelection } from "./organization-selection";
+import { ChannelIdentitiesSection } from "./channel-identities-section";
 import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-entry-form";
 import {
   HubChannelIdentitiesSchema,
@@ -175,8 +177,9 @@ function HubAccountSettingsForm({
   if (state?.status === "organizationRequired") {
     return (
       <OrganizationSelection
-        form={form}
-        fields={fields}
+        organizationName={fields.organizationName}
+        setOrganizationName={form.setOrganizationName}
+        canCreate={fields.canSubmit}
         hub={hub}
         state={state}
         pending={pending}
@@ -450,99 +453,14 @@ function ActiveHubAccount({
           ) : null}
         </View>
         <ProfileSettings hub={hub} account={state.account} pending={pending} run={run} />
-        <Button variant="outline" disabled={pending} onPress={openIdentity}>
-          Your Channel identities
-        </Button>
         <Button variant="outline" disabled={pending} onPress={signOut}>
           Sign out
         </Button>
         {hub.error ? <Alert variant="error" title={hub.error} /> : null}
       </SettingsSection>
+      <ChannelIdentitiesSection pending={pending} onManage={openIdentity} />
       <HubHostOnboardingSection />
     </View>
-  );
-}
-
-function OrganizationSelection({
-  hub,
-  pending,
-  run,
-  form,
-  fields,
-  state,
-}: AccountEntryFormProps & {
-  state: Extract<HubAccountState, { status: "organizationRequired" }>;
-}) {
-  const { organizationName } = fields;
-  const { setOrganizationName } = form;
-  const compact = useIsCompactFormFactor();
-  const fieldSize = compact ? "md" : "sm";
-  const createOrganization = useCallback(
-    () => void run(() => hub.createOrganization(organizationName.trim())),
-    [hub, organizationName, run],
-  );
-  const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
-  return (
-    <SettingsSection title="Choose an organization">
-      {state.memberships.length === 0 && !state.canCreateOrganization ? (
-        <Alert
-          variant="info"
-          title="No organization available"
-          description="Ask an organization owner or admin for an invitation, or sign in with another account."
-        />
-      ) : null}
-      {state.memberships.map((membership) => (
-        <OrganizationChoice
-          key={membership.id}
-          id={membership.id}
-          name={membership.name}
-          pending={pending}
-          select={hub.selectOrganization}
-          run={run}
-        />
-      ))}
-      {state.canCreateOrganization ? (
-        <View style={[settingsStyles.card, styles.form]}>
-          <Field label="Organization name">
-            <FormTextInput
-              size={fieldSize}
-              initialValue={organizationName}
-              onChangeText={setOrganizationName}
-              placeholder="Acme"
-              editable={!pending}
-            />
-          </Field>
-          <Button disabled={pending || !fields.canSubmit} onPress={createOrganization}>
-            Create organization
-          </Button>
-        </View>
-      ) : null}
-      <Button variant="outline" disabled={pending} onPress={signOut}>
-        Sign out
-      </Button>
-      {hub.error ? <Alert variant="error" title={hub.error} /> : null}
-    </SettingsSection>
-  );
-}
-
-function OrganizationChoice({
-  id,
-  name,
-  pending,
-  select,
-  run,
-}: {
-  id: string;
-  name: string;
-  pending: boolean;
-  select(organizationId: string): Promise<void>;
-  run: HubRun;
-}) {
-  const choose = useCallback(() => void run(() => select(id)), [id, run, select]);
-  return (
-    <Button variant="outline" disabled={pending} onPress={choose}>
-      {name}
-    </Button>
   );
 }
 

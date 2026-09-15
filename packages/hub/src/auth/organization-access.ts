@@ -296,7 +296,11 @@ export class OrganizationAccess {
       return Response.json({ status: "passwordChangeRequired", account });
     }
     const memberships = await this.memberships(this.options.pool, session.userId);
-    const resolvedSession = await this.activateBootstrapOrganization(session, memberships);
+    const resolvedSession = await this.activateSoleOrganization(
+      await this.activateBootstrapOrganization(session, memberships),
+      memberships,
+      invitationId,
+    );
     const invitation =
       invitationId === null
         ? undefined
@@ -826,6 +830,28 @@ export class OrganizationAccess {
       [session.userId, organizationId],
     );
     if (bootstrap.rowCount !== 1) return session;
+    await this.options.pool.query(
+      `update session set active_organization_id = $2, updated_at = now()
+       where id = $1 and user_id = $3 and active_organization_id is null`,
+      [session.sessionId, organizationId, session.userId],
+    );
+    return { ...session, activeOrganizationId: organizationId };
+  }
+
+  /**
+   * Clisbot: a session with no active organization starts in the Member's only organization, so
+   * signing in does not stop at a one-item "Choose an organization" list. A stale active
+   * organization still fails closed, and a pending invitation still asks first.
+   */
+  private async activateSoleOrganization(
+    session: AccountSession,
+    memberships: readonly MembershipRow[],
+    invitationId: string | null,
+  ): Promise<AccountSession> {
+    if (session.activeOrganizationId !== null || invitationId !== null) return session;
+    if (memberships.length !== 1) return session;
+    const organizationId = memberships[0]?.organization_id;
+    if (organizationId === undefined) return session;
     await this.options.pool.query(
       `update session set active_organization_id = $2, updated_at = now()
        where id = $1 and user_id = $3 and active_organization_id is null`,

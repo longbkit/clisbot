@@ -184,10 +184,10 @@ describe("Account entry lifecycle and recovery", () => {
     expect(screen.getByText(/Full organization access/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
     expect(screen.queryByTestId("identity-settings")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Your Channel identities" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage identities" }));
     expect(screen.getByTestId("identity-settings")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back to Account" }));
-    expect(screen.getByRole("button", { name: "Your Channel identities" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
     expect(screen.queryByTestId("identity-settings")).toBeNull();
     expect(hub.completeAppSetup).not.toHaveBeenCalled();
   });
@@ -288,6 +288,25 @@ describe("Account entry lifecycle and recovery", () => {
     expect(screen.getByRole("alert").textContent).toContain("No organization available");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sign out" })));
     expect(hub.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists each organization with its role and an explicit Open action", async () => {
+    const select = vi.fn(async () => {});
+    Object.assign(hub, { selectOrganization: select });
+    hub.state = {
+      status: "organizationRequired",
+      account,
+      memberships: [
+        { id: "org-a", name: "vexere.com", slug: "vexere-com", membershipId: "m-a", role: "owner" },
+        { id: "org-b", name: "Acme", slug: "acme", membershipId: "m-b", role: "member" },
+      ],
+      canCreateOrganization: false,
+    };
+    render(view());
+    expect(screen.getByText("Owner · vexere-com")).toBeTruthy();
+    expect(screen.getByText("Member · acme")).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getAllByRole("button", { name: "Open" })[1]!));
+    expect(select).toHaveBeenCalledWith("org-b");
   });
 
   it("keeps a pending invitation ahead of legacy setup Account capabilities", async () => {

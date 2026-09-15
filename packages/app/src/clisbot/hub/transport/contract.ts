@@ -8,6 +8,8 @@ export interface GoogleSignInContext {
   invitationId?: string;
   /** Started from first-run setup: the Google account claims the pristine Hub as its operator. */
   claimInstance?: boolean;
+  /** Same-origin path Google returns to; defaults to the current page. */
+  returnPath?: string;
 }
 
 export interface HubTransport {

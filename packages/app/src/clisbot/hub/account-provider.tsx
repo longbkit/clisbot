@@ -56,7 +56,9 @@ interface HubAccountContextValue {
   /** Better Auth `organization/update`; Hub allows only owners to change the display name. */
   renameOrganization(name: string): Promise<void>;
   /** Undefined when this client reaches Google through the Hub sign-in page instead. */
-  signInWithGoogle: ((options?: { claimInstance?: boolean }) => Promise<void>) | undefined;
+  signInWithGoogle:
+    | ((options?: { claimInstance?: boolean; returnPath?: string }) => Promise<void>)
+    | undefined;
   claimInstance(input: { email: string; password: string }): Promise<void>;
   completeAppSetup(): Promise<void>;
   changePassword(input: { currentPassword: string; newPassword: string }): Promise<void>;
@@ -205,11 +207,12 @@ function EnabledHubAccountProvider({
   const signInWithGoogle = useMemo(() => {
     const start = transport.signInWithGoogle?.bind(transport);
     if (start === undefined) return undefined;
-    return (options?: { claimInstance?: boolean }) =>
+    return (options?: { claimInstance?: boolean; returnPath?: string }) =>
       run(() =>
         start({
           ...(invitationId === null ? {} : { invitationId }),
           ...(options?.claimInstance === true ? { claimInstance: true } : {}),
+          ...(options?.returnPath === undefined ? {} : { returnPath: options.returnPath }),
         }),
       );
   }, [invitationId, run, transport]);

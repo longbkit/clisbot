@@ -40,7 +40,7 @@ class BrowserHubTransport implements HubTransport {
 
   async signInWithGoogle(context?: GoogleSignInContext): Promise<void> {
     this.assertSameOrigin();
-    const returnTo = new URL(window.location.href);
+    const returnTo = new URL(context?.returnPath ?? window.location.href, window.location.href);
     returnTo.searchParams.delete("error");
     const response = await fetch(new URL("/api/auth/sign-in/social", this.origin), {
       method: "POST",
