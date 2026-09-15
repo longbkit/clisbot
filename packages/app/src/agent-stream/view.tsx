@@ -845,6 +845,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               item.clientMessageId !== undefined &&
               pendingClientMessageIds.has(item.clientMessageId)
             }
+            isConfirmed={item.timelineCursor !== undefined}
           />
         );
       },

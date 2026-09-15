@@ -1984,6 +1984,7 @@ function applyCanonicalUserMessageEvent(params: {
     turnId: event.turnId,
     timelineCursor,
     text: normalized.chunk,
+    sender: event.item.sender,
     timestamp,
   });
   if (unmatchedInsert === "head") {

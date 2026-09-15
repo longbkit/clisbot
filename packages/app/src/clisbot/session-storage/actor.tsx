@@ -150,6 +150,31 @@ export const SessionActorAvatar = memo(function SessionActorAvatar({
   );
 });
 
+const UNRECORDED_SENDER_NOTE =
+  "Unknown user: this message has no recorded sender, so it is shown with your account.";
+
+/**
+ * The face of a confirmed message nobody recorded a sender for. Hover (or tap on
+ * mobile) discloses that, and it never opens the reader's own profile as if they
+ * wrote the message.
+ */
+export const UnrecordedSenderAvatar = memo(function UnrecordedSenderAvatar({
+  actor,
+}: {
+  actor: SessionActor;
+}) {
+  return (
+    <Tooltip enabledOnMobile>
+      <TooltipTrigger accessibilityLabel={UNRECORDED_SENDER_NOTE} testID="unrecorded-sender-avatar">
+        <ActorAvatar actor={actor} />
+      </TooltipTrigger>
+      <TooltipContent>
+        <Text style={styles.text}>{UNRECORDED_SENDER_NOTE}</Text>
+      </TooltipContent>
+    </Tooltip>
+  );
+});
+
 export const SessionActorLabel = memo(function SessionActorLabel({
   actor,
   serverId,

@@ -60,14 +60,16 @@ interface AccountIdentity {
  * Who wrote a message, as far as the client can tell.
  *
  * - `ready`: the recorded sender snapshot, or the signed-in account when the
- *   message carries no sender (the common case for local sends).
+ *   message carries no sender (the common case for local sends). `unrecorded`
+ *   marks that fallback on a message the daemon already confirmed: nothing
+ *   recorded who sent it, so the account shown is a guess the UI must disclose.
  * - `loading`: a sender-less message while the account is still resolving. The
  *   row should hold a placeholder rather than guess an identity.
  * - `unknown`: a sender-less message with no verified account. The UI keeps
  *   the right-hand layout, but omits the name and avatar.
  */
 export type MessageSenderResolution =
-  | { state: "ready"; actor: SessionActor; isOwn: boolean }
+  | { state: "ready"; actor: SessionActor; isOwn: boolean; unrecorded: boolean }
   | { state: "loading"; isOwn: true }
   | { state: "unknown"; isOwn: false };
 
@@ -76,19 +78,23 @@ export function resolveMessageSender(input: {
   account: AccountIdentity | null;
   accountOrigin: string | null;
   accountLoading: boolean;
+  /** The daemon has confirmed this message (it holds a timeline position). */
+  confirmed?: boolean;
 }): MessageSenderResolution {
-  const { sender, account, accountOrigin, accountLoading } = input;
+  const { sender, account, accountOrigin, accountLoading, confirmed = false } = input;
   if (sender) {
     return {
       state: "ready",
       actor: sender,
       isOwn: isOwnActor(sender, { id: account?.id, origin: accountOrigin }),
+      unrecorded: false,
     };
   }
   if (account) {
     return {
       state: "ready",
       isOwn: true,
+      unrecorded: confirmed,
       actor: {
         kind: "user",
         id: account.id,

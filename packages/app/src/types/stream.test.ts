@@ -113,6 +113,34 @@ describe("plugin timeline rows", () => {
 });
 
 describe("user message identity", () => {
+  it("keeps another participant's sender on a live canonical message", () => {
+    const sender = {
+      kind: "user" as const,
+      id: "designer",
+      displayName: "Designer",
+      hubOrigin: "https://hub.example",
+    };
+    const event: AgentStreamEventPayload = {
+      type: "timeline",
+      provider: "claude",
+      turnId: "turn-2",
+      item: { type: "user_message", text: "+2?", clientMessageId: "m-2", messageId: "m-2", sender },
+    };
+
+    for (const unmatchedUserMessageInsert of ["tail", "head"] as const) {
+      const result = applyStreamEvent({
+        tail: [],
+        head: [],
+        event,
+        timestamp: new Date("2026-09-15T10:41:23Z"),
+        source: "live",
+        unmatchedUserMessageInsert,
+      });
+      const message = [...result.tail, ...result.head].find((item) => item.kind === "user_message");
+      expect(message).toEqual(expect.objectContaining({ kind: "user_message", sender }));
+    }
+  });
+
   it("replaces provisional optimistic turn membership with canonical membership", () => {
     const optimistic = createUserMessage({
       clientMessageId: "hello-client",

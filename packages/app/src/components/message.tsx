@@ -1,5 +1,9 @@
 import type { SessionActor } from "@getpaseo/protocol/session-authorship";
-import { ActorAvatar, SessionActorAvatar } from "@/clisbot/session-storage/actor";
+import {
+  ActorAvatar,
+  SessionActorAvatar,
+  UnrecordedSenderAvatar,
+} from "@/clisbot/session-storage/actor";
 import { actorLabel } from "@/clisbot/session-storage/actor-presentation";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { useMessageSender } from "@/clisbot/session-storage/message-sender";
@@ -135,6 +139,8 @@ interface UserMessageProps {
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
   isPending?: boolean;
+  /** The daemon has confirmed this message (it holds a timeline position). */
+  isConfirmed?: boolean;
   disableOuterSpacing?: boolean;
 }
 
@@ -608,6 +614,7 @@ export const UserMessage = memo(function UserMessage({
   isFirstInGroup = true,
   isLastInGroup = true,
   isPending = false,
+  isConfirmed = false,
   disableOuterSpacing,
 }: UserMessageProps) {
   const isCompact = useIsCompactFormFactor();
@@ -634,7 +641,7 @@ export const UserMessage = memo(function UserMessage({
   );
   // The signed-in account reads the conversation like a group chat: anyone
   // else's message gets the left avatar row; own messages stay right.
-  const senderResolution = useMessageSender(sender);
+  const senderResolution = useMessageSender(sender, isConfirmed);
   const resolvedSender = senderResolution.state === "ready" ? senderResolution.actor : null;
   const alignRight = senderResolution.isOwn || senderResolution.state === "unknown";
   // Unknown senders keep the right-hand layout without a name or avatar.
@@ -642,14 +649,16 @@ export const UserMessage = memo(function UserMessage({
 
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const unrecordedSender = senderResolution.state === "ready" && senderResolution.unrecorded;
   const face = useMemo(() => {
     if (!resolvedSender) return null;
+    if (unrecordedSender) return <UnrecordedSenderAvatar actor={resolvedSender} />;
     return serverId && workspaceId ? (
       <SessionActorAvatar actor={resolvedSender} serverId={serverId} workspaceId={workspaceId} />
     ) : (
       <ActorAvatar actor={resolvedSender} />
     );
-  }, [resolvedSender, serverId, workspaceId]);
+  }, [resolvedSender, unrecordedSender, serverId, workspaceId]);
 
   const containerStyle = useMemo(
     () => [

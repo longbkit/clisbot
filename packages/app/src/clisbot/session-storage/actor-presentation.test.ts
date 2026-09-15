@@ -126,7 +126,7 @@ describe("resolveMessageSender", () => {
         accountOrigin: null,
         accountLoading: false,
       }),
-      { state: "ready", actor: longbkit, isOwn: true },
+      { state: "ready", actor: longbkit, isOwn: true, unrecorded: false },
     );
     assert.deepEqual(
       resolveMessageSender({
@@ -135,7 +135,7 @@ describe("resolveMessageSender", () => {
         accountOrigin: null,
         accountLoading: false,
       }),
-      { state: "ready", actor: longbkit, isOwn: false },
+      { state: "ready", actor: longbkit, isOwn: false, unrecorded: false },
     );
   });
 
@@ -150,9 +150,33 @@ describe("resolveMessageSender", () => {
       {
         state: "ready",
         isOwn: true,
+        unrecorded: false,
         actor: { kind: "user", id: "account-1", displayName: "Long", hubOrigin: "https://hub" },
       },
     );
+  });
+
+  it("marks the account fallback as unrecorded once the daemon confirmed the message", () => {
+    const resolved = resolveMessageSender({
+      sender: undefined,
+      account,
+      accountOrigin: null,
+      accountLoading: false,
+      confirmed: true,
+    });
+    assert.equal(resolved.state, "ready");
+    if (resolved.state === "ready") {
+      assert.equal(resolved.unrecorded, true);
+      assert.equal(resolved.actor.id, "account-1");
+    }
+    const recorded = resolveMessageSender({
+      sender: longbkit,
+      account,
+      accountOrigin: null,
+      accountLoading: false,
+      confirmed: true,
+    });
+    assert.equal(recorded.state === "ready" && recorded.unrecorded, false);
   });
 
   it("uses the email when the account has no name", () => {
