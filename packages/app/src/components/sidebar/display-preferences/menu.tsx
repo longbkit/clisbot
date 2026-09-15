@@ -638,18 +638,22 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Two groups, split by the separator. Above it, what a row may say about a workspace — each one
+ * Below Agent sessions, two groups split by the separator. Above it, what a row may say about a workspace — each one
  * independent. Below it, the one thing the slot to the right of the title holds, so picking the
  * one already showing empties the slot and gives the width back to the title.
  *
- * CI is the one item above the separator with three answers rather than two, so it opens a page
+ * CI is the one item in the row-items group with three answers rather than two, so it opens a page
  * instead of ticking, and it goes last: a row that navigates does not belong in the middle of a
- * column you are running down with your eyes ticking things on and off.
+ * column you are running down with your eyes ticking things on and off. Agent sessions opens a
+ * page too and sits above everything, in a group of its own, because it changes what the sidebar
+ * lists rather than what one row says.
  */
 function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
   const { t } = useTranslation();
   return (
     <>
+      <WorkspaceSessionsSubTrigger />
+      <MenuSeparator />
       {SIDEBAR_ROW_ITEMS.map((item) => (
         <OptionItem
           key={item}
@@ -663,7 +667,6 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
         />
       ))}
       <ChecksSubTrigger />
-      <WorkspaceSessionsSubTrigger />
       <MenuSeparator />
       {TRAILING_CHOICES.map((choice) => (
         <OptionItem

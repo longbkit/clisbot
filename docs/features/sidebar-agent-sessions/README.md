@@ -1,10 +1,10 @@
-# Workspace sessions in the sidebar
+# Agent sessions in the sidebar
 
 **Shipped 2026-09-15, off by default. Not yet checked in a running app — see [What is not done yet](#what-is-not-done-yet).**
 
 Lists a workspace's sessions under its sidebar row, so opening one takes a single press. Without it, you open the workspace first and then pick a tab, and with many sessions the tab bar truncates their titles.
 
-The terms are in the [glossary](../../glossary.md) under **Workspace sessions**.
+The terms are in the [glossary](../../glossary.md) under **Agent sessions**.
 
 ## Use cases
 
@@ -18,7 +18,7 @@ The terms are in the [glossary](../../glossary.md) under **Workspace sessions**.
 
 ## Settings
 
-Everything lives on one page, **Show → Workspace sessions** in the sidebar's display preferences, in four groups split by separators: the switch, expansion, Active sessions only, and the details a line shows. There is no deeper submenu.
+Everything lives on one page, **Show → Agent sessions** — the first row of the Show page, in a group of its own — in the sidebar's display preferences, in four groups split by separators: the switch, expansion, Active sessions only, and the details a line shows. There is no deeper submenu.
 
 | Item                 | Values                                                                                 | Default       |
 | -------------------- | -------------------------------------------------------------------------------------- | ------------- |
@@ -60,7 +60,7 @@ User, channel, Updated time and the metadata status only appear on hosts that ca
 
 - **A session line is the workspace row's sibling, not its child.** Nesting it inside the row's press target would make a session press also select, drag, or open the context menu of the workspace. The one exception is the chevron. It sits inside the row, and its own Pressable takes the tap; a drag needs 6pt of movement first, so a tap cannot start one.
 - **The chevron goes under the status mark, not in place of it on hover.** Touch has no hover, and a hover swap would hide the status right when you point at the row.
-- **Feature-flagged by the Show sessions switch, and scoped to `packages/app/src/clisbot/workspace-sessions/`.** Upstream files gain a menu entry, a leading-column wrapper, a sibling render in the two list files, one settings field, and the tab-label helper moved into `panels/agent-tab-label.ts` so the tab and the sidebar share it.
+- **Feature-flagged by the Show sessions switch, and scoped to `packages/app/src/clisbot/workspace-sessions/`.** The code folder and the persisted `sidebarWorkspaceSessions` key keep the earlier name; renaming a stored settings key would need a migration for a label change. Upstream files gain a menu entry, a leading-column wrapper, a sibling render in the two list files, one settings field, and the tab-label helper moved into `panels/agent-tab-label.ts` so the tab and the sidebar share it.
 - **Subscriptions stay narrow.** With the switch off, a row reads one setting and one expansion key and mounts nothing else. Under Keep as is, the chevron reads only the `agents` map. An open row reads only `agents` and `messageSubmissions`; both are replaced only when an agent or a submission changes, so other session-store updates, such as timeline items, do not re-run the list. The selected row's fill check looks up one agent inside the store selector and returns a boolean, so the upstream row re-renders only when the answer flips.
 
 ## What is not done yet

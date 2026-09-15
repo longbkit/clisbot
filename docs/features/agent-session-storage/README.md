@@ -120,4 +120,4 @@ Known cleanups, not blocking:
 Workspace naming, selection and reuse live in
 [Workspace organization](../workspace-organization/README.md). The sidebar's per-session
 lines, which show this authorship for each session, live in
-[Workspace sessions](../workspace-sessions/README.md).
+[Agent sessions](../sidebar-agent-sessions/README.md).

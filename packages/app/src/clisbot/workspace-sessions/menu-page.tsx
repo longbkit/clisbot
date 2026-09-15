@@ -4,10 +4,11 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   CircleDot,
+  Eye,
   Clock,
   Cpu,
   Hash,
-  ListTree,
+  MessagesSquare,
   MousePointerClick,
   UserRound,
 } from "lucide-react-native";
@@ -27,7 +28,7 @@ import {
 } from "./preferences";
 
 const SESSIONS_PAGE_ID = "workspaceSessions";
-const SESSIONS_TITLE = "Workspace sessions";
+const SESSIONS_TITLE = "Agent sessions";
 
 /** Matches the display menu's option icons: 14pt, muted. */
 const OPTION_ICON_SIZE = 14;
@@ -39,7 +40,10 @@ interface Option {
   icon: OptionIcon;
 }
 
-const ThemedListTree = withUnistyles(ListTree);
+// Two chat bubbles: sessions, plural. The page's own switch uses the eye, so the trigger and the
+// first row inside it do not repeat one glyph.
+const ThemedMessagesSquare = withUnistyles(MessagesSquare);
+const ThemedEye = withUnistyles(Eye);
 const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedUserRound = withUnistyles(UserRound);
 const ThemedClock = withUnistyles(Clock);
@@ -70,9 +74,9 @@ function useOptionIcon(Icon: OptionIcon): ReactElement {
   return useMemo(() => <Icon size={OPTION_ICON_SIZE} uniProps={mutedIconMapping} />, [Icon]);
 }
 
-/** The Show page's row into this feature; like Checks it navigates rather than ticks. */
+/** The Show page's first row, into this feature; like Checks it navigates rather than ticks. */
 export function WorkspaceSessionsSubTrigger(): ReactElement {
-  const leading = useOptionIcon(ThemedListTree);
+  const leading = useOptionIcon(ThemedMessagesSquare);
   return (
     <MenuSubTrigger
       id={SESSIONS_PAGE_ID}
@@ -93,7 +97,7 @@ export function WorkspaceSessionsSubTrigger(): ReactElement {
  */
 function WorkspaceSessionsPage(): ReactElement {
   const preferences = useWorkspaceSessionsPreferences();
-  const showLeading = useOptionIcon(ThemedListTree);
+  const showLeading = useOptionIcon(ThemedEye);
   const activeOnlyLeading = useOptionIcon(ThemedCircleDot);
 
   return (

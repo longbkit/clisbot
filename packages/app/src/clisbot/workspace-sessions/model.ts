@@ -170,7 +170,7 @@ export function useWorkspaceShownAgents(input: {
  * One fill marks where you are. When the session you are in has a line under the row, that line
  * carries the fill and the row gives it up. A workspace showing a terminal, a file, or a session
  * the Active sessions only filter hides has no line to hand it to, so the row keeps it. With
- * Workspace sessions off, or the workspace closed, this is plain `selected`, as upstream.
+ * Agent sessions off, or the workspace closed, this is plain `selected`, as upstream.
  *
  * The line test runs inside the store selector and returns a boolean, so the upstream row
  * re-renders only when the answer flips — not on every agent change on the server.
