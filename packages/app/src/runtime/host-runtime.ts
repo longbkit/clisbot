@@ -584,10 +584,9 @@ function createDefaultDeps(
         resolveAccessTicket: async () => {
           return resolveHostAccessTicket(host.serverId, clientId, host.management);
         },
+        // Only a closed admission removes a Hub Host. A single operation denied for missing
+        // permission (`access_denied`) is an ordinary authorization result, not revocation.
         onAccessRevoked: () => {
-          if (host.management) onManagedHostRevoked(host.management);
-        },
-        onResourceAccessDenied: () => {
           if (host.management) onManagedHostRevoked(host.management);
         },
         providerSnapshots: "wire",
