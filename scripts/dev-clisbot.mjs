@@ -81,6 +81,9 @@ export function createDevEnvironment(base, paths, hubOrigin) {
     APP_VARIANT: "development",
     BROWSER: "none",
     CLISBOT_HUB_ORIGIN: hubOrigin,
+    // The app's Hosts screen shows this checkout's CLI against the dev home, not an installed
+    // `paseo`, so a copied command enrolls the dev daemon.
+    EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND: `PASEO_HOME=${paths.devHome} npm run cli --`,
     EXPO_PORT: String(APP_PORT),
     EXPO_PUBLIC_LOCAL_DAEMON: `localhost:${DAEMON_PORT}`,
     PASEO_CORS_ORIGINS: "*",

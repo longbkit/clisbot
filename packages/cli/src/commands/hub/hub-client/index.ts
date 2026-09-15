@@ -4,6 +4,7 @@ import {
   authorizationPollSchema,
   authorizationSchema,
   configurationResourcesSchema,
+  credentialIdentitySchema,
   enrollmentTokenSchema,
   installResponseSchema,
   projectsResponseSchema,
@@ -15,6 +16,7 @@ import {
   type CliAuthorizationPoll,
   type HubInstallResult,
   type HubConfigurationResources,
+  type HubCredentialIdentity,
   type HubProject,
   type HubTrigger,
   type HubTriggerInstallationResult,
@@ -26,6 +28,7 @@ import { requestHub } from "./internal/transport.js";
 export type {
   CliAuthorization,
   CliAuthorizationPoll,
+  HubCredentialIdentity,
   HubInstallResult,
   HubConfigurationResources,
   HubProject,
@@ -174,6 +177,18 @@ export class HubHttpClient {
       successStatus: 200,
       schema: validationResponseSchema,
       failureMessage: "Hub configuration validation failed",
+    });
+  }
+
+  describeCredential(origin: string, credential: string): Promise<HubCredentialIdentity> {
+    return requestHub({
+      origin,
+      path: "/api/auth/paseo/credential",
+      method: "GET",
+      apiKey: credential,
+      successStatus: 200,
+      schema: credentialIdentitySchema,
+      failureMessage: "Hub could not describe this credential",
     });
   }
 

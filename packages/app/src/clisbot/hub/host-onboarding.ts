@@ -82,6 +82,7 @@ function hostOnboardingStatus(
   return status === "online" || status === "offline" || status === "error" ? status : "connecting";
 }
 
-export function buildHubLoginCommand(hubOrigin: string): string {
-  return `paseo hub login ${hubOrigin}`;
+/** `cliCommand` is `paseo` for users; the dev runner substitutes this checkout's CLI and home. */
+export function buildHubLoginCommand(hubOrigin: string, cliCommand = "paseo"): string {
+  return `${cliCommand} hub login ${hubOrigin}`;
 }

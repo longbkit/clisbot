@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { InvitationEmail, InvitationMailer } from "../index.js";
+import type {
+  InvitationEmail,
+  InvitationMailer,
+  VerificationEmail,
+  VerificationMailer,
+} from "../index.js";
 
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 const DELIVERY_TIMEOUT_MS = 10_000;
@@ -41,21 +46,66 @@ export function createResendInvitationMailer(
   sendRequest: SendRequest = fetch,
 ): InvitationMailer {
   return {
-    async send(invitation) {
-      const response = await sendRequest(RESEND_EMAILS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": `paseo-invitation-${invitation.id}`,
-        },
-        body: JSON.stringify(message(config.from, invitation)),
-        signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        throw new Error(`Resend rejected invitation email with status ${response.status}`);
-      }
+    send: (invitation) =>
+      deliver(
+        config,
+        sendRequest,
+        `paseo-invitation-${invitation.id}`,
+        message(config.from, invitation),
+        "invitation",
+      ),
+  };
+}
+
+export function createResendVerificationMailer(
+  config: ResendConfig,
+  sendRequest: SendRequest = fetch,
+): VerificationMailer {
+  return {
+    send: (verification) =>
+      deliver(
+        config,
+        sendRequest,
+        `paseo-verification-${verification.id}`,
+        verificationMessage(config.from, verification),
+        "verification",
+      ),
+  };
+}
+
+async function deliver(
+  config: ResendConfig,
+  sendRequest: SendRequest,
+  idempotencyKey: string,
+  body: object,
+  kind: string,
+): Promise<void> {
+  const response = await sendRequest(RESEND_EMAILS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
     },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`Resend rejected ${kind} email with status ${response.status}`);
+  }
+}
+
+function verificationMessage(from: string, verification: VerificationEmail) {
+  const introduction =
+    "Use this link to create your Paseo Hub account. If you didn't ask for it, ignore this email.";
+  const expiry = `This link expires at ${verification.expiresAt.toISOString()} and works once.`;
+  const link = escapeHtml(verification.link);
+  return {
+    from,
+    to: [verification.email],
+    subject: "Create your Paseo Hub account",
+    text: `${introduction}\n\nCreate your account: ${verification.link}\n\n${expiry}`,
+    html: `<p>${escapeHtml(introduction)}</p><p><a href="${link}">Create account</a></p><p>${escapeHtml(expiry)}</p>`,
   };
 }
 

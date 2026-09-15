@@ -9,6 +9,7 @@ import { DashboardShell } from "./dashboard-shell.js";
 import { InstanceSetupEntry } from "./instance-setup-entry.js";
 import { AppSetupEntry } from "../provider-applications/panel.js";
 import { PasswordChangeEntry } from "./password-change.js";
+import { EmailRegistrationComplete, readRegistrationToken } from "./registration-entry.js";
 import { PASEO_CLIENT_ID } from "./client-authorization.js";
 import type { AccountState } from "./organization-contract.js";
 
@@ -34,6 +35,8 @@ export function AccountApp() {
   const [handoff, setHandoff] = useState(false);
   const enterHandoff = useCallback(() => setHandoff(true), []);
   const leaveHandoff = useCallback(() => setHandoff(false), []);
+  // Read once: the registration page removes the single-use token from the URL after reading it.
+  const [registrationToken] = useState(readRegistrationToken);
   const invitation =
     typeof window === "undefined"
       ? undefined
@@ -43,6 +46,8 @@ export function AccountApp() {
     queryFn: () => loadAccount({ data: { invitation } }),
   });
   if (account.isPending) return <LoadingEntry />;
+  if (registrationToken !== undefined)
+    return <EmailRegistrationComplete token={registrationToken} />;
   if (account.isError || account.data.status === "error") {
     return (
       <FailedEntry
@@ -92,7 +97,9 @@ function ResolvedAccountApp({
       />
     );
   }
-  if (state.status === "instanceSetupRequired") return <InstanceSetupEntry />;
+  if (state.status === "instanceSetupRequired") {
+    return <InstanceSetupEntry googleSignIn={state.googleSignIn === true} />;
+  }
   if (state.status === "passwordChangeRequired")
     return <PasswordChangeEntry account={state.account} />;
   if (state.status === "appSetupRequired") {

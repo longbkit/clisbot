@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-export const REGISTRATION_MODES = ["open", "invite_only", "disabled"] as const;
+export const REGISTRATION_MODES = [
+  "open",
+  "invite_only",
+  "domain_self_registration",
+  "disabled",
+] as const;
 export const ORGANIZATION_CREATION_MODES = ["open", "disabled"] as const;
 export const PASSWORD_MIN_LENGTH = 12;
 
@@ -17,6 +22,9 @@ export interface InstanceAuthPolicy {
   registrationMode: RegistrationMode;
   organizationCreation: OrganizationCreationMode;
   bootstrap: BootstrapSettings | undefined;
+  /** Exact, lower-cased email domains admitted by `domain_self_registration`. Ignored by every
+   * other mode; absent means no domain is allowlisted. */
+  allowedDomains?: readonly string[];
 }
 
 const registrationModeSchema = z.enum(REGISTRATION_MODES);
@@ -63,6 +71,10 @@ export function readInstanceAuthPolicy(
     ORGANIZATION_CREATION_MODES,
     "disabled",
   );
+  const allowedDomains = readAllowedDomains(
+    registrationMode,
+    environment["PASEO_REGISTRATION_ALLOWED_DOMAINS"],
+  );
   const organizationName = environment["PASEO_BOOTSTRAP_ORGANIZATION"]?.trim() ?? "";
   const ownerEmail = environment["PASEO_BOOTSTRAP_OWNER_EMAIL"]?.trim() ?? "";
   const ownerPassword = environment["PASEO_BOOTSTRAP_OWNER_PASSWORD"] ?? "";
@@ -71,13 +83,14 @@ export function readInstanceAuthPolicy(
   ).length;
 
   if (suppliedBootstrapFields === 0) {
-    return { registrationMode, organizationCreation, bootstrap: undefined };
+    return { registrationMode, organizationCreation, bootstrap: undefined, allowedDomains };
   }
   if (suppliedBootstrapFields === 2 && ownerPassword.length === 0) {
     validateBootstrapIdentity(organizationName, ownerEmail);
     return {
       registrationMode,
       organizationCreation,
+      allowedDomains,
       bootstrap: {
         organizationName,
         ownerEmail: normalizeEmail(ownerEmail),
@@ -100,12 +113,76 @@ export function readInstanceAuthPolicy(
   return {
     registrationMode,
     organizationCreation,
+    allowedDomains,
     bootstrap: {
       organizationName,
       ownerEmail: normalizeEmail(ownerEmail),
       ownerPassword,
     },
   };
+}
+
+const DOMAIN_PATTERN =
+  /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/u;
+
+/** Consumer mailbox providers. Anyone can hold an address there, so owning one proves nothing
+ * about belonging to an organization; such users are admitted only by invitation. */
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "aol.com",
+  "gmail.com",
+  "gmx.com",
+  "gmx.net",
+  "googlemail.com",
+  "hotmail.com",
+  "icloud.com",
+  "live.com",
+  "mac.com",
+  "mail.com",
+  "me.com",
+  "msn.com",
+  "outlook.com",
+  "proton.me",
+  "protonmail.com",
+  "qq.com",
+  "yahoo.com",
+  "yandex.com",
+  "zoho.com",
+]);
+
+function readAllowedDomains(
+  registrationMode: RegistrationMode,
+  value: string | undefined,
+): readonly string[] {
+  const domains = [
+    ...new Set(
+      (value ?? "")
+        .split(",")
+        .map((domain) => domain.trim().toLowerCase())
+        .filter((domain) => domain.length > 0),
+    ),
+  ];
+  for (const domain of domains) {
+    if (!DOMAIN_PATTERN.test(domain)) {
+      throw new Error(`PASEO_REGISTRATION_ALLOWED_DOMAINS contains an invalid domain: ${domain}`);
+    }
+    if (PUBLIC_EMAIL_DOMAINS.has(domain)) {
+      throw new Error(
+        `PASEO_REGISTRATION_ALLOWED_DOMAINS must not contain a public email domain: ${domain}`,
+      );
+    }
+  }
+  if (registrationMode === "domain_self_registration" && domains.length === 0) {
+    throw new Error(
+      "PASEO_REGISTRATION_ALLOWED_DOMAINS must list at least one domain when PASEO_REGISTRATION_MODE is domain_self_registration",
+    );
+  }
+  return domains;
+}
+
+/** The domain an admission decision matches on: everything after the last `@`, lower-cased. */
+export function emailDomain(email: string): string {
+  const normalized = normalizeEmail(email);
+  return normalized.slice(normalized.lastIndexOf("@") + 1);
 }
 
 function validateBootstrapIdentity(organizationName: string, ownerEmail: string): void {

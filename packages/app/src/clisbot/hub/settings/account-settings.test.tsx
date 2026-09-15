@@ -14,6 +14,8 @@ const hub = vi.hoisted(() => ({
   signedIn: null,
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
+  registrationToken: null,
+  signInWithGoogle: undefined,
   signOut: vi.fn(async () => {}),
   refresh: vi.fn(async () => {}),
   acceptInvitation: vi.fn(async () => {}),
@@ -238,6 +240,23 @@ describe("Account entry lifecycle and recovery", () => {
     expect((screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
+  });
+
+  it("leads sign-in with Google and keeps the email form one step away", () => {
+    const signInWithGoogle = vi.fn(async () => {});
+    Object.assign(hub, { signInWithGoogle });
+    hub.state = { status: "signedOut", registration: "open", googleSignIn: true };
+    try {
+      render(view());
+      expect(screen.queryByLabelText("Email")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Use email and password instead" }));
+      expect(screen.getByLabelText("Email")).toBeDefined();
+      fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+      expect(signInWithGoogle).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.assign(hub, { signInWithGoogle: undefined });
+      hub.state = { status: "signedOut", registration: "open" };
+    }
   });
 
   it("keeps shared fields visible and resets signup-only fields when changing mode", () => {

@@ -7,11 +7,14 @@ import {
   stopProductionRuntime,
 } from "./index.js";
 import { hasApplication, startApplication } from "./server/runtime.js";
+import { applyClisbotEnvAliases } from "./env-alias.js";
 export { startApplication } from "./server/runtime.js";
 
 const startFetch = createStartHandler(defaultStreamHandler);
 
 export function startProductionRuntime() {
+  // COMPAT(clisbot-env-alias): the dev server skips `main()`, so operator names are aliased here.
+  applyClisbotEnvAliases();
   return startHubProductionRuntime();
 }
 

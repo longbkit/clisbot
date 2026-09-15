@@ -48,6 +48,8 @@ export interface AccountSession {
   userId: string;
   name: string;
   email: string;
+  /** The profile image URL, validated on write (`profile-update.ts`). */
+  image?: string | null;
   activeOrganizationId: string | null;
   mustChangePassword: boolean;
   isInstanceOperator: boolean;
@@ -109,6 +111,10 @@ interface OrganizationAccessOptions {
   onOrganizationAccessChanged?: (organizationId: string) => Promise<void>;
   /** Optional post-commit invitation delivery. Never rolls back or fails a created invitation. */
   invitationMailer?: InvitationMailer;
+  /** Whether the Google provider is configured, so sign-in can offer it. */
+  googleSignIn?: boolean;
+  /** Whether registration links can be delivered, which email self-registration requires. */
+  emailRegistration?: boolean;
 }
 
 interface MembershipRow extends QueryRow {
@@ -258,7 +264,10 @@ export class OrganizationAccess {
       // A pristine instance has no accounts to sign in to and no invitations to carry, so the
       // first-run journey replaces the sign-in wall entirely until someone claims it.
       if ((await this.options.instanceSetup.status()) === "available") {
-        return Response.json({ status: "instanceSetupRequired" });
+        return Response.json({
+          status: "instanceSetupRequired",
+          googleSignIn: this.options.googleSignIn === true,
+        });
       }
       const invitation =
         invitationId === null
@@ -267,13 +276,22 @@ export class OrganizationAccess {
       return Response.json({
         status: "signedOut",
         registration: this.options.policy.registrationMode,
+        googleSignIn: this.options.googleSignIn === true,
+        emailSelfRegistration:
+          this.options.policy.registrationMode === "domain_self_registration" &&
+          this.options.emailRegistration === true,
         ...(invitation === undefined ? {} : { invitation: invitationSummary(invitation, true) }),
         ...(invitationId !== null && invitation === undefined
           ? { invitationUnavailable: true }
           : {}),
       });
     }
-    const account = { id: session.userId, name: session.name, email: session.email };
+    const account = {
+      id: session.userId,
+      name: session.name,
+      email: session.email,
+      image: session.image ?? null,
+    };
     if (session.mustChangePassword) {
       return Response.json({ status: "passwordChangeRequired", account });
     }
@@ -641,68 +659,13 @@ export class OrganizationAccess {
     const session = await this.requireSession(request);
     const input = await parseBody(request, invitationIdBody);
     const organizationId = await this.options.pool.transaction(async (client) => {
-      const target = await client.query<{ organization_id: string }>(
-        `select organization_id from invitation where id = $1`,
-        [input.invitationId],
-      );
-      const targetOrganizationId = target.rows[0]?.organization_id;
-      if (targetOrganizationId === undefined) {
-        throw new ProductRequestError(404, "invitation_unavailable");
-      }
-      await this.options.locks.withTxLock(client, invitationLockName(input.invitationId));
-      await lockOrganizationMembershipTransitions(this.options.locks, client, targetOrganizationId);
-      const invitationResult = await client.query<InvitationRow>(
-        `select invitation.id, invitation.organization_id, organization.name as organization_name,
-                "user".name as inviter_name, invitation.email, invitation.role,
-                invitation.team_id, team.name as team_name, invitation.expires_at
-         from invitation
-         join organization on organization.id = invitation.organization_id
-         join "user" on "user".id = invitation.inviter_id
-         left join team on team.id = invitation.team_id
-         where invitation.id = $1 and invitation.status = 'pending'
-           and invitation.expires_at > now()
-         for update of invitation`,
-        [input.invitationId],
-      );
-      const invitation = invitationResult.rows[0];
-      if (
-        invitation === undefined ||
-        normalizeEmail(invitation.email) !== normalizeEmail(session.email)
-      ) {
-        throw new ProductRequestError(404, "invitation_unavailable");
-      }
-      const role = parseInvitationRole(invitation.role);
-      if (role === undefined) throw new ProductRequestError(404, "invitation_unavailable");
-      if (invitation.team_id !== null) {
-        const invitedTeam = await client.query(
-          `select id from team where id = $1 and organization_id = $2 for key share`,
-          [invitation.team_id, invitation.organization_id],
-        );
-        if (invitedTeam.rowCount !== 1) {
-          throw new ProductRequestError(404, "invitation_team_unavailable");
-        }
-      }
-      await client.query(
-        `insert into member (id, organization_id, user_id, role)
-         values ($1, $2, $3, $4)
-         on conflict (organization_id, user_id) do nothing`,
-        [randomUUID(), invitation.organization_id, session.userId, role],
-      );
-      if (invitation.team_id !== null) {
-        await client.query(
-          `insert into "teamMember" (id, team_id, user_id, created_at)
-           select $1, team.id, $3, now()
-           from team
-           where team.id = $2 and team.organization_id = $4
-           on conflict (team_id, user_id) do nothing`,
-          [randomUUID(), invitation.team_id, session.userId, invitation.organization_id],
-        );
-      }
-      await client.query(`update invitation set status = 'accepted' where id = $1`, [
-        input.invitationId,
-      ]);
-      await activateSession(client, session, invitation.organization_id);
-      return invitation.organization_id;
+      const accepted = await acceptInvitationForAccount(client, this.options.locks, {
+        invitationId: input.invitationId,
+        userId: session.userId,
+        email: session.email,
+      });
+      await activateSession(client, session, accepted);
+      return accepted;
     });
     await this.notifyOrganizationAccessChanged(organizationId);
     await this.notifyMembershipChanged(organizationId);
@@ -1041,6 +1004,79 @@ function managerInvitationSummary(invitation: InvitationRow, baseURL: string) {
           },
         }),
   };
+}
+
+/**
+ * Accepts a live invitation addressed to `email` for `userId` inside the caller's transaction and
+ * returns its organization. Shared by the signed-in accept action and by registration admission,
+ * which accepts the invitation of a newly verified account.
+ */
+export async function acceptInvitationForAccount(
+  client: TransactionHandle,
+  locks: Locks,
+  input: { invitationId: string; userId: string; email: string },
+): Promise<string> {
+  const target = await client.query<{ organization_id: string }>(
+    `select organization_id from invitation where id = $1`,
+    [input.invitationId],
+  );
+  const targetOrganizationId = target.rows[0]?.organization_id;
+  if (targetOrganizationId === undefined) {
+    throw new ProductRequestError(404, "invitation_unavailable");
+  }
+  await locks.withTxLock(client, invitationLockName(input.invitationId));
+  await lockOrganizationMembershipTransitions(locks, client, targetOrganizationId);
+  const invitationResult = await client.query<InvitationRow>(
+    `select invitation.id, invitation.organization_id, organization.name as organization_name,
+            "user".name as inviter_name, invitation.email, invitation.role,
+            invitation.team_id, team.name as team_name, invitation.expires_at
+     from invitation
+     join organization on organization.id = invitation.organization_id
+     join "user" on "user".id = invitation.inviter_id
+     left join team on team.id = invitation.team_id
+     where invitation.id = $1 and invitation.status = 'pending'
+       and invitation.expires_at > now()
+     for update of invitation`,
+    [input.invitationId],
+  );
+  const invitation = invitationResult.rows[0];
+  if (
+    invitation === undefined ||
+    normalizeEmail(invitation.email) !== normalizeEmail(input.email)
+  ) {
+    throw new ProductRequestError(404, "invitation_unavailable");
+  }
+  const role = parseInvitationRole(invitation.role);
+  if (role === undefined) throw new ProductRequestError(404, "invitation_unavailable");
+  if (invitation.team_id !== null) {
+    const invitedTeam = await client.query(
+      `select id from team where id = $1 and organization_id = $2 for key share`,
+      [invitation.team_id, invitation.organization_id],
+    );
+    if (invitedTeam.rowCount !== 1) {
+      throw new ProductRequestError(404, "invitation_team_unavailable");
+    }
+  }
+  await client.query(
+    `insert into member (id, organization_id, user_id, role)
+     values ($1, $2, $3, $4)
+     on conflict (organization_id, user_id) do nothing`,
+    [randomUUID(), invitation.organization_id, input.userId, role],
+  );
+  if (invitation.team_id !== null) {
+    await client.query(
+      `insert into "teamMember" (id, team_id, user_id, created_at)
+       select $1, team.id, $3, now()
+       from team
+       where team.id = $2 and team.organization_id = $4
+       on conflict (team_id, user_id) do nothing`,
+      [randomUUID(), invitation.team_id, input.userId, invitation.organization_id],
+    );
+  }
+  await client.query(`update invitation set status = 'accepted' where id = $1`, [
+    input.invitationId,
+  ]);
+  return invitation.organization_id;
 }
 
 async function parseBody<TSchema extends z.ZodType>(

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { z } from "zod";
-import { createResendInvitationMailer, readResendConfig } from "./resend.js";
+import {
+  createResendInvitationMailer,
+  createResendVerificationMailer,
+  readResendConfig,
+} from "./resend.js";
 
 describe("optional Resend invitation delivery", () => {
   it("is absent when RESEND_API_KEY is absent or blank", () => {
@@ -89,6 +93,51 @@ describe("optional Resend invitation delivery", () => {
           expiresAt: new Date("2026-08-31T12:00:00.000Z"),
         }),
       /^Error: Resend rejected invitation email with status 422$/,
+    );
+  });
+
+  it("sends a single-use verification link through the same delivery adapter", async () => {
+    let init: RequestInit | undefined;
+    const mailer = createResendVerificationMailer(
+      { apiKey: "re_test_abc123", from: "Paseo <accounts@example.com>" },
+      (_input, requestInit = {}) => {
+        init = requestInit;
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      },
+    );
+
+    await mailer.send({
+      id: "verification-1",
+      email: "person@acme.test",
+      link: "https://hub.example/?emailRegistration=abc&x=<y>",
+      expiresAt: new Date("2026-08-31T12:00:00.000Z"),
+    });
+
+    assert.ok(init !== undefined);
+    assert.equal(
+      (init.headers as Record<string, string>)["Idempotency-Key"],
+      "paseo-verification-verification-1",
+    );
+    const body = z
+      .object({ to: z.array(z.string()), subject: z.string(), text: z.string(), html: z.string() })
+      .parse(JSON.parse(String(init.body)));
+    assert.deepEqual(body.to, ["person@acme.test"]);
+    assert.equal(body.subject, "Create your Paseo Hub account");
+    assert.match(body.text, /emailRegistration=abc/);
+    assert.match(body.html, /x=&lt;y&gt;/);
+    const rejecting = createResendVerificationMailer(
+      { apiKey: "re_test_abc123", from: "a@example.com" },
+      () => Promise.resolve(new Response("detail", { status: 500 })),
+    );
+    const verification = {
+      id: "v",
+      email: "person@acme.test",
+      link: "https://hub.example/?emailRegistration=abc",
+      expiresAt: new Date(),
+    };
+    await assert.rejects(
+      () => rejecting.send(verification),
+      /^Error: Resend rejected verification email with status 500$/,
     );
   });
 });

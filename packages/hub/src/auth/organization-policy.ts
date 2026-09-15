@@ -1,4 +1,5 @@
 import { organization } from "better-auth/plugins";
+import { beforeUpdateOrganization } from "./organization-profile.js";
 import {
   INVITATION_ROLES,
   ORGANIZATION_ROLES,
@@ -40,6 +41,8 @@ export function paseoOrganizationPlugin() {
     // Team is the reusable member directory for access assignment subjects. BetterAuth owns
     // Team CRUD/membership; resource privileges deliberately remain a separate Hub policy.
     teams: { enabled: true },
+    // COMPAT(clisbot-organization-rename): owners rename the organization through Better Auth.
+    organizationHooks: { beforeUpdateOrganization },
   });
 }
 

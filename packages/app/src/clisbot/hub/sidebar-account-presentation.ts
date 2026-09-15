@@ -11,6 +11,7 @@ export interface HubSidebarAccountPresentation {
 export function resolveHubSidebarAccountPresentation(input: {
   enabled: boolean;
   account: { id: string; name: string; email: string } | null;
+  organizationName?: string;
 }): HubSidebarAccountPresentation | null {
   if (!input.enabled || input.account === null) return null;
 
@@ -18,7 +19,10 @@ export function resolveHubSidebarAccountPresentation(input: {
   const name = account.name.trim();
   const email = account.email.trim();
   const initials = nameInitials(name, email.at(0));
-  const tooltip = name || email || "Hub account";
+  const accountLabel = name || email || "Hub account";
+  const tooltip = input.organizationName
+    ? `${accountLabel} · ${input.organizationName}`
+    : accountLabel;
 
   return {
     accessibilityLabel: `Hub account: ${tooltip}`,

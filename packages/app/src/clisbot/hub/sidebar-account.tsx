@@ -21,6 +21,7 @@ export function HubSidebarAccountButton() {
   const presentation = resolveHubSidebarAccountPresentation({
     enabled: hub.enabled,
     account: hub.signedIn?.account ?? null,
+    ...(hub.signedIn ? { organizationName: hub.signedIn.organization.name } : {}),
   });
   if (presentation === null) return null;
 

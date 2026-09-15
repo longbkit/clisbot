@@ -2553,3 +2553,63 @@ export const organizationBillingCustomers = pgTable("organization_billing_custom
   stripeCustomerId: text("stripe_customer_id").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/**
+ * Clisbot domain self-registration: each allowlisted email domain belongs to at most one
+ * organization. The primary key is what makes two concurrent first registrations converge on
+ * one organization and one initial owner.
+ */
+export const organizationEmailDomains = pgTable(
+  "organization_email_domains",
+  {
+    domain: text().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("organization_email_domains_organization_id_idx").on(table.organizationId),
+    check(
+      "organization_email_domains_lowercase_check",
+      sql`${table.domain} = lower(${table.domain})`,
+    ),
+  ],
+);
+
+/**
+ * An account created before registration admission finished: a verified email or Google signup
+ * whose provisioning has not committed, or whose admission was refused when it was attempted.
+ * Keyed by the normalized email and written before the user row exists, so no crash window leaves
+ * an unadmitted account that looks admitted. A pending account holds no membership and gets no
+ * session until admission completes.
+ */
+export const pendingRegistrations = pgTable(
+  "pending_registrations",
+  {
+    email: text().primaryKey(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check("pending_registrations_lowercase_check", sql`${table.email} = lower(${table.email})`),
+  ],
+);
+
+/** Single-use, expiring email registration links. The account is created only when the link is
+ * used, so nobody can hold an address (or choose its password) before proving they own it. Only a
+ * hash of the link token is stored. */
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    email: text().notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_verification_tokens_token_hash_unique").on(table.tokenHash),
+    index("email_verification_tokens_email_created_idx").on(table.email, table.createdAt),
+  ],
+);

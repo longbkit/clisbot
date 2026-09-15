@@ -16,6 +16,8 @@ const hub = vi.hoisted(() => ({
   api: () => ({ post: fixtures.post }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
+  registrationToken: null,
+  signInWithGoogle: undefined,
   signOut: vi.fn(async () => {}),
   refresh: vi.fn(async () => {}),
   acceptInvitation: vi.fn(async () => {}),

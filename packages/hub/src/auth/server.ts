@@ -17,6 +17,7 @@ import type { Locks } from "../db/runtime/locks/index.js";
 import { OrganizationApiKeys } from "./api-keys.js";
 import { OrganizationCliCredentials } from "./cli-credentials.js";
 import { PublicCredentialAuthenticator } from "./public-credentials.js";
+import { CREDENTIAL_IDENTITY_PATH, CredentialIdentity } from "./credential-identity.js";
 import {
   InstanceSetup,
   type InitialOperator,
@@ -27,7 +28,12 @@ import {
   PASSWORD_MIN_LENGTH,
   type InstanceAuthPolicy,
 } from "./instance-policy.js";
-import { RegistrationAdmission, RegistrationAdmissionError } from "./registration-admission.js";
+import { RegistrationAdmissionError } from "./registration-admission.js";
+import type { GoogleAuthConfig } from "./google-sign-in.js";
+import { composeRegistration } from "./registration-routes.js";
+import { DEFAULT_PROFILE_IMAGE_HOSTS, UPDATE_USER_PATH } from "./profile-update.js";
+import { UPDATE_ORGANIZATION_PATH } from "./organization-profile.js";
+import { runInRegistrationScope } from "./registration-scope.js";
 import type {
   OrganizationResourceReader,
   OrganizationResources,
@@ -46,7 +52,7 @@ import {
 } from "../organizations/provisioning.js";
 import { InstanceAppOnboarding } from "../instance-setup/app-onboarding.js";
 import { TRUSTED_REQUEST_ORIGIN_HEADER } from "../http/request-origin.js";
-import type { InvitationMailer } from "../invitations/index.js";
+import type { InvitationMailer, VerificationMailer } from "../invitations/index.js";
 import { reportFailure } from "../failures/index.js";
 import {
   ClientAuthorization,
@@ -108,6 +114,12 @@ interface AuthServerOptions {
   invitationMailer?: InvitationMailer;
   /** Optional instance-wide recovery secret; absent disables recovery. */
   masterPassword?: string | undefined;
+  /** Google sign-in client credentials; absent disables the Google provider. */
+  google?: GoogleAuthConfig;
+  /** Hosts a profile image URL may point at; defaults to `DEFAULT_PROFILE_IMAGE_HOSTS`. */
+  profileImageHosts?: readonly string[];
+  /** Registration link delivery; required for email domain self-registration. */
+  verificationMailer?: VerificationMailer;
 }
 
 const sessionSchema = z.object({
@@ -123,6 +135,7 @@ const sessionSchema = z.object({
       id: z.string(),
       name: z.string(),
       email: z.string(),
+      image: z.string().nullable().optional(),
       mustChangePassword: z.boolean().optional(),
       isInstanceOperator: z.boolean().optional(),
     })
@@ -173,11 +186,32 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   const apiKeys = new OrganizationApiKeys(options.database, options.locks);
   const cliCredentials = new OrganizationCliCredentials(options.database);
   const publicCredentials = new PublicCredentialAuthenticator(apiKeys, cliCredentials);
-  const registration = new RegistrationAdmission(options.database, options.locks, policy);
+  const credentialIdentity = new CredentialIdentity(
+    options.database,
+    publicCredentials,
+    options.baseURL,
+  );
   const instanceSetup = new InstanceSetup({
     database: options.database,
     policy,
     provisioningEntitlements,
+  });
+  const registration = composeRegistration({
+    database: options.database,
+    locks: options.locks,
+    policy,
+    baseURL: options.baseURL,
+    provisioningEntitlements,
+    google: options.google,
+    mailer: options.verificationMailer,
+    instanceSetup,
+    profileImageHosts: options.profileImageHosts ?? DEFAULT_PROFILE_IMAGE_HOSTS,
+    ...(options.onMembershipChanged === undefined
+      ? {}
+      : { onMembershipChanged: options.onMembershipChanged }),
+    ...(options.onOrganizationAccessChanged === undefined
+      ? {}
+      : { onOrganizationAccessChanged: options.onOrganizationAccessChanged }),
   });
   const appOnboarding = new InstanceAppOnboarding(options.database);
   const clientAuthorization = new ClientAuthorization(options.database);
@@ -211,6 +245,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         }),
     database: drizzleAdapter(database, { provider: "pg", schema: authSchema }),
     emailAndPassword: { enabled: true, minPasswordLength: PASSWORD_MIN_LENGTH },
+    ...registration.betterAuthOptions,
     user: {
       additionalFields: {
         mustChangePassword: {
@@ -282,6 +317,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         userId: parsed.data.user.id,
         name: parsed.data.user.name,
         email: parsed.data.user.email,
+        image: parsed.data.user.image ?? null,
         activeOrganizationId: parsed.data.session.activeOrganizationId ?? null,
         mustChangePassword: parsed.data.user.mustChangePassword ?? false,
         isInstanceOperator: parsed.data.user.isInstanceOperator ?? false,
@@ -318,6 +354,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           userId: membership.user_id,
           name: membership.name,
           email: membership.email,
+          image: membership.image,
           activeOrganizationId: organizationId,
           mustChangePassword: false,
           isInstanceOperator: membership.is_instance_operator,
@@ -348,12 +385,27 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     ...(options.invitationMailer === undefined
       ? {}
       : { invitationMailer: options.invitationMailer }),
+    googleSignIn: registration.googleSignIn,
+    emailRegistration: registration.emailRegistration,
   });
   const browserOrigin = new URL(options.baseURL).origin;
+  const registrationRoutes = registration.routes({
+    handler: (request) => auth.handler(request),
+    rejectCookieMutation: (request) =>
+      rejectCrossOriginCookieMutation(request, requestBrowserOrigin(request, browserOrigin)),
+    async createVerifiedAccount(body, headers) {
+      const created = await runInRegistrationScope({ passwordAdmission: "verifiedEmail" }, () =>
+        auth.api.signUpEmail({ body, headers, returnHeaders: true }),
+      );
+      return created.headers;
+    },
+  });
 
   return {
     handle(request) {
       const path = new URL(request.url).pathname;
+      const registrationResponse = registrationRoutes.handle(path, request);
+      if (registrationResponse !== undefined) return registrationResponse;
       if (path.startsWith("/api/auth/paseo/")) {
         const rejected = rejectCrossOriginCookieMutation(
           request,
@@ -361,13 +413,14 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         );
         if (rejected !== undefined) return Promise.resolve(rejected);
         if (path === MASTER_PASSWORD_RESET_PATH) return passwordRecovery.handle(request);
+        if (path === CREDENTIAL_IDENTITY_PATH) return credentialIdentity.handle(request);
         if (path === "/api/auth/paseo/claim-instance") {
           return claimInstanceRequest(request);
         }
         return access.handle(request);
       }
       if (path === "/api/auth/sign-up/email") {
-        return registration
+        return registration.admission
           .handleSignUp(request, (admittedRequest) => auth.handler(admittedRequest))
           .catch((error: unknown) => {
             if (error instanceof RegistrationAdmissionError) {
@@ -383,6 +436,13 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         );
         if (rejected !== undefined) return Promise.resolve(rejected);
         return changePassword(request);
+      }
+      if (path === UPDATE_USER_PATH || path === UPDATE_ORGANIZATION_PATH) {
+        const rejected = rejectCrossOriginCookieMutation(
+          request,
+          requestBrowserOrigin(request, browserOrigin),
+        );
+        return rejected === undefined ? auth.handler(request) : Promise.resolve(rejected);
       }
       if (TEAM_AUTH_PATHS.has(path)) {
         const rejected = rejectCrossOriginCookieMutation(
@@ -440,7 +500,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     },
     async signUpEmail(data, headers, invitationId) {
       requireBrowserOrigin(headers, headersBrowserOrigin(headers, browserOrigin));
-      await registration.withAdmission(data.email, invitationId, async () => {
+      await registration.admission.withAdmission(data.email, invitationId, async () => {
         await auth.api.signUpEmail({ body: data, headers });
       });
     },

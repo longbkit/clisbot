@@ -12,12 +12,75 @@ import {
   runHubGuidedSetup,
   type HubGuidedSetupEnvironment,
 } from "./init.js";
+import { LOGIN_CONNECTION_QUESTION, planHubLoginConnection } from "./login-connection.js";
 import { runHubLogin } from "./login.js";
 
 const directories: string[] = [];
 
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
+});
+
+describe("Hub login connection asked before browser approval", () => {
+  it("asks once before approval, then connects with the chosen permissions without asking again", async () => {
+    const cwd = await temporaryDirectory();
+    const credentials = new MemoryCredentials();
+    const daemon = new SetupDaemon();
+    const prompts = new PromptAnswers([], ["connect"], []);
+    const events: string[] = [];
+    const environment = setupEnvironment(cwd, credentials, daemon, prompts, []);
+
+    await runHubLogin(
+      "https://hub.test",
+      {},
+      {
+        env: {},
+        credentials,
+        flow: {
+          authorize: async () => {
+            events.push(`approve after ${prompts.selections.length} question`);
+            return "paseo_cli_prefix_durable-secret";
+          },
+        },
+        isInteractive: () => true,
+        planGuidedSetup: (origin) => planHubLoginConnection(origin, environment),
+        reporter: { progress() {} },
+      },
+    );
+
+    assert.deepEqual(events, ["approve after 1 question"]);
+    assert.deepEqual(prompts.selections, [LOGIN_CONNECTION_QUESTION]);
+    assert.deepEqual(prompts.confirmations, []);
+    assert.equal(daemon.connections, 1);
+    assert.deepEqual((await daemon.getHubStatus()).status.permissions, ["hub.execute"]);
+    assert.equal(
+      prompts.messages[0],
+      "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  paseo hub disconnect",
+    );
+  });
+
+  it("logs in the CLI alone when no daemon is running", async () => {
+    const cwd = await temporaryDirectory();
+    const credentials = new MemoryCredentials();
+    const prompts = new PromptAnswers([], [], []);
+    const environment = {
+      ...setupEnvironment(cwd, credentials, new SetupDaemon(), prompts, []),
+      daemon: {
+        connect: async () => {
+          throw new Error("daemon unavailable");
+        },
+      },
+    };
+
+    const continueSetup = await planHubLoginConnection("https://hub.test", environment);
+    await continueSetup();
+
+    assert.deepEqual(prompts.selections, []);
+    assert.equal(
+      prompts.messages[0],
+      "No running daemon found, so only the CLI logs in. Connect later with: paseo hub connect https://hub.test",
+    );
+  });
 });
 
 describe("Hub guided setup continuation", () => {

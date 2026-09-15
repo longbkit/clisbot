@@ -49,7 +49,7 @@ Với bot đặt tên riêng, thêm `--bot-name TEN_BOT`. Lệnh sao lưu file c
 
 ### Quên mật khẩu hoặc muốn đổi mật khẩu
 
-Làm theo [Mật khẩu và recovery](../access/account-recovery.md). Chạy init lại không reset mật khẩu; dừng Hub không xóa account, dữ liệu hay Managed Access.
+Làm theo [Mật khẩu và recovery](../account/password-and-recovery.md). Chạy init lại không reset mật khẩu; dừng Hub không xóa account, dữ liệu hay Managed Access.
 
 ## Đăng nhập Hub xong sao chưa thấy Host?
 

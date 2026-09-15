@@ -1,6 +1,6 @@
 import { getDesktopHost } from "@/desktop/host";
 import type { HubConfiguration } from "../config";
-import type { HubRequestInput, HubTransport } from "./contract";
+import type { GoogleSignInContext, HubRequestInput, HubTransport } from "./contract";
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
   const bridge = getDesktopHost()?.hub;
@@ -33,7 +33,31 @@ class BrowserHubTransport implements HubTransport {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-    if (!response.ok) throw new Error("The email or password is incorrect.");
+    if (response.ok) return;
+    const code: unknown = Reflect.get(Object(await response.json().catch(() => ({}))), "code");
+    throw new Error(signInFailureMessage(code));
+  }
+
+  async signInWithGoogle(context?: GoogleSignInContext): Promise<void> {
+    this.assertSameOrigin();
+    const returnTo = new URL(window.location.href);
+    returnTo.searchParams.delete("error");
+    const response = await fetch(new URL("/api/auth/sign-in/social", this.origin), {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: "google",
+        callbackURL: `${returnTo.pathname}${returnTo.search}`,
+        ...(context?.invitationId === undefined ? {} : { invitation: context.invitationId }),
+        ...(context?.claimInstance === true ? { intent: "claimInstance" } : {}),
+      }),
+    });
+    const url: unknown = Reflect.get(Object(await response.json().catch(() => ({}))), "url");
+    if (!response.ok || typeof url !== "string") {
+      throw new Error("Hub couldn't start Google sign-in.");
+    }
+    window.location.assign(url);
   }
 
   async signOut(): Promise<void> {
@@ -91,6 +115,13 @@ class ElectronHubTransport implements HubTransport {
     if (this.bridge.signOut === undefined) throw new Error("Desktop Hub sign-out is unavailable.");
     await this.bridge.signOut({ origin: this.origin });
   }
+}
+
+function signInFailureMessage(code: unknown): string {
+  if (code === "registration_closed") {
+    return "This account isn't admitted to this Hub. Ask an organization owner to invite you.";
+  }
+  return "The email or password is incorrect.";
 }
 
 function assertHubPath(path: string): string {

@@ -1,4 +1,8 @@
-import { createResendInvitationMailer, readResendConfig } from "./internal/resend.js";
+import {
+  createResendInvitationMailer,
+  createResendVerificationMailer,
+  readResendConfig,
+} from "./internal/resend.js";
 
 export interface InvitationEmail {
   id: string;
@@ -23,4 +27,28 @@ export function composeInvitationMailer(
 ): InvitationMailer | undefined {
   const config = readResendConfig(environment);
   return config === undefined ? undefined : createResendInvitationMailer(config);
+}
+
+export interface VerificationEmail {
+  /** Stable per link, so a retried delivery of the same link is idempotent at the provider. */
+  id: string;
+  email: string;
+  link: string;
+  expiresAt: Date;
+}
+
+export interface VerificationMailer {
+  send(verification: VerificationEmail): Promise<void>;
+}
+
+/**
+ * Registration verification mail shares the invitation delivery configuration. Absent
+ * configuration means password self-registration cannot be offered: the caller reports that
+ * instead of admitting anyone unverified.
+ */
+export function composeVerificationMailer(
+  environment: Record<string, string | undefined> = process.env,
+): VerificationMailer | undefined {
+  const config = readResendConfig(environment);
+  return config === undefined ? undefined : createResendVerificationMailer(config);
 }

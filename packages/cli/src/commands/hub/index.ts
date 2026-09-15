@@ -21,8 +21,10 @@ import { addHubProjectsCommand } from "./projects.js";
 import { addHubExportCommand } from "./export.js";
 import { processHubReporter, type HubReporter } from "./reporter.js";
 import { hubStatusResult } from "./status-output.js";
+import { readCredentialIdentity, withCredentialIdentity } from "./credential-identity.js";
 import { addHubResolutionHelp } from "./help.js";
 import { addHubInitCommand, continueHubGuidedSetup } from "./init.js";
+import { planHubLoginConnection } from "./login-connection.js";
 // COMPAT(clisbot-hub-local): embedded-Hub lifecycle + discovery (implementation doc §3.2).
 import { startCommand as startLocalHubCommand } from "./start.js";
 import { stopCommand as stopLocalHubCommand } from "./stop.js";
@@ -68,9 +70,14 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
     env: environment.env,
     credentials: environment.credentials,
     flow: environment.login,
+    hub: environment.hub,
     reporter: environment.reporter,
     isInteractive: environment.isInteractive,
     continueGuidedSetup: (origin) => continueHubGuidedSetup(origin, environment),
+    // COMPAT(clisbot-login-connection): one terminal question before the browser approval.
+    ...(isOnboardingEnabled(environment.env)
+      ? { planGuidedSetup: (origin: string) => planHubLoginConnection(origin, environment) }
+      : {}),
   });
   if (isOnboardingEnabled(environment.env)) hub.addCommand(onboardingInitCommand());
   else addHubInitCommand(hub, environment);
@@ -84,9 +91,16 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
   addJsonAndDaemonHostOptions(hub.command("status")).action(
     withOutput(async (...args) => {
       const options = args.at(-2) as { host?: string };
-      return withHubDaemon(environment.daemon, options.host, async (client) =>
-        hubStatusResult((await client.getHubStatus()).status),
-      );
+      return withHubDaemon(environment.daemon, options.host, async (client) => {
+        const { status } = await client.getHubStatus();
+        const origin = status.hubOrigin;
+        const stored = origin === null ? null : environment.credentials.get(origin);
+        const identity =
+          origin === null || stored === null
+            ? undefined
+            : await readCredentialIdentity(environment.hub, origin, stored.credential);
+        return withCredentialIdentity(hubStatusResult(status), identity);
+      });
     }),
   );
   addHubDisconnectCommand(hub, {

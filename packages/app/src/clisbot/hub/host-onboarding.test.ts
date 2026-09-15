@@ -179,4 +179,13 @@ describe("Hub Host onboarding projection", () => {
       "paseo hub login https://hub.example.com",
     );
   });
+
+  it("uses the development CLI invocation when the dev runner provides one", () => {
+    expect(
+      buildHubLoginCommand(
+        "https://hub.example.com",
+        "PASEO_HOME=/home/op/.clisbot-dev-01 npm run cli --",
+      ),
+    ).toBe("PASEO_HOME=/home/op/.clisbot-dev-01 npm run cli -- hub login https://hub.example.com");
+  });
 });

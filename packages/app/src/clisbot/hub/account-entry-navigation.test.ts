@@ -10,6 +10,17 @@ describe("Hub account entry navigation", () => {
     });
   });
 
+  it("routes Hub registration links and refused Google sign-ins into Paseo Account", () => {
+    expect(hubAccountEntryRoute("https://paseo.example.test/?emailRegistration=token-1")).toEqual({
+      pathname: "/settings/hub/[hubSection]",
+      params: { emailRegistration: "token-1", hubSection: "account" },
+    });
+    expect(hubAccountEntryRoute("https://paseo.example.test/?error=registration_closed")).toEqual({
+      pathname: "/settings/hub/[hubSection]",
+      params: { error: "registration_closed", hubSection: "account" },
+    });
+  });
+
   it("does not take ownership of ordinary Paseo or malformed links", () => {
     expect(
       hubAccountEntryRoute("https://paseo.example.test/open-project?invitation=invite-1"),

@@ -12,6 +12,8 @@ const AccountSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string(),
+  // Optional on read for older Hubs.
+  image: z.string().nullable().optional(),
 });
 const MembershipSummarySchema = z.object({
   id: z.string(),
@@ -45,11 +47,34 @@ const ManagedInvitationSummarySchema = z.object({
   team: z.object({ id: z.string(), name: z.string() }).optional(),
 });
 
+/** `POST /api/auth/paseo/registration/{inspect,complete}` for email-first self-registration. */
+export const HubRegistrationLinkSchema = z.object({
+  status: z.enum([
+    "valid",
+    "registered",
+    "invalid",
+    "expired",
+    "used",
+    "already_registered",
+    "registration_closed",
+  ]),
+  email: z.string().optional(),
+});
+
+export type HubRegistrationLink = z.infer<typeof HubRegistrationLinkSchema>;
+
 export const HubAccountStateSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("instanceSetupRequired") }),
+  z.object({
+    status: z.literal("instanceSetupRequired"),
+    // Optional on read for older Hubs: whether the first account can be claimed with Google.
+    googleSignIn: z.boolean().optional(),
+  }),
   z.object({
     status: z.literal("signedOut"),
-    registration: z.enum(["open", "invite_only", "disabled"]),
+    registration: z.enum(["open", "invite_only", "domain_self_registration", "disabled"]),
+    // Optional on read for Hubs without Google sign-in or email self-registration.
+    googleSignIn: z.boolean().optional(),
+    emailSelfRegistration: z.boolean().optional(),
     invitation: AccountInvitationSchema.optional(),
     invitationUnavailable: z.literal(true).optional(),
   }),

@@ -11,8 +11,14 @@ import {
   organizationRoleSchema,
 } from "./organization-contract.js";
 import { PASSWORD_MIN_LENGTH } from "./instance-policy.js";
+import { REGISTRATION_ERROR_CODES } from "./registration-contract.js";
 import { API_KEY_SCOPES, apiKeyScopeSchema } from "./api-key-contract.js";
 import { parseEntitlementDenial, type EntitlementDenialPayload } from "../entitlements/denial.js";
+
+/** A password sign-in refused by registration admission (`registration-gate.ts`): the account
+ * exists, but the current policy no longer admits it. */
+const REGISTRATION_CLOSED_MESSAGE =
+  "This account isn't admitted to this Hub. Ask an organization owner to invite you.";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -101,6 +107,14 @@ export const signIn = createServerFn({ method: "POST" })
       await application.signInEmail(data, getRequest().headers);
       return respondOk({});
     } catch (error) {
+      if (isAPIError(error) && error.body?.code === REGISTRATION_ERROR_CODES.closed) {
+        return respondWithFailure(
+          error,
+          accountContext("auth.sign_in"),
+          { fallback: REGISTRATION_CLOSED_MESSAGE },
+          { kind: "authentication" },
+        );
+      }
       if (isAPIError(error) && error.body?.code === "INVALID_EMAIL_OR_PASSWORD") {
         return respondWithFailure(
           error,

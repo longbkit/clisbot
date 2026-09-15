@@ -124,3 +124,29 @@ describe("invitation consumption", () => {
     expect(result.current.error).toContain("400");
   });
 });
+
+describe("email self-registration", () => {
+  const signedOut = {
+    status: "signedOut",
+    registration: "domain_self_registration",
+    googleSignIn: true,
+    emailSelfRegistration: true,
+  };
+
+  it("asks the Hub for a sign-up link and reports each outcome", async () => {
+    const statuses = [202, 403, 429, 503];
+    testState.request.mockImplementation(async (path: string) =>
+      path === "/api/auth/paseo/registration/start"
+        ? Response.json({}, { status: statuses.shift() ?? 500 })
+        : Response.json(signedOut),
+    );
+    const { result } = setup();
+    await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
+    const outcomes: string[] = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      outcomes.push(await result.current.startRegistration("ada@acme.test"));
+    }
+    expect(outcomes).toEqual(["sent", "domainNotAllowed", "rateLimited", "unavailable"]);
+    expect(result.current.state).toMatchObject({ googleSignIn: true });
+  });
+});

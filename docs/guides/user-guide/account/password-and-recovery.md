@@ -1,6 +1,8 @@
 # Mật khẩu owner và recovery
 
-[User guide](../README.md) · [Onboarding](../getting-started/onboarding.md)
+[User guide](../README.md) · [Thiết lập và đăng nhập](setup-and-sign-in.md) · [Onboarding](../getting-started/onboarding.md)
+
+Tài khoản tạo bằng Google không có mật khẩu: đăng nhập bằng Google, các lệnh dưới đây không áp dụng.
 
 Các lệnh dùng đúng `--home` đã onboarding. Nếu chạy từ repository, dùng hàm `paseo` ở bước chuẩn bị của [onboarding](../getting-started/onboarding.md#1-chuẩn-bị).
 

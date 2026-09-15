@@ -2,6 +2,7 @@ import { apiFirstOnboardingEnabled } from "../organizations/onboarding.js";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import {
+  emailDomain,
   normalizeEmail,
   type BootstrapSettings,
   type InstanceAuthPolicy,
@@ -205,6 +206,63 @@ export class InstanceSetup {
       return { status: "claimed" };
     });
   }
+
+  private claimableDomain(email: string): string | undefined {
+    const { registrationMode, allowedDomains = [] } = this.options.policy;
+    const domain = emailDomain(email);
+    return registrationMode === "domain_self_registration" && allowedDomains.includes(domain)
+      ? domain
+      : undefined;
+  }
+
+  /**
+   * COMPAT(clisbot-google-claim): claims a pristine instance for an account Google just created.
+   * The account is a pending registration with no membership, so it does not count as tenant data
+   * (see `tenantCounts`). Under the same locks as `claim`, it becomes the instance operator and
+   * the owner of the first organization. Answers undefined when the instance is no longer
+   * available, leaving the account for the caller to remove.
+   */
+  async claimPendingAccount(userId: string): Promise<{ organizationId: string } | undefined> {
+    const entitlement = await this.options.provisioningEntitlements();
+    return this.options.database.transaction(async (client) => {
+      const row = await lockBootstrapRow(client);
+      await client.query(PRISTINE_TABLES_LOCK);
+      const counts = await tenantCounts(client);
+      if (setupStatus(row, counts) !== "available") return client.rollback(undefined);
+      const account = await client.query<{ email: string }>(
+        `update "user" set is_instance_operator = true, email_verified = true, updated_at = now()
+         where id = $1
+           and exists (select 1 from pending_registrations p where p.email = lower("user".email))
+         returning email`,
+        [userId],
+      );
+      const email = account.rows[0]?.email;
+      if (email === undefined) return client.rollback(undefined);
+      // Google verified the address, so an allowlisted company domain is claimed by this first
+      // organization; later colleagues join it instead of starting a second one.
+      const domain = this.claimableDomain(email);
+      const organization = await provisionOrganization(
+        client,
+        {
+          organizationId: randomUUID(),
+          name: domain ?? INTERACTIVE_ORGANIZATION_NAME,
+          ownerUserId: userId,
+        },
+        entitlement,
+      );
+      if (domain !== undefined) {
+        await client.query(
+          `insert into organization_email_domains (domain, organization_id) values ($1, $2)`,
+          [domain, organization.id],
+        );
+      }
+      await completeBootstrap(client, organization.id, userId);
+      await client.query(`delete from pending_registrations where email = $1`, [
+        normalizeEmail(email),
+      ]);
+      return { organizationId: organization.id };
+    });
+  }
 }
 
 /** Interactive identity is derived once from the normalized address, never from public input. */
@@ -255,9 +313,13 @@ async function lockBootstrapRow(client: QueryHandle): Promise<BootstrapRow> {
 }
 
 async function tenantCounts(client: QueryHandle): Promise<TenantCountRow> {
+  // COMPAT(clisbot-google-claim): a pending registration with no membership has not been admitted,
+  // so a Google sign-in racing a claim (or a failed one left behind) does not close setup.
   const result = await client.query<TenantCountRow>(
     `select
-       (select count(*)::integer from "user") as users,
+       (select count(*)::integer from "user" u
+        where not exists (select 1 from pending_registrations p where p.email = lower(u.email))
+           or exists (select 1 from member m where m.user_id = u.id)) as users,
        (select count(*)::integer from organization) as organizations`,
   );
   const counts = result.rows[0];

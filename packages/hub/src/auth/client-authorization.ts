@@ -17,6 +17,7 @@ interface AccountMembershipRow extends QueryRow {
   member_id: string;
   name: string;
   email: string;
+  image: string | null;
   must_change_password: boolean;
   is_instance_operator: boolean;
 }
@@ -69,6 +70,7 @@ export class ClientAuthorization {
          m.id as member_id,
          u.name,
          u.email,
+         u.image,
          u.must_change_password,
          u.is_instance_operator
        from "user" u

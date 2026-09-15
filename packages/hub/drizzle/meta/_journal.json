@@ -540,6 +540,13 @@
       "when": 1788830817380,
       "tag": "0076_channel_slash_commands",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1789400767271,
+      "tag": "0077_registration_admission",
+      "breakpoints": true
     }
   ]
 }

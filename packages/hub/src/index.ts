@@ -45,7 +45,9 @@ import {
 import { createSlackSocketInstallationVerifier } from "./providers/slack/installation.js";
 import { resolveHubDataDirectory } from "./data-directory.js";
 import { applyClisbotEnvDefaults } from "./env-alias.js";
-import { composeInvitationMailer } from "./invitations/index.js";
+import { composeInvitationMailer, composeVerificationMailer } from "./invitations/index.js";
+import { readGoogleAuthConfig } from "./auth/google-sign-in.js";
+import { readProfileImageHosts } from "./auth/profile-update.js";
 import {
   readCredentialCipherEnvironment,
   type CredentialCipher,
@@ -135,6 +137,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       config.trustedClientIpHeader,
       billing,
       invitationMailer,
+      config.google,
       (organizationId) =>
         accessLeaseRevocation.revokeOrganization(organizationId).then(() => undefined),
     );
@@ -278,8 +281,10 @@ function createProductionAuthServer(
   trustedClientIpHeader: string | undefined,
   billing: BillingRuntime | null,
   invitationMailer: ReturnType<typeof composeInvitationMailer>,
+  google: RuntimeConfig["google"],
   onOrganizationAccessChanged: (organizationId: string) => Promise<void>,
 ) {
+  const verificationMailer = composeVerificationMailer();
   return createAuthServer({
     database,
     locks,
@@ -290,6 +295,9 @@ function createProductionAuthServer(
     masterPassword: process.env["CLISBOT_MASTER_PASSWORD"],
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     ...(invitationMailer === undefined ? {} : { invitationMailer }),
+    ...(verificationMailer === undefined ? {} : { verificationMailer }),
+    ...(google === undefined ? {} : { google }),
+    profileImageHosts: readProfileImageHosts(process.env),
     onOrganizationAccessChanged,
     // Hosted: new organizations start on the Free plan from the catalog mirror. Self-hosted
     // (billing null) keeps the createAuthServer default, which stamps unlimited.
@@ -356,12 +364,14 @@ async function initializeDatabaseRuntime(
 }
 
 function loadRuntimeConfig(): RuntimeConfig {
+  const google = readGoogleAuthConfig(process.env);
   const trustedClientIpHeader = process.env["PASEO_HUB_TRUSTED_CLIENT_IP_HEADER"];
   if (trustedClientIpHeader !== undefined) validateHeaderName(trustedClientIpHeader);
   return {
     bind: process.env["PASEO_HUB_BIND"] ?? "0.0.0.0",
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     authPolicy: readInstanceAuthPolicy(process.env),
+    ...(google === undefined ? {} : { google }),
   };
 }
 

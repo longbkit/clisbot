@@ -19,6 +19,7 @@ export const Bell = StubIcon;
 export const BookOpen = StubIcon;
 export const Boxes = StubIcon;
 export const Bug = StubIcon;
+export const Building2 = StubIcon;
 export const Cable = StubIcon;
 export const CalendarClock = StubIcon;
 export const Camera = StubIcon;

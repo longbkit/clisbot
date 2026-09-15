@@ -7,7 +7,13 @@ export const INVITATION_ROLES = ["admin", "member"] as const;
 export const organizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 export const invitationRoleSchema = z.enum(INVITATION_ROLES);
 
-const accountSchema = z.object({ id: z.string(), name: z.string(), email: z.string() });
+const accountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  // Optional on read for older Hubs.
+  image: z.string().nullable().optional(),
+});
 const membershipSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -63,10 +69,15 @@ export const organizationCapabilitiesSchema = z.object({
 export const accountStateSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("instanceSetupRequired"),
+    // Optional on read for older Hubs: whether the first account can be claimed with Google.
+    googleSignIn: z.boolean().optional(),
   }),
   z.object({
     status: z.literal("signedOut"),
     registration: z.enum(REGISTRATION_MODES),
+    // Optional on read for older Hubs.
+    googleSignIn: z.boolean().optional(),
+    emailSelfRegistration: z.boolean().optional(),
     invitation: invitationSchema.optional(),
     invitationUnavailable: z.literal(true).optional(),
   }),

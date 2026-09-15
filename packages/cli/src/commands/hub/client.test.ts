@@ -53,6 +53,30 @@ describe("Hub HTTP client", () => {
     ]);
   });
 
+  it("reads the organization-scoped identity of a stored credential", async () => {
+    const requests: Array<{ url: string | undefined; body: string }> = [];
+    const origin = await startServer(
+      () => ({
+        status: 200,
+        body: {
+          hub: "https://hub.test",
+          credential: "cliCredential",
+          organization: { id: "org-1", name: "Acme", slug: "acme" },
+          account: { id: "user-1", name: "Ada", email: "ada@acme.test" },
+          role: "member",
+          futureField: true,
+        },
+      }),
+      requests,
+    );
+
+    const identity = await new HubHttpClient().describeCredential(origin, "paseo_cli_secret");
+
+    assert.equal(identity.organization.slug, "acme");
+    assert.equal(identity.role, "member");
+    assert.deepEqual(requests, [{ url: "/api/auth/paseo/credential", body: "" }]);
+  });
+
   it("validates projects and enrollment responses once at the HTTP boundary", async () => {
     const requests: Array<{ url: string | undefined; body: string }> = [];
     const origin = await startServer((url) => {

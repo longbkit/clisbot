@@ -88,5 +88,12 @@ describe("Hub app setup membership compatibility", () => {
   it("leaves unrelated account states unchanged", () => {
     const signedOut = { status: "signedOut", registration: "invite_only" };
     expect(HubAccountStateSchema.parse(signedOut)).toEqual(signedOut);
+    const domainSignedOut = {
+      status: "signedOut",
+      registration: "domain_self_registration",
+      googleSignIn: true,
+      emailSelfRegistration: false,
+    };
+    expect(HubAccountStateSchema.parse(domainSignedOut)).toEqual(domainSignedOut);
   });
 });

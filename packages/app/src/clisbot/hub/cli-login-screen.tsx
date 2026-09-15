@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { z } from "zod";
@@ -23,6 +23,7 @@ import {
 import { HubSettingsContent } from "./settings";
 import { openCliLoginForm, type CliLoginFormState } from "./cli-login-form";
 import { buildHubSettingsRoute } from "./navigation";
+import { CliAuthorizationSummary, type CliAuthorizationSubject } from "./cli-authorization-summary";
 
 const CliAuthorizationSchema = z.object({
   expiresAt: z.string().datetime(),
@@ -74,6 +75,7 @@ function CliLoginForm({ code }: { code: string }) {
   const hosts = useHosts();
   const organizationId = hub.signedIn?.organization.id ?? null;
   const accountId = hub.signedIn?.account.id ?? null;
+  const approver = useApprover(hub);
   const [model] = useState(() =>
     openCliLoginForm({
       code,
@@ -197,6 +199,8 @@ function CliLoginForm({ code }: { code: string }) {
     <SettingsSection title="Approve CLI login">
       <CliAuthorizationReview
         authorization={authorization}
+        account={approver}
+        hubOrigin={hub.origin}
         model={model}
         state={state}
         approve={approve}
@@ -297,6 +301,8 @@ function CliHostDiscovery({
 
 function CliAuthorizationReview({
   authorization,
+  account,
+  hubOrigin,
   model,
   state,
   approve,
@@ -309,6 +315,8 @@ function CliAuthorizationReview({
     error: unknown;
     data: z.infer<typeof CliAuthorizationSchema> | undefined;
   };
+  account: CliAuthorizationSubject["account"];
+  hubOrigin: string | null;
   model: CliLoginFormModel;
   state: CliLoginFormState;
   approve(): void;
@@ -337,20 +345,13 @@ function CliAuthorizationReview({
   if (authorization.data === undefined) return null;
   return (
     <>
-      <View style={settingsStyles.card}>
-        <View style={settingsStyles.row}>
-          <View style={settingsStyles.rowContent}>
-            <Text selectable style={settingsStyles.rowTitle}>
-              {state.submittedCode}
-            </Text>
-            <Text style={settingsStyles.rowTitle}>{authorization.data.organization.name}</Text>
-            <Text style={settingsStyles.rowHint}>
-              The CLI can list Projects, install configuration, enroll Hosts, and start Automation
-              runs for this organization until its credential is revoked.
-            </Text>
-          </View>
-        </View>
-      </View>
+      <CliAuthorizationSummary
+        organization={authorization.data.organization}
+        account={account}
+        hubOrigin={hubOrigin}
+        code={state.submittedCode}
+        expiresAt={authorization.data.expiresAt}
+      />
       {authorization.data.canManage ? (
         <>
           {state.error ? (
@@ -368,7 +369,7 @@ function CliAuthorizationReview({
               Deny
             </Button>
             <Button loading={state.pending} disabled={state.pending} onPress={approve}>
-              Approve CLI login
+              {`Approve for ${authorization.data.organization.name}`}
             </Button>
           </View>
         </>
@@ -385,6 +386,20 @@ function CliAuthorizationReview({
       )}
     </>
   );
+}
+
+/** The signed-in account that will approve, shown next to the organization it approves for. */
+function useApprover(hub: ReturnType<typeof useHubAccount>) {
+  const email = hub.signedIn?.account.email;
+  const role = hub.signedIn?.membership.role;
+  return useMemo(
+    () => (email && role ? { email, roleLabel: roleLabel(role) } : null),
+    [email, role],
+  );
+}
+
+function roleLabel(role: string): string {
+  return role.length === 0 ? role : `${role[0]?.toUpperCase() ?? ""}${role.slice(1)}`;
 }
 
 const styles = StyleSheet.create((theme) => ({

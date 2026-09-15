@@ -1,4 +1,5 @@
 import type { ConfigRef } from "./schema.js";
+import type { GoogleAuthConfig } from "../auth/google-sign-in.js";
 import type { InstanceAuthPolicy } from "../auth/instance-policy.js";
 import {
   ConfigInvalid,
@@ -46,6 +47,8 @@ export interface RuntimeConfig {
   bind: string;
   trustedClientIpHeader?: string;
   authPolicy: InstanceAuthPolicy;
+  /** Google sign-in client credentials; absent disables the provider. */
+  google?: GoogleAuthConfig;
 }
 
 export type { ResolveHubConfig, ResolvedHubConfig };

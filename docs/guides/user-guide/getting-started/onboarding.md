@@ -1,6 +1,6 @@
 # Onboarding: có bot Slack đầu tiên
 
-[User guide](../README.md) · [Xử lý lỗi](../help/faq.md#lỗi-onboarding-và-khởi-động) · [Mật khẩu và recovery](../access/account-recovery.md)
+[User guide](../README.md) · [Xử lý lỗi](../help/faq.md#lỗi-onboarding-và-khởi-động) · [Mật khẩu và recovery](../account/password-and-recovery.md)
 
 Bạn sẽ có bot personal dùng Codex, workspace đã seed template và dữ liệu lưu tại `~/.clisbot-dev-01`. Các lệnh dưới đây chạy trong Bash trên máy sẽ chạy bot.
 

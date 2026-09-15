@@ -35,7 +35,7 @@ For the unified Clisbot Web App, Hub, and daemon, use one command:
 npm run dev:clisbot -- https://your-host.example:8444
 ```
 
-The runner uses `~/.clisbot-dev-01` for daemon state, `~/.clisbot-dev-01/hub` for the embedded Hub database, and a persistent `~/.clisbot-dev-01.key` for credential encryption. It ignores ambient production `PASEO_HOME` and `DATABASE_URL` values, starts the daemon source on `6768`, Hub on `6868`, and Expo Web on `8081`, then prints `Ready` only after the daemon and Hub respond, the daemon WebSocket rejects an unauthenticated upgrade with 401, and Metro finishes the first Web bundle. Override the root only with an absolute `CLISBOT_DEV_HOME`.
+The runner uses `~/.clisbot-dev-01` for daemon state, `~/.clisbot-dev-01/hub` for the embedded Hub database, and a persistent `~/.clisbot-dev-01.key` for credential encryption. It ignores ambient production `PASEO_HOME` and `DATABASE_URL` values, starts the daemon source on `6768`, Hub on `6868`, and Expo Web on `8081`, then prints `Ready` only after the daemon and Hub respond, the daemon WebSocket rejects an unauthenticated upgrade with 401, and Metro finishes the first Web bundle. Override the root only with an absolute `CLISBOT_DEV_HOME`. The Hosts screen then shows `PASEO_HOME=<dev home> npm run cli -- hub login <origin>` instead of `paseo hub login`; run it from the repository root to enroll the dev daemon.
 
 The Hub Vite plugin forwards `/api/daemons/socket` upgrades through the same TanStack SSR entry and
 application runtime as HTTP. Without this adapter, HTTP pages can work while enrolled daemons stay

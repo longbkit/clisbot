@@ -219,6 +219,10 @@ export async function continueHubGuidedSetup(
       `Skipped daemon connection. Connect later with: ${hubLoginResumeCommand("connect", origin)}`,
     );
   }
+  reportHubNextSteps(origin, environment);
+}
+
+export function reportHubNextSteps(origin: string, environment: HubGuidedSetupEnvironment): void {
   reportMessage(
     environment,
     isOnboardingEnabled(environment.env)
@@ -270,7 +274,7 @@ async function ensureLogin(
   return normalizedOrigin;
 }
 
-async function ensureDaemonConnection(
+export async function ensureDaemonConnection(
   origin: string,
   environment: HubGuidedSetupEnvironment,
   confirmed = false,
@@ -741,7 +745,7 @@ async function requiredConfirm(
   return answer;
 }
 
-async function requiredSelect<T extends string>(
+export async function requiredSelect<T extends string>(
   environment: HubGuidedSetupEnvironment,
   options: Parameters<typeof select<T>>[0],
 ): Promise<T> {
@@ -759,7 +763,7 @@ function requireInteractiveTerminal(environment: HubGuidedSetupEnvironment): voi
   }
 }
 
-function reportMessage(environment: HubGuidedSetupEnvironment, message: string): void {
+export function reportMessage(environment: HubGuidedSetupEnvironment, message: string): void {
   if (environment.prompts === undefined) {
     log.message(message);
     return;

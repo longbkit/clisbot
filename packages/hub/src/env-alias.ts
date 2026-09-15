@@ -26,6 +26,13 @@ const CLISBOT_ALIAS_TABLE = [
   ["CLISBOT_HUB_BIND", "PASEO_HUB_BIND"],
   ["CLISBOT_HUB_URL", "PASEO_HUB_URL"],
   ["CLISBOT_HUB_API_KEY", "PASEO_HUB_API_KEY"],
+  ["CLISBOT_REGISTRATION_MODE", "PASEO_REGISTRATION_MODE"],
+  ["CLISBOT_REGISTRATION_ALLOWED_DOMAINS", "PASEO_REGISTRATION_ALLOWED_DOMAINS"],
+  ["CLISBOT_GOOGLE_AUTH_CLIENT_ID", "PASEO_GOOGLE_AUTH_CLIENT_ID"],
+  ["CLISBOT_GOOGLE_AUTH_CLIENT_SECRET", "PASEO_GOOGLE_AUTH_CLIENT_SECRET"],
+  ["CLISBOT_PROFILE_IMAGE_HOSTS", "PASEO_PROFILE_IMAGE_HOSTS"],
+  ["CLISBOT_RESEND_API_KEY", "RESEND_API_KEY"],
+  ["CLISBOT_RESEND_FROM", "RESEND_FROM"],
 ] as const;
 
 const FORK_DEFAULT_BIND = "127.0.0.1";
@@ -67,6 +74,20 @@ function resolveDefaultHubDataDirectory(environment: EnvLike): string {
 }
 
 /**
+ * Copy every set `CLISBOT_X` into its internal target when the target is unset. The Vite dev
+ * server enters through `start-server.ts`, not `main()`, and needs the operator names without
+ * the process-entry defaults below (the dev runner owns home, data dir, and bind).
+ */
+export function applyClisbotEnvAliases(environment: EnvLike = process.env): void {
+  for (const [clisbotKey, internalKey] of CLISBOT_ALIAS_TABLE) {
+    const operatorValue = environment[clisbotKey];
+    if (!isSet(operatorValue)) continue;
+    if (isSet(environment[internalKey])) continue;
+    environment[internalKey] = operatorValue;
+  }
+}
+
+/**
  * Apply the Clisbot environment defaults to `environment` (in place, defaulting to
  * `process.env`): (1) alias every set `CLISBOT_X` into its internal target when the
  * target is unset, and (2) fill the fork defaults — loopback bind, daemon home,
@@ -76,12 +97,7 @@ function resolveDefaultHubDataDirectory(environment: EnvLike): string {
  * `getpaseo/hub`.
  */
 export function applyClisbotEnvDefaults(environment: EnvLike = process.env): void {
-  for (const [clisbotKey, internalKey] of CLISBOT_ALIAS_TABLE) {
-    const operatorValue = environment[clisbotKey];
-    if (!isSet(operatorValue)) continue;
-    if (isSet(environment[internalKey])) continue;
-    environment[internalKey] = operatorValue;
-  }
+  applyClisbotEnvAliases(environment);
   if (!isSet(environment["PASEO_HUB_BIND"])) {
     environment["PASEO_HUB_BIND"] = FORK_DEFAULT_BIND;
   }

@@ -8,6 +8,7 @@ import { formValue } from "./account-actions.js";
 import { ErrorSummary } from "./account-states.js";
 import { FormField } from "./form-field.js";
 import { setUpInstance } from "./functions.js";
+import { GoogleSignInButton, readSignInError } from "./registration-entry.js";
 import type { Result } from "../contract/respond.js";
 
 type SetupResult = Result<{ state: "claimed" | "unavailable" }>;
@@ -18,7 +19,7 @@ type SetupResult = Result<{ state: "claimed" | "unavailable" }>;
  * closes while this form is open, the refreshed account state simply carries the visitor into the
  * ordinary sign-in flow, which is all they ever needed to know.
  */
-export function InstanceSetupEntry() {
+export function InstanceSetupEntry({ googleSignIn }: { googleSignIn: boolean }) {
   const queryClient = useQueryClient();
   const [accountRequested, setAccountRequested] = useState(false);
   const claim = useMutation({
@@ -50,7 +51,7 @@ export function InstanceSetupEntry() {
     [claim],
   );
 
-  if (!accountRequested) return <Welcome onBegin={requestAccount} />;
+  if (!accountRequested) return <Welcome googleSignIn={googleSignIn} onBegin={requestAccount} />;
   let message: string | undefined;
   if (claim.data?.status === "error") message = claim.data.error.message;
   if (claim.isError)
@@ -68,7 +69,12 @@ export function InstanceSetupEntry() {
   );
 }
 
-function Welcome({ onBegin }: { onBegin: () => void }) {
+/**
+ * COMPAT(clisbot-google-claim): with Google configured, the first account is claimed with Google.
+ * Google has verified the address, so the operator is not a self-declared email; the password
+ * form stays available as the secondary path.
+ */
+function Welcome({ googleSignIn, onBegin }: { googleSignIn: boolean; onBegin: () => void }) {
   return (
     <AuthLayout>
       <AuthCard
@@ -76,8 +82,15 @@ function Welcome({ onBegin }: { onBegin: () => void }) {
         title="Welcome to Paseo Hub"
         description="Set up an account to start operating Paseo Hub."
       >
-        <Button type="button" onClick={onBegin}>
-          Set up Paseo Hub
+        <ErrorSummary message={readSignInError(true)} />
+        <GoogleSignInButton
+          enabled={googleSignIn}
+          invitationId={undefined}
+          disabled={false}
+          claimInstance
+        />
+        <Button type="button" variant={googleSignIn ? "ghost" : "default"} onClick={onBegin}>
+          {googleSignIn ? "Set up with email and password instead" : "Set up Paseo Hub"}
         </Button>
       </AuthCard>
     </AuthLayout>

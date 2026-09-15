@@ -27,6 +27,11 @@ import { LoginForm } from "./login-form.js";
 import type { AccountState } from "./organization-contract.js";
 import type { Result } from "../contract/respond.js";
 import { ACCOUNT_MUTATION_KEY, useAccountMutationError } from "./account-mutation.js";
+import {
+  EmailRegistrationStart,
+  GoogleSignInButton,
+  readSignInError,
+} from "./registration-entry.js";
 
 type EmptyResult = Result<Record<string, never>>;
 type AccountCommandResult = Result<{
@@ -93,7 +98,7 @@ export function AccountEntry({ account }: { account: AccountState & { status: "s
     [account.invitation, mode, signInMutation, signUpMutation],
   );
   const mutation = mode === "signIn" ? signInMutation : signUpMutation;
-  let message: string | undefined;
+  let message = readSignInError(mutation.isIdle);
   if (mutation.data?.status === "error") message = mutation.data.error.message;
   if (mutation.isError) {
     if (mode === "signIn") {
@@ -120,18 +125,28 @@ export function AccountEntry({ account }: { account: AccountState & { status: "s
           Signed out
         </p>
         <ErrorSummary message={message} />
-        <LoginForm
-          key={mode}
-          mode={mode}
-          busy={busy}
-          onSubmit={submit}
-          {...(account.invitation?.email === undefined
-            ? {}
-            : { emailValue: account.invitation.email })}
-          {...(invitationContext ? { emailReadOnly: true } : {})}
+        <GoogleSignInButton
+          enabled={account.googleSignIn === true}
+          invitationId={invitationId}
+          disabled={busy}
         />
+        {usesEmailRegistration(account, mode) ? (
+          <EmailRegistrationStart disabled={busy} />
+        ) : (
+          <LoginForm
+            key={mode}
+            mode={mode}
+            busy={busy}
+            onSubmit={submit}
+            {...(account.invitation?.email === undefined
+              ? {}
+              : { emailValue: account.invitation.email })}
+            {...(invitationContext ? { emailReadOnly: true } : {})}
+          />
+        )}
         <SignedOutFooter
           registration={account.registration}
+          selfRegistration={account.emailSelfRegistration === true}
           invitationContext={invitationContext}
           mode={mode}
           busy={busy}
@@ -139,6 +154,17 @@ export function AccountEntry({ account }: { account: AccountState & { status: "s
         />
       </AuthCard>
     </AuthLayout>
+  );
+}
+
+/** Domain self-registration proves the email before any password exists, so its sign-up form
+ * asks only for the address. Invitation sign-ups keep the password form. */
+function usesEmailRegistration(
+  account: AccountState & { status: "signedOut" },
+  mode: "signIn" | "signUp",
+): boolean {
+  return (
+    mode === "signUp" && account.invitation === undefined && account.emailSelfRegistration === true
   );
 }
 
@@ -154,12 +180,14 @@ function readInvitationSignInRequest(): boolean {
 
 function SignedOutFooter({
   registration,
+  selfRegistration,
   invitationContext,
   mode,
   busy,
   onToggle,
 }: {
   registration: Extract<AccountState, { status: "signedOut" }>["registration"];
+  selfRegistration: boolean;
   invitationContext: boolean;
   mode: "signIn" | "signUp";
   busy: boolean;
@@ -183,7 +211,7 @@ function SignedOutFooter({
       </p>
     );
   }
-  if (registration === "open") {
+  if (registration === "open" || selfRegistration) {
     return (
       <p className="text-center text-sm text-muted-foreground">
         {mode === "signIn" ? "No account yet?" : "Already have an account?"}{" "}
@@ -200,10 +228,12 @@ function SignedOutFooter({
       </p>
     );
   }
-  const message =
-    registration === "invite_only"
-      ? "Accounts are created by invitation. Ask an organization owner to invite you."
-      : "Paseo Hub isn't accepting new accounts.";
+  let message = "Paseo Hub isn't accepting new accounts.";
+  if (registration === "invite_only") {
+    message = "Accounts are created by invitation. Ask an organization owner to invite you.";
+  } else if (registration === "domain_self_registration") {
+    message = "Accounts are created by invitation or with an allowed company email address.";
+  }
   return <p className="text-center text-sm text-muted-foreground">{message}</p>;
 }
 
@@ -343,12 +373,7 @@ export function OrganizationGate({
                     disabled={busy}
                     className="flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
                   >
-                    <span className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="truncate text-sm">{membership.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {membership.role}
-                      </span>
-                    </span>
+                    <MembershipLabel name={membership.name} role={membership.role} />
                     <ChevronRight
                       aria-hidden="true"
                       className="size-4 shrink-0 text-muted-foreground"
@@ -461,5 +486,14 @@ function OrganizationDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MembershipLabel({ name, role }: { name: string; role: string }) {
+  return (
+    <span className="grid min-w-0 flex-1 gap-0.5">
+      <span className="truncate text-sm">{name}</span>
+      <span className="truncate text-xs text-muted-foreground">{role}</span>
+    </span>
   );
 }

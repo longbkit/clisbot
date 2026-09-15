@@ -4,6 +4,12 @@ export interface HubRequestInput {
   body?: string;
 }
 
+export interface GoogleSignInContext {
+  invitationId?: string;
+  /** Started from first-run setup: the Google account claims the pristine Hub as its operator. */
+  claimInstance?: boolean;
+}
+
 export interface HubTransport {
   readonly signInKind: "password" | "system-browser";
   request(path: string, input?: HubRequestInput): Promise<Response>;
@@ -12,4 +18,7 @@ export interface HubTransport {
     context?: { invitationId?: string },
   ): Promise<void>;
   signOut(): Promise<void>;
+  /** Present only where the client runs on the Hub origin. System-browser transports reach
+   * Google through the Hub sign-in page instead. */
+  signInWithGoogle?(context?: GoogleSignInContext): Promise<void>;
 }

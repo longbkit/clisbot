@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { AutomationSidebarItem } from "./automation-sidebar-item";
+import { OrganizationSidebarItem } from "./organization-sidebar-item";
 import { useHubAccount } from "./account-provider";
 
 /**
@@ -30,6 +31,7 @@ export function SidebarNavGroup({
   if (!items.some((item) => item.visible) && !showsAutomations) return null;
   return (
     <View style={style}>
+      <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
       <SidebarNavRows onBeforeNavigate={onBeforeNavigate} />
       <AutomationSidebarItem onBeforeNavigate={onBeforeNavigate} />
     </View>

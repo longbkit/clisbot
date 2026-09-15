@@ -13,6 +13,10 @@ import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { EmailRegistrationButton, EmailRegistrationCompletion } from "./email-registration";
+import { GoogleFirstInstanceSetup, GoogleFirstSignIn } from "./google-sign-in";
+import { ProfileSettings } from "./profile-settings";
+import { OrganizationHeader } from "./organization-header";
 import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-entry-form";
 import {
   HubChannelIdentitiesSchema,
@@ -95,6 +99,10 @@ function HubAccountSettings() {
   if (!hub.enabled) return null;
   if (hub.loading) return <StateMessage message="Loading Hub account..." />;
   const state = hub.state;
+  // A registration link creates a new account; it only applies to a signed-out browser.
+  if (hub.registrationToken && state?.status === "signedOut") {
+    return <EmailRegistrationCompletion hub={hub} />;
+  }
   const invitation = getAccountInvitation(state);
   const accountId = state !== null && "account" in state ? state.account.id : null;
   return (
@@ -183,7 +191,16 @@ function HubAccountSettingsForm({
   }
 
   if (state?.status === "instanceSetupRequired") {
-    return <InstanceSetup form={form} fields={fields} hub={hub} pending={pending} run={run} />;
+    return (
+      <GoogleFirstInstanceSetup
+        googleSignIn={state.googleSignIn === true}
+        hub={hub}
+        pending={pending}
+        run={run}
+      >
+        <InstanceSetup form={form} fields={fields} hub={hub} pending={pending} run={run} />
+      </GoogleFirstInstanceSetup>
+    );
   }
 
   if (state?.status === "passwordChangeRequired") {
@@ -410,6 +427,15 @@ function ActiveHubAccount({
   return (
     <View>
       <SettingsSection title="Account">
+        <OrganizationHeader
+          hub={hub}
+          organizationName={state.organization.name}
+          organizationSlug={state.organization.slug}
+          roleLabel={role}
+          isOwner={state.membership.role === "owner"}
+          pending={pending}
+          run={run}
+        />
         {state.membership.role === "owner" ? (
           <Alert
             variant="success"
@@ -419,11 +445,11 @@ function ActiveHubAccount({
         ) : null}
         <View style={settingsStyles.card}>
           <InfoRow title={state.account.name} hint={state.account.email} />
-          <InfoRow title={state.organization.name} hint={`Organization role: ${role}`} bordered />
           {state.isInstanceOperator ? (
             <InfoRow title="Hub instance" hint="Instance role: Operator" bordered />
           ) : null}
         </View>
+        <ProfileSettings hub={hub} account={state.account} pending={pending} run={run} />
         <Button variant="outline" disabled={pending} onPress={openIdentity}>
           Your Channel identities
         </Button>
@@ -696,7 +722,7 @@ function SignedOutHubAccount({
   const { setName, setEmail, setPassword, setConfirmPassword, setEntryMode } = form;
   const compact = useIsCompactFormFactor();
   const fieldSize = compact ? "md" : "sm";
-  const maySignUp = invitation !== undefined || state.registration === "open";
+  const maySignUp = mayCreateAccount(state, invitation);
   const signingUp = fields.mode === "signUp" && maySignUp;
   const invitedEmail = invitation?.email;
   const submit = useCallback(() => {
@@ -731,57 +757,73 @@ function SignedOutHubAccount({
         />
       ) : null}
       <View style={[settingsStyles.card, styles.form]}>
-        {signingUp ? (
-          <Field label="Name">
+        <GoogleFirstSignIn
+          googleSignIn={state.googleSignIn === true}
+          hub={hub}
+          pending={pending}
+          run={run}
+        >
+          {signingUp ? (
+            <Field label="Name">
+              <FormTextInput
+                size={fieldSize}
+                initialValue={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                editable={!pending}
+              />
+            </Field>
+          ) : null}
+          <Field label="Email">
             <FormTextInput
               size={fieldSize}
-              initialValue={name}
-              onChangeText={setName}
-              placeholder="Your name"
-              editable={!pending}
+              key={invitedEmail ?? "email"}
+              initialValue={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!pending && invitedEmail === undefined}
             />
           </Field>
-        ) : null}
-        <Field label="Email">
-          <FormTextInput
-            size={fieldSize}
-            key={invitedEmail ?? "email"}
-            initialValue={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!pending && invitedEmail === undefined}
-          />
-        </Field>
-        <Field label="Password" hint={signingUp ? "Use at least 12 characters." : undefined}>
-          <FormTextInput
-            size={fieldSize}
-            initialValue={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!pending}
-          />
-        </Field>
-        {signingUp ? (
-          <Field label="Confirm password" error={passwordMismatch(confirmPassword, passwordsMatch)}>
+          <Field label="Password" hint={signingUp ? "Use at least 12 characters." : undefined}>
             <FormTextInput
               size={fieldSize}
-              initialValue={confirmPassword}
-              onChangeText={setConfirmPassword}
+              initialValue={password}
+              onChangeText={setPassword}
               secureTextEntry
               editable={!pending}
             />
           </Field>
-        ) : null}
-        <Button disabled={submitDisabled} loading={pending} onPress={submit}>
-          {signingUp ? "Create account" : "Sign in"}
-        </Button>
-        {maySignUp ? (
-          <Button variant="ghost" disabled={pending} onPress={toggleEntryMode}>
-            {signingUp ? "Already have an account? Sign in" : "Create an account"}
+          {signingUp ? (
+            <Field
+              label="Confirm password"
+              error={passwordMismatch(confirmPassword, passwordsMatch)}
+            >
+              <FormTextInput
+                size={fieldSize}
+                initialValue={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                editable={!pending}
+              />
+            </Field>
+          ) : null}
+          <Button disabled={submitDisabled} loading={pending} onPress={submit}>
+            {signingUp ? "Create account" : "Sign in"}
           </Button>
-        ) : null}
+          <EmailRegistrationButton
+            visible={state.emailSelfRegistration === true && invitation === undefined}
+            email={email}
+            hub={hub}
+            pending={pending}
+          />
+          {maySignUp ? (
+            <Button variant="ghost" disabled={pending} onPress={toggleEntryMode}>
+              {signingUp ? "Already have an account? Sign in" : "Create an account"}
+            </Button>
+          ) : null}
+        </GoogleFirstSignIn>
       </View>
       {maySignUp ? null : <Text style={settingsStyles.rowHint}>{registrationMessage(state)}</Text>}
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
@@ -802,10 +844,21 @@ function signedOutDescription(invitation: HubInvitation | undefined): string {
   return `${invitation.inviterName} invited you as ${channelLabel(invitation.role)}${team}. The invitation is bound to the invited email.`;
 }
 
+function mayCreateAccount(
+  state: Extract<HubAccountState, { status: "signedOut" }>,
+  invitation: HubInvitation | undefined,
+): boolean {
+  return invitation !== undefined || state.registration === "open";
+}
+
 function registrationMessage(state: Extract<HubAccountState, { status: "signedOut" }>): string {
-  return state.registration === "invite_only"
-    ? "Accounts are created by invitation. Ask an organization owner to invite you."
-    : "This Hub is not accepting new accounts.";
+  if (state.registration === "invite_only") {
+    return "Accounts are created by invitation. Ask an organization owner to invite you.";
+  }
+  if (state.registration === "domain_self_registration") {
+    return "Accounts are created by invitation or with an allowed company email address.";
+  }
+  return "This Hub is not accepting new accounts.";
 }
 
 function TeamSettings() {

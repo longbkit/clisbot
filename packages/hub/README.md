@@ -98,6 +98,9 @@ Billing is optional: leave `STRIPE_SECRET_KEY` unset and Hub runs with no billin
 
 Invitation email is optional too: set `RESEND_API_KEY` and `RESEND_FROM` to email organization
 invites through Resend. Without them, managers can still copy and share invitation links.
+The same two variables deliver email registration links, which email sign-up requires under
+domain self-registration. Google sign-in and domain self-registration are described in
+[docs/features/google-social-login](../../docs/features/google-social-login/README.md).
 
 Then start Hub and PostgreSQL:
 

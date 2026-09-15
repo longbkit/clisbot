@@ -16,14 +16,14 @@ const quietReporter: HubReporter = { progress() {} };
 
 describe("onboarding rollout", () => {
   it("keeps project/deploy commands only on the explicit legacy surface", () => {
-    const modern = createHubCommand({ env: {} }).commands.map((c) => c.name());
-    const legacy = createHubCommand({ env: { CLISBOT_ONBOARDING_ENABLED: "0" } }).commands.map(
-      (c) => c.name(),
+    const modern = new Set(createHubCommand({ env: {} }).commands.map((c) => c.name()));
+    const legacy = new Set(
+      createHubCommand({ env: { CLISBOT_ONBOARDING_ENABLED: "0" } }).commands.map((c) => c.name()),
     );
-    assert.equal(modern.includes("projects"), false);
-    assert.equal(modern.includes("deploy"), false);
-    assert.equal(legacy.includes("projects"), true);
-    assert.equal(legacy.includes("deploy"), true);
+    assert.equal(modern.has("projects"), false);
+    assert.equal(modern.has("deploy"), false);
+    assert.equal(legacy.has("projects"), true);
+    assert.equal(legacy.has("deploy"), true);
   });
 });
 
@@ -69,6 +69,21 @@ describe("Hub commands", () => {
         env: {},
         credentials,
         flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        hub: {
+          describeCredential: async (origin, credential) => {
+            assert.deepEqual(
+              [origin, credential],
+              ["https://hub.test", "paseo_cli_prefix_durable-secret"],
+            );
+            return {
+              hub: "https://hub.test",
+              credential: "cliCredential",
+              organization: { id: "org-1", name: "Acme", slug: "acme" },
+              account: { id: "user-1", name: "Ada", email: "ada@acme.test" },
+              role: "admin",
+            };
+          },
+        },
         reporter: quietReporter,
       },
     );
@@ -77,7 +92,13 @@ describe("Hub commands", () => {
       origin: "https://hub.test",
       credential: "paseo_cli_prefix_durable-secret",
     });
-    assert.deepEqual(result.data, { origin: "https://hub.test", status: "logged_in" });
+    assert.deepEqual(result.data, {
+      origin: "https://hub.test",
+      status: "logged_in",
+      organization: "Acme",
+      account: "ada@acme.test",
+      role: "admin",
+    });
     assert.equal(JSON.stringify(result).includes("durable-secret"), false);
   });
 
@@ -97,6 +118,7 @@ describe("Hub commands", () => {
             return "paseo_cli_prefix_durable-secret";
           },
         },
+        hub: { describeCredential: unknownIdentity },
         reporter: { progress: (message) => events.push(`progress:${message}`) },
       },
     );
@@ -105,6 +127,7 @@ describe("Hub commands", () => {
       "progress:Logging in to https://hub.paseo.sh",
       "authorize:https://hub.paseo.sh",
       "progress:Logged in",
+      "progress:Hub https://hub.paseo.sh did not report which organization this credential belongs to.",
     ]);
     assert.equal(result.data.origin, "https://hub.paseo.sh");
   });
@@ -125,6 +148,7 @@ describe("Hub commands", () => {
             return "paseo_cli_prefix_durable-secret";
           },
         },
+        hub: { describeCredential: unknownIdentity },
         isInteractive: () => true,
         continueGuidedSetup: async (origin) => {
           events.push(`connect:${origin}`);
@@ -138,6 +162,7 @@ describe("Hub commands", () => {
       "progress:Logging in to https://hub.test",
       "login",
       "progress:Logged in",
+      "progress:Hub https://hub.test did not report which organization this credential belongs to.",
       "connect:https://hub.test",
       "show-guidance",
     ]);
@@ -154,6 +179,7 @@ describe("Hub commands", () => {
         env: {},
         credentials,
         flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        hub: { describeCredential: unknownIdentity },
         isInteractive: () => interactive,
         continueGuidedSetup: async () => {
           continuationCount += 1;
@@ -178,6 +204,7 @@ describe("Hub commands", () => {
         env: {},
         credentials,
         hub: {
+          describeCredential: unknownIdentity,
           issueEnrollmentToken: async (origin, credential) => {
             observed.push({ origin, credential });
             return "one-time-enrollment-token-with-enough-length";
@@ -197,7 +224,59 @@ describe("Hub commands", () => {
       },
     ]);
     assert.equal(daemon.connections[0]?.token.includes("stored-human-secret"), false);
-    assert.deepEqual(progress, ["Connecting this daemon to https://hub.test"]);
+    assert.deepEqual(progress, [
+      "Connecting this daemon to https://hub.test",
+      "Hub https://hub.test did not report which organization this credential belongs to.",
+    ]);
+  });
+
+  it("connect shows the credential's Hub, account, organization, and role before enrolling", async () => {
+    const credentials = new MemoryCredentials();
+    credentials.save({ origin: "https://hub.test", credential: "stored-human-secret" });
+    const daemon = new FakeDaemon("https://hub.test");
+    const events: string[] = [];
+
+    const result = await runHubConnect(
+      "https://hub.test",
+      {},
+      {
+        env: {},
+        credentials,
+        hub: {
+          describeCredential: async () => {
+            events.push("describe");
+            return {
+              hub: "https://hub.test",
+              credential: "cliCredential",
+              organization: { id: "org-1", name: "Acme", slug: "acme" },
+              account: { id: "user-1", name: "Ada", email: "ada@acme.test" },
+              role: "owner",
+            };
+          },
+          issueEnrollmentToken: async () => {
+            events.push("enroll");
+            return "one-time-enrollment-token-with-enough-length";
+          },
+        },
+        daemon: new FakeDaemonConnection(daemon),
+        reporter: { progress: (message) => events.push(message) },
+      },
+    );
+
+    assert.deepEqual(events, [
+      "Connecting this daemon to https://hub.test",
+      "describe",
+      "Hub: https://hub.test",
+      "Account: ada@acme.test",
+      "Organization: Acme (acme)",
+      "Role: owner",
+      "enroll",
+    ]);
+    const [row] = JSON.parse(render(result, { format: "json" })) as Array<Record<string, unknown>>;
+    assert.ok(row !== undefined);
+    assert.equal(row["organization"], "Acme");
+    assert.equal(row["account"], "ada@acme.test");
+    assert.equal(row["role"], "owner");
   });
 
   it("grants workflow execution only when explicitly requested", async () => {
@@ -211,7 +290,10 @@ describe("Hub commands", () => {
       {
         env: {},
         credentials,
-        hub: { issueEnrollmentToken: async () => "one-time-token" },
+        hub: {
+          issueEnrollmentToken: async () => "one-time-token",
+          describeCredential: unknownIdentity,
+        },
         daemon: new FakeDaemonConnection(daemon),
         reporter: quietReporter,
       },
@@ -233,7 +315,10 @@ describe("Hub commands", () => {
         {
           env: {},
           credentials,
-          hub: { issueEnrollmentToken: async () => "one-time-token" },
+          hub: {
+            issueEnrollmentToken: async () => "one-time-token",
+            describeCredential: unknownIdentity,
+          },
           daemon: new FakeDaemonConnection(daemon),
           reporter: quietReporter,
         },
@@ -313,6 +398,7 @@ describe("Hub commands", () => {
         env: {},
         credentials,
         hub: {
+          describeCredential: unknownIdentity,
           issueEnrollmentToken: async (origin, credential) => {
             requests.push(`${origin}:${credential}`);
             return "one-time-enrollment-token-with-enough-length";
@@ -340,6 +426,7 @@ describe("Hub commands", () => {
           env: {},
           credentials,
           hub: {
+            describeCredential: unknownIdentity,
             issueEnrollmentToken: async () => {
               hubRequests += 1;
               return "one-time-enrollment-token-with-enough-length";
@@ -680,4 +767,8 @@ function hubStatus(
     connectedAt: null,
     lastError: null,
   };
+}
+
+async function unknownIdentity(): Promise<never> {
+  throw new Error("Hub could not describe this credential");
 }

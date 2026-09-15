@@ -66,6 +66,10 @@ test("createDevEnvironment replaces ambient production state", () => {
   assert.equal(environment.PASEO_HUB_CREDENTIAL_MASTER_KEY, undefined);
   assert.equal(environment.PASEO_HUB_AUTH_SECRET, undefined);
   assert.equal(environment.DATABASE_URL, undefined);
+  assert.equal(
+    environment.EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND,
+    "PASEO_HOME=/home/operator/.clisbot-dev-01 npm run cli --",
+  );
 });
 
 test("clearZombiePidLock removes only a confirmed zombie owner's lock", async () => {

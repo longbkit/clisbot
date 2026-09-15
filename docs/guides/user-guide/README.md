@@ -5,7 +5,10 @@ Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn h
 | Bạn muốn làm gì?                                | Hướng dẫn                                                         |
 | ----------------------------------------------- | ----------------------------------------------------------------- |
 | Tạo bot Slack/Codex, seed workspace, chạy lại   | [Onboarding](getting-started/onboarding.md)                       |
-| Đổi/quên mật khẩu, cấu hình master password     | [Mật khẩu và recovery](access/account-recovery.md)                |
+| Thiết lập Hub, đăng nhập Google, đăng ký        | [Thiết lập và đăng nhập](account/setup-and-sign-in.md)            |
+| Đổi tên hiển thị, ảnh đại diện                  | [Hồ sơ](account/profile.md)                                       |
+| Xem và đổi tên tổ chức                          | [Tên tổ chức](account/organization.md)                            |
+| Đổi/quên mật khẩu, cấu hình master password     | [Mật khẩu và recovery](account/password-and-recovery.md)          |
 | Enroll, unenroll, đổi tên, quản lý nhiều Host   | [Quản lý Hosts](hosts/connect-and-manage.md)                      |
 | Chọn chế độ kết nối và bắt buộc phân quyền Hub  | [Managed Access: off và external](hosts/managed-access.md)        |
 | Mời người, tạo Team, cấp và thu hồi quyền       | [Members, Teams và Access](access/members-and-teams.md)           |

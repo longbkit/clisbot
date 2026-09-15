@@ -21,8 +21,15 @@ export function hubAccountEntryRoute(value: string | null): Href | null {
   if (url === null || url.pathname !== "/") return null;
   const invitation = url.searchParams.get("invitation")?.trim();
   const authorization = clientAuthorizationQuery(url);
-  if (!invitation && authorization === null) return null;
-  const params: Record<string, string | string[]> = invitation ? { invitation } : {};
+  // Hub's registration links and refused Google sign-ins return to the origin root.
+  const registrationParams = passthroughParams(url, ["emailRegistration", "error"]);
+  if (!invitation && authorization === null && Object.keys(registrationParams).length === 0) {
+    return null;
+  }
+  const params: Record<string, string | string[]> = {
+    ...registrationParams,
+    ...(invitation ? { invitation } : {}),
+  };
   for (const field of AUTHORIZATION_QUERY_FIELDS) {
     const values = authorization?.getAll(field) ?? [];
     if (values.length > 0) params[field] = values.length === 1 ? values[0]! : values;
@@ -61,6 +68,15 @@ function accountEntryUrl(value: string | null): URL | null {
   } catch {
     return null;
   }
+}
+
+function passthroughParams(url: URL, names: readonly string[]): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (const name of names) {
+    const value = url.searchParams.get(name)?.trim();
+    if (value) params[name] = value;
+  }
+  return params;
 }
 
 function clientAuthorizationQuery(url: URL): URLSearchParams | null {

@@ -109,3 +109,14 @@ export type HubTriggerInstallationResult = z.infer<typeof triggerInstallationRes
 export type HubConfigurationResources = z.infer<typeof configurationResourcesSchema>;
 export type HubInstallResult = z.infer<typeof installResponseSchema>;
 export type HubValidationResult = z.infer<typeof validationResponseSchema>;
+
+/** `GET /api/auth/paseo/credential`. Not strict: a newer Hub may describe more. */
+export const credentialIdentitySchema = z.object({
+  hub: z.string().min(1),
+  credential: z.enum(["cliCredential", "apiKey"]),
+  organization: z.object({ id: z.string().min(1), name: z.string(), slug: z.string() }),
+  account: z.object({ id: z.string(), name: z.string(), email: z.string() }).nullable(),
+  role: z.enum(["owner", "admin", "member"]).nullable(),
+});
+
+export type HubCredentialIdentity = z.infer<typeof credentialIdentitySchema>;
