@@ -733,6 +733,50 @@ describe("viewed timeline persistence", () => {
     owner.dispose();
   });
 
+  it("catches up a hot agent whose live events were dropped while it was hidden", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    const requests: { agentId: string; direction: string; seq?: number }[] = [];
+    const requestsFor = (agentId: string) => requests.filter((r) => r.agentId === agentId);
+    const owner = createOwner(
+      { readTimeline: async () => undefined, commitTimeline: () => undefined },
+      undefined,
+      {
+        initialDeliveryMode: "selective",
+        fetchPage: async (agentId, request) => {
+          requests.push({
+            agentId,
+            direction: request.direction,
+            ...(request.direction === "after" ? { seq: request.cursor.seq } : {}),
+          });
+          return { hasNewer: false, endCursor: null };
+        },
+      },
+    );
+    owner.setConnected(true);
+    owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
+    await expect.poll(() => requestsFor(AGENT_ID)).toHaveLength(1);
+    applySynced(AGENT_ID, 8);
+    owner.replaceVisibleAgentIds("workspace", ["other-agent"]);
+    await expect.poll(() => requestsFor("other-agent")).toHaveLength(1);
+
+    owner.enqueueStreamEvent(AGENT_ID, {
+      event: {
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "while hidden", messageId: "9" },
+      },
+      seq: 9,
+      epoch: "epoch-1",
+      timestamp: new Date(),
+    });
+    owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
+
+    await expect
+      .poll(() => requestsFor(AGENT_ID).at(-1))
+      .toEqual({ agentId: AGENT_ID, direction: "after", seq: 8 });
+    owner.dispose();
+  });
+
   it("does not retain hidden legacy broadcasts or certify their cursors", () => {
     useSessionStore.getState().initializeSession(SERVER_ID, null);
     applySynced(AGENT_ID, 8);

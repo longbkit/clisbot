@@ -429,6 +429,9 @@ export function createViewedTimelineOwner(input: {
   const retention = new TimelineRetentionOwner(input.serverId, input.retentionBudget);
   const visibleSources = new Map<string, readonly string[]>();
   const deferredLatest = new Map<string, { epoch: string; seq: number }>();
+  // Agents whose live events were dropped while hidden. Selective delivery keeps a hidden
+  // agent hot and skips catch-up on return, so these must catch up when shown again.
+  const droppedWhileHidden = new Set<string>();
   let active = true;
   const visible = (agentId: string) => {
     if (!active) return false;
@@ -498,6 +501,16 @@ export function createViewedTimelineOwner(input: {
       hasOlder: timeline.older === "available",
       hasNewer: timeline.newer === "available",
     });
+  };
+  const catchUpDroppedVisibleAgents = () => {
+    for (const agentId of droppedWhileHidden) {
+      if (!visible(agentId)) continue;
+      droppedWhileHidden.delete(agentId);
+      const cursor = useSessionStore
+        .getState()
+        .sessions[input.serverId]?.agentTimelineCursor.get(agentId);
+      if (cursor) sync.recoverGap(agentId, cursor);
+    }
   };
   const sync = createViewedTimelineSync({
     ...input.ports,
@@ -606,6 +619,7 @@ export function createViewedTimelineOwner(input: {
         prefetch.reset();
         cancelAnchors();
         deferredLatest.clear();
+        droppedWhileHidden.clear();
       }
       sync.setConnected(value);
     },
@@ -618,6 +632,7 @@ export function createViewedTimelineOwner(input: {
       }
       retention.setVisible(value ? [...visibleSources.values()].flat() : []);
       sync.setActive(value);
+      catchUpDroppedVisibleAgents();
     },
     replaceVisibleAgentIds(sourceId, agentIds) {
       prefetch.reset();
@@ -631,6 +646,7 @@ export function createViewedTimelineOwner(input: {
         }
       retention.setVisible(active ? [...visibleSources.values()].flat() : []);
       sync.replaceVisibleAgentIds(sourceId, agentIds);
+      catchUpDroppedVisibleAgents();
     },
     enqueueStreamEvent(agentId, event) {
       prefetch.cursorChanged(agentId);
@@ -638,6 +654,7 @@ export function createViewedTimelineOwner(input: {
       // dropping these payloads must not advance the retained authoritative cursor.
       if (!visible(agentId)) {
         acknowledgeHiddenSubmission(input.serverId, agentId, event);
+        droppedWhileHidden.add(agentId);
         return;
       }
       const session = useSessionStore.getState().sessions[input.serverId];
@@ -688,6 +705,7 @@ export function createViewedTimelineOwner(input: {
       prefetch.reset();
       visibleSources.clear();
       deferredLatest.clear();
+      droppedWhileHidden.clear();
       streamQueue.dispose({ flush: true });
       retention.dispose();
       sync.dispose();

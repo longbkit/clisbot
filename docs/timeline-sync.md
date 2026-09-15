@@ -133,7 +133,11 @@ The app chooses one delivery policy from `server_info.features.selectiveAgentTim
 - Selective daemons receive every agent visible in any pane plus the most recently viewed hidden
   agents, up to five subscribed agents. Visible agents always win: if more than five are visible,
   they all remain subscribed and no hidden agent does. Switching and app backgrounding preserve
-  this connection-scoped hot set, so returning to an agent still covered by it needs no catch-up.
+  this connection-scoped hot set, so returning to an agent still covered by it needs no
+  membership change. The viewed-timeline owner still drops live events for agents that are not
+  visible (it does not retain hidden rows), so an agent that dropped an event while hidden
+  catches up `after` its cursor when it becomes visible again. Without that, a hot agent opened
+  after another participant or the agent wrote to it shows nothing new until a reload.
   Losing window keyboard focus does not make a selected pane invisible. Disconnecting clears hidden
   hot agents; reconnect restores the currently visible set before authoritative catch-up. Revisiting
   an evicted retained timeline displays its cached state immediately while authoritative catch-up
