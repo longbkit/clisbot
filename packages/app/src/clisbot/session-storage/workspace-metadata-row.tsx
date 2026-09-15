@@ -1,12 +1,16 @@
-import { Fragment } from "react";
-import { Text, View } from "react-native";
+import { Fragment, type ReactElement } from "react";
+import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { MenuRoot, MenuTrigger, MenuSurface, MenuItem } from "@/components/ui/menu";
-import { sessionChannelKey } from "@getpaseo/protocol/session-authorship";
+import {
+  sessionChannelKey,
+  type SessionAuthorship,
+  type SessionChannelReference,
+} from "@getpaseo/protocol/session-authorship";
 import { SessionActorLabel } from "./actor";
 import { useSessionStorageReadable } from "./capability";
 
@@ -28,64 +32,133 @@ function MetadataTime({ timestamp, label }: { timestamp: string; label: string }
   );
 }
 
-function metadataStatusLabel(status: SidebarWorkspaceEntry["authorshipStatus"]): string {
+function metadataStatusLabel(status: SessionAuthorship["authorshipStatus"]): string {
   if (status === "error") return "Metadata unavailable";
   if (status === "recovering") return "Loading metadata";
   return "Metadata pending";
 }
 
-export function WorkspaceMetadataRow({ workspace }: { workspace: SidebarWorkspaceEntry }) {
-  const enabled = useSessionStorageReadable(workspace.serverId);
-  const visible = useSidebarRowItems();
-  if (!enabled) return null;
-  const actorProps = {
-    serverId: workspace.serverId,
-    workspaceId: workspace.workspaceId,
-  };
-  const channels = workspace.channels ?? [];
-  const status = workspace.authorshipStatus;
+function ChannelsItem({
+  channels,
+  accessibilityLabel,
+}: {
+  channels: readonly SessionChannelReference[];
+  accessibilityLabel: string;
+}) {
+  return (
+    <MenuRoot>
+      <MenuTrigger accessibilityLabel={accessibilityLabel}>
+        <Text style={styles.text}>
+          {channels[0]!.displayName || channels[0]!.channelId}
+          {channels.length > 1 ? ` +${channels.length - 1}` : ""}
+        </Text>
+      </MenuTrigger>
+      <MenuSurface>
+        {channels.map((channel) => (
+          <MenuItem
+            key={sessionChannelKey(channel)}
+            closeOnSelect={false}
+          >{`${channel.displayName || channel.channelId} · ${channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`}</MenuItem>
+        ))}
+      </MenuSurface>
+    </MenuRoot>
+  );
+}
+
+export interface SessionMetadataVisibility {
+  createdUser: boolean;
+  updatedUser: boolean;
+  channels: boolean;
+  createdTime: boolean;
+  updatedTime: boolean;
+}
+
+/** The items that need session storage, split around Created time to keep the line's order. */
+function authorshipItems({
+  serverId,
+  workspaceId,
+  metadata,
+  visible,
+  channelsLabel,
+}: {
+  serverId: string;
+  workspaceId: string;
+  metadata: SessionAuthorship;
+  visible: SessionMetadataVisibility;
+  channelsLabel: string;
+}): { before: (ReactElement | null)[]; after: (ReactElement | null)[] } {
+  const actorProps = { serverId, workspaceId };
+  const channels = metadata.channels ?? [];
+  const status = metadata.authorshipStatus;
   const incomplete = status !== undefined && status !== "ready";
-  const statusLabel = metadataStatusLabel(status);
-  const items = [
-    incomplete ? (
-      <Text key="metadataStatus" style={styles.text} accessibilityLiveRegion="polite">
-        {statusLabel}
-      </Text>
-    ) : null,
-    visible.createdUser && workspace.createdBy ? (
-      <SessionActorLabel key="createdUser" {...actorProps} actor={workspace.createdBy} />
-    ) : null,
-    visible.channels && channels.length > 0 ? (
-      <MenuRoot key="channels">
-        <MenuTrigger accessibilityLabel="Workspace channels">
-          <Text style={styles.text}>
-            {channels[0]!.displayName || channels[0]!.channelId}
-            {channels.length > 1 ? ` +${channels.length - 1}` : ""}
-          </Text>
-        </MenuTrigger>
-        <MenuSurface>
-          {channels.map((channel) => (
-            <MenuItem
-              key={sessionChannelKey(channel)}
-              closeOnSelect={false}
-            >{`${channel.displayName || channel.channelId} · ${channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`}</MenuItem>
-          ))}
-        </MenuSurface>
-      </MenuRoot>
-    ) : null,
-    !incomplete && visible.updatedUser && workspace.lastInteractionBy ? (
-      <SessionActorLabel key="updatedUser" {...actorProps} actor={workspace.lastInteractionBy} />
-    ) : null,
-    visible.createdTime && workspace.createdAt ? (
-      <MetadataTime key="createdTime" timestamp={workspace.createdAt} label="Created" />
-    ) : null,
-    !incomplete && visible.updatedTime && workspace.lastInteractionAt ? (
-      <MetadataTime key="updatedTime" timestamp={workspace.lastInteractionAt} label="Updated" />
-    ) : null,
-  ].filter((item) => item !== null);
+  return {
+    before: [
+      incomplete ? (
+        <Text key="metadataStatus" style={styles.text} accessibilityLiveRegion="polite">
+          {metadataStatusLabel(status)}
+        </Text>
+      ) : null,
+      visible.createdUser && metadata.createdBy ? (
+        <SessionActorLabel key="createdUser" {...actorProps} actor={metadata.createdBy} />
+      ) : null,
+      visible.channels && channels.length > 0 ? (
+        <ChannelsItem key="channels" channels={channels} accessibilityLabel={channelsLabel} />
+      ) : null,
+      !incomplete && visible.updatedUser && metadata.lastInteractionBy ? (
+        <SessionActorLabel key="updatedUser" {...actorProps} actor={metadata.lastInteractionBy} />
+      ) : null,
+    ],
+    after: [
+      !incomplete && visible.updatedTime && metadata.lastInteractionAt ? (
+        <MetadataTime key="updatedTime" timestamp={metadata.lastInteractionAt} label="Updated" />
+      ) : null,
+    ],
+  };
+}
+
+/**
+ * The user/channel/time items for anything carrying session authorship — a workspace row's meta
+ * line and a session line under it read the same fields, so they draw them the same way.
+ *
+ * `leadingItems` go first on the line (a session line puts its model there). Returns null when
+ * nothing is left to show, so callers never render an empty line.
+ */
+export function SessionMetadataLine({
+  serverId,
+  workspaceId,
+  metadata,
+  createdAt,
+  visible,
+  channelsLabel,
+  leadingItems = [],
+  style,
+}: {
+  serverId: string;
+  workspaceId: string;
+  metadata: SessionAuthorship;
+  createdAt: string | undefined;
+  visible: SessionMetadataVisibility;
+  channelsLabel: string;
+  leadingItems?: ReactElement[];
+  /** Extra layout for the line, e.g. a session line's indent under its title. */
+  style?: ViewStyle;
+}) {
+  const enabled = useSessionStorageReadable(serverId);
+  const authored = enabled
+    ? authorshipItems({ serverId, workspaceId, metadata, visible, channelsLabel })
+    : { before: [], after: [] };
+  // Created time is not authorship — the agent or workspace record carries it — so it shows on any
+  // host that sends it. Every other item needs session storage.
+  const created =
+    visible.createdTime && createdAt ? (
+      <MetadataTime key="createdTime" timestamp={createdAt} label="Created" />
+    ) : null;
+  const items = [...leadingItems, ...authored.before, created, ...authored.after].filter(
+    (item) => item !== null,
+  );
   if (!items.length) return null;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, style]}>
       {items.map((item, index) => (
         <Fragment key={item.key}>
           {index > 0 ? <Text style={styles.text}>·</Text> : null}
@@ -95,6 +168,21 @@ export function WorkspaceMetadataRow({ workspace }: { workspace: SidebarWorkspac
     </View>
   );
 }
+
+export function WorkspaceMetadataRow({ workspace }: { workspace: SidebarWorkspaceEntry }) {
+  const visible = useSidebarRowItems();
+  return (
+    <SessionMetadataLine
+      serverId={workspace.serverId}
+      workspaceId={workspace.workspaceId}
+      metadata={workspace}
+      createdAt={workspace.createdAt}
+      visible={visible}
+      channelsLabel="Workspace channels"
+    />
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",

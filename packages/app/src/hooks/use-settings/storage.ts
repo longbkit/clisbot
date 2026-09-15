@@ -13,6 +13,11 @@ import {
   isChecksHiddenByLegacyRowItem,
   type SidebarRowItems,
 } from "@/components/sidebar/display-preferences/row-items";
+import {
+  DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
+  SidebarWorkspaceSessionsSchema,
+  type SidebarWorkspaceSessions,
+} from "@/clisbot/workspace-sessions/preferences";
 import { isNative } from "@/constants/platform";
 import {
   FONT_SIZE,
@@ -83,6 +88,7 @@ export interface AppSettings {
   sidebarWorkspaceTrailing: SidebarWorkspaceTrailing;
   sidebarRowItems: SidebarRowItems;
   sidebarChecksDisplay: SidebarChecksDisplay;
+  sidebarWorkspaceSessions: SidebarWorkspaceSessions;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
   sidebarNavItems: SidebarNavPreference[];
   autoExpandReasoning: boolean;
@@ -137,6 +143,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarWorkspaceTrailing: "diff",
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
+  sidebarWorkspaceSessions: DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
   sidebarNavItems: [],
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
@@ -232,6 +239,7 @@ const StoredAppSettingsSchema = z
       .enum(["iconAndText", "icon", "none"])
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
+    sidebarWorkspaceSessions: SidebarWorkspaceSessionsSchema,
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     autoExpandReasoning: z.boolean().catch(false),
     toolCallDetailLevel: z

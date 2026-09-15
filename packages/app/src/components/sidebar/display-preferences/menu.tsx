@@ -1,4 +1,8 @@
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import {
+  workspaceSessionsMenuPage,
+  WorkspaceSessionsSubTrigger,
+} from "@/clisbot/workspace-sessions/menu-page";
 import { useSessionStore } from "@/stores/session-store";
 import { useShallow } from "zustand/react/shallow";
 import { sessionMetadataOptions } from "@/clisbot/session-storage/directory";
@@ -270,6 +274,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           />
         ),
       },
+      workspaceSessionsMenuPage(),
     ];
 
     if (showHostFilter) {
@@ -658,6 +663,7 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
         />
       ))}
       <ChecksSubTrigger />
+      <WorkspaceSessionsSubTrigger />
       <MenuSeparator />
       {TRAILING_CHOICES.map((choice) => (
         <OptionItem

@@ -18,6 +18,8 @@ import {
 } from "react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import type { GestureType } from "react-native-gesture-handler";
+import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
+import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { type SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -535,23 +537,33 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
 
   return (
-    <StatusWorkspaceRowWithMenu
-      workspace={workspace}
-      hostBadge={hostBadge}
-      projectName={projectName}
-      projectIconDataUri={projectIconDataUri}
-      selected={selected}
-      shortcutNumber={shortcutNumber}
-      showShortcutBadge={showShortcutBadge}
-      canPin={canPin}
-      onToggleWorkspacePin={onToggleWorkspacePin}
-      reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-      inStatusGroup={inStatusGroup}
-      onPress={handlePress}
-      drag={drag}
-      isDragging={isDragging}
-      dragHandleProps={dragHandleProps}
-    />
+    <>
+      <StatusWorkspaceRowWithMenu
+        workspace={workspace}
+        hostBadge={hostBadge}
+        projectName={projectName}
+        projectIconDataUri={projectIconDataUri}
+        selected={selected}
+        shortcutNumber={shortcutNumber}
+        showShortcutBadge={showShortcutBadge}
+        canPin={canPin}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+        inStatusGroup={inStatusGroup}
+        onPress={handlePress}
+        drag={drag}
+        isDragging={isDragging}
+        dragHandleProps={dragHandleProps}
+      />
+      <WorkspaceSessionList
+        serverId={workspace.serverId}
+        workspaceId={workspace.workspaceId}
+        workspaceKey={workspace.workspaceKey}
+        selected={selected}
+        indented={inStatusGroup}
+        onSessionPress={onWorkspacePress}
+      />
+    </>
   );
 });
 
@@ -785,6 +797,12 @@ function StatusWorkspaceRowInnerContent({
 }: StatusWorkspaceRowInnerProps & {
   dragInteraction?: ReturnType<typeof useLongPressDragInteraction>;
 }) {
+  const selectionFill = useWorkspaceRowSelectionFill({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    workspaceKey: workspace.workspaceKey,
+    selected,
+  });
   const isCompact = useIsCompactFormFactor();
   const isTouchPlatform = platformIsNative || isCompact;
   const [isPressed, setIsPressed] = useState(false);
@@ -843,12 +861,17 @@ function StatusWorkspaceRowInnerContent({
         });
         const workspaceRowStyle = getStatusWorkspaceRowStyle({
           isPressed,
-          selected,
+          selected: selectionFill,
           isHovered,
           inStatusGroup,
           isDragging,
         });
-        const backdrop = getSidebarRowBackdrop({ isDragging, isPressed, selected, isHovered });
+        const backdrop = getSidebarRowBackdrop({
+          isDragging,
+          isPressed,
+          selected: selectionFill,
+          isHovered,
+        });
         return (
           <View
             {...dragAttributes}

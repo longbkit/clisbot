@@ -118,4 +118,6 @@ Known cleanups, not blocking:
 | The closed 2026-09-12 three-lane campaign (history, not backlog)                             | [campaign-2026-09-12/](campaign-2026-09-12/)         |
 
 Workspace naming, selection and reuse live in
-[Workspace organization](../workspace-organization/README.md).
+[Workspace organization](../workspace-organization/README.md). The sidebar's per-session
+lines, which show this authorship for each session, live in
+[Workspace sessions](../workspace-sessions/README.md).

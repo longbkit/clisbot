@@ -1,4 +1,5 @@
 import { WorkspaceMetadataRow } from "@/clisbot/session-storage/workspace-metadata-row";
+import { WorkspaceSessionsLeadingColumn } from "@/clisbot/workspace-sessions/expand-toggle";
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -139,24 +140,30 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   return (
     <View style={styles.workspaceRowContent}>
       <View style={styles.workspaceRowMain}>
-        {leadingProjectName ? (
-          <ProjectStatusIndicator
-            iconDataUri={leadingProjectIconDataUri}
-            displayName={leadingProjectName}
-            projectViewKey={workspace.projectViewKey}
-            statusBucket={workspace.statusBucket}
-            backdrop={backdrop}
-            loading={isLoading}
-            testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
-          />
-        ) : (
-          <WorkspaceStatusIndicator
-            bucket={workspace.statusBucket}
-            workspaceKind={workspace.workspaceKind}
-            loading={isLoading}
-            reserveIdleSpace={reserveIdleStatusIndicatorSpace}
-          />
-        )}
+        <WorkspaceSessionsLeadingColumn
+          serverId={workspace.serverId}
+          workspaceId={workspace.workspaceId}
+          workspaceKey={workspace.workspaceKey}
+        >
+          {leadingProjectName ? (
+            <ProjectStatusIndicator
+              iconDataUri={leadingProjectIconDataUri}
+              displayName={leadingProjectName}
+              projectViewKey={workspace.projectViewKey}
+              statusBucket={workspace.statusBucket}
+              backdrop={backdrop}
+              loading={isLoading}
+              testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
+            />
+          ) : (
+            <WorkspaceStatusIndicator
+              bucket={workspace.statusBucket}
+              workspaceKind={workspace.workspaceKind}
+              loading={isLoading}
+              reserveIdleSpace={reserveIdleStatusIndicatorSpace}
+            />
+          )}
+        </WorkspaceSessionsLeadingColumn>
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
             <Text style={workspaceBranchTextStyle} numberOfLines={1}>

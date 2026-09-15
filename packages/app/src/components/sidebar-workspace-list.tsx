@@ -1,4 +1,6 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
+import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
 import {
   View,
   Text,
@@ -1076,6 +1078,12 @@ function WorkspaceRowInner({
   onTogglePin,
   reserveIdleStatusIndicatorSpace = true,
 }: WorkspaceRowInnerProps) {
+  const selectionFill = useWorkspaceRowSelectionFill({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    workspaceKey: workspace.workspaceKey,
+    selected,
+  });
   const isCompact = useIsCompactFormFactor();
   const [isPressed, setIsPressed] = useState(false);
   const isTouchPlatform = platformIsNative || isCompact;
@@ -1119,10 +1127,15 @@ function WorkspaceRowInner({
         const workspaceRowStyle = getProjectWorkspaceRowStyle({
           isDragging,
           isPressed,
-          selected,
+          selected: selectionFill,
           isHovered,
         });
-        const backdrop = getSidebarRowBackdrop({ isDragging, isPressed, selected, isHovered });
+        const backdrop = getSidebarRowBackdrop({
+          isDragging,
+          isPressed,
+          selected: selectionFill,
+          isHovered,
+        });
         return (
           <View
             {...dragAttributes}
@@ -1413,30 +1426,44 @@ function WorkspaceRowItem({
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
   }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
 
+  const selected = isWorkspaceSelected({
+    selection: activeWorkspaceSelection,
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    enabled: selectionEnabled,
+  });
+
   return (
-    <WorkspaceRow
-      workspaceEntry={workspaceEntry}
-      hostBadge={hostBadge}
-      leadingProjectName={leadingProjectName}
-      leadingProjectIconDataUri={leadingProjectIconDataUri}
-      shortcutNumber={shortcutNumber}
-      showShortcutBadge={showShortcutBadge}
-      canCopyBranchName={canCopyBranchName}
-      canPin={canPin}
-      onToggleWorkspacePin={onToggleWorkspacePin}
-      reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-      isCreating={isCreating}
-      selected={isWorkspaceSelected({
-        selection: activeWorkspaceSelection,
-        serverId: workspace.serverId,
-        workspaceId: workspace.workspaceId,
-        enabled: selectionEnabled,
-      })}
-      onPress={handlePress}
-      drag={drag ?? noop}
-      isDragging={isDragging}
-      dragHandleProps={dragHandleProps}
-    />
+    <>
+      <WorkspaceRow
+        workspaceEntry={workspaceEntry}
+        hostBadge={hostBadge}
+        leadingProjectName={leadingProjectName}
+        leadingProjectIconDataUri={leadingProjectIconDataUri}
+        shortcutNumber={shortcutNumber}
+        showShortcutBadge={showShortcutBadge}
+        canCopyBranchName={canCopyBranchName}
+        canPin={canPin}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+        isCreating={isCreating}
+        selected={selected}
+        onPress={handlePress}
+        drag={drag ?? noop}
+        isDragging={isDragging}
+        dragHandleProps={dragHandleProps}
+      />
+      {workspaceEntry ? (
+        <WorkspaceSessionList
+          serverId={workspace.serverId}
+          workspaceId={workspace.workspaceId}
+          workspaceKey={workspace.workspaceKey}
+          selected={selected}
+          indented={false}
+          onSessionPress={onWorkspacePress}
+        />
+      ) : null}
+    </>
   );
 }
 
