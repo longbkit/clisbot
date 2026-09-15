@@ -136,7 +136,8 @@ The app chooses one delivery policy from `server_info.features.selectiveAgentTim
   this connection-scoped hot set, so returning to an agent still covered by it needs no
   membership change. The viewed-timeline owner still drops live events for agents that are not
   visible (it does not retain hidden rows), so an agent that dropped an event while hidden
-  catches up `after` its cursor when it becomes visible again. Without that, a hot agent opened
+  resumes when it becomes visible again, through the same bounded resume as opening it: one
+  `after` page, then the latest tail if more is newer. Without that, a hot agent opened
   after another participant or the agent wrote to it shows nothing new until a reload.
   Losing window keyboard focus does not make a selected pane invisible. Disconnecting clears hidden
   hot agents; reconnect restores the currently visible set before authoritative catch-up. Revisiting

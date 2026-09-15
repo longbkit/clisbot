@@ -377,6 +377,8 @@ export interface ViewedTimelineSync extends ViewedTimelineUiBridge {
   setConnected(connected: boolean): void;
   setDeliveryMode(mode: TimelineDeliveryMode): void;
   recoverGap(agentId: string, cursor: { epoch: string; endSeq: number }): void;
+  /** Resume a desired agent whose live events were not applied, unless a catch-up is running. */
+  catchUpOnReturn(agentId: string): void;
   dispose(): void;
 }
 
@@ -506,10 +508,7 @@ export function createViewedTimelineOwner(input: {
     for (const agentId of droppedWhileHidden) {
       if (!visible(agentId)) continue;
       droppedWhileHidden.delete(agentId);
-      const cursor = useSessionStore
-        .getState()
-        .sessions[input.serverId]?.agentTimelineCursor.get(agentId);
-      if (cursor) sync.recoverGap(agentId, cursor);
+      sync.catchUpOnReturn(agentId);
     }
   };
   const sync = createViewedTimelineSync({
@@ -1220,6 +1219,11 @@ export function createViewedTimelineSync(ports: ViewedTimelineSyncPorts): Viewed
       notifyListeners();
       if (deliveryMode === "selective" && connected) void reconcileMembership();
       else if (connected) startAcknowledgedCatchUps();
+    },
+    catchUpOnReturn(agentId) {
+      if (!isDesired(agentId) || catchUps.get(agentId)?.status === "running") return;
+      // The ordinary resume plan: one bounded page, then the latest tail if more is newer.
+      startCatchUp(agentId, { supersede: true });
     },
     recoverGap(agentId, cursor) {
       if (!isDesired(agentId)) return;

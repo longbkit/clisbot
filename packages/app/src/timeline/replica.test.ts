@@ -733,21 +733,32 @@ describe("viewed timeline persistence", () => {
     owner.dispose();
   });
 
-  it("catches up a hot agent whose live events were dropped while it was hidden", async () => {
+  it("resumes a hot agent that dropped live events while hidden with one bounded page", async () => {
     useSessionStore.getState().initializeSession(SERVER_ID, null);
     const requests: { agentId: string; direction: string; seq?: number }[] = [];
     const requestsFor = (agentId: string) => requests.filter((r) => r.agentId === agentId);
+    let latestTails = 0;
     const owner = createOwner(
       { readTimeline: async () => undefined, commitTimeline: () => undefined },
       undefined,
       {
         initialDeliveryMode: "selective",
+        readCursor: (agentId) => {
+          const range = useSessionStore
+            .getState()
+            .sessions[SERVER_ID]?.agentTimelineCursor.get(agentId);
+          return range ? { epoch: range.epoch, endSeq: range.endSeq } : undefined;
+        },
         fetchPage: async (agentId, request) => {
-          requests.push({
-            agentId,
-            direction: request.direction,
-            ...(request.direction === "after" ? { seq: request.cursor.seq } : {}),
-          });
+          const seq = request.direction === "after" ? request.cursor.seq : undefined;
+          requests.push({ agentId, direction: request.direction, ...(seq ? { seq } : {}) });
+          // Hundreds of rows arrived while hidden: the first resume page is not the end.
+          return seq === 8
+            ? { hasNewer: true, endCursor: { epoch: "epoch-1", seq: 48 } }
+            : { hasNewer: false, endCursor: null };
+        },
+        fetchLatestTail: async () => {
+          latestTails += 1;
           return { hasNewer: false, endCursor: null };
         },
       },
@@ -771,9 +782,10 @@ describe("viewed timeline persistence", () => {
     });
     owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
 
-    await expect
-      .poll(() => requestsFor(AGENT_ID).at(-1))
-      .toEqual({ agentId: AGENT_ID, direction: "after", seq: 8 });
+    await expect.poll(() => latestTails).toBe(1);
+    expect(requestsFor(AGENT_ID).slice(1)).toEqual([
+      { agentId: AGENT_ID, direction: "after", seq: 8 },
+    ]);
     owner.dispose();
   });
 
