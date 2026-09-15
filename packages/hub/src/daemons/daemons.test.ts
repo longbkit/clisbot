@@ -120,6 +120,39 @@ describe("daemon enrollment and execution", () => {
     assert.equal(second.slug, `studio-mac-local-${second.daemonId.slice(0, 8)}`);
   });
 
+  it("refuses a second daemon with the same server ID and tells the operator to reset it", async () => {
+    const identity = { serverId: "srv_copied_home", daemonPublicKey: "copied-public-key" };
+    const first = await hub.enrollIdentity(identity);
+    const copy = await hub.enrollIdentity(identity);
+
+    assert.equal(first.status, 200);
+    assert.equal(copy.status, 409);
+    assert.equal(copy.body["error"], "daemon_server_id_conflict");
+    assert.match(String(copy.body["message"]), /paseo daemon reset-identity/u);
+  });
+
+  it("accepts connection details only for the identity a daemon enrolled with", async () => {
+    const enrolled = await hub.enrollIdentity({
+      serverId: "srv_own",
+      daemonPublicKey: "own-public-key",
+    });
+
+    assert.equal(
+      await enrolled.daemon.publishConnectionOffer({
+        serverId: "srv_someone_else",
+        daemonPublicKeyB64: "own-public-key",
+      }),
+      409,
+    );
+    assert.equal(
+      await enrolled.daemon.publishConnectionOffer({
+        serverId: "srv_own",
+        daemonPublicKeyB64: "own-public-key",
+      }),
+      200,
+    );
+  });
+
   it("rejects invalid and revoked credentials on reconnect", async () => {
     await hub.connectDaemon();
     assert.equal(await hub.invalidCredentialReconnectStatus(), 403);

@@ -785,6 +785,37 @@ describe("HostRuntimeController", () => {
     await probeCycle;
   });
 
+  it("restarts with a fresh probe cycle when the stopped run's cycle never settles", async () => {
+    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    let attempts = 0;
+    const controller = new HostRuntimeController({
+      host,
+      deps: {
+        createClient: () => {
+          throw new Error("should adopt probe clients");
+        },
+        connectToDaemon: async ({ host: hostProfile }) => {
+          attempts += 1;
+          if (attempts === 1) return new Promise<never>(() => undefined);
+          return {
+            client: makeConnectedProbeClient(12) as unknown as DaemonClient,
+            serverId: hostProfile.serverId,
+            hostname: null,
+          };
+        },
+        getClientId: async () => "cid_test_runtime",
+      },
+    });
+
+    void controller.start({ autoProbe: false });
+    await vi.waitFor(() => expect(attempts).toBeGreaterThan(0));
+    await controller.stop();
+    await controller.start({ autoProbe: false });
+
+    expect(attempts).toBeGreaterThan(1);
+    await controller.stop();
+  });
+
   it("ranks the live connection by its heartbeat RTT without pinging it again", async () => {
     useHostRuntimeClock();
     const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
@@ -1554,9 +1585,67 @@ describe("HostRuntimeStore", () => {
       management,
     });
     expect(profile?.serverId).toBe("srv_offer");
-    expect(store.getHosts()[0]?.management).toEqual(management);
+    expect(store.getHosts()[0]?.management).toEqual({
+      ...management,
+      manualConnectionIds: ["relay:wss:manual-relay.example.test:443"],
+    });
     expect(store.getHosts()[0]?.label).toBe("Manual Host");
     expect(store.getHosts()[0]?.connections).toHaveLength(1);
+    store.syncHosts([]);
+  });
+
+  it("attaches Hub management to a direct Host saved for the same daemon and restores it on leave", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    await store.upsertDirectConnection({
+      serverId: "srv_offer",
+      endpoint: "localhost:6767",
+      label: "My Mac",
+    });
+
+    const profile = await store.upsertManagedConnectionFromOffer({
+      offer: makeOffer(),
+      management,
+    });
+    expect(profile?.label).toBe("My Mac");
+    expect(store.getHosts()).toHaveLength(1);
+    expect(store.getHosts()[0]?.management).toEqual({
+      ...management,
+      manualConnectionIds: ["direct:localhost:6767"],
+    });
+
+    // A later synchronization carries no adoption record; the store keeps the original one.
+    await store.upsertManagedConnectionFromOffer({ offer: makeOffer(), management, label: "mac" });
+    expect(store.getHosts()[0]?.management?.manualConnectionIds).toEqual(["direct:localhost:6767"]);
+
+    const restart = vi.spyOn(store, "restartHostConnection");
+    await expect(store.removeManagedHost(management)).resolves.toBe(true);
+    expect(restart).toHaveBeenCalledWith("srv_offer");
+    expect(store.getHosts()).toHaveLength(1);
+    expect(store.getHosts()[0]).not.toHaveProperty("management");
+    expect(store.getHosts()[0]?.connections.map(({ id }) => id)).toEqual(["direct:localhost:6767"]);
+    expect(store.getHosts()[0]?.preferredConnectionId).toBe("direct:localhost:6767");
+    store.syncHosts([]);
+  });
+
+  it("does not attach Hub management to a saved Host whose relay key contradicts the offer", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    await store.upsertRelayConnection({
+      serverId: "srv_offer",
+      relayEndpoint: "manual-relay.example.test:443",
+      useTls: true,
+      daemonPublicKeyB64: "manual-public-key",
+    });
+
+    await expect(
+      store.upsertManagedConnectionFromOffer({ offer: makeOffer(), management }),
+    ).resolves.toBeNull();
+    expect(store.getHosts()[0]).not.toHaveProperty("management");
     store.syncHosts([]);
   });
 

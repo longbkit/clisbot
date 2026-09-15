@@ -55,19 +55,21 @@ vi.mock("./settings/rename-host-dialog", () => ({
     name: string;
     onSave(name: string): Promise<void>;
     onClose(): void;
-  }) => (
-    <div role="dialog" aria-label="Rename Host">
-      <span>Current shared name: {name}</span>
-      <button
-        onClick={() => {
-          void onSave("renamed-workstation").then(onClose);
-        }}
-      >
-        Save shared name
-      </button>
-      <button onClick={onClose}>Cancel rename</button>
-    </div>
-  ),
+  }) => {
+    // eslint-disable-next-line react-perf/jsx-no-new-function-as-prop -- test double inside vi.mock
+    const save = () => void onSave("renamed-workstation").then(onClose);
+    return (
+      <div role="dialog" aria-label="Rename Host">
+        <span>Current shared name: {name}</span>
+        <button type="button" onClick={save}>
+          Save shared name
+        </button>
+        <button type="button" onClick={onClose}>
+          Cancel rename
+        </button>
+      </div>
+    );
+  },
 }));
 
 const registeredDaemon = {
@@ -134,6 +136,26 @@ describe("Host onboarding query recovery", () => {
       expect(adapters.upsert).not.toHaveBeenCalled();
     },
   );
+
+  it("offers Reconnect for an offline Host that has connection details", async () => {
+    const offer = {
+      v: 2,
+      serverId: "srv-1",
+      daemonPublicKeyB64: "key",
+      relay: { endpoint: "relay.example.test", useTls: true },
+    };
+    adapters.get.mockResolvedValue({ daemons: [{ ...registeredDaemon, connectionOffer: offer }] });
+    adapters.hosts = [{ serverId: "srv-1", label: "Workstation" }] as never;
+    adapters.statuses = new Map([["srv-1", "offline"]]) as never;
+    try {
+      renderSection();
+      fireEvent.click(await screen.findByRole("button", { name: "Reconnect" }));
+      expect(adapters.restart).toHaveBeenCalledWith("srv-1");
+    } finally {
+      adapters.hosts = [];
+      adapters.statuses = new Map();
+    }
+  });
 
   it("waits for a successful response before showing the empty Host guidance", async () => {
     let resolve!: (value: typeof emptyHosts) => void;

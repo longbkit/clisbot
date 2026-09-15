@@ -160,6 +160,47 @@ function sameHubManagement(left: HubHostManagement | undefined, right: HubHostMa
   );
 }
 
+/**
+ * A saved Host is the offered daemon when its relay key matches the offer, or when it has no relay
+ * key to contradict it: every connection to that Host already checks the daemon's `serverId`, and
+ * the offer comes from that daemon's own authenticated Hub connection.
+ */
+function provesOfferedDaemon(host: HostProfile, offer: ConnectionOffer): boolean {
+  const relayKeys = host.connections.flatMap((connection) =>
+    connection.type === "relay" ? [connection.daemonPublicKeyB64] : [],
+  );
+  if (relayKeys.length === 0) return host.management === undefined;
+  return relayKeys.includes(offer.daemonPublicKeyB64);
+}
+
+function withManualConnections(
+  management: HubHostManagement,
+  adoptedHost: HostProfile | undefined,
+): HubHostManagement {
+  if (adoptedHost === undefined) return management;
+  const manualConnectionIds =
+    adoptedHost.management?.manualConnectionIds ??
+    (adoptedHost.management === undefined
+      ? adoptedHost.connections.map((connection) => connection.id)
+      : undefined);
+  return manualConnectionIds === undefined ? management : { ...management, manualConnectionIds };
+}
+
+function restoreManualHost(host: HostProfile, manualConnectionIds: string[]): HostProfile {
+  const { management: _management, ...manual } = host;
+  const connections = host.connections.filter((connection) =>
+    manualConnectionIds.includes(connection.id),
+  );
+  return {
+    ...manual,
+    connections,
+    preferredConnectionId: connections.some(({ id }) => id === host.preferredConnectionId)
+      ? host.preferredConnectionId
+      : (connections[0]?.id ?? null),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -712,6 +753,9 @@ export class HostRuntimeController {
   async stop(): Promise<void> {
     this.switchRequestVersion += 1;
     this.probeRequestVersion += 1;
+    // The in-flight cycle belongs to the stopped run; a restart must not wait on it, since a
+    // connect that was cut off mid-admission may never settle.
+    this.probeCycleInFlight = null;
     this.started = false;
     if (this.probeIntervalHandle) {
       clearInterval(this.probeIntervalHandle);
@@ -1955,18 +1999,14 @@ export class HostRuntimeStore {
           useTls: input.offer.direct.useTls ?? true,
         }
       : null;
-    // An authenticated projection may replace a stale enrollment on this Hub.
-    // Require the same daemon identity; an endpoint match alone is insufficient.
+    // An authenticated projection may replace a stale enrollment on this Hub or attach to a Host
+    // the user saved. Require the same daemon identity; an endpoint match alone is insufficient.
     const refreshedHost = this.hosts.find(
       (host) =>
         host.serverId === input.offer.serverId &&
         (host.management?.hubOrigin === input.management.hubOrigin ||
           host.management === undefined) &&
-        host.connections.some(
-          (connection) =>
-            connection.type === "relay" &&
-            connection.daemonPublicKeyB64 === input.offer.daemonPublicKeyB64,
-        ),
+        provesOfferedDaemon(host, input.offer),
     );
     const conflictingHost = this.hosts.find(
       (host) =>
@@ -1978,18 +2018,19 @@ export class HostRuntimeStore {
     );
     if (conflictingHost) return null;
 
+    const management = withManualConnections(input.management, refreshedHost);
     if (directConnection !== null) {
       await this.upsertHostConnection({
         serverId: input.offer.serverId,
         label: input.label,
-        management: input.management,
+        management,
         connection: directConnection,
       });
     }
     return this.upsertHostConnection({
       serverId: input.offer.serverId,
       label: input.label,
-      management: input.management,
+      management,
       connection: relayConnection,
     });
   }
@@ -2102,7 +2143,18 @@ export class HostRuntimeStore {
         candidate.management?.kind === "hub" && sameHubManagement(candidate.management, management),
     );
     if (!host) return false;
-    await this.removeHost(host.serverId);
+    const manualConnectionIds = host.management?.manualConnectionIds;
+    if (manualConnectionIds === undefined) {
+      await this.removeHost(host.serverId);
+      return true;
+    }
+    const next = this.hosts.map((candidate) =>
+      candidate === host ? restoreManualHost(host, manualConnectionIds) : candidate,
+    );
+    await this.persistHosts(next);
+    this.setHostsAndSync(next);
+    // A revoked managed client stops reconnecting; the restored Host needs a fresh one.
+    await this.restartHostConnection(host.serverId);
     return true;
   }
 
@@ -2711,15 +2763,26 @@ export function useHostRuntimeConnectionStatuses(
     () => store.getVersion(),
   );
 
-  return useMemo(() => {
-    // The aggregate version is the reactivity trigger; re-read snapshots on every host tick.
-    void version;
-    const entries: Array<[string, HostRuntimeConnectionStatus]> = serverIds.map((serverId) => [
+  // The aggregate version is the reactivity trigger; re-read snapshots on every host tick. It is
+  // passed as an argument because React Compiler drops a `void version` statement and, with it,
+  // the dependency, which froze these statuses at their first value.
+  return useMemo(
+    () => readConnectionStatuses(store, serverIds, version),
+    [serverIds, store, version],
+  );
+}
+
+function readConnectionStatuses(
+  store: HostRuntimeStore,
+  serverIds: readonly string[],
+  _version: number,
+): ReadonlyMap<string, HostRuntimeConnectionStatus> {
+  return new Map(
+    serverIds.map((serverId) => [
       serverId,
       store.getSnapshot(serverId)?.connectionStatus ?? "connecting",
-    ]);
-    return new Map(entries);
-  }, [serverIds, store, version]);
+    ]),
+  );
 }
 
 export function useHostRuntimeLastError(serverId: string): string | null {

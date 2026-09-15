@@ -126,3 +126,12 @@ it("evicts a Hub-managed Host whose daemon is no longer projected", async () => 
   );
   expect(adapters.remove).not.toHaveBeenCalledWith(expect.objectContaining({ daemonId: "daemon" }));
 });
+
+it("reconnects a saved Host when Hub management is attached to it", async () => {
+  vi.stubGlobal("React", React);
+  adapters.restart.mockClear();
+  adapters.hosts = [{ serverId: "server" }] as typeof adapters.hosts;
+  render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  await waitFor(() => expect(adapters.restart).toHaveBeenCalledWith("server"));
+});

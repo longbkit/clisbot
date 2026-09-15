@@ -64,6 +64,12 @@ export interface HubHostManagement {
   daemonId: string;
   /** Last shared Hub name, used to preserve a user-chosen local label on rename. */
   daemonSlug?: string;
+  /** The Hub's managed access mode for this daemon when it was last synchronized; `external`
+   * means every session needs a Hub access ticket. Absent on profiles saved before it existed. */
+  managedAccessMode?: "off" | "external";
+  /** Set when Hub management was attached to a Host the user saved themselves: the connections
+   * that Host had before. Leaving Hub restores exactly these instead of deleting the Host. */
+  manualConnectionIds?: string[];
 }
 
 export interface HostProfile {
@@ -238,6 +244,7 @@ function hostProfileNeedsUpdate(input: {
   );
 }
 
+// eslint-disable-next-line complexity -- upstream merge of one connection into possibly several matching profiles.
 export function upsertHostConnectionInProfiles(input: {
   profiles: HostProfile[];
   serverId: string;
@@ -449,6 +456,8 @@ const StoredHostProfileSchema = z.strictObject({
       organizationId: z.string().min(1),
       daemonId: z.string().min(1),
       daemonSlug: z.string().min(1).optional(),
+      managedAccessMode: z.enum(["off", "external"]).optional(),
+      manualConnectionIds: z.array(z.string().min(1)).optional(),
     })
     .optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),

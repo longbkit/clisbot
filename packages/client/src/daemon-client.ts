@@ -7,6 +7,7 @@ import {
 } from "./connection/index.js";
 import type { z } from "zod";
 import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
+import { MANAGED_SESSION_SUPERSEDED_CLOSE_CODE } from "@getpaseo/protocol/managed-access";
 import type { AgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
 import { parsePluginSourceReference } from "@getpaseo/protocol/plugin-source-reference";
 import {
@@ -1338,6 +1339,14 @@ export class DaemonClient {
               ? event.code
               : undefined;
           if (
+            closeCode === MANAGED_SESSION_SUPERSEDED_CLOSE_CODE ||
+            // COMPAT(managedSessionSuperseded): daemons before the dedicated close code replaced a
+            // session with 4403 and this reason. Remove after 2026-12-15.
+            reason.includes("Managed access lease renewed")
+          ) {
+            // A newer connection from this client took the session over; nothing was revoked.
+            this.setReconnectEnabled(false);
+          } else if (
             closeCode === 4401 ||
             closeCode === 4403 ||
             /managed access|ticket required|access denied/i.test(reason)

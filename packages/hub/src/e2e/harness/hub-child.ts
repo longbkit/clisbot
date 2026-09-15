@@ -109,7 +109,10 @@ async function main(): Promise<void> {
       permissions: ["hub.execute"],
       now: new Date(),
     });
-    daemon = enrollment?.status === "slug_conflict" ? undefined : enrollment;
+    daemon =
+      enrollment?.status === "slug_conflict" || enrollment?.status === "server_id_conflict"
+        ? undefined
+        : enrollment;
   }
   if (daemon === undefined) throw new Error("Hub E2E seed daemon enrollment failed");
   const config = await configuration.insertManualBundleRevision({

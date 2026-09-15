@@ -2708,14 +2708,7 @@ async function getCheckoutShortstatUncached(
   }
 
   try {
-    const { stdout: mergeBaseOut } = await getRunGitCommand(context)(
-      ["merge-base", "HEAD", comparisonRef],
-      {
-        cwd,
-        envOverlay: READ_ONLY_GIT_ENV,
-      },
-    );
-    const mergeBase = mergeBaseOut.trim();
+    const mergeBase = await findComparisonMergeBase(cwd, comparisonRef, currentBranch, context);
     if (!mergeBase) {
       return null;
     }
@@ -2740,6 +2733,51 @@ async function getCheckoutShortstatUncached(
   } catch (error) {
     return handleShortstatGitError(error, options?.throwOnGitError);
   }
+}
+
+async function findShortstatMergeBase(
+  cwd: string,
+  ref: string,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  try {
+    const { stdout } = await getRunGitCommand(context)(["merge-base", "HEAD", ref], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    return stdout.trim() || null;
+  } catch {
+    // `git merge-base` exits 1 when the histories share no commit.
+    return null;
+  }
+}
+
+async function findComparisonMergeBase(
+  cwd: string,
+  comparisonRef: string,
+  currentBranch: string | null,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  return (
+    (await findShortstatMergeBase(cwd, comparisonRef, context)) ??
+    (await findUpstreamMergeBase(cwd, currentBranch, comparisonRef, context))
+  );
+}
+
+/**
+ * A branch whose history shares nothing with the base (an imported or subtree-merged fork) has no
+ * merge-base there; its own upstream still measures the local, unpushed work.
+ */
+async function findUpstreamMergeBase(
+  cwd: string,
+  currentBranch: string | null,
+  comparisonRef: string,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  const upstreamRef = currentBranch ? `origin/${currentBranch}` : null;
+  if (upstreamRef === null || upstreamRef === comparisonRef) return null;
+  if (!(await doesGitRefExist(cwd, `refs/remotes/${upstreamRef}`, context))) return null;
+  return findShortstatMergeBase(cwd, upstreamRef, context);
 }
 
 async function resolveShortstatComparisonRef(input: {

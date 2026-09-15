@@ -30,6 +30,17 @@ paseo hub connect
 
 `connect` uses the active login to request a single-use enrollment token. The daemon exchanges it for its own relationship credential; your CLI login is never stored as daemon authority.
 
+A daemon's identity (its server ID and key) lives in its `PASEO_HOME`. Copying that directory to another computer, cloning a VM, or baking it into a container image copies the identity too. Hub refuses to enroll a second daemon with a server ID another Host in the organization already uses, and names that Host. On the copied computer, reset the identity and connect again:
+
+```sh
+paseo daemon stop
+paseo daemon reset-identity
+paseo daemon start
+paseo hub login https://hub.example.com
+```
+
+`reset-identity` removes `server-id`, `daemon-keypair.json`, and `hub-relationship.json` from `PASEO_HOME`. It refuses while the daemon runs or while `PASEO_SERVER_ID` is set, since that variable would restore the same ID. Hub also accepts connection details from a daemon only for the identity it enrolled with.
+
 Hub derives the daemon's initial slug from its hostname. If that slug is already used in the organization, Hub adds a short daemon ID suffix. You can rename the daemon later in Hub.
 
 Each daemon has two identifiers: an immutable generated ID and a friendly slug. Hub normalizes slugs with lowercase words joined by hyphens, so `Build Studio` becomes `build-studio`. The dashboard shows the slug. Configuration accepts either the slug or the immutable ID.

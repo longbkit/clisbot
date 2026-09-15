@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Server } from "lucide-react-native";
+import { Server, ShieldCheck } from "lucide-react-native";
+import { MANAGED_ACCESS_HOST_LABEL } from "@/hosts/managed-access";
 import { HOST_COLORS, type HostBadgeModel, type HostColor } from "@/hosts/appearance";
 import { identityForeground } from "@/styles/identity-colors";
 import type { Theme } from "@/styles/theme";
@@ -12,6 +13,9 @@ import type { Theme } from "@/styles/theme";
 export const HOST_BADGE_ICON_SIZE = 12;
 
 const ThemedServer = withUnistyles(Server);
+// A managed access Host swaps the glyph only: same size, same identity color, no extra width,
+// so it stays recognizable in a dense row without competing with status signals.
+const ThemedShieldCheck = withUnistyles(ShieldCheck);
 
 const mutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -45,13 +49,24 @@ export function HostBadge({ badge }: { badge: HostBadgeModel }) {
     <View
       style={styles.badge}
       testID={`host-badge-${badge.serverId}`}
-      accessibilityLabel={badge.label}
+      accessibilityLabel={
+        badge.managedAccess ? `${badge.label}, ${MANAGED_ACCESS_HOST_LABEL}` : badge.label
+      }
     >
-      <ThemedServer
-        size={HOST_BADGE_ICON_SIZE}
-        style={styles.icon}
-        uniProps={HOST_ICON_MAPPINGS[badge.color]}
-      />
+      {badge.managedAccess ? (
+        <ThemedShieldCheck
+          size={HOST_BADGE_ICON_SIZE}
+          style={styles.icon}
+          uniProps={HOST_ICON_MAPPINGS[badge.color]}
+          testID={`host-badge-managed-${badge.serverId}`}
+        />
+      ) : (
+        <ThemedServer
+          size={HOST_BADGE_ICON_SIZE}
+          style={styles.icon}
+          uniProps={HOST_ICON_MAPPINGS[badge.color]}
+        />
+      )}
       {badge.showLabel ? (
         <Text style={[styles.label, labelColorStyle(badge.color)]} numberOfLines={1}>
           {badge.label}

@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isManagedAccessHost } from "@/hosts/managed-access";
+import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
+import { ICON_SIZE } from "@/styles/theme";
 import type { ComponentType, ReactNode } from "react";
 import {
   Alert,
@@ -1059,6 +1062,9 @@ function HostPicker({
         <Text style={sidebarStyles.pickerTriggerLabel} numberOfLines={1}>
           {activeHost?.label ?? t("settings.groups.host")}
         </Text>
+        {isManagedAccessHost(activeHost ?? undefined) ? (
+          <ManagedAccessIcon size={ICON_SIZE.sm} testID="settings-host-picker-managed" />
+        ) : null}
       </ComboboxTrigger>
     </SharedHostPicker>
   );

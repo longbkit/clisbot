@@ -60,6 +60,13 @@ import { ProvidersSection } from "@/screens/settings/providers-section";
 import { ProviderUsageSettingsSection } from "@/provider-usage/settings-section";
 import { useProviderUsage } from "@/provider-usage/use-provider-usage";
 import { HostAppearanceSection } from "@/screens/settings/host-appearance-section";
+import {
+  HUB_CONNECTION_LABEL,
+  isHubProvidedConnection,
+  isManagedAccessHost,
+  MANAGED_ACCESS_HOST_LABEL,
+} from "@/hosts/managed-access";
+import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
@@ -170,7 +177,13 @@ function HostNotFound() {
   );
 }
 
-function HostStatusBadges({ serverId }: { serverId: string }) {
+function HostStatusBadges({
+  serverId,
+  managedAccess,
+}: {
+  serverId: string;
+  managedAccess: boolean;
+}) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const snapshot = useHostRuntimeSnapshot(serverId);
@@ -201,10 +214,17 @@ function HostStatusBadges({ serverId }: { serverId: string }) {
     [statusDotColor],
   );
   const statusLeading = useMemo(() => <View style={statusDotStyle} />, [statusDotStyle]);
+  const managedLeading = useMemo(
+    () => <ManagedAccessIcon size={theme.iconSize.sm} />,
+    [theme.iconSize.sm],
+  );
 
   return (
     <View style={styles.identityBadges} testID="host-page-identity">
       <StatusBadge label={statusLabel} variant={statusVariant} leading={statusLeading} />
+      {managedAccess ? (
+        <StatusBadge label={MANAGED_ACCESS_HOST_LABEL} leading={managedLeading} />
+      ) : null}
       {connectionBadge ? (
         <View style={styles.badgePill}>
           {connectionBadge.icon}
@@ -369,7 +389,7 @@ export function HostSettingsPage({
         </Text>
       </View>
 
-      <HostStatusBadges serverId={serverId} />
+      <HostStatusBadges serverId={serverId} managedAccess={isManagedAccessHost(host)} />
 
       <HostAppearanceSection host={host} />
 
@@ -443,6 +463,7 @@ function ConnectionsSection({ host }: { host: HostProfile }) {
             <ConnectionRow
               key={conn.id}
               connection={conn}
+              hubProvided={isHubProvidedConnection(host, conn)}
               showBorder={index > 0}
               latencyMs={probe?.status === "available" ? probe.latencyMs : undefined}
               latencyLoading={!probe || probe.status === "pending"}
@@ -494,6 +515,7 @@ function ConnectionsSection({ host }: { host: HostProfile }) {
 
 function ConnectionRow({
   connection,
+  hubProvided,
   showBorder,
   latencyMs,
   latencyLoading,
@@ -501,6 +523,7 @@ function ConnectionRow({
   onRemove,
 }: {
   connection: HostConnection;
+  hubProvided: boolean;
   showBorder: boolean;
   latencyMs: number | null | undefined;
   latencyLoading: boolean;
@@ -542,16 +565,19 @@ function ConnectionRow({
         <Text style={settingsStyles.rowTitle} numberOfLines={1}>
           {title}
         </Text>
+        {hubProvided ? <Text style={settingsStyles.rowHint}>{HUB_CONNECTION_LABEL}</Text> : null}
       </View>
       <Text style={latencyTextStyle}>{latencyText}</Text>
-      <Button
-        variant="ghost"
-        size="sm"
-        textStyle={destructiveTextStyle}
-        onPress={handlePressRemove}
-      >
-        {t("settings.host.connections.removeAction")}
-      </Button>
+      {hubProvided ? null : (
+        <Button
+          variant="ghost"
+          size="sm"
+          textStyle={destructiveTextStyle}
+          onPress={handlePressRemove}
+        >
+          {t("settings.host.connections.removeAction")}
+        </Button>
+      )}
     </View>
   );
 }

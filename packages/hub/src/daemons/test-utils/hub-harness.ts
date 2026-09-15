@@ -249,6 +249,16 @@ export class HubHarness {
     return TestDaemon.create(this.origin).enroll(issued.token, hostname);
   }
 
+  /** A fresh daemon enrolling with a chosen identity, as a copied Paseo home would. */
+  async enrollIdentity(identity: { serverId: string; daemonPublicKey: string }) {
+    const issued = await this.issueEnrollment();
+    if (issued.status !== 201 || !("token" in issued)) {
+      throw new Error("Enrollment token was not issued");
+    }
+    const daemon = TestDaemon.create(this.origin);
+    return { daemon, ...(await daemon.enrollAs(issued.token, identity)) };
+  }
+
   async enrollLegacyDaemon(): Promise<{ daemonId: string; scopes: string[] }> {
     const issued = await this.issueEnrollment();
     if (issued.status !== 201 || !("token" in issued)) {
@@ -2194,6 +2204,43 @@ class TestDaemon {
     this.permissions = [...enrollment.permissions];
     Object.assign(this, { webSocketUrl: enrollment.webSocketUrl });
     return enrollment;
+  }
+  /** Enrolls with a chosen server ID and public key; returns the raw Hub response. */
+  async enrollAs(
+    token: string,
+    identity: { serverId: string; daemonPublicKey: string },
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const response = await fetch(`${this.origin}/api/daemons/enroll`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        daemonId: this.daemonId,
+        idempotencyKey: this.idempotencyKey,
+        serverId: identity.serverId,
+        daemonPublicKey: identity.daemonPublicKey,
+        credentialVerifier: createHash("sha256").update(this.credential).digest("base64url"),
+        permissions: [],
+      }),
+    });
+    return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+  }
+  async publishConnectionOffer(offer: { serverId: string; daemonPublicKeyB64: string }) {
+    const response = await fetch(
+      `${this.origin}/api/daemons/${encodeURIComponent(this.daemonId)}/connection-offer`,
+      {
+        method: "PUT",
+        headers: { authorization: `Bearer ${this.credential}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          connectionOffer: {
+            v: 2,
+            serverId: offer.serverId,
+            daemonPublicKeyB64: offer.daemonPublicKeyB64,
+            relay: { endpoint: "relay.example.test:443", useTls: true },
+          },
+        }),
+      },
+    );
+    return response.status;
   }
   async enrollmentStatus(token: string): Promise<number> {
     const response = await fetch(`${this.origin}/api/daemons/enroll`, {

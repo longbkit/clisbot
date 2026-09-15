@@ -1700,6 +1700,13 @@ class MemoryDatabase implements Database {
     if (replay) return replay;
     const token = this.enrollmentTokens.get(input.tokenVerifier);
     if (!token || token.consumedAt || token.expiresAt <= input.now) return undefined;
+    const sameServer = Array.from(this.daemons.values()).find(
+      (daemon) =>
+        daemon.status === "active" &&
+        daemon.serverId === input.serverId &&
+        this.machines.get(daemon.machineId)?.orgId === token.organizationId,
+    );
+    if (sameServer) return { status: "server_id_conflict" as const, slug: sameServer.slug };
     const suggestedSlug = input.suggestedSlug ?? `daemon-${input.daemonId.slice(0, 8)}`;
     const suggestedSlugTaken = Array.from(this.daemons.values()).some(
       (daemon) =>

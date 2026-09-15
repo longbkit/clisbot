@@ -567,6 +567,7 @@ function createManagementApi(
     auth: options.auth,
     access: accessStore,
     tickets: accessTickets,
+    ...(options.auth.publicCredentials ? { credentials: options.auth.publicCredentials } : {}),
     channelSupervisor,
     providerApplications: options.providerApplications ?? null,
     disconnectProviderConnection,

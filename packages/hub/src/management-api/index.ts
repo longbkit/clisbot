@@ -70,6 +70,11 @@ import {
   OrganizationTriggerConflictError,
 } from "../db/errors.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
+import type { OperationAuthenticator } from "../auth/operation-auth.js";
+import {
+  CliAccessTickets,
+  isCliAccessTicketRequest,
+} from "../managed-access/cli-access-tickets.js";
 import * as schema from "../db/schema.js";
 import type {
   ChannelBotIdentity,
@@ -353,6 +358,7 @@ type ManagementConnectionSummary = Omit<ManagementConnectionView, "consumers">;
 export class ManagementApi {
   private readonly accessLeaseRevocation: AccessLeaseRevocation;
   private readonly teams: OrganizationTeamDirectory;
+  private readonly cliAccessTickets: CliAccessTickets;
 
   constructor(
     private readonly options: {
@@ -375,11 +381,18 @@ export class ManagementApi {
       manualRuns?: Pick<PublicOperations, "dispatchManualRun"> | null;
       revokeDaemon?: (request: Request, daemonId: string) => Promise<Response>;
       renameDaemon?: (request: Request, daemonId: string) => Promise<Response>;
+      /** Bearer credentials, so a logged-in CLI can request daemon access tickets. */
+      credentials?: OperationAuthenticator;
     },
   ) {
     this.accessLeaseRevocation =
       options.accessLeaseRevocation ?? new AccessLeaseRevocation(options.tickets);
     this.teams = new OrganizationTeamDirectory(options.runtime);
+    this.cliAccessTickets = new CliAccessTickets(
+      options.runtime,
+      options.credentials,
+      options.tickets,
+    );
   }
 
   async handle(request: Request): Promise<Response> {
@@ -425,6 +438,9 @@ export class ManagementApi {
   private async dispatch(request: Request, requestId: string): Promise<Response> {
     const method = request.method.toUpperCase();
     const segments = managementSegments(request);
+    if (isCliAccessTicketRequest(request, segments)) {
+      return this.cliAccessTickets.handle(request, segments[1]!, segments[3]!);
+    }
     if (segments[0] !== "organizations" || segments[1] === undefined) {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
@@ -2058,6 +2074,7 @@ export class ManagementApi {
     return problem(requestId, 404, "not_found", "No management resource matches this path.");
   }
 
+  // eslint-disable-next-line complexity -- one router for the daemon management resource and its sub-routes.
   private async handleDaemons(
     request: Request,
     requestId: string,

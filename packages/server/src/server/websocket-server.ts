@@ -1,3 +1,7 @@
+import {
+  MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
+  MANAGED_SESSION_SUPERSEDED_REASON,
+} from "@getpaseo/protocol/managed-access";
 import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import { AgentRequests } from "./agent/requests/index.js";
 import { WebSocket, WebSocketServer } from "ws";
@@ -469,6 +473,22 @@ function managedAuthoritySignature(
     resourceMode: admission.resourceMode ?? "daemon",
     projects,
   });
+}
+
+/**
+ * A second live window of the same client, admitted with the same authority, joins the session as
+ * one more socket, as ordinary sessions do. Replacing it instead closes the other window, which
+ * reconnects and replaces this one in turn.
+ */
+function sharesLiveManagedSession(
+  existing: SessionConnection,
+  pending: Pick<PendingConnection, "admission">,
+): boolean {
+  return (
+    existing.sockets.size > 0 &&
+    existing.managedAuthoritySignature !== null &&
+    existing.managedAuthoritySignature === managedAuthoritySignature(pending.admission)
+  );
 }
 
 function getBrowserHostCapability(
@@ -1702,11 +1722,13 @@ export class VoiceAssistantWebSocketServer {
     const sessionKey = sessionConnectionKey(pending.admission.principalId, clientId);
     const existing = pluginId ? undefined : this.externalSessionsByKey.get(sessionKey);
     if (existing) {
-      if (pending.admission.leaseId === undefined) {
+      if (pending.admission.leaseId === undefined || sharesLiveManagedSession(existing, pending)) {
         this.resumeSession({ ws, message, pending, existing });
         return;
       }
-      void this.closeManagedConnection(existing, "Managed access lease renewed");
+      void this.closeManagedConnection(existing, MANAGED_SESSION_SUPERSEDED_REASON, {
+        code: MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
+      });
     }
 
     const connectionLogger = pending.connectionLogger.child({ clientId });
@@ -2319,6 +2341,7 @@ export class VoiceAssistantWebSocketServer {
   private async closeManagedConnection(
     connection: SessionConnection,
     reason: string,
+    options: { code?: number } = {},
   ): Promise<void> {
     if (connection.managedLeaseId !== null) {
       try {
@@ -2332,7 +2355,7 @@ export class VoiceAssistantWebSocketServer {
     }
     for (const socket of connection.sockets) {
       try {
-        socket.close(WS_CLOSE_MANAGED_ACCESS_REVOKED, reason);
+        socket.close(options.code ?? WS_CLOSE_MANAGED_ACCESS_REVOKED, reason);
       } catch {
         // Cleanup below remains authoritative even if the transport close fails.
       }

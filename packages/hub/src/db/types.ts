@@ -203,6 +203,14 @@ export interface DaemonSlugConflict {
 
 export type DaemonWriteResult = DaemonRecord | DaemonSlugConflict | undefined;
 
+/** Another active daemon in the organization already uses this server ID (a copied Paseo home). */
+export interface DaemonServerIdConflict {
+  status: "server_id_conflict";
+  slug: string;
+}
+
+export type DaemonEnrollmentResult = DaemonWriteResult | DaemonServerIdConflict;
+
 export interface EnrollmentTokenRecord {
   id: string;
   verifier: string;
@@ -1328,7 +1336,7 @@ export interface Database {
     deviceVerifier: string;
     credential: { id: string; prefix: string; verifier: string };
   }): Promise<CliAuthorizationPollResult>;
-  enrollDaemon(input: EnrollDaemonInput): Promise<DaemonWriteResult>;
+  enrollDaemon(input: EnrollDaemonInput): Promise<DaemonEnrollmentResult>;
   findDaemonBySlugForOrganization(
     organizationId: string,
     slug: string,

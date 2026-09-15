@@ -729,7 +729,8 @@ describe("relay external socket reconnect behavior", () => {
       issue += 1;
       return {
         principalId: "member:user-1",
-        permissions: ["workspace.read" as const],
+        // The third ticket carries different authority, so it replaces rather than shares.
+        permissions: issue >= 3 ? ["workspace.write" as const] : ["workspace.read" as const],
         resourceMode: "projects" as const,
         projects: new Map<string, never>(),
         leaseId: `00000000-0000-4000-8000-${String(issue).padStart(12, "0")}`,
@@ -740,6 +741,8 @@ describe("relay external socket reconnect behavior", () => {
       managedAccess: { mode: "external", resolver: { resolve: resolver } },
     });
     const first = new MockSocket();
+    const firstClose = vi.fn();
+    first.on("close", firstClose);
     await server.attachExternalSocket(
       first,
       { transport: "relay" },
@@ -747,6 +750,18 @@ describe("relay external socket reconnect behavior", () => {
       createHelloMessage("managed-client", { accessTicket: "paseo_dat_first" }),
     );
     await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(1));
+
+    // A second live window with the same authority shares the session instead of closing the first.
+    const window = new MockSocket();
+    await server.attachExternalSocket(
+      window,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", { accessTicket: "paseo_dat_window" }),
+    );
+    expect(sessionMock.instances).toHaveLength(1);
+    expect(first.readyState).not.toBe(3);
+    window.close();
 
     const second = new MockSocket();
     await server.attachExternalSocket(
@@ -759,9 +774,11 @@ describe("relay external socket reconnect behavior", () => {
     );
     await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(2));
     expect(first.readyState).toBe(3);
+    // Replaced, not revoked: the client must not treat this as losing Hub access.
+    expect(firstClose).toHaveBeenCalledWith(4409, "Session continued in another connection");
     expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
 
-    expect(server.revokeManagedLeases(["00000000-0000-4000-8000-000000000002"])).toBe(1);
+    expect(server.revokeManagedLeases(["00000000-0000-4000-8000-000000000003"])).toBe(1);
     await vi.waitFor(() => expect(second.readyState).toBe(3));
     expect(sessionMock.instances[1]?.cleanup).toHaveBeenCalledOnce();
     await server.close();

@@ -157,6 +157,7 @@ export async function enrollDaemon(
     return Response.json({ error: "invalid enrollment token" }, { status: 401 });
   }
   if (daemon.status === "slug_conflict") return daemonSlugConflict(daemon.slug);
+  if (daemon.status === "server_id_conflict") return daemonServerIdConflict(daemon.slug);
   const webSocketUrl = new URL("/api/daemons/socket", publicBaseUrl ?? request.url);
   webSocketUrl.protocol = webSocketUrl.protocol === "https:" ? "wss:" : "ws:";
   const response = {
@@ -200,6 +201,14 @@ export async function replaceDaemonConnectionOffer(
   if (daemon instanceof Response) return daemon;
   const input = await parseRequest(request, connectionOfferBody);
   if (input instanceof Response) return input;
+  const offer = input.connectionOffer;
+  if (
+    offer !== null &&
+    (offer.serverId !== daemon.serverId || offer.daemonPublicKeyB64 !== daemon.daemonPublicKey)
+  ) {
+    // A daemon may only publish connection details for the identity it enrolled with.
+    return Response.json({ error: "daemon_identity_mismatch" }, { status: 409 });
+  }
   const updated = await database.setDaemonConnectionOffer(
     id,
     input.connectionOffer,
@@ -296,6 +305,20 @@ function daemonSummary(daemon: DaemonRecord) {
 
 function unavailableDaemon(): Response {
   return Response.json({ error: "daemon_unavailable" }, { status: 404 });
+}
+
+/** The daemon's Paseo home was likely copied from another enrolled computer. */
+export const DAEMON_SERVER_ID_CONFLICT_ERROR = "daemon_server_id_conflict";
+
+function daemonServerIdConflict(slug: string): Response {
+  return Response.json(
+    {
+      error: DAEMON_SERVER_ID_CONFLICT_ERROR,
+      slug,
+      message: `Host "${slug}" in this organization already uses this daemon's identity, usually because the Paseo home was copied from that computer. On this computer run: paseo daemon stop && paseo daemon reset-identity, then connect again.`,
+    },
+    { status: 409 },
+  );
 }
 
 function daemonSlugConflict(slug: string): Response {

@@ -16,6 +16,10 @@ import { DaemonClient, type WebSocketLike } from "@getpaseo/client/internal/daem
 import path from "node:path";
 import { WebSocket } from "ws";
 import { getOrCreateCliClientId } from "./client-id.js";
+import {
+  createDaemonAccessTicketResolver,
+  requiresDaemonAccessTicket,
+} from "../commands/hub/daemon-access-ticket.js";
 import { resolveCliVersion } from "../version.js";
 import { createSshTunnel } from "../ssh/ssh-tunnel.js";
 
@@ -285,6 +289,7 @@ async function tryConnectHost(
   clientId: string,
   timeout: number,
   nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
+  resolveAccessTicket?: () => Promise<string>,
 ): Promise<{ client: DaemonClient } | { error: unknown }> {
   const target = resolveDaemonTarget(host);
   const client = new DaemonClient({
@@ -293,6 +298,7 @@ async function tryConnectHost(
     clientType: "cli",
     appVersion: resolveCliVersion(),
     password,
+    ...(resolveAccessTicket ? { resolveAccessTicket } : {}),
     connectTimeoutMs: timeout,
     webSocketFactory: (
       url: string,
@@ -401,7 +407,13 @@ export async function connectToDaemon(options?: ConnectOptions): Promise<DaemonC
     }
     const host = hosts[index];
     const password = resolveDaemonPassword(host);
-    const result = await tryConnectHost(host, password, clientId, timeout, nodeWebSocketFactory);
+    const result = await tryConnectHostWithAccessTicket(
+      host,
+      password,
+      clientId,
+      timeout,
+      nodeWebSocketFactory,
+    );
     if ("client" in result) {
       return result.client;
     }
@@ -409,6 +421,41 @@ export async function connectToDaemon(options?: ConnectOptions): Promise<DaemonC
   }
 
   return tryNext(0, null);
+}
+
+/**
+ * COMPAT(clisbot-cli-access-ticket): a daemon with managed access closes an unticketed hello. The
+ * CLI then asks the daemon's Hub for a ticket with its login and connects again, as the app does.
+ */
+async function tryConnectHostWithAccessTicket(
+  host: string,
+  password: string | undefined,
+  clientId: string,
+  timeout: number,
+  nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
+): Promise<{ client: DaemonClient } | { error: unknown }> {
+  const result = await tryConnectHost(host, password, clientId, timeout, nodeWebSocketFactory);
+  if (!("error" in result) || !requiresDaemonAccessTicket(result.error)) return result;
+  const resolveAccessTicket = createDaemonAccessTicketResolver({
+    paseoHome: resolvePaseoHome(process.env),
+    clientId,
+  });
+  if (resolveAccessTicket === null) {
+    return {
+      error: new Error(
+        "This daemon requires Hub access. Log in to the Hub it is connected to with `paseo hub login`, then try again.",
+        { cause: result.error },
+      ),
+    };
+  }
+  return tryConnectHost(
+    host,
+    password,
+    clientId,
+    timeout,
+    nodeWebSocketFactory,
+    resolveAccessTicket,
+  );
 }
 
 /**

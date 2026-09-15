@@ -6,7 +6,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
-import { useHostRuntimeSnapshot, type ActiveConnection } from "@/runtime/host-runtime";
+import { useHostRuntimeSnapshot, useHosts, type ActiveConnection } from "@/runtime/host-runtime";
+import { isManagedAccessHost, MANAGED_ACCESS_HOST_LABEL } from "@/hosts/managed-access";
+import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { orderHostsLocalFirst } from "@/types/host-connection";
 import {
   ADD_HOST_OPTION_ID,
@@ -80,6 +82,7 @@ export function HostPickerOption({
       ? formatActiveConnectionLabel(activeConnection)
       : undefined;
   const leadingSlot = useMemo(() => <HostStatusDotSlot serverId={serverId} />, [serverId]);
+  const managedAccess = isManagedAccessHost(useHosts().find((host) => host.serverId === serverId));
   const handleSettingsPress = useCallback(
     (event: GestureResponderEvent) => {
       event.stopPropagation();
@@ -88,21 +91,29 @@ export function HostPickerOption({
     [onOpenHostSettings, serverId],
   );
   const trailingSlot = useMemo(() => {
-    if (!onOpenHostSettings) return undefined;
+    const managedIcon = managedAccess ? (
+      <ManagedAccessIcon size={theme.iconSize.sm} testID={`host-picker-managed-${serverId}`} />
+    ) : null;
+    if (!onOpenHostSettings) return managedIcon ?? undefined;
     return (
-      <Pressable
-        onPress={handleSettingsPress}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${label} settings`}
-      >
-        <Settings size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
-      </Pressable>
+      <View style={styles.trailing}>
+        {managedIcon}
+        <Pressable
+          onPress={handleSettingsPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${label} settings`}
+        >
+          <Settings size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
+        </Pressable>
+      </View>
     );
   }, [
     handleSettingsPress,
     label,
+    managedAccess,
     onOpenHostSettings,
+    serverId,
     theme.colors.foregroundMuted,
     theme.iconSize.sm,
   ]);
@@ -110,7 +121,7 @@ export function HostPickerOption({
   return (
     <ComboboxItem
       label={label}
-      description={connectionLabel}
+      description={hostOptionDescription(managedAccess, connectionLabel)}
       leadingSlot={leadingSlot}
       trailingSlot={trailingSlot}
       selected={selected}
@@ -318,7 +329,24 @@ export function HostPicker({
   );
 }
 
+/** A managed access Host names how it is reached before the endpoint, so the row reads the same
+ * whether or not the active connection is shown. */
+function hostOptionDescription(
+  managedAccess: boolean,
+  connectionLabel: string | undefined,
+): string | undefined {
+  if (!managedAccess) return connectionLabel;
+  return connectionLabel
+    ? `${MANAGED_ACCESS_HOST_LABEL} · ${connectionLabel}`
+    : MANAGED_ACCESS_HOST_LABEL;
+}
+
 const styles = StyleSheet.create((theme) => ({
+  trailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+  },
   statusDotSlot: {
     width: theme.iconSize.sm,
     height: theme.iconSize.sm,

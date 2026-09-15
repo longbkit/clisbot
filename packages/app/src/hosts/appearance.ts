@@ -1,3 +1,4 @@
+import { isManagedAccessHost } from "@/hosts/managed-access";
 import { IDENTITY_COLOR_NAMES, type IdentityColorName } from "@/styles/identity-colors";
 import type { HostProfile } from "@/types/host-connection";
 import { z } from "zod";
@@ -53,9 +54,12 @@ export interface HostBadgeModel {
   label: string;
   color: HostColor;
   showLabel: boolean;
+  /** Draw the managed access glyph instead of the plain server glyph. */
+  managedAccess?: boolean;
 }
 
-export type HostAppearanceSource = Pick<HostProfile, "serverId" | "label" | "appearance">;
+export type HostAppearanceSource = Pick<HostProfile, "serverId" | "label" | "appearance"> &
+  Partial<Pick<HostProfile, "management">>;
 
 /**
  * The sidebar's whole host-badge decision, resolved once per host list. Rows look their
@@ -86,6 +90,7 @@ export function selectHostBadges(input: {
       label: host.label.trim() || host.serverId,
       color: host.appearance.color,
       showLabel: display === "name",
+      ...(isManagedAccessHost(host) ? { managedAccess: true } : {}),
     });
   }
   return badges;

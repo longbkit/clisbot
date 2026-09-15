@@ -333,6 +333,29 @@ test.each([408, 429])("transient enrollment status %s remains retryable", async 
   expect((error as Error).message).toBe(`Hub enrollment failed (${status})`);
 });
 
+test("a copied daemon identity is rejected with Hub's reset instructions", async () => {
+  const message = 'Host "studio" already uses this identity. Run: paseo daemon reset-identity';
+  const hubOrigin = await startHubReturning(409, { error: "daemon_server_id_conflict", message });
+  const remote = new DirectHubRelationshipRemote();
+
+  const error = await remote
+    .enroll({
+      daemonId: "daemon-1",
+      idempotencyKey: "ceremony-1",
+      hubOrigin,
+      token: "token",
+      hostname: "test-daemon.local",
+      serverId: "server-1",
+      daemonPublicKey: "public-key",
+      credentialVerifier: "verifier",
+      permissions: ["hub.execute"],
+    })
+    .catch((caught: unknown) => caught);
+
+  expect(error).toBeInstanceOf(HubEnrollmentRejectedError);
+  expect((error as Error).message).toBe(message);
+});
+
 test("enrollment rejects a transport URL that cannot open a WebSocket", async () => {
   let enrolledHostname: string | undefined;
   const hubOrigin = await startEnrollmentHub("ftp://hub.test/daemon", (enrollment) => {
@@ -545,9 +568,11 @@ test("controller redials once after a failed upgrade without also handling its c
   expect(clock.pendingTasks()).toBe(0);
 });
 
-async function startHubReturning(status: number): Promise<string> {
+async function startHubReturning(status: number, body?: unknown): Promise<string> {
   const server = createServer((_request, response) => {
-    response.writeHead(status).end();
+    if (body === undefined) response.writeHead(status).end();
+    else
+      response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
   });
   openServers.push(server);
   await new Promise<void>((resolve, reject) => {

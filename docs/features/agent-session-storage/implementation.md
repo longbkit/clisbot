@@ -10,7 +10,11 @@ unchanged.
 ## Current implementation
 
 The persisted feature setting `features.agentSessionStorage` and
-`PASEO_AGENT_SESSION_STORAGE` select capture, default off. Optional
+`PASEO_AGENT_SESSION_STORAGE` select capture, **default on in the Clisbot fusion** (upstream Paseo
+defaults off; decided 2026-09-15 because workspace and message authorship — Created user, Updated
+user, message senders — exist only when capture runs). `PASEO_AGENT_SESSION_STORAGE=0` or
+`features.agentSessionStorage: false` turns it off; the site is tagged
+`COMPAT(clisbot-session-storage-default)` in `packages/server/src/server/config.ts`. Optional
 `server_info.features.agentSessionStorage` advertises capture. The separate optional
 `agentSessionStorageRead` advertises retained durable reads, including rollout-off
 sessions with the new layout. Hub identity tickets depend on capture, not on the

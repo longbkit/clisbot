@@ -22,12 +22,22 @@ Với `off`, việc là Member hay chỉ được Connect trên Hub **không bi�
 
 1. Enroll daemon, kiểm tra Owner kết nối được bằng app hỗ trợ Managed Access.
 2. Owner vào Settings → **Hosts → [Host] → Managed access**.
-3. Bật **Require Hub access externally**.
-4. Kết nối lại; kiểm tra bằng Member chỉ được cấp một Project.
+3. Bật **Require Hub access externally**, xác nhận.
+4. App hiện **Turning on managed access…**: Host đóng mọi phiên không có vé Hub, kể cả phiên của thiết bị bạn. App tự xin vé từ Hub và kết nối lại, không cần làm gì.
+5. Khi thấy **Managed access is on** và badge **Managed access** là xong. Kiểm tra thêm bằng một Member chỉ được cấp một Project.
+
+Sau 30 giây vẫn chưa kết nối lại thì app báo lỗi: bấm **Reconnect** ở Account → Hosts, hoặc kiểm tra daemon bằng lệnh hiện trên card. Tab khác đang mở app từ trước cần reload để lấy vé.
 
 Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối ngoài không có vé bị đóng và phải kết nối lại qua Hub. Nếu vừa cập nhật mã nguồn/binary thì vẫn phải khởi động lại để nạp phiên bản mới; đó là việc khác với đổi mode.
 
 `external` áp dụng cả TCP localhost, LAN, Tailscale, SSH tunnel và relay. Socket/pipe local của hệ điều hành là đường quản trị/khôi phục riêng; kết nối dịch vụ Hub có danh tính và quyền riêng.
+
+## CLI trên Host ở chế độ external
+
+CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `paseo hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên CLI không có nhiều quyền hơn người đó.
+
+- Chưa đăng nhập Hub đó thì CLI báo: chạy `paseo hub login` rồi thử lại.
+- `paseo hub connect` không bị ảnh hưởng: khi enroll, daemon chưa thuộc Hub nên chưa thể ở `external`. Bật Managed Access là việc của Owner, làm sau khi enroll.
 
 ## Tắt external
 

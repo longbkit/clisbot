@@ -132,8 +132,11 @@ export interface HubRelationshipRemote {
 }
 
 export class HubEnrollmentRejectedError extends Error {
-  constructor(readonly statusCode: number) {
-    super(`Hub enrollment failed (${statusCode})`);
+  constructor(
+    readonly statusCode: number,
+    message = `Hub enrollment failed (${statusCode})`,
+  ) {
+    super(message);
     this.name = "HubEnrollmentRejectedError";
   }
 }
@@ -212,6 +215,10 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           throw new HubEnrollmentRejectedError(response.status);
+        }
+        const identityConflict = await readServerIdConflict(response);
+        if (identityConflict !== null) {
+          throw new HubEnrollmentRejectedError(response.status, identityConflict);
         }
         throw new Error(`Hub enrollment failed (${response.status})`);
       }
@@ -455,4 +462,16 @@ function stampAdmissionOrigin(
   return admission.actor
     ? { ...admission, actor: { ...admission.actor, hubOrigin: new URL(origin).origin } }
     : admission;
+}
+
+/**
+ * Hub refuses a daemon whose server ID another Host in the organization already uses, which
+ * happens when a Paseo home is copied. Its message tells the operator how to reset the identity.
+ */
+async function readServerIdConflict(response: Response): Promise<string | null> {
+  if (response.status !== 409) return null;
+  const body = z
+    .object({ error: z.literal("daemon_server_id_conflict"), message: z.string().min(1) })
+    .safeParse(await response.json().catch(() => null));
+  return body.success ? body.data.message : null;
 }

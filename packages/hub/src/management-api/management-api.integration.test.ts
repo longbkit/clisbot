@@ -2195,9 +2195,10 @@ it("stores the daemon Connection Offer and managed access mode with an off compa
     .set({
       credentialVerifier: createHash("sha256").update(credential).digest("base64url"),
     });
+  // The offer carries the identity enrollTestDaemon enrolled with; Hub refuses any other.
   const connectionOffer = {
     v: 2 as const,
-    serverId: "server-managed",
+    serverId: "server-1",
     daemonPublicKeyB64: "public-key",
     relay: { endpoint: "relay.example.test:443", useTls: true },
   };

@@ -81,6 +81,32 @@ describe("resolveHostBadgeDisplay", () => {
 });
 
 describe("selectHostBadges", () => {
+  it("marks only Hub Hosts in managed access external mode", () => {
+    const management = {
+      kind: "hub" as const,
+      hubOrigin: "https://hub.example.com",
+      organizationId: "org-1",
+      daemonId: "daemon-1",
+    };
+    const badges = selectHostBadges({
+      hosts: [
+        {
+          ...host("managed", "Managed"),
+          management: { ...management, managedAccessMode: "external" },
+        },
+        { ...host("hub-off", "Hub off"), management: { ...management, managedAccessMode: "off" } },
+        { ...host("legacy", "Legacy"), management },
+        host("direct", "Direct"),
+      ],
+      localServerId: null,
+      enabled: true,
+    });
+    expect(badges.get("managed")?.managedAccess).toBe(true);
+    expect(badges.get("hub-off")?.managedAccess).toBeUndefined();
+    expect(badges.get("legacy")?.managedAccess).toBeUndefined();
+    expect(badges.get("direct")?.managedAccess).toBeUndefined();
+  });
+
   it("shows no badges while the sidebar spans a single host", () => {
     const badges = selectHostBadges({
       hosts: [host("alpha", "Alpha"), host("beta", "Beta")],

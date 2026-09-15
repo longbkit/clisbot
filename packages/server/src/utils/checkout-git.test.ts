@@ -581,6 +581,18 @@ describe("checkout git utilities", () => {
     );
   });
 
+  it("measures a branch that shares no history with the base against its upstream", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    execFileSync("git", ["checkout", "--orphan", "fork"], { cwd: repoDir });
+    commitFile(repoDir, "fork.txt", "fork\n", "fork root");
+    execFileSync("git", ["update-ref", "refs/remotes/origin/fork", "HEAD"], { cwd: repoDir });
+    writeFileSync(join(repoDir, "fork.txt"), "fork\nlocal change\n");
+
+    const shortstat = await getCheckoutShortstat(repoDir, { paseoHome }, { force: true });
+
+    expect(shortstat).toEqual({ additions: 1, deletions: 0 });
+  });
+
   it("reuses checkout snapshot facts across status, shortstat, and PR status reads", async () => {
     setupRemoteTrackingMain(repoDir, tempDir);
     execFileSync("git", ["checkout", "-b", "feature/facts"], { cwd: repoDir });

@@ -12,7 +12,26 @@ paseo hub connect
 paseo hub status
 ```
 
-Thay URL bằng Hub của bạn. Login mở luồng duyệt đăng nhập; chế độ tương tác có thể đề nghị enroll ngay. `connect` đăng ký daemon bằng tài khoản vừa đăng nhập. Khi chạy không tương tác, đừng coi login thành công là daemon đã enroll: kiểm tra `status`.
+Thay URL bằng Hub của bạn. Khi chạy trong terminal, `login` hỏi **một câu** trước khi mở link duyệt:
+
+- **Connect and let Hub run agents here:** kết nối daemon. Automations và Channels của tổ chức được tạo workspace, chạy agent trên máy này. Ngắt bằng `paseo hub disconnect`.
+- **Don't connect now:** chỉ CLI đăng nhập; kết nối sau bằng `paseo hub connect`.
+
+Không có lựa chọn "chỉ kết nối": Channels dùng kết nối Hub như client tin cậy, nên daemon đã kết nối thì Hub chạy agent được qua Channels dù chưa cấp `hub.execute`.
+
+Sau đó terminal in link và mở trình duyệt. Duyệt trên web xong, daemon tự kết nối theo lựa chọn trên, không hỏi thêm. Daemon chưa chạy hoặc đang nối Hub khác thì chỉ CLI đăng nhập.
+
+Host đã lưu sẵn trong app (ví dụ kết nối trực tiếp `localhost`) được gắn vào Hub luôn, giữ tên và kết nối cũ. Đăng xuất Hub chỉ gỡ phần Hub, Host đã lưu vẫn còn.
+
+Trong **Connections** của Host, kết nối Hub cấp (thường là Relay) ghi **Provided by Hub** và không có nút Remove, vì Hub sẽ thêm lại. Kết nối bạn tự lưu vẫn xoá được.
+
+Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `PASEO_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
+
+Hub báo **Host "…" already uses this daemon's identity** khi `PASEO_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `paseo daemon stop`, `paseo daemon reset-identity`, `paseo daemon start` rồi `paseo hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
+
+Host báo **Offline** ở Account → Hosts: bấm **Reconnect**. Vẫn offline thì kiểm tra Paseo đang chạy trên máy đó rồi mở **Connections**.
+
+Khi chạy không tương tác hoặc `--json`, `login` chỉ đăng nhập CLI: chạy `connect` rồi kiểm tra `status`.
 
 Đăng nhập CLI và enrollment là hai thứ riêng: daemon giữ credential máy để duy trì quan hệ với Hub. Mỗi daemon có một quan hệ Hub tại một thời điểm.
 

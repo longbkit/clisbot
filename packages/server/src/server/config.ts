@@ -548,6 +548,7 @@ interface ResolveConfigFromPersistedOptions {
   relayEnabledFallback?: boolean;
 }
 
+// eslint-disable-next-line complexity -- upstream resolver: one flat mapping of env and config.json to daemon config.
 export function resolveConfigFromPersisted(
   paseoHome: string,
   persisted: PersistedConfig,
@@ -666,8 +667,11 @@ function resolveAgentSessionStorageFeature(
   environment: string | undefined,
   features: { agentSessionStorage?: boolean } | undefined,
 ): boolean {
+  // COMPAT(clisbot-session-storage-default): upstream Paseo defaults capture off. The Clisbot fusion
+  // needs authorship, so capture is on unless the environment or config turns it off.
   if (environment === "0") return false;
-  return environment === "1" || features?.agentSessionStorage === true;
+  if (environment === "1") return true;
+  return features?.agentSessionStorage !== false;
 }
 
 export function loadConfig(

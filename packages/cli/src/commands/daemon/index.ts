@@ -4,6 +4,7 @@ import { runStatusCommand } from "./status.js";
 import { runStopCommand } from "./stop.js";
 import { runRestartCommand } from "./restart.js";
 import { runSetPasswordCommand } from "./set-password.js";
+import { runResetIdentityCommand } from "./reset-identity.js";
 import { pairCommand } from "./pair.js";
 import { runDaemonReloadCommand } from "./reload.js";
 import { withOutput } from "../../output/index.js";
@@ -76,6 +77,14 @@ export function createDaemonCommand(): Command {
   )
     .option("--home <path>", "Paseo home directory (default: ~/.paseo)")
     .action(withOutput(runSetPasswordCommand));
+
+  addJsonOption(
+    daemon
+      .command("reset-identity")
+      .description("Give this daemon a new identity after its Paseo home was copied"),
+  )
+    .option("--home <path>", "Paseo home directory (default: ~/.paseo)")
+    .action(withOutput(runResetIdentityCommand));
 
   return daemon;
 }

@@ -1834,6 +1834,17 @@ class PgDatabase implements Database {
         const consumedToken = token.rows[0];
         if (consumedToken?.organization_id === null || consumedToken === undefined)
           return client.rollback(undefined);
+        const sameServer = await client.query<{ slug: string }>(
+          `select slug from daemons
+           where organization_id = $1 and server_id = $2 and status = 'active' limit 1`,
+          [consumedToken.organization_id, input.serverId],
+        );
+        if (sameServer.rows[0] !== undefined) {
+          return client.rollback({
+            status: "server_id_conflict" as const,
+            slug: sameServer.rows[0].slug,
+          });
+        }
         const machine = await client.query<MachineRow>(
           `insert into machines (org_id, source, status) values ($1, $2, 'alive') returning *`,
           [consumedToken.organization_id, { kind: "daemon", daemonId: input.daemonId }],

@@ -199,15 +199,15 @@ function HubHostBinding({
     );
     void enqueueManagedHostMutation(async () => {
       if (disposed) return;
+      // Restart any Host already running for this daemon, including a saved one being attached:
+      // its client was admitted without this binding, or gave up before it was registered.
       const existing = store
         .getHosts()
-        .find(
-          (host) => host.serverId === synchronizedOffer.serverId && host.management !== undefined,
-        );
+        .find((host) => host.serverId === synchronizedOffer.serverId);
       const profile = await store.upsertManagedConnectionFromOffer({
         offer: synchronizedOffer,
         label: labelRef.current,
-        management: { ...management, daemonSlug: labelRef.current },
+        management: { ...management, daemonSlug: labelRef.current, managedAccessMode },
       });
       if (profile === null) {
         throw new Error(
@@ -257,6 +257,7 @@ function HubHostBinding({
           organizationId,
           daemonId,
           daemonSlug: label,
+          managedAccessMode,
         },
       });
       if (profile === null)
@@ -272,7 +273,16 @@ function HubHostBinding({
     return () => {
       disposed = true;
     };
-  }, [daemonId, hubOrigin, label, organizationId, retry, synchronizationKey, synchronizedOffer]);
+  }, [
+    daemonId,
+    hubOrigin,
+    label,
+    managedAccessMode,
+    organizationId,
+    retry,
+    synchronizationKey,
+    synchronizedOffer,
+  ]);
 
   useEffect(() => {
     const store = getHostRuntimeStore();
