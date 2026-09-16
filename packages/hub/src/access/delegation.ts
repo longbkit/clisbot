@@ -7,6 +7,7 @@ import {
 import type { Database } from "../db/types.js";
 import type { ChannelControlPlane, RouteTarget } from "../channels/config/compile.js";
 import type { ApprovalRule } from "../channels/config/schema.js";
+import { applyAgentControls, type AgentControls } from "../channels/config/agent-controls.js";
 import { privilegeCovers } from "../channels/config/privileges.js";
 import { APPROVAL_PRIVILEGES, type AccessPrivilege } from "./contract.js";
 import { AccessPolicyError, type AccessStore, type DelegatedAgentExecution } from "./store.js";
@@ -35,12 +36,16 @@ export async function assertChannelConfigurationDelegation(input: {
     target: RouteTarget,
     approval: readonly ApprovalRule[],
     preapprovesChannelReply: boolean,
+    agentControls: AgentControls | undefined,
   ): Promise<void> => {
     const requiredPrivileges = automaticApprovalPrivileges(approval, preapprovesChannelReply);
     if (target.kind === "agent") {
       const environment = environments.get(target.environment);
-      const agent = input.bundle.agents[target.agent];
-      if (environment?.kind !== "daemon" || agent === undefined) throw delegationDenied();
+      const named = input.bundle.agents[target.agent];
+      if (environment?.kind !== "daemon" || named === undefined) throw delegationDenied();
+      // The Route's default controls are what the Route starts, so they are
+      // what the publisher must be able to delegate.
+      const agent = applyAgentControls(named, agentControls);
       executions.push(
         executionFromAgent(
           environment.daemonId ?? environment.daemon,
@@ -68,13 +73,19 @@ export async function assertChannelConfigurationDelegation(input: {
 
   for (const account of input.controlPlane.accounts) {
     for (const route of account.routes) {
-      await appendTarget(route.target, route.approval, route.defaults.outbound.path === "tool");
+      await appendTarget(
+        route.target,
+        route.approval,
+        route.defaults.outbound.path === "tool",
+        route.defaults.agentControls,
+      );
     }
     if (!account.fallback.deny && account.fallback.target !== undefined) {
       await appendTarget(
         account.fallback.target,
         account.fallback.approval ?? account.approval,
         account.defaults.outbound.path === "tool",
+        (account.fallback.defaults ?? account.defaults).agentControls,
       );
     }
   }

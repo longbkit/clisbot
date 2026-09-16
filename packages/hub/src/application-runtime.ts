@@ -51,6 +51,7 @@ import { runtimeFile } from "./runtime-files.js";
 import { ChannelStore } from "./db/channels.js";
 import type { ChannelReplyServer } from "./channels/channel-reply.js";
 import { AccessStore } from "./access/store.js";
+import { assertChannelConfigurationDelegation } from "./access/delegation.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
 import { ManagementApi } from "./management-api/index.js";
@@ -659,7 +660,19 @@ async function createChannelSupervisorAtComposition(
       ...(process.env["PASEO_HUB_APP_WEB_URL"]
         ? { appWebUrl: process.env["PASEO_HUB_APP_WEB_URL"] }
         : {}),
-      ...(access ? { commandAccess: access } : {}),
+      ...(access
+        ? {
+            commandAccess: access,
+            authorizeChannelConfiguration: (principal, candidate) =>
+              assertChannelConfigurationDelegation({
+                access,
+                database,
+                principal,
+                bundle: candidate.bundle,
+                controlPlane: candidate.controlPlane,
+              }),
+          }
+        : {}),
       ...(access === null
         ? {}
         : {

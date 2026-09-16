@@ -195,6 +195,9 @@ export const RESOURCE_ACCESS_LEVELS = {
   },
   channel_account: {
     use: ["channel.use"],
+    // Change this Channel Route's Route defaults from a conversation
+    // (`/promoteroutedefault`). Covers every conversation on the account.
+    manage: ["channel.use", "channel.manage"],
   },
   automation: {
     run: ["automation.run"],

@@ -177,7 +177,20 @@ export interface ChannelPlane {
   ): void;
   /** Stop the plane; configuration replacement may also cancel Route-owned work. */
   stop(options?: { cancelActive?: boolean }): Promise<void>;
+  /**
+   * Adopt a newer revision without restarting: the supervisor calls this only
+   * when the revision differs from the running one in Route default Agent
+   * controls alone, so nothing the transport, bindings or running sessions
+   * depend on has changed. The next session a Route starts uses the new value.
+   */
+  refresh(snapshot: ChannelPlaneSnapshot): void;
 }
+
+/** The revision-derived part of the plane's dependencies. */
+export type ChannelPlaneSnapshot = Pick<
+  ChannelPlaneDeps,
+  "channelRevisionId" | "controlPlane" | "resolveAgentSpec" | "resolveAgentAccessTarget"
+>;
 
 /** The plane kind a thread/topic's ROOT conversation carries (the two-pass
  * match's second descriptor; inbound.md). A thread sits in a Slack channel; a
@@ -489,7 +502,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       });
       lifecycleCommands = new ChannelLifecycleCommands({
         organizationId: deps.organizationId,
-        channelRevisionId: deps.channelRevisionId ?? null,
+        // Getters read the current revision after `refresh`.
+        get channelRevisionId() {
+          return deps.channelRevisionId ?? null;
+        },
         daemon: daemonConnection,
         logger,
         store: channelStore,
@@ -568,8 +584,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       });
       bindings = new BindingEngine({
         organizationId: deps.organizationId,
-        channelRevisionId: deps.channelRevisionId ?? null,
-        controlPlane: deps.controlPlane,
+        get channelRevisionId() {
+          return deps.channelRevisionId ?? null;
+        },
+        get controlPlane() {
+          return deps.controlPlane;
+        },
         logger,
         clock,
         store: channelStore,
@@ -578,7 +598,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.authorizeChannelUse === undefined
           ? {}
           : { authorizeChannelUse: deps.authorizeChannelUse }),
-        resolveAgentSpec: deps.resolveAgentSpec,
+        get resolveAgentSpec() {
+          return deps.resolveAgentSpec;
+        },
         ...(deps.commandAccess
           ? {
               authorizeConfiguration: (
@@ -589,7 +611,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.replyCapabilities === undefined
           ? {}
           : { replyCapabilities: deps.replyCapabilities }),
-        resolveAgentAccessTarget: deps.resolveAgentAccessTarget,
+        get resolveAgentAccessTarget() {
+          return deps.resolveAgentAccessTarget;
+        },
         ...(processing !== undefined ? { processing } : {}),
       });
       // The live-draft producer (slice 22b): mounted only when the loaded
@@ -622,7 +646,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       });
       approvals = new ApprovalEngine({
         organizationId: deps.organizationId,
-        controlPlane: deps.controlPlane,
+        get controlPlane() {
+          return deps.controlPlane;
+        },
         logger,
         clock,
         store: channelStore,
@@ -697,6 +723,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // rejected ("daemon client stopped") — expected teardown, not a live
       // failure, so it must not surface as an unhandled rejection.
       void resubscribe().catch(() => undefined);
+    },
+
+    refresh(snapshot) {
+      deps.channelRevisionId = snapshot.channelRevisionId;
+      deps.controlPlane = snapshot.controlPlane;
+      deps.resolveAgentSpec = snapshot.resolveAgentSpec;
+      deps.resolveAgentAccessTarget = snapshot.resolveAgentAccessTarget;
     },
 
     async stop(options) {

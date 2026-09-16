@@ -92,6 +92,36 @@ agent profile or already active on a session you want to resume. Returning a
 staged provider choice to the running session's provider preserves its active
 mode and feature settings unless your selection explicitly changes them.
 
+## Make a choice the default for everyone on this route
+
+The commands above change only this conversation. When the setup you picked
+should be what everyone gets, promote it to the **route** that serves this
+conversation — the rule that decided which agent answers here. You don't name
+the route; the bot uses the one that matched your message.
+
+| You want                                                 | Type                        |
+| -------------------------------------------------------- | --------------------------- |
+| See which route serves you and its default               | `/routedefault`             |
+| Make this conversation's setup the route's default       | `/promoteroutedefault`      |
+| Put back the route's default from before its last change | `/promoteroutedefault undo` |
+
+For example, after `/model claude-opus-5`:
+
+```
+/promoteroutedefault
+Default set for route #3 (mention, contains "deploy"):
+claude / claude-opus-5 / high
+New conversations on this route use it. Undo: /promoteroutedefault undo
+```
+
+Sessions already running keep their setup; the next session on the route uses
+the new default. Your own conversation keeps working exactly as before.
+
+Changing a route affects other people, so it needs `channel.manage`: an
+organization owner or admin has it, and so does anyone given **Manage** on that
+Channel Route in Access. If someone changed the route since your session started,
+the bot asks you to check `/routedefault` first.
+
 ## One-off questions and forking
 
 Sometimes you want to ask something without disturbing the session running here.

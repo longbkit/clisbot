@@ -216,6 +216,24 @@ export const CHANNEL_COMMANDS = [
     usage: "/quick <message>",
     description: "one-off question in a fresh session",
   },
+  {
+    name: "routedefault",
+    aliases: [],
+    args: false,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/routedefault",
+    description: "show the route serving this conversation and its default",
+  },
+  {
+    name: "promoteroutedefault",
+    aliases: [],
+    args: true,
+    privilege: "channel.manage",
+    directOnly: true,
+    usage: "/promoteroutedefault [undo]",
+    description: "make this conversation's agent the route default",
+  },
 ] as const;
 
 export type ChannelCommandName = (typeof CHANNEL_COMMANDS)[number]["name"];

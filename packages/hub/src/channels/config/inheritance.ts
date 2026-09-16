@@ -8,6 +8,7 @@ import { ORG_DEFAULTS, type ApprovalRule, type ChannelDefaults } from "./schema.
 import type { SyncProgress, SyncProgressGroup, SyncStreaming } from "./schema.js";
 import type { DmPolicy, GroupPolicy } from "./enums.js";
 import { issue } from "./compile-support.js";
+import type { AgentControls } from "./agent-controls.js";
 
 export interface EffectiveAccess {
   dmPolicy?: DmPolicy | undefined;
@@ -43,6 +44,11 @@ export interface EffectiveDefaults {
    * `resolveDmGroupAccessWithLists` decision runs in front of the RBAC gate.
    */
   access?: EffectiveAccess | undefined;
+  /** Default Agent controls over the Route's named agent (`agent-controls.ts`).
+   * One block, taken whole from the most specific layer that authors it: a
+   * model only means something beside the provider it was chosen under.
+   * ABSENT when no layer authors it, so existing route fingerprints hold. */
+  agentControls?: AgentControls | undefined;
   sync: {
     finalAnswers: boolean;
     /** The "the bot is working" group: the relayed progress line, the
@@ -119,6 +125,10 @@ export function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): 
         pick((layer) => layer?.inbound?.editNotifications) ?? floor.inbound.editNotifications,
     },
     ...foldAccessDefaults(pick),
+    ...optional(
+      "agentControls",
+      pick((layer) => layer?.agentControls),
+    ),
     sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
   };
 }

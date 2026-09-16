@@ -238,6 +238,13 @@ export class ChannelAccessStore extends ChannelCommandStore {
     }
     return toSelection(updated);
   }
+
+  /** Drop the conversation's choice so its next session follows the Route default. */
+  async clearConversationSelection(key: ChannelConversationKey): Promise<void> {
+    await this.database
+      .delete(schema.channelConversationSelections)
+      .where(and(...conversationWhere(key)));
+  }
 }
 
 function toSelection(

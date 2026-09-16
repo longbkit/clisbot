@@ -28,6 +28,7 @@ import {
   StreamingModeSchema,
   ThreadLinkSchema,
 } from "./enums.js";
+import { AgentControlsSchema } from "./agent-controls.js";
 // --- Shared value shapes ------------------------------------------------------
 
 /** `<channel>:<provider-id>` identity; email is `email:<address>` (§4.3.7). */
@@ -304,6 +305,7 @@ export const ChannelDefaultsSchema = z
     inbound: InboundDefaultsSchema.optional(),
     access: AccessDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
+    agentControls: AgentControlsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
   })
   .strict();
@@ -618,6 +620,8 @@ export const RouteSchema = z
     outbound: OutboundDefaultsSchema.optional(),
     access: AccessDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
+    // Default Agent controls over the named `agent:` (`agent-controls.ts`).
+    agentControls: AgentControlsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
     limits: RouteLimitsSchema.optional(),
   })

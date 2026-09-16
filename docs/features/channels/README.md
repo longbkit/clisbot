@@ -259,7 +259,10 @@ Three shapes are worth knowing:
   route can never capture a conversation that is already bound. The second
   compares the stored `target` with the route's: same target keeps the session,
   a different one releases the binding and mints a session at the new target,
-  no route at all leaves the conversation unserved and silent. A conversation
+  no route at all leaves the conversation unserved and silent. A Route's
+  default Agent controls (`agentControls:`) are not part of the target, so
+  changing them keeps every session, and a revision that changes nothing else
+  is adopted without restarting accounts ([Route defaults](../slash-commands/README.md#route-defaults)). A conversation
   routed to a Workflow retires its bound session too — a Workflow mints no
   binding, so a session left behind would post beside the run. Retiring is
   gated exactly like starting: an inbound the route would not admit changes

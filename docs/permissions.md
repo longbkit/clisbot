@@ -67,6 +67,14 @@ Administrator switches the session to daemon resource mode: no Project filter, a
 therefore no Agent configuration ceiling either. A Host level keeps the session in
 Project mode, so provider and model limits still apply to every Project it reaches.
 
+A Channel account assignment carries channel authority, not Project authority.
+**Use** (`channel.use`) lets a sender talk in the conversations its constraint
+names. **Manage** (`channel.manage`) also lets them change that Channel Route's
+Route defaults from a conversation, and requires the All conversations constraint;
+an organization owner or admin holds it without an assignment. What the Route may
+start is still bounded by the sender's own Project grants, through delegation. See
+[Route defaults](features/slash-commands/README.md#route-defaults).
+
 ### Approval leaves
 
 Every pending permission request maps to exactly one `approval.*` leaf. A tool

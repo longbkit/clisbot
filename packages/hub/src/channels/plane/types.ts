@@ -416,7 +416,11 @@ export interface ChannelPlaneDeps {
   commandAccess?: Pick<
     import("../../access/store.js").AccessStore,
     "authorizeChannelPrivilege" | "resolveChannelAgentConfigurations" | "resolveChannelMember"
-  >;
+  > &
+    Partial<Pick<import("../../access/store.js").AccessStore, "authorizeChannelAccountManagement">>;
+  /** Publishes a Route default from a conversation; absent = the route-default
+   * commands answer that the Hub cannot change Routes from here. */
+  routeDefaults?: import("../route-defaults/publish.js").RouteDefaultPublisher;
   appWebUrl?: string;
   cancelWorkflowRuns?: (input: {
     organizationId: string;

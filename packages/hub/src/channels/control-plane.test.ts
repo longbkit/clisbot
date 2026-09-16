@@ -657,4 +657,37 @@ describe("createChannelAgentSpecResolver", () => {
       branch: "release/next",
     });
   });
+  it("starts the Route's default Agent controls instead of the named agent's", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    const target = {
+      kind: "agent" as const,
+      agent: "codex-safe",
+      environment: "work",
+      template: null,
+    };
+    const config = resolver(
+      target,
+      {
+        ...RELAY_DEFAULTS,
+        agentControls: { provider: "claude", model: "claude-opus-5", thinkingOptionId: "high" },
+      },
+      BINDING_REF,
+    );
+    // Another provider drops the named agent's model, Fast mode and options.
+    assert.equal(config.provider, "claude");
+    assert.equal(config.model, "claude-opus-5");
+    assert.equal(config.thinkingOptionId, "high");
+    assert.equal(config.featureValues, undefined);
+    assert.equal(config.providerOptions, undefined);
+    const sameProvider = resolver(
+      target,
+      { ...RELAY_DEFAULTS, agentControls: { model: "gpt-5.6-luna" } },
+      BINDING_REF,
+    );
+    assert.equal(sameProvider.model, "gpt-5.6-luna");
+    assert.deepEqual(sameProvider.featureValues, { fast_mode: true });
+  });
 });

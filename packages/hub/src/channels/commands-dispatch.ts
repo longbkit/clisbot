@@ -24,6 +24,8 @@ import {
   validateAgentConfigurationAuthority,
 } from "./commands-config.js";
 import type { ChannelLifecycleCommands, LifecycleCommandContext } from "./commands-lifecycle.js";
+import { promoteRouteDefault, routeDefaultText } from "./commands-route-default.js";
+import type { AgentControls } from "./config/agent-controls.js";
 
 export interface CommandDispatcherDependencies {
   plane: ChannelPlaneDeps;
@@ -98,6 +100,8 @@ export class ChannelCommandDispatcher {
       if (context.route.target.kind === "workflow") return this.workflow(command, context);
       const lifecycle = await this.deps.lifecycle.handle(command, context);
       if (lifecycle) return lifecycle;
+      if (command.name === "routedefault" || command.name === "promoteroutedefault")
+        return this.routeDefault(command, context);
       if (["agent", "provider", "model", "effort", "permission"].includes(command.name)) {
         return this.configuration(
           command as Parameters<typeof runConfigurationCommand>[0]["command"],
@@ -133,8 +137,12 @@ export class ChannelCommandDispatcher {
       privilege,
       context.accessTarget,
     );
-    const allowed = await plane.commandAccess?.authorizeChannelPrivilege(request);
-    if (!allowed?.allowed) return `/${command.name} requires ${privilege} access here.`;
+    // Changing a Route is authority over the account, not over a Project.
+    const allowed =
+      privilege === "channel.manage"
+        ? (await plane.commandAccess?.authorizeChannelAccountManagement?.(request)) !== undefined
+        : (await plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed === true;
+    if (!allowed) return `/${command.name} requires ${privilege} access here.`;
     return undefined;
   }
 
@@ -143,16 +151,37 @@ export class ChannelCommandDispatcher {
     capability?: import("./plane/types.js").ChannelReplyAgentCapability,
     validate = true,
   ): Promise<CreateAgentConfig> {
-    const { message, account, route } = context;
-    if (route.target.kind !== "agent") throw new Error("A direct route is required.");
     const selection = await this.deps.store.access.findConversationSelection(
       this.selectionKey(context),
     );
-    const defaults =
-      capability === undefined && route.defaults.outbound.path === "tool"
-        ? { ...route.defaults, outbound: { ...route.defaults.outbound, path: "relay" as const } }
-        : route.defaults;
-    const base = this.deps.plane.resolveAgentSpec(
+    const config = resolveConversationConfiguration(
+      this.routeConfig(context, undefined, capability),
+      selection,
+    );
+    if (validate) {
+      const decision = await this.authorizeConfiguration({ ...context, config });
+      if (!decision.allowed) throw new Error(decision.reason);
+    }
+    return config;
+  }
+
+  /** What the Route starts for this conversation, before the conversation's own choice. */
+  routeConfig(
+    context: LifecycleCommandContext,
+    override?: { agentControls: AgentControls | undefined },
+    capability?: import("./plane/types.js").ChannelReplyAgentCapability,
+  ): CreateAgentConfig {
+    const { message, account, route } = context;
+    if (route.target.kind !== "agent") throw new Error("A direct route is required.");
+    const { agentControls: _controls, ...routeDefaults } = route.defaults;
+    const defaults = {
+      ...(override === undefined ? route.defaults : routeDefaults),
+      ...(override?.agentControls === undefined ? {} : { agentControls: override.agentControls }),
+      ...(capability === undefined && route.defaults.outbound.path === "tool"
+        ? { outbound: { ...route.defaults.outbound, path: "relay" as const } }
+        : {}),
+    };
+    return this.deps.plane.resolveAgentSpec(
       route.target,
       defaults,
       {
@@ -162,12 +191,6 @@ export class ChannelCommandDispatcher {
       },
       capability,
     );
-    const config = resolveConversationConfiguration(base, selection);
-    if (validate) {
-      const decision = await this.authorizeConfiguration({ ...context, config });
-      if (!decision.allowed) throw new Error(decision.reason);
-    }
-    return config;
   }
 
   async authorizeConfiguration(input: {
@@ -339,6 +362,39 @@ export class ChannelCommandDispatcher {
     };
   }
 
+  private async routeDefault(
+    command: Extract<ChannelTextCommand, { name: "routedefault" | "promoteroutedefault" }>,
+    context: LifecycleCommandContext,
+  ): Promise<CommandResult> {
+    const deps = {
+      plane: this.deps.plane,
+      store: this.deps.store,
+      routeConfig: this.routeConfig.bind(this),
+      conversationConfig: this.conversationConfig.bind(this),
+      selectionKey: this.selectionKey.bind(this),
+    };
+    if (command.name === "routedefault")
+      return this.reply(context, await routeDefaultText(deps, context), "routedefault");
+    const result = await promoteRouteDefault(deps, context, command.value);
+    const replied = await this.reply(context, result.text, "promoteroutedefault");
+    // Reply first: applying the revision can replace this account's plane.
+    if (result.published) this.deps.plane.routeDefaults?.apply();
+    return replied;
+  }
+
+  /** The conversation's own choice, else its live session, else what the Route starts. */
+  private async conversationConfig(context: LifecycleCommandContext): Promise<CreateAgentConfig> {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    const route = this.routeConfig(context);
+    if (selection !== undefined) return resolveConversationConfiguration(route, selection);
+    const agent = context.agentId
+      ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
+      : undefined;
+    return agent === undefined ? route : snapshotConfiguration(route, agent);
+  }
+
   private async extension(
     command: Extract<ChannelTextCommand, { name: "skill" | "command" }>,
     context: LifecycleCommandContext,
@@ -464,7 +520,7 @@ export class ChannelCommandDispatcher {
 }
 
 function isMutation(command: ChannelTextCommand): boolean {
-  if (["help", "me", "status", "cowork"].includes(command.name)) return false;
+  if (["help", "me", "status", "cowork", "routedefault"].includes(command.name)) return false;
   if (
     ["agent", "provider", "model", "effort", "permission", "skill", "command"].includes(
       command.name,

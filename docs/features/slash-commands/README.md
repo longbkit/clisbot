@@ -29,14 +29,15 @@ conversation-visibility constraint.
 Each privilege, and what it unlocks — grant these to a Member, Team, or the Guest
 group:
 
-| Privilege         | What it unlocks                                               | Commands                                                                                                                                         |
-| ----------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| _public_          | anyone, even an unlinked guest                                | `/help`, `/me`                                                                                                                                   |
-| `channel.use`     | use the channel account (chat) — the baseline to give a Guest | — (floor, not tied to a command)                                                                                                                 |
-| `agent.interact`  | drive the bound session                                       | `/status`, `/cowork`, `/stop`, `/steer`, `/queue`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/skill`, `/command` (list/search) |
-| `agent.create`    | start or rebind a session                                     | `/new`, `/resume`, `/fork`, `/side`, `/quick`                                                                                                    |
-| `approval.config` | manage dynamic commands                                       | `/command add`, `/command remove`                                                                                                                |
-| `approval.*`      | answer or suppress prompts                                    | `/approve`, `/deny`; an unattended `/permission` mode                                                                                            |
+| Privilege         | What it unlocks                                               | Commands                                                                                                                                                          |
+| ----------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _public_          | anyone, even an unlinked guest                                | `/help`, `/me`                                                                                                                                                    |
+| `channel.use`     | use the channel account (chat) — the baseline to give a Guest | — (floor, not tied to a command)                                                                                                                                  |
+| `agent.interact`  | drive the bound session                                       | `/status`, `/cowork`, `/stop`, `/steer`, `/queue`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/skill`, `/command` (list/search), `/routedefault` |
+| `agent.create`    | start or rebind a session                                     | `/new`, `/resume`, `/fork`, `/side`, `/quick`                                                                                                                     |
+| `approval.config` | manage dynamic commands                                       | `/command add`, `/command remove`                                                                                                                                 |
+| `approval.*`      | answer or suppress prompts                                    | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                             |
+| `channel.manage`  | change a Channel Route's Route defaults³                      | `/promoteroutedefault`                                                                                                                                            |
 
 The per-command **Requires** columns below repeat this at the row level.
 
@@ -62,6 +63,12 @@ approval-authority checks, not a single privilege.
 requires `agent.fast.use`. This check applies to profile discovery/application,
 live configuration, session creation and `/resume`; ordinary configuration or
 creation privileges do not imply Fast mode access.
+³ `channel.manage` is checked by `authorizeChannelAccountManagement`, not
+`authorizeChannelPrivilege`: an organization owner or admin holds it, and so does
+a Member or Team assigned the **Manage** level on that Channel Route. The Manage
+level requires the All conversations constraint, because a Route can match
+conversations outside a narrower list. A Guest never holds it. See
+[Route defaults](#route-defaults).
 
 ### Discovery, configuration, and additional session controls
 
@@ -85,6 +92,8 @@ Implementation and verification notes are in [implementation-plan.md](implementa
 | `/fork [message]`                                               | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | agent.create            |   •    |     —      |
 | `/side <message>`                                               | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | agent.create            |   •    |     —      |
 | `/quick <message>`                                              | One-off question in a fresh, unrelated session; binding unchanged.                                             | agent.create            |   •    |     —      |
+| `/routedefault`                                                 | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | agent.interact          |   •    |     —      |
+| `/promoteroutedefault` · `/promoteroutedefault undo`            | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³         |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -193,12 +202,18 @@ Names are the contract users learn; these are chosen against
   "permission"; providers like Claude Code literally call it "permission mode".
   `/permission` sets `modeId`; `/mode` is the glossary-aligned alias. Distinct
   from `/approve`/`/deny`, which answer an open permission _prompt_.
+- **`/routedefault` / `/promoteroutedefault`** — "route" is the glossary's
+  **Route**, the ordered rule inside a Channel Route. The write is one long word on
+  purpose: it reaches conversations other than the caller's, so it should be
+  typed deliberately, and `promote` says the direction — from this conversation
+  up to its Route.
 - **`/fork` / `/side` / `/quick`** — the two axes are context (forked vs fresh)
   and whether it takes over the binding; `/fork` = fork + continue here, `/side` =
   fork + one-off, `/quick` = fresh + one-off. See [Starting sessions](#starting-sessions).
 - **Commands covered by this feature** — `/cowork`, `/me`, `/resume`, `/steer`,
   `/queue`, `/provider`, `/effort`, `/permission`, `/skill`, `/command`, `/fork`,
-  `/side`, `/quick`, plus `list`/`search` on `/model`. `/status`, `/stop`, `/new`,
+  `/side`, `/quick`, `/routedefault`, `/promoteroutedefault`, plus `list`/`search`
+  on `/model`. `/status`, `/stop`, `/new`,
   `/agent`, `/model`, `/help`, `/approve`, `/deny` already ship.
 
 ## Invocation: one parser, every channel
@@ -292,8 +307,48 @@ selection explicitly overrides them. Authorization checks this resulting bundle,
 including any preserved Fast mode or unattended features.
 
 Selections persist across `/new` and layer over the route defaults. They never
-rewrite the immutable, organization-owned Channel revision. The Hub facade reuses
-existing daemon RPCs; this feature introduces no new daemon protocol.
+rewrite the immutable, organization-owned Channel revision; only
+`/promoteroutedefault` does ([Route defaults](#route-defaults)). The Hub facade
+reuses existing daemon RPCs; this feature introduces no new daemon protocol.
+
+## Route defaults
+
+Most changes are for the conversation you are in, so `/model`, `/provider` and
+the rest stay conversation-scoped. When the choice should apply to everyone the
+same Route serves, `/promoteroutedefault` makes this conversation's configuration
+the Route's default. The caller never names the Route: Routes match in order, by
+conversation and by message text (`contains`), so only the Hub knows which one
+served this message. That Route is the one changed, and `/routedefault` shows it.
+
+- **Where it lives.** The Route's `agentControls:` leaf (provider, model, mode,
+  thinking option, feature values) over the named `agent:` in `hub.yml`
+  (`channels/config/agent-controls.ts`). It changes one Route, not an agent that
+  other Routes and Automations share. A different provider replaces every
+  provider-specific value of the named agent; the same provider overrides field
+  by field. The leaf can also sit in an account's or the policy's `defaults:`;
+  the most specific layer's block wins whole.
+- **How it is written.** An ordinary Channel revision, through `deployRevision`:
+  the same compile guard, the same delegation check applied to the effective
+  agent, `createdByUserId` set to the Member, and `expectedRevisionId` so a
+  concurrent publish is refused rather than overwritten. The command refuses a
+  Route that changed since the running plane compiled it, ignoring an earlier
+  default change (`routeIdentity`).
+- **What happens to the conversation.** Its own selection is cleared, since the
+  Route now says the same thing. Its behavior does not change.
+- **What happens to running sessions.** Nothing. The default is not part of the
+  Route target, so bindings keep their sessions, and only the next session a
+  Route starts uses the new value. The supervisor adopts a revision that differs
+  only in `agentControls` in place (`route-defaults/signature.ts`,
+  `ChannelPlane.refresh`) instead of restarting accounts, because a restart
+  cancels Route-owned turns and retires reply capabilities in every account.
+- **Undo.** `/promoteroutedefault undo` restores the value the Route's default had
+  before its most recent change, published as a new revision. It reads the
+  revision history and stops where the Route itself was different, so it never
+  reaches past a reorder or an edit of the match, target or other defaults. A
+  second undo reapplies the change it undid.
+
+Replies are English, like every other command reply, until the Hub has locale
+support.
 
 ## Agent profiles and the route menu
 

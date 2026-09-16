@@ -81,6 +81,10 @@ export interface ChannelSupervisorOptions {
   publicBaseUrl?: string;
   appWebUrl?: string;
   commandAccess?: import("../plane/types.js").ChannelPlaneDeps["commandAccess"];
+  /** Delegation for a Route default published from a conversation: the Member
+   * may start everything the candidate revision's Routes start. Absent = the
+   * route-default commands cannot publish. */
+  authorizeChannelConfiguration?: import("../route-defaults/publish.js").RouteDefaultPublisherOptions["authorize"];
   cancelWorkflowRuns?: import("../plane/types.js").ChannelPlaneDeps["cancelWorkflowRuns"];
   readWorkflowRuns?: import("../plane/types.js").ChannelPlaneDeps["readWorkflowRuns"];
   /** The runtime handle: `ChannelStore` (org-scoped channel runtime state). */

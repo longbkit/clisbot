@@ -83,15 +83,17 @@ The same matrix appears per account under **Channels → Channel Integrations** 
 
 The same verbs work on every channel, with or without a leading `/`, and with or without a mention in front. An addressed `@bot /new` and a Telegram-style `/new@yourbot` both normalize to the same command.
 
-| Command             | What it does                                       |
-| ------------------- | -------------------------------------------------- |
-| `/new`, `/reset`    | Start a fresh agent session for this conversation. |
-| `/stop`, `/cancel`  | Stop what the agent is doing.                      |
-| `/status`, `/state` | Report what the conversation is bound to.          |
-| `/help`             | List the commands.                                 |
-| `/agent <name>`     | Switch this conversation to another agent.         |
-| `/model <name>`     | Switch this conversation to another model.         |
-| `/approve`, `/deny` | Answer a pending permission request.               |
+| Command                | What it does                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `/new`, `/reset`       | Start a fresh agent session for this conversation.                                   |
+| `/stop`, `/cancel`     | Stop what the agent is doing.                                                        |
+| `/status`, `/state`    | Report what the conversation is bound to.                                            |
+| `/help`                | List the commands.                                                                   |
+| `/agent <name>`        | Switch this conversation to another agent.                                           |
+| `/model <name>`        | Switch this conversation to another model.                                           |
+| `/approve`, `/deny`    | Answer a pending permission request.                                                 |
+| `/routedefault`        | Show the route serving this conversation and its default.                            |
+| `/promoteroutedefault` | Make this conversation's setup that route's default; `undo` reverts its last change. |
 
 Approve and deny also arrive as button presses where the platform has buttons.
 
@@ -110,6 +112,30 @@ A route that lists neither refuses both commands. A bare `/model` prints the
 menu. Switching ends the running session, because an agent's model is fixed when
 it starts; the next message opens a session on the new choice, and the choice
 outlives `/new`.
+
+## Route defaults
+
+A route starts new sessions with its `agent:` from `hub.yml`. `agentControls:`
+overrides that for one route without editing an agent other routes or
+automations share:
+
+```yaml
+routes:
+  - match: { kind: channel, ids: [C0APP], contains: deploy }
+    agent: worker
+    environment: repo
+    agentControls: { provider: claude, model: claude-opus-5, thinkingOptionId: high }
+```
+
+A different `provider` replaces the agent's model, mode, thinking option,
+feature values and options; the same provider overrides only the fields you set.
+
+`/promoteroutedefault` writes this leaf from a conversation: it publishes a new
+Channel revision that makes the conversation's current setup the default of the
+route that served it. It needs `channel.manage` — an organization owner or admin,
+or **Manage** on that Channel Route in Access — and the default must be something
+the sender could start themselves. Running sessions keep their setup; the next
+session on the route uses the new default, and no account restarts.
 
 ## Where a conversation's work lands
 

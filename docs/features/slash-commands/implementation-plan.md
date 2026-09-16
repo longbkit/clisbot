@@ -102,6 +102,52 @@ Implementation decisions that resolve earlier contradictory prose:
   file-size guideline. This change extracts command handlers and reduces its
   command logic; splitting unrelated orchestration is outside this change.
 
+### Route defaults (2026-09-16)
+
+`/routedefault` and `/promoteroutedefault [undo]` implement
+[Route defaults](README.md#route-defaults). Code: `commands-route-default.ts`,
+`route-defaults/{files,publish,signature}.ts`, `config/agent-controls.ts`, and
+`AccessStore.authorizeChannelAccountManagement`.
+
+Decisions, with the options that lost:
+
+- **The Route is implicit.** Naming a Route from chat was rejected: `contains`
+  and first-match order mean a sender cannot tell which Route served them.
+- **A Route leaf, not a shared agent edit.** Writing the named `hub.yml` agent
+  would change every Route and Automation that shares it. A generated
+  per-Route copy of the agent was rejected as registry clutter with no owner.
+- **A revision, not a side table.** A per-Route row outside the revision would
+  skip the compile guard, delegation, history and the Hub UI view.
+- **Not part of the target.** Putting the default in the target would release
+  every binding on the Route and mint new sessions at the next message.
+- **Refresh in place.** Every revision previously restarted every account,
+  cancelling Route-owned turns and retiring reply capabilities org-wide. A
+  revision that differs only in `agentControls` is now adopted by
+  `ChannelPlane.refresh`; any other difference still restarts.
+- **Undo from history.** No undo store: the previous value is read from revision
+  history, bounded by the Route's own identity.
+- **`channel.manage` per Channel Route.** A `manage` access level on
+  `channel_account`, requiring the All conversations constraint, beside the
+  owner/admin role capability.
+
+Verification: 23 new tests pass — `route-defaults/route-defaults.test.ts` (8),
+`route-defaults/publish.test.ts` (5, memory database),
+`commands-route-default.test.ts` (8), `access/channel-account-management.test.ts`
+(1, embedded database), `access/delegation-route-defaults.test.ts` (1) — plus a
+resolver case in `control-plane.test.ts`. Existing files for the touched modules
+pass: `config/compile.test.ts`, `commands.test.ts`, `commands-config.test.ts`,
+`supervisor/supervisor.test.ts`, `access/channel-privilege.test.ts`,
+`execution/execution.test.ts` (76, 1 existing skip). Hub typecheck and targeted
+lint pass.
+
+Limits:
+
+- **No live channel E2E yet.** `refreshInPlace` is covered only through the
+  signature tests; the supervisor unit harness cannot start an account.
+- **The Hub UI still gates channel configuration on the organization role.** A
+  Member with Manage on one Channel Route can change its default from chat but
+  not from Settings. Scoping the management API by account is open.
+
 The audit below records the **2026-09-07 baseline**, before this implementation.
 Its line numbers and descriptions of missing code are historical evidence.
 The README and the status above describe the current behavior.

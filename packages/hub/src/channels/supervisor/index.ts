@@ -118,6 +118,11 @@ import { isSettledTransport, monitorFailureTransport } from "./needs-login.js";
 import { runQrLoginVerb, type QrLoginResult, type QrLoginVerb } from "./qr-login.js";
 import { openChannelSecretStateBackend } from "../state/secret-backend.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
+import {
+  createRouteDefaultPublisher,
+  type RouteDefaultPublisher,
+} from "../route-defaults/publish.js";
+import { revisionSignature } from "../route-defaults/signature.js";
 import type {
   ChannelAccountStartResult,
   ChannelAccountStatusEntry,
@@ -515,6 +520,8 @@ interface AccountHandle {
   accountId: string;
   organizationId?: string;
   revisionId: string | null;
+  /** The running revision apart from Route defaults (`route-defaults/signature.ts`). */
+  revisionSignature?: string;
   connectionId?: string;
   resolveConversation?: (
     to: string,
@@ -604,6 +611,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private readonly accountState = new Map<string, HostKeyedStoreRoot>();
   /** Hub-wide retention for the durable queue; one timer, every organization. */
   private readonly retentionSweep: ChannelIngressRetentionSweep;
+  /** `/promoteroutedefault`'s writer; absent without a delegation check. */
+  private readonly routeDefaults: RouteDefaultPublisher | undefined;
 
   constructor(options: ChannelSupervisorOptions) {
     this.options = options;
@@ -626,6 +635,23 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     });
     this.pinsPath =
       options.pinsPath ?? fileURLToPath(new URL("../../../channel-pins.json", import.meta.url));
+    this.routeDefaults =
+      options.authorizeChannelConfiguration === undefined
+        ? undefined
+        : createRouteDefaultPublisher({
+            database: options.database,
+            ...(options.publicBaseUrl === undefined
+              ? {}
+              : { publicBaseUrl: options.publicBaseUrl }),
+            authorize: options.authorizeChannelConfiguration,
+            apply: () => {
+              void this.reconcile().catch((error: unknown) => {
+                this.logger.warn("channel reconcile after a route default failed", {
+                  error: errorMessage(error),
+                });
+              });
+            },
+          });
     // The bound seam module (a separate compilation, drive-time) reports its
     // no-runtime miss through this sink; without it the miss is a silent
     // no-dispatch the operator cannot see (seam-logger.ts).
@@ -726,6 +752,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         this.startTransport(handle, snapshot, compiled, loaded),
       );
       handle.revisionId = snapshot.revision?.id ?? null;
+      handle.revisionSignature = revisionSignature(snapshot);
       handle.transport = "started";
       delete handle.detail;
       return {
@@ -815,9 +842,34 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       ) {
         continue;
       }
+      if (handle !== undefined && this.refreshInPlace(handle, snapshot)) continue;
       accounts.push(await this.startAccount(account.channel, account.accountId));
     }
     return { accounts, stopped };
+  }
+
+  /**
+   * Adopt a revision that changes only Route default Agent controls without a
+   * restart, which would cancel the account's running turns. Anything else, or
+   * an account that is not running, takes the restart path.
+   */
+  private refreshInPlace(handle: AccountHandle, snapshot: ChannelControlPlaneSnapshot): boolean {
+    if (
+      handle.plane === undefined ||
+      handle.transport !== "started" ||
+      handle.revisionSignature === undefined ||
+      handle.revisionSignature !== revisionSignature(snapshot)
+    ) {
+      return false;
+    }
+    handle.plane.refresh({
+      channelRevisionId: snapshot.revision?.id ?? null,
+      controlPlane: snapshot.controlPlane,
+      resolveAgentSpec: snapshot.resolveAgentSpec,
+      resolveAgentAccessTarget: snapshot.resolveAgentAccessTarget,
+    });
+    handle.revisionId = snapshot.revision?.id ?? null;
+    return true;
   }
 
   status(): readonly ChannelAccountStatusEntry[] {
@@ -1257,7 +1309,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       normalizeInbound: flatInboundNormalizer,
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
-      ...commandPlaneOptions(this.options),
+      ...commandPlaneOptions(this.options, this.routeDefaults),
       ...(this.options.authorizeChannelUse === undefined
         ? {}
         : { authorizeChannelUse: this.options.authorizeChannelUse }),
@@ -2100,8 +2152,12 @@ export function createChannelSupervisor(options: ChannelSupervisorOptions): Chan
   return new ChannelSupervisorImpl(options);
 }
 
-function commandPlaneOptions(options: ChannelSupervisorOptions) {
+function commandPlaneOptions(
+  options: ChannelSupervisorOptions,
+  routeDefaults: RouteDefaultPublisher | undefined,
+) {
   return {
+    ...(routeDefaults ? { routeDefaults } : {}),
     ...(options.commandAccess ? { commandAccess: options.commandAccess } : {}),
     ...(options.readWorkflowRuns ? { readWorkflowRuns: options.readWorkflowRuns } : {}),
     ...(options.cancelWorkflowRuns ? { cancelWorkflowRuns: options.cancelWorkflowRuns } : {}),

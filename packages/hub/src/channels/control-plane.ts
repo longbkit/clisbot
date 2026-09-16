@@ -37,6 +37,7 @@ import {
   type RouteTarget,
 } from "./config/compile.js";
 import { TriggerDocumentError } from "../triggers/configuration/index.js";
+import { applyAgentControls } from "./config/agent-controls.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
@@ -198,16 +199,21 @@ export async function assertOpenAudienceTargetSafety(
   const openTargets = controlPlane.accounts.flatMap((account) =>
     account.routes.flatMap((route, index) =>
       route.audience?.kind === "conversationParticipants"
-        ? [{ accountId: account.accountId, index, target: route.target }]
+        ? [{ accountId: account.accountId, index, target: route.target, defaults: route.defaults }]
         : [],
     ),
   );
   const records = triggerRecords ?? (await database.listOrganizationTriggers(organizationId));
   const triggerByName = new Map(records.map((trigger) => [trigger.name, trigger]));
-  for (const { accountId, index, target } of openTargets) {
+  for (const { accountId, index, target, defaults } of openTargets) {
     const path = ["channel-accounts", accountId, "routes", index, "target"] as const;
     if (target.kind === "agent") {
-      appendOpenAudienceAgentIssues([bundle.agents[target.agent]], path, issues);
+      const agent = bundle.agents[target.agent];
+      appendOpenAudienceAgentIssues(
+        [agent === undefined ? undefined : applyAgentControls(agent, defaults.agentControls)],
+        path,
+        issues,
+      );
       continue;
     }
     const trigger = triggerByName.get(target.workflow);
@@ -414,10 +420,11 @@ export function createChannelAgentSpecResolver(
     ),
   );
   return (target, defaults, bindingRef, capability, overrides) => {
-    const agent = bundle.agents[target.agent];
-    if (agent === undefined) {
+    const named = bundle.agents[target.agent];
+    if (named === undefined) {
       throw new ChannelAgentSpecError(`unknown agent "${target.agent}"`);
     }
+    const agent = applyAgentControls(named, defaults.agentControls);
     const environment = environments.get(target.environment);
     if (environment === undefined || environment.kind !== "daemon") {
       throw new ChannelAgentSpecError(

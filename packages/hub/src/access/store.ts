@@ -3,6 +3,7 @@ import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { load } from "js-yaml";
 import { z } from "zod";
 import { AccountFileSchema } from "../channels/config/schema.js";
+import { capabilitiesFor, parseOrganizationRole } from "../auth/organization-policy.js";
 import type { WorktreeTarget } from "../config/schema.js";
 import { CHANNELS_DIRECTORY, CHANNEL_POLICY_PATH } from "../config/bundle-contract.js";
 import * as schema from "../db/schema.js";
@@ -65,7 +66,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.channel",
     "approval.other",
   ]),
-  channel_account: new Set(["channel.use"]),
+  channel_account: new Set(["channel.use", "channel.manage"]),
   automation: new Set(["automation.run"]),
 };
 
@@ -1082,6 +1083,36 @@ export class AccessStore {
     return authority.unrestricted || authority.privileges.includes(input.privilege);
   }
 
+  /**
+   * Whether a channel sender may change this Channel Route's configuration:
+   * an organization role that manages channels, or `channel.manage` assigned on
+   * this account. Returns the linked Member so the change is published, and
+   * delegation is checked, under that Member. A Guest never manages a Route.
+   */
+  async authorizeChannelAccountManagement(input: {
+    organizationId: string;
+    connectionId: string;
+    channel: string;
+    accountId: string;
+    senderIdentity: string;
+  }): Promise<{ membershipId: string; userId: string } | undefined> {
+    const identity = await this.resolveChannelMember(input);
+    if (identity === undefined) return undefined;
+    const principal = { membershipId: identity.membershipId, userId: identity.userId };
+    const role = parseOrganizationRole(identity.role);
+    if (role !== undefined && capabilitiesFor(role).manageChannels) return principal;
+    const resourceId = formatChannelAccountResourceId(input.channel, input.accountId);
+    const assignments = await this.channelSubjectAssignments(input, identity);
+    const managed = assignments.some(
+      (assignment) =>
+        assignment.resourceKind === "channel_account" &&
+        assignment.resourceId === resourceId &&
+        assignment.privileges.includes("channel.manage") &&
+        assignment.constraints.conversation?.kind === "all",
+    );
+    return managed ? principal : undefined;
+  }
+
   async resolveChannelMember(input: {
     organizationId: string;
     connectionId: string;
@@ -1553,6 +1584,18 @@ function validateConstraints(assignment: AccessAssignmentInput): void {
     throw new AccessPolicyError(
       "invalid_assignment",
       "channel.use requires a Conversation constraint",
+    );
+  }
+  if (
+    assignment.resourceKind === "channel_account" &&
+    assignment.privileges.includes("channel.manage") &&
+    assignment.constraints.conversation?.kind !== "all"
+  ) {
+    // A Route can match conversations outside a narrower list, so changing it
+    // is authority over the whole account.
+    throw new AccessPolicyError(
+      "invalid_assignment",
+      "channel.manage requires the All conversations constraint",
     );
   }
   if (
