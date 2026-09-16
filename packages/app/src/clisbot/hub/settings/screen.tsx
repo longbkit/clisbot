@@ -51,6 +51,8 @@ import { ProviderApplicationSettings } from "./provider-application-settings";
 import { HubHostOnboardingSection } from "../host-onboarding-section";
 import { hubResourceQueryKey } from "../query-keys";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
+import { capitalizeLabel as channelLabel } from "./labels";
+import { TeamMembersSection } from "./team-members-section";
 import {
   parseInvitationEmails,
   sendInvitations,
@@ -859,6 +861,44 @@ function TeamSettings() {
     },
     [assignments, hub, run, teams],
   );
+  /** Adds each picked Member in turn and returns the ones Hub refused, so they stay picked. */
+  const addTeamMembers = useCallback(
+    async (teamId: string, userIds: string[]) => {
+      const notAdded: string[] = [];
+      await run(async () => {
+        let reason = "Hub request failed.";
+        for (const userId of userIds) {
+          try {
+            await hub
+              .api()
+              .post(
+                `teams/${encodeURIComponent(teamId)}/members`,
+                { userId },
+                HubTeamMembershipSchema,
+              );
+          } catch (error) {
+            notAdded.push(userId);
+            if (error instanceof Error) reason = error.message;
+          }
+        }
+        // Members too: a refusal can mean the person left the organization, and they should
+        // leave the picker instead of staying selected for a retry that cannot succeed.
+        await Promise.all([
+          teams.refetch(),
+          assignments.refetch(),
+          ...(notAdded.length > 0 ? [members.refetch()] : []),
+        ]);
+        if (notAdded.length > 0) {
+          const added = userIds.length - notAdded.length;
+          throw new Error(
+            `Added ${String(added)} of ${String(userIds.length)} Members. ${reason} The rest are still selected.`,
+          );
+        }
+      });
+      return notAdded;
+    },
+    [assignments, hub, members, run, teams],
+  );
   const renameTeam = useCallback(
     (teamId: string, name: string) =>
       run(async () => {
@@ -951,6 +991,7 @@ function TeamSettings() {
       select={setSelection}
       clearSelection={clearSelection}
       setTeamMembership={setTeamMembership}
+      addTeamMembers={addTeamMembers}
       renameTeam={renameTeam}
       removeTeam={removeTeam}
       removeMember={removeMember}
@@ -1061,6 +1102,7 @@ function SelectedTeamDetail({
   mutationError,
   back,
   setMembership,
+  addMembers,
   renameTeam,
   removeTeam,
   manageAccess,
@@ -1075,11 +1117,20 @@ function SelectedTeamDetail({
   mutationError: string | null;
   back(): void;
   setMembership(teamId: string, userId: string, included: boolean): void;
+  addMembers(teamId: string, userIds: string[]): Promise<string[]>;
   renameTeam(teamId: string, name: string): Promise<void>;
   removeTeam(teamId: string, name: string): Promise<void>;
   manageAccess(): void;
 }) {
   const rename = useCallback((name: string) => renameTeam(team.id, name), [renameTeam, team.id]);
+  const addTeamMembers = useCallback(
+    (userIds: string[]) => addMembers(team.id, userIds),
+    [addMembers, team.id],
+  );
+  const removeTeamMember = useCallback(
+    (userId: string) => setMembership(team.id, userId, true),
+    [setMembership, team.id],
+  );
   const remove = useCallback(
     () => removeTeam(team.id, team.name),
     [removeTeam, team.id, team.name],
@@ -1095,7 +1146,8 @@ function SelectedTeamDetail({
       canManage={canManage}
       mutationError={mutationError}
       back={back}
-      setMembership={setMembership}
+      addMembers={addTeamMembers}
+      removeMember={removeTeamMember}
       rename={rename}
       remove={remove}
       manageAccess={manageAccess}
@@ -1137,6 +1189,7 @@ function TeamSettingsView({
   select,
   clearSelection,
   setTeamMembership,
+  addTeamMembers,
   renameTeam,
   removeTeam,
   removeMember,
@@ -1175,6 +1228,7 @@ function TeamSettingsView({
   select(value: TeamSelection): void;
   clearSelection(): void;
   setTeamMembership(teamId: string, userId: string, included: boolean): void;
+  addTeamMembers(teamId: string, userIds: string[]): Promise<string[]>;
   renameTeam(teamId: string, name: string): Promise<void>;
   removeTeam(teamId: string, name: string): Promise<void>;
   removeMember(memberId: string, name: string): Promise<void>;
@@ -1223,6 +1277,7 @@ function TeamSettingsView({
         mutationError={mutationError}
         back={clearSelection}
         setMembership={setTeamMembership}
+        addMembers={addTeamMembers}
         renameTeam={renameTeam}
         removeTeam={removeTeam}
         manageAccess={manageAccess}
@@ -1346,6 +1401,7 @@ function SelectedTeamFromQueries({
   mutationError,
   back,
   setMembership,
+  addMembers,
   renameTeam,
   removeTeam,
   manageAccess,
@@ -1359,6 +1415,7 @@ function SelectedTeamFromQueries({
   mutationError: string | null;
   back(): void;
   setMembership(teamId: string, userId: string, included: boolean): void;
+  addMembers(teamId: string, userIds: string[]): Promise<string[]>;
   renameTeam(teamId: string, name: string): Promise<void>;
   removeTeam(teamId: string, name: string): Promise<void>;
   manageAccess(): void;
@@ -1375,6 +1432,7 @@ function SelectedTeamFromQueries({
       mutationError={mutationError}
       back={back}
       setMembership={setMembership}
+      addMembers={addMembers}
       renameTeam={renameTeam}
       removeTeam={removeTeam}
       manageAccess={manageAccess}
@@ -2149,7 +2207,8 @@ function TeamDetail({
   canManage,
   mutationError,
   back,
-  setMembership,
+  addMembers,
+  removeMember,
   rename,
   remove,
   manageAccess,
@@ -2163,7 +2222,8 @@ function TeamDetail({
   canManage: boolean;
   mutationError: string | null;
   back(): void;
-  setMembership(teamId: string, userId: string, included: boolean): void;
+  addMembers(userIds: string[]): Promise<string[]>;
+  removeMember(userId: string): void;
   rename(name: string): Promise<void>;
   remove(): Promise<void>;
   manageAccess(): void;
@@ -2209,26 +2269,14 @@ function TeamDetail({
           </View>
         ) : null}
       </SettingsSection>
-      <SettingsSection title="Members">
-        <View style={settingsStyles.card}>
-          {members.length === 0 ? (
-            <EmptyRow message="No Members are available" />
-          ) : (
-            members.map((member, index) => (
-              <TeamMemberMembershipRow
-                key={member.id}
-                teamId={team.id}
-                member={member}
-                included={team.userIds.includes(member.userId)}
-                bordered={index > 0}
-                pending={pending}
-                canManage={canManage}
-                setMembership={setMembership}
-              />
-            ))
-          )}
-        </View>
-      </SettingsSection>
+      <TeamMembersSection
+        teamUserIds={team.userIds}
+        members={members}
+        pending={pending}
+        canManage={canManage}
+        addMembers={addMembers}
+        removeMember={removeMember}
+      />
       <SettingsSection title="Access">
         <AccessSummary
           entries={teamAssignments.map((assignment) => ({ assignment, source: team.name }))}
@@ -2248,47 +2296,6 @@ function TeamDetail({
             Delete Team
           </Button>
         </SettingsSection>
-      ) : null}
-    </View>
-  );
-}
-
-function TeamMemberMembershipRow({
-  teamId,
-  member,
-  included,
-  bordered,
-  pending,
-  canManage,
-  setMembership,
-}: {
-  teamId: string;
-  member: HubMember;
-  included: boolean;
-  bordered: boolean;
-  pending: boolean;
-  canManage: boolean;
-  setMembership(teamId: string, userId: string, included: boolean): void;
-}) {
-  const toggle = useCallback(
-    () => setMembership(teamId, member.userId, included),
-    [included, member.userId, setMembership, teamId],
-  );
-  return (
-    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{member.name}</Text>
-        <Text style={settingsStyles.rowHint}>{channelLabel(member.role)}</Text>
-      </View>
-      {canManage ? (
-        <Button
-          size="xs"
-          variant={included ? "ghost" : "outline"}
-          disabled={pending}
-          onPress={toggle}
-        >
-          {included ? "Remove" : "Add"}
-        </Button>
       ) : null}
     </View>
   );
@@ -2699,11 +2706,6 @@ function StateMessage({ message }: { message: string }) {
       <Text style={settingsStyles.rowHint}>{message}</Text>
     </View>
   );
-}
-
-function channelLabel(value: string): string {
-  if (value.length === 0) return value;
-  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
 }
 
 function plural(count: number, singular: string, pluralValue = `${singular}s`): string {

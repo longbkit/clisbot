@@ -13,7 +13,7 @@ const hub = vi.hoisted(() => ({
   error: null,
   signedIn: null as Record<string, unknown> | null,
   inviteMember: vi.fn(async (_input: { email: string }) => {}),
-  api: () => ({ post: fixtures.post }),
+  api: () => ({ post: fixtures.post, delete: fixtures.delete }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
   registrationToken: null,
@@ -34,13 +34,42 @@ const fixtures = vi.hoisted(() => ({
     }
   >,
   push: vi.fn(),
-  post: vi.fn(async () => ({})),
+  post: vi.fn(async (_path: string, _body?: unknown) => ({})),
+  delete: vi.fn(async (_path: string) => {}),
+  notAdded: vi.fn(),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: fixtures.push }) }));
 vi.mock("@/data/query", () => ({
   useFetchQuery: ({ queryKey }: { queryKey: string[] }) => fixtures.queries[queryKey.at(-1)!],
 }));
 vi.mock("./managed-host-row", () => ({ ManagedHostRow: () => null }));
+// The section is covered by team-members-section.test.tsx (its Combobox pulls native-only
+// modules); this stub only exercises the wiring from the Team detail to the management API.
+vi.mock("./team-members-section", () => ({
+  TeamMembersSection: ({
+    addMembers,
+    removeMember,
+  }: {
+    addMembers(userIds: string[]): Promise<string[]>;
+    removeMember(userId: string): void;
+  }) => {
+    const add = React.useCallback(
+      () => void addMembers(["user-2", "user-3"]).then(fixtures.notAdded),
+      [addMembers],
+    );
+    const remove = React.useCallback(() => removeMember("user-1"), [removeMember]);
+    return (
+      <div>
+        <button type="button" onClick={add}>
+          Stub add
+        </button>
+        <button type="button" onClick={remove}>
+          Stub remove
+        </button>
+      </div>
+    );
+  },
+}));
 vi.mock("./connection-result", () => ({ HubConnectionResultNotice: () => null }));
 vi.mock("./connection-continuation", () => ({ HubConnectionContinuationNotice: () => null }));
 vi.mock("../use-connection-continuation", () => ({
@@ -335,6 +364,40 @@ describe("Team invitation review and access navigation", () => {
       pathname: "/settings/hub/[hubSection]",
       params: { hubSection: "access", subjectKind: kind, subjectId: id },
     });
+  });
+});
+
+describe("Team detail Members wiring", () => {
+  function openTeam() {
+    render(<HubSettingsContent section="team" />);
+    const section = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
+    fireEvent.click(within(section).getByRole("button", { name: "View" }));
+  }
+  it("adds each picked Member and reports the refused ones back to the picker", async () => {
+    fixtures.post.mockImplementation(async (_path: string, body?: unknown) => {
+      if ((body as { userId: string }).userId === "user-3") throw new Error("Member unavailable.");
+      return {};
+    });
+    openTeam();
+    fireEvent.click(screen.getByRole("button", { name: "Stub add" }));
+    await waitFor(() => expect(fixtures.notAdded).toHaveBeenCalledWith(["user-3"]));
+    expect(fixtures.post).toHaveBeenCalledWith(
+      "teams/team-1/members",
+      { userId: "user-2" },
+      expect.anything(),
+    );
+    expect(fixtures.queries.members!.refetch).toHaveBeenCalled();
+    expect(
+      screen.getByText("Added 1 of 2 Members. Member unavailable. The rest are still selected."),
+    ).toBeTruthy();
+    fixtures.post.mockImplementation(async () => ({}));
+  });
+  it("removes a Member from the Team, not from the organization", async () => {
+    openTeam();
+    fireEvent.click(screen.getByRole("button", { name: "Stub remove" }));
+    await waitFor(() =>
+      expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1/members/user-1"),
+    );
   });
 });
 

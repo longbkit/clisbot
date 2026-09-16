@@ -20,6 +20,8 @@ Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cầ
 
 Lời mời hết hạn sau **48 giờ**, gửi lại không gia hạn lời mời còn hạn. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Hết hạn thì gửi lại để tạo lời mời mới; muốn gia hạn sớm thì **Cancel** rồi gửi lại.
 
+Thêm Member đã có vào Team: mở Team, ở **Add Members** gõ tên hoặc email để tìm, chọn một hoặc nhiều người rồi bấm **Add to Team** / **Add N Members**. Danh sách bên dưới chỉ gồm người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team.
+
 Member mới không tự có quyền dùng tài nguyên. Nếu vào Team đã được cấp Access, người đó nhận các quyền của Team.
 
 ## Cấp quyền làm việc trên một Project cố định
