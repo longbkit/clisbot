@@ -15,7 +15,8 @@ import {
 import {
   commandAccessRequest,
   channelIdentityText,
-  channelSessionLink,
+  channelSessionLinks,
+  channelSessionLinkText,
 } from "./commands-context.js";
 import {
   runConfigurationCommand,
@@ -388,11 +389,12 @@ export class ChannelCommandDispatcher {
       (entry) => entry.id === context.agentId,
     );
     if (!agent) return this.reply(context, "The bound agent is unavailable.");
-    const link = channelSessionLink(
+    const links = channelSessionLinks(
       this.deps.daemon.getServerInfo?.()?.serverId,
       agent.id,
       this.deps.plane.appWebUrl,
     );
+    const link = links ? channelSessionLinkText(links) : undefined;
     if (command.name === "cowork")
       return this.reply(context, link ?? "The host has not provided a session link yet.", "cowork");
     if (command.name === "status") return this.reply(context, this.status(agent, link), "status");
@@ -502,10 +504,10 @@ function workflowRunsText(
       [
         `Run: ${run.id} (${run.status})`,
         ...run.steps.map((step) => {
-          const link = step.agentId
-            ? channelSessionLink(step.serverId, step.agentId, appWebUrl)
+          const links = step.agentId
+            ? channelSessionLinks(step.serverId, step.agentId, appWebUrl)
             : undefined;
-          return `${step.id}: ${step.status}${link ? `\n${link}` : ""}`;
+          return `${step.id}: ${step.status}${links ? `\n${channelSessionLinkText(links)}` : ""}`;
         }),
       ].join("\n"),
     )

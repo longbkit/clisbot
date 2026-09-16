@@ -16,7 +16,7 @@ Handlers are extracted into `commands-dispatch.ts`, `commands-config*.ts`, and
 | Area                              | Implemented behavior                                                                                                                                                                                      |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registry and native normalization | Shared command metadata, generated help, aliases and whole-message grammar; adapters normalize into the same parser.                                                                                      |
-| Info and cowork                   | Access-aware private output. `PASEO_HUB_APP_WEB_URL` selects the web app origin; otherwise links use `paseo://`.                                                                                          |
+| Info and cowork                   | Access-aware output, posted in the source conversation. A session link offers both destinations as labeled links; see [Session links](README.md#session-links) for why the app link is an https redirect. |
 | Lifecycle                         | `/new <message>`, authorized atomic `/resume`, transcript fork and auto-archived one-offs. Failed fork attachment/send restores the old binding; same-Agent resume preserves the current stream.          |
 | Turn control                      | `/steer` and in-memory FIFO `/queue`, with release-time access and running-state checks.                                                                                                                  |
 | Configuration                     | Grant-bounded catalogs and profiles; same-provider edits apply live, different-provider selections remain staged until `/new` or `/fork`.                                                                 |
@@ -66,9 +66,15 @@ Implementation decisions that resolve earlier contradictory prose:
   configuration. `fast_mode: true` requires the separate `agent.fast.use`
   privilege for profile discovery/application, live edits, minting and resume;
   unattended features retain their approval-privilege checks.
-- **Private ordinary-text replies use DMs on all channels.** Slack/Discord
-  ordinary messages do not contain native interaction tokens for ephemeral
-  responses. The private-output invariant is retained; no public fallback.
+- **Commands reply where they were invoked.** _Superseded 2026-09-16._ The
+  original rule sent identity, link and config output to a requester DM in a
+  public conversation, because Slack/Discord ordinary messages carry no native
+  interaction token for an ephemeral reply. Live Slack use showed the cost: the
+  caller sees nothing where they typed, so a delivered answer and an ignored
+  command look identical (`/model list`, then `/status` and `/cowork`, all read
+  as broken). A DM is not an ephemeral reply and does not behave like one.
+  Link exposure is now bounded by `agent.interact` plus Host authentication
+  rather than by delivery address.
 - **Subscribe before first prompt.** Fork/one-off creation is idle, stream
   subscription is awaited, then the first message carries the `chat_history`
   attachment. Sending `initialPrompt` during creation would race attachment.
@@ -217,7 +223,7 @@ agent <name> | model <name>` (`ChannelTextCommand`, `commands.ts:47`) plus
 | ~20 commands with arguments and sub-commands                        | 6 verbs; args on `/agent` `/model`                                  | Sub-command/search grammar + a command **registry** (metadata: name, aliases, args, privilege, route-kinds, handler)                                                                                          |
 | Generated help / discovery, `search`                                | one static help string                                              | Help + `list`/`search` render from the registry                                                                                                                                                               |
 | Per-conversation config: model/effort/mode live, provider on `/new` | `/agent`/`/model` ship (re-mint); selection store + live RPCs exist | Expose `set_agent_*`/`agent.config.apply` in the facade; apply live when provider unchanged; add `/provider` `/effort` `/permission` (scoped, qualified, confirm-triple); extend the existing selection store |
-| `/cowork` link, private in public convos                            | deep-link builder only                                              | Web-origin config to emit an `https://` link; wire `ephemeral`/`initiatorOnly`                                                                                                                                |
+| `/cowork` link                                                      | deep-link builder only                                              | Web-origin config to emit an `https://` link                                                                                                                                                                  |
 | `/resume <id>`, `/new <message>`                                    | `/new` only                                                         | Rebind to a given agentId; first-prompt on mint                                                                                                                                                               |
 | `/stop` cancels an automation run                                   | cancels the direct agent turn                                       | Resolve + cancel active Workflow run(s) for the route                                                                                                                                                         |
 | `/steer`, `/queue`                                                  | steer exists via `sendAgentMessage`; no channel command             | Direct-route commands mapping to steer / client-side hold                                                                                                                                                     |
@@ -225,7 +231,7 @@ agent <name> | model <name>` (`ChannelTextCommand`, `commands.ts:47`) plus
 | `/fork`, `/side`, `/quick` (fork / one-off sessions)                | fork + attach RPCs exist, not exposed                               | `buildAgentForkContext` + create `attachments`/`initialPrompt`/`autoArchive` in facade; transient reply routing for one-offs                                                                                  |
 | `/permission` (mode list/set)                                       | `list_provider_modes` + `set_agent_mode` exist                      | Expose both in the facade; gate unattended modes on `approval.*`                                                                                                                                              |
 | `/me`, richer `/status`                                             | identity-link command exists; basic `/status`                       | Read Member/access for `/me`; add link + context-left to `/status`                                                                                                                                            |
-| Access-gated commands                                               | org Access + channel hooks exist; no Guest subject                  | Gate each verb via `authorizeChannelPrivilege`; add the **Guest** subject to org Access; wire `/cowork` private reply                                                                                         |
+| Access-gated commands                                               | org Access + channel hooks exist; no Guest subject                  | Gate each verb via `authorizeChannelPrivilege`; add the **Guest** subject to org Access                                                                                                                       |
 
 ## Concerns raised, and how this plan answers them
 
@@ -309,7 +315,8 @@ crutch.
   model is a separate layer, not the channel command gate.
 - **No universal https link.** `/cowork` can emit `paseo://…` today; an
   `https://<origin>/h/<serverId>/agent/<agentId>` link needs the app's public web
-  origin — resolved below to an instance-level `appWebUrl`, `paseo://` fallback.
+  origin — resolved below to an instance-level `appWebUrl`, emitted beside the
+  `paseo://` link rather than replacing it.
 - **`/command add` needs a store + pass-through.** Dynamic commands are the
   largest new surface: a store of `name → prompt` plus expanding `/name` into the
   stored prompt before it reaches the agent. Scope resolved below to the channel
@@ -361,13 +368,14 @@ crutch.
   `/approve`/`/deny` = the open prompt's authority; `/help`/`/me` = public. An
   **unlinked** sender acts as the **Guest** group. This replaces the control-plane
   role projection (`CHANNEL_COMMAND_ROLE`) as the gate.
-- **Private replies** reuse the `ephemeral` route option (Slack/Discord) and the
-  `initiatorOnly` command pattern (`policy.ts:427`) for identity/link/config
-  output in public conversations.
+- **Replies stay in the conversation.** `initiatorOnly` (`policy.ts:427`) keeps
+  gating _who may act_; it never moves a reply. See the superseded private-reply
+  decision above.
 - **Deep link** via `buildAgentDeepLink` / `buildAgentDeepLinkRoute`
   (`packages/protocol/src/agent-deep-link.ts`); prepend an instance-level app web
   origin (`appWebUrl`, same pattern as `RuntimeConfiguration.publicUrl()` /
-  `publicBaseUrl`) for the https form, else emit the `paseo://` link.
+  `publicBaseUrl`) for the https form; the `paseo://` link is always emitted
+  beside it.
 - **Dynamic commands** live in a Hub DB table keyed by `(org, channel, accountId,
 name)` — shared, listable account config, not transient keyed-store state.
   `add`/`remove` need `approval.config`; a name equal to a platform reserved word
@@ -395,8 +403,8 @@ message-only) extend `commands.test.ts`.
 
 **Phase 1 — Info & cowork.** `/me`, enrich `/status` (binding, link, access,
 context-left from the wire fields; quota deferred), `/cowork` with the deep link +
-`appWebUrl` + private reply. Requires: `/help`·`/me` public, `/status`·`/cowork` =
-`agent.interact`. Tests: privilege gating (linked vs Guest), public-vs-DM reply routing.
+`appWebUrl`. Requires: `/help`·`/me` public, `/status`·`/cowork` =
+`agent.interact`. Tests: privilege gating (linked vs Guest), source-conversation reply routing.
 
 **Phase 2 — Session lifecycle.** `/new <message>` (first prompt on mint),
 `/resume <id>` (rebind to an existing agentId), `/stop` extended to cancel the
@@ -464,7 +472,7 @@ conversation.
   `provider.usage.list` RPC being wired into the channel client.
 - **Web origin — instance-level `appWebUrl`.** One per Hub deployment (the app's
   public origin, distinct from the Hub's own UI origin), reusing the
-  `RuntimeConfiguration` pattern; `paseo://` fallback when unset.
+  `RuntimeConfiguration` pattern; only the `paseo://` link when unset.
 - **`/provider` kept, complementary to `/agent`.** `/agent <name>` picks a preset
   bundle from the route menu; `/provider`/`/model`/`/effort` tune single axes. Both
   obey the provider→model→effort hierarchy (scoped lists, qualified names,

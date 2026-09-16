@@ -3,7 +3,7 @@
 One command vocabulary that works the same in every channel — Slack, Telegram,
 Discord, Feishu, Google Chat. The commands are **in-conversation controls** for
 the agent session bound to the conversation you type them in: start it, steer
-it, configure it, stop it, or jump to it in the Paseo app. They are not
+it, configure it, stop it, or jump to it in the Clisbot app. They are not
 per-channel app registrations, so the same word works everywhere with zero
 per-channel setup.
 
@@ -70,7 +70,7 @@ Implementation and verification notes are in [implementation-plan.md](implementa
 
 | Command                                                         | Does                                                                                                           | Requires                | Direct | Automation |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------- | :----: | :--------: |
-| `/cowork` (`/open`, `/app`)                                     | Reply with a link that opens the bound session in the Paseo app/web; private in public conversations.          | agent.interact          |   •    |     •      |
+| `/cowork` (`/open`, `/app`)                                     | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact          |   •    |     •      |
 | `/me`                                                           | Your channel identity and access here.                                                                         | — (public)              |   •    |     •      |
 | `/resume <id>`                                                  | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create            |   •    |     —      |
 | `/steer <message>`                                              | Admit `<message>` into the running turn.                                                                       | agent.interact          |   •    |     —      |
@@ -336,18 +336,35 @@ is never ambiguous:
 
 ## Visibility in public conversations
 
-Not everyone in a public channel may see a link into your dev environment or your
-identity. Command **output** is scoped:
+Every command replies in the conversation and thread it was invoked from,
+including `/cowork` and `/status`, whose output carries a session link. Ordinary
+messages carry no native interaction token on Slack or Discord, so the only
+private surface available is a requester DM — and a reply in a DM the caller is
+not looking at is indistinguishable from the bot ignoring the command.
 
-- Turn controls (`/stop`, `/steer`, `/queue`) and their acknowledgements post in
-  the conversation as usual.
-- Identity, link, and config output — `/cowork`, `/status`, `/me`, and `list` /
-  `search` results — is delivered to the **requester privately** when the
-  conversation is public, gated by the sender's privileges. Ordinary text commands
-  use a requester DM on every channel: they do not carry the interaction tokens
-  required for native ephemeral replies. If private delivery fails, the command
-  does not fall back to publishing that output in the conversation. A `/cowork` link
-  never lands where a bystander without `agent.interact` can use it.
+What bounds a link instead is access, not delivery: a caller needs
+`agent.interact` in the conversation to get one, and the link only opens for
+someone who can already authenticate to that Host. Treat a public conversation
+as the audience of every command you run there.
+
+## Session links
+
+`/cowork` and `/status` offer two destinations — the web app and the installed
+app — as two short labeled links.
+
+Channels linkify `http(s):` and nothing else. Slack renders link markup around a
+`paseo://` URL as literal text; that is measured, not assumed (post a probe and
+read `message.blocks` back: the https URL becomes a `link` element, the custom
+scheme stays `text`). And the app registers only the `paseo` scheme — no
+`associatedDomains`, no verified intent filters — so no https URL opens it
+directly.
+
+So the app destination is an https URL on the Hub, `GET /api/open/agent/<id>?host=<serverId>`,
+which 302s into the deep link (`channels/session-open-link.ts`). It carries no
+authority: the app still authenticates to the Host, and the route only echoes
+ids that match the daemon's id shape. Without `PASEO_HUB_APP_WEB_URL` there is no
+origin to build either https URL from, and the reply falls back to one bare
+`paseo://` URL — long, but copyable, which link markup would not be.
 
 ## Maintaining this doc
 

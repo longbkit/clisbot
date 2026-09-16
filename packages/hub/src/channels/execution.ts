@@ -1440,7 +1440,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     account: CompiledChannelAccount,
     command: ChannelTextCommand["name"],
   ): CommandReply {
-    const address = commandReplyAddress(message, command);
+    const address = commandReplyAddress(message);
     return async (text) => {
       const response = await deps.post({
         channel: channelName(account),

@@ -9,19 +9,25 @@ you type them in. The full list and what each needs is the
 
 - `/help` shows every command in the conversation you're in.
 - Most commands act on **this conversation's** agent. `/new` starts one, `/stop`
-  stops it, `/cowork` opens it in the Paseo app.
+  stops it, `/cowork` opens it in the Clisbot app.
 - If a command needs a permission you don't have, the bot says so and does
   nothing — nothing changes silently.
 
 ## Move between the channel and the app
 
 `/cowork` replies with a link that opens this conversation's agent session in the
-Paseo app, or the web app configured by your Hub operator. Use it to pick up the same session on your
+Clisbot app, or the web app configured by your Hub operator. Use it to pick up the same session on your
 phone or desktop and keep working, then come back to the channel — the session
 is the same on both sides.
 
-In a **public** channel the link is sent to you privately (a DM), because it opens your dev environment and not everyone in the channel
-should reach it. You need `agent.interact` access in this conversation to get a link. Private delivery failures never publish the link back to the public conversation.
+You get two links and pick the one that suits where you are — **Open in the web
+app** opens a browser, **Open in the Clisbot app** opens the installed app. Both
+need your Hub operator to have set the web origin; without it you get one bare
+`paseo://` URL to copy, because a channel will not linkify that scheme.
+
+Both are posted in the conversation you asked from, including a public channel.
+You need `agent.interact` access there to get them, and opening one still
+requires your own access to the Host — but anyone reading the channel sees them.
 
 ## Start, resume, and stop a session
 
@@ -126,7 +132,7 @@ summarize what changed today and what's blocked`, then later just `/standup`.
 - `/me` — your public identity and what you're allowed to do here. An identity that is not linked to a Hub Member
   uses the organization's Guest grants; Guest has no permissions by default.
 
-Both reply privately in a public channel. On an Automation route, `/status` and
+Both reply in the conversation you asked from. On an Automation route, `/status` and
 `/cowork` show the runs and step Agents you may access; links use each Agent's Host.
 
 ## Approvals
