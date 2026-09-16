@@ -19,6 +19,28 @@ export function assignmentsForSubject(
   );
 }
 
+/**
+ * Assignments that give access to one Resource. A Project is also reached by an
+ * assignment on its Host that carries Project authority, so "who has access to
+ * this Project" must include those rows or it undercounts the common case.
+ */
+export function assignmentsForResource(
+  assignments: z.infer<typeof HubAccessAssignmentSchema>[],
+  resource: { kind: string; id: string; parent: { kind: string; id: string } | null } | undefined,
+) {
+  if (resource === undefined) return [];
+  const parentHost =
+    resource.kind === "project" && resource.parent?.kind === "daemon" ? resource.parent.id : null;
+  return assignments.filter(
+    (assignment) =>
+      (assignment.resourceKind === resource.kind && assignment.resourceId === resource.id) ||
+      (parentHost !== null &&
+        assignment.resourceKind === "daemon" &&
+        assignment.resourceId === parentHost &&
+        assignment.privileges.includes("project.use")),
+  );
+}
+
 const routeSchema = z.object({
   audience: z.object({ kind: z.literal("conversationParticipants") }),
   match: z.object({ kind: z.string(), ids: z.array(z.string()).optional() }),

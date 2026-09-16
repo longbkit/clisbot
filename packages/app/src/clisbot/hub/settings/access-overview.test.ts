@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { HubAccessAssignmentSchema, HubMemberSchema, HubTeamSchema } from "../contracts";
-import { assignmentsForSubject, publicAccessRoutes } from "./access-overview";
+import {
+  assignmentsForResource,
+  assignmentsForSubject,
+  publicAccessRoutes,
+} from "./access-overview";
 
 const member = HubMemberSchema.parse({
   id: "membership",
@@ -35,6 +39,40 @@ const assignments = [
 );
 
 describe("Access overview projections", () => {
+  it("counts a Host assignment with Project authority as access to each Project on it", () => {
+    const row = (id: string, resourceKind: string, resourceId: string, privileges: string[]) =>
+      HubAccessAssignmentSchema.parse({
+        id,
+        organizationId: "org",
+        subjectKind: "member",
+        subjectId: "membership",
+        resourceKind,
+        resourceId,
+        privileges,
+        constraints: {},
+        createdAt: "now",
+        updatedAt: "now",
+      });
+    const rows = [
+      row("exact", "project", "project-a", ["project.use"]),
+      row("host-developer", "daemon", "host", ["daemon.connect", "project.use"]),
+      // Connect alone opens the Host, not its Projects.
+      row("host-connect", "daemon", "host", ["daemon.connect"]),
+      row("other-host", "daemon", "elsewhere", ["daemon.connect", "project.use"]),
+      row("sibling", "project", "project-b", ["project.use"]),
+    ];
+    const projectA = { kind: "project", id: "project-a", parent: { kind: "daemon", id: "host" } };
+    expect(assignmentsForResource(rows, projectA).map(({ id }) => id)).toEqual([
+      "exact",
+      "host-developer",
+    ]);
+    const host = { kind: "daemon", id: "host", parent: null };
+    expect(assignmentsForResource(rows, host).map(({ id }) => id)).toEqual([
+      "host-developer",
+      "host-connect",
+    ]);
+  });
+
   it("finds direct access by membership ID and inherited Teams by user ID", () => {
     expect(
       assignmentsForSubject(assignments, { kind: "member", id: member.id }, [member], [team]).map(

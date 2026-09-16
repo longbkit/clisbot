@@ -22,18 +22,9 @@ export function accessConstraintDraft(constraints: Record<string, unknown>) {
     conversation: conversation.data?.kind ?? "specific",
     conversationIds:
       conversation.data?.kind === "specific" ? conversation.data.conversationIds.join(", ") : "",
-    agentConfigurations: (configurations.data ?? []).flatMap((configuration) => {
-      const models = configuration.modelIds === "*" ? ["*"] : configuration.modelIds;
-      const thinking =
-        configuration.thinkingOptionIds === "*" ? ["*"] : configuration.thinkingOptionIds;
-      return models.flatMap((modelId) =>
-        thinking.map((thinkingOptionId) => ({
-          providerId: configuration.providerId,
-          modelId,
-          thinkingOptionId,
-        })),
-      );
-    }),
+    // One stored grant is one editable row; flattening it into single-value rows
+    // would turn one decision into a screen of near-identical cards.
+    agentConfigurations: configurations.data ?? [],
   };
 }
 

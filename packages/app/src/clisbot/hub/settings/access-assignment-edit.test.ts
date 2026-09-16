@@ -15,11 +15,12 @@ describe("Access assignment constraint editing", () => {
       futureConstraint: { ceiling: 3 },
     };
     const draft = accessConstraintDraft(existing);
-    expect(draft.agentConfigurations).toHaveLength(4);
-    const edited = draft.agentConfigurations.map(({ providerId, modelId, thinkingOptionId }) => ({
+    // One stored grant stays one row; it is not exploded per Model or Thinking.
+    expect(draft.agentConfigurations).toHaveLength(1);
+    const edited = draft.agentConfigurations.map(({ providerId, modelIds, thinkingOptionIds }) => ({
       providerId,
-      modelIds: [modelId],
-      thinkingOptionIds: [thinkingOptionId],
+      modelIds,
+      thinkingOptionIds,
     }));
     expect(mergeAccessConstraints(existing, { agentConfigurations: edited })).toEqual(existing);
     expect(existing.agentConfigurations).toHaveLength(1);
@@ -31,7 +32,7 @@ describe("Access assignment constraint editing", () => {
       futureConstraint: "keep",
     };
     expect(accessConstraintDraft(existing).agentConfigurations).toEqual([
-      { providerId: "codex", modelId: "*", thinkingOptionId: "*" },
+      { providerId: "codex", modelIds: "*", thinkingOptionIds: "*" },
     ]);
     const next = {
       agentConfigurations: [{ providerId: "codex", modelIds: ["m1"], thinkingOptionIds: "*" }],

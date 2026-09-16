@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AccessSettings, assignmentResourceOptions } from "./access-settings";
+import { AccessSettings } from "./access-settings";
+import { assignmentResourceOptions } from "./access-catalog";
 
 const adapters = vi.hoisted(() => ({
   get: vi.fn(),
@@ -51,6 +52,38 @@ vi.mock("@/components/ui/switch", () => ({
         disabled={props.disabled}
         onChange={change}
       />
+    );
+  },
+}));
+// The real field opens a Combobox, whose module cannot load under this runner.
+vi.mock("./multi-select-field", () => ({
+  selectionLabel: () => null,
+  MultiSelectField: function TestMultiSelectField(props: {
+    label: string;
+    disabled?: boolean;
+    options: { id: string; value: string; label: string }[];
+    value: "*" | readonly string[] | null;
+    onChange(value: "*" | readonly string[]): void;
+  }) {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLSelectElement>) =>
+        props.onChange([...event.target.selectedOptions].map((option) => option.value)),
+      [props],
+    );
+    return (
+      <select
+        multiple
+        aria-label={props.label}
+        disabled={props.disabled}
+        value={props.value === "*" || props.value === null ? [] : [...props.value]}
+        onChange={change}
+      >
+        {props.options.map((option) => (
+          <option key={option.id} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     );
   },
 }));
@@ -416,6 +449,196 @@ describe("Access assignment editing", () => {
       },
     ]);
     expect(adapters.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("Access granted to more than one Resource at a time", () => {
+  const catalog = {
+    providers: [
+      {
+        id: "codex",
+        label: "Codex",
+        models: [
+          { id: "m1", label: "Model One", thinkingOptions: [{ id: "t1", label: "Low" }] },
+          { id: "m2", label: "Model Two", thinkingOptions: [] },
+        ],
+      },
+    ],
+  };
+
+  function mockCatalog(
+    extraResources: unknown[],
+    accessLevels: Record<string, unknown>,
+    hostCatalog?: unknown,
+    existingAssignments: unknown[] = [],
+  ) {
+    adapters.get.mockImplementation(async (resource: keyof typeof resources) => {
+      if (resource === "access-assignments") return { assignments: existingAssignments };
+      if (resource === "access-catalog")
+        return {
+          ...resources[resource],
+          accessLevels: { ...resources[resource].accessLevels, ...accessLevels },
+          resources: [
+            // A Host publishes one Provider catalog for all of its Projects.
+            ...resources[resource].resources.map((entry) =>
+              hostCatalog === undefined
+                ? entry
+                : { ...entry, agentConfigurationCatalog: hostCatalog },
+            ),
+            ...extraResources,
+          ],
+        };
+      return resources[resource];
+    });
+  }
+
+  function chooseMany(label: string, values: string[]) {
+    const select = screen.getByLabelText(label) as HTMLSelectElement;
+    for (const option of select.options) option.selected = values.includes(option.value);
+    fireEvent.change(select);
+  }
+
+  it("writes one assignment per selected Project plus the parent Host in a single batch", async () => {
+    const existingOnB = {
+      ...assignment,
+      id: "existing-b",
+      resourceKind: "project",
+      resourceId: "project-b",
+      privileges: ["project.use", "agent.create"],
+      constraints: {
+        agentConfigurations: [{ providerId: "claude", modelIds: "*", thinkingOptionIds: "*" }],
+      },
+    };
+    mockCatalog(
+      ["a", "b"].map((id) => ({
+        kind: "project",
+        id: `project-${id}`,
+        name: `Project ${id.toUpperCase()}`,
+        available: true,
+        parent: { kind: "daemon", id: "host" },
+        agentConfigurationCatalog: catalog,
+      })),
+      { project: { developer: ["project.use", "agent.create"] } },
+      undefined,
+      [existingOnB],
+    );
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "project\u0000project-a" },
+    });
+    chooseMany("Also apply to", ["project\u0000project-b"]);
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseMany("Models", ["m1", "m2"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    // The batch is an upsert: Project B loses its Claude grant, so the operator is told.
+    const { message } = adapters.confirm.mock.calls[0]![0] as { message: string };
+    expect(message).toContain("Project A, Project B");
+    expect(message).toContain(
+      "Replaces existing access, including its Agent choices, on: Project B",
+    );
+    const [path, body] = adapters.post.mock.calls[0]!.slice(0, 2) as [
+      string,
+      { assignments: unknown[] },
+    ];
+    expect(path).toBe("access-assignments/batch");
+    expect(body.assignments).toEqual([
+      expect.objectContaining({ resourceKind: "daemon", resourceId: "host" }),
+      expect.objectContaining({
+        resourceKind: "project",
+        resourceId: "project-a",
+        // One row names both Models; it is not split into one grant per Model.
+        constraints: {
+          agentConfigurations: [
+            { providerId: "codex", modelIds: ["m1", "m2"], thinkingOptionIds: "*" },
+          ],
+        },
+      }),
+      expect.objectContaining({ resourceKind: "project", resourceId: "project-b" }),
+    ]);
+  });
+
+  it("edits a Host grant in place, keeping its Agent choices and Fast mode", async () => {
+    const hostGrant = {
+      ...assignment,
+      privileges: ["daemon.connect", "project.use", "agent.create", "agent.fast.use"],
+      constraints: {
+        agentConfigurations: [
+          { providerId: "codex", modelIds: ["m1", "m2"], thinkingOptionIds: "*" },
+        ],
+      },
+    };
+    mockCatalog(
+      [],
+      { daemon: { developer: ["daemon.connect", "project.use", "agent.create"] } },
+      catalog,
+      [hostGrant],
+    );
+    renderAccess();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    // A finished grant opens collapsed; the Host row alone is written back.
+    expect(screen.queryByLabelText("Models")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toEqual({
+      subjectKind: "member",
+      subjectId: "membership",
+      resourceKind: "daemon",
+      resourceId: "host",
+      privileges: hostGrant.privileges,
+      constraints: hostGrant.constraints,
+    });
+  });
+
+  it("tells the operator that Guest means every unlinked sender before a Host grant", async () => {
+    mockCatalog([], { daemon: { connect: ["daemon.connect"] } });
+    adapters.confirm.mockResolvedValue(false);
+    renderAccess();
+    // The view filter above the form has the same label; the grant form is last.
+    const subjectFields = await screen.findAllByLabelText("Team, Member or Guest");
+    fireEvent.change(subjectFields.at(-1)!, { target: { value: "guest\u0000guest" } });
+    fireEvent.change(screen.getByLabelText("Resource"), { target: { value: "daemon\u0000host" } });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.confirm).toHaveBeenCalledTimes(1));
+    const { message } = adapters.confirm.mock.calls[0]![0] as { message: string };
+    expect(message).toContain("Guest is every channel sender without a linked Member");
+    expect(message).toContain("including Projects added later");
+    expect(adapters.post).not.toHaveBeenCalled();
+  });
+
+  it("offers Agent choices on a Host, where the grant reaches every Project", async () => {
+    mockCatalog(
+      [
+        {
+          kind: "project",
+          id: "project-a",
+          name: "Project A",
+          available: true,
+          parent: { kind: "daemon", id: "host" },
+          agentConfigurationCatalog: catalog,
+        },
+      ],
+      { daemon: { developer: ["daemon.connect", "project.use", "agent.create"] } },
+      catalog,
+    );
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\u0000host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseMany("Models", ["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      resourceKind: "daemon",
+      resourceId: "host",
+      constraints: {
+        agentConfigurations: [{ providerId: "codex", modelIds: ["m1"], thinkingOptionIds: "*" }],
+      },
+    });
   });
 });
 
