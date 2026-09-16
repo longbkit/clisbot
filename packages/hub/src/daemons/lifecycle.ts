@@ -50,7 +50,7 @@ import type { Logger } from "pino";
 import { CHANNEL_REPLY_MCP_SERVER_NAME, CHANNEL_REPLY_TOOL_NAME } from "../channels/plane/types.js";
 import type { ChannelReplyCapabilityService } from "../channels/channel-reply-capabilities.js";
 import { composeMessageToolPrompt } from "../channels/outbound-template.js";
-import { isSupportedChannel } from "../channels/catalog.js";
+import { isSupportedChannel, type SupportedChannelName } from "../channels/catalog.js";
 import { isHubFinishExecutionToolName } from "../hub/protocol.js";
 
 export interface DaemonDispatchResult {
@@ -2163,6 +2163,7 @@ async function buildCreateAgentOptions(
       channelTool === undefined
         ? intent.prompt
         : `${intent.prompt}\n\n${composeMessageToolPrompt(channelTool.template, {
+            channel: channelTool.channel,
             canSendFiles: channelTool.canSendFiles,
           })}`,
     env: buildAgentEnv(intent, materializedEnv),
@@ -2214,6 +2215,7 @@ function workflowChannelTool(
   | {
       url: string;
       template: string | null;
+      channel: SupportedChannelName;
       capabilityToken: string;
       canSendFiles: boolean;
     }
@@ -2270,6 +2272,7 @@ function workflowChannelTool(
   return {
     url: `${publicBaseUrl.replace(/\/$/u, "")}/mcp/channel/${capabilityToken}`,
     template,
+    channel: name,
     capabilityToken,
     canSendFiles: projectRoot !== undefined,
   };

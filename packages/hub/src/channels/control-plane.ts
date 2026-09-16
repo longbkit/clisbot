@@ -413,7 +413,7 @@ export function createChannelAgentSpecResolver(
       (environment) => [environment.name, environment] as const,
     ),
   );
-  return (target, defaults, _bindingRef, capability, overrides) => {
+  return (target, defaults, bindingRef, capability, overrides) => {
     const agent = bundle.agents[target.agent];
     if (agent === undefined) {
       throw new ChannelAgentSpecError(`unknown agent "${target.agent}"`);
@@ -465,6 +465,9 @@ export function createChannelAgentSpecResolver(
         ],
       },
       systemPrompt: composeMessageToolPrompt(defaults.outbound.template, {
+        // The capability is channel-agnostic; the binding ref is what knows
+        // which Channel the reply leaves through.
+        channel: bindingRef.channel,
         canSendFiles: capability.canSendFiles,
       }),
     };

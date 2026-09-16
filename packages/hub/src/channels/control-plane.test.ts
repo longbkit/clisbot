@@ -20,7 +20,7 @@ import {
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
 } from "./control-plane.js";
-import { DEFAULT_MESSAGE_TOOL_PROMPT } from "./outbound-template.js";
+import { composeMessageToolPrompt } from "./outbound-template.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
@@ -541,7 +541,18 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
         },
       ],
     });
-    assert.equal(config.systemPrompt, DEFAULT_MESSAGE_TOOL_PROMPT);
+    // The default block is composed per Channel, so there is no single constant
+    // to compare against: assert what the injection has to carry.
+    const injected = config.systemPrompt ?? "";
+    assert.equal(
+      injected,
+      composeMessageToolPrompt(null, { channel: BINDING_REF.channel, canSendFiles: true }),
+    );
+    assert.ok(injected.includes("Slack"), "names the Channel the user is asking from");
+    assert.ok(
+      injected.includes(`mcp__${CHANNEL_REPLY_MCP_SERVER_NAME}__${CHANNEL_REPLY_TOOL_NAME}`),
+      "names the tool the way a provider exposes it",
+    );
   });
 
   it("honors a route template override and keeps binding facts out of the URL", async () => {

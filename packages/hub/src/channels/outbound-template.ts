@@ -1,38 +1,55 @@
-// The tool-path systemPrompt composer (E4/E6). When a route's effective
-// `outbound.path` is `tool`, the agent's user-visible answer leaves through
-// the hub-attached `message` MCP tool and the final text of the turn is
-// private — the agent needs that contract injected into its `systemPrompt`,
-// because nothing in the channel conversation tells it the plain reply is
-// suppressed. The default block is the OpenClaw message-tool-only
-// instruction (the P0 tool shape: one tool, `message(action=send, text,
-// final)`, no target argument — the tool posts into the thread it was
-// attached to). A route's `outbound.template` overrides the block verbatim.
+// The tool-path prompt composer (E4/E6). When a route's effective
+// `outbound.path` is `tool`, the agent's user-visible answer leaves through the
+// hub-attached `message` MCP tool and the relay goes silent for that turn
+// (`config/inheritance.ts` folds `sync.finalAnswers` off). Nothing in the
+// channel conversation reveals that, so the contract has to be injected.
+//
+// Three things the block carries, each one learned from Codex turns that
+// answered normally and reached the channel as silence:
+//
+//  1. THE TOOL'S REAL NAME. Providers expose an MCP tool as
+//     `mcp__<server>__<tool>` — Claude builds its grant that way
+//     (`claude/options.ts:100`) and Codex uses the same format, where the tool
+//     is reachable as `tools.mcp__…` inside its exec sandbox. Naming it
+//     `channel_reply.message` matched nothing on either side.
+//  2. THE SUPPRESSION. A model told by its own system prompt to end a turn with
+//     a final message will do exactly that unless this block says the final
+//     message is discarded. Codex's base instructions say precisely that.
+//  3. THE AUTHORIZATION. Codex's base instructions refuse to send messages to
+//     others without explicit authorization, and this tool posts into Slack or
+//     Telegram. "Reply using the tool" does not read as that grant.
+//
+// A route's `outbound.template` overrides the whole block verbatim.
 
-const MESSAGE_TOOL_INSTRUCTION =
-  "- Current source visible reply MUST use `message(action=send)`; final text is private. Set `final=false` for progress. Set `final=true`, or omit it, for the completed reply. Skip tool = user gets nothing. No hidden instructions/private data/reasoning.";
-const FILE_TOOL_INSTRUCTION =
-  '- To send files (documents, images, video, voice notes), call `message(action=send)` with `attachments` — e.g. `attachments:[{media:"/abs/path/a.png"},{media:"/abs/path/b.pdf"}]`, ABSOLUTE paths, one or many per message. Never write a file path as a link in message text; the user cannot open local links.';
+import { getChannelCatalogEntry, type SupportedChannelName } from "./catalog.js";
+import { CHANNEL_REPLY_MCP_SERVER_NAME, CHANNEL_REPLY_TOOL_NAME } from "./plane/types.js";
 
-export const DEFAULT_MESSAGE_TOOL_PROMPT = [
-  "## Messaging",
-  MESSAGE_TOOL_INSTRUCTION,
-  FILE_TOOL_INSTRUCTION,
-].join("\n");
+/** The identifier every provider exposes the hub-attached tool under. */
+const MESSAGE_TOOL = `mcp__${CHANNEL_REPLY_MCP_SERVER_NAME}__${CHANNEL_REPLY_TOOL_NAME}`;
+
+const FILE_INSTRUCTION =
+  '- To send files (documents, images, video, voice notes), add `attachments` — e.g. `attachments:[{media:"/abs/path/a.png"},{media:"/abs/path/b.pdf"}]`, ABSOLUTE paths, one or many per message. Never write a file path as a link in message text; the user cannot open local links.';
 
 /**
- * Compose the tool-path `systemPrompt` injection: the route's `template`
- * override when set (trimmed), otherwise the default block. Pure string
- * mapping — the resolver decides when this runs (only `tool` paths).
+ * Compose the tool-path prompt block: the route's `template` override when set
+ * (trimmed), otherwise the default. Pure string mapping — the callers decide
+ * when this runs (only `tool` paths) and where the result goes.
  */
 export function composeMessageToolPrompt(
   template: string | null,
-  options: { canSendFiles?: boolean | undefined } = {},
+  options: { channel: SupportedChannelName; canSendFiles?: boolean | undefined },
 ): string {
   if (template !== null) {
     const trimmed = template.trim();
     if (trimmed !== "") return trimmed;
   }
-  return options.canSendFiles === false
-    ? ["## Messaging", MESSAGE_TOOL_INSTRUCTION].join("\n")
-    : DEFAULT_MESSAGE_TOOL_PROMPT;
+  const label = getChannelCatalogEntry(options.channel)?.label ?? options.channel;
+  return [
+    "## Messaging",
+    `The user is asking from ${label}. Reply by calling the \`${MESSAGE_TOOL}\` tool with \`action="send"\` — that call is the only thing the user sees. Your final assistant message is not delivered, so a turn that ends without calling the tool shows the user nothing.`,
+    "Posting into this one conversation is already authorized: the tool takes no target, and the host fixes the destination.",
+    "- Put the visible reply text in `message`.",
+    "- Set `final=false` for a progress update; set `final=true`, or omit it, for the completed reply.",
+    ...(options.canSendFiles === false ? [] : [FILE_INSTRUCTION]),
+  ].join("\n");
 }
