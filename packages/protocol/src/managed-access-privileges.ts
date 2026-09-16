@@ -20,6 +20,7 @@ export const PROJECT_PRIVILEGES = [
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ] as const;
 export type ProjectPrivilege = (typeof PROJECT_PRIVILEGES)[number];
 

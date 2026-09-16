@@ -241,16 +241,14 @@ export class ApprovalEngine {
       context.accessTarget?.projectId !== undefined &&
       this.context.authorizeChannelApproval !== undefined
     ) {
-      const privilege = approvalPrivilege(classifyToolClass(request));
       if (
-        privilege !== null &&
-        (await this.context.authorizeChannelApproval({
+        await this.context.authorizeChannelApproval({
           organizationId: this.context.organizationId,
           account: context.account,
           responderIdentity,
           target: context.accessTarget,
-          privilege,
-        }))
+          privilege: approvalPrivilege(classifyToolClass(request)),
+        })
       ) {
         check = { allowed: true, reason: "ok" };
       }
@@ -611,10 +609,11 @@ export class ApprovalEngine {
   }
 }
 
+/** Every tool class has an approval leaf, so no class is unanswerable by design. */
 function approvalPrivilege(
   toolClass: ReturnType<typeof classifyToolClass>,
-): Parameters<ChannelApprovalAuthorizer>[0]["privilege"] | null {
-  return toolClass === "other" ? null : `approval.${toolClass}`;
+): Parameters<ChannelApprovalAuthorizer>[0]["privilege"] {
+  return `approval.${toolClass}`;
 }
 
 // --- Card-id passthrough -------------------------------------------------------

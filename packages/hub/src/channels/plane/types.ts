@@ -1,3 +1,4 @@
+import type { ApprovalPrivilege } from "../../access/contract.js";
 import type { ChannelPrivilegeDecision } from "../../access/store.js";
 // Shared vocabulary for the channel execution plane (plan §4-S2/§4-S5/§4-S6).
 // One place for the shapes that the bindings, relay, and approval engines all
@@ -384,12 +385,7 @@ export type ChannelApprovalAuthorizer = (input: {
   account: CompiledChannelAccount;
   responderIdentity: string;
   target: ChannelAgentAccessTarget;
-  privilege:
-    | "approval.file"
-    | "approval.config"
-    | "approval.command"
-    | "approval.command.destructive"
-    | "approval.channel";
+  privilege: ApprovalPrivilege;
 }) => Promise<boolean>;
 
 /** Consumes a signed-in Member's one-use code from the provider identity that sent it. */

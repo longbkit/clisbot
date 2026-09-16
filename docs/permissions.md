@@ -46,6 +46,45 @@ Project grants on requests and outbound observations; see the
 without granting daemon-wide `workspace.manage`. Project creation still requires
 `workspace.manage`. Existing stored grants do not gain new privileges when a UI preset changes.
 
+### Access scopes
+
+A Hub assignment names one Resource: an Organization, a Host, a Project, a Channel
+account, or an Automation. Host and Project both carry Project authority, and a
+Host assignment reaches every Project on that Host, including Projects added
+later. Use a Host assignment when the answer is "all of them".
+
+Grants combine by **union**. A Project assignment only adds to what a Host
+assignment already gave; it never narrows it. To give someone less on one
+Project, give them less on the Host rather than more on the Project.
+
+Availability is inventory, not authority. A Project the daemon has stopped
+reporting still resolves for a subject that was granted it, so a late or partial
+Project snapshot does not silently drop access. The daemon stays the authority on
+whether a Project exists.
+
+`daemon.manage` (Host **Administrator**) is not a Host-scoped Project level.
+Administrator switches the session to daemon resource mode: no Project filter, and
+therefore no Agent configuration ceiling either. A Host level keeps the session in
+Project mode, so provider and model limits still apply to every Project it reaches.
+
+### Approval leaves
+
+Every pending permission request maps to exactly one `approval.*` leaf. A tool
+outside the named classes maps to `approval.other` rather than to nothing: a
+request that no level can answer reads to the user as a prompt that hangs forever.
+
+Suppressing prompts requires holding every leaf, `approval.other` included. An
+assignment stored before that leaf existed therefore stops qualifying for
+unattended modes, `toolPolicy.preapproved`, and auto-accept delegation until an
+operator re-saves it — re-selecting its access level is enough. Nothing warns
+about this, so check assignments that relied on unattended execution.
+
+Update every daemon before re-saving. A daemon rejects an access ticket carrying
+a Project privilege it does not know, so a re-saved assignment locks its subject
+out of any daemon that predates `approval.other`.
+
+`developer` and `full_access` carry the same leaves today; see [Access feature](features/access/README.md#decisions) for why both ids stay.
+
 Future base grants may select workspaces or agents, but operation classification remains inside the authorization module:
 
 ```ts

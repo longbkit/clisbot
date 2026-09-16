@@ -222,6 +222,7 @@ export const PRIVILEGE_LEAVES = [
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ] as const;
 
 /**

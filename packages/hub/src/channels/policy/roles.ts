@@ -33,6 +33,7 @@ const APPROVAL_PRIVILEGES = [
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ] as const;
 
 /**

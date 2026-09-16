@@ -18,6 +18,7 @@ import {
   type AccessPrivilege,
   type AccessResourceKind,
   type AgentConfigurationGrant,
+  type ApprovalPrivilege,
   formatChannelAccountResourceId,
 } from "./contract.js";
 
@@ -38,6 +39,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "daemon.connect",
     "daemon.manage",
     "project.use",
+    "workspace.create",
     "agent.interact",
     "agent.create",
     "agent.fast.use",
@@ -47,6 +49,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.command",
     "approval.command.destructive",
     "approval.channel",
+    "approval.other",
   ]),
   project: new Set([
     "project.use",
@@ -60,6 +63,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.command",
     "approval.command.destructive",
     "approval.channel",
+    "approval.other",
   ]),
   channel_account: new Set(["channel.use"]),
   automation: new Set(["automation.run"]),
@@ -77,6 +81,7 @@ const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ]);
 
 export interface AccessAssignmentRecord extends AccessAssignmentInput {
@@ -211,12 +216,7 @@ export interface ChannelApprovalPrivilegeRequest {
   senderIdentity: string;
   daemonReference: string;
   projectId: string;
-  privilege:
-    | "approval.file"
-    | "approval.config"
-    | "approval.command"
-    | "approval.command.destructive"
-    | "approval.channel";
+  privilege: ApprovalPrivilege;
 }
 
 export class AccessPolicyError extends Error {
@@ -523,13 +523,18 @@ export class AccessStore {
         parent: null,
         available: true,
       },
-      ...daemonRows.map((daemon) => ({
-        kind: "daemon" as const,
-        id: daemon.id,
-        name: daemon.name,
-        parent,
-        available: daemon.status === "active",
-      })),
+      ...daemonRows.map((daemon) =>
+        Object.assign(
+          {
+            kind: "daemon" as const,
+            id: daemon.id,
+            name: daemon.name,
+            parent,
+            available: daemon.status === "active",
+          },
+          daemonAgentConfigurationCatalog(projectRows, daemon.id),
+        ),
+      ),
       ...projectRows.map((project) =>
         Object.assign(
           {
@@ -985,7 +990,6 @@ export class AccessStore {
           eq(schema.daemonProjects.organizationId, input.organizationId),
           eq(schema.daemonProjects.daemonId, daemon.id),
           eq(schema.daemonProjects.externalProjectId, input.projectId),
-          eq(schema.daemonProjects.available, true),
         ),
       )
       .limit(1);
@@ -1272,7 +1276,6 @@ export class AccessStore {
         and(
           eq(schema.daemonProjects.organizationId, input.organizationId),
           eq(schema.daemonProjects.daemonId, input.daemonId),
-          eq(schema.daemonProjects.available, true),
         ),
       )
       .orderBy(asc(schema.daemonProjects.externalProjectId));
@@ -1368,6 +1371,11 @@ export class AccessStore {
     }
   }
 
+  /**
+   * The catalog that says whether a Mode prompts for approval. Unlike authority,
+   * this needs a Project the daemon still reports: a stale catalog must not vouch
+   * for a Mode the daemon may have reclassified since. Missing means not attended.
+   */
   private async findDaemonProjectMetadata(
     organizationId: string,
     daemonId: string,
@@ -1557,14 +1565,18 @@ function validateConstraints(assignment: AccessAssignmentInput): void {
     );
   }
   const agentConfigurations = assignment.constraints.agentConfigurations;
-  if (agentConfigurations !== undefined && assignment.resourceKind !== "project") {
+  // A Host assignment fans out to every Project on that Host, so it carries the
+  // same Agent choices a Project assignment does.
+  const scopesAgents =
+    assignment.resourceKind === "project" || assignment.resourceKind === "daemon";
+  if (agentConfigurations !== undefined && !scopesAgents) {
     throw new AccessPolicyError(
       "invalid_assignment",
-      "Agent configuration constraints apply only to Projects",
+      "Agent configuration constraints apply only to Hosts and Projects",
     );
   }
   if (
-    assignment.resourceKind === "project" &&
+    scopesAgents &&
     assignment.privileges.includes("agent.create") &&
     (!agentConfigurations || agentConfigurations.length === 0)
   ) {
@@ -1672,6 +1684,23 @@ function agentModeIsClassifiedAttended(
 
 function accessDenied(): AccessPolicyError {
   return new AccessPolicyError("access_denied", "Access denied");
+}
+
+/**
+ * A daemon publishes one catalog for all of its Projects, so any live Project
+ * row carries it. Rows the daemon has stopped reporting keep the catalog they
+ * last had, and that is not evidence about what this Host offers now.
+ */
+function daemonAgentConfigurationCatalog(
+  projects: readonly { daemonId: string; available: boolean; metadata: unknown }[],
+  daemonId: string,
+): { agentConfigurationCatalog?: z.infer<typeof AgentConfigurationCatalogSchema> } {
+  for (const project of projects) {
+    if (project.daemonId !== daemonId || !project.available) continue;
+    const parsed = parseAgentConfigurationCatalog(project.metadata);
+    if ("agentConfigurationCatalog" in parsed) return parsed;
+  }
+  return {};
 }
 
 function accessResourceKey(kind: AccessResourceKind, id: string): string {

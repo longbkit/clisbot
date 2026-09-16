@@ -124,6 +124,15 @@ function createHarness(
         input: { command: "git reset --hard HEAD~1" },
       },
     ],
+    [
+      "other-request",
+      {
+        id: "other-request",
+        provider: "codex",
+        name: "WebFetch",
+        kind: "tool",
+      },
+    ],
   ]);
   const projectAuthorization: ProjectAuthorization = {
     privileges: new Set(privileges),
@@ -353,6 +362,7 @@ describe("ManagedResourceAuthorizer", () => {
       "approval.command",
       "approval.command.destructive",
       "approval.channel",
+      "approval.other",
     ]);
     await expect(
       full.allowsInbound({
@@ -792,6 +802,29 @@ describe("ManagedResourceAuthorizer", () => {
         agentId: "agent-a",
         requestId: "command-request",
         response: { behavior: "deny" },
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it("answers a tool outside the named classes through approval.other", async () => {
+    // Without this leaf the request maps to nothing and no level can ever answer
+    // it, which reads to the user as a prompt that hangs forever.
+    const withoutLeaf = createHarness(["project.use", "approval.file", "approval.command"]);
+    await expect(
+      withoutLeaf.allowsInbound({
+        type: "agent_permission_response",
+        agentId: "agent-a",
+        requestId: "other-request",
+        response: { behavior: "allow" },
+      }),
+    ).resolves.toBe(false);
+    const withLeaf = createHarness(["project.use", "approval.other"]);
+    await expect(
+      withLeaf.allowsInbound({
+        type: "agent_permission_response",
+        agentId: "agent-a",
+        requestId: "other-request",
+        response: { behavior: "allow" },
       }),
     ).resolves.toBe(true);
   });

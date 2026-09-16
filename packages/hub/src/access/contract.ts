@@ -23,6 +23,7 @@ export const ACCESS_PRIVILEGES = [
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ] as const;
 
 export const AccessPrivilegeSchema = z.enum(ACCESS_PRIVILEGES);
@@ -35,7 +36,10 @@ export const APPROVAL_PRIVILEGES = [
   "approval.command",
   "approval.command.destructive",
   "approval.channel",
+  "approval.other",
 ] as const satisfies readonly AccessPrivilege[];
+/** The leaf one pending permission request maps to. Every request maps to one. */
+export type ApprovalPrivilege = (typeof APPROVAL_PRIVILEGES)[number];
 
 export const ACCESS_SUBJECT_KINDS = ["member", "team", "guest"] as const;
 /** The organization-scoped group for channel senders without a linked Member. */
@@ -143,36 +147,51 @@ export const AccessAssignmentBatchInputSchema = z
   .strict();
 export type AccessAssignmentBatchInput = z.infer<typeof AccessAssignmentBatchInputSchema>;
 
-/** Built-in resource access levels. Clients render these instead of inventing local role bundles. */
+/** Read-only Agent work: no shell, no Workspace creation, no risky approvals. */
+const OFFICE_WORKER_PROJECT_PRIVILEGES = [
+  "project.use",
+  "agent.interact",
+  "agent.create",
+  "approval.file",
+] as const satisfies readonly AccessPrivilege[];
+
+/**
+ * Every Project authority, including destructive command approval. `full_access`
+ * is deliberately identical for now: the level that earns more than this one is
+ * the per-Project, per-action approval policy, which does not exist yet. Keep
+ * both ids so that policy can split them without a rename.
+ */
+const DEVELOPER_PROJECT_PRIVILEGES = [
+  "project.use",
+  "workspace.create",
+  "agent.interact",
+  "agent.create",
+  "terminal.use",
+  "approval.file",
+  "approval.config",
+  "approval.command",
+  "approval.command.destructive",
+  "approval.channel",
+  "approval.other",
+] as const satisfies readonly AccessPrivilege[];
+
+/**
+ * Built-in resource access levels. Clients render these instead of inventing
+ * local role bundles. A Host level carries the Project bundle of the same name:
+ * it reaches every Project on that Host, and Project assignments only add to it
+ * (grants combine by union, never by intersection).
+ */
 export const RESOURCE_ACCESS_LEVELS = {
   daemon: {
     connect: ["daemon.connect"],
+    office_worker: ["daemon.connect", ...OFFICE_WORKER_PROJECT_PRIVILEGES],
+    developer: ["daemon.connect", ...DEVELOPER_PROJECT_PRIVILEGES],
     administrator: ["daemon.connect", "daemon.manage"],
   },
   project: {
-    office_worker: ["project.use", "agent.interact", "agent.create", "approval.file"],
-    developer: [
-      "project.use",
-      "workspace.create",
-      "agent.interact",
-      "agent.create",
-      "terminal.use",
-      "approval.file",
-      "approval.config",
-      "approval.command",
-    ],
-    full_access: [
-      "project.use",
-      "workspace.create",
-      "agent.interact",
-      "agent.create",
-      "terminal.use",
-      "approval.file",
-      "approval.config",
-      "approval.command",
-      "approval.command.destructive",
-      "approval.channel",
-    ],
+    office_worker: OFFICE_WORKER_PROJECT_PRIVILEGES,
+    developer: DEVELOPER_PROJECT_PRIVILEGES,
+    full_access: DEVELOPER_PROJECT_PRIVILEGES,
   },
   channel_account: {
     use: ["channel.use"],

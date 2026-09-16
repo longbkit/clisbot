@@ -23,7 +23,11 @@ import {
   requiredPermissionForOutbound,
 } from "../authorization/operation-permissions.js";
 import { requiredPrivilegeForOperation } from "@getpaseo/protocol/managed-access-privileges";
-import type { ProjectPrivilege, ResolvedAgentConfigurationGrant } from "./types.js";
+import {
+  PROJECT_PRIVILEGES,
+  type ProjectPrivilege,
+  type ResolvedAgentConfigurationGrant,
+} from "./types.js";
 
 interface AgentStorageReader {
   get(agentId: string): Promise<StoredAgentRecord | null>;
@@ -658,8 +662,7 @@ export class ManagedResourceAuthorizer {
         .getPendingPermissions(message.agentId)
         .find((candidate) => candidate.id === message.requestId);
       if (!request) return false;
-      const privilege = approvalPrivilegeFor(request);
-      return privilege !== null && this.allowsAgent(message.agentId, privilege);
+      return this.allowsAgent(message.agentId, approvalPrivilegeFor(request));
     }
     if (message.type === "create_agent_request") {
       if (message.projectId !== undefined) {
@@ -1303,21 +1306,24 @@ function filterProviderModel(
   return [projected];
 }
 
+const APPROVAL_PRIVILEGES = PROJECT_PRIVILEGES.filter((privilege) =>
+  privilege.startsWith("approval."),
+);
+
 function hasEveryApprovalPrivilege(privileges: ReadonlySet<ProjectPrivilege>): boolean {
-  return [
-    "approval.file",
-    "approval.config",
-    "approval.command",
-    "approval.command.destructive",
-    "approval.channel",
-  ].every((privilege) => privileges.has(privilege as ProjectPrivilege));
+  return APPROVAL_PRIVILEGES.every((privilege) => privileges.has(privilege));
 }
 
+/**
+ * Every pending request maps to exactly one approval leaf. Tools outside the
+ * named classes land on `approval.other` rather than on nothing: a request no
+ * level could ever answer reads to the user as a prompt that hangs forever.
+ */
 function approvalPrivilegeFor(request: {
   name: string;
   input?: Record<string, unknown>;
   detail?: { type: string; command?: string };
-}): ProjectPrivilege | null {
+}): ProjectPrivilege {
   const name = request.name.toLowerCase();
   if (name.startsWith("channel.tool.")) return "approval.channel";
   if (["config", "configedit", "configdelete"].includes(name)) return "approval.config";
@@ -1338,7 +1344,7 @@ function approvalPrivilegeFor(request: {
       ? "approval.command.destructive"
       : "approval.command";
   }
-  return null;
+  return "approval.other";
 }
 
 function commandOf(request: {
