@@ -4,13 +4,19 @@ import { SessionInboundMessageSchema } from "@getpaseo/protocol/messages";
 import { sessionOperationContent } from "@getpaseo/protocol/session-operation";
 import type { AccessStore } from "../../access/store.js";
 import type { Database } from "../../db/types.js";
+import { normalizeHubOrigin } from "../../managed-access/hub-origin.js";
 import type { AccessTicketService } from "../../managed-access/tickets.js";
 import type { InboundMessage } from "../plane/types.js";
 
-export interface ChannelOperationTarget {
+/** Where an operation is admitted, plus the account's provider name lookup for its conversation. */
+export interface ChannelIdentityTarget {
   organizationId: string;
-  daemonReference: string;
   connectionId: string;
+  /** The Channel account's conversation lookup (Slack `conversations.info`, Telegram `getChat`). */
+  resolveConversationLabel?: (conversationId: string) => Promise<string | null>;
+}
+export interface ChannelOperationTarget extends ChannelIdentityTarget {
+  daemonReference: string;
   clientId: string;
 }
 export interface ChannelSystemOperation {
@@ -73,7 +79,7 @@ export function createChannelOperationTicketResolver(
 /** Captured after Gate 1 and persisted with the Automation receipt before workflow dispatch. */
 export async function resolveChannelOperationIdentity(
   deps: { access: AccessStore; hubOrigin: string },
-  target: Pick<ChannelOperationTarget, "organizationId" | "connectionId">,
+  target: ChannelIdentityTarget,
   source: ChannelOperationSource,
 ): Promise<VerifiedSessionOperationIdentity> {
   const system = isSystemOperation(source);
@@ -85,12 +91,18 @@ export async function resolveChannelOperationIdentity(
         channel: source.channel,
         senderIdentity: source.senderIdentity,
       });
-  const hubOrigin = new URL(deps.hubOrigin).origin;
+  const hubOrigin = normalizeHubOrigin(deps.hubOrigin);
+  const conversationId = system ? source.channelId : source.conversation.rootConversationId;
   return {
     actor: {
       kind: system ? "system" : "user",
       id: system ? "channel-approval-policy" : source.senderIdentity,
-      displayName: system ? "Channel approval policy" : source.senderName,
+      // A linked identity is a known Member, so the snapshot carries their name over the
+      // provider's sender name; `id` stays the provider identity either way.
+      displayName: system ? "Channel approval policy" : (member?.name ?? source.senderName),
+      // The Member's Hub profile image is the only avatar on this path: no
+      // inbound vertical carries one (docs/features/agent-session-storage/design.md).
+      ...(system || !member?.image ? {} : { avatarUrl: member.image }),
       hubOrigin,
       organizationId: target.organizationId,
       connectionId: target.connectionId,
@@ -100,10 +112,25 @@ export async function resolveChannelOperationIdentity(
       hubOrigin,
       organizationId: target.organizationId,
       connectionId: target.connectionId,
-      channelId: isSystemOperation(source)
-        ? source.channelId
-        : source.conversation.rootConversationId,
-      displayName: system ? undefined : source.conversationLabel,
+      channelId: conversationId,
+      displayName: system ? undefined : await conversationDisplayName(target, source),
+      ...(system ? {} : { channel: source.channel }),
     },
   };
+}
+
+/**
+ * The vertical's own label when the message carried one (Telegram group title), else the account's
+ * cached provider lookup — Slack messages carry no channel name. A failed lookup keeps the raw id.
+ */
+async function conversationDisplayName(
+  target: ChannelIdentityTarget,
+  source: InboundMessage,
+): Promise<string | undefined> {
+  const carried = source.conversationLabel?.trim().slice(0, 200);
+  if (carried) return carried;
+  const resolved = await target
+    .resolveConversationLabel?.(source.conversation.rootConversationId)
+    .catch(() => null);
+  return resolved?.trim().slice(0, 200) || undefined;
 }

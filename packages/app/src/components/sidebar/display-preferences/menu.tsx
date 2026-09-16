@@ -7,6 +7,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useShallow } from "zustand/react/shallow";
 import { sessionMetadataOptions } from "@/clisbot/session-storage/directory";
 import { actorLabel } from "@/clisbot/session-storage/actor";
+import { channelConversationLabel } from "@/clisbot/channels/channel-icon";
 import {
   useCallback,
   useMemo,
@@ -335,7 +336,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
               new Map(
                 [...metadataOptions.channels].map(([key, channel]) => [
                   key,
-                  `${channel.displayName || channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`,
+                  `${channelConversationLabel(channel)} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`,
                 ]),
               )
             }

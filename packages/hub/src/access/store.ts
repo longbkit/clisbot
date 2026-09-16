@@ -1083,7 +1083,10 @@ export class AccessStore {
     connectionId: string;
     channel: string;
     senderIdentity: string;
-  }): Promise<{ membershipId: string; userId: string; role: string } | undefined> {
+  }): Promise<
+    | { membershipId: string; userId: string; role: string; name: string; image: string | null }
+    | undefined
+  > {
     const prefix = `${input.channel}:`;
     const externalSubjectId = input.senderIdentity.startsWith(prefix)
       ? input.senderIdentity.slice(prefix.length)
@@ -1093,9 +1096,12 @@ export class AccessStore {
         membershipId: schema.members.id,
         userId: schema.members.userId,
         role: schema.members.role,
+        name: schema.users.name,
+        image: schema.users.image,
       })
       .from(schema.channelIdentities)
       .innerJoin(schema.members, eq(schema.channelIdentities.memberId, schema.members.id))
+      .innerJoin(schema.users, eq(schema.members.userId, schema.users.id))
       .where(
         and(
           eq(schema.channelIdentities.organizationId, input.organizationId),

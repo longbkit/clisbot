@@ -1383,10 +1383,31 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     return {
       resolveSessionIdentity: (source) =>
         resolve(
-          { organizationId: snapshot.organizationId, connectionId: compiled.connectionId },
+          {
+            organizationId: snapshot.organizationId,
+            connectionId: compiled.connectionId,
+            resolveConversationLabel: this.conversationLabelResolver(snapshot, compiled),
+          },
           source,
         ),
     };
+  }
+
+  /** Session snapshots name a conversation with the same cached lookup the Hub's pickers use. */
+  private conversationLabelResolver(
+    snapshot: ChannelControlPlaneSnapshot,
+    compiled: CompiledChannelAccount,
+  ): (conversationId: string) => Promise<string | null> {
+    return async (conversationId) =>
+      (
+        await this.resolveConversation({
+          organizationId: snapshot.organizationId,
+          channel: supportedChannel(compiled.channel),
+          accountId: compiled.accountId,
+          connectionId: compiled.connectionId,
+          conversationId,
+        })
+      )?.label ?? null;
   }
 
   private applyChannelAdmissionTicket(
@@ -1406,6 +1427,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           daemonReference,
           clientId,
           connectionId: compiled.connectionId,
+          resolveConversationLabel: this.conversationLabelResolver(snapshot, compiled),
         });
     if (this.options.buildDaemonAccessTicketResolver)
       daemonOptions.resolveAccessTicket = this.options.buildDaemonAccessTicketResolver({
@@ -1501,7 +1523,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         });
         break;
       case "command":
-        this.logger.info?.("channel inbound answered an approval command", {
+        this.logger.info?.("channel inbound handled a command", {
           ...base,
           handled: outcome.handled,
           detail: outcome.detail,

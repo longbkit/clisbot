@@ -46,6 +46,12 @@ Only facts that differ from one session to the next. Anything that comes from th
 
 User, channel, Updated time and the metadata status only appear on hosts that can read session storage. Model, Created time and Last activity come from the agent record and show on any host. The items are drawn by the same component as the workspace row (`SessionMetadataLine`), so they look and behave the same.
 
+What those items say is fixed by the Hub when it records each channel message, not by the app:
+
+- **User** — a sender with a linked channel identity is recorded under their Member name; an unlinked sender keeps the provider's sender name, or the raw `slack:U…` id when the provider sent none.
+- **Channel** — the conversation's name comes from the message when the Channel carries it (Telegram group title), otherwise from the account's cached provider lookup (Slack `conversations.info`). The app writes Slack names as `#name` and marks each conversation with its Channel's icon (`clisbot/channels/channel-icon.tsx`).
+- The daemon replaces a session's snapshot on every new message, so a session recorded before this naming shows the new names after its next channel message. Its **Created user** never changes.
+
 ## Behavior
 
 | Topic          | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

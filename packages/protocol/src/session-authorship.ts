@@ -20,6 +20,8 @@ export const SessionChannelReferenceSchema = z.object({
   connectionId: z.string(),
   channelId: z.string(),
   displayName: z.string().optional(),
+  /** The Channel (chat platform) id, e.g. `slack` or `telegram`, so a client can mark it. */
+  channel: z.string().optional(),
 });
 export type SessionChannelReference = z.infer<typeof SessionChannelReferenceSchema>;
 

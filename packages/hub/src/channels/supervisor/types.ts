@@ -98,7 +98,7 @@ export interface ChannelSupervisorOptions {
    * clientId. Absent (or the account has no daemon route) → no ticket, the
    * trusted session admits as today. */
   resolveSessionIdentity?: (
-    target: { organizationId: string; connectionId: string },
+    target: import("../daemon/session-operation.js").ChannelIdentityTarget,
     source: import("../plane/types.js").InboundMessage,
   ) => Promise<import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity>;
   buildSessionOperationTicketResolver?: (

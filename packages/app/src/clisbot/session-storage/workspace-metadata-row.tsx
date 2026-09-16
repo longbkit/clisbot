@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement } from "react";
+import { Fragment, useMemo, type ReactElement } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
@@ -11,6 +11,7 @@ import {
   type SessionAuthorship,
   type SessionChannelReference,
 } from "@getpaseo/protocol/session-authorship";
+import { ChannelIcon, channelConversationLabel } from "@/clisbot/channels/channel-icon";
 import { SessionActorLabel } from "./actor";
 import { useSessionStorageReadable } from "./capability";
 
@@ -38,6 +39,16 @@ function metadataStatusLabel(status: SessionAuthorship["authorshipStatus"]): str
   return "Metadata pending";
 }
 
+function ChannelMenuItem({ channel }: { channel: SessionChannelReference }) {
+  const leading = useMemo(() => <ChannelIcon channel={channel.channel} size={14} />, [channel]);
+  return (
+    <MenuItem
+      leading={leading}
+      closeOnSelect={false}
+    >{`${channelConversationLabel(channel)} · ${channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`}</MenuItem>
+  );
+}
+
 function ChannelsItem({
   channels,
   accessibilityLabel,
@@ -47,18 +58,16 @@ function ChannelsItem({
 }) {
   return (
     <MenuRoot>
-      <MenuTrigger accessibilityLabel={accessibilityLabel}>
-        <Text style={styles.text}>
-          {channels[0]!.displayName || channels[0]!.channelId}
+      <MenuTrigger accessibilityLabel={accessibilityLabel} style={styles.channel}>
+        <ChannelIcon channel={channels[0]!.channel} />
+        <Text style={styles.text} numberOfLines={1}>
+          {channelConversationLabel(channels[0]!)}
           {channels.length > 1 ? ` +${channels.length - 1}` : ""}
         </Text>
       </MenuTrigger>
       <MenuSurface>
         {channels.map((channel) => (
-          <MenuItem
-            key={sessionChannelKey(channel)}
-            closeOnSelect={false}
-          >{`${channel.displayName || channel.channelId} · ${channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`}</MenuItem>
+          <ChannelMenuItem key={sessionChannelKey(channel)} channel={channel} />
         ))}
       </MenuSurface>
     </MenuRoot>
@@ -191,4 +200,5 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
   },
   text: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  channel: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1], minWidth: 0 },
 }));
