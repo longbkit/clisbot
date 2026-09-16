@@ -79,6 +79,22 @@ Với `external`, Connect cho phép kết nối daemon; muốn làm việc cần
 
 Kiểm tra grant Project thuộc đúng Host, Member đã vào Team và app đã nhận quyền mới. Connect không tự cấp tất cả Project. Dùng tài khoản Member để thử, vì Owner luôn có quyền rộng hơn.
 
+## Muốn cấp mọi Project trên Host nhưng chỉ cho dùng một số model?
+
+Chọn chính Host làm tài nguyên, mức **Developer** hoặc **Office worker**, rồi chọn cấu hình Agent. Không dùng Administrator: Administrator bỏ qua giới hạn provider/model. Xem [cấp cho mọi Project trên một Host](../access/members-and-teams.md#cấp-cho-mọi-project-trên-một-host).
+
+## Cấp Project chỉ dùng Claude, sao người đó vẫn dùng được Codex?
+
+Grant cộng dồn. Nếu Host đã cấp Codex, grant Project chỉ thêm Claude chứ không bỏ Codex. Muốn giới hạn thì giảm lựa chọn trên Host.
+
+## Agent chờ phê duyệt một tool (WebFetch, MCP…) mãi không ai duyệt được?
+
+Bản cũ không có quyền nào duyệt được tool ngoài nhóm file/config/lệnh. Cập nhật và restart Hub cùng **mọi daemon** trước, rồi Edit assignment, chọn lại Developer hoặc Full access để nhận quyền `approval.other`. Làm ngược thứ tự thì daemon cũ từ chối vé và người đó không vào được.
+
+## Sau khi cập nhật, Agent không còn chạy chế độ unattended?
+
+Grant lưu trước bản cập nhật thiếu `approval.other`, mà chạy không hỏi phê duyệt cần đủ mọi quyền phê duyệt. Cập nhật mọi daemon trước, rồi Edit assignment, chọn lại mức quyền và lưu. Xem [mức quyền](../access/permissions.md#sau-khi-cập-nhật-grant-cũ-không-chạy-unattended-được-nữa).
+
 ## Developer có tạo Project mới được không?
 
 Không. Tạo Project cần Owner/Daemon Administrator. Nhờ người vận hành thêm Project rồi cấp Developer trên Project đó; không cần nâng thành Administrator chỉ để tạo worktree.
@@ -113,9 +129,13 @@ Nếu terminal báo lỗi, kiểm tra Workspace còn tồn tại, Project grant 
 
 Đây là kiểm tra trước khi mở luồng tạo Project. Developer/Project Full access không có quyền này. Chọn Host khác mà bạn được quản trị hoặc nhờ Owner/Daemon Administrator tạo Project. Nếu vừa được cấp quyền, kết nối lại để cập nhật thông tin session.
 
+## Cấp nhiều Project cùng lúc làm mất cấu hình cũ?
+
+Có thể. Nếu người đó đã có grant trên một Project được chọn, grant cũ bị thay, kể cả cấu hình Agent. Hộp xác nhận liệt kê các Project bị thay — kiểm tra trước khi đồng ý.
+
 ## Xóa một assignment rồi sao người đó vẫn vào được?
 
-Kiểm tra grant trực tiếp, tất cả Team và vai trò Owner; quyền cộng dồn. Kiểm tra daemon có đang `off` hoặc người đó còn đường ghép nối tin cậy khác không. Thu hồi đủ nguồn quyền và kiểm tra lại kết nối; đăng xuất một app không phải thu hồi toàn bộ quyền.
+Kiểm tra grant trực tiếp, tất cả Team và vai trò Owner; quyền cộng dồn. Grant trên **Host** cũng mở mọi Project của Host đó: xem theo **Resource · Who has access** trên Project để thấy cả những dòng này. Kiểm tra daemon có đang `off` hoặc người đó còn đường ghép nối tin cậy khác không. Thu hồi đủ nguồn quyền và kiểm tra lại kết nối; đăng xuất một app không phải thu hồi toàn bộ quyền.
 
 ## Daemon Administrator có phải Hub Admin không?
 

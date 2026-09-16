@@ -2,21 +2,22 @@
 
 Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn hướng dẫn theo việc cần làm. Tên nút và menu giữ nguyên tiếng Anh để dễ tìm trong app.
 
-| Bạn muốn làm gì?                                | Hướng dẫn                                                         |
-| ----------------------------------------------- | ----------------------------------------------------------------- |
-| Tạo bot Slack/Codex, seed workspace, chạy lại   | [Onboarding](getting-started/onboarding.md)                       |
-| Thiết lập Hub, đăng nhập Google, đăng ký        | [Thiết lập và đăng nhập](account/setup-and-sign-in.md)            |
-| Đổi tên hiển thị, ảnh đại diện                  | [Hồ sơ](account/profile.md)                                       |
-| Xem và đổi tên tổ chức                          | [Tên tổ chức](account/organization.md)                            |
-| Đổi/quên mật khẩu, cấu hình master password     | [Mật khẩu và recovery](account/password-and-recovery.md)          |
-| Enroll, unenroll, đổi tên, quản lý nhiều Host   | [Quản lý Hosts](hosts/connect-and-manage.md)                      |
-| Chọn chế độ kết nối và bắt buộc phân quyền Hub  | [Managed Access: off và external](hosts/managed-access.md)        |
-| Mời người, tạo Team, cấp và thu hồi quyền       | [Members, Teams và Access](access/members-and-teams.md)           |
-| Chọn Office worker, Developer hay Administrator | [Các mức quyền](access/permissions.md)                            |
-| Hiểu đầy đủ quyền quản trị daemon               | [Daemon Administrator](access/daemon-administrator.md)            |
-| Tạo Project, Workspace, worktree và session     | [Làm việc trên Project](work/projects-and-workspaces.md)          |
-| Kết nối Slack/Telegram, chạy Automation         | [Channels và Automations](automation/channels-and-automations.md) |
-| Tìm nguyên nhân và xử lý lỗi                    | [Q&A và troubleshooting](help/faq.md)                             |
+| Bạn muốn làm gì?                                      | Hướng dẫn                                                                  |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Tạo bot Slack/Codex, seed workspace, chạy lại         | [Onboarding](getting-started/onboarding.md)                                |
+| Thiết lập Hub, đăng nhập Google, đăng ký              | [Thiết lập và đăng nhập](account/setup-and-sign-in.md)                     |
+| Đổi tên hiển thị, ảnh đại diện                        | [Hồ sơ](account/profile.md)                                                |
+| Xem và đổi tên tổ chức                                | [Tên tổ chức](account/organization.md)                                     |
+| Đổi/quên mật khẩu, cấu hình master password           | [Mật khẩu và recovery](account/password-and-recovery.md)                   |
+| Enroll, unenroll, đổi tên, quản lý nhiều Host         | [Quản lý Hosts](hosts/connect-and-manage.md)                               |
+| Chọn chế độ kết nối và bắt buộc phân quyền Hub        | [Managed Access: off và external](hosts/managed-access.md)                 |
+| Mời người, tạo Team, cấp và thu hồi quyền             | [Members, Teams và Access](access/members-and-teams.md)                    |
+| Cấp mọi Project trên Host, nhiều Project, nhiều model | [Cấp nhanh](access/members-and-teams.md#cấp-cho-mọi-project-trên-một-host) |
+| Chọn Office worker, Developer hay Administrator       | [Các mức quyền](access/permissions.md)                                     |
+| Hiểu đầy đủ quyền quản trị daemon                     | [Daemon Administrator](access/daemon-administrator.md)                     |
+| Tạo Project, Workspace, worktree và session           | [Làm việc trên Project](work/projects-and-workspaces.md)                   |
+| Kết nối Slack/Telegram, chạy Automation               | [Channels và Automations](automation/channels-and-automations.md)          |
+| Tìm nguyên nhân và xử lý lỗi                          | [Q&A và troubleshooting](help/faq.md)                                      |
 
 ## Bốn khái niệm cần biết
 
