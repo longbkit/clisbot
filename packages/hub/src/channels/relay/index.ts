@@ -13,7 +13,6 @@ import type { EffectiveDefaults } from "../config/compile.js";
 import type { AgentStreamTimelineItem } from "../daemon/types.js";
 import type { RelayedStreamEvent, SubagentStreamEvent } from "../plane/stream.js";
 import {
-  SLACK_THREAD_TS_PATTERN,
   type PlaneClock,
   type PlaneLogger,
   type PostFn,
@@ -21,6 +20,7 @@ import {
   type StreamContext,
 } from "../plane/types.js";
 import type { ProcessingController } from "../plane/processing.js";
+import { anchoredReplyThreadId } from "../reply-anchor.js";
 import type { ChannelStreamingProducer, StreamingFinalizeTransport } from "../streaming/index.js";
 
 /**
@@ -67,20 +67,16 @@ export function replyLocationFor(context: StreamContext): {
   to: string;
   threadId?: string | undefined;
 } {
-  let threadId = context.externalThreadId ?? context.triggerThreadId ?? null;
-  if (
-    threadId === null &&
-    context.route.defaults.replyAnchor === "thread" &&
-    context.channel === "slack" &&
-    context.rootKind !== "dm" &&
-    context.triggerMessageId !== undefined &&
-    SLACK_THREAD_TS_PATTERN.test(context.triggerMessageId)
-  ) {
-    threadId = context.triggerMessageId;
-  }
+  const threadId = anchoredReplyThreadId({
+    channel: context.channel,
+    rootKind: context.rootKind,
+    replyAnchor: context.route.defaults.replyAnchor,
+    threadId: context.externalThreadId ?? context.triggerThreadId ?? null,
+    messageId: context.triggerMessageId,
+  });
   return {
     to: context.externalConversationId,
-    ...(threadId !== null ? { threadId } : {}),
+    ...(threadId !== undefined ? { threadId } : {}),
   };
 }
 

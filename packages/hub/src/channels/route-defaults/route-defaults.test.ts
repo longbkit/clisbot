@@ -121,7 +121,16 @@ describe("applyAgentControls", () => {
     assert.deepEqual(applyAgentControls(named, OPUS), OPUS);
   });
 
-  it("overrides field by field under the same provider", () => {
+  it("reads controls naming the same provider as a whole configuration", () => {
+    // A conversation on codex that left effort unset must not inherit "medium".
+    assert.deepEqual(applyAgentControls(named, { provider: "codex", model: "gpt-5.6-terra" }), {
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      options: named.options,
+    });
+  });
+
+  it("overrides field by field when no provider is named", () => {
     assert.deepEqual(applyAgentControls(named, { model: "gpt-5.6" }), {
       ...named,
       model: "gpt-5.6",

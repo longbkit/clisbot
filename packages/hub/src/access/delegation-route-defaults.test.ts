@@ -8,30 +8,38 @@ import type { AccessStore, DelegatedAgentExecution } from "./store.js";
 
 const HUB = `
 environments:
-  lab:
+  support:
     kind: daemon
     daemon: daemon-10000000
-    cwd: /lab
+    cwd: /support
+  finance:
+    kind: daemon
+    daemon: daemon-10000000
+    cwd: /finance
 agents:
   assistant:
     provider: codex
     model: gpt-5.6-luna
 `;
 
-const ACCOUNT = `
+function account(accountId: string, environment: string, controls = ""): string {
+  return `
 channel: slack
-accountId: support
-connectionId: slack-support
+accountId: ${accountId}
+connectionId: slack-${accountId}
 transport: { mode: socket, errorPolicy: once }
 routes:
   - match: { kind: channel, ids: [C1] }
     agent: assistant
-    environment: lab
-    agentControls: { provider: claude, model: claude-opus-5, mode: bypassPermissions }
+    environment: ${environment}
+${controls}
 fallback: { deny: true }
 `;
+}
 
-it("checks the agent a Route's default controls start, not only the named agent", async () => {
+async function delegatedExecutions(
+  routes?: Parameters<typeof assertChannelConfigurationDelegation>[0]["routes"],
+): Promise<DelegatedAgentExecution[]> {
   const bundle = compileHubBundle([{ path: ".paseo/hub.yml", content: HUB }], {
     requireWorkflow: false,
   });
@@ -41,10 +49,18 @@ it("checks the agent a Route's default controls start, not only the named agent"
         path: ".paseo/channels/policy.yml",
         content: 'defaults:\n  approval:\n    - { match: "*", mode: require }\n',
       },
-      { path: ".paseo/channels/slack/support.yml", content: ACCOUNT },
+      {
+        path: ".paseo/channels/slack/support.yml",
+        content: account(
+          "support",
+          "support",
+          "    agentControls: { provider: claude, model: claude-opus-5, mode: bypassPermissions }",
+        ),
+      },
+      { path: ".paseo/channels/slack/finance.yml", content: account("finance", "finance") },
     ],
     agentNames: ["assistant"],
-    environmentNames: ["lab"],
+    environmentNames: ["support", "finance"],
     workflowNames: [],
   });
   const assertCanDelegateAgentExecutions = vi.fn(
@@ -56,9 +72,30 @@ it("checks the agent a Route's default controls start, not only the named agent"
     principal: { organizationId: "org", userId: "u", membershipId: "m" },
     bundle,
     controlPlane,
+    ...(routes === undefined ? {} : { routes }),
   });
-  const [execution] = assertCanDelegateAgentExecutions.mock.calls[0]![0].executions;
-  assert.equal(execution?.providerId, "claude");
-  assert.equal(execution?.modelId, "claude-opus-5");
-  assert.equal(execution?.modeId, "bypassPermissions");
+  return assertCanDelegateAgentExecutions.mock.calls[0]![0].executions;
+}
+
+it("checks the agent a Route's default controls start, not only the named agent", async () => {
+  const support = (await delegatedExecutions()).find(({ cwd }) => cwd === "/support");
+  assert.equal(support?.providerId, "claude");
+  assert.equal(support?.modelId, "claude-opus-5");
+  assert.equal(support?.modeId, "bypassPermissions");
+});
+
+it("checks only the changed Route when a change names one", async () => {
+  assert.deepEqual((await delegatedExecutions()).map(({ cwd }) => cwd).sort(), [
+    "/finance",
+    "/support",
+  ]);
+  // A Channel Route manager changing `slack/support` is not asked about the
+  // untouched `slack/finance` Route.
+  const scoped = await delegatedExecutions([
+    { channel: "slack", accountId: "support", position: 0 },
+  ]);
+  assert.deepEqual(
+    scoped.map(({ cwd }) => cwd),
+    ["/support"],
+  );
 });

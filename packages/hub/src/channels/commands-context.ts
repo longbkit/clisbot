@@ -2,6 +2,7 @@ import type { AccessPrivilege } from "../access/contract.js";
 import type { ChannelPrivilegeRequest } from "../access/store.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { ChannelPlaneDeps, InboundMessage, OutboundPostParams } from "./plane/types.js";
+import { anchoredReplyThreadId } from "./reply-anchor.js";
 import { sessionDeepLink, sessionOpenUrl } from "./session-open-link.js";
 
 export function commandAccessRequest(
@@ -32,13 +33,26 @@ export function commandAccessRequest(
  * session link. A reply delivered anywhere else — a DM the caller is not
  * looking at — is indistinguishable from the bot ignoring the command, which
  * is what a private-by-default reply cost us in Slack.
+ *
+ * "Where it was asked" follows the Route's `reply.anchor` exactly as the
+ * agent's own replies do: under `thread`, a command sent at the channel root
+ * is answered in a thread on that message. Without a Route (`/help` and `/me`
+ * in an unrouted conversation) there is no anchor, and the reply stays put.
  */
 export function commandReplyAddress(
   message: InboundMessage,
+  replyAnchor: "default" | "thread" = "default",
 ): Pick<OutboundPostParams, "to" | "threadId"> {
+  const threadId = anchoredReplyThreadId({
+    channel: message.channel,
+    rootKind: message.conversation.kind === "dm" ? "dm" : "channel",
+    replyAnchor,
+    threadId: message.conversation.threadId,
+    messageId: message.externalMessageId,
+  });
   return {
     to: message.conversation.rootConversationId,
-    ...(message.conversation.threadId === null ? {} : { threadId: message.conversation.threadId }),
+    ...(threadId === undefined ? {} : { threadId }),
   };
 }
 

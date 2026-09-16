@@ -80,8 +80,9 @@ A Channel account assignment carries channel authority, not Project authority.
 **Use** (`channel.use`) lets a sender talk in the conversations its constraint
 names. **Manage** (`channel.manage`) also lets them change that Channel Route's
 Route defaults from a conversation, and requires the All conversations constraint;
-an organization owner or admin holds it without an assignment. What the Route may
-start is still bounded by the sender's own Project grants, through delegation. See
+an organization owner or admin holds it without an assignment. What the changed
+Route may start is still bounded by the sender's own Project grants, through
+delegation scoped to that Route. See
 [Route defaults](features/slash-commands/README.md#route-defaults).
 
 ### Approval leaves

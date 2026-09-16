@@ -323,16 +323,24 @@ served this message. That Route is the one changed, and `/routedefault` shows it
 - **Where it lives.** The Route's `agentControls:` leaf (provider, model, mode,
   thinking option, feature values) over the named `agent:` in `hub.yml`
   (`channels/config/agent-controls.ts`). It changes one Route, not an agent that
-  other Routes and Automations share. A different provider replaces every
-  provider-specific value of the named agent; the same provider overrides field
-  by field. The leaf can also sit in an account's or the policy's `defaults:`;
-  the most specific layer's block wins whole.
+  other Routes and Automations share. A block that names a provider is a whole
+  configuration, read the way a conversation selection is: it replaces the named
+  agent's model, mode, thinking option and feature values, keeps its provider
+  `options` only under the same provider, and a field it leaves out is unset
+  rather than inherited. That is what makes a promoted conversation start exactly
+  what it ran. A block without a provider overrides the named agent field by
+  field. The leaf can also sit in an account's or the policy's `defaults:`; the
+  most specific layer's block wins whole.
 - **How it is written.** An ordinary Channel revision, through `deployRevision`:
-  the same compile guard, the same delegation check applied to the effective
-  agent, `createdByUserId` set to the Member, and `expectedRevisionId` so a
+  the same compile guard, delegation applied to the effective agent of **the
+  changed Route only**, `createdByUserId` set to the Member, and `expectedRevisionId` so a
   concurrent publish is refused rather than overwritten. The command refuses a
   Route that changed since the running plane compiled it, ignoring an earlier
-  default change (`routeIdentity`).
+  default change (`routeIdentity`). Delegation is scoped because every other Route
+  in the revision is unchanged and was authorized by whoever published it;
+  checking all of them would refuse a Channel Route manager whose own Route is
+  within their grants whenever another account uses a Project they lack. A Hub UI
+  save still checks every Route.
 - **What happens to the conversation.** Its own selection is cleared, since the
   Route now says the same thing. Its behavior does not change.
 - **What happens to running sessions.** Nothing. The default is not part of the
@@ -392,7 +400,11 @@ is never ambiguous:
 ## Visibility in public conversations
 
 Every command replies in the conversation and thread it was invoked from,
-including `/cowork` and `/status`, whose output carries a session link. Ordinary
+including `/cowork` and `/status`, whose output carries a session link. The
+reply follows the Route's `reply.anchor` exactly as the agent's replies do
+(`channels/reply-anchor.ts`): under `thread`, a command sent at the Slack channel
+root is answered in a thread on that message rather than at the root. An
+unrouted `/help` or `/me` has no anchor and replies where it was sent. Ordinary
 messages carry no native interaction token on Slack or Discord, so the only
 private surface available is a requester DM — and a reply in a DM the caller is
 not looking at is indistinguishable from the bot ignoring the command.

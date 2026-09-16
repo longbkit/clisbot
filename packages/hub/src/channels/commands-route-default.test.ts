@@ -161,6 +161,21 @@ describe("/promoteroutedefault", () => {
     assert.equal(clearConversationSelection.mock.calls.length, 1);
   });
 
+  it("publishes a default that starts exactly what the conversation runs", async () => {
+    // Same provider as the named agent, effort left unset: the Route must not
+    // fall back to the named agent's "medium".
+    const conversation: CreateAgentConfig = {
+      provider: "codex",
+      cwd: "/lab",
+      model: "gpt-5.6-terra",
+    };
+    const { deps, context, publisher } = harness({ conversation });
+    const result = await promoteRouteDefault(deps, context, undefined);
+    assert.match(result.text, /codex \/ gpt-5\.6-terra \/ default/u);
+    const [, controls] = vi.mocked(publisher.promote).mock.calls[0]!;
+    assert.deepEqual(deps.routeConfig(context, { agentControls: controls }), conversation);
+  });
+
   it("publishes nothing when the conversation already uses the route default", async () => {
     const { deps, context, publisher } = harness();
     const result = await promoteRouteDefault(deps, context, undefined);

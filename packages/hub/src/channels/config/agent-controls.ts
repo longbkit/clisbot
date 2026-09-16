@@ -14,20 +14,27 @@ export const AgentControlsSchema = AgentSchema.omit({ options: true }).partial()
 export type AgentControls = z.infer<typeof AgentControlsSchema>;
 
 /**
- * The agent a Route starts. A different provider replaces every
- * provider-specific value, because a model, mode or option id means nothing
- * under another provider. The same provider (or none named) overrides field by
- * field.
+ * The agent a Route starts. Controls that name a provider are a whole
+ * configuration, read the way a conversation selection is
+ * (`resolveConversationConfiguration`): they replace the named agent's model,
+ * mode, thinking option and feature values, and keep its provider `options`
+ * only under the same provider. A field they leave out is unset, not inherited,
+ * so promoting a conversation reproduces that conversation exactly. Controls
+ * without a provider override the named agent field by field.
  */
 export function applyAgentControls(
   agent: CompiledAgent,
   controls: AgentControls | undefined,
 ): CompiledAgent {
   if (controls === undefined) return agent;
-  if (controls.provider !== undefined && controls.provider !== agent.provider) {
-    return { ...controls, provider: controls.provider };
-  }
-  return { ...agent, ...controls, provider: agent.provider };
+  if (controls.provider === undefined) return { ...agent, ...controls, provider: agent.provider };
+  return {
+    ...controls,
+    provider: controls.provider,
+    ...(controls.provider === agent.provider && agent.options !== undefined
+      ? { options: agent.options }
+      : {}),
+  };
 }
 
 /** Two control sets name the same agent configuration. */

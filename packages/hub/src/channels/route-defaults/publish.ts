@@ -53,11 +53,12 @@ export interface RouteDefaultPublisher {
 export interface RouteDefaultPublisherOptions {
   database: Database;
   publicBaseUrl?: string;
-  /** Delegation: the Member may start everything the candidate's Routes start. */
-  authorize(
-    principal: RouteDefaultPrincipal & { organizationId: string },
-    candidate: ChannelConfigurationCandidate,
-  ): Promise<void>;
+  /** Delegation for the changed Route only: the Member may start what it starts. */
+  authorize(input: {
+    principal: RouteDefaultPrincipal & { organizationId: string };
+    candidate: ChannelConfigurationCandidate;
+    route: { channel: string; accountId: string; position: RoutePosition };
+  }): Promise<void>;
   apply(): void;
 }
 
@@ -93,10 +94,15 @@ export function createRouteDefaultPublisher(
         createdByUserId: target.principal.userId,
         expectedRevisionId: snapshot.revision?.id ?? null,
         authorize: (candidate) =>
-          options.authorize(
-            { ...target.principal, organizationId: target.organizationId },
+          options.authorize({
+            principal: { ...target.principal, organizationId: target.organizationId },
             candidate,
-          ),
+            route: {
+              channel: target.channel,
+              accountId: target.accountId,
+              position: target.position,
+            },
+          }),
       });
     } catch (error) {
       if (error instanceof ChannelConfigurationConflictError) return { status: "route_changed" };

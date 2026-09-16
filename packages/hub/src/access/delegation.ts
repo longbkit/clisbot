@@ -18,13 +18,28 @@ export interface DelegationPrincipal {
   membershipId: string;
 }
 
-/** Authorizes every direct Agent and referenced Automation in one compiled Channel candidate. */
+/** One Route of one Channel account: an index into its `routes`, or its fallback. */
+export interface DelegatedRouteRef {
+  channel: string;
+  accountId: string;
+  position: number | "fallback";
+}
+
+/**
+ * Authorizes the direct Agents and referenced Automations in one compiled
+ * Channel candidate. A save of the whole configuration checks every Route.
+ * A change to one Route (`/promoteroutedefault`) passes `routes`: the rest of
+ * the candidate is byte-identical to the active revision, and was authorized
+ * by whoever published it, so checking it against this principal would only
+ * refuse a Channel Route manager for Routes they did not touch.
+ */
 export async function assertChannelConfigurationDelegation(input: {
   access: AccessStore;
   database: Database;
   principal: DelegationPrincipal;
   bundle: CompiledHubBundle;
   controlPlane: ChannelControlPlane;
+  routes?: readonly DelegatedRouteRef[];
 }): Promise<void> {
   const executions: DelegatedAgentExecution[] = [];
   const environments = new Map(
@@ -71,8 +86,20 @@ export async function assertChannelConfigurationDelegation(input: {
     executions.push(...executionsFromConfiguration(await configuration, requiredPrivileges));
   };
 
+  const inScope = (
+    account: { channel: string; accountId: string },
+    position: number | "fallback",
+  ) =>
+    input.routes === undefined ||
+    input.routes.some(
+      (route) =>
+        route.channel === account.channel &&
+        route.accountId === account.accountId &&
+        route.position === position,
+    );
   for (const account of input.controlPlane.accounts) {
-    for (const route of account.routes) {
+    for (const [position, route] of account.routes.entries()) {
+      if (!inScope(account, position)) continue;
       await appendTarget(
         route.target,
         route.approval,
@@ -80,12 +107,16 @@ export async function assertChannelConfigurationDelegation(input: {
         route.defaults.agentControls,
       );
     }
-    if (!account.fallback.deny && account.fallback.target !== undefined) {
+    if (
+      !account.fallback.deny &&
+      account.fallback.target !== undefined &&
+      inScope(account, "fallback")
+    ) {
       await appendTarget(
         account.fallback.target,
         account.fallback.approval ?? account.approval,
         account.defaults.outbound.path === "tool",
-        (account.fallback.defaults ?? account.defaults).agentControls,
+        account.fallback.defaults?.agentControls,
       );
     }
   }

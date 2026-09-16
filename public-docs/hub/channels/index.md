@@ -127,14 +127,17 @@ routes:
     agentControls: { provider: claude, model: claude-opus-5, thinkingOptionId: high }
 ```
 
-A different `provider` replaces the agent's model, mode, thinking option,
-feature values and options; the same provider overrides only the fields you set.
+Naming a `provider` makes the block the whole setup: the agent's model, mode,
+thinking option and feature values are replaced, anything you leave out is
+unset, and the agent's `options` stay only when the provider is the same.
+Without a `provider`, the block overrides only the fields you set.
 
 `/promoteroutedefault` writes this leaf from a conversation: it publishes a new
 Channel revision that makes the conversation's current setup the default of the
 route that served it. It needs `channel.manage` — an organization owner or admin,
-or **Manage** on that Channel Route in Access — and the default must be something
-the sender could start themselves. Running sessions keep their setup; the next
+or **Manage** on that Channel Route in Access — and the new default must be
+something the sender could start themselves. Only the route being changed is
+checked against the sender's access; the organization's other routes are not. Running sessions keep their setup; the next
 session on the route uses the new default, and no account restarts.
 
 ## Where a conversation's work lands

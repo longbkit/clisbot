@@ -22,6 +22,28 @@ describe("command replies", () => {
       commandReplyAddress({ ...message, channel: "telegram", senderIdentity: "telegram:123" }),
     ).toEqual({ to: "C123", threadId: "123.456" });
   });
+  it("follows the route's thread anchor for a command sent at the channel root", () => {
+    const root = {
+      ...message,
+      externalMessageId: "1789556491.248199",
+      conversation: { ...message.conversation, threadId: null },
+    };
+    expect(commandReplyAddress(root, "thread")).toEqual({
+      to: "C123",
+      threadId: "1789556491.248199",
+    });
+    expect(commandReplyAddress(root, "default")).toEqual({ to: "C123" });
+    expect(commandReplyAddress(root)).toEqual({ to: "C123" });
+    expect(
+      commandReplyAddress(
+        { ...root, conversation: { ...root.conversation, kind: "dm" } },
+        "thread",
+      ),
+    ).toEqual({ to: "C123" });
+    expect(commandReplyAddress({ ...root, channel: "telegram" }, "thread")).toEqual({
+      to: "C123",
+    });
+  });
   it("answers a DM without a thread", () => {
     expect(
       commandReplyAddress({

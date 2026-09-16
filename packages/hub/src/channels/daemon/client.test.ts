@@ -687,6 +687,12 @@ describe("channel trusted-client daemon connection", () => {
         await ticketed.waitForConnected(5000);
         assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_ticket");
         assert.equal(admit.hellos.at(-1)?.["clientId"], "slack:acct");
+        // Without `all_providers` the daemon hides every provider but the
+        // three pre-0.1.45 ones (`/provider` then never offers Grok or Pi).
+        assert.equal(
+          (admit.hellos.at(-1)?.["capabilities"] as Record<string, unknown>)?.["all_providers"],
+          true,
+        );
       } finally {
         ticketed.stop();
         await admit.close();

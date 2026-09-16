@@ -5,7 +5,11 @@ import { createMemoryDatabase } from "../../db/memory.js";
 import type { Database } from "../../db/types.js";
 import { enrollTestDaemon } from "../../test-utils/project-configuration.js";
 import { loadChannelControlPlane } from "../control-plane.js";
-import { createRouteDefaultPublisher, type RouteDefaultTarget } from "./publish.js";
+import {
+  createRouteDefaultPublisher,
+  type RouteDefaultPublisherOptions,
+  type RouteDefaultTarget,
+} from "./publish.js";
 
 const ORG = "org-1";
 
@@ -53,7 +57,7 @@ async function publishConfiguration(database: Database, requireMention = true): 
   });
 }
 
-async function setup(authorize = vi.fn(async () => undefined)) {
+async function setup(authorize: RouteDefaultPublisherOptions["authorize"] = async () => undefined) {
   const database = createMemoryDatabase({
     memberships: [
       {
@@ -86,9 +90,16 @@ async function setup(authorize = vi.fn(async () => undefined)) {
 
 describe("createRouteDefaultPublisher", () => {
   it("publishes the default as a revision attributed to the Member", async () => {
-    const { database, publisher, serving } = await setup();
+    const authorize = vi.fn<RouteDefaultPublisherOptions["authorize"]>(async () => undefined);
+    const { database, publisher, serving } = await setup(authorize);
     const outcome = await publisher.promote(await serving(), OPUS);
     assert.deepEqual(outcome, { status: "published", agentControls: OPUS });
+    // Delegation is asked about the changed Route only.
+    assert.deepEqual(authorize.mock.calls[0]![0].route, {
+      channel: "slack",
+      accountId: "support",
+      position: 0,
+    });
     const active = await database.findActiveChannelConfiguration(ORG);
     assert.equal(active?.createdByUserId, "user-1");
     const snapshot = await loadChannelControlPlane(database, ORG);

@@ -364,6 +364,11 @@ export class TrustedDaemonClient extends EventEmitter {
           selective_agent_timeline: true,
           provider_subagents: true,
           agent_session_storage: true,
+          // Without it the daemon treats this client as a pre-0.1.45 app and
+          // hides every provider but claude, codex and opencode, so `/provider`
+          // never offered Pi, Grok or any custom ACP provider. The channel
+          // treats provider ids as opaque strings.
+          all_providers: true,
         },
         ...(accessTicket === undefined ? {} : { accessTicket }),
       }),

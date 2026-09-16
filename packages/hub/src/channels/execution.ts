@@ -1401,7 +1401,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
     command: ChannelTextCommand,
   ): Promise<PlaneInboundResult> {
-    const post = commandReplyFor(message, account, command.name);
+    const post = commandReplyFor(message, account, command.name, route);
     if (
       command.name !== "help" &&
       command.name !== "me" &&
@@ -1460,8 +1460,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
    * The ONE reply path every session command answers on — `/help` and
    * `/status` take it exactly as `/stop` and `/new` do. Commands answer where
    * they were asked, at the marker's own level (the binding key may be
-   * coarser, e.g. `binding.key: channel`); they never mint threads — that is
-   * the relay's `reply.anchor: thread` behavior.
+   * coarser, e.g. `binding.key: channel`), and follow the Route's
+   * `reply.anchor` the way agent replies do (`reply-anchor.ts`).
    *
    * It reports whether the post reached the channel, because a command whose
    * only effect is its reply is not "handled" when the post failed: reporting
@@ -1472,8 +1472,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     command: ChannelTextCommand["name"],
+    route?: CompiledRoute,
   ): CommandReply {
-    const address = commandReplyAddress(message);
+    const address = commandReplyAddress(message, route?.defaults.replyAnchor);
     return async (text) => {
       const response = await deps.post({
         channel: channelName(account),
@@ -1534,7 +1535,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       message,
     });
     if (gated.kind === "allow") return undefined;
-    await postAccessRefusal(message, account, gated);
+    await postAccessRefusal(message, account, route, gated);
     return recordChannelActivity(message, account, route, {
       result: result(false, { kind: "ignored", reason: gated.reason }),
       outcome: "denied",
@@ -1547,6 +1548,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   async function postAccessRefusal(
     message: InboundMessage,
     account: CompiledChannelAccount,
+    route: CompiledRoute,
     gated: ChannelAccessGateOutcome,
   ): Promise<void> {
     const text = gated.kind === "allow" ? undefined : gated.reply;
@@ -1554,10 +1556,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     const response = await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
-      to: message.conversation.rootConversationId,
-      ...(message.conversation.threadId === null
-        ? {}
-        : { threadId: message.conversation.threadId }),
+      ...commandReplyAddress(message, route.defaults.replyAnchor),
       text,
     });
     if (!response.ok) {

@@ -124,6 +124,16 @@ Decisions, with the options that lost:
   cancelling Route-owned turns and retiring reply capabilities org-wide. A
   revision that differs only in `agentControls` is now adopted by
   `ChannelPlane.refresh`; any other difference still restarts.
+- **A block naming a provider is a whole configuration.** Merging it field by
+  field over the named agent (the first cut) let an unset field inherit the
+  agent's value, so a promoted conversation could start something else — for
+  example effort `medium` from `hub.yml` after the conversation left it unset.
+  It now reads like a conversation selection; a block without a provider still
+  merges.
+- **Delegation scoped to the changed Route.** The first cut checked every Route
+  in the organization, which refused a Channel Route manager whenever another
+  account used a Project they lacked. Promote and undo now pass the one Route;
+  a Hub UI save still checks all of them.
 - **Undo from history.** No undo store: the previous value is read from revision
   history, bounded by the Route's own identity.
 - **`channel.manage` per Channel Route.** A `manage` access level on
@@ -140,10 +150,20 @@ pass: `config/compile.test.ts`, `commands.test.ts`, `commands-config.test.ts`,
 `execution/execution.test.ts` (76, 1 existing skip). Hub typecheck and targeted
 lint pass.
 
+Live check, 2026-09-16, dev stack against the Slack test channel (read back
+with `conversations.replies`): `/help` lists both commands; `/routedefault` at
+the channel root answers in a thread on that message within about a second;
+`/promoteroutedefault` before any change answers "already uses the route
+default"; `/model gpt-5.6-terra` then `/promoteroutedefault` sets the default and
+`/routedefault` shows it with no Slack socket reconnect; `undo` restores
+`gpt-5.6-luna`. That run also found that command replies ignored
+`reply.anchor: thread` at the channel root; commands and access refusals now use
+the relay's anchoring rule.
+
 Limits:
 
-- **No live channel E2E yet.** `refreshInPlace` is covered only through the
-  signature tests; the supervisor unit harness cannot start an account.
+- **One live pass.** The Telegram and cross-account refresh paths were not
+  exercised live; `refreshInPlace` has no unit test beyond the signature.
 - **The Hub UI still gates channel configuration on the organization role.** A
   Member with Manage on one Channel Route can change its default from chat but
   not from Settings. Scoping the management API by account is open.

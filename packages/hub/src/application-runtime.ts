@@ -663,13 +663,14 @@ async function createChannelSupervisorAtComposition(
       ...(access
         ? {
             commandAccess: access,
-            authorizeChannelConfiguration: (principal, candidate) =>
+            authorizeChannelConfiguration: ({ principal, candidate, route }) =>
               assertChannelConfigurationDelegation({
                 access,
                 database,
                 principal,
                 bundle: candidate.bundle,
                 controlPlane: candidate.controlPlane,
+                routes: [route],
               }),
           }
         : {}),
