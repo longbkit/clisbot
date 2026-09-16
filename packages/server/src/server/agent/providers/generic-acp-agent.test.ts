@@ -1,3 +1,4 @@
+import type pino from "pino";
 import { describe, expect, test, vi } from "vitest";
 
 import { createTestLogger } from "../../../test-utils/test-logger.js";
@@ -64,6 +65,18 @@ describe("GenericACPAgentClient", () => {
         },
       },
     ]);
+  });
+
+  test("binds the configured provider id to its log lines", () => {
+    const _client = new GenericACPAgentClient({
+      logger: createTestLogger(),
+      command: ["grok", "agent", "stdio"],
+      providerId: "grok-ask",
+    });
+    void _client;
+
+    const { logger } = mockState.superConstructorOptions.at(-1) as { logger: pino.Logger };
+    expect(logger.bindings()).toMatchObject({ providerId: "grok-ask" });
   });
 
   test("uses provider params to report MCP support", () => {

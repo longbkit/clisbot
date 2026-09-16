@@ -536,6 +536,58 @@ container. When delegating filesystem operations to Paseo (`fs.readTextFile: tru
 or `fs.writeTextFile: true`), ensure the agent and Paseo share equivalent
 absolute workspace paths.
 
+### Channel reply tool on a tool-path route
+
+A channel route that replies through a tool grants the session one MCP tool,
+`channel_reply` / `message`. Claude and Codex take that grant in their own
+config. ACP has no such field, so a custom ACP provider fails the create with
+`tool_policy_unsupported` unless it declares where its permission request names
+the MCP server and tool. The daemon then answers "allow once" for that exact
+tool, without asking any client; every other request still asks.
+
+Grok writes one combined name, Antigravity writes the two parts:
+
+```json
+{
+  "agents": {
+    "providers": {
+      "grok": {
+        "extends": "acp",
+        "command": ["grok", "agent", "stdio"],
+        "params": {
+          "exactMcpPreapproval": {
+            "when": { "rawInput.variant": "UseTool" },
+            "toolName": "rawInput.tool_name",
+            "toolNameFormat": "{server}__{tool}"
+          }
+        }
+      },
+      "antigravity": {
+        "extends": "acp",
+        "command": ["agy_acp_server.par"],
+        "params": {
+          "exactMcpPreapproval": {
+            "when": { "_meta.is_mcp_tool_call": true },
+            "server": "_meta.mcp.server",
+            "tool": "_meta.mcp.tool"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Paths start at the request's `toolCall`. `when` must match a field only MCP
+calls carry, so a shell request can never match. To find the shape for another
+agent, capture one `session/request_permission` for an MCP call; the probe and
+the captured requests are in the
+[2026-09-16 audit](audits/2026-09-16-acp-mcp-tool-preapproval.md).
+
+ACP also has no system prompt field. A new ACP session sends the agent's
+`systemPrompt` (the channel's reply rules, for example) as a text block ahead of
+its first prompt; a resumed session does not repeat it.
+
 ### Generic ACP diagnostics
 
 Paseo diagnostics for `extends: "acp"` providers report the configured command, resolved launcher binary, version output, ACP `initialize`, ACP `session/new`, model count, modes, and final status.

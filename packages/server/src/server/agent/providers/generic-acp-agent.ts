@@ -11,6 +11,7 @@ import {
   DEFAULT_ACP_CAPABILITIES,
   type ACPExtensionCommandsParser,
 } from "./acp-agent.js";
+import { ACPExactMcpPreapprovalSchema } from "./acp-exact-mcp-preapproval.js";
 import {
   buildBinaryDiagnosticRows,
   formatProviderDiagnostic,
@@ -32,6 +33,7 @@ export const GenericACPProviderParamsSchema = z
         terminal: z.boolean().optional(),
       })
       .optional(),
+    exactMcpPreapproval: ACPExactMcpPreapprovalSchema.optional(),
   })
   .passthrough();
 
@@ -64,7 +66,10 @@ export class GenericACPAgentClient extends ACPAgentClient {
     const providerParams = parseGenericACPProviderParams(options.providerParams);
     super({
       provider: "acp",
-      logger: options.logger,
+      // Every custom ACP provider shares the "acp" id; the configured id tells their log lines apart.
+      logger: options.providerId
+        ? options.logger.child({ providerId: options.providerId })
+        : options.logger,
       runtimeSettings: {
         env: options.env,
       },
@@ -76,6 +81,7 @@ export class GenericACPAgentClient extends ACPAgentClient {
       clientCapabilityMeta: options.clientCapabilityMeta,
       configFeatureOptions: options.configFeatureOptions,
       extensionCommandsParser: options.extensionCommandsParser,
+      exactMcpPreapproval: providerParams.exactMcpPreapproval,
       catalogModelResolver: options.catalogModelResolver,
       now: options.now,
     });

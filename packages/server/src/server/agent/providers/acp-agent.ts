@@ -57,6 +57,10 @@ import {
   type WriteTextFileRequest,
   type Stream as ACPStream,
 } from "@agentclientprotocol/sdk";
+import {
+  matchesExactMcpPreapproval,
+  type ACPExactMcpPreapproval,
+} from "./acp-exact-mcp-preapproval.js";
 import type { Logger } from "pino";
 
 import {
@@ -440,6 +444,8 @@ interface ACPAgentClientOptions {
   ) => Promise<void>;
   capabilities?: AgentCapabilityFlags;
   extensionCommandsParser?: ACPExtensionCommandsParser;
+  /** Where this agent's permission requests name an MCP tool; enables exact MCP preapproval. */
+  exactMcpPreapproval?: ACPExactMcpPreapproval;
   waitForInitialCommands?: boolean;
   initialCommandsWaitTimeoutMs?: number;
   terminateProcess?: ProcessTerminator;
@@ -471,6 +477,7 @@ interface ACPAgentSessionOptions {
   ) => Promise<void>;
   capabilities: AgentCapabilityFlags;
   extensionCommandsParser?: ACPExtensionCommandsParser;
+  exactMcpPreapproval?: ACPExactMcpPreapproval;
   handle?: AgentPersistenceHandle;
   agentId?: string;
   launchEnv?: Record<string, string>;
@@ -903,6 +910,7 @@ export class ACPAgentClient implements AgentClient {
   private readonly waitForInitialCommands: boolean;
   private readonly initialCommandsWaitTimeoutMs: number;
   private readonly extensionCommandsParser?: ACPExtensionCommandsParser;
+  private readonly exactMcpPreapproval?: ACPExactMcpPreapproval;
   private readonly importPromptCache = new Map<string, ACPImportPromptCacheEntry>();
   private readonly now: () => number;
   protected readonly terminateProcess: ProcessTerminator;
@@ -933,6 +941,7 @@ export class ACPAgentClient implements AgentClient {
     this.waitForInitialCommands = options.waitForInitialCommands ?? false;
     this.initialCommandsWaitTimeoutMs = options.initialCommandsWaitTimeoutMs ?? 1500;
     this.extensionCommandsParser = options.extensionCommandsParser;
+    this.exactMcpPreapproval = options.exactMcpPreapproval;
     this.now = options.now ?? Date.now;
   }
 
@@ -964,6 +973,7 @@ export class ACPAgentClient implements AgentClient {
         agentId: launchContext?.agentId,
         launchEnv: launchContext?.env,
         extensionCommandsParser: this.extensionCommandsParser,
+        exactMcpPreapproval: this.exactMcpPreapproval,
         waitForInitialCommands: this.waitForInitialCommands,
         initialCommandsWaitTimeoutMs: this.initialCommandsWaitTimeoutMs,
       },
@@ -1015,6 +1025,7 @@ export class ACPAgentClient implements AgentClient {
       agentId: launchContext?.agentId,
       launchEnv: launchContext?.env,
       extensionCommandsParser: this.extensionCommandsParser,
+      exactMcpPreapproval: this.exactMcpPreapproval,
       waitForInitialCommands: this.waitForInitialCommands,
       initialCommandsWaitTimeoutMs: this.initialCommandsWaitTimeoutMs,
     });
@@ -1687,6 +1698,13 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   private waitForInitialCommands: boolean;
   private initialCommandsWaitTimeoutMs: number;
   private readonly extensionCommandsParser?: ACPExtensionCommandsParser;
+  private readonly exactMcpPreapproval?: ACPExactMcpPreapproval;
+  /**
+   * ACP has no system prompt field, so a new session sends `systemPrompt` as a
+   * text block ahead of its first prompt. A resumed session already carries it
+   * in the agent's own history.
+   */
+  private pendingSystemPrompt: string | undefined;
   private currentTurnUsage: AgentUsage | undefined;
   private activeForegroundTurnId: string | null = null;
   private fallbackAssistantMessageId: string | null = null;
@@ -1727,6 +1745,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     this.waitForInitialCommands = options.waitForInitialCommands ?? false;
     this.initialCommandsWaitTimeoutMs = options.initialCommandsWaitTimeoutMs ?? 1500;
     this.extensionCommandsParser = options.extensionCommandsParser;
+    this.exactMcpPreapproval = options.exactMcpPreapproval;
   }
 
   get id(): string | null {
@@ -1747,6 +1766,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
         }),
       );
       this.sessionId = response.sessionId;
+      this.pendingSystemPrompt = this.config.systemPrompt?.trim() || undefined;
       this.bootstrapThreadEventPending = true;
       this.applySessionState(response);
       await this.applyConfiguredOverrides();
@@ -1861,12 +1881,17 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     this.emitBootstrapThreadEvent();
     this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
     this.emitSubmittedUserMessage(prompt, messageId, turnId, options?.clientMessageId);
+    const systemPrompt = this.pendingSystemPrompt;
+    this.pendingSystemPrompt = undefined;
 
     void this.connection
       .prompt({
         sessionId: this.sessionId,
         messageId,
-        prompt: toACPContentBlocks(prompt),
+        prompt: [
+          ...(systemPrompt ? [{ type: "text" as const, text: systemPrompt }] : []),
+          ...toACPContentBlocks(prompt),
+        ],
       })
       .then((response) => {
         this.handlePromptResponse(response, turnId);
@@ -2464,6 +2489,16 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+    const preapprovedOption = this.exactMcpPreapprovalOption(params);
+    if (preapprovedOption) {
+      // Answered like Claude's allowedTools or Codex's approval_mode: the grant was
+      // settled before the session started, so no client is asked or shown a request.
+      this.logger.info(
+        { toolCallId: params.toolCall.toolCallId, optionId: preapprovedOption.optionId },
+        "Allowing exactly preapproved MCP tool call",
+      );
+      return { outcome: { outcome: "selected", optionId: preapprovedOption.optionId } };
+    }
     const canAutoAccept =
       isACPAutoAcceptEnabled(this.config) && !isACPChooserRequest(params.options);
     const allowOption = canAutoAccept
@@ -2515,6 +2550,23 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       });
     }
     return promise;
+  }
+
+  /**
+   * "Allow once" for a call of an exactly preapproved MCP tool. Never "allow
+   * always": the grant belongs to this session's `toolPolicy`, not to the
+   * agent's remembered approvals.
+   */
+  private exactMcpPreapprovalOption(
+    params: RequestPermissionRequest,
+  ): PermissionOption | undefined {
+    if (isACPChooserRequest(params.options)) return undefined;
+    if (
+      !matchesExactMcpPreapproval(this.exactMcpPreapproval, this.config.toolPolicy, params.toolCall)
+    ) {
+      return undefined;
+    }
+    return params.options.find((option) => option.kind === "allow_once");
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {

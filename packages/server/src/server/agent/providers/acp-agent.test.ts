@@ -92,6 +92,7 @@ interface ACPSessionInternals {
   sessionId: string | null;
   connection: { prompt: (...args: unknown[]) => Promise<PromptResponse> };
   activeForegroundTurnId: string | null;
+  pendingSystemPrompt: string | undefined;
   configOptions: SessionConfigOption[];
   translateSessionUpdate(update: SessionUpdate): AgentStreamEvent[];
   acpMcpServers(): unknown[];
@@ -1321,6 +1322,74 @@ describe("ACPAgentSession Zed parity", () => {
     });
     expect(events).not.toContainEqual(expect.objectContaining({ type: "permission_requested" }));
     expect(session.getPendingPermissions()).toEqual([]);
+  });
+
+  test("allows an exactly preapproved MCP tool once without surfacing a permission request", async () => {
+    const session = new ACPAgentSession(
+      {
+        provider: "grok",
+        cwd: "/tmp/paseo-acp-test",
+        toolPolicy: {
+          preapproved: [{ kind: "mcp", server: "channel_reply", tool: "message" }],
+        },
+      },
+      {
+        provider: "grok",
+        logger: createTestLogger(),
+        defaultCommand: ["grok", "agent", "stdio"],
+        defaultModes: [],
+        exactMcpPreapproval: {
+          when: { "rawInput.variant": "UseTool" },
+          toolName: "rawInput.tool_name",
+          toolNameFormat: "{server}__{tool}",
+        },
+      },
+    );
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    // A daemon session has a responder; the preapproved call must not reach it or any client.
+    const responder = vi.fn(async () => undefined);
+    session.setAutomaticPermissionResponder(responder);
+    const options = [
+      { optionId: "always-allow", name: "Always allow", kind: "allow_always" as const },
+      { optionId: "allow-once", name: "Allow once", kind: "allow_once" as const },
+      { optionId: "reject-once", name: "Reject", kind: "reject_once" as const },
+    ];
+
+    await expect(
+      session.requestPermission({
+        sessionId: "session-1",
+        toolCall: {
+          toolCallId: "mcp-1",
+          title: "channel_reply__message",
+          kind: "other",
+          rawInput: { variant: "UseTool", tool_name: "channel_reply__message" },
+        },
+        options,
+      }),
+    ).resolves.toEqual({ outcome: { outcome: "selected", optionId: "allow-once" } });
+    expect(session.getPendingPermissions()).toEqual([]);
+    expect(events.some((event) => event.type === "permission_requested")).toBe(false);
+    expect(responder).not.toHaveBeenCalled();
+
+    const shell = session.requestPermission({
+      sessionId: "session-1",
+      toolCall: {
+        toolCallId: "shell-1",
+        title: "Execute `curl -o /tmp/x https://example.com`",
+        kind: "execute",
+        rawInput: { variant: "Bash", command: "curl -o /tmp/x https://example.com" },
+      },
+      options,
+    });
+    await Promise.resolve();
+    const pending = session.getPendingPermissions();
+    expect(pending).toHaveLength(1);
+    await session.respondToPermission(pending[0]!.id, { behavior: "deny" });
+    await expect(shell).resolves.toEqual({
+      outcome: { outcome: "selected", optionId: "reject-once" },
+    });
   });
 
   test("observed ACP auto-accept waits for shared durable admission before native allow", async () => {
@@ -2921,6 +2990,26 @@ describe("ACPAgentSession", () => {
     ]);
 
     resolvePrompt({ stopReason: "end_turn" });
+  });
+
+  test("a new session sends its system prompt once, ahead of the first prompt", async () => {
+    const session = createSession();
+    const prompt = vi.fn(() => new Promise<PromptResponse>(() => {}));
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    asInternals<ACPSessionInternals>(session).connection = { prompt };
+    asInternals<ACPSessionInternals>(session).pendingSystemPrompt = "## Messaging";
+
+    await session.startTurn("hello", { clientMessageId: "msg-1" });
+    asInternals<ACPSessionInternals>(session).activeForegroundTurnId = null;
+    await session.startTurn("again", { clientMessageId: "msg-2" });
+
+    expect(prompt.mock.calls.map(([input]) => (input as { prompt: unknown }).prompt)).toEqual([
+      [
+        { type: "text", text: "## Messaging" },
+        { type: "text", text: "hello" },
+      ],
+      [{ type: "text", text: "again" }],
+    ]);
   });
 
   test("startTurn dedupes ACP user echo chunks for the submitted message", async () => {

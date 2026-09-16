@@ -786,6 +786,51 @@ test("ordinary custom ACP providers remain fail-closed for exact MCP grants", ()
   ).toThrow(/cannot preapprove exact MCP tools for unattended execution/u);
 });
 
+test("a custom ACP provider that declares exact MCP preapproval accepts exact grants", () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: {
+      grok: {
+        extends: "acp",
+        label: "Grok",
+        command: ["grok", "agent", "stdio"],
+        params: {
+          exactMcpPreapproval: {
+            when: { "rawInput.variant": "UseTool" },
+            toolName: "rawInput.tool_name",
+            toolNameFormat: "{server}__{tool}",
+          },
+        },
+      },
+    },
+  });
+  const config = { provider: "grok", cwd: "/tmp/grok" };
+  const toolPolicy = {
+    preapproved: [{ kind: "mcp" as const, server: "channel_reply", tool: "message" }],
+  };
+
+  expect(registry.grok.applyToolPolicy(config, toolPolicy)).toEqual({ ...config, toolPolicy });
+});
+
+test("an invalid exact MCP preapproval declaration stays fail-closed", () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: {
+      grok: {
+        extends: "acp",
+        label: "Grok",
+        command: ["grok", "agent", "stdio"],
+        params: { exactMcpPreapproval: { toolName: "rawInput.tool_name" } },
+      },
+    },
+  });
+
+  expect(() =>
+    registry.grok.applyToolPolicy(
+      { provider: "grok", cwd: "/tmp/grok" },
+      { preapproved: [{ kind: "mcp", server: "channel_reply", tool: "message" }] },
+    ),
+  ).toThrow(/cannot preapprove exact MCP tools for unattended execution/u);
+});
+
 test("ACP provider params can disable MCP support", () => {
   const registry = buildProviderRegistry(logger, {
     providerOverrides: {

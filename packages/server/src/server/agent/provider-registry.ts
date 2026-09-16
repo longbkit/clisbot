@@ -39,6 +39,7 @@ import { CodexAppServerAgentClient } from "./providers/codex-app-server-agent.js
 import { CopilotACPAgentClient } from "./providers/copilot-acp-agent.js";
 import { CursorACPAgentClient } from "./providers/cursor-acp-agent.js";
 import { GenericACPAgentClient } from "./providers/generic-acp-agent.js";
+import { ACPExactMcpPreapprovalSchema } from "./providers/acp-exact-mcp-preapproval.js";
 import { KimiACPAgentClient } from "./providers/kimi-acp-agent.js";
 import { KiroACPAgentClient } from "./providers/kiro-acp-agent.js";
 import { OpenCodeAgentClient } from "./providers/opencode-agent.js";
@@ -165,6 +166,27 @@ const UNSUPPORTED_PROVIDER_CONTRACT: ProviderContract = {
   optionsSchema: EmptyProviderOptionsSchema,
   supportsExactMcpPreapproval: false,
 };
+
+/**
+ * A custom ACP provider supports exact MCP preapproval only when it declares
+ * where its permission requests name an MCP tool (`params.exactMcpPreapproval`);
+ * the ACP session then allows exactly the granted tools once per call.
+ */
+const DECLARED_ACP_PROVIDER_CONTRACT: ProviderContract = {
+  optionsSchema: EmptyProviderOptionsSchema,
+  supportsExactMcpPreapproval: true,
+};
+
+function acpProviderContract(
+  providerId: string,
+  params: Record<string, unknown> | undefined,
+): ProviderContract {
+  if (providerId === HUB_E2E_PROVIDER_ID) return HUB_E2E_PROVIDER_CONTRACT;
+  // An invalid declaration stays fail-closed here and fails loudly when the client parses params.
+  return ACPExactMcpPreapprovalSchema.safeParse(params?.["exactMcpPreapproval"]).success
+    ? DECLARED_ACP_PROVIDER_CONTRACT
+    : UNSUPPORTED_PROVIDER_CONTRACT;
+}
 
 const HUB_E2E_PROVIDER_ID = "hub-e2e";
 const HUB_E2E_MCP_SERVER = "hub";
@@ -816,10 +838,7 @@ function addDerivedProviders(
           }
           return new GenericACPAgentClient(acpOptions);
         },
-        contract:
-          providerId === HUB_E2E_PROVIDER_ID
-            ? HUB_E2E_PROVIDER_CONTRACT
-            : UNSUPPORTED_PROVIDER_CONTRACT,
+        contract: acpProviderContract(providerId, override.params),
       });
       continue;
     }

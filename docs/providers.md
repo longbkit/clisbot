@@ -35,7 +35,9 @@ This Paseo version accepts these keys:
 
 Each provider definition owns its option schema and exact MCP preapproval mapping. A new provider
 must fail closed for Hub unattended execution until it can approve one exact injected MCP server
-and tool identity without approving native tools.
+and tool identity without approving native tools. A custom ACP provider fails closed unless it
+declares `params.exactMcpPreapproval` ([custom providers](custom-providers.md#channel-reply-tool-on-a-tool-path-route);
+why and the probe: [2026-09-16 ACP preapproval audit](audits/2026-09-16-acp-mcp-tool-preapproval.md)).
 
 ## Two Integration Patterns
 

@@ -18,7 +18,11 @@ fields to `create_agent`:
 - `mcpServers.channel_reply` — the Hub's MCP endpoint, with an opaque capability
   token that pins the account and thread. The tool takes no target argument.
 - `toolPolicy.preapproved` — a grant for `channel_reply` / `message`, so the
-  call needs no approval.
+  call needs no approval. Only providers with exact MCP preapproval accept it;
+  a custom ACP provider such as Grok fails at create unless it declares
+  `params.exactMcpPreapproval`
+  ([how](../../custom-providers.md#channel-reply-tool-on-a-tool-path-route),
+  [why](../../audits/2026-09-16-acp-mcp-tool-preapproval.md)).
 - `systemPrompt` — the block from `channels/outbound-template.ts`.
 
 The daemon translates those for Codex: `toCodexMcpConfig`
