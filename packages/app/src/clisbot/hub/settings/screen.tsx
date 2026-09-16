@@ -51,6 +51,11 @@ import { ProviderApplicationSettings } from "./provider-application-settings";
 import { HubHostOnboardingSection } from "../host-onboarding-section";
 import { hubResourceQueryKey } from "../query-keys";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
+import {
+  parseInvitationEmails,
+  sendInvitations,
+  type InvitationEmailList,
+} from "./invitation-emails";
 import { HubConnectionResultNotice } from "./connection-result";
 import { HubConnectionContinuationNotice } from "./connection-continuation";
 import { useHubConnectionContinuation } from "../use-connection-continuation";
@@ -1601,22 +1606,31 @@ function InviteMemberForm({
     () => ({ label: selectedInviteTeam?.name ?? "No Team" }),
     [selectedInviteTeam?.name],
   );
+  const invitees = useMemo(() => parseInvitationEmails(inviteEmail), [inviteEmail]);
   const sendInvitation = useCallback(() => {
-    if (!reviewReady) return;
+    if (!reviewReady || invitees.emails.length === 0 || invitees.invalid.length > 0) return;
     void run(async () => {
-      await hub.inviteMember({
-        email: inviteEmail.trim().toLowerCase(),
-        role: inviteRole,
-        ...(selectedInviteTeam === undefined ? {} : { teamId: selectedInviteTeam.id }),
-      });
-      setInviteEmail("");
+      const failures = await sendInvitations(invitees.emails, (email) =>
+        hub.inviteMember({
+          email,
+          role: inviteRole,
+          ...(selectedInviteTeam === undefined ? {} : { teamId: selectedInviteTeam.id }),
+        }),
+      );
+      // Refused addresses stay in the field with the same role and Team, ready to retry.
+      setInviteEmail(failures.map(({ email }) => email).join("\n"));
+      setInviteResetKey((value) => value + 1);
+      if (failures.length > 0) {
+        const sent = invitees.emails.length - failures.length;
+        const details = failures.map(({ email, message }) => `${email}: ${message}`).join("; ");
+        throw new Error(`${String(sent)} of ${String(invitees.emails.length)} sent. ${details}`);
+      }
       setInviteRole("member");
       setInviteTeamId("");
-      setInviteResetKey((value) => value + 1);
     });
   }, [
     hub,
-    inviteEmail,
+    invitees,
     inviteRole,
     run,
     reviewReady,
@@ -1634,13 +1648,20 @@ function InviteMemberForm({
       : "After accepting, the Member receives the Team access shown below.";
   return (
     <View style={[settingsStyles.card, styles.form]}>
-      <Field label="Email">
+      <Field
+        label="Emails"
+        hint={invitationEmailsHint(invitees)}
+        error={
+          invitees.invalid.length > 0 ? `Not an email: ${invitees.invalid.join(", ")}` : undefined
+        }
+      >
         <FormTextInput
           size={fieldSize}
-          initialValue=""
+          initialValue={inviteEmail}
           resetKey={inviteResetKey}
           onChangeText={setInviteEmail}
-          placeholder="teammate@example.com"
+          placeholder={"teammate@example.com\nanother@example.com"}
+          multiline
           autoCapitalize="none"
           autoCorrect={false}
           editable={!pending}
@@ -1681,14 +1702,23 @@ function InviteMemberForm({
         />
       ) : null}
       <Button
-        disabled={pending || inviteEmail.trim().length === 0 || !reviewReady}
+        disabled={
+          pending || invitees.emails.length === 0 || invitees.invalid.length > 0 || !reviewReady
+        }
         loading={pending}
         onPress={sendInvitation}
       >
-        Send invitation
+        {invitees.emails.length > 1
+          ? `Send ${String(invitees.emails.length)} invitations`
+          : "Send invitation"}
       </Button>
     </View>
   );
+}
+
+function invitationEmailsHint({ emails }: InvitationEmailList): string {
+  if (emails.length > 1) return `${String(emails.length)} people get the same role and Team.`;
+  return "Paste one or more emails, separated by commas or new lines.";
 }
 
 function InvitationTeamAccessPreview({

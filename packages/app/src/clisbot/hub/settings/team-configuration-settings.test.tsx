@@ -12,7 +12,7 @@ const hub = vi.hoisted(() => ({
   state: { status: "signedOut", registration: "open" } as Record<string, unknown>,
   error: null,
   signedIn: null as Record<string, unknown> | null,
-  inviteMember: vi.fn(async () => {}),
+  inviteMember: vi.fn(async (_input: { email: string }) => {}),
   api: () => ({ post: fixtures.post }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
@@ -256,7 +256,7 @@ afterEach(cleanup);
 describe("Team invitation review and access navigation", () => {
   it("starts a fresh invitation draft when the signed-in account changes", () => {
     const ui = render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Email"), {
+    fireEvent.change(screen.getByLabelText("Emails"), {
       target: { value: "private-draft@example.test" },
     });
     fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
@@ -266,7 +266,7 @@ describe("Team invitation review and access navigation", () => {
       capabilities,
     };
     ui.rerender(<HubSettingsContent section="team" />);
-    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Emails") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Team") as HTMLSelectElement).value).toBe("");
     expect(
       (screen.getByRole("button", { name: "Send invitation" }) as HTMLButtonElement).disabled,
@@ -274,7 +274,7 @@ describe("Team invitation review and access navigation", () => {
   });
   it("shows the selected Team resources and privileges before inviting", async () => {
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.test" } });
+    fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
     fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
     expect(screen.getByText("Customer chat")).toBeTruthy();
     expect(screen.getByText("channel read, channel reply")).toBeTruthy();
@@ -287,13 +287,33 @@ describe("Team invitation review and access navigation", () => {
       }),
     );
   });
+  it("invites a pasted list and keeps refused addresses for retry", async () => {
+    hub.inviteMember.mockImplementation(async (input: { email: string }) => {
+      if (input.email === "taken@example.test") {
+        throw new Error("Hub account request failed (409).");
+      }
+    });
+    render(<HubSettingsContent section="team" />);
+    fireEvent.change(screen.getByLabelText("Emails"), {
+      target: { value: "One@example.test, taken@example.test one@example.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send 2 invitations" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("1 of 2 sent. taken@example.test: already a Member, or no free seat"),
+      ).toBeTruthy(),
+    );
+    expect(hub.inviteMember).toHaveBeenCalledWith({ email: "one@example.test", role: "member" });
+    expect(hub.inviteMember).toHaveBeenCalledTimes(2);
+    hub.inviteMember.mockImplementation(async () => {});
+  });
   it("blocks invitation until failed Team access can be reviewed and offers retry", () => {
     const access = fixtures.queries["access-assignments"]!;
     access.data = undefined;
     access.isError = true;
     access.error = new Error("Access unavailable");
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.test" } });
+    fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
     fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
     const submit = screen.getByRole("button", { name: "Send invitation" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);

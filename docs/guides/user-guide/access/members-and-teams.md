@@ -7,10 +7,18 @@ Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cầ
 ## Tạo Team và mời người
 
 1. Mở Settings → **Team**, tạo Team theo nhóm làm việc, ví dụ `Product` hoặc `AI Team`.
-2. Trong phần **Members**, nhập email mời, chọn vai trò **Member** cho người chỉ cần làm việc trên tài nguyên. Chọn **Admin** khi người đó cần quản lý tổ chức.
-3. Chọn Team cho lời mời nếu cần, tạo lời mời và chia sẻ liên kết mời cho đúng người.
-4. Người nhận mở liên kết, đăng nhập đúng email và hoàn tất tham gia.
-5. Kiểm tra người đó đã có trong Members và đúng Team. Có thể thêm Member hiện có vào Team sau đó.
+2. Trong phần **Members**, dán một hoặc nhiều email vào ô **Emails** (ngăn cách bằng dấu phẩy, khoảng trắng hoặc xuống dòng; dạng `Tên <email>` cũng được). Chọn vai trò **Member** cho người chỉ cần làm việc trên tài nguyên, **Admin** khi người đó cần quản lý tổ chức. Cả danh sách nhận cùng vai trò và Team.
+3. Chọn Team nếu cần, bấm **Send N invitations**. Email nào bị từ chối (đã là Member, hết seat) được giữ lại trong ô để gửi lại; các email khác đã gửi.
+4. Người nhận tham gia như bảng dưới, rồi kiểm tra người đó đã có trong Members và đúng Team.
+
+| Người được mời                                             | Có cần bấm link mời?                                                                                              |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Chưa có tài khoản, đăng nhập **Continue with Google**      | Không. Lần đăng nhập đầu tiên tự nhận lời mời còn hạn mới nhất gửi tới email đó, kèm vai trò và Team.             |
+| Chưa có tài khoản, đăng ký qua **Email me a sign-up link** | Không. Như Google, vì link trong mail đã chứng minh email. Chỉ dùng được với email thuộc domain Hub cho phép.     |
+| Chưa có tài khoản, tự nhập email và mật khẩu               | Có. Mật khẩu gõ tay chưa chứng minh sở hữu email, nên chỉ form mở từ link mời mới tạo được tài khoản kèm lời mời. |
+| Đã có tài khoản trên Hub (kể cả đang ở tổ chức khác)       | Có. Lời mời không tự áp dụng cho tài khoản sẵn có; mở link mời khi đang đăng nhập rồi bấm **Accept invitation**.  |
+
+Lời mời hết hạn sau **48 giờ**, gửi lại không gia hạn lời mời còn hạn. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Hết hạn thì gửi lại để tạo lời mời mới; muốn gia hạn sớm thì **Cancel** rồi gửi lại.
 
 Member mới không tự có quyền dùng tài nguyên. Nếu vào Team đã được cấp Access, người đó nhận các quyền của Team.
 
