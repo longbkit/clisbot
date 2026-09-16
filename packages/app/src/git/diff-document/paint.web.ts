@@ -7,6 +7,7 @@ import {
 } from "./model";
 import { codeLineNumberTone, codeTextColor } from "./palette";
 import {
+  DIFF_FILE_HEADER_ACTION_SLOT,
   DIFF_FILE_HEADER_CONTENT_HEIGHT,
   DIFF_FILE_HEADER_HEIGHT,
   DIFF_FILE_HEADER_ICON_SIZE,
@@ -138,7 +139,14 @@ export function paintWebFileHeader(input: {
   context.fillStyle = palette.headerBorder;
   context.fillRect(0, y + DIFF_FILE_HEADER_HEIGHT - 1, viewportWidth, 1);
 
-  const iconX = viewportWidth - DIFF_FILE_HEADER_RIGHT - DIFF_FILE_HEADER_ICON_SIZE;
+  // The painted cluster stops left of the slot the React layer draws its Open file action
+  // into. Reserved even where that action is absent (commit diffs), so both diff modes share
+  // one header geometry and the painter needs no signal from the surface above it.
+  const iconX =
+    viewportWidth -
+    DIFF_FILE_HEADER_RIGHT -
+    DIFF_FILE_HEADER_ICON_SIZE -
+    DIFF_FILE_HEADER_ACTION_SLOT;
   const statLabels = [
     `+${formatDiffCount(file.file.additions)}`,
     `-${formatDiffCount(file.file.deletions)}`,

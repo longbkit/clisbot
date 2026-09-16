@@ -22,6 +22,7 @@ import {
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFileHeaderInteraction } from "@/git/file-header-interaction";
+import { FileHeaderOpenAction } from "@/git/file-header-open-action";
 import {
   diffFileChangeKind,
   directorySuffix,
@@ -355,6 +356,15 @@ export const FileHeader = memo(function FileHeader({
           <FileHeaderMenu file={file} testID={testID} {...actions} bodyVisible={bodyVisible} />
         ) : null}
       </ContextMenu>
+      <FileHeaderOpenAction
+        path={file.path}
+        isDeleted={file.isDeleted}
+        onOpenFile={actions.onOpenFile}
+        isDocumentHeader={showsBodyState}
+        canvasRendered={canvasRendered}
+        isHovered={hover.isHovered}
+        testID={testID}
+      />
     </View>
   );
 });

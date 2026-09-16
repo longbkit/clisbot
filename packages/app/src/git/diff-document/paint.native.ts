@@ -9,6 +9,7 @@ import {
   type SkPicture,
 } from "@shopify/react-native-skia";
 import {
+  DIFF_FILE_HEADER_ACTION_SLOT,
   DIFF_FILE_HEADER_CONTENT_HEIGHT,
   DIFF_FILE_HEADER_HEIGHT,
   DIFF_FILE_HEADER_ICON_SIZE,
@@ -98,7 +99,14 @@ export function recordNativeHeaderPicture(input: {
     Skia.XYWHRect(0, DIFF_FILE_HEADER_HEIGHT - 1, input.viewportWidth, 1),
     input.paints.headerBorder,
   );
-  const iconX = input.viewportWidth - DIFF_FILE_HEADER_RIGHT - DIFF_FILE_HEADER_ICON_SIZE;
+  // The painted cluster stops left of the slot the React layer draws its Open file action
+  // into. Reserved even where that action is absent (commit diffs), so both diff modes share
+  // one header geometry and the painter needs no signal from the surface above it.
+  const iconX =
+    input.viewportWidth -
+    DIFF_FILE_HEADER_RIGHT -
+    DIFF_FILE_HEADER_ICON_SIZE -
+    DIFF_FILE_HEADER_ACTION_SLOT;
   const additions = `+${formatDiffCount(input.file.file.additions)}`;
   const deletions = `-${formatDiffCount(input.file.file.deletions)}`;
   const additionsText = shapeNativeHeaderText({
