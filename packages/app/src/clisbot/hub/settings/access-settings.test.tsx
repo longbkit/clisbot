@@ -608,6 +608,53 @@ describe("Access granted to more than one Resource at a time", () => {
     expect(adapters.post).not.toHaveBeenCalled();
   });
 
+  it("says what Full access reaches before granting it on a Host", async () => {
+    mockCatalog(
+      [],
+      {
+        daemon: {
+          full_access: ["daemon.connect", "project.use", "agent.create", "workspace.manage"],
+        },
+      },
+      catalog,
+    );
+    adapters.confirm.mockResolvedValue(false);
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\u0000host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "full_access" } });
+    // The consequences show under the picker, before anyone presses Grant.
+    const summary = screen.getByTestId("access-level-summary");
+    expect(summary.textContent).toContain("Create Projects in any folder on this Host");
+    expect(summary.textContent).toContain("Before you grant");
+    expect(summary.textContent).toContain("Any folder this machine can read can become a Project");
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseMany("Models", ["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.confirm).toHaveBeenCalledTimes(1));
+    const { message } = adapters.confirm.mock.calls[0]![0] as { message: string };
+    expect(message).toContain("Create Projects in any folder on this Host");
+    expect(message).toContain("including other people's");
+    expect(adapters.post).not.toHaveBeenCalled();
+  });
+
+  it("names the level a saved grant equals instead of listing its privileges", async () => {
+    mockCatalog(
+      [],
+      { daemon: { developer: ["daemon.connect", "project.use", "agent.create"] } },
+      catalog,
+      [
+        {
+          ...assignment,
+          privileges: ["daemon.connect", "project.use", "agent.create", "agent.fast.use"],
+        },
+      ],
+    );
+    renderAccess();
+    expect(await screen.findByText(/Developer \+ Fast mode/)).toBeTruthy();
+  });
+
   it("offers Agent choices on a Host, where the grant reaches every Project", async () => {
     mockCatalog(
       [

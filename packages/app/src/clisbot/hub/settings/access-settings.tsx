@@ -435,6 +435,7 @@ function ManagedAccessContent({
         </View>
         <ExplicitAssignments
           assignments={visibleAssignments}
+          accessLevels={catalog.accessLevels}
           resourceByKey={resourceByKey}
           teamById={teamById}
           teamMembersById={teamMembersById}

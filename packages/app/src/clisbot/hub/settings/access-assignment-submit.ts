@@ -1,7 +1,8 @@
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { mergeAccessConstraints } from "./access-assignment-edit";
 import { assignmentSubjectName } from "./access-assignment-list";
-import { accessLevelLabel, privilegeLabel } from "./access-catalog";
+import { accessLevelLabel } from "./access-catalog";
+import { effectLines, summarizeAccess, type AccessSummary } from "./access-level-summary";
 import type {
   AccessAssignment,
   AccessResource,
@@ -61,9 +62,11 @@ export async function submitAccessAssignment(input: {
       ),
       resourceName: resources.map(({ name }) => name).join(", "),
       accessLevel: accessLevelLabel(input.accessLevel),
-      privileges: selection.privileges,
+      summary: summarizeAccess({
+        privileges: grantedPrivileges(selection, input.fastMode),
+        resourceKind: selection.resource.kind,
+      }),
       configurationCount: selection.needsAgentConfiguration ? input.agentConfigurations.length : 0,
-      fastMode: input.fastMode,
       addsHostConnect,
       replacedNames: replaced.map(({ name }) => name),
       guestScope: guestScope(selection.subject.kind, selection.resource.kind),
@@ -101,12 +104,19 @@ function createAccessAssignment(
     subjectId: selection.subject!.id,
     resourceKind: resource.kind,
     resourceId: resource.id,
-    privileges:
-      input.fastMode && selection.needsAgentConfiguration
-        ? [...selection.privileges, "agent.fast.use"]
-        : selection.privileges,
+    privileges: grantedPrivileges(selection, input.fastMode),
     constraints: mergeAccessConstraints(input.editing?.constraints, constraints),
   };
+}
+
+/**
+ * The privileges a save writes. Where the form shows the Fast mode switch, the
+ * switch alone decides `agent.fast.use`; elsewhere saved privileges pass through.
+ */
+export function grantedPrivileges(selection: AssignmentSelection, fastMode: boolean): string[] {
+  if (!selection.needsAgentConfiguration) return selection.privileges;
+  const privileges = selection.privileges.filter((privilege) => privilege !== "agent.fast.use");
+  return fastMode ? [...privileges, "agent.fast.use"] : privileges;
 }
 
 function channelConversationConstraint(
@@ -185,15 +195,13 @@ function grantReviewMessage(input: {
   subjectName: string;
   resourceName: string;
   accessLevel: string;
-  privileges: readonly string[];
+  summary: AccessSummary;
   configurationCount: number;
-  fastMode: boolean;
   addsHostConnect: boolean;
   replacedNames: readonly string[];
   guestScope: string | null;
   assignmentCount: number;
 }): string {
-  const approvals = input.privileges.filter((privilege) => privilege.startsWith("approval."));
   return [
     `${input.subjectName} → ${input.resourceName}`,
     // "Guest" reads like one person; it is everyone on a channel who never linked.
@@ -201,7 +209,9 @@ function grantReviewMessage(input: {
       ? null
       : `Guest is every channel sender without a linked Member. All of them get this access on ${input.guestScope}.`,
     `Access level: ${input.accessLevel}`,
-    input.privileges.includes("workspace.create") ? "Create workspaces/worktrees: allowed" : null,
+    effectLines("Allows", input.summary.allows),
+    effectLines("Not included", input.summary.withholds),
+    effectLines("Before you grant", input.summary.cautions),
     input.addsHostConnect ? "Also grants: Connect to the parent Host" : null,
     input.replacedNames.length > 0
       ? `Replaces existing access, including its Agent choices, on: ${input.replacedNames.join(", ")}`
@@ -209,10 +219,6 @@ function grantReviewMessage(input: {
     input.configurationCount > 0
       ? `Agent configurations: ${String(input.configurationCount)}`
       : null,
-    approvals.length > 0
-      ? `Tool approvals: ${approvals.map(privilegeLabel).join(", ")}`
-      : "Tool approvals: none",
-    `Fast mode: ${input.fastMode ? "allowed" : "not allowed"}`,
     input.assignmentCount > 1
       ? `Written as ${String(input.assignmentCount)} assignments in one action.`
       : null,

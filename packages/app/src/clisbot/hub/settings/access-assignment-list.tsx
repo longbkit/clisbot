@@ -4,13 +4,16 @@ import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
 import {
+  accessLevelLabel,
   constraintSummary,
   privilegeLabel,
   resourceKindLabel,
   type AccessAssignment,
+  type AccessCatalog,
   type AccessResource,
   type SubjectKind,
 } from "./access-catalog";
+import { matchingAccessLevel } from "./access-level-summary";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { EmptyRow } from "./access-settings-feedback";
 
@@ -52,6 +55,7 @@ function groupAssignments(assignments: AccessAssignment[]): AccessAssignment[][]
 
 export function ExplicitAssignments({
   assignments,
+  accessLevels,
   resourceByKey,
   teamById,
   teamMembersById,
@@ -61,6 +65,7 @@ export function ExplicitAssignments({
   edit,
 }: {
   assignments: AccessAssignment[];
+  accessLevels: AccessCatalog["accessLevels"];
   resourceByKey: Map<string, AccessResource>;
   teamById: Map<string, string>;
   teamMembersById: Map<string, string>;
@@ -79,6 +84,7 @@ export function ExplicitAssignments({
           <AssignmentGroupRows
             key={group[0]!.id}
             group={group}
+            accessLevels={accessLevels}
             resourceByKey={resourceByKey}
             subjectName={assignmentSubjectName(
               { kind: group[0]!.subjectKind, id: group[0]!.subjectId },
@@ -103,6 +109,7 @@ export function ExplicitAssignments({
 
 function AssignmentGroupRows({
   group,
+  accessLevels,
   resourceByKey,
   subjectName,
   subjectDetail,
@@ -112,6 +119,7 @@ function AssignmentGroupRows({
   edit,
 }: {
   group: AccessAssignment[];
+  accessLevels: AccessCatalog["accessLevels"];
   resourceByKey: Map<string, AccessResource>;
   subjectName: string | undefined;
   subjectDetail: string | undefined;
@@ -131,6 +139,7 @@ function AssignmentGroupRows({
     return (
       <ExplicitAssignmentRow
         assignment={group[0]!}
+        accessLevels={accessLevels}
         resource={resourceOf(group[0]!)}
         subjectName={subjectName}
         subjectDetail={subjectDetail}
@@ -165,7 +174,7 @@ function AssignmentGroupRows({
             {`${subjectName ?? "Unavailable subject"} · ${String(group.length)} ${resourceKindLabel(first.resourceKind)}s`}
             {parents.length > 0 ? ` · ${parents.join(", ")}` : ""}
           </Text>
-          <Text style={settingsStyles.rowHint}>{assignmentDetail(first)}</Text>
+          <Text style={settingsStyles.rowHint}>{assignmentDetail(first, accessLevels)}</Text>
           {subjectDetail ? (
             <Text style={settingsStyles.rowHint}>Members: {subjectDetail}</Text>
           ) : null}
@@ -176,6 +185,7 @@ function AssignmentGroupRows({
             <ExplicitAssignmentRow
               key={assignment.id}
               assignment={assignment}
+              accessLevels={accessLevels}
               resource={resourceOf(assignment)}
               subjectName={subjectName}
               subjectDetail={undefined}
@@ -190,18 +200,35 @@ function AssignmentGroupRows({
   );
 }
 
-function assignmentDetail(assignment: AccessAssignment): string {
+function assignmentDetail(
+  assignment: AccessAssignment,
+  accessLevels: AccessCatalog["accessLevels"],
+): string {
   const summary = constraintSummary(assignment.constraints);
   return [
     SUBJECT_ASSIGNMENT_LABELS[assignment.subjectKind],
     resourceKindLabel(assignment.resourceKind),
-    assignment.privileges.map(privilegeLabel).join(", "),
+    grantedAccessLabel(assignment, accessLevels),
     ...(summary ? [summary] : []),
   ].join(" · ");
 }
 
+/** The level name when the grant still equals one; the privilege list only for custom grants. */
+function grantedAccessLabel(
+  assignment: AccessAssignment,
+  accessLevels: AccessCatalog["accessLevels"],
+): string {
+  const level = matchingAccessLevel(accessLevels, assignment.resourceKind, assignment.privileges);
+  if (level === undefined) {
+    return `Custom: ${assignment.privileges.map(privilegeLabel).join(", ")}`;
+  }
+  const fastMode = assignment.privileges.includes("agent.fast.use") ? " + Fast mode" : "";
+  return `${accessLevelLabel(level)}${fastMode}`;
+}
+
 function ExplicitAssignmentRow({
   assignment,
+  accessLevels,
   resource,
   subjectName,
   subjectDetail,
@@ -211,6 +238,7 @@ function ExplicitAssignmentRow({
   edit,
 }: {
   assignment: AccessAssignment;
+  accessLevels: AccessCatalog["accessLevels"];
   resource: AccessResource | undefined;
   subjectName: string | undefined;
   subjectDetail: string | undefined;
@@ -227,7 +255,7 @@ function ExplicitAssignmentRow({
         <Text style={settingsStyles.rowTitle}>
           {`${subjectName ?? "Unavailable subject"} · ${resource?.name ?? assignment.resourceId}`}
         </Text>
-        <Text style={settingsStyles.rowHint}>{assignmentDetail(assignment)}</Text>
+        <Text style={settingsStyles.rowHint}>{assignmentDetail(assignment, accessLevels)}</Text>
         {subjectDetail ? (
           <Text style={settingsStyles.rowHint}>Members: {subjectDetail}</Text>
         ) : null}

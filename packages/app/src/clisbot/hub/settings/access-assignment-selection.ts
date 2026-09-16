@@ -7,6 +7,7 @@ import type {
   SubjectKind,
 } from "./access-catalog";
 import type { SelectFieldOption } from "@/components/ui/select-field";
+import { accessLevelDescription, matchingAccessLevel } from "./access-level-summary";
 import {
   isCompleteAgentConfiguration,
   type AgentConfigurationDraft,
@@ -45,18 +46,21 @@ export function resolveAssignmentSelection(input: {
   );
   const channelAccount =
     resource?.kind === "channel_account" ? parseChannelAccountResourceId(resource.id) : null;
-  const levelEntries =
-    resource === undefined ? [] : Object.entries(input.catalog.accessLevels[resource.kind] ?? {});
-  const levelOptions = levelEntries.map(([id]) => ({
-    id,
-    value: id,
-    label: accessLevelLabel(id),
-  }));
+  const levelOptions: SelectFieldOption<string>[] =
+    resource === undefined
+      ? []
+      : Object.keys(input.catalog.accessLevels[resource.kind] ?? {}).map((id) => ({
+          id,
+          value: id,
+          label: accessLevelLabel(id),
+          description: accessLevelDescription(id, resource.kind),
+        }));
   if (input.editing)
     levelOptions.unshift({
       id: "current",
       value: "current",
       label: "Current privileges",
+      description: currentPrivilegesDescription(input.catalog, input.editing),
     });
   const privileges =
     input.editing && input.accessLevel === "current"
@@ -124,4 +128,12 @@ function constraintsAreComplete(input: {
     input.agentConfigurations.length > 0 &&
     input.agentConfigurations.every(isCompleteAgentConfiguration)
   );
+}
+
+/** Names the built-in level a saved grant still equals, so "Current" is not a blind choice. */
+function currentPrivilegesDescription(catalog: AccessCatalog, editing: AccessAssignment): string {
+  const level = matchingAccessLevel(catalog.accessLevels, editing.resourceKind, editing.privileges);
+  return level === undefined
+    ? "Keep the custom privileges saved on this assignment."
+    : `Keep the saved privileges, which match ${accessLevelLabel(level)}.`;
 }

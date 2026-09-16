@@ -14,7 +14,8 @@ import {
   resolveAssignmentSelection,
   type AssignmentSelection,
 } from "./access-assignment-selection";
-import { submitAccessAssignment } from "./access-assignment-submit";
+import { grantedPrivileges, submitAccessAssignment } from "./access-assignment-submit";
+import { AccessLevelSummary } from "./access-level-summary-view";
 import {
   assignmentResourceOptions,
   assignmentSubjectOptions,
@@ -271,13 +272,6 @@ function AccessAssignmentForm({
             searchPlaceholder="Search Projects"
           />
         ) : null}
-        {selection.resource?.kind === "daemon" && selection.needsAgentConfiguration ? (
-          <Alert
-            variant="info"
-            title="Applies to every Project on this Host"
-            description="Including Projects added later. A Project assignment can only add to this one, never narrow it."
-          />
-        ) : null}
         <SelectField
           label="Access level"
           value={accessLevel}
@@ -289,6 +283,14 @@ function AccessAssignmentForm({
           title="Access level"
           disabled={pending || selection.resource === undefined}
         />
+        {selection.resource ? (
+          <AccessLevelSummary
+            privileges={grantedPrivileges(selection, fastMode)}
+            savedPrivileges={editing?.privileges}
+            resourceKind={selection.resource.kind}
+            subjectKind={selection.subject?.kind}
+          />
+        ) : null}
         {selection.resource?.kind === "channel_account" ? (
           <ConversationFields
             channelAccount={selection.channelAccount}
