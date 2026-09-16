@@ -75,9 +75,49 @@ export async function ensureCredentialKeyFile(path) {
   await chmod(path, 0o600);
 }
 
-export function createDevEnvironment(base, paths, hubOrigin) {
+// Exporting all of `.env` into the dev stack breaks the Hub (the channel
+// credentials there belong to the live verticals, not to a dev Hub), so the repo
+// file feeds exactly the keys the dev Hub needs and nothing else. A value already
+// exported in the shell wins over the file.
+const DEV_ENV_FILE_KEYS = [
+  "CLISBOT_GOOGLE_AUTH_CLIENT_ID",
+  "CLISBOT_GOOGLE_AUTH_CLIENT_SECRET",
+  "CLISBOT_MASTER_PASSWORD",
+  "CLISBOT_REGISTRATION_ALLOWED_DOMAINS",
+  "CLISBOT_REGISTRATION_MODE",
+];
+
+/** Minimal `KEY=value` reader: no interpolation, no `export` prefixes, no multi-line values. */
+export function parseEnvFile(contents) {
+  const values = {};
+  for (const line of contents.split("\n")) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/u.exec(line);
+    if (match === null) continue;
+    const raw = match[2].trim();
+    const quoted = /^(["'])(.*)\1$/su.exec(raw);
+    values[match[1]] = quoted === null ? raw : quoted[2];
+  }
+  return values;
+}
+
+export async function readDevEnvFile(directory = ROOT_DIRECTORY) {
+  try {
+    return parseEnvFile(await readFile(join(directory, ".env"), "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+export function createDevEnvironment(base, paths, hubOrigin, envFile = {}) {
+  const fromFile = {};
+  for (const key of DEV_ENV_FILE_KEYS) {
+    const value = base[key]?.trim() || envFile[key]?.trim() || "";
+    if (value.length > 0) fromFile[key] = value;
+  }
   const environment = {
     ...base,
+    ...fromFile,
     APP_VARIANT: "development",
     BROWSER: "none",
     CLISBOT_HUB_ORIGIN: hubOrigin,
@@ -90,6 +130,9 @@ export function createDevEnvironment(base, paths, hubOrigin) {
     PASEO_DEV_MANAGED_HOME: "1",
     PASEO_HOME: paths.devHome,
     PASEO_HUB_APP_URL: hubOrigin,
+    // Channel session links offer a web destination beside the `paseo://` deep
+    // link; in dev the Hub origin is also where the web app is served.
+    PASEO_HUB_APP_WEB_URL: hubOrigin,
     PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: paths.credentialKeyFile,
     PASEO_HUB_DATA_DIR: paths.hubDataDirectory,
     PASEO_LISTEN: `127.0.0.1:${DAEMON_PORT}`,
@@ -282,7 +325,7 @@ async function main() {
     assertPortAvailable("0.0.0.0", APP_PORT, "App"),
   ]);
 
-  const environment = createDevEnvironment(process.env, paths, hubOrigin);
+  const environment = createDevEnvironment(process.env, paths, hubOrigin, await readDevEnvFile());
   console.log("Clisbot dev");
   console.log(`  Home:   ${paths.devHome}`);
   console.log(`  Hub DB: ${paths.hubDataDirectory}`);

@@ -39,7 +39,11 @@ CLISBOT_REGISTRATION_ALLOWED_DOMAINS=
 ```
 
 The Google provider is enabled only when both Google variables are set; setting
-one without the other fails startup. The `CLISBOT_` prefix is the operator-facing
+one without the other fails startup. An instance with neither shows no Google
+button at all — the provider is absent, not an error. `npm run dev:clisbot`
+reads these four from the repo `.env` itself (`DEV_ENV_FILE_KEYS` in
+`scripts/dev-clisbot.mjs`); do not export the whole file, its channel
+credentials stop the Hub from starting. The `CLISBOT_` prefix is the operator-facing
 namespace for this fork: `packages/hub/src/env-alias.ts` copies each variable to
 its internal `PASEO_*` name (`PASEO_REGISTRATION_MODE`,
 `PASEO_REGISTRATION_ALLOWED_DOMAINS`, `PASEO_GOOGLE_AUTH_CLIENT_ID`,

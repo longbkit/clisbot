@@ -9,6 +9,7 @@ import {
   clearZombiePidLock,
   createDevEnvironment,
   ensureCredentialKeyFile,
+  parseEnvFile,
   parseHubOrigin,
   resolveDevPaths,
   waitForHttp,
@@ -48,6 +49,30 @@ test("ensureCredentialKeyFile creates and reuses one private 32-byte key", async
   assert.equal((await stat(path)).mode & 0o777, 0o600);
 });
 
+test("createDevEnvironment takes only allowlisted keys from the repo .env", () => {
+  const paths = resolveDevPaths({}, "/home/operator");
+  const envFile = parseEnvFile(
+    [
+      "# comment",
+      "CLISBOT_GOOGLE_AUTH_CLIENT_ID=file-id",
+      'CLISBOT_GOOGLE_AUTH_CLIENT_SECRET="file-secret"',
+      "SLACK_BOT_TOKEN=xoxb-live",
+    ].join("\n"),
+  );
+  const environment = createDevEnvironment({}, paths, "https://hub.example.com", envFile);
+  assert.equal(environment.CLISBOT_GOOGLE_AUTH_CLIENT_ID, "file-id");
+  assert.equal(environment.CLISBOT_GOOGLE_AUTH_CLIENT_SECRET, "file-secret");
+  // Live channel credentials stay out of the dev Hub even though `.env` carries them.
+  assert.equal(environment.SLACK_BOT_TOKEN, undefined);
+  const exported = createDevEnvironment(
+    { CLISBOT_GOOGLE_AUTH_CLIENT_ID: "shell-id" },
+    paths,
+    "https://hub.example.com",
+    envFile,
+  );
+  assert.equal(exported.CLISBOT_GOOGLE_AUTH_CLIENT_ID, "shell-id");
+});
+
 test("createDevEnvironment replaces ambient production state", () => {
   const paths = resolveDevPaths({}, "/home/operator");
   const environment = createDevEnvironment(
@@ -61,6 +86,7 @@ test("createDevEnvironment replaces ambient production state", () => {
     "https://hub.example.com",
   );
   assert.equal(environment.PASEO_HOME, paths.devHome);
+  assert.equal(environment.PASEO_HUB_APP_WEB_URL, "https://hub.example.com");
   assert.equal(environment.PASEO_HUB_DATA_DIR, paths.hubDataDirectory);
   assert.equal(environment.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE, paths.credentialKeyFile);
   assert.equal(environment.PASEO_HUB_CREDENTIAL_MASTER_KEY, undefined);
