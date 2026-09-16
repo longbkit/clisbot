@@ -33,7 +33,7 @@ rm /tmp/telegram-token
 
 Hub probes the token with `getMe` before storing it, encrypts it into a Connection, and starts the account. `paseo channels ls` shows the transport state.
 
-In the app: **Channels → Accounts → Add Channel account**, choose Telegram, paste the token into the credential form, then add Routes.
+In the app: **Channels → Channel Routes → Add Channel Route**, choose Telegram, paste the token into the credential form, then add Routes.
 
 Polling is the default and needs nothing else. The webhook transport needs a public HTTPS URL and a secret token, and Hub refuses to compile it until you supply both.
 

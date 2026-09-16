@@ -46,11 +46,15 @@ vi.mock("@/components/ui/select-field", () => ({
     label,
     value,
     options,
+    hint,
+    error,
     onChange,
   }: {
     label: string;
     value: string | null;
     options: { value: string; label: string }[];
+    hint?: string;
+    error?: string | null;
     onChange(value: string): void;
   }) => {
     const change = React.useCallback(
@@ -58,14 +62,18 @@ vi.mock("@/components/ui/select-field", () => ({
       [onChange],
     );
     return (
-      <select aria-label={label} value={value ?? ""} onChange={change}>
-        <option value="">Choose a Project</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div>
+        <select aria-label={label} value={value ?? ""} onChange={change}>
+          <option value="">Choose a Project</option>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {hint ? <div>{hint}</div> : null}
+        {error ? <div>{error}</div> : null}
+      </div>
     );
   },
 }));

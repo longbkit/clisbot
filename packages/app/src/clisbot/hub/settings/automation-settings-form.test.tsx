@@ -105,6 +105,7 @@ vi.mock("./daemon-project-field", () => ({
 vi.mock("./managed-workspace-fields", () => ({ ManagedWorkspaceFields: () => null }));
 vi.mock("./managed-agent-configuration-fields", () => ({
   ManagedAgentConfigurationFields: () => null,
+  ManagedAgentFastModeSwitch: () => null,
 }));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: function TestSelect(props: {

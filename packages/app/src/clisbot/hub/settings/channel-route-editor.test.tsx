@@ -207,6 +207,7 @@ vi.mock("./daemon-project-field", () => ({
 }));
 vi.mock("./managed-agent-configuration-fields", () => ({
   ManagedAgentConfigurationFields: () => null,
+  ManagedAgentFastModeSwitch: () => null,
 }));
 vi.mock("./managed-workspace-fields", () => ({
   ManagedWorkspaceFields: () => null,
@@ -349,7 +350,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     const draft = `${yaml.value}\n# draft retained locally`;
     fireEvent.change(yaml, { target: { value: draft } });
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
-    fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Channel Routes" }));
     fireEvent.click(screen.getByRole("button", { name: "Advanced YAML" }));
     expect((screen.getByLabelText("Configuration YAML") as HTMLTextAreaElement).value).toBe(draft);
     fireEvent.click(screen.getByRole("button", { name: "Manage" }));
@@ -653,13 +654,13 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Channel activity")).toBeNull();
     expect(adapters.get.mock.calls.some(([resource]) => resource.includes("activity"))).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "View activity" }));
-    expect((screen.getByLabelText("Channel account") as HTMLSelectElement).value).toBe(
+    expect((screen.getByLabelText("Channel Route") as HTMLSelectElement).value).toBe(
       "slack:support",
     );
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Details" }));
     expect(screen.getByRole("button", { name: "Back to activity" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Channel Routes" }));
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.queryByText("Channel activity")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
@@ -682,16 +683,54 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByLabelText("Configuration YAML")).toBeNull();
   });
 
+  it("keeps only the active revision on screen and discloses the earlier ones", async () => {
+    const revisions = [
+      { id: "revision", version: 6, createdAt: "2026-09-16T04:10:48Z" },
+      { id: "r5", version: 5, createdAt: "2026-09-15T17:02:11Z" },
+      { id: "r4", version: 4, createdAt: "2026-09-15T16:48:25Z" },
+    ];
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration/revisions" ? { revisions } : data[resource],
+    );
+    renderChannels();
+    expect(await screen.findByText("Revision 6 · Active")).toBeTruthy();
+    expect(screen.queryByText("Revision 5")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "2 earlier" }));
+    expect(screen.getByText("Revision 5")).toBeTruthy();
+    expect(screen.getByText("Revision 4")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide earlier" }));
+    expect(screen.queryByText("Revision 5")).toBeNull();
+  });
+
   it("adds a Route within the selected account with thread replies enabled by default", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
+    // Opening an account adds Add Route beside Add Channel Route; neither action
+    // takes the other's meaning, so a new account stays reachable from here.
+    expect(screen.getByRole("button", { name: "Add Channel Route" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
     expect(screen.queryByLabelText("Account name")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Connect a provider account" })).toBeNull();
+    // A Route inherits its account, so the picker and Connect belong to Add Channel
+    // Route; the account it will use is still named here.
+    expect(screen.queryByRole("button", { name: "Connect a Channel Integration" })).toBeNull();
+    expect(screen.getByText("Slack · support")).toBeTruthy();
+    // `dm` is spelled out so the choice is not read as a two-letter word.
+    expect(screen.getByRole("button", { name: "Direct Message (DM)" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Channel" }));
+    // A new Route starts an Agent; Automation is still experimental and says so.
+    expect(screen.queryByLabelText("Automation")).toBeNull();
+    expect(screen.queryByText("Experimental")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
+    expect(screen.getByLabelText("Automation")).toBeTruthy();
+    expect(screen.getByText("Experimental")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Start or continue an Agent" }));
+    expect(screen.queryByText("Experimental")).toBeNull();
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("button", { name: "Text forward" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use Channel tool" })).toBeTruthy();
+    // Use Channel tool is the default, so the Agent owns replies without extra relay switches.
+    expect(screen.getByText("The Agent controls replies")).toBeTruthy();
+    expect(screen.queryByLabelText("Send final answers")).toBeNull();
     expect(screen.getByRole("button", { name: "Activate Route" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
@@ -731,17 +770,21 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     });
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
-    fireEvent.change(screen.getByLabelText("Connection"), {
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
+    // The heading names the group; `Or` is the only word between the two controls.
+    expect(screen.getByText("Channel Account")).toBeTruthy();
+    expect(screen.getByText("Or")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Channel Account"), {
       target: { value: "connection" },
     });
     fireEvent.change(screen.getByLabelText("Account name"), {
       target: { value: "new-account" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
     fireEvent.change(screen.getByLabelText("Automation"), {
       target: { value: "support" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
     // The Add-connection form is catalog-driven, so it mounts once the Hub's
     // catalog read lands and the first connectable channel is chosen.
@@ -756,7 +799,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
       expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull(),
     );
     expect((screen.getByLabelText("Account name") as HTMLInputElement).value).toBe("new-account");
-    expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("new-connection");
+    expect((screen.getByLabelText("Channel Account") as HTMLSelectElement).value).toBe(
+      "new-connection",
+    );
     expect((screen.getByLabelText("Automation") as HTMLSelectElement).value).toBe("support");
     fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
@@ -766,16 +811,16 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
     expect(screen.getByText("Telegram · new-account")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Back to accounts" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Channel Routes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
     expect((screen.getByLabelText("Account name") as HTMLInputElement).value).toBe("");
   });
 
   it("offers every channel this Hub can connect and swaps the credential form", async () => {
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
     expect(await screen.findByText("Connect Telegram")).toBeTruthy();
     // Slack Socket Mode is created from a Provider Application; this Member is
     // not an instance operator, so it is not on offer.
@@ -828,7 +873,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     });
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
     await screen.findByText("Automations unavailable");
     expect(screen.queryByLabelText("Account name")).toBeNull();
     unavailable = false;
@@ -846,8 +891,8 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     );
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
       target: { value: "bot" },
     });
@@ -865,7 +910,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Back to Channel account",
+          name: "Back to Channel Route",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -886,6 +931,23 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     renderChannels();
     expect(screen.getByRole("button", { name: "Open Account settings" })).toBeTruthy();
     expect(adapters.get).not.toHaveBeenCalled();
+  });
+
+  it("keeps a Route that stored Text forward on the relay path the owner chose", async () => {
+    const relayRoute = { ...route, outbound: { path: "relay" } };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration"
+        ? { ...configuration, accounts: [{ ...account, routes: [relayRoute] }] }
+        : data[resource],
+    );
+    await openEditor();
+    expect(screen.queryByText("The Agent controls replies")).toBeNull();
+    expect(screen.getByLabelText("Send final answers")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].outbound).toEqual({
+      path: "relay",
+    });
   });
 
   it("preserves an Agent Route directory, clears it on Host change, and saves the selected Project root", async () => {
@@ -963,13 +1025,13 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByLabelText("Conversation IDs") as HTMLInputElement).value).toBe("C1");
     expect((screen.getByLabelText("Contains exact text") as HTMLInputElement).value).toBe("#help");
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByText("Channel accounts")).toBeNull();
+    expect(screen.queryByText("Channel Routes")).toBeNull();
     expect(screen.queryByText("Add Channel behavior")).toBeNull();
     expect(screen.queryByText("Advanced YAML")).toBeNull();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
     adapters.scrollToTop.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await screen.findByText("Channel accounts");
+    await screen.findByRole("button", { name: "Refresh status" });
     expect(adapters.scrollToTop).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(adapters.post).not.toHaveBeenCalled();
@@ -1004,7 +1066,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
         ],
       }),
     ]);
-    await screen.findByText("Channel accounts");
+    await screen.findByRole("button", { name: "Refresh status" });
   });
 
   it("preserves the Route draft when creating its Automation inline", async () => {

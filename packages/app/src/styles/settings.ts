@@ -39,6 +39,27 @@ export const settingsStyles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[4],
     paddingHorizontal: theme.spacing[4],
   },
+  /**
+   * A label-left / control-right row inside a form body. Unlike `row` it adds no
+   * padding of its own, so its label shares the left rail with the surrounding
+   * field labels instead of sitting indented.
+   */
+  formRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[3],
+    justifyContent: "space-between",
+  },
+  formRowContent: {
+    flex: 1,
+  },
+  formRowControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
   rowBorder: {
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,

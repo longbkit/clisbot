@@ -723,7 +723,7 @@ must not infer usage from whichever list happens to be loaded.
 ### Add channel
 
 Channels opens with the configured accounts. Selecting an account opens its Routes and runtime
-actions. `Add Channel account` starts account setup; `Add Route` starts a new Route for the selected
+actions. `Add Channel Route` starts account setup; `Add Route` starts a new Route for the selected
 account, and editing an existing Route opens that Route alone. Creation and edit forms replace the
 overview while open. Their action labels describe the job being saved, and Cancel returns without
 writing. After activation succeeds, the editor closes and the configured account is selected;
@@ -770,9 +770,9 @@ configuration:
    messages, public Conversations, or all Conversations when policy permits it.
 3. **When:** choose `Every eligible message` or `Message contains…`. This is Route selection, not an
    Automation input.
-4. **What should happen:** show `Run an Automation` first, then
-   `Start or continue an Agent`. Automation is the recommended bounded path, but direct Agent work
-   remains available for an open-ended conversation.
+4. **What should happen:** show `Start or continue an Agent` first and select it by default, then
+   `Run an Automation`. Direct Agent work is the ordinary path; Automation carries an
+   `Experimental` marker beside the choice until the bounded path settles.
 5. **Target:** choose an existing Automation or create one using the normal Automation form. For a
    direct Agent, choose the Project, Workspace behavior, Provider, Model, Thinking, Mode, optional
    feature values such as Fast mode, provider settings, and optional Agent profile shortcut.
@@ -839,7 +839,7 @@ the real Account-to-identity form, pending invitations, and legacy responses wit
 
 ### Catalog and capabilities
 
-`Channels → Catalog` lists every channel the build knows, whether or not an account exists for it:
+`Channels → Channel Integrations` lists every channel the build knows, whether or not an account exists for it:
 its prerequisites, its transports and what each one requires, its channel-specific tools, the health
 of each configured account, and its capability matrix.
 
@@ -1052,8 +1052,9 @@ does not need to read several YAML files to understand the result.
 
 The `Reply method` labels are `Text forward` and `Use Channel tool`. `Text forward` uses the existing
 `outbound.path: relay` behavior; `Use Channel tool` uses `outbound.path: tool`. The display names do
-not change stored configuration or the provider transport. New Routes default `Reply in a thread`
-to on. Editing preserves an existing explicit or omitted legacy reply anchor rather than silently
+not change stored configuration or the provider transport. `Use Channel tool` is shown first and is
+the default for a new Route; a Route that stored `relay` keeps it when reopened. New Routes default
+`Reply in a thread` to on. Editing preserves an existing explicit or omitted legacy reply anchor rather than silently
 changing its behavior.
 
 The tool
@@ -1737,7 +1738,7 @@ The Hub area uses Paseo's existing Settings patterns:
   explains how to narrow the list. This bounds rendered options; it does not add server pagination.
 - `DropdownMenu` for small fixed action lists.
 - `AdaptiveModalSheet` for Link identity, Add Team member, and Add access.
-- A focused detail view within the existing Settings screen for Add Channel account and Add Route;
+- A focused detail view within the existing Settings screen for Add Channel Route and Add Route;
   no additional router or app shell owns these forms.
 - Web confirmations, including Access grants and removals, use the shared app
   `ConfirmationProvider` through `confirmDialog`, rendered with `AdaptiveModalSheet` and standard
@@ -1838,9 +1839,9 @@ These are release-gating integration scenarios, not illustrative examples.
    reads do not issue access tickets.
 2. The owner adds a Channel account and links their provider identity during setup.
 3. `Who can use it` is already set to `Only you`; the owner does not open the access picker.
-4. The owner sees `Run an Automation` first and can create or select the standard one-Agent
-   Automation. They may instead choose direct Agent work, configure Project and Agent controls, or
-   optionally apply an Agent profile.
+4. The owner starts on `Start or continue an Agent`, configures Project and Agent controls, and may
+   optionally apply an Agent profile. They may instead switch to the `Experimental`
+   `Run an Automation` path and create or select the standard one-Agent Automation.
 5. `Use Project folder` is preselected; worktree/branch/PR choices remain available without forcing
    extra setup. Selecting a Project resolves its root from the existing Paseo Host directory,
    matching both Host server ID and Project ID, and writes that absolute path into the existing

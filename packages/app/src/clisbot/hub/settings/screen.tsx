@@ -2556,7 +2556,7 @@ function ConnectionRow({
       </View>
       <Text style={settingsStyles.rowHint}>
         {connection.consumers.length === 0
-          ? "Not used by a Channel account, Automation, or Project."
+          ? "Not used by a Channel Route, Automation, or Project."
           : `Used by ${consumers}. Move or remove these consumers before disconnecting.`}
       </Text>
     </View>
@@ -2710,7 +2710,7 @@ function hubResourceKindLabel(kind: HubAssignment["resourceKind"]): string {
     organization: "Organization",
     daemon: "Host",
     project: "Project",
-    channel_account: "Channel account",
+    channel_account: "Channel Route",
     automation: "Automation",
   }[kind];
 }

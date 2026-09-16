@@ -231,7 +231,7 @@ describe("Channel activity pages and detail recovery", () => {
     expect(screen.queryByText("Slack · first-0")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Details" })).toHaveLength(1);
     await openDetails();
-    fireEvent.change(screen.getByLabelText("Channel account"), {
+    fireEvent.change(screen.getByLabelText("Channel Route"), {
       target: { value: "slack:support" },
     });
     expect(screen.queryByRole("button", { name: "Back to activity" })).toBeNull();
@@ -267,7 +267,7 @@ describe("Channel activity pages and detail recovery", () => {
     });
     render(view());
     await screen.findByText("Route 1 · Ignored");
-    fireEvent.change(screen.getByLabelText("Channel account"), {
+    fireEvent.change(screen.getByLabelText("Channel Route"), {
       target: { value: "slack:support" },
     });
     await screen.findByText("Channel activity is unavailable");
@@ -281,7 +281,13 @@ describe("Channel activity pages and detail recovery", () => {
     await screen.findByText("Channel activity is unavailable");
     expect(screen.getByText(/update the Hub/)).toBeTruthy();
     expect(screen.queryByText(/No events match/)).toBeNull();
-    expect(fixture.get).toHaveBeenCalledTimes(1);
+    // No fanout means the activity endpoint is asked once, not that the screen
+    // reads nothing else: it also reads the Channel catalog, off a shared cache
+    // entry, to name each Channel the way the Hub does.
+    const activityCalls = fixture.get.mock.calls.filter(([resource]) =>
+      String(resource).startsWith("channel-activity"),
+    );
+    expect(activityCalls).toHaveLength(1);
     expect(fixture.get).toHaveBeenCalledWith("channel-activity?limit=25", expect.anything());
     fixture.get.mockResolvedValue({ activity: [], nextCursor: null });
     fireEvent.click(screen.getByRole("button", { name: "Refresh activity" }));

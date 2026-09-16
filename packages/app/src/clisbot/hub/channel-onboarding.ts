@@ -1,4 +1,4 @@
-export const CHANNEL_ROUTE_TARGET_VALUES = ["automation", "agent"];
+export const CHANNEL_ROUTE_TARGET_VALUES = ["agent", "automation"];
 
 /** New Routes reply in a thread; editing retains the saved or legacy default. */
 export function initialChannelReplyAnchor(
@@ -9,11 +9,12 @@ export function initialChannelReplyAnchor(
   return anchor === "thread" ? "thread" : "default";
 }
 
+/** New Routes start an Agent; editing keeps the saved target. */
 export function initialChannelRouteTarget(
   isEditing: boolean,
   workflow: string | null,
 ): "agent" | "automation" {
-  return isEditing && workflow === null ? "agent" : "automation";
+  return isEditing && workflow !== null ? "automation" : "agent";
 }
 
 /** Only a confirmed one-member owner organization earns this personal-use label. */

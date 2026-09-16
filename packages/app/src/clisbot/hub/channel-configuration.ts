@@ -43,7 +43,7 @@ export interface ChannelRouteBehavior {
 export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   requireMention: true,
   replyAnchor: "thread",
-  outboundPath: "relay",
+  outboundPath: "tool",
   finalAnswers: true,
   progressMessage: true,
   typingIndicator: true,

@@ -4,6 +4,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Field } from "@/components/ui/form-field";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { channelApiProblem } from "../channel-api";
 import {
   channelConnectionProblem,
@@ -41,6 +42,16 @@ export function AddChannelConnection({
     () => connectableChannelEntries(catalog.entries, { allowProviderApplications }),
     [allowProviderApplications, catalog.entries],
   );
+  // Each tab carries its brand mark so a Channel is recognizable before reading.
+  const channelOptions = useMemo(
+    () =>
+      entries.map((entry) => ({
+        value: entry.id,
+        label: entry.label,
+        icon: ({ size }: { size: number }) => <ChannelIcon channel={entry.id} size={size} />,
+      })),
+    [entries],
+  );
   const [choice, setChoice] = useState<string | null>(null);
   const selected = entries.find((entry) => entry.id === choice) ?? entries[0];
   const save = useChannelConnectionSave(selected, create);
@@ -50,7 +61,7 @@ export function AddChannelConnection({
       {entries.length > 1 ? (
         <Field label="Channel">
           <SegmentedControl
-            options={entries.map((entry) => ({ value: entry.id, label: entry.label }))}
+            options={channelOptions}
             value={selected.id}
             onValueChange={setChoice}
             size="sm"

@@ -158,6 +158,11 @@ describe("Conversation selection", () => {
     expect(await screen.findByText("#support")).toBeTruthy();
     expect(screen.getByText("Channel · C1 · Private")).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
+    // The Conversations choice above names the group, so the block keeps only the
+    // selection rule and drops the label and picker hint that repeated it.
+    expect(screen.getByText("Select at least one conversation.")).toBeTruthy();
+    expect(screen.queryByText("Selected conversations")).toBeNull();
+    expect(screen.queryByText("Choose one or more known conversations.")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Choose conversations" }));
     fireEvent.click(screen.getByRole("button", { name: "Choose #delivery" }));
     expect(screen.getByLabelText("Canonical IDs").textContent).toBe("C1, C2");

@@ -186,7 +186,7 @@ function setupBlocker(
     return {
       state: "needsSetup",
       reason: "No account is configured for this channel.",
-      nextAction: `Add a ${entry.label} Channel account.`,
+      nextAction: `Add a ${entry.label} Channel Route.`,
     };
   }
   if (!account.enabled) {

@@ -77,7 +77,7 @@ What each vertical implements. A blank cell means the platform or the vertical h
 ⁴ Card clicks arrive inbound; Hub renders no Lark card of its own.
 ⁵ Slash commands and interaction callbacks are not wired yet.
 
-The same matrix appears per account under **Channels → Catalog** in the Paseo app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
+The same matrix appears per account under **Channels → Channel Integrations** in the Paseo app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
 
 ## Commands in a conversation
 

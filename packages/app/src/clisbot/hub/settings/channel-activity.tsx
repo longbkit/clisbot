@@ -12,7 +12,9 @@ import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { useChannelCatalog } from "./channel-catalog-queries";
 import { HubChannelActivitySchema, HubConnectionsSchema } from "../contracts";
+import { channelCatalogLabel, type ChannelCatalogEntry } from "../channel-catalog";
 import { hubResourceQueryKey } from "../query-keys";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
 
@@ -71,6 +73,7 @@ export function ChannelActivity({
   onChange: ChangeActivity;
 }) {
   const compact = useIsCompactFormFactor();
+  const catalog = useChannelCatalog();
   const accountOptions = useMemo<SelectFieldOption<string>[]>(
     () => [
       { id: ALL, value: ALL, label: "All accounts" },
@@ -78,11 +81,17 @@ export function ChannelActivity({
         if (typeof account.channel !== "string" || typeof account.accountId !== "string") return [];
         const value = `${account.channel}:${account.accountId}`;
         return [
-          { id: value, value, label: `${providerLabel(account.channel)} · ${account.accountId}` },
+          {
+            id: value,
+            value,
+            label: `${activityChannelLabel(catalog.entries, account.channel)} · ${account.accountId}`,
+          },
         ];
       }),
     ],
-    [accounts],
+    // The catalog arrives after the accounts do; without it here the options
+    // would keep the fallback label for the rest of the session.
+    [accounts, catalog.entries],
   );
   const selectedAccount = accounts.find(
     (account) => `${String(account.channel)}:${String(account.accountId)}` === state.accountKey,
@@ -145,7 +154,7 @@ export function ChannelActivity({
       <View style={styles.filters}>
         <View style={styles.filter}>
           <SelectField
-            label="Channel account"
+            label="Channel Route"
             value={state.accountKey}
             selectedDisplay={accountDisplay}
             options={accountOptions}
@@ -153,7 +162,7 @@ export function ChannelActivity({
             searchable
             size={size}
             placeholder="All accounts"
-            emptyText="No Channel accounts"
+            emptyText="No Channel Routes"
           />
         </View>
         {state.accountKey !== ALL ? (
@@ -426,6 +435,7 @@ function ChannelActivityRow({
   select(entry: ActivityEntry): void;
 }) {
   const open = useCallback(() => select(entry), [entry, select]);
+  const catalog = useChannelCatalog();
   return (
     <View style={[settingsStyles.row, bordered && settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
@@ -436,7 +446,7 @@ function ChannelActivityRow({
         <Text
           style={settingsStyles.rowHint}
           numberOfLines={1}
-        >{`${providerLabel(entry.channel)} · ${entry.accountId ?? "Account"}`}</Text>
+        >{`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? "Account"}`}</Text>
         <Text style={settingsStyles.rowHint}>{new Date(entry.createdAt).toLocaleString()}</Text>
       </View>
       <Button size="sm" variant="ghost" onPress={open}>
@@ -454,6 +464,7 @@ function ChannelActivityDetails({
   connectionId?: string;
   back(): void;
 }) {
+  const catalog = useChannelCatalog();
   const recovery = entry.outcome === "ignored" ? channelAccessRecovery(entry.outcomeDetail) : null;
   return (
     <View style={styles.results}>
@@ -466,7 +477,7 @@ function ChannelActivityDetails({
       <View style={settingsStyles.card}>
         <ActivityDetail
           label={`${routeLabel(entry)} · ${outcomeLabel(entry)}`}
-          value={`${providerLabel(entry.channel)} · ${entry.accountId ?? "Account"}`}
+          value={`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? "Account"}`}
         />
         <ActivityDetail label="Time" value={new Date(entry.createdAt).toLocaleString()} />
         <ActivityDetail label="Conversation" value={entry.conversationId} />
@@ -499,14 +510,17 @@ function routeLabel(entry: ActivityEntry): string {
 function outcomeLabel(entry: ActivityEntry): string {
   return entry.limitDecision === "denied" ? "Blocked by Route limits" : OUTCOMES[entry.outcome];
 }
-/** The Hub owns the supported channel set, so an unrecognized name is labelled
- * from its id rather than as a generic "Channel". */
-function providerLabel(channel: string | undefined): string {
-  if (channel === "slack") return "Slack";
-  if (channel === "telegram") return "Telegram";
-  if (channel === "discord") return "Discord";
+/**
+ * The Hub owns the supported channel set, so its catalog names the Channel
+ * (`channelCatalogLabel`). Only an activity row with no channel recorded at all
+ * falls back to the generic word.
+ */
+function activityChannelLabel(
+  catalog: readonly ChannelCatalogEntry[],
+  channel: string | undefined,
+): string {
   if (channel === undefined || channel.length === 0) return "Channel";
-  return channel[0]!.toUpperCase() + channel.slice(1);
+  return channelCatalogLabel(catalog, channel);
 }
 const styles = StyleSheet.create((theme) => ({
   filters: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[3] },
@@ -540,7 +554,7 @@ function channelAccessRecovery(reason: string | null | undefined): AccessRecover
       return {
         title: "Sender needs conversation access",
         description:
-          "The sender's Channel identity is verified. An owner or administrator must grant their Member or Team access to this Channel account and conversation, then the sender can try again.",
+          "The sender's Channel identity is verified. An owner or administrator must grant their Member or Team access to this Channel Route and conversation, then the sender can try again.",
         identity: false,
         access: true,
       };

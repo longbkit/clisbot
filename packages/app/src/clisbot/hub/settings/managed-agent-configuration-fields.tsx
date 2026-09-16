@@ -1,5 +1,6 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 import type { AgentProfilePicker } from "@/agent-profiles";
 import { useAgentProfiles } from "@/agent-profiles";
@@ -30,6 +31,8 @@ interface ManagedAgentConfigurationFieldsProps {
   onChange(value: ManagedAgentConfigurationValue): void;
   disabled?: boolean;
   allowFastMode?: boolean;
+  /** Off when the surface places Fast mode in its own advanced group instead. */
+  showFastMode?: boolean;
 }
 
 function configurationHint(input: {
@@ -53,6 +56,7 @@ export function ManagedAgentConfigurationFields({
   onChange,
   disabled = false,
   allowFastMode = true,
+  showFastMode = true,
 }: ManagedAgentConfigurationFieldsProps) {
   const snapshot = useProvidersSnapshot(serverId, { cwd: cwd.trim() || null });
   const { profiles, isSupported: profilesSupported } = useAgentProfiles(serverId);
@@ -177,15 +181,6 @@ export function ManagedAgentConfigurationFields({
     [serverId, value.provider],
   );
 
-  const setFastMode = useCallback(
-    (enabled: boolean) => {
-      const featureValues = { ...value.featureValues };
-      if (enabled) featureValues["fast_mode"] = true;
-      else delete featureValues["fast_mode"];
-      onChange({ ...value, featureValues });
-    },
-    [onChange, value],
-  );
   const setThinkingOption = useCallback(
     (thinkingOptionId: string) => onChange({ ...value, thinkingOptionId }),
     [onChange, value],
@@ -226,66 +221,125 @@ export function ManagedAgentConfigurationFields({
 
   return (
     <>
-      <Field label="Provider and Model" hint={hint}>
-        <CombinedModelSelector
-          providers={providers}
-          selectedProvider={value.provider}
-          selectedModel={value.model}
-          onSelect={selectModel}
-          isLoading={snapshot.isLoading || snapshot.isFetching}
-          profiles={profilePicker}
-          onApplyProfile={applyProfile}
-          renderTrigger={renderModelTrigger}
-          triggerFill
-          serverId={serverId}
-          disabled={disabled || serverId === null}
-          onOpen={openModelSelector}
-          onRetryProvider={retryProvider}
-          isRetryingProvider={snapshot.isRefreshing}
-        />
-      </Field>
-      <SelectField
-        label="Thinking"
-        value={value.thinkingOptionId}
-        selectedDisplay={thinkingDisplay}
-        options={thinkingOptions}
-        onChange={setThinkingOption}
-        placeholder="Default"
-        emptyText="No Thinking options are available."
-        searchable={thinkingOptions.length > 6}
-        title="Thinking"
-        disabled={disabled || serverId === null || thinkingOptions.length <= 1}
-      />
-      {(modeOptions.length > 1 || value.mode.length > 0) && (
-        <SelectField
-          label="Mode"
-          value={value.mode}
-          selectedDisplay={modeDisplay}
-          options={modeOptions}
-          onChange={setMode}
-          placeholder="Default"
-          emptyText="No Modes are available."
-          searchable={modeOptions.length > 6}
-          title="Mode"
-          disabled={disabled || serverId === null || modeOptions.length <= 1}
-        />
-      )}
-      <View style={settingsStyles.row}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Use Fast mode</Text>
-          <Text style={settingsStyles.rowHint}>
-            {allowFastMode
-              ? "Uses the Provider's faster service tier when supported and may cost more."
-              : "Unavailable for Routes that external participants can invoke."}
-          </Text>
+      {/* One line while the surface is wide enough; each selector wraps whole. */}
+      <View style={styles.selectorRow}>
+        <View style={styles.selector}>
+          <Field label="Provider and Model" hint={hint}>
+            <CombinedModelSelector
+              providers={providers}
+              selectedProvider={value.provider}
+              selectedModel={value.model}
+              onSelect={selectModel}
+              isLoading={snapshot.isLoading || snapshot.isFetching}
+              profiles={profilePicker}
+              onApplyProfile={applyProfile}
+              renderTrigger={renderModelTrigger}
+              triggerFill
+              serverId={serverId}
+              disabled={disabled || serverId === null}
+              onOpen={openModelSelector}
+              onRetryProvider={retryProvider}
+              isRetryingProvider={snapshot.isRefreshing}
+            />
+          </Field>
         </View>
-        <Switch
-          value={allowFastMode && value.featureValues["fast_mode"] === true}
-          onValueChange={setFastMode}
-          disabled={disabled || serverId === null || !allowFastMode}
-          accessibilityLabel="Use Fast mode"
-        />
+        <View style={styles.selector}>
+          <SelectField
+            label="Thinking"
+            value={value.thinkingOptionId}
+            selectedDisplay={thinkingDisplay}
+            options={thinkingOptions}
+            onChange={setThinkingOption}
+            placeholder="Default"
+            emptyText="No Thinking options are available."
+            searchable={thinkingOptions.length > 6}
+            title="Thinking"
+            disabled={disabled || serverId === null || thinkingOptions.length <= 1}
+          />
+        </View>
+        {modeOptions.length > 1 || value.mode.length > 0 ? (
+          <View style={styles.selector}>
+            <SelectField
+              label="Mode"
+              value={value.mode}
+              selectedDisplay={modeDisplay}
+              options={modeOptions}
+              onChange={setMode}
+              placeholder="Default"
+              emptyText="No Modes are available."
+              searchable={modeOptions.length > 6}
+              title="Mode"
+              disabled={disabled || serverId === null || modeOptions.length <= 1}
+            />
+          </View>
+        ) : null}
       </View>
+      {showFastMode ? (
+        <ManagedAgentFastModeSwitch
+          serverId={serverId}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          allowFastMode={allowFastMode}
+        />
+      ) : null}
     </>
   );
 }
+
+/** The Fast mode row, so a surface can place it in its own advanced group. */
+export function ManagedAgentFastModeSwitch({
+  serverId,
+  value,
+  onChange,
+  disabled = false,
+  allowFastMode = true,
+}: {
+  serverId: string | null;
+  value: ManagedAgentConfigurationValue;
+  onChange(value: ManagedAgentConfigurationValue): void;
+  disabled?: boolean;
+  allowFastMode?: boolean;
+}) {
+  const setFastMode = useCallback(
+    (enabled: boolean) => {
+      const featureValues = { ...value.featureValues };
+      if (enabled) featureValues["fast_mode"] = true;
+      else delete featureValues["fast_mode"];
+      onChange({ ...value, featureValues });
+    },
+    [onChange, value],
+  );
+  return (
+    <View style={settingsStyles.formRow}>
+      <View style={settingsStyles.formRowContent}>
+        <Text style={settingsStyles.rowTitle}>Use Fast mode</Text>
+        <Text style={settingsStyles.rowHint}>
+          {allowFastMode
+            ? "Uses the Provider's faster service tier when supported and may cost more."
+            : "Unavailable for Routes that external participants can invoke."}
+        </Text>
+      </View>
+      <Switch
+        value={allowFastMode && value.featureValues["fast_mode"] === true}
+        onValueChange={setFastMode}
+        disabled={disabled || serverId === null || !allowFastMode}
+        accessibilityLabel="Use Fast mode"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  selectorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[3],
+  },
+  selector: {
+    flexBasis: 180,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+}));

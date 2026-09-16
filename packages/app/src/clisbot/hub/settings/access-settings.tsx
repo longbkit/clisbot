@@ -114,7 +114,7 @@ function MemberAccessSettings() {
   });
   return (
     <View>
-      <SettingsSection title="Access">
+      <SettingsSection title="Access overview">
         <Alert
           variant="info"
           title="Access is managed by your organization"
@@ -375,11 +375,13 @@ function ManagedAccessContent({
       team.id,
       members
         .filter((member) => team.userIds.includes(member.userId))
-        .map((member) => member.name)
+        .map((member) => `${member.name} · ${member.email}`)
         .join(", ") || "No Members in this Team",
     ]),
   );
-  const memberById = new Map(members.map((member) => [member.id, member.name]));
+  const memberById = new Map(
+    members.map((member) => [member.id, `${member.name} · ${member.email}`]),
+  );
   const subjectOptions = assignmentSubjectOptions(members, teams);
   const selectedSubject = subjectValue ?? subjectOptions[0]?.value ?? null;
   const resourceOptions = assignmentResourceOptions(catalog.resources, false);
@@ -874,7 +876,7 @@ function AccessAssignmentForm({
           selectedDisplay={selectedOptionDisplay(resourceOptions, resourceKeyValue)}
           options={resourceOptions}
           onChange={changeResource}
-          placeholder="Choose a Channel account, Host, Project, or Automation"
+          placeholder="Choose a Channel Route, Host, Project, or Automation"
           emptyText="No resources are available."
           searchable
           searchPlaceholder="Search resources or parent Host"
@@ -1380,7 +1382,7 @@ export function assignmentResourceOptions(
     organization: "Organizations",
     daemon: "Hosts",
     project: "Projects",
-    channel_account: "Channel accounts",
+    channel_account: "Channel Routes",
     automation: "Automations",
   };
   return resources
@@ -1418,7 +1420,7 @@ function assignmentSubjectOptions(
       .map((member) => ({
         id: `member:${member.id}`,
         value: subjectKey("member", member.id),
-        label: member.name,
+        label: `${member.name} · ${member.email}`,
         description: member.email,
         group: "Members",
       })),
@@ -1464,7 +1466,7 @@ function resourceKindLabel(kind: AccessResourceKind): string {
     organization: "Organization",
     daemon: "Host",
     project: "Project",
-    channel_account: "Channel account",
+    channel_account: "Channel Route",
     automation: "Automation",
   }[kind];
 }

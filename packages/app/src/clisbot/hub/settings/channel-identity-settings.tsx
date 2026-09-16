@@ -12,6 +12,8 @@ import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
+import { channelCatalogLabel } from "../channel-catalog";
+import { useChannelCatalog } from "./channel-catalog-queries";
 import { hubResourceQueryKey } from "../query-keys";
 import {
   HubChannelIdentitiesSchema,
@@ -47,6 +49,7 @@ function ChannelIdentitySelfLinkForm({
   initialConnectionId: string | null;
 }) {
   const hub = useHubAccount();
+  const catalog = useChannelCatalog();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
   const queryScope = { origin: hub.origin, organizationId, accountId };
@@ -88,10 +91,12 @@ function ChannelIdentitySelfLinkForm({
       channelConnections.map((connection) => ({
         id: connection.id,
         value: connection.id,
-        label: `${providerLabel(connection.provider)} · ${connection.name}`,
+        label: `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`,
         description: connection.externalName ?? undefined,
       })),
-    [channelConnections],
+    // The catalog arrives after the Connections do; without it here the options
+    // would keep the fallback label for the rest of the session.
+    [channelConnections, catalog.entries],
   );
   const ownIdentities = useMemo(
     () => (identities.data?.identities ?? []).filter(({ memberId }) => memberId === membershipId),
@@ -167,91 +172,99 @@ function ChannelIdentitySelfLinkForm({
   if (membershipId === null) return null;
 
   return (
-    <SettingsSection title="Your Channel identities">
-      <Alert
-        variant="info"
-        title="Link the account you use in Slack or Telegram"
-        description="Choose the Connection used by your Channel account, create a one-use command, then send it from your own Slack or Telegram account. The command verifies your identity; your existing organization access stays unchanged."
-      />
-      <QueryFeedback queries={[identities, connections]} />
-      <Button size="sm" variant="outline" disabled={pending} onPress={refresh}>
-        Refresh identities
-      </Button>
-      <RequestedConnectionFeedback
-        requested={initialConnectionId}
-        ready={connections.data !== undefined}
-        selected={selectedConnection !== undefined}
-      />
-      {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-      {identities.data !== undefined ? (
-        <View style={settingsStyles.card}>
-          {ownIdentities.length === 0 ? (
-            <View style={settingsStyles.row}>
-              <Text style={settingsStyles.rowHint}>No provider identities are linked.</Text>
-            </View>
-          ) : (
-            ownIdentities.map((identity, index) => {
-              const connection = channelConnections.find(({ id }) => id === identity.connectionId);
-              return (
-                <View
-                  key={identity.id}
-                  style={[
-                    settingsStyles.row,
-                    styles.row,
-                    index > 0 ? settingsStyles.rowBorder : null,
-                  ]}
-                >
-                  <View style={settingsStyles.rowContent}>
-                    <Text style={settingsStyles.rowTitle}>
-                      {identity.displayName ?? identity.externalSubjectId}
-                    </Text>
-                    <Text style={settingsStyles.rowHint}>
-                      {connection
-                        ? `${providerLabel(connection.provider)} · ${connection.name}`
-                        : "Connection unavailable"}
-                    </Text>
-                  </View>
-                  <IdentityUnlinkButton
-                    identityId={identity.id}
-                    pending={pending}
-                    unlink={unlink}
-                  />
-                </View>
-              );
-            })
-          )}
-        </View>
-      ) : null}
-      <View style={[settingsStyles.card, styles.form]}>
-        <SelectField
-          label="Connection"
-          value={connectionId}
-          selectedDisplay={selectedOptionDisplay(connectionOptions, connectionId)}
-          options={connectionOptions}
-          onChange={setSelectedConnection}
-          placeholder="Choose a Channel account"
-          emptyText="No Channel account is available to your Hub Member."
-          searchable={connectionOptions.length > 6}
-          title="Connection"
-          disabled={pending}
+    <View>
+      <SettingsSection title="Channel identity setup">
+        <Alert
+          variant="info"
+          title="Link the account you use in Slack or Telegram"
+          description="Choose the Connection used by your Channel account, create a one-use command, then send it from your own Slack or Telegram account. The command verifies your identity; your existing organization access stays unchanged."
         />
-        <Button
-          disabled={pending || selectedConnection === undefined}
-          onPress={handleCreateChallenge}
-        >
-          {pending ? "Creating code…" : "Create link code"}
+        <QueryFeedback queries={[identities, connections]} />
+        <Button size="sm" variant="outline" disabled={pending} onPress={refresh}>
+          Refresh identities
         </Button>
-        {challenge !== null ? (
-          <ChannelIdentityChallenge
-            key={challenge.command}
-            challenge={challenge}
-            provider={selectedConnection?.provider}
-            pending={pending}
-            reportError={setMutationError}
-          />
+        <RequestedConnectionFeedback
+          requested={initialConnectionId}
+          ready={connections.data !== undefined}
+          selected={selectedConnection !== undefined}
+        />
+        {mutationError ? <Alert variant="error" title={mutationError} /> : null}
+      </SettingsSection>
+      <SettingsSection title="Linked identities">
+        {identities.data !== undefined ? (
+          <View style={settingsStyles.card}>
+            {ownIdentities.length === 0 ? (
+              <View style={settingsStyles.row}>
+                <Text style={settingsStyles.rowHint}>No provider identities are linked.</Text>
+              </View>
+            ) : (
+              ownIdentities.map((identity, index) => {
+                const connection = channelConnections.find(
+                  ({ id }) => id === identity.connectionId,
+                );
+                return (
+                  <View
+                    key={identity.id}
+                    style={[
+                      settingsStyles.row,
+                      styles.row,
+                      index > 0 ? settingsStyles.rowBorder : null,
+                    ]}
+                  >
+                    <View style={settingsStyles.rowContent}>
+                      <Text style={settingsStyles.rowTitle}>
+                        {identity.displayName ?? identity.externalSubjectId}
+                      </Text>
+                      <Text style={settingsStyles.rowHint}>
+                        {connection
+                          ? `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`
+                          : "Connection unavailable"}
+                      </Text>
+                    </View>
+                    <IdentityUnlinkButton
+                      identityId={identity.id}
+                      pending={pending}
+                      unlink={unlink}
+                    />
+                  </View>
+                );
+              })
+            )}
+          </View>
         ) : null}
-      </View>
-    </SettingsSection>
+      </SettingsSection>
+      <SettingsSection title="Link a new identity">
+        <View style={[settingsStyles.card, styles.form]}>
+          <SelectField
+            label="Connection"
+            value={connectionId}
+            selectedDisplay={selectedOptionDisplay(connectionOptions, connectionId)}
+            options={connectionOptions}
+            onChange={setSelectedConnection}
+            placeholder="Choose a Channel account"
+            emptyText="No Channel account is available to your Hub Member."
+            searchable={connectionOptions.length > 6}
+            title="Connection"
+            disabled={pending}
+          />
+          <Button
+            disabled={pending || selectedConnection === undefined}
+            onPress={handleCreateChallenge}
+          >
+            {pending ? "Creating code…" : "Create link code"}
+          </Button>
+          {challenge !== null ? (
+            <ChannelIdentityChallenge
+              key={challenge.command}
+              challenge={challenge}
+              provider={selectedConnection?.provider}
+              pending={pending}
+              reportError={setMutationError}
+            />
+          ) : null}
+        </View>
+      </SettingsSection>
+    </View>
   );
 }
 
@@ -317,6 +330,7 @@ function ChannelIdentityChallenge({
 
 export function ChannelIdentitySettings() {
   const hub = useHubAccount();
+  const catalog = useChannelCatalog();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
   const queryScope = { origin: hub.origin, organizationId, accountId };
@@ -374,10 +388,12 @@ export function ChannelIdentitySettings() {
       channelConnections.map((connection) => ({
         id: connection.id,
         value: connection.id,
-        label: `${providerLabel(connection.provider)} · ${connection.name}`,
+        label: `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`,
         description: connection.externalName ?? undefined,
       })),
-    [channelConnections],
+    // The catalog arrives after the Connections do; without it here the options
+    // would keep the fallback label for the rest of the session.
+    [channelConnections, catalog.entries],
   );
   const memberById = useMemo(
     () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
@@ -511,6 +527,7 @@ function ChannelIdentityRows({
   pending: boolean;
   remove(id: string): Promise<void>;
 }) {
+  const catalog = useChannelCatalog();
   if (identities.length === 0) {
     return (
       <View style={settingsStyles.card}>
@@ -526,7 +543,7 @@ function ChannelIdentityRows({
         const member = members.get(identity.memberId);
         const connection = connections.get(identity.connectionId);
         const connectionLabel = connection
-          ? `${providerLabel(connection.provider)} · ${connection.name}`
+          ? `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`
           : "Connection unavailable";
         return (
           <View
@@ -685,10 +702,6 @@ function selectedOptionDisplay(
         label: option.label,
         ...(option.description ? { description: option.description } : {}),
       };
-}
-
-function providerLabel(value: string): string {
-  return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
 }
 
 function QueryFeedback({

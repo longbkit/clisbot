@@ -23,9 +23,10 @@ describe("Channel onboarding defaults", () => {
     });
     expect(candidate.route.reply).toEqual({ anchor: "thread" });
   });
-  it("offers Automation first for new Routes and preserves an edited direct Agent target", () => {
-    expect(CHANNEL_ROUTE_TARGET_VALUES).toEqual(["automation", "agent"]);
-    expect(initialChannelRouteTarget(false, null)).toBe("automation");
+  it("offers Agent first for new Routes and preserves an edited Automation target", () => {
+    expect(CHANNEL_ROUTE_TARGET_VALUES).toEqual(["agent", "automation"]);
+    expect(initialChannelRouteTarget(false, null)).toBe("agent");
+    expect(initialChannelRouteTarget(false, "triage")).toBe("agent");
     expect(initialChannelRouteTarget(true, null)).toBe("agent");
     expect(initialChannelRouteTarget(true, "triage")).toBe("automation");
   });

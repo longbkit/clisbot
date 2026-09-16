@@ -31,7 +31,7 @@ paseo channels add zalouser --account main --profile main
 
 `--profile` names the stored session and defaults to the account id. The account starts, finds no session, and reports the transport state **`needs-login`**. That is the designed first state, not a failure.
 
-Then link it from the app: **Channels → Accounts**, select the account, and use its QR operations. The flow is start → show the QR → poll → linked. Confirm the reported user id is the account you meant before you point a Route at it.
+Then link it from the app: **Channels → Channel Routes**, select the Channel Route, and use its QR operations. The flow is start → show the QR → poll → linked. Confirm the reported user id is the account you meant before you point a Route at it.
 
 Five verbs drive it, and the app renders all five:
 

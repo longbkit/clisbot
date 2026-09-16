@@ -16,6 +16,7 @@ import {
 } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
+import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -87,6 +88,7 @@ import { ConversationSelectionFields } from "./conversation-picker-field";
 import { DaemonProjectField } from "./daemon-project-field";
 import {
   ManagedAgentConfigurationFields,
+  ManagedAgentFastModeSwitch,
   type ManagedAgentConfigurationValue,
 } from "./managed-agent-configuration-fields";
 import { ManagedWorkspaceFields } from "./managed-workspace-fields";
@@ -122,6 +124,8 @@ type HubChannelConfiguration = z.infer<typeof HubChannelConfigurationSchema>;
 
 const EMPTY_RECORD: RecordValue = {};
 const MATCH_KIND_VALUES = ["dm", "channel", "thread", "group", "topic"];
+// Only `dm` needs spelling out; the rest read correctly once capitalized.
+const MATCH_KIND_LABELS = { dm: "Direct Message (DM)" };
 const CONVERSATION_SCOPE_VALUES = ["specific", "all"];
 const CONVERSATION_SCOPE_LABELS = {
   specific: "Selected conversations",
@@ -138,13 +142,14 @@ const ROUTE_AUDIENCE_LABELS = {
   conversationParticipants: "Anyone in matching conversations",
 };
 const ROUTE_TARGET_LABELS = {
-  automation: "Run an Automation",
   agent: "Start or continue an Agent",
+  automation: "Run an Automation",
 };
-const OUTBOUND_PATH_VALUES = ["relay", "tool"];
+const EXPERIMENTAL_ROUTE_TARGET_NOTE = "Experimental";
+const OUTBOUND_PATH_VALUES = ["tool", "relay"];
 const OUTBOUND_PATH_LABELS = {
-  relay: "Text forward",
   tool: "Use Channel tool",
+  relay: "Text forward",
 };
 const APPROVAL_VALUES = ["require", "auto-deny", "auto-allow"];
 const CUSTOM_APPROVAL_VALUES = ["custom", ...APPROVAL_VALUES];
@@ -207,13 +212,14 @@ export function ChannelSettings({
   );
 }
 
-/** Accounts is the canonical Route editor; Catalog is setup and capabilities,
- * Operations is the durable ingress queue, Activity is inbound admission. */
+/** Channel Routes is the canonical Route editor; Channel Integrations is setup
+ * and capabilities, Operations is the durable ingress queue, Activity is inbound
+ * admission. The `accounts`/`catalog` values stay as the stored view ids. */
 type ChannelView = "accounts" | "catalog" | "operations" | "activity";
 
 const CHANNEL_VIEWS: SegmentedControlOption<ChannelView>[] = [
-  { value: "accounts", label: "Accounts" },
-  { value: "catalog", label: "Catalog" },
+  { value: "accounts", label: "Channel Routes" },
+  { value: "catalog", label: "Channel Integrations" },
   { value: "operations", label: "Operations" },
   { value: "activity", label: "Activity" },
 ];
@@ -442,7 +448,7 @@ function ChannelSettingsContent({
           remainingConsumers.length > 0
             ? `This removes ${channel} behavior and its Routes. The provider Connection remains in use by ${remainingConsumers.map(({ name }) => name).join(", ")}.`
             : `This removes ${channel} behavior and its Routes. You can also disconnect the unused provider Connection next.`,
-        confirmLabel: "Remove Channel account",
+        confirmLabel: "Remove Channel Route",
         destructive: true,
       });
       if (!confirmed) return;
@@ -700,7 +706,7 @@ function ChannelSettingsContent({
             } catch (error) {
               const detail = error instanceof Error ? error.message : "Hub request failed.";
               throw new Error(
-                `Route saved, but Team access could not be updated. Open Manage access to finish sharing this Channel account. ${detail}`,
+                `Route saved, but Team access could not be updated. Open Manage access to finish sharing this Channel Route. ${detail}`,
                 { cause: error },
               );
             }
@@ -1068,16 +1074,20 @@ function ChannelAccountsSection({
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
   return (
-    <SettingsSection title="Channel accounts">
+    <SettingsSection title="Channel Routes">
       <QueryFeedback queries={queries} />
       <View style={styles.actions}>
+        {/* Two fixed actions rather than one that changes meaning with the
+            selection: a new Channel Route always carries the Channel Account
+            picker, while Add Route only adds a rule to the open one. */}
         {canManage ? (
-          <Button
-            size="sm"
-            disabled={pending}
-            onPress={selectedAccountKey === null ? addAccount : addRoute}
-          >
-            {selectedAccountKey === null ? "Add Channel account" : "Add Route"}
+          <Button size="sm" disabled={pending} onPress={addAccount}>
+            Add Channel Route
+          </Button>
+        ) : null}
+        {canManage && selectedAccountKey !== null ? (
+          <Button size="sm" variant="outline" disabled={pending} onPress={addRoute}>
+            Add Route
           </Button>
         ) : null}
         <Button size="xs" variant="outline" disabled={refreshing} onPress={refreshStatus}>
@@ -1210,14 +1220,10 @@ function ChannelManagementSection({
       />
       <QueryFeedback queries={queries} />
       <View style={addingConnection ? styles.hidden : undefined}>
-        {editor.kind === "account" ? (
-          <Button size="sm" variant="outline" disabled={pending} onPress={openConnection}>
-            Connect a provider account
-          </Button>
-        ) : null}
         <ChannelAccountForm
           automationName={automationName}
           connections={channelConnections}
+          {...(editor.kind === "account" ? { connectChannelAccount: openConnection } : {})}
           automationConnections={connections.connections}
           automations={automations.automations}
           daemons={daemons.daemons}
@@ -1241,7 +1247,7 @@ function ChannelManagementSection({
             create={submitConnection}
           />
           <Button variant="outline" disabled={connectionPending} onPress={closeConnection}>
-            Back to Channel account
+            Back to Channel Route
           </Button>
         </View>
       ) : null}
@@ -1300,7 +1306,7 @@ function ChannelAccountList({
   if (accounts.length === 0) {
     return (
       <View style={settingsStyles.card}>
-        <EmptyRow message="No Channel accounts are configured." />
+        <EmptyRow message="No Channel Routes are configured." />
       </View>
     );
   }
@@ -1411,7 +1417,10 @@ function ChannelAccountRow({
     <View style={index > 0 ? settingsStyles.rowBorder : null}>
       <View style={[settingsStyles.row, styles.row, compact && styles.stackedRow]}>
         <View style={[settingsStyles.rowContent, compact && styles.stackedRowContent]}>
-          <Text style={settingsStyles.rowTitle}>{`${channelLabel(channel)} · ${accountId}`}</Text>
+          <View style={styles.channelTitle}>
+            <ChannelIcon channel={channel} size={14} />
+            <Text style={settingsStyles.rowTitle}>{`${channelLabel(channel)} · ${accountId}`}</Text>
+          </View>
           <Text style={settingsStyles.rowHint}>
             {channelAccountStatus(enabled, runtimeAvailable, runtime, connection, routes.length)}
           </Text>
@@ -1424,7 +1433,7 @@ function ChannelAccountRow({
               disabled={pending}
               onPress={toggleSelected}
             >
-              {selected ? "Back to accounts" : "Manage"}
+              {selected ? "Back to Channel Routes" : "Manage"}
             </Button>
             <Switch
               value={enabled}
@@ -1691,7 +1700,7 @@ function ChannelAccountAccess({
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Who can use this Channel account?</Text>
+        <Text style={settingsStyles.rowTitle}>Who can use this Channel Route?</Text>
         <Text style={settingsStyles.rowHint}>
           Each Route chooses its audience. Members with access requires a linked Channel identity.
           Owners have access automatically; other Members need a matching grant. Anyone in
@@ -1778,7 +1787,7 @@ function ChannelAccountRouteList({
   });
   if (!visible) return null;
   if (routes.length === 0) {
-    return <EmptyRow message="No Routes are configured for this Channel account." />;
+    return <EmptyRow message="No Routes are configured for this Channel Route." />;
   }
   return routes.map((route, routeIndex) =>
     automationName !== undefined && route.workflow !== automationName ? null : (
@@ -1921,6 +1930,10 @@ function ChannelRouteRow({
   );
 }
 
+/**
+ * Only the active revision earns permanent space: the older entries are a read-only
+ * log, so they stay behind a disclosure instead of growing the page with every save.
+ */
 function ChannelRevisionHistory({
   revisions,
   activeRevisionId,
@@ -1928,31 +1941,60 @@ function ChannelRevisionHistory({
   revisions: HubRevision[] | undefined;
   activeRevisionId: string | undefined;
 }) {
-  let content;
-  if (revisions === undefined) content = <EmptyRow message="Loading revisions…" />;
-  else if (revisions.length === 0) {
-    content = <EmptyRow message="No Channel configuration revision exists yet." />;
-  } else {
-    content = revisions.map((revision, index) => (
-      <View
-        key={revision.id}
-        style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
-      >
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>
-            {`Revision ${String(revision.version)}${revision.id === activeRevisionId ? " · Active" : ""}`}
-          </Text>
-          <Text style={settingsStyles.rowHint}>
-            {new Date(revision.createdAt).toLocaleString()}
-          </Text>
+  const [expanded, setExpanded] = useState(false);
+  const toggle = useCallback(() => setExpanded((current) => !current), []);
+  if (revisions === undefined || revisions.length === 0) {
+    return (
+      <SettingsSection title="Revision history">
+        <View style={settingsStyles.card}>
+          <EmptyRow
+            message={
+              revisions === undefined
+                ? "Loading revisions…"
+                : "No Channel configuration revision exists yet."
+            }
+          />
         </View>
-      </View>
-    ));
+      </SettingsSection>
+    );
   }
+  const active = revisions.find((revision) => revision.id === activeRevisionId) ?? revisions[0]!;
+  const older = revisions.filter((revision) => revision.id !== active.id);
   return (
     <SettingsSection title="Revision history">
-      <View style={settingsStyles.card}>{content}</View>
+      <View style={settingsStyles.card}>
+        <View style={settingsStyles.row}>
+          <View style={settingsStyles.rowContent}>
+            <ChannelRevisionLine revision={active} active={active.id === activeRevisionId} />
+          </View>
+          {older.length === 0 ? null : (
+            <Button size="xs" variant="ghost" onPress={toggle}>
+              {expanded ? "Hide earlier" : `${String(older.length)} earlier`}
+            </Button>
+          )}
+        </View>
+        {expanded
+          ? older.map((revision) => (
+              <View key={revision.id} style={[settingsStyles.row, settingsStyles.rowBorder]}>
+                <View style={settingsStyles.rowContent}>
+                  <ChannelRevisionLine revision={revision} active={false} />
+                </View>
+              </View>
+            ))
+          : null}
+      </View>
     </SettingsSection>
+  );
+}
+
+function ChannelRevisionLine({ revision, active }: { revision: HubRevision; active: boolean }) {
+  return (
+    <View style={styles.revisionLine}>
+      <Text style={settingsStyles.rowTitle}>
+        {`Revision ${String(revision.version)}${active ? " · Active" : ""}`}
+      </Text>
+      <Text style={styles.revisionTime}>{new Date(revision.createdAt).toLocaleString()}</Text>
+    </View>
   );
 }
 
@@ -1970,6 +2012,7 @@ function ChannelAccountForm({
   createdConnectionId,
   pending,
   cancelEdit,
+  connectChannelAccount,
   createRouteAutomation,
   save,
 }: {
@@ -1991,6 +2034,8 @@ function ChannelAccountForm({
   createdConnectionId: string | null;
   pending: boolean;
   cancelEdit(): void;
+  /** Absent when the form edits an account that already has its Channel Account. */
+  connectChannelAccount?: () => void;
   createRouteAutomation(yaml: string): Promise<string>;
   save(accounts: RecordValue[], resource: RecordValue, teamGrant?: ChannelTeamGrant): void;
 }) {
@@ -2351,15 +2396,17 @@ function ChannelAccountForm({
       nextResource = candidate.resource;
       nextRoute = candidate.route;
     }
+    const review: RouteReviewInput = {
+      route: nextRoute,
+      target: routeTargetReviewLabel(target, automationName, agentConfiguration),
+      teams: teams.filter(({ id }) => selectedTeamIds.includes(id)).map(({ name }) => name),
+    };
     const confirmed = await confirmDialog({
       title: inputDraft
         ? "Use this input in the Automation?"
         : routeConfirmationTitle(audience, approvalChoice, isEditing),
-      message: routeReviewMessage({
-        route: nextRoute,
-        target: routeTargetReviewLabel(target, automationName, agentConfiguration),
-        teams: teams.filter(({ id }) => selectedTeamIds.includes(id)).map(({ name }) => name),
-      }),
+      message: routeReviewMessage(review),
+      body: routeReviewBody(review),
       confirmLabel: inputDraft ? "Use input" : channelFormSubmitLabel(isEditing),
       destructive: audience === "conversationParticipants" || approvalChoice === "auto-allow",
     });
@@ -2411,18 +2458,45 @@ function ChannelAccountForm({
       ) : null}
       {!isEditing && configurationKind === "account" ? (
         <>
-          <SelectField
-            label="Connection"
-            value={connectionId}
-            selectedDisplay={connectionDisplay}
-            options={connectionOptions}
-            onChange={setConnectionId}
-            placeholder="Choose a Connection"
-            emptyText="Add a Slack or Telegram Connection first."
-            searchable={connectionOptions.length > 6}
-            title="Connection"
-            disabled={pending}
-          />
+          {/* The heading names the group and the trigger names itself, so the two
+              controls carry no captions; `Or` joins them and wraps with the button
+              rather than being stranded at the end of the first line. */}
+          <View style={styles.accountPicker}>
+            <Text style={styles.formHeading}>Channel Account</Text>
+            <View style={styles.accountRow}>
+              <View style={styles.accountSelect}>
+                <SelectField
+                  label="Channel Account"
+                  field={false}
+                  value={connectionId}
+                  selectedDisplay={connectionDisplay}
+                  options={connectionOptions}
+                  onChange={setConnectionId}
+                  placeholder="Choose a channel account"
+                  emptyText="No Channel Account is connected yet."
+                  searchable={connectionOptions.length > 6}
+                  title="Channel Account"
+                  disabled={pending}
+                />
+              </View>
+              {connectChannelAccount === undefined ? null : (
+                <View style={styles.accountConnect}>
+                  <Text style={styles.accountOr}>Or</Text>
+                  <Button
+                    size="sm"
+                    variant={connectionOptions.length === 0 ? "secondary" : "outline"}
+                    disabled={pending}
+                    onPress={connectChannelAccount}
+                  >
+                    Connect a Channel Integration
+                  </Button>
+                </View>
+              )}
+            </View>
+            {connectionOptions.length === 0 ? (
+              <Text style={settingsStyles.rowHint}>Nothing is connected yet.</Text>
+            ) : null}
+          </View>
           <Field
             label="Account name"
             hint="A short name for this behavior configuration; credentials stay on the Connection."
@@ -2440,7 +2514,17 @@ function ChannelAccountForm({
         </>
       ) : null}
       {!isEditing && configurationKind === "route" ? (
-        <Alert variant="info" title={channelAccountLabel(selectedAccount)} />
+        // A Route belongs to the Channel Route it was opened from, so the account
+        // is shown rather than picked; the hint names the path to a different one.
+        <Field
+          label="Channel Account"
+          hint="Fixed by the Channel Route you opened. Use Add Channel Route for a different account."
+        >
+          <View style={styles.channelTitle}>
+            <ChannelIcon channel={stringField(selectedAccount, "channel") ?? undefined} size={14} />
+            <Text style={settingsStyles.rowTitle}>{channelAccountLabel(selectedAccount)}</Text>
+          </View>
+        </Field>
       ) : null}
     </>
   );
@@ -2450,6 +2534,7 @@ function ChannelAccountForm({
         label="Conversation type"
         values={MATCH_KIND_VALUES}
         selected={matchKind}
+        labels={MATCH_KIND_LABELS}
         onChange={changeMatchKind}
         disabled={pending}
       />
@@ -2793,6 +2878,7 @@ function MemberRouteBehaviorFields({
         values={OUTBOUND_PATH_VALUES}
         selected={behavior.outboundPath}
         labels={OUTBOUND_PATH_LABELS}
+        layout="row"
         onChange={changeOutboundPath}
         disabled={pending}
       />
@@ -2810,6 +2896,7 @@ function MemberRouteBehaviorFields({
         values={approvalValues}
         selected={approvalChoice}
         labels={APPROVAL_LABELS}
+        layout="row"
         onChange={changeApprovalChoice}
         disabled={pending}
       />
@@ -2949,6 +3036,7 @@ function RouteTargetFields({
         values={CHANNEL_ROUTE_TARGET_VALUES}
         selected={target}
         labels={ROUTE_TARGET_LABELS}
+        note={target === "automation" ? EXPERIMENTAL_ROUTE_TARGET_NOTE : undefined}
         onChange={changeTarget}
         disabled={pending}
       />
@@ -3110,23 +3198,34 @@ function AgentTargetFields({
         value={agentConfiguration}
         onChange={setAgentConfiguration}
         allowFastMode={allowFastMode}
+        showFastMode={false}
         disabled={pending}
       />
-      <Field
-        label="Provider options"
-        hint="Optional JSON object for provider-specific settings."
-        error={providerOptionsError}
-      >
-        <FormTextInput
-          initialValue=""
-          onChangeText={setProviderOptions}
-          placeholder='{"setting": true}'
-          autoCapitalize="none"
-          autoCorrect={false}
-          multiline
-          editable={!pending}
+      <View style={styles.inlineFields}>
+        <Text style={styles.formHeading}>Advanced Provider Options</Text>
+        <ManagedAgentFastModeSwitch
+          serverId={selectedDaemonServerId}
+          value={agentConfiguration}
+          onChange={setAgentConfiguration}
+          allowFastMode={allowFastMode}
+          disabled={pending}
         />
-      </Field>
+        <Field
+          label="Provider options"
+          hint="Optional JSON object for provider-specific settings."
+          error={providerOptionsError}
+        >
+          <FormTextInput
+            initialValue=""
+            onChangeText={setProviderOptions}
+            placeholder='{"setting": true}'
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            editable={!pending}
+          />
+        </Field>
+      </View>
     </>
   );
 }
@@ -3136,6 +3235,8 @@ function ChoiceRow({
   values,
   selected,
   labels = {},
+  note,
+  layout = "stacked",
   onChange,
   disabled,
 }: {
@@ -3143,24 +3244,42 @@ function ChoiceRow({
   values: string[];
   selected: string;
   labels?: Record<string, string>;
+  note?: string;
+  /** `row` sits the choices beside the label, level with the switches above. */
+  layout?: "stacked" | "row";
   onChange(value: string): void;
   disabled: boolean;
 }) {
+  const choices = (
+    <>
+      {values.map((value) => (
+        <ChoiceButton
+          key={value}
+          value={value}
+          selected={selected === value}
+          label={labels[value] ?? channelLabel(value)}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      ))}
+      {note === undefined ? null : <Text style={styles.choiceNote}>{note}</Text>}
+    </>
+  );
+  if (layout === "row") return <SettingRow label={label}>{choices}</SettingRow>;
   return (
     <View style={styles.choiceGroup}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.actions}>
-        {values.map((value) => (
-          <ChoiceButton
-            key={value}
-            value={value}
-            selected={selected === value}
-            label={labels[value] ?? channelLabel(value)}
-            onChange={onChange}
-            disabled={disabled}
-          />
-        ))}
-      </View>
+      <View style={styles.actions}>{choices}</View>
+    </View>
+  );
+}
+
+/** Label left, control right — the one row shape the behavior block is built from. */
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={settingsStyles.formRow}>
+      <Text style={[settingsStyles.rowTitle, settingsStyles.formRowContent]}>{label}</Text>
+      <View style={settingsStyles.formRowControls}>{children}</View>
     </View>
   );
 }
@@ -3203,15 +3322,14 @@ function RouteBehaviorSwitch({
   disabled: boolean;
 }) {
   return (
-    <View style={styles.switchRow}>
-      <Text style={styles.switchLabel}>{label}</Text>
+    <SettingRow label={label}>
       <Switch
         value={value}
         onValueChange={onChange}
         disabled={disabled}
         accessibilityLabel={label}
       />
-    </View>
+    </SettingRow>
   );
 }
 
@@ -3229,7 +3347,7 @@ function TeamAccessChoices({
   if (teams.length === 0) {
     return (
       <Text style={settingsStyles.rowHint}>
-        Owners can use this Channel account automatically. Add Teams later from Access.
+        Owners can use this Channel Route automatically. Add Teams later from Access.
       </Text>
     );
   }
@@ -3319,7 +3437,7 @@ function channelAccountKey(account: RecordValue): string {
 }
 
 function channelAccountLabel(account: RecordValue | undefined): string {
-  if (account === undefined) return "Channel account unavailable";
+  if (account === undefined) return "Channel Route unavailable";
   return `${channelLabel(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
 }
 
@@ -3449,10 +3567,7 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
         DEFAULT_MEMBER_ROUTE_BEHAVIOR.requireMention,
       ),
       replyAnchor: initialChannelReplyAnchor(route !== undefined, stringField(reply, "anchor")),
-      outboundPath:
-        stringField(outbound, "path") === "tool"
-          ? "tool"
-          : DEFAULT_MEMBER_ROUTE_BEHAVIOR.outboundPath,
+      outboundPath: routeOutboundPath(stringField(outbound, "path")),
       finalAnswers: booleanValue(sync["finalAnswers"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.finalAnswers),
       progressMessage: routeProgressMessage(progress, sync),
       typingIndicator: booleanValue(
@@ -3464,6 +3579,12 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
     },
     approvalChoice,
   };
+}
+
+/** Only an unsaved Route follows the current default; a stored path wins. */
+function routeOutboundPath(path: string | null): ChannelRouteBehavior["outboundPath"] {
+  if (path === "tool" || path === "relay") return path;
+  return DEFAULT_MEMBER_ROUTE_BEHAVIOR.outboundPath;
 }
 
 function routeApprovalChoice(
@@ -3495,18 +3616,24 @@ function behaviorWithApprovalChoice(
   return approvalChoice === "custom" ? settings : { ...settings, approvalMode: approvalChoice };
 }
 
+function isPublicAudienceRoute(route: RecordValue): boolean {
+  return stringField(objectField(route, "audience") ?? {}, "kind") === "conversationParticipants";
+}
+
+function routeReplySummary(route: RecordValue): string {
+  if (isPublicAudienceRoute(route)) return "Final answers only";
+  return routeBehaviorDraft(route).behavior.outboundPath === "tool"
+    ? "Use Channel tool: text and Project files, preapproved"
+    : "Text forward";
+}
+
+function routeToolRequestSummary(route: RecordValue): string {
+  if (isPublicAudienceRoute(route)) return "Requests denied · Conservative limits";
+  return approvalSummary(routeBehaviorDraft(route).approvalChoice);
+}
+
 function routeBehaviorSummary(route: RecordValue): string {
-  const audience = stringField(objectField(route, "audience") ?? {}, "kind");
-  if (audience === "conversationParticipants") {
-    return "Final answers only · Approvals denied · Conservative limits";
-  }
-  const { behavior, approvalChoice } = routeBehaviorDraft(route);
-  const reply =
-    behavior.outboundPath === "tool"
-      ? "Use Channel tool: text and Project files, preapproved"
-      : "Text forward";
-  const approval = approvalSummary(approvalChoice);
-  return `${reply} · ${approval}`;
+  return `${routeReplySummary(route)} · ${routeToolRequestSummary(route)}`;
 }
 
 function approvalSummary(approvalChoice: RouteApprovalChoice): string {
@@ -3516,21 +3643,48 @@ function approvalSummary(approvalChoice: RouteApprovalChoice): string {
   return "Custom approvals";
 }
 
-function routeReviewMessage(input: {
+interface RouteReviewInput {
   route: RecordValue;
   target: string;
   teams: string[];
-}): string {
-  const teamAccess =
-    input.teams.length === 0
-      ? "Access: owners and existing assignments"
-      : `Access: owners and ${input.teams.join(", ")}`;
+}
+
+/** One source for the review the owner confirms, so the sheet body and the
+ * platform dialog's plain text cannot drift apart. */
+function routeReviewFacts(input: RouteReviewInput): { label: string; value: string }[] {
   return [
-    routeMatchSummary(input.route),
-    `Target: ${input.target}`,
-    routeBehaviorSummary(input.route),
-    teamAccess,
-  ].join("\n");
+    { label: "Conversation", value: routeMatchSummary(input.route) },
+    { label: "Target", value: input.target },
+    { label: "Reply method", value: routeReplySummary(input.route) },
+    { label: "Tool requests", value: routeToolRequestSummary(input.route) },
+    {
+      label: "Access",
+      value:
+        input.teams.length === 0
+          ? "owners and existing assignments"
+          : `owners and ${input.teams.join(", ")}`,
+    },
+  ];
+}
+
+function routeReviewMessage(input: RouteReviewInput): string {
+  return routeReviewFacts(input)
+    .map(({ label, value }) => `${label}: ${value}`)
+    .join("\n");
+}
+
+/** Labels carry the scan line and values the answer, so a long summary stays readable. */
+function routeReviewBody(input: RouteReviewInput): React.ReactNode {
+  return (
+    <View style={styles.reviewList}>
+      {routeReviewFacts(input).map(({ label, value }) => (
+        <View key={label} style={styles.reviewFact}>
+          <Text style={styles.reviewLabel}>{label}</Text>
+          <Text style={styles.reviewValue}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function conversationAccessForRoute(
@@ -3580,10 +3734,11 @@ function routeMatchSummary(
     (value): value is string => typeof value === "string",
   );
   const contains = stringField(match, "contains");
+  const scopeKind = matchKindSummaryLabel(kind);
   const scope =
     ids.length === 0
-      ? `Any ${kind}`
-      : `${kind} · ${ids.map((id) => channelDestinationLabel(id, kind, metadata)).join(", ")}`;
+      ? `Any ${scopeKind}`
+      : `${scopeKind} · ${ids.map((id) => channelDestinationLabel(id, kind, metadata)).join(", ")}`;
   const audience = objectField(route, "audience");
   const audienceLabel =
     stringField(audience ?? undefined, "kind") === "conversationParticipants"
@@ -3645,6 +3800,11 @@ function routeTestTarget(route: RecordValue): { conversationId: string } | null 
     (value): value is string => typeof value === "string" && value.length > 0,
   );
   return conversationId === undefined ? null : { conversationId };
+}
+
+/** `DM` inside a sentence; the button spells it out, a summary line does not. */
+function matchKindSummaryLabel(kind: string): string {
+  return kind === "dm" ? "DM" : kind;
 }
 
 function channelLabel(value: string): string {
@@ -3769,7 +3929,7 @@ function channelFormTitle(
   editing: EditingRoute | null,
   kind: ConfigurationKind,
 ): string {
-  if (!isEditing) return kind === "account" ? "Add Channel account" : "Add Route";
+  if (!isEditing) return kind === "account" ? "Add Channel Route" : "Add Route";
   return `Edit Route ${String((editing?.routeIndex ?? 0) + 1)}`;
 }
 
@@ -3940,39 +4100,90 @@ const styles = StyleSheet.create((theme) => ({
   },
   form: {
     padding: theme.spacing[4],
-    gap: theme.spacing[4],
+    gap: theme.spacing[3],
   },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[2],
   },
+  accountPicker: {
+    gap: theme.spacing[3],
+  },
+  accountRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[3],
+  },
+  accountSelect: {
+    flexBasis: 240,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  accountConnect: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: theme.spacing[3],
+  },
+  accountOr: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+  },
+  revisionLine: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  revisionTime: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  channelTitle: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing[2],
+  },
   choiceGroup: {
     gap: theme.spacing[2],
   },
-  label: {
+  choiceNote: {
+    alignSelf: "center",
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  reviewList: {
+    gap: theme.spacing[3],
+  },
+  reviewFact: {
+    gap: theme.spacing[0.5],
+  },
+  reviewLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  reviewValue: {
     color: theme.colors.foreground,
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
+  },
+  // A stacked choice group reads as a field whose control is a button row, so it
+  // uses the same label treatment as every Select and text field around it.
+  label: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.normal,
   },
   formHeading: {
     color: theme.colors.foreground,
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.semibold,
   },
   inlineFields: {
     gap: theme.spacing[3],
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing[3],
-  },
-  switchLabel: {
-    color: theme.colors.foreground,
-    flex: 1,
-    fontSize: 13,
   },
   errorText: {
     color: theme.colors.destructive,

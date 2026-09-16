@@ -105,22 +105,24 @@ export function ConversationSelectionFields({
   );
 
   return (
-    <Field label="Selected conversations" hint={hint}>
-      <View style={styles.selection}>
-        {selectedIds.length === 0 ? (
-          <Text style={settingsStyles.rowHint}>No conversations selected.</Text>
-        ) : (
-          selectedIds.map((id) => (
-            <SelectedConversation
-              key={id}
-              id={id}
-              option={options.find((option) => option.conversationId === id)}
-              selectedIds={selectedIds}
-              onChange={setSelectedIds}
-              disabled={disabled}
-            />
-          ))
-        )}
+    // The Conversations choice above already names this group, so a Field label
+    // here would only repeat the selected button's own text.
+    <View style={styles.selection}>
+      {selectedIds.length === 0 ? (
+        <Text style={settingsStyles.rowHint}>No conversations selected.</Text>
+      ) : (
+        selectedIds.map((id) => (
+          <SelectedConversation
+            key={id}
+            id={id}
+            option={options.find((option) => option.conversationId === id)}
+            selectedIds={selectedIds}
+            onChange={setSelectedIds}
+            disabled={disabled}
+          />
+        ))
+      )}
+      <View style={styles.pickerRow}>
         {options.length > 0 ? (
           <ObservedConversationPicker
             key={`${hub.origin}:${hub.signedIn?.account.id}:${organizationId}:${channel}:${accountId}:${kind}`}
@@ -130,34 +132,35 @@ export function ConversationSelectionFields({
             disabled={disabled}
           />
         ) : null}
-        <Button size="xs" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
+        <Button size="sm" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
           {manualEntry ? "Hide ID entry" : "Enter IDs"}
         </Button>
-        {manualEntry ? (
-          <Field
-            label="Conversation IDs"
-            hint="Enter multiple IDs separated by commas or new lines. These update the selected conversations above."
-          >
-            <FormTextInput
-              ref={inputRef}
-              initialValue={value}
-              onChangeText={changeText}
-              placeholder={placeholder}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!disabled}
-              multiline
-            />
-          </Field>
-        ) : null}
-        {observations.error ? (
-          <Text style={settingsStyles.rowHint}>
-            Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs
-            manually.
-          </Text>
-        ) : null}
       </View>
-    </Field>
+      {manualEntry ? (
+        <Field
+          label="Conversation IDs"
+          hint="Enter multiple IDs separated by commas or new lines. These update the selected conversations above."
+        >
+          <FormTextInput
+            ref={inputRef}
+            initialValue={value}
+            onChangeText={changeText}
+            placeholder={placeholder}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!disabled}
+            multiline
+          />
+        </Field>
+      ) : null}
+      {observations.error ? (
+        <Text style={settingsStyles.rowHint}>
+          Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs
+          manually.
+        </Text>
+      ) : null}
+      <Text style={settingsStyles.rowHint}>{hint}</Text>
+    </View>
   );
 }
 
@@ -185,7 +188,7 @@ function SelectedConversation({
           {option?.label ?? id}
         </Text>
         {option ? (
-          <Text selectable style={settingsStyles.rowHint}>
+          <Text selectable style={styles.selectedMeta}>
             {option.description}
           </Text>
         ) : null}
@@ -266,8 +269,7 @@ function ObservedConversationPicker({
   );
 
   return (
-    <View style={styles.selection}>
-      <Text style={settingsStyles.rowHint}>Choose one or more known conversations.</Text>
+    <View style={styles.pickerTrigger}>
       <View ref={anchorRef} collapsable={false}>
         <Pressable
           disabled={disabled}
@@ -316,6 +318,29 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[6],
     paddingBottom: theme.spacing[2],
   },
+  pickerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  pickerTrigger: {
+    flexBasis: 200,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   selectedRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
-  selectedText: { flex: 1, minWidth: 0 },
+  selectedText: {
+    alignItems: "baseline",
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+    minWidth: 0,
+  },
+  selectedMeta: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
 }));
