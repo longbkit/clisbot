@@ -45,7 +45,7 @@ Mỗi dòng **Agent configuration** là một provider, chọn được **nhiề
 Dùng khi Team cần làm trên tất cả Project của Host nhưng vẫn giới hạn provider/model:
 
 1. Chọn Team/Member, rồi chọn chính **Host** làm tài nguyên (nhóm Hosts).
-2. Chọn **Office worker** hoặc **Developer** — không phải Administrator.
+2. Chọn **Office worker**, **Developer**, hoặc **Full access** nếu cần tự thêm Project mới. Không chọn Administrator nếu muốn giữ giới hạn provider/model.
 3. Chọn cấu hình Agent; lưu.
 
 Grant này áp cho mọi Project hiện có và Project thêm sau, kể cả Project daemon tạm thời không báo cáo. Không cần thêm grant Connect riêng. Mỗi người chỉ có một assignment trên một Host, nên lưu mức mới sẽ **thay** mức cũ trên Host đó — đổi Administrator thành Developer là mất quyền Administrator.

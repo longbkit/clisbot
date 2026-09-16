@@ -1,44 +1,51 @@
-# Access: Host scope and bulk grants
+# Access: levels, Host scope, and bulk grants
 
-**Shipped 2026-09-16.** One Access assignment can cover every Project on a Host while keeping provider and model limits, and one grant action can cover several Projects and several Models.
+**What each level grants, on which resource, and what follows from granting it: [user guide — Quyền: cấp gì thì được gì](../../guides/user-guide/access/permissions.md).** How to grant: [Cấp Access](../../guides/user-guide/access/members-and-teams.md). The implementation rules live in [permissions](../../permissions.md#access-scopes).
 
-The rules themselves — scopes, union, availability, approval leaves — live in [permissions](../../permissions.md#access-scopes). This page records what shipped, why, and what is still open.
-
-## What an operator can do
-
-| Need                                              | How                                                                                      |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Every Project on a Host, limited to chosen Models | Resource = the Host, level **Developer** or **Office worker**, then Agent configurations |
-| A few Projects on one Host, same choices          | Resource = one Project, then **Also apply to** — one batch, one assignment per Project   |
-| Several Models or Thinking options for a Provider | One Agent configuration row, multi-select; a finished row collapses to one summary line  |
-| See who can reach a Project                       | View by Resource now includes Host assignments that carry `project.use`                  |
-| Read many near-identical grants                   | Rows differing only by Resource group into one line; expand to edit or remove one        |
-
-The confirmation names every Project written, which existing assignments it **replaces** (the write is an upsert), and what **Guest** reaches.
+This page keeps only what those two do not say: why the model is shaped this way, the implementation facts the code cannot explain on its own, and what later phases need.
 
 ## Decisions
 
-| Decision                                                                                             | Why                                                                                                                                                            |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host levels keep the session in Project mode; `daemon.manage` is not reused                          | Administrator mode has no Project filter, so an Agent configuration ceiling has nowhere to be checked                                                          |
-| Grants combine by union; a Project assignment cannot narrow a Host one                               | Privileges already add up; one rule for both privileges and constraints. Considered intersection and rejected it                                               |
-| Availability is not authority; catalogs are read from live Projects only                             | A partial daemon snapshot must not drop access, but a stale catalog must not offer Host choices or vouch for an attended Mode the daemon may have reclassified |
-| **Also apply to** is limited to one Host                                                             | A Host publishes one catalog and needs one `daemon.connect` row. "All Projects" is a Host assignment, not N rows                                               |
-| One Agent configuration row is one stored grant, never split per Model and never merged per Provider | Splitting turned one decision into many cards; merging loses per-Model Thinking choices                                                                        |
-| `developer` equals `full_access`, both ids kept                                                      | The level that earns more is a per-Project, per-action approval policy. Keeping both ids avoids a rename then                                                  |
-| Unclassified tools map to `approval.other`; no separate `agent.unattended.use`                       | A request no level can answer hangs. Suppressing prompts still means holding every approval leaf                                                               |
+| Decision                                                                                 | Why                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host levels keep the session in Project mode; they never reuse `daemon.manage`           | Administrator mode has no Project filter, so an Agent configuration ceiling has nowhere to be checked                                                                                                                  |
+| **Full access = Developer + `workspace.manage`**; Developer never manages Projects       | Creating a Project only writes metadata. What a person can reach starts at the workspace, and Developer already governs that. One name serves both layers: the Hub privilege is the daemon permission of the same name |
+| Full access on a **Host** creates Projects at any path; on a **Project**, only inside it | "Any folder" is what a Host grant means. A Project grant stays inside its own root, the same way every other Project check does                                                                                        |
+| Grants combine by union; a Project assignment cannot narrow a Host one                   | One rule for privileges and constraints. Intersection was considered and rejected                                                                                                                                      |
+| Availability is not authority; catalogs come from live Projects only                     | A partial daemon snapshot must not drop access, but a stale catalog must not offer Host choices or vouch for an attended Mode                                                                                          |
+| **Also apply to** is limited to one Host, with no "all" option                           | A Host publishes one catalog. Every Project, including later ones, is a Host grant, not N rows                                                                                                                         |
+| One Agent configuration row is one stored grant                                          | Splitting per Model multiplied cards; merging per Provider loses per-Model Thinking choices                                                                                                                            |
+| Unclassified tools map to `approval.other`; no separate `agent.unattended.use`           | A request no level can answer hangs. Suppressing prompts still means holding every approval leaf                                                                                                                       |
+| The daemon's coarse permission names stay as upstream defines them                       | They are upstream's wire vocabulary. Splitting `workspace.manage` into Project and workspace names belongs in an upstream PR; Clisbot scopes it through Project privileges instead                                     |
+
+## Implementation notes
+
+- **A daemon permission is session-wide; a Project privilege is not.** Holding `workspace.manage` on one Project gives the session the daemon permission for every operation in that class. The authorizer therefore checks `workspace.manage` on **every resource a request names** — a worktree archive carries both `workspaceId` and `worktreePath` and acts on the path first — never only `project.use`, or a Full access Project would let its holder rename, remove, or delete worktrees in any other Project they can merely use. The rule table lives in [`workspace-management.ts`](../../../packages/server/src/server/managed-access/workspace-management.ts).
+- **Creating outside every Project needs a Host-level fact.** A ticket lists privileges per Project, which cannot say "this came from the Host". The ticket's `daemonPrivileges` carries the Host grant's privileges, and only it unlocks creation at a path no Project covers.
+- **Two parsing rules, on purpose.** `daemonPrivileges` ignores values the daemon does not know, so adding one later cannot lock anyone out. Per-Project privileges keep the strict enum: a daemon older than a leaf rejects the whole ticket instead of silently granting less. Only subjects holding the new leaf are affected, which is why the guide says to update daemons before re-saving grants.
+- **Upstream daemons are unaffected.** They have no Managed Access, so no Hub grant reaches them.
+- **A new Project is not in the creator's current ticket.** The daemon publishes it to the Hub at once and a Host grant covers it, but the session keeps its admitted ticket until it reconnects. A lease refresh (at two thirds of the lease, 10 minutes by default) closes a connection whose authority changed. Until then, the outbound filter would also drop the creation reply itself, because that reply describes a Project outside the ticket; the authorizer remembers the `requestId`s of creations it admitted and lets exactly those replies through.
+- **A Project created inside another is a new Project no grant names.** The deepest Project owns its folder, so a Project-level Full access holder who creates one loses that subfolder, like everyone granted only the outer Project, until someone grants the new one.
 
 ## Code
 
-- Levels and leaves: [`contract.ts`](../../../packages/hub/src/access/contract.ts); Host scope, validation, Host catalog: [`store.ts`](../../../packages/hub/src/access/store.ts)
-- Approval classification: daemon [`resource-authorizer.ts`](../../../packages/server/src/server/managed-access/resource-authorizer.ts), channel [`approvals/index.ts`](../../../packages/hub/src/channels/approvals/index.ts)
-- UI: [`access-assignment-form.tsx`](../../../packages/app/src/clisbot/hub/settings/access-assignment-form.tsx), [`agent-configuration-grant-fields.tsx`](../../../packages/app/src/clisbot/hub/settings/agent-configuration-grant-fields.tsx), [`multi-select-field.tsx`](../../../packages/app/src/clisbot/hub/settings/multi-select-field.tsx), [`access-overview.ts`](../../../packages/app/src/clisbot/hub/settings/access-overview.ts)
-- Tests: [`host-scope.test.ts`](../../../packages/hub/src/access/host-scope.test.ts), web/channel [`resolve-access-parity.test.ts`](../../../packages/hub/src/access/resolve-access-parity.test.ts)
+- Levels, privileges, Host fan-out, ticket: [`contract.ts`](../../../packages/hub/src/access/contract.ts), [`store.ts`](../../../packages/hub/src/access/store.ts), [`http.ts`](../../../packages/hub/src/managed-access/http.ts)
+- Daemon admission and checks: [`relationship-remote.ts`](../../../packages/server/src/server/hub/relationship-remote.ts), [`authorization/index.ts`](../../../packages/server/src/server/authorization/index.ts), [`resource-authorizer.ts`](../../../packages/server/src/server/managed-access/resource-authorizer.ts), [`workspace-management.ts`](../../../packages/server/src/server/managed-access/workspace-management.ts)
+- UI: [`access-level-summary.ts`](../../../packages/app/src/clisbot/hub/settings/access-level-summary.ts) (the one place that words what a grant does, for the picker, summary, confirmation, and rows), [`access-assignment-form.tsx`](../../../packages/app/src/clisbot/hub/settings/access-assignment-form.tsx), [`agent-configuration-grant-fields.tsx`](../../../packages/app/src/clisbot/hub/settings/agent-configuration-grant-fields.tsx), [`access-overview.ts`](../../../packages/app/src/clisbot/hub/settings/access-overview.ts)
+- Tests: [`host-scope.test.ts`](../../../packages/hub/src/access/host-scope.test.ts), [`resolve-access-parity.test.ts`](../../../packages/hub/src/access/resolve-access-parity.test.ts), [`workspace-management.test.ts`](../../../packages/server/src/server/managed-access/workspace-management.test.ts), [`project-management.e2e.test.ts`](../../../packages/server/src/server/managed-access/project-management.e2e.test.ts)
 
-## Open
+## Later phases
 
-- **Per-Project, per-action approval policy** — which actions need an explicit prompt and who may answer each. It is what will separate `developer` from `full_access`.
-- **Stored grants need a re-save** before they qualify for unattended execution again — [permissions](../../permissions.md#approval-leaves).
-- **Two destructive-command lists** — [`policy.ts`](../../../packages/hub/src/channels/policy.ts) has 24 patterns, the daemon authorizer 8. Harmless while every level that approves commands also holds the destructive leaf; a hole once one does not.
-- Changing the Model set resets Thinking to all options (existing behavior), and the confirmation does not show Thinking.
-- Verified by store, form, and web/channel parity tests; not yet in a running app or on a live Slack/Telegram surface.
+| Phase                             | What it needs                                                                                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Team admins**                   | An admin scoped to their Team's Hosts and Projects, granting only what they hold. Decide whether a shared Host belongs to one Team                                                     |
+| **Read versus write per Project** | "Read-only" is only real without agents, terminal, and command approvals. A worktree writes into the main repository's `.git`, so a read-only Project cannot offer worktrees           |
+| **Folder limits**                 | Where a Project or worktree may be created, beyond "inside a parent Project"                                                                                                           |
+| **Project-level creation**        | A Project-level Full access holder can create nested Projects but not use them. Decide whether that level should create at all, or grant the creator the new Project                   |
+| **Scratch space**                 | `/tmp` is shared across every user of the machine; give each user or session its own                                                                                                   |
+| **Per-action approval policy**    | Which actions need a prompt and who may answer each, per Project                                                                                                                       |
+| **Developer cleanup**             | Developer creates worktrees but cannot archive them or bulk-close items. A narrow exception, like `workspace.create`, would let them clean up their own                                |
+| **One destructive-command list**  | [`policy.ts`](../../../packages/hub/src/channels/policy.ts) has 24 patterns, the daemon authorizer 8. Harmless while every level that approves commands also approves destructive ones |
+| **Budgets and audit**             | An allowed Model is not a budget. Team admins need who-did-what per Host                                                                                                               |
+| **Isolation**                     | Hub checks stop Paseo operations, not code an agent or terminal runs. Real separation is a per-Team OS user or container, and per-Team provider and git credentials                    |
+| **Upstream permission names**     | Propose Project and workspace names to upstream Paseo, keep `workspace.manage` as the umbrella, and let Clisbot drop its Project-level mapping                                         |

@@ -14,6 +14,7 @@ export const ACCESS_PRIVILEGES = [
   "daemon.manage",
   "project.use",
   "workspace.create",
+  "workspace.manage",
   "agent.interact",
   "agent.create",
   "agent.fast.use",
@@ -155,12 +156,7 @@ const OFFICE_WORKER_PROJECT_PRIVILEGES = [
   "approval.file",
 ] as const satisfies readonly AccessPrivilege[];
 
-/**
- * Every Project authority, including destructive command approval. `full_access`
- * is deliberately identical for now: the level that earns more than this one is
- * the per-Project, per-action approval policy, which does not exist yet. Keep
- * both ids so that policy can split them without a rename.
- */
+/** Full work inside a Project, destructive command approval included, without managing Projects. */
 const DEVELOPER_PROJECT_PRIVILEGES = [
   "project.use",
   "workspace.create",
@@ -176,6 +172,15 @@ const DEVELOPER_PROJECT_PRIVILEGES = [
 ] as const satisfies readonly AccessPrivilege[];
 
 /**
+ * Developer plus creating and managing Projects, workspaces, and worktrees. On a
+ * Host it may create a Project at any path; on a Project, only inside it.
+ */
+const FULL_ACCESS_PROJECT_PRIVILEGES = [
+  ...DEVELOPER_PROJECT_PRIVILEGES,
+  "workspace.manage",
+] as const satisfies readonly AccessPrivilege[];
+
+/**
  * Built-in resource access levels. Clients render these instead of inventing
  * local role bundles. A Host level carries the Project bundle of the same name:
  * it reaches every Project on that Host, and Project assignments only add to it
@@ -186,12 +191,13 @@ export const RESOURCE_ACCESS_LEVELS = {
     connect: ["daemon.connect"],
     office_worker: ["daemon.connect", ...OFFICE_WORKER_PROJECT_PRIVILEGES],
     developer: ["daemon.connect", ...DEVELOPER_PROJECT_PRIVILEGES],
+    full_access: ["daemon.connect", ...FULL_ACCESS_PROJECT_PRIVILEGES],
     administrator: ["daemon.connect", "daemon.manage"],
   },
   project: {
     office_worker: OFFICE_WORKER_PROJECT_PRIVILEGES,
     developer: DEVELOPER_PROJECT_PRIVILEGES,
-    full_access: DEVELOPER_PROJECT_PRIVILEGES,
+    full_access: FULL_ACCESS_PROJECT_PRIVILEGES,
   },
   channel_account: {
     use: ["channel.use"],

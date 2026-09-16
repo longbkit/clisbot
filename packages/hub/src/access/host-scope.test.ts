@@ -295,3 +295,102 @@ it("does not let a Project the daemon stopped reporting vouch for an attended Mo
     await rm(root, { recursive: true, force: true });
   }
 }, 30_000);
+
+it("puts workspace.manage in the ticket only for Full access, and marks it Host-wide only from a Host grant", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-full-access-"));
+  const bundle = await embeddedDatabaseRuntime(root);
+  try {
+    await bundle.runtime.migrate();
+    const db = bundle.runtime.drizzle();
+    await db.insert(schema.organizations).values({ id: "org", name: "Org", slug: "org" });
+    await db.insert(schema.users).values([
+      { id: "owner", name: "Owner", email: "owner@example.test" },
+      { id: "member", name: "Member", email: "member@example.test" },
+    ]);
+    await db.insert(schema.members).values([
+      { id: "owner-membership", organizationId: "org", userId: "owner", role: "owner" },
+      { id: "membership", organizationId: "org", userId: "member", role: "member" },
+    ]);
+    const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    await enrollTestDaemon(database, "org");
+    const access = new AccessStore(bundle.runtime);
+    const constraints = {
+      agentConfigurations: [
+        { providerId: "codex", modelIds: "*" as const, thinkingOptionIds: "*" as const },
+      ],
+    };
+    const grant = (
+      resourceKind: "daemon" | "project",
+      resourceId: string,
+      privileges: readonly string[],
+    ) =>
+      access.saveAssignment(
+        "org",
+        {
+          subjectKind: "member",
+          subjectId: "membership",
+          resourceKind,
+          resourceId,
+          privileges: [...privileges] as never,
+          constraints,
+        },
+        "owner",
+      );
+    const resolve = () =>
+      access.resolveDaemonAccess({
+        organizationId: "org",
+        daemonId: TEST_DAEMON_ID,
+        membershipId: "membership",
+        userId: "member",
+      });
+
+    // No Project exists yet: a Host Full access grant can still create the first one.
+    await grant("daemon", TEST_DAEMON_ID, RESOURCE_ACCESS_LEVELS.daemon.full_access);
+    const empty = await resolve();
+    expect(empty?.resourceMode).toBe("projects");
+    expect(empty?.projects).toEqual([]);
+    expect(empty?.permissions).toContain("workspace.manage");
+    expect(empty?.daemonPrivileges).toContain("workspace.manage");
+
+    const [projectA, projectB] = await db
+      .insert(schema.daemonProjects)
+      .values(
+        ["a", "b"].map((id) => ({
+          organizationId: "org",
+          daemonId: TEST_DAEMON_ID,
+          externalProjectId: `project-${id}`,
+          name: `Project ${id}`,
+        })),
+      )
+      .returning();
+    const hostWide = await resolve();
+    expect(
+      hostWide?.projects.every(({ privileges }) => privileges.includes("workspace.manage")),
+    ).toBe(true);
+
+    // Developer on the Host, Full access on one Project: managed there, never Host-wide.
+    await grant("daemon", TEST_DAEMON_ID, RESOURCE_ACCESS_LEVELS.daemon.developer);
+    await grant("project", projectA!.id, RESOURCE_ACCESS_LEVELS.project.full_access);
+    const oneProject = await resolve();
+    expect(oneProject?.permissions).toContain("workspace.manage");
+    expect(oneProject?.daemonPrivileges).not.toContain("workspace.manage");
+    const privilegesOf = (projectId: string) =>
+      oneProject?.projects.find((entry) => entry.projectId === projectId)?.privileges;
+    expect(privilegesOf("project-a")).toContain("workspace.manage");
+    expect(privilegesOf("project-b")).not.toContain("workspace.manage");
+
+    // Developer alone never carries it, so the daemon refuses every management operation.
+    await access.deleteAssignment(
+      "org",
+      (await access.listAssignments("org")).find((row) => row.resourceId === projectA!.id)!.id,
+    );
+    const developer = await resolve();
+    expect(developer?.permissions).not.toContain("workspace.manage");
+    expect(developer?.daemonPrivileges).not.toContain("workspace.manage");
+    expect(RESOURCE_ACCESS_LEVELS.project.developer).not.toContain("workspace.manage");
+    expect(projectB).toBeDefined();
+  } finally {
+    await bundle.runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30_000);

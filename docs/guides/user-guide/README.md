@@ -13,7 +13,7 @@ Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn h
 | Chọn chế độ kết nối và bắt buộc phân quyền Hub        | [Managed Access: off và external](hosts/managed-access.md)                 |
 | Mời người, tạo Team, cấp và thu hồi quyền             | [Members, Teams và Access](access/members-and-teams.md)                    |
 | Cấp mọi Project trên Host, nhiều Project, nhiều model | [Cấp nhanh](access/members-and-teams.md#cấp-cho-mọi-project-trên-một-host) |
-| Chọn Office worker, Developer hay Administrator       | [Các mức quyền](access/permissions.md)                                     |
+| Cấp gì thì được gì: bảng quyền theo Host, Project...  | [Các mức quyền](access/permissions.md)                                     |
 | Hiểu đầy đủ quyền quản trị daemon                     | [Daemon Administrator](access/daemon-administrator.md)                     |
 | Tạo Project, Workspace, worktree và session           | [Làm việc trên Project](work/projects-and-workspaces.md)                   |
 | Kết nối Slack/Telegram, chạy Automation               | [Channels và Automations](automation/channels-and-automations.md)          |

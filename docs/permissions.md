@@ -67,6 +67,15 @@ Administrator switches the session to daemon resource mode: no Project filter, a
 therefore no Agent configuration ceiling either. A Host level keeps the session in
 Project mode, so provider and model limits still apply to every Project it reaches.
 
+**Full access** adds the Project privilege `workspace.manage`: creating, renaming,
+removing, and archiving Projects, workspaces, and worktrees. The Hub then gives the
+session the daemon permission of the same name, which is session-wide, so the
+daemon checks `workspace.manage` on **every Project, workspace, and path** such an
+operation names. Creating a Project at a path no Project covers needs `workspace.manage`
+granted on the Host itself, which the ticket carries as `daemonPrivileges`; a
+Project grant creates only inside its own root. The level-by-level effect is in
+the [user guide](guides/user-guide/access/permissions.md).
+
 A Channel account assignment carries channel authority, not Project authority.
 **Use** (`channel.use`) lets a sender talk in the conversations its constraint
 names. **Manage** (`channel.manage`) also lets them change that Channel Route's
@@ -91,7 +100,7 @@ Update every daemon before re-saving. A daemon rejects an access ticket carrying
 a Project privilege it does not know, so a re-saved assignment locks its subject
 out of any daemon that predates `approval.other`.
 
-`developer` and `full_access` carry the same leaves today; see [Access feature](features/access/README.md#decisions) for why both ids stay.
+`developer` and `full_access` carry every approval leaf; `full_access` differs by `workspace.manage` alone.
 
 Future base grants may select workspaces or agents, but operation classification remains inside the authorization module:
 

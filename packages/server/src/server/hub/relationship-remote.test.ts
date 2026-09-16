@@ -852,3 +852,46 @@ async function withDeadline<T>(promise: Promise<T>, message: string): Promise<T>
     if (timer) clearTimeout(timer);
   }
 }
+
+test("admits the Host privileges it knows, ignores the rest, and stays strict per Project", async () => {
+  const admission = {
+    leaseId: "00000000-0000-4000-8000-000000000001",
+    principalId: "membership",
+    permissions: ["daemon.read", "workspace.read", "workspace.write", "workspace.manage"],
+    resourceMode: "projects",
+    projects: [
+      {
+        projectId: "project-a",
+        privileges: ["project.use", "workspace.manage"],
+        agentConfigurations: [],
+      },
+    ],
+    daemonPrivileges: ["workspace.manage", "a.future.privilege"],
+    leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+  const remote = new DirectHubRelationshipRemote();
+  const consume = async (body: unknown) =>
+    remote.consumeAccessTicket({
+      hubOrigin: await startHubReturning(200, body),
+      credential: "credential",
+      daemonId: "daemon-1",
+      accessTicket: "ticket",
+      clientId: "client",
+    });
+
+  const admitted = await consume(admission);
+  expect([...(admitted.daemonPrivileges ?? [])]).toEqual(["workspace.manage"]);
+  expect(admitted.projects.get("project-a")?.privileges.has("workspace.manage")).toBe(true);
+
+  // A Hub that predates the field admits with no Host-wide privilege.
+  const { daemonPrivileges: _dropped, ...older } = admission;
+  expect([...((await consume(older)).daemonPrivileges ?? [])]).toEqual([]);
+
+  // An unknown Project privilege rejects the whole ticket instead of granting less.
+  await expect(
+    consume({
+      ...admission,
+      projects: [{ ...admission.projects[0], privileges: ["project.use", "a.future.privilege"] }],
+    }),
+  ).rejects.toThrow();
+});

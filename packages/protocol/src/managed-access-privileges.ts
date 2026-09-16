@@ -11,6 +11,7 @@
 export const PROJECT_PRIVILEGES = [
   "project.use",
   "workspace.create",
+  "workspace.manage",
   "agent.interact",
   "agent.create",
   "agent.fast.use",
@@ -23,6 +24,12 @@ export const PROJECT_PRIVILEGES = [
   "approval.other",
 ] as const;
 export type ProjectPrivilege = (typeof PROJECT_PRIVILEGES)[number];
+
+const PROJECT_PRIVILEGE_SET: ReadonlySet<string> = new Set(PROJECT_PRIVILEGES);
+
+export function isProjectPrivilege(value: string): value is ProjectPrivilege {
+  return PROJECT_PRIVILEGE_SET.has(value);
+}
 
 /**
  * The overlap only: wire operations (message `type`) that become daemon RPCs a

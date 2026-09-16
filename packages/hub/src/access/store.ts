@@ -41,6 +41,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "daemon.manage",
     "project.use",
     "workspace.create",
+    "workspace.manage",
     "agent.interact",
     "agent.create",
     "agent.fast.use",
@@ -55,6 +56,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
   project: new Set([
     "project.use",
     "workspace.create",
+    "workspace.manage",
     "agent.interact",
     "agent.create",
     "agent.fast.use",
@@ -73,6 +75,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
 const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
   "project.use",
   "workspace.create",
+  "workspace.manage",
   "agent.interact",
   "agent.create",
   "agent.fast.use",
@@ -146,6 +149,12 @@ export interface ResolvedDaemonAccess {
   permissions: string[];
   resourceMode: "daemon" | "projects";
   projects: ResolvedProjectAccess[];
+  /**
+   * Project privileges granted on the Host itself. A Project list cannot say where
+   * a privilege came from, and only a Host grant may create a Project outside every
+   * existing one.
+   */
+  daemonPrivileges: string[];
 }
 
 /** The subject whose assignments an access resolution reads: a linked Member or the Guest group. */
@@ -1281,6 +1290,7 @@ export class AccessStore {
         permissions: [...DAEMON_SESSION_PERMISSIONS, ...DAEMON_ADMIN_SESSION_PERMISSIONS],
         resourceMode: "daemon",
         projects: [],
+        daemonPrivileges: [],
       };
     }
 
@@ -1328,6 +1338,26 @@ export class AccessStore {
       ];
     });
     const daemonAdmin = inheritedPrivileges.has("daemon.manage");
+    if (daemonAdmin) {
+      return {
+        principalId: membership.id,
+        organizationId: input.organizationId,
+        daemonId: input.daemonId,
+        owner: false,
+        permissions: [...DAEMON_SESSION_PERMISSIONS, ...DAEMON_ADMIN_SESSION_PERMISSIONS],
+        resourceMode: "daemon",
+        projects: [],
+        daemonPrivileges: [],
+      };
+    }
+    const daemonPrivileges = [...inheritedPrivileges].filter((entry) =>
+      PROJECT_PRIVILEGES.has(entry),
+    );
+    // The daemon permission is session-wide; the daemon narrows it back to the
+    // Projects that hold the privilege, so granting it here widens nothing else.
+    const managesWorkspaces =
+      daemonPrivileges.includes("workspace.manage") ||
+      projects.some(({ privileges }) => privileges.includes("workspace.manage"));
     return {
       principalId: membership.id,
       organizationId: input.organizationId,
@@ -1335,10 +1365,11 @@ export class AccessStore {
       owner: false,
       permissions: [
         ...DAEMON_SESSION_PERMISSIONS,
-        ...(daemonAdmin ? DAEMON_ADMIN_SESSION_PERMISSIONS : []),
+        ...(managesWorkspaces ? (["workspace.manage"] as const) : []),
       ],
-      resourceMode: daemonAdmin ? "daemon" : "projects",
-      projects: daemonAdmin ? [] : projects,
+      resourceMode: "projects",
+      projects,
+      daemonPrivileges,
     };
   }
 

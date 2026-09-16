@@ -28,6 +28,11 @@ import {
   type ProjectPrivilege,
   type ResolvedAgentConfigurationGrant,
 } from "./types.js";
+import {
+  allowsWorkspaceManagement,
+  PROJECT_CREATION_REPLIES,
+  workspaceManagementTarget,
+} from "./workspace-management.js";
 
 interface AgentStorageReader {
   get(agentId: string): Promise<StoredAgentRecord | null>;
@@ -65,6 +70,9 @@ const WORKSPACE_FILE_MESSAGES = new Set<SessionInboundMessage["type"]>([
  * admission. It deliberately has no Hub role, Team, or organization concepts.
  */
 export class ManagedResourceAuthorizer {
+  /** Creation requests this session was allowed to make, awaiting their reply. */
+  private readonly admittedProjectCreations = new Set<string>();
+
   private readonly projects = new Map<string, PersistedProjectRecord>();
   private readonly workspaces = new Map<string, PersistedWorkspaceRecord>();
   private readonly storedAgents = new Map<string, StoredAgentRecord>();
@@ -278,6 +286,12 @@ export class ManagedResourceAuthorizer {
 
   allowsOutbound(message: SessionOutboundMessage): boolean {
     if (!this.isRestricted()) return true;
+    if (PROJECT_CREATION_REPLIES.has(message.type)) {
+      // The creator learns what it created; using that Project waits for a ticket
+      // that covers it, which the session gets when it reconnects.
+      const requestId = "payload" in message ? stringProperty(message.payload, "requestId") : null;
+      if (requestId !== null && this.admittedProjectCreations.delete(requestId)) return true;
+    }
     if (message.type.startsWith("workspace.label.")) {
       // Labels are one daemon-wide catalog today. Until the protocol carries a
       // Project owner, returning it would disclose names from other Projects.
@@ -592,6 +606,9 @@ export class ManagedResourceAuthorizer {
 
     if (message.type.startsWith("workspace.label.")) return false;
 
+    const management = await this.allowsWorkspaceManagementInbound(message);
+    if (management !== undefined) return management;
+
     if (requiredPermissionForInbound(message.type) === "daemon.read") {
       return this.allowsRestrictedDaemonReadInbound(message);
     }
@@ -823,6 +840,27 @@ export class ManagedResourceAuthorizer {
     );
   }
 
+  /** `workspace.manage` operations, remembering admitted creations so their replies get out. */
+  private async allowsWorkspaceManagementInbound(
+    message: SessionInboundMessage,
+  ): Promise<boolean | undefined> {
+    const allowed = await allowsWorkspaceManagement(message, {
+      allowsDaemonPrivilege: (privilege) => this.authorization.allowsDaemonPrivilege(privilege),
+      allowsProject: (projectId, privilege) => this.allowsProject(projectId, privilege),
+      allowsWorkspace: (workspaceId, privilege) => this.allowsWorkspace(workspaceId, privilege),
+      allowsCwd: (cwd, privilege) => this.allowsCwd(cwd, privilege),
+    });
+    if (
+      allowed === true &&
+      workspaceManagementTarget(message)?.kind === "new-project" &&
+      "requestId" in message &&
+      typeof message.requestId === "string"
+    ) {
+      this.admittedProjectCreations.add(message.requestId);
+    }
+    return allowed;
+  }
+
   private async allowsWorkspaceInbound(
     message: SessionInboundMessage,
   ): Promise<boolean | undefined> {
@@ -842,21 +880,8 @@ export class ManagedResourceAuthorizer {
       const cwd = message.repoRoot ?? message.cwd;
       return cwd === undefined ? false : this.allowsCwd(cwd);
     }
-    if (message.type === "paseo_worktree_archive_request") {
-      if (message.workspaceId !== undefined) {
-        return this.allowsWorkspace(message.workspaceId, "project.use");
-      }
-      const cwd = message.worktreePath ?? message.repoRoot;
-      return cwd === undefined ? false : this.allowsCwd(cwd);
-    }
     if (message.type === "open_in_editor_request")
       return this.allowsCwd(message.cwd ?? message.path);
-    if (message.type === "project.create_directory.request") {
-      return this.allowsCwd(message.parentPath);
-    }
-    if (message.type === "project.github.clone.request") {
-      return this.allowsCwd(message.targetDirectory);
-    }
     if (message.type === "workspace.github.search_repositories.request") return false;
     if (message.type === "workspace.create.request") return this.allowsWorkspaceCreate(message);
     return undefined;

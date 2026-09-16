@@ -26,6 +26,8 @@ export interface ProjectAuthorization {
 export interface SessionResourceAuthorization {
   resourceMode: "daemon" | "projects";
   projects: ReadonlyMap<string, ProjectAuthorization>;
+  /** Project privileges granted on the whole Host; absent from Hubs that predate it. */
+  daemonPrivileges?: ReadonlySet<ProjectPrivilege>;
   leaseId: string;
   leaseExpiresAt: number;
 }

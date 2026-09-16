@@ -93,11 +93,11 @@ Bản cũ không có quyền nào duyệt được tool ngoài nhóm file/config
 
 ## Sau khi cập nhật, Agent không còn chạy chế độ unattended?
 
-Grant lưu trước bản cập nhật thiếu `approval.other`, mà chạy không hỏi phê duyệt cần đủ mọi quyền phê duyệt. Cập nhật mọi daemon trước, rồi Edit assignment, chọn lại mức quyền và lưu. Xem [mức quyền](../access/permissions.md#sau-khi-cập-nhật-grant-cũ-không-chạy-unattended-được-nữa).
+Grant lưu trước bản cập nhật thiếu `approval.other`, mà chạy không hỏi phê duyệt cần đủ mọi quyền phê duyệt. Cập nhật mọi daemon trước, rồi Edit assignment, chọn lại mức quyền và lưu. Xem [sau khi cập nhật phiên bản](../access/permissions.md#6-sau-khi-cập-nhật-phiên-bản).
 
 ## Developer có tạo Project mới được không?
 
-Không. Tạo Project cần Owner/Daemon Administrator. Nhờ người vận hành thêm Project rồi cấp Developer trên Project đó; không cần nâng thành Administrator chỉ để tạo worktree.
+Không. Cấp **Full access** thay vì Developer: trên Host thì tạo được Project ở bất kỳ thư mục nào, trên một Project thì chỉ tạo được bên trong Project đó, và Project con cần được cấp quyền riêng mới dùng được. Muốn tự tạo rồi dùng ngay, cấp Full access trên Host. Không cần Administrator, và giới hạn provider/model vẫn giữ. Full access cũng quản lý được Project và workspace của người khác, nên xem [hệ quả khi cấp](../access/permissions.md#4-hệ-quả-cần-biết-trước-khi-cấp).
 
 ## Developer vẫn không tạo được Workspace/worktree?
 
@@ -127,7 +127,7 @@ Nếu terminal báo lỗi, kiểm tra Workspace còn tồn tại, Project grant 
 
 ## Vì sao Add Project báo không có quyền ngay?
 
-Đây là kiểm tra trước khi mở luồng tạo Project. Developer/Project Full access không có quyền này. Chọn Host khác mà bạn được quản trị hoặc nhờ Owner/Daemon Administrator tạo Project. Nếu vừa được cấp quyền, kết nối lại để cập nhật thông tin session.
+Đây là kiểm tra trước khi mở luồng tạo Project. Office worker và Developer không có quyền này; cần Full access hoặc Administrator. Nếu có Full access **trên một Project** thì nút vẫn hiện, nhưng tạo Project ngoài thư mục của Project đó sẽ bị từ chối. Nếu vừa được cấp quyền, kết nối lại để cập nhật thông tin session.
 
 ## Cấp nhiều Project cùng lúc làm mất cấu hình cũ?
 

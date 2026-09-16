@@ -9,6 +9,7 @@ import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import type { WebSocketLike } from "../websocket-server.js";
 import { PROJECT_PRIVILEGES, type ManagedAccessAdmission } from "../managed-access/types.js";
+import { isProjectPrivilege } from "@getpaseo/protocol/managed-access-privileges";
 import { parseDaemonPermissions } from "../authorization/index.js";
 
 export interface HubEnrollment {
@@ -174,6 +175,9 @@ const AccessTicketAdmissionSchema = z.object({
       ),
     }),
   ),
+  // Unlike Project privileges, unknown values here are dropped rather than
+  // rejected: a newer Hub may add Host-level privileges this daemon cannot use.
+  daemonPrivileges: z.array(z.string()).optional(),
   leaseExpiresAt: z.string().datetime(),
 });
 
@@ -451,6 +455,7 @@ function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
         },
       ]),
     ),
+    daemonPrivileges: new Set((admission.daemonPrivileges ?? []).filter(isProjectPrivilege)),
     leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
   };
 }

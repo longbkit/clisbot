@@ -120,6 +120,7 @@ import type {
   ManagedAccessAdmissionResolver,
   ManagedAccessMode,
   ProjectAuthorization,
+  ProjectPrivilege,
   SessionResourceAuthorization,
 } from "./managed-access/types.js";
 
@@ -137,6 +138,7 @@ export interface SessionAdmission {
   principalId: string;
   permissions: readonly DaemonPermission[];
   projects?: ReadonlyMap<string, ProjectAuthorization>;
+  daemonPrivileges?: ReadonlySet<ProjectPrivilege>;
   resourceMode?: "daemon" | "projects";
   leaseId?: string;
   leaseExpiresAt?: number;
@@ -450,7 +452,10 @@ function bufferFromWsData(data: Buffer | ArrayBuffer | Buffer[] | string): Buffe
 }
 
 function managedAuthoritySignature(
-  admission: Pick<SessionAdmission, "permissions" | "projects" | "resourceMode">,
+  admission: Pick<
+    SessionAdmission,
+    "permissions" | "projects" | "daemonPrivileges" | "resourceMode"
+  >,
 ): string {
   const projects = [...(admission.projects?.entries() ?? [])]
     .sort(([left], [right]) => left.localeCompare(right))
@@ -472,6 +477,7 @@ function managedAuthoritySignature(
     permissions: [...admission.permissions].sort(),
     resourceMode: admission.resourceMode ?? "daemon",
     projects,
+    daemonPrivileges: [...(admission.daemonPrivileges ?? [])].sort(),
   });
 }
 
@@ -1433,6 +1439,9 @@ export class VoiceAssistantWebSocketServer {
             resourceAuthorization: {
               resourceMode: admission.resourceMode,
               projects: admission.projects,
+              ...(admission.daemonPrivileges === undefined
+                ? {}
+                : { daemonPrivileges: admission.daemonPrivileges }),
               leaseId: admission.leaseId,
               leaseExpiresAt: admission.leaseExpiresAt,
             },

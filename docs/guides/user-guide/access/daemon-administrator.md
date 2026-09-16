@@ -26,7 +26,7 @@ Có quyền cấu hình ở backend: `daemon.manage` cho phép thay đổi cấu
 
 Vì vậy không cấp Administrator cho người mà bạn muốn buộc chỉ làm việc trong một Project. Dùng **Connect + Developer** cho nhu cầu tạo worktree.
 
-Cần làm trên **mọi Project** nhưng vẫn giới hạn provider/model: cấp **Developer trên Host** thay vì Administrator. Mức này không có quyền vận hành daemon, và vẫn áp giới hạn cấu hình Agent; xem [cấp cho mọi Project trên một Host](members-and-teams.md#cấp-cho-mọi-project-trên-một-host).
+Cần làm trên **mọi Project** nhưng vẫn giới hạn provider/model: cấp **Developer trên Host** thay vì Administrator; cần thêm quyền tự tạo Project thì cấp **Full access trên Host**. Mức này không có quyền vận hành daemon, và vẫn áp giới hạn cấu hình Agent; xem [cấp cho mọi Project trên một Host](members-and-teams.md#cấp-cho-mọi-project-trên-một-host).
 
 ## Những quyền không tự đi kèm
 

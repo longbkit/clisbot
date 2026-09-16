@@ -90,6 +90,15 @@ export class SessionAuthorization {
     return this.resources.projects.get(projectId);
   }
 
+  /** A privilege the Hub granted on the whole Host, not only on listed Projects. */
+  allowsDaemonPrivilege(privilege: ProjectPrivilege): boolean {
+    if (!this.hasActiveLease()) return false;
+    if (this.resources === null || this.resources.resourceMode === "daemon") return true;
+    // Mirrors allowsProject: a Project privilege means nothing without project.use.
+    const privileges = this.resources.daemonPrivileges;
+    return privileges?.has("project.use") === true && privileges.has(privilege);
+  }
+
   allowsProject(projectId: string, privilege: ProjectPrivilege): boolean {
     if (!this.hasActiveLease()) return false;
     if (this.resources === null || this.resources.resourceMode === "daemon") return true;

@@ -105,6 +105,7 @@ function accessAdmissionResponse(
     permissions: admission.permissions,
     resourceMode: admission.resourceMode,
     projects: admission.projects,
+    daemonPrivileges: admission.daemonPrivileges,
     leaseExpiresAt: admission.leaseExpiresAt.toISOString(),
   });
 }

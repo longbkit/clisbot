@@ -10,7 +10,7 @@
 2. Chọn **Add Project**, chọn thư mục có sẵn hoặc luồng tạo/clone phù hợp.
 3. Kiểm tra đường dẫn và hoàn tất.
 
-Cần Organization Owner hoặc Daemon Administrator. Developer/Project Full access không được tạo Project mới. App kiểm tra quyền ngay khi mở Add Project; daemon vẫn là nơi quyết định cuối cùng.
+Cần một trong các quyền: Organization Owner, **Administrator** trên Host, hoặc **Full access**. Full access trên Host tạo được Project ở bất kỳ thư mục nào; Full access trên một Project chỉ tạo được Project bên trong thư mục của Project đó. Developer không tạo được Project. App kiểm tra quyền ngay khi mở Add Project; daemon vẫn là nơi quyết định cuối cùng. Với Full access trên Host, Project vừa tạo dùng được sau khi kết nối lại Host. Với Full access trên một Project, Project con vừa tạo cần được cấp quyền riêng mới dùng được, kể cả với người tạo. Xem [hệ quả khi cấp](../access/permissions.md#4-hệ-quả-cần-biết-trước-khi-cấp).
 
 ## Cho phép một người tự tạo worktree trong một Project
 

@@ -12,6 +12,7 @@ import {
   permissionsForLegacyHubScopes,
   parseDaemonPermissions,
 } from "./index.js";
+import type { ProjectPrivilege } from "../managed-access/types.js";
 
 function inboundOperationTypes(): SessionInboundMessage["type"][] {
   return SessionInboundMessageSchema.options.map((option) => option.shape.type.value);
@@ -182,5 +183,34 @@ describe("Project workspace creation", () => {
         false,
       );
     }
+  });
+});
+
+describe("Host-wide Project privileges", () => {
+  function managed(daemonPrivileges: ReadonlySet<ProjectPrivilege> | undefined, expired = false) {
+    return new SessionAuthorization(["workspace.read", "workspace.write", "workspace.manage"], {
+      resourceMode: "projects",
+      projects: new Map(),
+      ...(daemonPrivileges === undefined ? {} : { daemonPrivileges }),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + (expired ? -1 : 60_000),
+    });
+  }
+
+  test("count only with project.use and an active lease, like a Project grant", () => {
+    expect(
+      managed(new Set(["project.use", "workspace.manage"])).allowsDaemonPrivilege(
+        "workspace.manage",
+      ),
+    ).toBe(true);
+    expect(managed(new Set(["workspace.manage"])).allowsDaemonPrivilege("workspace.manage")).toBe(
+      false,
+    );
+    expect(managed(undefined).allowsDaemonPrivilege("workspace.manage")).toBe(false);
+    expect(
+      managed(new Set(["project.use", "workspace.manage"]), true).allowsDaemonPrivilege(
+        "workspace.manage",
+      ),
+    ).toBe(false);
   });
 });
