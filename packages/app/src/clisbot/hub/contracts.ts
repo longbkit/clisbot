@@ -27,6 +27,8 @@ const TeamMemberSummarySchema = z.object({
   userId: z.string(),
   name: z.string(),
   email: z.string(),
+  // Optional on read for older Hubs, which did not select it with the roster.
+  image: z.string().nullable().optional(),
   role: OrganizationRoleSchema,
 });
 const AccountInvitationSchema = z.object({

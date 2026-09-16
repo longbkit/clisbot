@@ -430,7 +430,11 @@ function createAccessTicketService(
 ): AccessTicketService | null {
   if (options.accessTickets !== undefined) return options.accessTickets;
   if (options.databaseRuntime === undefined || accessStore === null) return null;
-  return new AccessTicketService(options.databaseRuntime, accessStore);
+  return new AccessTicketService(
+    options.databaseRuntime,
+    accessStore,
+    options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl },
+  );
 }
 
 function createAppPublicOperations(

@@ -119,10 +119,15 @@ describe("catalog load state", () => {
 });
 
 describe("catalog accessors", () => {
-  it("labels a channel the catalog does not carry from its id", () => {
-    expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "matrix")).toBe("matrix");
+  it("names a channel from the catalog, and reads an unknown id back readably", () => {
     expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "telegram")).toBe("Telegram");
-    expect(channelCatalogLabel([], "telegram")).toBe("telegram");
+    // The catalog is the source: no amount of casing turns these ids into their names.
+    expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "zalouser")).toBe("Zalo Personal");
+    expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "googlechat")).toBe("Google Chat");
+    // A channel this Hub does not carry, and the window before the catalog loads.
+    expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "matrix")).toBe("Matrix");
+    expect(channelCatalogLabel([], "telegram")).toBe("Telegram");
+    expect(channelCatalogLabel([], "zalouser")).toBe("Zalouser");
   });
 
   it("treats a QR channel as not connectable through the credential form", () => {

@@ -1,4 +1,4 @@
-import { sessionActorKey } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantBlockSpacing, getGapBetweenStreamItems } from "./spacing";
@@ -444,5 +444,5 @@ export function layoutStream(input: StreamLayoutInput): StreamLayout {
 function sameUserMessageAuthor(left: StreamItem, right?: StreamItem | null): boolean {
   if (left.kind !== "user_message" || right?.kind !== "user_message") return false;
   if (!left.sender || !right.sender) return left.sender === right.sender;
-  return sessionActorKey(left.sender) === sessionActorKey(right.sender);
+  return sessionParticipantKey(left.sender) === sessionParticipantKey(right.sender);
 }

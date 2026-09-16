@@ -435,13 +435,12 @@ function createManagedAccessServices(options: ApplicationCompositionOptions): {
   const accessStore = new AccessStore(options.databaseRuntime);
   const accessTickets =
     options.accessTickets ??
-    new AccessTicketService(
-      options.databaseRuntime,
-      accessStore,
-      options.managedAccessLeaseDurationMs === undefined
+    new AccessTicketService(options.databaseRuntime, accessStore, {
+      ...(options.managedAccessLeaseDurationMs === undefined
         ? {}
-        : { leaseDurationMs: options.managedAccessLeaseDurationMs },
-    );
+        : { leaseDurationMs: options.managedAccessLeaseDurationMs }),
+      ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
+    });
   return { accessStore, accessTickets };
 }
 

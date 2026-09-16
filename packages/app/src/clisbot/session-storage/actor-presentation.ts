@@ -1,5 +1,5 @@
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
 import { nameInitials } from "@/utils/name-initials";
 
 export type ActorAvatarPresentation =
@@ -17,8 +17,10 @@ export function actorLabel(actor: SessionActor): string {
 /**
  * Every actor gets a face: the profile image when one is on record, otherwise a
  * deterministic monogram so group chats read as a set of people. Seeding the
- * color with `actor.id` (never the name) keeps one actor the same color even
- * after their display name changes.
+ * color with the participant key (never the name) keeps one person the same
+ * color after a rename, and keeps them one person across the channels they
+ * speak through — a channel snapshot carries its provider identity in `id`, so
+ * seeding with `id` would give the same human a face per channel.
  */
 export function resolveActorAvatarPresentation(
   actor: SessionActor,
@@ -28,26 +30,41 @@ export function resolveActorAvatarPresentation(
   const label = actorLabel(actor);
   return {
     kind: "initials",
-    color: identityColor(deriveIdentityColorName(actor.id)),
+    color: identityColor(deriveIdentityColorName(sessionParticipantKey(actor))),
     label: nameInitials(label, actor.id.at(0)),
   };
 }
 
+/** The signed-in reader, as much of their identity as the app can name. */
+export interface HubAccountIdentity {
+  id: string | null | undefined;
+  origin: string | null;
+  /** The reader's membership in the active organization, when one is resolved. */
+  memberId?: string | null;
+}
+
 /**
- * Whether `actor` is the signed-in Hub account. Hub actor IDs are the Hub
- * `users.id`, which is the same id the app's signed-in account exposes, so the
- * match is a direct id comparison — scoped to the hub origin when both sides
- * record one, since ids are per-hub. Not being signed in means "not me":
- * without an account we cannot tell, and messages keep the group form rather
- * than claiming to be the reader.
+ * Whether `actor` is the signed-in Hub account.
+ *
+ * Two snapshots can name the same person by different ids: an app snapshot uses
+ * the Hub `users.id`, while a channel snapshot keeps the provider identity
+ * (`slack:U…`) and carries the verified link in `memberId`. So the Member link
+ * decides whenever both sides carry one, and the id comparison covers the rest —
+ * including a reader whose membership the app has not resolved. Not being signed in means "not me": without an account we cannot
+ * tell, and messages keep the group form rather than claiming to be the reader.
+ *
+ * Deliberately more forgiving than `sessionParticipantKey`, which is the
+ * grouping key for two *snapshots*. Here one side is the live account, so a
+ * snapshot written before its scope was complete still matches its reader.
  */
 export function isOwnActor(
   actor: SessionActor,
-  hubAccount: { id: string | null | undefined; origin: string | null } | null | undefined,
+  hubAccount: HubAccountIdentity | null | undefined,
 ): boolean {
-  if (actor.kind !== "user" || !hubAccount?.id || actor.id !== hubAccount.id) return false;
+  if (actor.kind !== "user" || !hubAccount) return false;
   if (actor.hubOrigin && hubAccount.origin && actor.hubOrigin !== hubAccount.origin) return false;
-  return true;
+  if (actor.memberId && hubAccount.memberId) return actor.memberId === hubAccount.memberId;
+  return !!hubAccount.id && actor.id === hubAccount.id;
 }
 
 interface AccountIdentity {
@@ -77,16 +94,22 @@ export function resolveMessageSender(input: {
   sender: SessionActor | undefined;
   account: AccountIdentity | null;
   accountOrigin: string | null;
+  accountMemberId?: string | null;
   accountLoading: boolean;
   /** The daemon has confirmed this message (it holds a timeline position). */
   confirmed?: boolean;
 }): MessageSenderResolution {
-  const { sender, account, accountOrigin, accountLoading, confirmed = false } = input;
+  const { sender, account, accountOrigin, accountMemberId, accountLoading } = input;
+  const confirmed = input.confirmed ?? false;
   if (sender) {
     return {
       state: "ready",
       actor: sender,
-      isOwn: isOwnActor(sender, { id: account?.id, origin: accountOrigin }),
+      isOwn: isOwnActor(sender, {
+        id: account?.id,
+        origin: accountOrigin,
+        memberId: accountMemberId,
+      }),
       unrecorded: false,
     };
   }

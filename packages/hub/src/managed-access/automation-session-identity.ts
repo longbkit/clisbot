@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { members, users } from "../db/schema.js";
+import { normalizeHubOrigin } from "./hub-origin.js";
 
 /** Called only with the Member established by public-operation authorization, never payload.actor. */
 export async function automationMemberIdentity(
@@ -26,7 +27,7 @@ export async function automationMemberIdentity(
       id: member.id,
       organizationId,
       memberId: membershipId,
-      hubOrigin: new URL(hubOrigin).origin,
+      hubOrigin: normalizeHubOrigin(hubOrigin),
       ...(member.name ? { displayName: member.name } : {}),
       ...(member.image ? { avatarUrl: member.image } : {}),
     },

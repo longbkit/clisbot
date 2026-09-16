@@ -87,7 +87,12 @@ function signedInHub() {
   return {
     enabled: true,
     origin: "https://hub.one",
-    signedIn: { state: "active", account: { id: "me-id", name: "Me", email: "me@example.com" } },
+    signedIn: {
+      state: "active",
+      account: { id: "me-id", name: "Me", email: "me@example.com" },
+      membership: { id: "me-member", role: "member" },
+      team: { members: [] },
+    },
     loading: false,
   };
 }

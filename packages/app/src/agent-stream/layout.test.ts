@@ -601,6 +601,22 @@ for (const platform of ["web", "android"] as const) {
     expect(findLayoutItem(layout, "tool-t").isFirstInResponseGroup).toBe(true);
   });
 
+  it(`${platform} groups one person's adjacent messages across the channels they used`, () => {
+    const scope = { hubOrigin: "https://a", organizationId: "org", memberId: "member" };
+    const layout = layoutFor({
+      platform,
+      tail: [
+        { ...userMessage("app", 0), sender: { kind: "user" as const, id: "user-1", ...scope } },
+        {
+          ...userMessage("slack", 1),
+          sender: { kind: "user" as const, id: "slack:U1", connectionId: "c", ...scope },
+        },
+      ],
+    });
+    expect(findLayoutItem(layout, "app").isLastInUserGroup).toBe(false);
+    expect(findLayoutItem(layout, "slack").isFirstInUserGroup).toBe(false);
+  });
+
   it(`${platform} separates adjacent messages by scoped author, including unknown history`, () => {
     const a = { kind: "user" as const, id: "same", hubOrigin: "https://a" };
     const b = { ...a, hubOrigin: "https://b" };

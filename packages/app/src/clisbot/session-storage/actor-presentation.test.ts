@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
 import {
   actorLabel,
@@ -22,6 +23,16 @@ const ngocLong: SessionActor = {
   kind: "user",
   id: "oWzlS92kXrvfoL9iPXAkbbHg1OR30St9",
   displayName: "Ngoc Long",
+};
+/** The same person as `longbkit`, recorded as they arrived through Slack. */
+const longbkitOnSlack: SessionActor = {
+  kind: "user",
+  id: "slack:U8ZTVGJJF",
+  displayName: "longbkit",
+  organizationId: "org",
+  connectionId: "connection",
+  memberId: "member",
+  hubOrigin: "https://hub.example",
 };
 
 describe("actorLabel", () => {
@@ -56,6 +67,18 @@ describe("isOwnActor", () => {
     assert.equal(isOwnActor(longbkit, null), false);
   });
 
+  it("recognizes the reader behind a channel snapshot through the verified Member", () => {
+    const account = { id: longbkit.id, origin: "https://hub.example", memberId: "member" };
+    assert.equal(isOwnActor(longbkitOnSlack, account), true);
+    assert.equal(isOwnActor(longbkitOnSlack, { ...account, memberId: "someone-else" }), false);
+    // Nobody to match against: an unlinked sender is never the reader.
+    const unlinked = { ...longbkitOnSlack, memberId: undefined };
+    assert.equal(isOwnActor(unlinked, account), false);
+    // A reader with no membership on record falls back to the id comparison.
+    assert.equal(isOwnActor(longbkitOnSlack, { ...account, memberId: undefined }), false);
+    assert.equal(isOwnActor(longbkit, { ...account, memberId: undefined }), true);
+  });
+
   it("scopes an id match to the hub origin when both sides record one", () => {
     const withOrigin = { ...longbkit, hubOrigin: "https://hub.example" };
     assert.equal(isOwnActor(withOrigin, { id: longbkit.id, origin: "https://hub.example" }), true);
@@ -83,7 +106,7 @@ describe("resolveActorAvatarPresentation", () => {
     const presentation = resolveActorAvatarPresentation(longbkit, false);
     assert.deepEqual(presentation, {
       kind: "initials",
-      color: expectedColor(longbkit.id),
+      color: expectedColor(longbkit),
       label: "L",
     });
   });
@@ -95,6 +118,18 @@ describe("resolveActorAvatarPresentation", () => {
         true,
       ).kind,
       "initials",
+    );
+  });
+
+  it("gives one person one face across the channels they speak through", () => {
+    assert.deepEqual(
+      colorOf(resolveActorAvatarPresentation(longbkit, false)),
+      colorOf(resolveActorAvatarPresentation(longbkitOnSlack, false)),
+    );
+    // An unlinked sender has no person to join, so it keeps its own colour.
+    assert.notEqual(
+      colorOf(resolveActorAvatarPresentation(longbkit, false)),
+      colorOf(resolveActorAvatarPresentation({ ...longbkitOnSlack, memberId: undefined }, false)),
     );
   });
 
@@ -223,6 +258,6 @@ function labelOf(presentation: ActorAvatarPresentation): string {
   assert.equal(presentation.kind, "initials");
   return presentation.label;
 }
-function expectedColor(id: string): string {
-  return identityColor(deriveIdentityColorName(id));
+function expectedColor(actor: SessionActor): string {
+  return identityColor(deriveIdentityColorName(sessionParticipantKey(actor)));
 }

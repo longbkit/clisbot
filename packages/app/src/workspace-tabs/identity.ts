@@ -1,4 +1,4 @@
-import { SessionActorSchema, sessionActorKey } from "@getpaseo/protocol/session-authorship";
+import { SessionActorSchema, sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
 import { normalizeWorkspaceFileLocation, workspaceFileLocationsEqual } from "@/workspace/file-open";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
@@ -137,7 +137,7 @@ function secondaryWorkspaceTabTargetsEqual(
   right: WorkspaceTabTarget,
 ): boolean {
   if (left.kind === "user_profile" && right.kind === "user_profile") {
-    return sessionActorKey(left.actor) === sessionActorKey(right.actor);
+    return sessionParticipantKey(left.actor) === sessionParticipantKey(right.actor);
   }
   if (left.kind === "browser" && right.kind === "browser") {
     return left.browserId === right.browserId;
@@ -204,7 +204,7 @@ export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): st
     throw new Error("New tabs do not have deterministic target identities");
   }
   if (target.kind === "user_profile") {
-    return `user_profile_${sessionActorKey(target.actor)}`;
+    return `user_profile_${sessionParticipantKey(target.actor)}`;
   }
   if (target.kind === "draft") {
     return target.draftId;

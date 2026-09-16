@@ -12,6 +12,7 @@ import {
   resolveActorAvatarPresentation,
   type ActorAvatarPresentation,
 } from "./actor-presentation";
+import { usePersonProfile } from "./person";
 
 export { actorLabel };
 
@@ -79,6 +80,11 @@ function InitialsFace({
   );
 }
 
+/**
+ * The person's current face. The snapshot's `avatarUrl` is what it looked like
+ * when they spoke, so the roster wins where the reader can see it — a profile
+ * picture changed today shows on every message they ever sent.
+ */
 export const ActorAvatar = memo(function ActorAvatar({
   actor,
   size = ACTOR_AVATAR_SIZE,
@@ -87,15 +93,16 @@ export const ActorAvatar = memo(function ActorAvatar({
   size?: number;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const label = actorLabel(actor);
-  const source = useMemo(() => ({ uri: actor.avatarUrl }), [actor.avatarUrl]);
+  const { actor: person } = usePersonProfile(actor);
+  const label = actorLabel(person);
+  const source = useMemo(() => ({ uri: person.avatarUrl }), [person.avatarUrl]);
   // Only the currently loaded URL can have failed; a fresh avatarUrl retries.
-  const imageFailed = actor.avatarUrl !== undefined && failedUrl === actor.avatarUrl;
+  const imageFailed = person.avatarUrl !== undefined && failedUrl === person.avatarUrl;
   const presentation = useMemo(
-    () => resolveActorAvatarPresentation(actor, imageFailed),
-    [actor, imageFailed],
+    () => resolveActorAvatarPresentation(person, imageFailed),
+    [person, imageFailed],
   );
-  const handleError = useCallback(() => setFailedUrl(actor.avatarUrl ?? null), [actor.avatarUrl]);
+  const handleError = useCallback(() => setFailedUrl(person.avatarUrl ?? null), [person.avatarUrl]);
   const imageStyle = useMemo(() => [avatarMetrics(size), styles.image], [size]);
   if (presentation.kind === "image")
     return (
@@ -134,12 +141,13 @@ export const SessionActorAvatar = memo(function SessionActorAvatar({
   size?: number;
 }) {
   const openProfile = useOpenActorProfile(actor, serverId, workspaceId);
+  const { actor: person } = usePersonProfile(actor);
   return (
     <Tooltip>
       <TooltipTrigger
         onPress={openProfile}
         accessibilityRole="button"
-        accessibilityLabel={`Open profile: ${actorLabel(actor)} (${actor.id})`}
+        accessibilityLabel={`Open profile: ${actorLabel(person)} (${actor.id})`}
       >
         <ActorAvatar actor={actor} size={size} />
       </TooltipTrigger>
@@ -185,16 +193,17 @@ export const SessionActorLabel = memo(function SessionActorLabel({
   workspaceId: string;
 }) {
   const openProfile = useOpenActorProfile(actor, serverId, workspaceId);
+  const { actor: person } = usePersonProfile(actor);
   return (
     <Tooltip>
       <TooltipTrigger
         onPress={openProfile}
         accessibilityRole="button"
-        accessibilityLabel={`Open profile: ${actorLabel(actor)} (${actor.id})`}
+        accessibilityLabel={`Open profile: ${actorLabel(person)} (${actor.id})`}
       >
         <View style={styles.label}>
           <ActorAvatar actor={actor} size={ACTOR_INLINE_AVATAR_SIZE} />
-          <Text style={styles.text}>{actorLabel(actor)}</Text>
+          <Text style={styles.text}>{actorLabel(person)}</Text>
         </View>
       </TooltipTrigger>
       <TooltipContent>

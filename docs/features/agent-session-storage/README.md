@@ -107,15 +107,16 @@ Known cleanups, not blocking:
 
 ## Where to read more
 
-| You need                                                                                     | Read                                                 |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| The long-term contract: schema rationale, identity rules, lifecycle, AC1–AC9 / W1–W7 in full | [design.md](design.md)                               |
-| Progress and test/benchmark evidence                                                         | [implementation.md](implementation.md)               |
-| What one iteration committed to                                                              | [iterations/](iterations/)                           |
-| Which upstream files were touched and what was decided                                       | [upstream-blast-radius.md](upstream-blast-radius.md) |
-| Changes outside the storage / session / timeline layers                                      | [out-of-layer-changes.md](out-of-layer-changes.md)   |
-| Benchmark measurements                                                                       | [benchmarks/](benchmarks/)                           |
-| The closed 2026-09-12 three-lane campaign (history, not backlog)                             | [campaign-2026-09-12/](campaign-2026-09-12/)         |
+| You need                                                                                     | Read                                                          |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| The long-term contract: schema rationale, identity rules, lifecycle, AC1–AC9 / W1–W7 in full | [design.md](design.md)                                        |
+| Progress and test/benchmark evidence                                                         | [implementation.md](implementation.md)                        |
+| What one iteration committed to                                                              | [iterations/](iterations/)                                    |
+| Why one person is one profile across their channels, and what it cost                        | [2026-09-16](iterations/2026-09-16-one-person-one-profile.md) |
+| Which upstream files were touched and what was decided                                       | [upstream-blast-radius.md](upstream-blast-radius.md)          |
+| Changes outside the storage / session / timeline layers                                      | [out-of-layer-changes.md](out-of-layer-changes.md)            |
+| Benchmark measurements                                                                       | [benchmarks/](benchmarks/)                                    |
+| The closed 2026-09-12 three-lane campaign (history, not backlog)                             | [campaign-2026-09-12/](campaign-2026-09-12/)                  |
 
 Workspace naming, selection and reuse live in
 [Workspace organization](../workspace-organization/README.md). The sidebar's per-session

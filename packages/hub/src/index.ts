@@ -99,6 +99,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       leaseDurationMs: readAccessLeaseDuration(
         process.env["PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION"],
       ),
+      publicBaseUrl: identity.appUrl,
     });
     let notifyAccessLeaseRevocation = (_daemonId: string, _leaseIds: readonly string[]): boolean =>
       false;

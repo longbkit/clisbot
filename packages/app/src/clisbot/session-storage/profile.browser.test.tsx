@@ -15,11 +15,29 @@ import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-mode
 const boundary = vi.hoisted(() => ({
   actor: {} as SessionActor,
   visible: {} as Record<string, boolean>,
+  roster: [] as unknown[],
+  linked: [] as unknown[],
 }));
 vi.mock("expo-router", () => ({
   router: { push: vi.fn(), replace: vi.fn() },
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   usePathname: () => "/",
   useLocalSearchParams: () => ({}),
+}));
+// The Hub account and its Channel-identity reads are network boundaries; the
+// panel's own resolution of person, avatar and linked identities is production code.
+vi.mock("@/clisbot/hub/account-provider", () => ({
+  useHubAccount: () => ({ signedIn: { team: { members: boundary.roster } } }),
+}));
+vi.mock("@/clisbot/hub/channel-identity-directory", () => ({
+  useChannelIdentityDirectory: () => ({
+    identitiesOf: (memberId: string | null | undefined) =>
+      boundary.linked.filter(
+        (identity) => (identity as { memberId: string }).memberId === memberId,
+      ),
+    pending: false,
+    error: null,
+  }),
 }));
 // Animation timing belongs to the Metro route test. Reanimated's exit animation
 // cannot recover native style metadata from the browser project's Unistyles stub.
@@ -127,7 +145,15 @@ const workspace: SidebarWorkspaceEntry = {
     },
   ],
 };
-const otherConnectionActor = { ...actor, connectionId: "slack-two" };
+/** The same verified Member, arriving through a second Channel account. */
+const otherConnectionActor = { ...actor, id: "telegram:9", connectionId: "telegram-one" };
+/** A sender with no Hub Member behind them, so there is no person to merge into. */
+const unlinkedActor = {
+  ...actor,
+  id: "slack:U9",
+  displayName: "Unlinked",
+  memberId: undefined,
+};
 const failedAvatarActor = { ...actor, avatarUrl: "data:image/png;base64,broken" };
 const emptyWorkspace = {
   ...workspace,
@@ -142,6 +168,8 @@ beforeEach(() => {
   vi.stubGlobal("React", React);
   boundary.actor = actor;
   boundary.visible = { ...DEFAULT_SIDEBAR_ROW_ITEMS };
+  boundary.roster = [];
+  boundary.linked = [];
   useWorkspaceLayoutStore.setState({ layoutByWorkspace: {} });
 });
 afterEach(() => {
@@ -149,7 +177,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("opens profiles by keyboard and click, shows scoped snapshots, and reuses only matching identity", async () => {
+it("opens profiles by keyboard and click, shows scoped snapshots, and keeps one tab per person", async () => {
   await page.viewport(1200, 800);
   render(<SessionActorLabel actor={actor} serverId="host" workspaceId="workspace" />);
   const trigger = screen.getByRole("button", { name: "Open profile: Alex (slack:U1)" });
@@ -172,12 +200,20 @@ it("opens profiles by keyboard and click, shows scoped snapshots, and reuses onl
       .getWorkspaceTabs(workspaceKey)
       .filter((tab) => tab.target.kind === "user_profile"),
   ).toHaveLength(1);
+  // The same Member through a second Channel account is the same person: one tab.
   render(
     <SessionActorLabel actor={otherConnectionActor} serverId="host" workspaceId="workspace" />,
   );
-  await userEvent.click(
-    screen.getAllByRole("button", { name: "Open profile: Alex (slack:U1)" })[1]!,
-  );
+  await userEvent.click(screen.getByRole("button", { name: "Open profile: Alex (telegram:9)" }));
+  expect(
+    useWorkspaceLayoutStore
+      .getState()
+      .getWorkspaceTabs(workspaceKey)
+      .filter((tab) => tab.target.kind === "user_profile"),
+  ).toHaveLength(1);
+  // An unlinked sender has no Member to merge into, so it stays its own profile.
+  render(<SessionActorLabel actor={unlinkedActor} serverId="host" workspaceId="workspace" />);
+  await userEvent.click(screen.getByRole("button", { name: "Open profile: Unlinked (slack:U9)" }));
   expect(
     useWorkspaceLayoutStore
       .getState()
@@ -195,6 +231,55 @@ it("opens profiles by keyboard and click, shows scoped snapshots, and reuses onl
   ])
     expect(profile.textContent).toContain(value);
   await page.screenshot({ path: "/tmp/session-profile-desktop.png" });
+});
+
+it("shows one person, their linked Channels, and the snapshot it was recorded from", async () => {
+  await page.viewport(1200, 800);
+  boundary.roster = [
+    {
+      id: "member-one",
+      userId: "user-one",
+      name: "Alex Nguyen",
+      email: "alex@example.com",
+      image: "https://cdn.example/alex.png",
+    },
+  ];
+  boundary.linked = [
+    { id: "i1", memberId: "member-one", label: "Slack · Acme", subject: "@alex" },
+    { id: "i2", memberId: "member-one", label: "Telegram · Acme", subject: "alex_ng" },
+    { id: "i3", memberId: "member-two", label: "Slack · Acme", subject: "@bailey" },
+  ];
+  render(<Profile />);
+  const text = screen.getByTestId("user-profile-panel").textContent ?? "";
+  // The Hub user, not the Slack identity, names the person.
+  expect(text).toContain("Alex Nguyen");
+  expect(text).toContain("alex@example.com");
+  expect(text).toContain("user-one");
+  // Every Channel they linked, not only the one this session saw.
+  for (const shown of ["@alex", "Slack · Acme", "alex_ng", "Telegram · Acme"])
+    expect(text).toContain(shown);
+  // Someone else's link never leaks into this profile.
+  expect(text).not.toContain("@bailey");
+  // The snapshot stays visible as provenance.
+  expect(text).toContain(actor.id);
+  const avatar = screen.getByTestId("user-profile-panel").querySelector("img");
+  expect(avatar?.getAttribute("src")).toBe("https://cdn.example/alex.png");
+  await page.screenshot({ path: "/tmp/session-profile-person.png" });
+});
+
+it("derives the monogram from the same name it shows, not the frozen one", async () => {
+  await page.viewport(1200, 800);
+  // Renamed since the snapshot, and with no image: the face falls back to a monogram.
+  boundary.roster = [
+    { id: "member-one", userId: "user-one", name: "Bao Tran", email: "bao@example.com" },
+  ];
+  boundary.actor = { ...actor, displayName: "Alex" };
+  render(<Profile />);
+  const panel = screen.getByTestId("user-profile-panel");
+  expect(panel.textContent).toContain("Bao Tran");
+  expect(panel.textContent).not.toContain("Alex");
+  // "BT" from the name on screen — never "A" from the name the snapshot froze.
+  expect(panel.textContent).toContain("BT");
 });
 
 it("opens at narrow layout without hover and renders Automation without exposing its ID as name", async () => {

@@ -130,6 +130,7 @@ interface MemberRow extends QueryRow {
   user_id: string;
   name: string;
   email: string;
+  image: string | null;
   role: string;
 }
 
@@ -862,7 +863,7 @@ export class OrganizationAccess {
 
   private async team(access: OrganizationAccessValue) {
     const members = await this.options.pool.query<MemberRow>(
-      `select member.id, member.user_id, "user".name, "user".email, member.role
+      `select member.id, member.user_id, "user".name, "user".email, "user".image, member.role
        from member
        join "user" on "user".id = member.user_id
        where member.organization_id = $1
@@ -879,6 +880,7 @@ export class OrganizationAccess {
               userId: member.user_id,
               name: member.name,
               email: member.email,
+              image: member.image,
               role,
             },
           ];

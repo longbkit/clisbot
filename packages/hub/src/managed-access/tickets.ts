@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { AccessStore, type ResolvedDaemonAccess } from "../access/store.js";
+import { normalizeHubOrigin } from "./hub-origin.js";
 import * as schema from "../db/schema.js";
 import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
 
@@ -45,14 +46,19 @@ export class AccessTicketService {
   readonly sessionOperations = new SessionOperationTickets();
   private readonly leaseDurationMs: number;
 
+  /** Absent only where a composition has no configured public URL; the actor then omits its scope. */
+  private readonly hubOrigin: string | undefined;
+
   constructor(
     private readonly runtime: DatabaseRuntime,
     private readonly access: AccessStore,
-    options: { leaseDurationMs?: number } = {},
+    options: { leaseDurationMs?: number; publicBaseUrl?: string } = {},
   ) {
     this.leaseDurationMs = validateLeaseDuration(
       options.leaseDurationMs ?? DEFAULT_ACCESS_LEASE_DURATION_MS,
     );
+    this.hubOrigin =
+      options.publicBaseUrl === undefined ? undefined : normalizeHubOrigin(options.publicBaseUrl);
   }
 
   async issue(input: {
@@ -147,7 +153,7 @@ export class AccessTicketService {
         ...authority,
         leaseId: lease.id,
         leaseExpiresAt,
-        actor: await accountActor(database, ticket),
+        actor: await accountActor(database, ticket, this.hubOrigin),
       };
     });
   }
@@ -201,7 +207,7 @@ export class AccessTicketService {
         ...authority,
         leaseId: lease.id,
         leaseExpiresAt,
-        actor: await accountActor(database, lease),
+        actor: await accountActor(database, lease, this.hubOrigin),
       };
     });
     if (admission === null) {
@@ -327,9 +333,16 @@ async function lockActiveDaemon(database: DrizzleHandle, daemonId: string): Prom
   }
 }
 
+/**
+ * `hubOrigin` completes the identity scope the app snapshot is required to carry
+ * (`docs/features/agent-session-storage/design.md`). Without it this actor cannot
+ * group with the same person's channel snapshots, because `sessionParticipantKey`
+ * only unifies by Member when the full scope is present.
+ */
 async function accountActor(
   database: DrizzleHandle,
   identity: { clientId: string; userId: string; organizationId: string; membershipId: string },
+  hubOrigin: string | undefined,
 ): Promise<SessionActor | undefined> {
   if (identity.clientId.startsWith("channel-account:")) return undefined;
   const [user] = await database
@@ -342,6 +355,7 @@ async function accountActor(
     id: identity.userId,
     organizationId: identity.organizationId,
     memberId: identity.membershipId,
+    ...(hubOrigin ? { hubOrigin } : {}),
     ...(user?.name ? { displayName: user.name } : {}),
     ...(user?.image ? { avatarUrl: user.image } : {}),
   };

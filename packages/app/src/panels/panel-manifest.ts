@@ -1,4 +1,4 @@
-import { sessionActorKey } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 export type PaneHost = "main" | "explorer";
@@ -17,7 +17,8 @@ const manifests = {
   user_profile: {
     kind: "user_profile",
     supportedHosts: ["main", "explorer"],
-    resourceKey: (target) => sessionActorKey(target.actor),
+    // One profile per person, not per identity they arrived through.
+    resourceKey: (target) => sessionParticipantKey(target.actor),
   },
   new_tab: {
     kind: "new_tab",

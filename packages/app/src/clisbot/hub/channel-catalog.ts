@@ -72,12 +72,21 @@ export function channelCatalogEntry(
   return entries.find((entry) => entry.id === channel);
 }
 
-/** A Hub may report a channel its own catalog does not carry; label it from the id. */
+/**
+ * The Hub's own name for a Channel — "Zalo Personal", not "Zalouser".
+ *
+ * A Hub may report a channel its catalog does not carry, and the catalog itself
+ * arrives after the surfaces that name Channels; both fall back to a readable
+ * form of the id. Never use that fallback as the primary source: it is wrong for
+ * every id that is not a single word (`googlechat`, `zalouser`).
+ */
 export function channelCatalogLabel(
   entries: readonly ChannelCatalogEntry[],
   channel: string,
 ): string {
-  return channelCatalogEntry(entries, channel)?.label ?? channel;
+  const entry = channelCatalogEntry(entries, channel);
+  if (entry) return entry.label;
+  return channel.length === 0 ? channel : channel[0]!.toUpperCase() + channel.slice(1);
 }
 
 /**
