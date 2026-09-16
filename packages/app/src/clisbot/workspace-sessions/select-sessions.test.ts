@@ -129,12 +129,14 @@ describe("SidebarWorkspaceSessionsSchema", () => {
         visible: true,
         expansion: "sideways",
         activeOnly: 1,
+        fullTitles: "yes",
         details: { model: true },
       }),
     ).toEqual({
       visible: true,
       expansion: "autoCollapse",
       activeOnly: false,
+      fullTitles: true,
       details: { ...DEFAULT_SIDEBAR_WORKSPACE_SESSIONS.details, model: true },
     });
   });

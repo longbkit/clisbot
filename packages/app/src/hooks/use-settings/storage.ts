@@ -140,7 +140,8 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   codeFontSize: DEFAULT_CODE_FONT_SIZE,
   syntaxTheme: "one",
   workspaceTitleSource: "title",
-  sidebarWorkspaceTrailing: "diff",
+  // Clisbot fusion default; upstream shows "diff". A channel-driven workspace is read by recency.
+  sidebarWorkspaceTrailing: "timestamp",
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarWorkspaceSessions: DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
@@ -179,8 +180,8 @@ const SidebarRowItemsSchema = z
     services: z.boolean().optional().catch(undefined),
     labels: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.labels),
     createdUser: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.createdUser),
-    updatedUser: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.updatedUser),
     channels: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.channels),
+    updatedUser: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.updatedUser),
     createdTime: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.createdTime),
     updatedTime: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.updatedTime),
 
@@ -233,7 +234,9 @@ const StoredAppSettingsSchema = z
     ),
     syntaxTheme: z.string().refine(isSyntaxThemeId).catch("one"),
     workspaceTitleSource: z.enum(["title", "branch"]).catch("title"),
-    sidebarWorkspaceTrailing: z.enum(["diff", "timestamp", "none"]).catch("diff"),
+    sidebarWorkspaceTrailing: z
+      .enum(["diff", "timestamp", "none"])
+      .catch(DEFAULT_CLIENT_SETTINGS.sidebarWorkspaceTrailing),
     sidebarRowItems: SidebarRowItemsSchema,
     sidebarChecksDisplay: z
       .enum(["iconAndText", "icon", "none"])

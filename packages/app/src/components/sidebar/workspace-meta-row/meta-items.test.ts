@@ -18,6 +18,10 @@ const SERVICE: WorkspaceServiceSummary = { name: "web", health: null };
 
 const LABELS: WorkspaceLabelDefinition[] = [{ name: "Urgent", color: "red" }];
 
+// The fusion shows the branch by default; these cases read the operational items, and switch the
+// identity badges on where they need them.
+const OPERATIONAL_ITEMS = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: false, project: false };
+
 function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {}) {
   return selectMetaRowItems({
     currentBranch: "feature/sidebar-badges",
@@ -26,7 +30,7 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
     prHint: PR_HINT,
     serviceSummary: SERVICE,
     labels: LABELS,
-    visible: DEFAULT_SIDEBAR_ROW_ITEMS,
+    visible: OPERATIONAL_ITEMS,
     checksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
     ...overrides,
   });
@@ -36,7 +40,7 @@ const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item)
 
 describe("selectMetaRowItems", () => {
   it("puts the enabled branch and project badges first", () => {
-    const visible = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: true, project: true };
+    const visible = { ...OPERATIONAL_ITEMS, branch: true, project: true };
     expect(kinds(select({ visible }))).toEqual([
       "branch",
       "project",
@@ -68,7 +72,7 @@ describe("selectMetaRowItems", () => {
   });
 
   it("only draws identity badges when enabled and available", () => {
-    const visible = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: true, project: true };
+    const visible = { ...OPERATIONAL_ITEMS, branch: true, project: true };
     expect(kinds(select({ currentBranch: null, projectName: null, visible }))).toEqual([
       "host",
       "changeRequest",
@@ -91,9 +95,7 @@ describe("selectMetaRowItems", () => {
     ["services", ["host", "changeRequest", "checks", "labels"]],
     ["labels", ["host", "changeRequest", "checks", "services"]],
   ] as const)("drops %s and only %s when it is switched off", (item, expected) => {
-    expect(kinds(select({ visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, [item]: false } }))).toEqual(
-      expected,
-    );
+    expect(kinds(select({ visible: { ...OPERATIONAL_ITEMS, [item]: false } }))).toEqual(expected);
   });
 
   it("drops checks and only checks when they are hidden", () => {
@@ -108,13 +110,13 @@ describe("selectMetaRowItems", () => {
   it("keeps checks when the change request is hidden", () => {
     // Each control answers for itself. A checks setting that drew nothing because a different
     // switch was off would be lying about its own state.
-    const items = select({ visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, changeRequest: false } });
+    const items = select({ visible: { ...OPERATIONAL_ITEMS, changeRequest: false } });
     expect(kinds(items)).toEqual(["host", "checks", "services", "labels"]);
   });
 
   it("draws nothing for checks when both are off", () => {
     const items = select({
-      visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, changeRequest: false },
+      visible: { ...OPERATIONAL_ITEMS, changeRequest: false },
       checksDisplay: "none",
     });
     expect(kinds(items)).toEqual(["host", "services", "labels"]);

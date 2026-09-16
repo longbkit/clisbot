@@ -36,6 +36,7 @@ export interface WorkspaceSessionsPreferences extends SidebarWorkspaceSessions {
   toggleVisible: () => void;
   setExpansion: (expansion: SidebarWorkspaceSessionExpansion) => void;
   toggleActiveOnly: () => void;
+  toggleFullTitles: () => void;
   toggleDetail: (detail: SidebarWorkspaceSessionDetail) => void;
 }
 
@@ -64,6 +65,10 @@ export function useWorkspaceSessionsPreferences(): WorkspaceSessionsPreferences 
     () => update((s) => ({ activeOnly: !s.activeOnly })),
     [update],
   );
+  const toggleFullTitles = useCallback(
+    () => update((s) => ({ fullTitles: !s.fullTitles })),
+    [update],
+  );
   const toggleDetail = useCallback(
     (detail: SidebarWorkspaceSessionDetail) =>
       update((s) => ({ details: { ...s.details, [detail]: !s.details[detail] } })),
@@ -71,8 +76,15 @@ export function useWorkspaceSessionsPreferences(): WorkspaceSessionsPreferences 
   );
 
   return useMemo(
-    () => ({ ...current, toggleVisible, setExpansion, toggleActiveOnly, toggleDetail }),
-    [current, toggleVisible, setExpansion, toggleActiveOnly, toggleDetail],
+    () => ({
+      ...current,
+      toggleVisible,
+      setExpansion,
+      toggleActiveOnly,
+      toggleFullTitles,
+      toggleDetail,
+    }),
+    [current, toggleVisible, setExpansion, toggleActiveOnly, toggleFullTitles, toggleDetail],
   );
 }
 

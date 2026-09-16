@@ -6,7 +6,7 @@ import { z } from "zod";
  * Pure on purpose, like `display-preferences/checks-display.ts`: `hooks/use-settings/storage.ts`
  * validates the persisted value through `SidebarWorkspaceSessionsSchema` rather than growing its
  * own copy of the shape. `visible: false` is the whole feature switched off — the sidebar renders
- * exactly as upstream Paseo does.
+ * exactly as upstream Paseo does. The fusion ships it on.
  */
 
 export const SIDEBAR_WORKSPACE_SESSION_EXPANSIONS = [
@@ -50,24 +50,27 @@ export interface SidebarWorkspaceSessions {
   expansion: SidebarWorkspaceSessionExpansion;
   /** Only sessions carrying a live status mark — anything but idle. */
   activeOnly: boolean;
+  /** Wrap a long title over as many lines as it needs; off cuts it to one line with a tooltip. */
+  fullTitles: boolean;
   details: SidebarWorkspaceSessionDetails;
 }
 
-// A session line is a quick way into a session, so it starts as its title and last activity.
+// A session line starts with who started it, from where, on which model, and when it last moved.
 export const DEFAULT_SIDEBAR_WORKSPACE_SESSION_DETAILS: SidebarWorkspaceSessionDetails = {
-  model: false,
-  createdUser: false,
+  model: true,
+  createdUser: true,
   updatedUser: false,
-  channels: false,
+  channels: true,
   createdTime: false,
   updatedTime: false,
   lastActivity: true,
 };
 
 export const DEFAULT_SIDEBAR_WORKSPACE_SESSIONS: SidebarWorkspaceSessions = {
-  visible: false,
+  visible: true,
   expansion: "autoCollapse",
   activeOnly: false,
+  fullTitles: true,
   details: DEFAULT_SIDEBAR_WORKSPACE_SESSION_DETAILS,
 };
 
@@ -89,6 +92,7 @@ export const SidebarWorkspaceSessionsSchema = z
       .enum(SIDEBAR_WORKSPACE_SESSION_EXPANSIONS)
       .catch(DEFAULT_SIDEBAR_WORKSPACE_SESSIONS.expansion),
     activeOnly: z.boolean().catch(DEFAULT_SIDEBAR_WORKSPACE_SESSIONS.activeOnly),
+    fullTitles: z.boolean().catch(DEFAULT_SIDEBAR_WORKSPACE_SESSIONS.fullTitles),
     details: SessionDetailsSchema,
   })
   .catch(DEFAULT_SIDEBAR_WORKSPACE_SESSIONS);

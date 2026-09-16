@@ -30,15 +30,20 @@ export type SidebarRowItem = (typeof SIDEBAR_ROW_ITEMS)[number];
 
 export type SidebarRowItems = Record<SidebarRowItem, boolean>;
 
-/** The persisted record is merged over these explicit product defaults. */
+/**
+ * The persisted record is merged over these explicit product defaults.
+ *
+ * Clisbot fusion diverges from upstream on `branch` and `createdUser` (upstream: off), so a row
+ * says whose work it is and where out of the box.
+ */
 export const DEFAULT_SIDEBAR_ROW_ITEMS: SidebarRowItems = {
-  branch: false,
+  branch: true,
   project: false,
   host: true,
   changeRequest: true,
   services: true,
   labels: true,
-  createdUser: false,
+  createdUser: true,
   channels: true,
   updatedUser: false,
   createdTime: false,

@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useRef, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -21,6 +21,7 @@ import {
 } from "./model";
 import type { SidebarWorkspaceSessionDetails } from "./preferences";
 import type { WorkspaceSessionItem } from "./select-sessions";
+import { SessionTitleTooltip } from "./session-title-tooltip";
 
 /**
  * - `selected`: the agent in the workspace's focused pane — the session you are in. It takes the
@@ -57,6 +58,7 @@ export const WorkspaceSessionList = memo(function WorkspaceSessionList(
     <OpenWorkspaceSessionList
       {...props}
       activeOnly={preference.activeOnly}
+      fullTitles={preference.fullTitles}
       details={preference.details}
     />
   );
@@ -70,9 +72,11 @@ function OpenWorkspaceSessionList({
   indented,
   onSessionPress,
   activeOnly,
+  fullTitles,
   details,
 }: WorkspaceSessionListProps & {
   activeOnly: boolean;
+  fullTitles: boolean;
   details: SidebarWorkspaceSessionDetails;
 }): ReactElement | null {
   const sessions = useWorkspaceSessions({ serverId, workspaceId, activeOnly });
@@ -93,6 +97,7 @@ function OpenWorkspaceSessionList({
             workspaceId={workspaceId}
             session={session}
             state={state}
+            fullTitles={fullTitles}
             details={details}
             indented={indented}
             onPress={onSessionPress}
@@ -108,6 +113,7 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   workspaceId,
   session,
   state,
+  fullTitles,
   details,
   indented,
   onPress,
@@ -116,6 +122,8 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   workspaceId: string;
   session: WorkspaceSessionItem;
   state: SessionLineState;
+  /** Wrap the title instead of cutting it; a cut title shows in full in a hover tooltip. */
+  fullTitles: boolean;
   details: SidebarWorkspaceSessionDetails;
   indented: boolean;
   onPress?: () => void;
@@ -124,6 +132,7 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   const { agent } = session;
   const label = session.title ?? t("workspace.tabs.fallback.newAgent");
   const selected = state === "selected";
+  const titleRef = useRef<Text>(null);
   const handlePress = useCallback(() => {
     onPress?.();
     navigateToAgent({ serverId, workspaceId, agentId: agent.id });
@@ -140,7 +149,7 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
     [indented, selected],
   );
 
-  return (
+  const row = (
     <Pressable
       accessibilityRole={isWeb ? undefined : "button"}
       accessibilityLabel={label}
@@ -159,7 +168,11 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
               active={state !== "idle"}
               backdrop={resolveBackdrop(selected, hovered)}
             />
-            <Text style={titleStyle(state)} numberOfLines={1}>
+            <Text
+              ref={titleRef}
+              style={titleStyle(state)}
+              numberOfLines={fullTitles ? undefined : 1}
+            >
               {label}
             </Text>
             {details.lastActivity ? <LastActivity agent={agent} /> : null}
@@ -174,6 +187,12 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
       )}
     </Pressable>
   );
+  if (fullTitles) return row;
+  return (
+    <SessionTitleTooltip label={label} titleRef={titleRef}>
+      {row}
+    </SessionTitleTooltip>
+  );
 });
 
 function resolveBackdrop(selected: boolean, hovered: boolean): SidebarSurfaceBackdrop {
@@ -182,9 +201,8 @@ function resolveBackdrop(selected: boolean, hovered: boolean): SidebarSurfaceBac
 }
 
 function titleStyle(state: SessionLineState) {
-  if (state === "selected") return [styles.title, styles.titleSelected];
-  if (state === "visible") return [styles.title, styles.titleVisible];
-  return styles.title;
+  // Selected and visible read the same; the fill alone marks the selected line.
+  return state === "idle" ? styles.title : [styles.title, styles.titleShown];
 }
 
 /**
@@ -273,6 +291,9 @@ function SessionDetailLine({
   );
 }
 
+// The workspace title's size and line height, so a session reads at the same weight as its row.
+const TITLE_LINE_HEIGHT = 20;
+
 const styles = StyleSheet.create((theme) => ({
   // The mark starts where the workspace title starts: the workspace row's left padding, its
   // leading status column, and the gap after it. Every session sits under its workspace's
@@ -299,13 +320,15 @@ const styles = StyleSheet.create((theme) => ({
   rowPressed: {
     backgroundColor: theme.colors.surface2,
   },
+  // Top-aligned so a wrapped title keeps its mark and time on its first line.
   titleLine: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: theme.spacing[2],
   },
   markSlot: {
     width: theme.iconSize.sm,
+    height: TITLE_LINE_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -314,20 +337,17 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minWidth: 0,
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 18,
+    fontSize: theme.fontSize.base,
+    lineHeight: TITLE_LINE_HEIGHT,
   },
-  titleVisible: {
+  titleShown: {
     color: theme.colors.foreground,
-  },
-  titleSelected: {
-    color: theme.colors.foreground,
-    fontWeight: theme.fontWeight.medium,
   },
   trailing: {
     flexShrink: 0,
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+    lineHeight: TITLE_LINE_HEIGHT,
   },
   // Under the title, past the mark, so detail items line up with the words they describe.
   detailLine: {

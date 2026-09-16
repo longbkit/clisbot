@@ -11,6 +11,7 @@ import {
   MessagesSquare,
   MousePointerClick,
   UserRound,
+  WrapText,
 } from "lucide-react-native";
 import {
   MenuItem,
@@ -45,6 +46,7 @@ interface Option {
 const ThemedMessagesSquare = withUnistyles(MessagesSquare);
 const ThemedEye = withUnistyles(Eye);
 const ThemedCircleDot = withUnistyles(CircleDot);
+const ThemedWrapText = withUnistyles(WrapText);
 const ThemedUserRound = withUnistyles(UserRound);
 const ThemedClock = withUnistyles(Clock);
 
@@ -89,8 +91,8 @@ export function WorkspaceSessionsSubTrigger(): ReactElement {
 }
 
 /**
- * Four groups, top to bottom: the master switch, how rows open, which sessions they list, and
- * what each line says.
+ * Four groups, top to bottom: the master switch, how rows open, which sessions they list and how
+ * much of their titles they show, and what each line says.
  *
  * The groups below the switch stay live while sessions are hidden, so turning sessions back on
  * restores the setup you had rather than resetting it.
@@ -99,6 +101,7 @@ function WorkspaceSessionsPage(): ReactElement {
   const preferences = useWorkspaceSessionsPreferences();
   const showLeading = useOptionIcon(ThemedEye);
   const activeOnlyLeading = useOptionIcon(ThemedCircleDot);
+  const fullTitlesLeading = useOptionIcon(ThemedWrapText);
 
   return (
     <>
@@ -131,6 +134,15 @@ function WorkspaceSessionsPage(): ReactElement {
         testID="sidebar-workspace-sessions-active-only"
       >
         Active sessions only
+      </MenuItem>
+      <MenuItem
+        selected={preferences.fullTitles}
+        leading={fullTitlesLeading}
+        closeOnSelect={false}
+        onSelect={preferences.toggleFullTitles}
+        testID="sidebar-workspace-sessions-full-titles"
+      >
+        Full titles
       </MenuItem>
       <MenuSeparator />
       {SIDEBAR_WORKSPACE_SESSION_DETAILS.map((detail) => (

@@ -6,15 +6,15 @@ import {
 } from "./row-items";
 
 describe("parseSidebarRowItems", () => {
-  it("shows operational metadata but hides identity badges by default", () => {
+  it("shows operational metadata, the branch, and who started the work by default", () => {
     expect(DEFAULT_SIDEBAR_ROW_ITEMS).toEqual({
-      branch: false,
+      branch: true,
       project: false,
       host: true,
       changeRequest: true,
       services: true,
       labels: true,
-      createdUser: false,
+      createdUser: true,
       updatedUser: false,
       channels: true,
       createdTime: false,
