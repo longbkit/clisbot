@@ -288,7 +288,7 @@ const ACP_PROBE_CLOSE_TIMEOUT_MS = 2_000;
 const ACP_SHUTDOWN_REQUEST_TIMEOUT_MS = 1_000;
 // Bounds each handshake step (initialize, session/new, session/load, session/resume). A child
 // that never answers is terminated instead of living on as an orphan.
-const ACP_HANDSHAKE_TIMEOUT_MS = 90_000;
+const ACP_HANDSHAKE_TIMEOUT_MS = 180_000;
 // Below the manager's 2s interrupt timeout, so a locally closed turn still counts as acknowledged.
 const ACP_CANCEL_SETTLE_TIMEOUT_MS = 1_500;
 const ABANDONED_PROMPT_OUTPUT_UPDATES = new Set<string>([
