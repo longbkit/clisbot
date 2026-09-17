@@ -688,7 +688,7 @@ function isSubscribedEvent(
 }
 
 export class Session {
-  private readonly accountActor?: SessionActor;
+  private accountActor?: SessionActor;
   private readonly hubRelationships?: HubRelationshipManagement;
   private readonly clientId: string;
   private readonly authorization: SessionAuthorization;
@@ -2200,6 +2200,21 @@ export class Session {
       this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
     }
     return extended;
+  }
+
+  public replaceManagedAdmission(admission: {
+    permissions: readonly DaemonPermission[];
+    resourceAuthorization: SessionResourceAuthorization;
+    actor?: SessionActor;
+  }): void {
+    this.authorization.replacePermissions(admission.permissions);
+    this.authorization.replaceResources(admission.resourceAuthorization);
+    if (admission.actor !== undefined) {
+      this.accountActor = admission.actor;
+    }
+    if (this.registeredPushToken) {
+      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
+    }
   }
 
   public subscribesToAgent(agent: ManagedAgent): Promise<boolean> {

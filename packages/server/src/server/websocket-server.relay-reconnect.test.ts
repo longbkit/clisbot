@@ -60,6 +60,9 @@ const sessionMock = vi.hoisted(() => {
     allowsInbound = vi.fn(() => true);
     allowsPermission = vi.fn(() => true);
     extendManagedLease = vi.fn(() => true);
+    replaceManagedAdmission = vi.fn((admission: { permissions: unknown }) => {
+      this.args.permissions = admission.permissions;
+    });
     publish = vi.fn((message: unknown) => {
       const onMessage = this.args.onMessage as ((message: unknown) => void) | undefined;
       onMessage?.(message);
@@ -723,13 +726,13 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
-  test("managed reconnect replaces the prior lease and proactive revocation closes the session", async () => {
+  test("managed reconnect continues the session and proactive revocation closes it", async () => {
     let issue = 0;
     const resolver = vi.fn(async () => {
       issue += 1;
       return {
         principalId: "member:user-1",
-        // The third ticket carries different authority, so it replaces rather than shares.
+        // The third ticket carries different authority, so leftover sockets are superseded.
         permissions: issue >= 3 ? ["workspace.write" as const] : ["workspace.read" as const],
         resourceMode: "projects" as const,
         projects: new Map<string, never>(),
@@ -772,15 +775,17 @@ describe("relay external socket reconnect behavior", () => {
         accessTicket: "paseo_dat_second",
       }),
     );
-    await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(2));
+    await vi.waitFor(() => expect(second.readyState).toBe(1));
+    expect(sessionMock.instances).toHaveLength(1);
     expect(first.readyState).toBe(3);
-    // Replaced, not revoked: the client must not treat this as losing Hub access.
+    // The session continued; only the replaced socket closed. Not a revocation.
     expect(firstClose).toHaveBeenCalledWith(4409, "Session continued in another connection");
-    expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
+    expect(sessionMock.instances[0]?.cleanup).not.toHaveBeenCalled();
+    expect(sessionMock.instances[0]?.replaceManagedAdmission).toHaveBeenCalled();
 
     expect(server.revokeManagedLeases(["00000000-0000-4000-8000-000000000003"])).toBe(1);
     await vi.waitFor(() => expect(second.readyState).toBe(3));
-    expect(sessionMock.instances[1]?.cleanup).toHaveBeenCalledOnce();
+    expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
     await server.close();
   });
 
@@ -838,22 +843,29 @@ describe("relay external socket reconnect behavior", () => {
     }
   });
 
-  test("closes a managed session when refreshed authority no longer matches", async () => {
+  test("asks the client to rebind when refreshed authority no longer matches", async () => {
     vi.useFakeTimers();
     try {
       const leaseId = "00000000-0000-4000-8000-000000000011";
+      const reboundLeaseId = "00000000-0000-4000-8000-000000000012";
+      let hellos = 0;
+      const socketClose = vi.fn();
       const server = createServer({
         managedAccess: {
           mode: "external",
           resolver: {
-            resolve: async () => ({
-              principalId: "member:user-1",
-              permissions: ["workspace.read" as const],
-              resourceMode: "projects" as const,
-              projects: new Map<string, never>(),
-              leaseId,
-              leaseExpiresAt: Date.now() + 1_500,
-            }),
+            resolve: async () => {
+              hellos += 1;
+              return {
+                principalId: "member:user-1",
+                permissions:
+                  hellos === 1 ? (["workspace.read"] as const) : (["workspace.write"] as const),
+                resourceMode: "projects" as const,
+                projects: new Map<string, never>(),
+                leaseId: hellos === 1 ? leaseId : reboundLeaseId,
+                leaseExpiresAt: Date.now() + (hellos === 1 ? 1_500 : 60_000),
+              };
+            },
             refresh: async () => ({
               principalId: "member:user-1",
               permissions: ["workspace.write" as const],
@@ -866,6 +878,7 @@ describe("relay external socket reconnect behavior", () => {
         },
       });
       const socket = new MockSocket();
+      socket.on("close", socketClose);
       await server.attachExternalSocket(
         socket,
         { transport: "relay" },
@@ -878,11 +891,72 @@ describe("relay external socket reconnect behavior", () => {
       await vi.advanceTimersByTimeAsync(1_000);
 
       expect(socket.readyState).toBe(3);
-      expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
+      expect(socketClose).toHaveBeenCalledWith(4410, "Session continued with updated admission");
+      expect(sessionMock.instances[0]?.cleanup).not.toHaveBeenCalled();
+
+      const rebound = new MockSocket();
+      await server.attachExternalSocket(
+        rebound,
+        { transport: "relay" },
+        undefined,
+        createHelloMessage("managed-client", {
+          accessTicket: "paseo_dat_rebind",
+        }),
+      );
+
+      expect(sessionMock.instances).toHaveLength(1);
+      expect(rebound.readyState).toBe(1);
+      expect(sessionMock.instances[0]?.replaceManagedAdmission).toHaveBeenCalled();
+      expect(server.revokeManagedLeases([reboundLeaseId])).toBe(1);
+      await vi.waitFor(() => expect(rebound.readyState).toBe(3));
       await server.close();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test("resumes a managed session after the last socket drops", async () => {
+    let issue = 0;
+    const server = createServer({
+      managedAccess: {
+        mode: "external",
+        resolver: {
+          resolve: async () => {
+            issue += 1;
+            return {
+              principalId: "member:user-1",
+              permissions: ["workspace.read" as const],
+              resourceMode: "projects" as const,
+              projects: new Map<string, never>(),
+              leaseId: `00000000-0000-4000-8000-${String(issue).padStart(12, "0")}`,
+              leaseExpiresAt: Date.now() + 60_000,
+            };
+          },
+        },
+      },
+    });
+    const first = new MockSocket();
+    await server.attachExternalSocket(
+      first,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", { accessTicket: "paseo_dat_first" }),
+    );
+    expect(sessionMock.instances).toHaveLength(1);
+    first.close();
+
+    const second = new MockSocket();
+    await server.attachExternalSocket(
+      second,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", { accessTicket: "paseo_dat_second" }),
+    );
+    expect(sessionMock.instances).toHaveLength(1);
+    expect(second.readyState).toBe(1);
+    expect(sessionMock.instances[0]?.cleanup).not.toHaveBeenCalled();
+    expect(sessionMock.instances[0]?.replaceManagedAdmission).toHaveBeenCalled();
+    await server.close();
   });
 
   test("accepts lease revocation only from the enrolled Hub service connection", async () => {

@@ -197,6 +197,24 @@ describe("Host-wide Project privileges", () => {
     });
   }
 
+  test("replaceResources swaps the lease and Project grants in place", () => {
+    const authorization = managed(new Set(["project.use", "workspace.manage"]));
+    authorization.replaceResources({
+      resourceMode: "projects",
+      projects: new Map([
+        [
+          "project-b",
+          { privileges: new Set(["project.use", "workspace.create"]), agentConfigurations: [] },
+        ],
+      ]),
+      leaseId: "lease-b",
+      leaseExpiresAt: Date.now() + 60_000,
+    });
+    expect(authorization.leaseId()).toBe("lease-b");
+    expect(authorization.allowsProject("project-a", "workspace.manage")).toBe(false);
+    expect(authorization.allowsProject("project-b", "workspace.create")).toBe(true);
+  });
+
   test("count only with project.use and an active lease, like a Project grant", () => {
     expect(
       managed(new Set(["project.use", "workspace.manage"])).allowsDaemonPrivilege(

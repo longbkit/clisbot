@@ -37,7 +37,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 }, 30_000);
 
-it("uses a 15 minute lease by default and accepts a bounded minute override", () => {
+it("uses a 1 hour lease by default and accepts a bounded minute override", () => {
   assert.equal(readAccessLeaseDuration(undefined), DEFAULT_ACCESS_LEASE_DURATION_MS);
   assert.equal(readAccessLeaseDuration("5m"), 5 * 60_000);
   assert.equal(readAccessLeaseDuration("1h"), 60 * 60_000);

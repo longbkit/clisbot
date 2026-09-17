@@ -10,9 +10,18 @@ export const MutableManagedAccessConfigSchema = z
 export type MutableManagedAccessConfig = z.infer<typeof MutableManagedAccessConfigSchema>;
 
 /**
- * Close code for a managed session replaced by a newer connection from the same client (a fresh
- * ticket, or another window sharing its client id). It is not a revocation: the client keeps its
- * Hub binding and does not reconnect, so two windows never take the session back and forth.
+ * Close code for sockets replaced by a newer connection from the same client (a fresh ticket, or
+ * another window sharing its client id). The session itself continues on the new connection. It is
+ * not a revocation: the client keeps its Hub binding and does not reconnect, so two windows never
+ * take the session back and forth.
  */
 export const MANAGED_SESSION_SUPERSEDED_CLOSE_CODE = 4409;
 export const MANAGED_SESSION_SUPERSEDED_REASON = "Session continued in another connection";
+
+/**
+ * Close code asking this client to reconnect with a fresh ticket after Hub authority changed. Not a
+ * revocation: the session stays in reconnect grace so the new hello rebinds admission in place.
+ * Reason text avoids the client's "managed access" revoke matcher so older clients still redial.
+ */
+export const MANAGED_ACCESS_REBIND_CLOSE_CODE = 4410;
+export const MANAGED_ACCESS_REBIND_REASON = "Session continued with updated admission";

@@ -1,4 +1,6 @@
 import {
+  MANAGED_ACCESS_REBIND_CLOSE_CODE,
+  MANAGED_ACCESS_REBIND_REASON,
   MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
   MANAGED_SESSION_SUPERSEDED_REASON,
 } from "@getpaseo/protocol/managed-access";
@@ -1731,13 +1733,12 @@ export class VoiceAssistantWebSocketServer {
     const sessionKey = sessionConnectionKey(pending.admission.principalId, clientId);
     const existing = pluginId ? undefined : this.externalSessionsByKey.get(sessionKey);
     if (existing) {
-      if (pending.admission.leaseId === undefined || sharesLiveManagedSession(existing, pending)) {
+      if (pending.admission.leaseId === undefined) {
         this.resumeSession({ ws, message, pending, existing });
         return;
       }
-      void this.closeManagedConnection(existing, MANAGED_SESSION_SUPERSEDED_REASON, {
-        code: MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
-      });
+      this.continueManagedSession({ ws, message, pending, existing });
+      return;
     }
 
     const connectionLogger = pending.connectionLogger.child({ clientId });
@@ -1848,6 +1849,66 @@ export class VoiceAssistantWebSocketServer {
       ws.close(WS_CLOSE_DAEMON_AUTH_FAILED, reason);
     } catch {
       // ignore close errors
+    }
+  }
+
+  private continueManagedSession(params: {
+    ws: WebSocketLike;
+    message: WSHelloMessage;
+    pending: PendingConnection;
+    existing: ReconnectableSessionConnection;
+  }): void {
+    const { ws, message, pending, existing } = params;
+    if (existing.sockets.size > 0 && !sharesLiveManagedSession(existing, pending)) {
+      this.closeConnectionSockets(
+        existing,
+        MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
+        MANAGED_SESSION_SUPERSEDED_REASON,
+      );
+    }
+    this.rebindManagedAdmission(existing, pending.admission);
+    this.resumeSession({ ws, message, pending, existing });
+  }
+
+  private rebindManagedAdmission(connection: SessionConnection, admission: SessionAdmission): void {
+    if (
+      admission.leaseId === undefined ||
+      admission.leaseExpiresAt === undefined ||
+      admission.resourceMode === undefined ||
+      admission.projects === undefined
+    ) {
+      return;
+    }
+    connection.managedLeaseId = admission.leaseId;
+    connection.managedAuthoritySignature = managedAuthoritySignature(admission);
+    connection.session.replaceManagedAdmission({
+      permissions: admission.permissions,
+      resourceAuthorization: {
+        resourceMode: admission.resourceMode,
+        projects: admission.projects,
+        ...(admission.daemonPrivileges === undefined
+          ? {}
+          : { daemonPrivileges: admission.daemonPrivileges }),
+        leaseId: admission.leaseId,
+        leaseExpiresAt: admission.leaseExpiresAt,
+      },
+      ...(admission.actor === undefined ? {} : { actor: admission.actor }),
+    });
+    this.scheduleManagedLease(connection, admission.leaseExpiresAt);
+  }
+
+  private closeConnectionSockets(
+    connection: SessionConnection,
+    code: number,
+    reason: string,
+  ): void {
+    // Close mutates the set via handleClientClose; iterate a snapshot.
+    for (const socket of Array.from(connection.sockets)) {
+      try {
+        socket.close(code, reason);
+      } catch {
+        // handleClientClose remains authoritative if the transport close fails.
+      }
     }
   }
 
@@ -2324,11 +2385,19 @@ export class VoiceAssistantWebSocketServer {
       if (
         admission.leaseId !== leaseId ||
         admission.principalId !== connection.principalId ||
-        managedAuthoritySignature(admission) !== connection.managedAuthoritySignature ||
+        managedAuthoritySignature(admission) !== connection.managedAuthoritySignature
+      ) {
+        this.requestManagedAdmissionRebind(connection);
+        return;
+      }
+      if (
         admission.leaseExpiresAt <= currentLeaseExpiresAt ||
         !connection.session.extendManagedLease(leaseId, admission.leaseExpiresAt)
       ) {
-        await this.closeManagedConnection(connection, "Managed access authority changed");
+        connection.connectionLogger.warn(
+          { leaseId },
+          "Managed access refresh did not extend the lease",
+        );
         return;
       }
       this.scheduleManagedLease(connection, admission.leaseExpiresAt);
@@ -2345,6 +2414,19 @@ export class VoiceAssistantWebSocketServer {
       retryTimeout.unref?.();
       connection.managedLeaseRefreshTimeout = retryTimeout;
     }
+  }
+
+  private requestManagedAdmissionRebind(connection: SessionConnection): void {
+    connection.connectionLogger.info(
+      { leaseId: connection.managedLeaseId },
+      "Managed access authority changed; waiting for a new ticket",
+    );
+    if (connection.sockets.size === 0) return;
+    this.closeConnectionSockets(
+      connection,
+      MANAGED_ACCESS_REBIND_CLOSE_CODE,
+      MANAGED_ACCESS_REBIND_REASON,
+    );
   }
 
   private async closeManagedConnection(

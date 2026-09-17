@@ -64,7 +64,7 @@ The channel plane admits against a daemon in managed-access `external` mode by m
   `external`_ races the relationship that consumes tickets; `startAccount`'s 15 s connect gate
   can expire first and tear the account down with no retry. Lease refresh and socket reconnect
   are otherwise automatic. Shorten the lease with `PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION=1m`
-  (min `1m`) to watch a refresh without a 15-minute wait.
+  (min `1m`) to watch a refresh without a 1-hour wait.
 
 ### Writing a config revision
 

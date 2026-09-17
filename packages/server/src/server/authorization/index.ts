@@ -29,7 +29,7 @@ export const OWNER_PERMISSIONS: readonly DaemonPermission[] = DAEMON_PERMISSIONS
 
 export class SessionAuthorization {
   private permissions: ReadonlySet<DaemonPermission>;
-  private readonly resources: SessionResourceAuthorization | null;
+  private resources: SessionResourceAuthorization | null;
 
   constructor(permissions: readonly DaemonPermission[], resources?: SessionResourceAuthorization) {
     this.permissions = new Set(permissions);
@@ -64,6 +64,18 @@ export class SessionAuthorization {
 
   replacePermissions(permissions: readonly DaemonPermission[]): void {
     this.permissions = new Set(permissions);
+  }
+
+  replaceResources(resources: SessionResourceAuthorization): void {
+    this.resources = {
+      resourceMode: resources.resourceMode,
+      projects: resources.projects,
+      ...(resources.daemonPrivileges === undefined
+        ? {}
+        : { daemonPrivileges: resources.daemonPrivileges }),
+      leaseId: resources.leaseId,
+      leaseExpiresAt: resources.leaseExpiresAt,
+    };
   }
 
   listPermissions(): DaemonPermission[] {

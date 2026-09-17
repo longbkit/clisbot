@@ -9,7 +9,7 @@ import * as schema from "../db/schema.js";
 import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
 
 export const ACCESS_TICKET_LIFETIME_MS = 60_000;
-export const DEFAULT_ACCESS_LEASE_DURATION_MS = 15 * 60_000;
+export const DEFAULT_ACCESS_LEASE_DURATION_MS = 60 * 60_000;
 export const MIN_ACCESS_LEASE_DURATION_MS = 60_000;
 export const MAX_ACCESS_LEASE_DURATION_MS = 60 * 60_000;
 

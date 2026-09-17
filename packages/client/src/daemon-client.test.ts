@@ -356,6 +356,28 @@ test("keeps Hub access when a newer connection from this client replaces the ses
   expect(onAccessRevoked).not.toHaveBeenCalled();
 });
 
+test("reconnects with a new ticket when the daemon asks to rebind admission", async () => {
+  const mock = createMockTransport();
+  const onAccessRevoked = vi.fn();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "managed_access_rebind_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+    resolveAccessTicket: async () => "paseo_dat_ticket",
+    onAccessRevoked,
+  });
+  clients.push(client);
+
+  const connecting = client.connect().catch(() => undefined);
+  mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+  await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+  mock.triggerClose({ code: 4410, reason: "Session continued with updated admission" });
+  await connecting;
+
+  expect(onAccessRevoked).not.toHaveBeenCalled();
+});
+
 test("keeps Hub access when an older daemon replaces the session with the legacy reason", async () => {
   const mock = createMockTransport();
   const onAccessRevoked = vi.fn();

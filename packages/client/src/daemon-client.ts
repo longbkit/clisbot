@@ -7,7 +7,10 @@ import {
 } from "./connection/index.js";
 import type { z } from "zod";
 import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
-import { MANAGED_SESSION_SUPERSEDED_CLOSE_CODE } from "@getpaseo/protocol/managed-access";
+import {
+  MANAGED_ACCESS_REBIND_CLOSE_CODE,
+  MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
+} from "@getpaseo/protocol/managed-access";
 import type { AgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
 import { parsePluginSourceReference } from "@getpaseo/protocol/plugin-source-reference";
 import {
@@ -1347,9 +1350,10 @@ export class DaemonClient {
             // A newer connection from this client took the session over; nothing was revoked.
             this.setReconnectEnabled(false);
           } else if (
-            closeCode === 4401 ||
-            closeCode === 4403 ||
-            /managed access|ticket required|access denied/i.test(reason)
+            closeCode !== MANAGED_ACCESS_REBIND_CLOSE_CODE &&
+            (closeCode === 4401 ||
+              closeCode === 4403 ||
+              /managed access|ticket required|access denied/i.test(reason))
           ) {
             this.config.onAccessRevoked?.();
             this.setReconnectEnabled(false);
