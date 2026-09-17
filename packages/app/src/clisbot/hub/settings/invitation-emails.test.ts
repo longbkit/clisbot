@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseInvitationEmails, sendInvitations } from "./invitation-emails";
+import { parseInvitationEmails } from "./invitation-emails";
 
 describe("parseInvitationEmails", () => {
   it("splits on commas, semicolons, spaces, and new lines, lower-cased and de-duplicated", () => {
@@ -20,17 +20,5 @@ describe("parseInvitationEmails", () => {
       emails: ["ok@vexere.com"],
       invalid: ["bad@vexere", "@x.com"],
     });
-  });
-});
-
-describe("sendInvitations", () => {
-  it("continues past a refused address and reports it", async () => {
-    const sent: string[] = [];
-    const failures = await sendInvitations(["a@x.com", "b@x.com", "c@x.com"], async (email) => {
-      if (email === "b@x.com") throw new Error("Hub account request failed (409).");
-      sent.push(email);
-    });
-    expect(sent).toEqual(["a@x.com", "c@x.com"]);
-    expect(failures).toEqual([{ email: "b@x.com", message: "already a Member, or no free seat" }]);
   });
 });

@@ -18,10 +18,11 @@ import {
   channelConnectionLabel,
   channelIdentityLine,
   identityCoversConnection,
-  type ChannelConnectionNaming,
 } from "../channel-identity-directory";
-import { useChannelCatalog } from "./channel-catalog-queries";
 import type { ChannelCatalogEntry } from "../channel-catalog";
+import { useChannelCatalog } from "./channel-catalog-queries";
+import { ChannelIdentityList } from "./channel-identity-list";
+import { useHubResource } from "./hub-resource";
 import { hubResourceQueryKey } from "../query-keys";
 import {
   HubChannelIdentitiesSchema,
@@ -409,35 +410,12 @@ function ChannelIdentityChallenge({
 export function ChannelIdentitySettings() {
   const hub = useHubAccount();
   const catalog = useChannelCatalog();
-  const organizationId = hub.signedIn?.organization.id ?? "";
-  const accountId = hub.signedIn?.account.id ?? null;
-  const queryScope = { origin: hub.origin, organizationId, accountId };
   const canManage = hub.signedIn?.capabilities.manageResources === true;
   const canOverrideIdentity = hub.signedIn?.isInstanceOperator === true;
-  const identities = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "channel-identities"),
-    queryFn: () => hub.api().get("channel-identities", HubChannelIdentitiesSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const members = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "members"),
-    queryFn: () => hub.api().get("members", HubMembersSchema),
-    enabled: organizationId.length > 0 && canManage,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const connections = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "connections"),
-    queryFn: () => hub.api().get("connections", HubConnectionsSchema),
-    enabled: organizationId.length > 0 && canManage,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
+  // Same queries as the Team settings screen, so the tab reuses what the screen already loaded.
+  const identities = useHubResource("channel-identities", HubChannelIdentitiesSchema);
+  const members = useHubResource("members", HubMembersSchema, canManage);
+  const connections = useHubResource("connections", HubConnectionsSchema, canManage);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [externalSubjectId, setExternalSubjectId] = useState("");
@@ -472,10 +450,6 @@ export function ChannelIdentitySettings() {
     // The catalog arrives after the Connections do; without it here the options
     // would keep the fallback label for the rest of the session.
     [channelConnections, catalog.entries],
-  );
-  const memberById = useMemo(
-    () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
-    [members.data?.members],
   );
 
   const remove = useCallback(
@@ -530,18 +504,16 @@ export function ChannelIdentitySettings() {
   }, [link]);
 
   return (
-    <SettingsSection title="Channel identities">
-      <Alert
-        variant="info"
-        title="One Member can use several provider identities"
-        description="Each identity is scoped to its Connection, so the same provider user ID in two workspaces or accounts stays distinct."
-      />
+    <SettingsSection
+      title="Channel identities"
+      info="One Member can use several provider identities. Each identity is scoped to its Connection, so the same provider user ID in two workspaces or accounts stays distinct."
+    >
       <QueryFeedback queries={[identities, ...(canManage ? [members, connections] : [])]} />
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-      <ChannelIdentityRows
+      <ChannelIdentityList
         identities={identities.data?.identities ?? []}
-        members={memberById}
-        connections={connections.data?.connections ?? []}
+        members={canManage ? members.data?.members : undefined}
+        connections={connections.data?.connections}
         canManage={canManage}
         pending={pending}
         remove={remove}
@@ -574,65 +546,6 @@ function identityCanBeLinked(
 ): boolean {
   return (
     !pending && memberId !== null && connectionId !== null && externalSubjectId.trim().length > 0
-  );
-}
-
-function ChannelIdentityRows({
-  identities,
-  members,
-  connections,
-  canManage,
-  pending,
-  remove,
-}: {
-  identities: Array<{
-    id: string;
-    memberId: string;
-    identityRealm?: string | undefined;
-    connectionId: string;
-    displayName?: string | null;
-    externalSubjectId: string;
-  }>;
-  members: Map<string, { name: string }>;
-  connections: readonly ChannelConnectionNaming[];
-  canManage: boolean;
-  pending: boolean;
-  remove(id: string): Promise<void>;
-}) {
-  const catalog = useChannelCatalog();
-  if (identities.length === 0) {
-    return (
-      <View style={settingsStyles.card}>
-        <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>No Channel identities are linked.</Text>
-        </View>
-      </View>
-    );
-  }
-  return (
-    <View style={settingsStyles.card}>
-      {identities.map((identity, index) => {
-        const member = members.get(identity.memberId);
-        return (
-          <View
-            key={identity.id}
-            style={[settingsStyles.row, styles.row, index > 0 ? settingsStyles.rowBorder : null]}
-          >
-            <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>
-                {`${member?.name ?? identity.displayName ?? "Member"} · ${identity.displayName ?? identity.externalSubjectId}`}
-              </Text>
-              <Text style={settingsStyles.rowHint}>
-                {`${channelIdentityLine(catalog.entries, identity, connections)} · ${identity.externalSubjectId}`}
-              </Text>
-            </View>
-            {canManage ? (
-              <IdentityUnlinkButton identityId={identity.id} pending={pending} unlink={remove} />
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
   );
 }
 

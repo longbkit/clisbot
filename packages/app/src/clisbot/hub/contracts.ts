@@ -31,6 +31,7 @@ const TeamMemberSummarySchema = z.object({
   image: z.string().nullable().optional(),
   role: OrganizationRoleSchema,
 });
+const InvitationTeamSchema = z.object({ id: z.string(), name: z.string() });
 const AccountInvitationSchema = z.object({
   id: z.string(),
   organization: z.object({ id: z.string(), name: z.string() }),
@@ -38,7 +39,10 @@ const AccountInvitationSchema = z.object({
   role: z.enum(["admin", "member"]),
   expiresAt: z.string(),
   email: z.string().email().optional(),
-  team: z.object({ id: z.string(), name: z.string() }).optional(),
+  // COMPAT(invitationSingleTeam): Hubs before multi-Team invitations publish only `team`;
+  // remove `team` and read `teams` directly after 2027-03-17.
+  team: InvitationTeamSchema.optional(),
+  teams: z.array(InvitationTeamSchema).optional(),
 });
 const ManagedInvitationSummarySchema = z.object({
   id: z.string(),
@@ -46,8 +50,19 @@ const ManagedInvitationSummarySchema = z.object({
   role: z.enum(["admin", "member"]),
   expiresAt: z.string(),
   link: z.string(),
-  team: z.object({ id: z.string(), name: z.string() }).optional(),
+  // COMPAT(invitationSingleTeam): see AccountInvitationSchema.
+  team: InvitationTeamSchema.optional(),
+  teams: z.array(InvitationTeamSchema).optional(),
 });
+
+/** The Teams an invitation joins, from a Hub that publishes `teams` or only one `team`. */
+export function invitationTeams(invitation: {
+  team?: { id: string; name: string } | undefined;
+  teams?: { id: string; name: string }[] | undefined;
+}): { id: string; name: string }[] {
+  // COMPAT(invitationSingleTeam): drop the `team` fallback after 2027-03-17.
+  return invitation.teams ?? (invitation.team === undefined ? [] : [invitation.team]);
+}
 
 /** `POST /api/auth/paseo/registration/{inspect,complete}` for email-first self-registration. */
 export const HubRegistrationLinkSchema = z.object({

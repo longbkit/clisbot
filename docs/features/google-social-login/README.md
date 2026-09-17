@@ -107,8 +107,10 @@ A single operator on a personal address needs neither mail nor an allowlist
    operator keeps signing in with the password; Google sign-in with the same address
    is refused (`unable_to_link_account`), see
    [Operator accounts are not linked to Google](#operator-accounts-are-not-linked-to-google).
-4. Invite anyone else from the Team page and share the copied link. Invitation
-   email is sent only when Resend is configured.
+4. Invite anyone else from **Team → Teams → Add people to Teams** and share the
+   copied link. One invitation can join several Teams; emails of existing Members
+   are added to the chosen Teams directly. Invitation email is sent only when
+   Resend is configured.
 
 A Google claim starts from the setup screen with `intent: "claimInstance"` on
 `POST /api/auth/sign-in/social`. The callback creates the account as a pending

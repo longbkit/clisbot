@@ -26,28 +26,8 @@ export function parseInvitationEmails(text: string): InvitationEmailList {
   return { emails, invalid };
 }
 
-export interface InvitationFailure {
-  email: string;
-  message: string;
-}
-
-/** Sends one invitation per address, in order, and reports the addresses Hub refused. */
-export async function sendInvitations(
-  emails: string[],
-  invite: (email: string) => Promise<void>,
-): Promise<InvitationFailure[]> {
-  const failures: InvitationFailure[] = [];
-  for (const email of emails) {
-    try {
-      await invite(email);
-    } catch (error) {
-      failures.push({ email, message: invitationFailureMessage(error) });
-    }
-  }
-  return failures;
-}
-
-function invitationFailureMessage(error: unknown): string {
+/** A short reason for a refused invitation or Team addition, from a Hub request error. */
+export function invitationFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   // Hub answers 409 both for an existing Member and for a full seat plan.
   if (message.includes("(409)")) return "already a Member, or no free seat";

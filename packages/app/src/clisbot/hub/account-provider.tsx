@@ -66,7 +66,12 @@ interface HubAccountContextValue {
   signOut(): Promise<void>;
   selectOrganization(organizationId: string): Promise<void>;
   createOrganization(name: string): Promise<void>;
-  inviteMember(input: { email: string; role: "admin" | "member"; teamId?: string }): Promise<void>;
+  inviteMember(input: {
+    email: string;
+    role: "admin" | "member";
+    teamId?: string;
+    teamIds?: string[];
+  }): Promise<void>;
   cancelInvitation(invitationId: string): Promise<void>;
   changeMemberRole(input: { memberId: string; role: "owner" | "admin" | "member" }): Promise<void>;
   removeMember(memberId: string): Promise<void>;
@@ -293,7 +298,7 @@ function EnabledHubAccountProvider({
     [run, transport],
   );
   const inviteMember = useCallback(
-    (input: { email: string; role: "admin" | "member"; teamId?: string }) =>
+    (input: { email: string; role: "admin" | "member"; teamId?: string; teamIds?: string[] }) =>
       run(() => accountCommand(transport, "/api/auth/paseo/create-invitation", input)),
     [run, transport],
   );

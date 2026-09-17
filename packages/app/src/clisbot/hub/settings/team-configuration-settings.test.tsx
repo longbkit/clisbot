@@ -13,6 +13,7 @@ const hub = vi.hoisted(() => ({
   error: null,
   signedIn: null as Record<string, unknown> | null,
   inviteMember: vi.fn(async (_input: { email: string }) => {}),
+  cancelInvitation: vi.fn(async () => {}),
   api: () => ({ post: fixtures.post, delete: fixtures.delete }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
@@ -38,7 +39,27 @@ const fixtures = vi.hoisted(() => ({
   delete: vi.fn(async (_path: string) => {}),
   notAdded: vi.fn(),
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: fixtures.push }) }));
+const route = vi.hoisted(() => ({
+  params: {} as Record<string, string | undefined>,
+  listeners: new Set<() => void>(),
+}));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({
+    push: fixtures.push,
+    setParams: (params: Record<string, string | undefined>) => {
+      route.params = { ...route.params, ...params };
+      for (const listener of route.listeners) listener();
+    },
+  }),
+  useLocalSearchParams: () =>
+    React.useSyncExternalStore(
+      (listener: () => void) => {
+        route.listeners.add(listener);
+        return () => route.listeners.delete(listener);
+      },
+      () => route.params,
+    ),
+}));
 vi.mock("@/data/query", () => ({
   useFetchQuery: ({ queryKey }: { queryKey: string[] }) => fixtures.queries[queryKey.at(-1)!],
 }));
@@ -128,6 +149,119 @@ vi.mock("./channel-identity-settings", () => ({
 }));
 vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/components/ui/segmented-control", () => ({
+  SegmentedControl: ({
+    options,
+    value,
+    onValueChange,
+  }: {
+    options: { value: string; label: string }[];
+    value: string;
+    onValueChange(value: string): void;
+  }) => (
+    <div role="tablist">
+      {options.map((option) => (
+        <StubTab key={option.value} option={option} value={value} select={onValueChange} />
+      ))}
+    </div>
+  ),
+}));
+vi.mock("@/components/ui/search-field", () => ({
+  SearchField: ({
+    placeholder,
+    onChangeText,
+  }: {
+    placeholder: string;
+    onChangeText(value: string): void;
+  }) => <StubSearch placeholder={placeholder} onChangeText={onChangeText} />,
+}));
+vi.mock("./multi-select-field", () => ({
+  MultiSelectField: ({
+    label,
+    options,
+    value,
+    onChange,
+  }: {
+    label: string;
+    options: { value: string; label: string }[];
+    value: readonly string[];
+    onChange(value: string[]): void;
+  }) => (
+    <fieldset>
+      <legend>{label}</legend>
+      {options.map((option) => (
+        <StubCheckbox
+          key={option.value}
+          label={label}
+          option={option}
+          value={value}
+          onChange={onChange}
+        />
+      ))}
+    </fieldset>
+  ),
+}));
+
+function StubTab({
+  option,
+  value,
+  select,
+}: {
+  option: { value: string; label: string };
+  value: string;
+  select(value: string): void;
+}) {
+  const click = React.useCallback(() => select(option.value), [option.value, select]);
+  return (
+    <button type="button" role="tab" aria-selected={option.value === value} onClick={click}>
+      {option.label}
+    </button>
+  );
+}
+
+function StubSearch({
+  placeholder,
+  onChangeText,
+}: {
+  placeholder: string;
+  onChangeText(value: string): void;
+}) {
+  const change = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => onChangeText(event.target.value),
+    [onChangeText],
+  );
+  return <input aria-label={placeholder} onChange={change} />;
+}
+
+function StubCheckbox({
+  label,
+  option,
+  value,
+  onChange,
+}: {
+  label: string;
+  option: { value: string; label: string };
+  value: readonly string[];
+  onChange(value: string[]): void;
+}) {
+  const checked = value.includes(option.value);
+  const toggle = React.useCallback(
+    () => onChange(checked ? value.filter((id) => id !== option.value) : [...value, option.value]),
+    [checked, onChange, option.value, value],
+  );
+  return (
+    <label>
+      <input
+        type="checkbox"
+        aria-label={`${label}: ${option.label}`}
+        checked={checked}
+        onChange={toggle}
+      />
+      {option.label}
+    </label>
+  );
+}
+
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn() }));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: ({
@@ -256,11 +390,17 @@ function query(data: unknown) {
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.clearAllMocks();
+  route.params = {};
   hub.signedIn = { account, organization: { id: "organization" }, capabilities };
   hub.state = { status: "active", account, capabilities, team: { invitations: [] } };
   fixtures.queries = {
     members: query({ members: [member] }),
-    teams: query({ teams: [{ id: "team-1", name: "Support", userIds: [member.userId] }] }),
+    teams: query({
+      teams: [
+        { id: "team-1", name: "Support", userIds: [member.userId] },
+        { id: "team-2", name: "Sales", userIds: [] },
+      ],
+    }),
     "channel-identities": query({ identities: [] }),
     "access-assignments": query({
       assignments: [
@@ -285,13 +425,56 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("Team invitation review and access navigation", () => {
-  it("starts a fresh invitation draft when the signed-in account changes", () => {
+function openTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
+function chooseTeam(name: string) {
+  fireEvent.click(screen.getByLabelText(`Teams: ${name}`));
+}
+
+describe("Team settings tabs", () => {
+  it("opens on Members with counts and a search across name, email, and Team", () => {
+    fixtures.queries.members = query({
+      members: [
+        member,
+        {
+          id: "membership-2",
+          userId: "user-2",
+          name: "Nguyễn Bảo",
+          email: "bao@example.test",
+          role: "admin",
+        },
+      ],
+    });
+    render(<HubSettingsContent section="team" />);
+    const overview = screen.getByRole("heading", { name: "Overview" }).closest("section")!;
+    expect(within(overview).getByText("Without a Team").previousSibling?.textContent).toBe("1");
+    expect(screen.getByText("Support · 0 Channel identities")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search name, email, or Team"), {
+      target: { value: "nguyen" },
+    });
+    expect(screen.getByText("1 of 2 Members")).toBeTruthy();
+    expect(screen.queryByText("Alice")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Without a Team" }));
+    expect(screen.getByText("Nguyễn Bảo")).toBeTruthy();
+  });
+  it("keeps the chosen tab in the route", () => {
+    render(<HubSettingsContent section="team" />);
+    openTab("Teams");
+    expect(route.params).toEqual({ view: "teams" });
+    expect(screen.getByRole("heading", { name: "Add people to Teams" })).toBeTruthy();
+  });
+});
+
+describe("Add people to Teams", () => {
+  it("starts a fresh draft when the signed-in account changes", () => {
+    route.params = { view: "teams" };
     const ui = render(<HubSettingsContent section="team" />);
     fireEvent.change(screen.getByLabelText("Emails"), {
       target: { value: "private-draft@example.test" },
     });
-    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
+    chooseTeam("Support");
     hub.signedIn = {
       account: { ...account, id: "other-owner" },
       organization: { id: "organization" },
@@ -299,15 +482,14 @@ describe("Team invitation review and access navigation", () => {
     };
     ui.rerender(<HubSettingsContent section="team" />);
     expect((screen.getByLabelText("Emails") as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText("Team") as HTMLSelectElement).value).toBe("");
-    expect(
-      (screen.getByRole("button", { name: "Send invitation" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByLabelText("Teams: Support") as HTMLInputElement).checked).toBe(false);
   });
-  it("shows the selected Team resources and privileges before inviting", async () => {
+  it("sends one invitation that joins every chosen Team, after showing their access", async () => {
+    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
     fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
-    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
+    chooseTeam("Support");
+    chooseTeam("Sales");
     expect(screen.getByText("Customer chat")).toBeTruthy();
     expect(screen.getByText("channel read, channel reply")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
@@ -315,16 +497,41 @@ describe("Team invitation review and access navigation", () => {
       expect(hub.inviteMember).toHaveBeenCalledWith({
         email: "new@example.test",
         role: "member",
-        teamId: "team-1",
+        teamIds: ["team-1", "team-2"],
       }),
     );
+    await waitFor(() => expect(screen.getByText("Sent 1 invitation.")).toBeTruthy());
   });
-  it("invites a pasted list and keeps refused addresses for retry", async () => {
+  it("adds existing Members now and invites only new emails", async () => {
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    fireEvent.change(screen.getByLabelText("Emails"), {
+      target: { value: "Alice@example.test, new@example.test" },
+    });
+    chooseTeam("Support");
+    chooseTeam("Sales");
+    fireEvent.click(screen.getByRole("button", { name: "Add 1 and invite 1" }));
+    await waitFor(() => expect(hub.inviteMember).toHaveBeenCalledOnce());
+    // Alice is already in Support, so only Sales is added.
+    expect(fixtures.post).toHaveBeenCalledTimes(1);
+    expect(fixtures.post).toHaveBeenCalledWith(
+      "teams/team-2/members",
+      { userId: "user-1" },
+      expect.anything(),
+    );
+    expect(hub.inviteMember).toHaveBeenCalledWith({
+      email: "new@example.test",
+      role: "member",
+      teamIds: ["team-1", "team-2"],
+    });
+  });
+  it("keeps refused addresses for retry", async () => {
     hub.inviteMember.mockImplementation(async (input: { email: string }) => {
       if (input.email === "taken@example.test") {
         throw new Error("Hub account request failed (409).");
       }
     });
+    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
     fireEvent.change(screen.getByLabelText("Emails"), {
       target: { value: "One@example.test, taken@example.test one@example.test" },
@@ -332,21 +539,21 @@ describe("Team invitation review and access navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send 2 invitations" }));
     await waitFor(() =>
       expect(
-        screen.getByText("1 of 2 sent. taken@example.test: already a Member, or no free seat"),
+        screen.getByText("1 of 2 done. taken@example.test: already a Member, or no free seat"),
       ).toBeTruthy(),
     );
     expect(hub.inviteMember).toHaveBeenCalledWith({ email: "one@example.test", role: "member" });
-    expect(hub.inviteMember).toHaveBeenCalledTimes(2);
     hub.inviteMember.mockImplementation(async () => {});
   });
-  it("blocks invitation until failed Team access can be reviewed and offers retry", () => {
+  it("blocks until failed Team access can be reviewed and offers retry", () => {
     const access = fixtures.queries["access-assignments"]!;
     access.data = undefined;
     access.isError = true;
     access.error = new Error("Access unavailable");
+    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
     fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
-    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "team-1" } });
+    chooseTeam("Support");
     const submit = screen.getByRole("button", { name: "Send invitation" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
     fireEvent.click(submit);
@@ -355,13 +562,101 @@ describe("Team invitation review and access navigation", () => {
     expect(access.refetch).toHaveBeenCalledOnce();
     expect(fixtures.queries["access-catalog"]!.refetch).toHaveBeenCalledOnce();
   });
-  it.each([
-    { label: "Members", kind: "member", id: "membership-1" },
-    { label: "Teams", kind: "team", id: "team-1" },
-  ])("preserves $kind context when managing access", ({ label, kind, id }) => {
+  it("starts a draft for a Team from its detail", () => {
+    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
+    const section = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
+    fireEvent.click(within(section).getAllByRole("button", { name: "View" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Add people to this Team" }));
+    expect((screen.getByLabelText("Teams: Support") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("Team settings regressions", () => {
+  it("stays on the Member when removing fails, and shows why", async () => {
+    const { confirmDialog } = await import("@/utils/confirm-dialog");
+    vi.mocked(confirmDialog).mockResolvedValue(true);
+    (hub as Record<string, unknown>)["removeMember"] = vi.fn(async () => {
+      throw new Error("Owner cannot be removed.");
+    });
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getAllByRole("button", { name: "View" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Member" }));
+    await waitFor(() => expect(screen.getByText("Owner cannot be removed.")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Back to Members" })).toBeTruthy();
+  });
+  it("clears the new Team name after creating it", async () => {
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    const inputs = screen.getAllByRole("textbox");
+    const name = inputs[inputs.length - 1] as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "Ops" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Team" }));
+    await waitFor(() =>
+      expect(fixtures.post).toHaveBeenCalledWith("teams", { name: "Ops" }, expect.anything()),
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Create Team" }) as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+  });
+  it("renews a pending invitation with its Teams", async () => {
+    hub.signedIn = {
+      account,
+      organization: { id: "organization" },
+      capabilities,
+      team: {
+        invitations: [
+          {
+            id: "invitation-1",
+            email: "pending@example.test",
+            role: "admin",
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+            link: "https://hub.example.test/?invitation=invitation-1",
+            teams: [{ id: "team-1", name: "Support" }],
+          },
+        ],
+      },
+    };
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    expect(screen.getByText("Admin · Support")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+    await waitFor(() =>
+      expect(hub.inviteMember).toHaveBeenCalledWith({
+        email: "pending@example.test",
+        role: "admin",
+        teamId: "team-1",
+      }),
+    );
+  });
+  it("does not show access data to a Member who cannot manage it", () => {
+    hub.signedIn = {
+      account,
+      organization: { id: "organization" },
+      capabilities: { manageMembers: false, manageResources: false },
+    };
+    const ui = render(<HubSettingsContent section="team" />);
+    expect(screen.queryByRole("button", { name: "Add people" })).toBeNull();
+    ui.unmount();
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    expect(screen.queryByRole("heading", { name: "Add people to Teams" })).toBeNull();
+    expect(screen.getByText("1 Member")).toBeTruthy();
+    expect(screen.queryByText(/access assignment/)).toBeNull();
+  });
+});
+
+describe("Team access navigation", () => {
+  it.each([
+    { tab: "Members", label: "Members", kind: "member", id: "membership-1" },
+    { tab: "Teams", label: "Teams", kind: "team", id: "team-1" },
+  ])("preserves $kind context when managing access", ({ tab, label, kind, id }) => {
+    render(<HubSettingsContent section="team" />);
+    openTab(tab);
     const section = screen.getByRole("heading", { name: label }).closest("section")!;
-    fireEvent.click(within(section).getByRole("button", { name: "View" }));
+    fireEvent.click(within(section).getAllByRole("button", { name: "View" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
     expect(fixtures.push).toHaveBeenCalledWith({
       pathname: "/settings/hub/[hubSection]",
@@ -372,9 +667,11 @@ describe("Team invitation review and access navigation", () => {
 
 describe("Team detail Members wiring", () => {
   function openTeam() {
+    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
     const section = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
-    fireEvent.click(within(section).getByRole("button", { name: "View" }));
+    const row = within(section).getByText("Support").parentElement!.parentElement!;
+    fireEvent.click(within(row).getByRole("button", { name: "View" }));
   }
   it("adds each picked Member and reports the refused ones back to the picker", async () => {
     fixtures.post.mockImplementation(async (_path: string, body?: unknown) => {
