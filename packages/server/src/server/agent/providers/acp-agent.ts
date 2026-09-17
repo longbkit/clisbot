@@ -283,6 +283,16 @@ export function buildACPClientCapabilities(
 const PROBE_ENV: Record<string, string> = { NO_BROWSER: "true" };
 const ACP_DIAGNOSTIC_PHASE_TIMEOUT_MS = 20_000;
 const ACP_PROBE_CLOSE_TIMEOUT_MS = 2_000;
+// Below the manager's 2s interrupt timeout, so a locally closed turn still counts as acknowledged.
+const ACP_CANCEL_SETTLE_TIMEOUT_MS = 1_500;
+const ABANDONED_PROMPT_OUTPUT_UPDATES = new Set<string>([
+  "user_message_chunk",
+  "agent_message_chunk",
+  "agent_thought_chunk",
+  "tool_call",
+  "tool_call_update",
+  "plan",
+]);
 const ACP_IMPORT_HISTORY_LOAD_TIMEOUT_MS = 30_000;
 const ACP_IMPORT_HISTORY_BUDGET_MS = 60_000;
 
@@ -1707,6 +1717,10 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   private pendingSystemPrompt: string | undefined;
   private currentTurnUsage: AgentUsage | undefined;
   private activeForegroundTurnId: string | null = null;
+  /** The pending `session/prompt` of the foreground turn; `settled` runs after its handling. */
+  private activePrompt: { turnId: string; settled: Promise<void> } | null = null;
+  /** A prompt closed locally after ignoring `session/cancel`; its output is dropped until the next prompt. */
+  private abandonedPrompt: Promise<void> | null = null;
   private fallbackAssistantMessageId: string | null = null;
   private closed = false;
   private historyPending = false;
@@ -1873,6 +1887,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     }
 
     this.deliverTranslatedEvents(this.flushPendingUserMessage());
+    this.abandonedPrompt = null;
     const turnId = randomUUID();
     const messageId = options?.clientMessageId ?? randomUUID();
     this.activeForegroundTurnId = turnId;
@@ -1884,7 +1899,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     const systemPrompt = this.pendingSystemPrompt;
     this.pendingSystemPrompt = undefined;
 
-    void this.connection
+    const settled: Promise<void> = this.connection
       .prompt({
         sessionId: this.sessionId,
         messageId,
@@ -1894,10 +1909,16 @@ export class ACPAgentSession implements AgentSession, ACPClient {
         ],
       })
       .then((response) => {
+        if (this.isAbandonedTurn(turnId)) {
+          return;
+        }
         this.handlePromptResponse(response, turnId);
         return;
       })
       .catch((error) => {
+        if (this.isAbandonedTurn(turnId)) {
+          return;
+        }
         const summary = summarizeACPRequestError(error);
         this.finishTurn({
           type: "turn_failed",
@@ -1907,7 +1928,16 @@ export class ACPAgentSession implements AgentSession, ACPClient {
           diagnostic: this.collectDiagnostic(summary.diagnostic ?? summary.message),
           turnId,
         });
+      })
+      .finally(() => {
+        if (this.activePrompt?.settled === settled) {
+          this.activePrompt = null;
+        }
+        if (this.abandonedPrompt === settled) {
+          this.abandonedPrompt = null;
+        }
       });
+    this.activePrompt = { turnId, settled };
 
     return { turnId };
   }
@@ -2434,9 +2464,50 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     }
     this.pendingPermissions.clear();
 
-    if (this.activeForegroundTurnId) {
+    const turnId = this.activeForegroundTurnId;
+    if (turnId) {
       await this.connection.cancel({ sessionId: this.sessionId });
+      await this.settleCanceledTurn(turnId);
     }
+  }
+
+  /**
+   * `interrupt()` must not resolve while the turn can still run, but `session/cancel` is a
+   * notification: only the prompt response ends the turn. Wait briefly for the "cancelled" stop
+   * reason, then close the turn locally.
+   *
+   * COMPAT(acpIgnoredCancel): Grok 1.0.30 never answers a canceled prompt. Remove the local close
+   * once supported ACP agents settle `session/prompt` after `session/cancel`.
+   */
+  private async settleCanceledTurn(turnId: string): Promise<void> {
+    const prompt = this.activePrompt?.turnId === turnId ? this.activePrompt : null;
+    if (prompt) {
+      await withTimeout(
+        prompt.settled,
+        ACP_CANCEL_SETTLE_TIMEOUT_MS,
+        "ACP prompt did not settle after session/cancel",
+      ).catch(() => undefined);
+    }
+    if (this.activeForegroundTurnId !== turnId) {
+      return;
+    }
+    this.logger.warn(
+      { agentId: this.agentId, provider: this.provider, sessionId: this.sessionId, turnId },
+      "ACP agent did not settle the canceled prompt; closing the turn locally",
+    );
+    this.abandonedPrompt = prompt?.settled ?? null;
+    this.synthesizeCanceledToolCalls();
+    this.finishTurn({
+      type: "turn_canceled",
+      provider: this.provider,
+      reason: "Interrupted",
+      turnId,
+    });
+  }
+
+  /** A late settlement of a locally closed prompt must not end the turn that replaced it. */
+  private isAbandonedTurn(turnId: string): boolean {
+    return this.activeForegroundTurnId !== turnId;
   }
 
   async close(): Promise<void> {
@@ -2580,6 +2651,15 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       "provider.acp.raw_event",
     );
     if (params.sessionId !== this.sessionId) {
+      return;
+    }
+    // Output of a canceled prompt the agent kept running. Once a new prompt starts, ACP updates
+    // carry no prompt identity, so they can no longer be told apart.
+    if (
+      this.abandonedPrompt &&
+      !this.activeForegroundTurnId &&
+      ABANDONED_PROMPT_OUTPUT_UPDATES.has(params.update.sessionUpdate)
+    ) {
       return;
     }
 

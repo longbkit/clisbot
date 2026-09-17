@@ -12,6 +12,7 @@ import {
   PromptResponse,
   RequestPermissionRequest,
   SessionConfigOption,
+  SessionNotification,
   SessionUpdate,
 } from "@agentclientprotocol/sdk";
 
@@ -90,7 +91,10 @@ describe("buildACPClientCapabilities", () => {
 
 interface ACPSessionInternals {
   sessionId: string | null;
-  connection: { prompt: (...args: unknown[]) => Promise<PromptResponse> };
+  connection: {
+    prompt: (...args: unknown[]) => Promise<PromptResponse>;
+    cancel?: (...args: unknown[]) => Promise<void>;
+  };
   activeForegroundTurnId: string | null;
   pendingSystemPrompt: string | undefined;
   configOptions: SessionConfigOption[];
@@ -2935,6 +2939,104 @@ describe("ACPAgentSession", () => {
       turnId,
     });
     expect(asInternals<ACPSessionInternals>(session).activeForegroundTurnId).toBeNull();
+  });
+
+  test("interrupt resolves once the ACP agent answers the cancel", async () => {
+    const session = createSession();
+    const events: Array<{ type: string; turnId?: string }> = [];
+    let resolvePrompt!: (value: PromptResponse) => void;
+    const prompt = vi.fn(
+      () =>
+        new Promise<PromptResponse>((resolve) => {
+          resolvePrompt = resolve;
+        }),
+    );
+    const cancel = vi.fn(async () => {
+      resolvePrompt({ stopReason: "cancelled" });
+    });
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    asInternals<ACPSessionInternals>(session).connection = { prompt, cancel };
+    session.subscribe((event) => {
+      events.push(event as { type: string; turnId?: string });
+    });
+
+    const { turnId } = await session.startTurn("run a long command");
+    await session.interrupt();
+
+    expect(cancel).toHaveBeenCalledWith({ sessionId: "session-1" });
+    expect(events.filter((event) => event.type === "turn_canceled")).toEqual([
+      expect.objectContaining({ type: "turn_canceled", turnId }),
+    ]);
+    expect(asInternals<ACPSessionInternals>(session).activeForegroundTurnId).toBeNull();
+  });
+
+  test("interrupt closes a turn whose prompt the ACP agent never settles after cancel", async () => {
+    vi.useFakeTimers();
+    try {
+      const session = createSession();
+      const events: AgentStreamEvent[] = [];
+      const resolvers: Array<(value: PromptResponse) => void> = [];
+      const prompt = vi.fn(
+        () =>
+          new Promise<PromptResponse>((resolve) => {
+            resolvers.push(resolve);
+          }),
+      );
+      const cancel = vi.fn(async () => {});
+      asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+      asInternals<ACPSessionInternals>(session).connection = { prompt, cancel };
+      session.subscribe((event) => {
+        events.push(event);
+      });
+
+      const first = await session.startTurn("run a long command");
+      const interrupted = session.interrupt();
+      await vi.advanceTimersByTimeAsync(1_500);
+      await interrupted;
+
+      expect(events.filter((event) => event.type === "turn_canceled")).toEqual([
+        expect.objectContaining({ type: "turn_canceled", turnId: first.turnId }),
+      ]);
+      expect(asInternals<ACPSessionInternals>(session).activeForegroundTurnId).toBeNull();
+
+      // The agent keeps producing output for the canceled prompt while the session is idle.
+      const eventCount = events.length;
+      await session.sessionUpdate({
+        sessionId: "session-1",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "still working on the canceled request" },
+        },
+      } as SessionNotification);
+      expect(events).toHaveLength(eventCount);
+
+      const second = await session.startTurn("next message");
+      expect(asInternals<ACPSessionInternals>(session).activeForegroundTurnId).toBe(second.turnId);
+
+      // The canceled prompt settling late must not end the turn that replaced it.
+      resolvers[0]({ stopReason: "cancelled" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(asInternals<ACPSessionInternals>(session).activeForegroundTurnId).toBe(second.turnId);
+      expect(events.filter((event) => event.type === "turn_canceled")).toHaveLength(1);
+
+      resolvers[1]({ stopReason: "end_turn" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(events.at(-1)).toMatchObject({ type: "turn_completed", turnId: second.turnId });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a prompt while a turn runs without an interrupt is still rejected", async () => {
+    const session = createSession();
+    const prompt = vi.fn(() => new Promise<PromptResponse>(() => {}));
+    asInternals<ACPSessionInternals>(session).sessionId = "session-1";
+    asInternals<ACPSessionInternals>(session).connection = { prompt };
+
+    await session.startTurn("hello");
+
+    await expect(session.startTurn("again")).rejects.toThrow("A foreground turn is already active");
+    expect(prompt).toHaveBeenCalledOnce();
   });
 
   test("startTurn emits the submitted user message even when ACP does not echo it", async () => {
