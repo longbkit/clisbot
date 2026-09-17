@@ -2,6 +2,7 @@ import {
   pendingSessionEvents,
   PendingEventBudgetError,
 } from "./session-storage/pending-event-budget.js";
+import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
 import { isDeepStrictEqual } from "node:util";
 import { TimelineRetentionBudget } from "./session-storage/timeline-retention.js";
@@ -748,6 +749,13 @@ function createProviderSubagentStore(options: AgentManagerOptions): ProviderSuba
   });
 }
 
+interface PermissionToolAnchor {
+  toolCallId: string;
+  toolCallCursor: AgentTimelineCursor;
+  /** The history write that was still in flight when the anchor was taken. */
+  committed?: Promise<void>;
+}
+
 export class AgentManager {
   private readonly serverId?: string;
   private readonly pluginLifecycle: PluginLifecycle | undefined;
@@ -763,6 +771,7 @@ export class AgentManager {
   private readonly agentsAwaitingInitialSnapshotPersist = new Set<string>();
   private readonly authorshipWorkspaceDemand = new Set<string>();
   private readonly sessionEventTails = new Map<string, Promise<void>>();
+  private readonly sessionEventProcessingTails = new Map<string, Promise<void>>();
   private readonly eventReservations = new WeakMap<AgentStreamEvent, () => void>();
   private readonly stagedRunReservations = new WeakSet<PendingForegroundRun>();
   private readonly historyFailureInterrupts = new Map<string, Promise<void>>();
@@ -780,10 +789,16 @@ export class AgentManager {
   }
   private readonly timelineWriteTails = new Map<string, Promise<void>>();
   private readonly timelineWriteErrors = new Map<string, Error>();
+  private readonly committedEvents = new CommittedEventOutbox({
+    pendingWrite: (agentId) => this.timelineWriteTails.get(agentId),
+    failed: (agentId) => this.timelineWriteErrors.has(agentId),
+    onDeliveryError: (agentId, err) =>
+      this.logger.error({ err, agentId }, "Failed to deliver committed agent event"),
+  });
   private readonly permissionResponseAdmission?: PermissionResponseAdmission;
   private readonly permissionToolAnchors = new WeakMap<
     AgentPermissionRequest,
-    { toolCallId: string; toolCallCursor: AgentTimelineCursor } | undefined
+    PermissionToolAnchor | undefined
   >();
   private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
   private readonly backgroundTasks = new Set<Promise<void>>();
@@ -866,7 +881,9 @@ export class AgentManager {
       onFlush: ({ agentId, item, provider, turnId }) => {
         try {
           const event = this.recordAndDispatchTimelineItem(agentId, item, provider, turnId);
-          this.notifyForegroundTurnWaiters(agentId, event);
+          this.committedEvents.publish(agentId, () =>
+            this.notifyForegroundTurnWaiters(agentId, event),
+          );
         } catch (error) {
           this.failSessionEventAdmission(agentId, error);
         }
@@ -3407,7 +3424,9 @@ export class AgentManager {
     context = context ? structuredClone(context) : undefined;
     if (this.permissionResponseAdmission) {
       const request = this.requireAgent(agentId).pendingPermissions.get(requestId);
-      const anchor = request ? this.permissionToolAnchors.get(request) : undefined;
+      const anchor = request
+        ? await this.committedPermissionToolAnchor(agentId, request)
+        : undefined;
       return this.permissionResponseAdmission.respond({
         ...anchor,
         agentId,
@@ -4244,6 +4263,7 @@ export class AgentManager {
     if (this.timelineWriteErrors.has(agentId)) return;
     const failure = error instanceof Error ? error : new Error(String(error));
     this.timelineWriteErrors.set(agentId, failure);
+    this.committedEvents.discard(agentId);
     this.logSessionEventAdmissionFailure(agentId, failure);
     const snapshot = this.agents.get(agentId);
     if (snapshot?.session) {
@@ -4359,8 +4379,8 @@ export class AgentManager {
       this.stagePendingSessionEvent(pendingRun, event);
       return;
     }
-    const previous = this.sessionEventTails.get(agentId) ?? Promise.resolve();
-    const next = previous
+    const previous = this.sessionEventProcessingTails.get(agentId) ?? Promise.resolve();
+    const processed = previous
       .catch(() => undefined)
       .then(async () => {
         const current = this.agents.get(agentId);
@@ -4391,10 +4411,24 @@ export class AgentManager {
         );
       });
 
+    // The next event is processed without waiting for this one's rows, so the store can group
+    // commit them. A drain still waits until what this event published was delivered, which
+    // happens only after the rows it follows are committed.
+    const next = processed.then(() => this.committedEvents.delivered(agentId));
+    this.sessionEventProcessingTails.set(agentId, processed);
     this.sessionEventTails.set(agentId, next);
     this.trackBackgroundTask(next);
-    void next.finally(() => {
+    // A timeline event hands its slot to the row it records. Any other event keeps its slot until
+    // its delivery, so deliveries waiting behind a stalled write stay inside the event budget.
+    void (event.type === "timeline" ? processed : next).finally(() => {
       this.releaseSessionEvent(event);
+    });
+    void processed.finally(() => {
+      if (this.sessionEventProcessingTails.get(agentId) === processed) {
+        this.sessionEventProcessingTails.delete(agentId);
+      }
+    });
+    void next.finally(() => {
       if (this.sessionEventTails.get(agentId) === next) {
         this.sessionEventTails.delete(agentId);
       }
@@ -4419,6 +4453,18 @@ export class AgentManager {
     }
   }
 
+  /**
+   * Rows are written without holding the session queue, but agent state stays synchronous with
+   * the manager (in-process waiters read both). A turn therefore ends only after its rows are
+   * committed and delivered, so no client, waiter or finished notice sees it end ahead of its
+   * last row. A turn whose history failed is ended by the failure path instead.
+   */
+  private async deliverTurnRows(agentId: string): Promise<boolean> {
+    this.agentStreamCoalescer.flushFor(agentId);
+    await this.committedEvents.delivered(agentId);
+    return !this.timelineWriteErrors.has(agentId);
+  }
+
   private async dispatchSessionEvent(
     agent: ActiveManagedAgent,
     event: AgentStreamEvent,
@@ -4432,6 +4478,7 @@ export class AgentManager {
       this.dispatch({ type: "provider_subagent", event: update });
       return;
     }
+    if (isTurnTerminalEvent(event) && !(await this.deliverTurnRows(agent.id))) return;
     const turnId = getAgentStreamEventTurnId(event);
     const matchingWaiters = this.runs.getMatchingWaiters(agent, turnId);
     this.logger.trace(
@@ -4452,9 +4499,11 @@ export class AgentManager {
       return;
     }
 
-    this.runs.notifyWaiters(matchingWaiters, event, {
-      terminal: isTurnTerminalEvent(event),
-    });
+    this.committedEvents.publish(agent.id, () =>
+      this.runs.notifyWaiters(matchingWaiters, event, {
+        terminal: isTurnTerminalEvent(event),
+      }),
+    );
     this.logger.trace(
       {
         agentId: agent.id,
@@ -4822,12 +4871,10 @@ export class AgentManager {
     if (!options?.fromHistory) {
       this.touchUpdatedAt(agent);
       if (this.agentStreamCoalescer.handle(agent.id, event)) {
-        await this.waitForTimelinePersistence(agent.id);
         this.traceCoalescerBuffered(agent, event, eventTurnId);
         return false;
       }
       this.agentStreamCoalescer.flushFor(agent.id);
-      await this.waitForTimelinePersistence(agent.id);
     }
 
     let terminalDisposition: ActiveTurnTerminalDisposition = "untracked";
@@ -5079,7 +5126,6 @@ export class AgentManager {
     }
 
     this.recordAndDispatchTimelineItem(agent.id, event.item, event.provider, event.turnId);
-    await this.waitForTimelinePersistence(agent.id);
     if (event.item.type === "user_message") {
       agent.lastUserMessageAt = new Date();
       this.emitState(agent);
@@ -5240,6 +5286,18 @@ export class AgentManager {
     this.emitState(agent);
   }
 
+  // An anchor taken while its tool row was still being written holds only once that write lands.
+  private async committedPermissionToolAnchor(
+    agentId: string,
+    request: AgentPermissionRequest,
+  ): Promise<Omit<PermissionToolAnchor, "committed"> | undefined> {
+    const anchor = this.permissionToolAnchors.get(request);
+    if (!anchor?.committed) return anchor;
+    await anchor.committed;
+    if (this.timelineWriteErrors.has(agentId)) return undefined;
+    return { toolCallId: anchor.toolCallId, toolCallCursor: anchor.toolCallCursor };
+  }
+
   private capturePermissionToolAnchor(
     agent: ActiveManagedAgent,
     event: Extract<AgentStreamEvent, { type: "permission_requested" }>,
@@ -5247,7 +5305,7 @@ export class AgentManager {
     if (!this.sessionStorageEnabled || this.permissionToolAnchors.has(event.request)) return;
     // Remember an uncertain first observation too; later duplicate events cannot invent an anchor.
     this.permissionToolAnchors.set(event.request, undefined);
-    if (this.timelineWriteErrors.has(agent.id) || this.timelineWriteTails.has(agent.id)) return;
+    if (this.timelineWriteErrors.has(agent.id)) return;
     const turnId = getAgentStreamEventTurnId(event);
     if (!turnId || turnId !== agent.activeTurnId) return;
     // ACP and Claude expose their explicit provider tool correlation. Other adapters stay
@@ -5270,6 +5328,7 @@ export class AgentManager {
     this.permissionToolAnchors.set(event.request, {
       toolCallId,
       toolCallCursor: { epoch: this.timelineStore.getEpoch(agent.id), seq: rows[0]!.seq },
+      committed: this.timelineWriteTails.get(agent.id),
     });
   }
 
@@ -5738,8 +5797,8 @@ export class AgentManager {
     if (error) throw error;
   }
 
-  // A stalled write holds every later session event behind it; make the stall visible before
-  // the pending-event budget overflows.
+  // A stalled write holds every later delivery for the agent, and its rows keep their budget
+  // slots; make the stall visible before the pending-event budget overflows.
   private warnWhenTimelineWriteStalls(agentId: string, write: Promise<void>): void {
     const startedAt = Date.now();
     const timer = setTimeout(() => {
@@ -5788,6 +5847,7 @@ export class AgentManager {
     const existing = this.timelineWriteErrors.get(agentId);
     if (existing && !(existing instanceof PendingEventBudgetError)) return;
     this.timelineWriteErrors.set(agentId, error);
+    this.committedEvents.discard(agentId);
     const agent = this.agents.get(agentId);
     if (agent) {
       agent.lastError = `Session history was not saved: ${error.message}`;
@@ -5927,17 +5987,26 @@ export class AgentManager {
       },
       "agent.manager.dispatch_stream",
     );
-    const write = this.timelineWriteTails.get(agentId);
-    if (write && this.durableTimelineStore) {
-      // The write owner reports failure; never publish an uncommitted cursor.
-      void write.then(() => {
-        if (!this.timelineWriteErrors.has(agentId))
-          this.dispatch({ type: "agent_stream", agentId, event, ...metadata });
-        return undefined;
-      });
-      return;
-    }
-    if (metadata?.seq !== undefined && this.timelineWriteErrors.has(agentId)) return;
+    // Stream events reach subscribers in call order, after the history rows they follow commit;
+    // a row is never published once that history has failed.
+    this.committedEvents.publish(
+      agentId,
+      () => this.publishStream({ agentId, agent, event, metadata }),
+      { cursor: metadata?.seq !== undefined },
+    );
+  }
+
+  private publishStream({
+    agentId,
+    agent,
+    event,
+    metadata,
+  }: {
+    agentId: string;
+    agent: LiveManagedAgent | undefined;
+    event: AgentStreamEvent;
+    metadata: { seq?: number; epoch?: string; timestamp?: string } | undefined;
+  }): void {
     this.dispatch({ type: "agent_stream", agentId, event, ...metadata });
     if (this.pluginLifecycle && agent && !agent.internal && event.type !== "timeline") {
       publishAgentStream(

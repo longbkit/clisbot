@@ -11684,9 +11684,10 @@ test("each held session event keeps one pending reservation while a write is sta
         item: { type: "assistant_message", text: "chunk", messageId: `${index}` },
       });
     await vi.waitFor(() => expect(writing).toBe(true));
-    // The event whose write is in flight holds its event slot and its row slot; every queued
-    // event holds exactly one. Holding two per event would halve the budget.
-    expect(pendingSessionEvents.sessionEventCount(agent.id)).toBe(51);
+    // A processed timeline event hands its slot to its row: the 49 rows waiting on the stalled
+    // write and the chunk still buffered hold exactly one each. Two per event would halve the
+    // budget.
+    await vi.waitFor(() => expect(pendingSessionEvents.sessionEventCount(agent.id)).toBe(50));
   } finally {
     release();
     await manager.closeAgent(agent.id);
