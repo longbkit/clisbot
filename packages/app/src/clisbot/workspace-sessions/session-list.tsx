@@ -177,12 +177,7 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
             </Text>
             {details.lastActivity ? <LastActivity agent={agent} /> : null}
           </View>
-          <SessionDetailLine
-            serverId={serverId}
-            workspaceId={workspaceId}
-            session={session}
-            details={details}
-          />
+          <SessionDetailLine serverId={serverId} session={session} details={details} />
         </>
       )}
     </Pressable>
@@ -256,12 +251,10 @@ function LastActivity({ agent }: { agent: Agent }): ReactElement {
 
 function SessionDetailLine({
   serverId,
-  workspaceId,
   session,
   details,
 }: {
   serverId: string;
-  workspaceId: string;
   session: WorkspaceSessionItem;
   details: SidebarWorkspaceSessionDetails;
 }): ReactElement | null {
@@ -280,7 +273,6 @@ function SessionDetailLine({
   return (
     <SessionMetadataLine
       serverId={serverId}
-      workspaceId={workspaceId}
       metadata={agent}
       createdAt={agent.createdAt.toISOString()}
       visible={details}

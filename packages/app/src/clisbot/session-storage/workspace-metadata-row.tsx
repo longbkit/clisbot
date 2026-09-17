@@ -1,18 +1,16 @@
-import { Fragment, useMemo, type ReactElement } from "react";
+import { Fragment, type ReactElement } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
-import { MenuRoot, MenuTrigger, MenuSurface, MenuItem } from "@/components/ui/menu";
 import {
-  sessionChannelKey,
   type SessionAuthorship,
   type SessionChannelReference,
 } from "@getpaseo/protocol/session-authorship";
 import { ChannelIcon, channelConversationLabel } from "@/clisbot/channels/channel-icon";
-import { SessionActorLabel } from "./actor";
+import { SessionActorName } from "./actor";
 import { useSessionStorageReadable } from "./capability";
 
 function MetadataTime({ timestamp, label }: { timestamp: string; label: string }) {
@@ -39,16 +37,11 @@ function metadataStatusLabel(status: SessionAuthorship["authorshipStatus"]): str
   return "Metadata pending";
 }
 
-function ChannelMenuItem({ channel }: { channel: SessionChannelReference }) {
-  const leading = useMemo(() => <ChannelIcon channel={channel.channel} size={14} />, [channel]);
-  return (
-    <MenuItem
-      leading={leading}
-      closeOnSelect={false}
-    >{`${channelConversationLabel(channel)} · ${channel.channelId} · ${channel.hubOrigin} / ${channel.organizationId} / ${channel.connectionId}`}</MenuItem>
-  );
-}
-
+/**
+ * Where the work came from, as plain content for the same reason a name is: the row around it
+ * owns the press. The conversation beyond the first is counted rather than listed, so a line
+ * that holds several stays one line.
+ */
 function ChannelsItem({
   channels,
   accessibilityLabel,
@@ -56,21 +49,15 @@ function ChannelsItem({
   channels: readonly SessionChannelReference[];
   accessibilityLabel: string;
 }) {
+  const first = channels[0]!;
   return (
-    <MenuRoot>
-      <MenuTrigger accessibilityLabel={accessibilityLabel} style={styles.channel}>
-        <ChannelIcon channel={channels[0]!.channel} />
-        <Text style={styles.text} numberOfLines={1}>
-          {channelConversationLabel(channels[0]!)}
-          {channels.length > 1 ? ` +${channels.length - 1}` : ""}
-        </Text>
-      </MenuTrigger>
-      <MenuSurface>
-        {channels.map((channel) => (
-          <ChannelMenuItem key={sessionChannelKey(channel)} channel={channel} />
-        ))}
-      </MenuSurface>
-    </MenuRoot>
+    <View style={styles.channel} accessibilityLabel={accessibilityLabel}>
+      <ChannelIcon channel={first.channel} />
+      <Text style={styles.text} numberOfLines={1}>
+        {channelConversationLabel(first)}
+        {channels.length > 1 ? ` +${channels.length - 1}` : ""}
+      </Text>
+    </View>
   );
 }
 
@@ -84,19 +71,14 @@ export interface SessionMetadataVisibility {
 
 /** The items that need session storage, split around Created time to keep the line's order. */
 function authorshipItems({
-  serverId,
-  workspaceId,
   metadata,
   visible,
   channelsLabel,
 }: {
-  serverId: string;
-  workspaceId: string;
   metadata: SessionAuthorship;
   visible: SessionMetadataVisibility;
   channelsLabel: string;
 }): { before: (ReactElement | null)[]; after: (ReactElement | null)[] } {
-  const actorProps = { serverId, workspaceId };
   const channels = metadata.channels ?? [];
   const status = metadata.authorshipStatus;
   const incomplete = status !== undefined && status !== "ready";
@@ -108,13 +90,13 @@ function authorshipItems({
         </Text>
       ) : null,
       visible.createdUser && metadata.createdBy ? (
-        <SessionActorLabel key="createdUser" {...actorProps} actor={metadata.createdBy} />
+        <SessionActorName key="createdUser" actor={metadata.createdBy} />
       ) : null,
       visible.channels && channels.length > 0 ? (
         <ChannelsItem key="channels" channels={channels} accessibilityLabel={channelsLabel} />
       ) : null,
       !incomplete && visible.updatedUser && metadata.lastInteractionBy ? (
-        <SessionActorLabel key="updatedUser" {...actorProps} actor={metadata.lastInteractionBy} />
+        <SessionActorName key="updatedUser" actor={metadata.lastInteractionBy} />
       ) : null,
     ],
     after: [
@@ -134,7 +116,6 @@ function authorshipItems({
  */
 export function SessionMetadataLine({
   serverId,
-  workspaceId,
   metadata,
   createdAt,
   visible,
@@ -143,7 +124,6 @@ export function SessionMetadataLine({
   style,
 }: {
   serverId: string;
-  workspaceId: string;
   metadata: SessionAuthorship;
   createdAt: string | undefined;
   visible: SessionMetadataVisibility;
@@ -154,7 +134,7 @@ export function SessionMetadataLine({
 }) {
   const enabled = useSessionStorageReadable(serverId);
   const authored = enabled
-    ? authorshipItems({ serverId, workspaceId, metadata, visible, channelsLabel })
+    ? authorshipItems({ metadata, visible, channelsLabel })
     : { before: [], after: [] };
   // Created time is not authorship — the agent or workspace record carries it — so it shows on any
   // host that sends it. Every other item needs session storage.
@@ -183,7 +163,6 @@ export function WorkspaceMetadataRow({ workspace }: { workspace: SidebarWorkspac
   return (
     <SessionMetadataLine
       serverId={workspace.serverId}
-      workspaceId={workspace.workspaceId}
       metadata={workspace}
       createdAt={workspace.createdAt}
       visible={visible}

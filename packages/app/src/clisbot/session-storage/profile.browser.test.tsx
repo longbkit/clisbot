@@ -329,13 +329,11 @@ it("renders the five metadata facts independently and gives all space back for m
     view.rerender(<WorkspaceMetadataRow workspace={workspace} />);
     expect(view.container.textContent).not.toBe("");
     expect(view.container.textContent).not.toContain("·");
-    expect(screen.queryByRole("button", { name: /Open profile: Alex/ }) !== null).toBe(
-      fact === "createdUser",
-    );
-    expect(screen.queryByRole("button", { name: /Open profile: Bailey/ }) !== null).toBe(
-      fact === "updatedUser",
-    );
+    expect(screen.queryByText("Alex") !== null).toBe(fact === "createdUser");
+    expect(screen.queryByText("Bailey") !== null).toBe(fact === "updatedUser");
   }
+  // A sidebar row is one press target; its names are text, not controls that could take it.
+  expect(screen.queryByRole("button", { name: /Open profile/ })).toBeNull();
   boundary.visible = {
     ...DEFAULT_SIDEBAR_ROW_ITEMS,
     ...Object.fromEntries(facts.map((key) => [key, true])),

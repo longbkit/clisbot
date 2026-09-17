@@ -183,6 +183,22 @@ export const UnrecordedSenderAvatar = memo(function UnrecordedSenderAvatar({
   );
 });
 
+/**
+ * The actor's face and name as plain content, for a surface whose own press target owns the
+ * whole line — a sidebar workspace row or session line. A control here would take the press
+ * meant for the row, and the profile is a press away inside the session anyway.
+ */
+export const SessionActorName = memo(function SessionActorName({ actor }: { actor: SessionActor }) {
+  const { actor: person } = usePersonProfile(actor);
+  return (
+    <View style={styles.label}>
+      <ActorAvatar actor={actor} size={ACTOR_INLINE_AVATAR_SIZE} />
+      <Text style={styles.text}>{actorLabel(person)}</Text>
+    </View>
+  );
+});
+
+/** The same name as a control: hover shows the identity, press opens the profile tab. */
 export const SessionActorLabel = memo(function SessionActorLabel({
   actor,
   serverId,
@@ -201,10 +217,7 @@ export const SessionActorLabel = memo(function SessionActorLabel({
         accessibilityRole="button"
         accessibilityLabel={`Open profile: ${actorLabel(person)} (${actor.id})`}
       >
-        <View style={styles.label}>
-          <ActorAvatar actor={actor} size={ACTOR_INLINE_AVATAR_SIZE} />
-          <Text style={styles.text}>{actorLabel(person)}</Text>
-        </View>
+        <SessionActorName actor={actor} />
       </TooltipTrigger>
       <TooltipContent>
         <Text style={styles.text}>{actor.id}</Text>
