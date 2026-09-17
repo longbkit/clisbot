@@ -194,6 +194,14 @@ export interface ChannelReplyCapabilityService {
    * call must not post.
    */
   reserveTurnOutput(token: string): ChannelReplyTurnOutput | undefined;
+  /**
+   * Does the Agent still hold a live capability? A bound session whose
+   * capability is gone can never post again — its MCP URL is fixed at create —
+   * so the binding engine replaces it instead of steering into silence. Answers
+   * `true` while the durable capabilities are not restored: an unknown is not a
+   * loss, and replacing on it would end every session after a failed boot read.
+   */
+  holdsAgentCapability(agentId: string): boolean;
   revoke(token: string): void;
   revokeAccount(organizationId: string, channel: string, accountId: string): void;
   /** Load the durable capabilities this process must keep answering. */
@@ -227,6 +235,7 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
   private readonly logger: ChannelReplyCapabilityLogger | undefined;
   private pending: Promise<void> = Promise.resolve();
   private failure: unknown;
+  private hydrated: boolean;
 
   constructor(options: ChannelReplyCapabilityRegistryOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -235,6 +244,8 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
     this.turnOutputMax = options.turnOutputMax ?? DEFAULT_CHANNEL_REPLY_TURN_OUTPUT_MAX;
     this.store = options.store;
     this.logger = options.logger;
+    // Without a durable store the map is the whole truth from the start.
+    this.hydrated = this.store === undefined;
     if (!Number.isFinite(this.ttlMs) || this.ttlMs <= 0) {
       throw new Error("Channel reply capability ttlMs must be positive");
     }
@@ -252,6 +263,7 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
       this.capabilities.set(row.tokenHash, capability);
       restored += 1;
     }
+    this.hydrated = true;
     await this.store.deleteExpired(now);
     this.logger?.info?.("channel reply capabilities restored", { restored, rows: rows.length });
   }
@@ -353,6 +365,14 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
     return { complete: () => settle(true), fail: () => settle(false) };
   }
 
+  holdsAgentCapability(agentId: string): boolean {
+    if (!this.hydrated) return true;
+    for (const [hash, capability] of this.capabilities) {
+      if (capability.agentId === agentId && this.active(hash) !== undefined) return true;
+    }
+    return false;
+  }
+
   revoke(token: string): void {
     const hash = channelReplyCapabilityHash(token);
     this.capabilities.delete(hash);
@@ -361,8 +381,9 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
 
   /**
    * Drop an account's capabilities for good. The supervisor calls this only
-   * when the account's policy is replaced: a plain stop (Hub shutdown, monitor
-   * fault) must leave the rows in place, or the restart is back to D-W4-01.
+   * when the account leaves the configuration: any other stop (restart, new
+   * revision, disable, Hub shutdown, monitor fault) must leave the rows in
+   * place, or every session of the account is back to D-W4-01.
    */
   revokeAccount(organizationId: string, channel: string, accountId: string): void {
     for (const [hash, capability] of this.capabilities) {

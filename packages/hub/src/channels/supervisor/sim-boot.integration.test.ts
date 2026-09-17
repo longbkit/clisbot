@@ -439,4 +439,24 @@ describe.runIf(ENABLED)("channel plane against simulated platforms", () => {
     expect(result.ok).toBe(true);
     expect(boot.telegram.transcript(SIM_TELEGRAM_CHAT).length).toBe(before + 1);
   }, 120_000);
+
+  // Restarting one account (a new revision, the operator's restart, a QR relink)
+  // used to revoke every reply capability the account had issued, so each of its
+  // running sessions answered "unknown, expired, or revoked" for good.
+  it("keeps the reply capability usable across an account restart", async () => {
+    const capabilities = boot.supervisor.channelReplyCapabilities;
+    const token = capabilities?.issue({
+      organizationId: SIM_ORG_ID,
+      channelRevisionId: null,
+      routePosition: 0,
+      routeFingerprint: "sim-route",
+      ref: telegramRef(),
+    }) as string;
+    expect(capabilities?.bind(token, "agent-sim-restart")).toBe(true);
+
+    await boot.supervisor.startAccount("telegram", SIM_ACCOUNT_ID);
+
+    expect(capabilities?.resolve(token, SIM_ORG_ID)?.agentId).toBe("agent-sim-restart");
+    expect(capabilities?.holdsAgentCapability("agent-sim-restart")).toBe(true);
+  }, 120_000);
 });

@@ -193,6 +193,23 @@ describe("channel reply capabilities across a Hub restart", () => {
     assert.equal(restored.resolve(token, ORGANIZATION_ID), undefined);
   });
 
+  // The binding engine replaces a session that holds no live capability, so a
+  // registry that has not read the durable rows yet must not report a loss.
+  it("reports an Agent's capability as held only once the durable rows are read", async () => {
+    const minted = new ChannelReplyCapabilityRegistry({ store });
+    const token = minted.issue(capabilityInput());
+    assert.equal(minted.bind(token, "agent-held"), true);
+    await minted.flush();
+
+    const restored = new ChannelReplyCapabilityRegistry({ store });
+    assert.equal(restored.holdsAgentCapability("agent-gone"), true, "unknown is not a loss");
+    await restored.hydrate();
+    assert.equal(restored.holdsAgentCapability("agent-held"), true);
+    assert.equal(restored.holdsAgentCapability("agent-gone"), false);
+    restored.revoke(token);
+    assert.equal(restored.holdsAgentCapability("agent-held"), false);
+  });
+
   it("drops expired rows instead of restoring them", async () => {
     let now = 1_000;
     const minted = new ChannelReplyCapabilityRegistry({ store, ttlMs: 100, now: () => now });

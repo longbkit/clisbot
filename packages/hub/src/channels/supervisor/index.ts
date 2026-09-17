@@ -821,7 +821,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       if (desired.has(key)) continue;
       this.handles.delete(key);
       this.disposeSetupSession(handle.channel, handle.accountId);
-      await this.stopHandle(handle, { cancelActive: true, retireCapabilities: true });
+      // Only an account gone from the configuration retires its reply
+      // capabilities; a disabled one keeps them, and its sessions post again
+      // once it is re-enabled (a post while it is stopped fails cleanly).
+      await this.stopHandle(handle, {
+        cancelActive: true,
+        retireCapabilities: !configured.has(key),
+      });
       if (!configured.has(key)) await this.forgetAccountSecrets(handle);
       stopped.push({ channel: handle.channel, account: handle.accountId });
     }
@@ -1798,13 +1804,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     };
   }
 
-  /** Stop one account; a policy replacement also revokes Route-owned work.
+  /** Stop one account; a policy replacement also cancels Route-owned work.
    *
-   * `retireCapabilities` is the account going away for good (reconcile removed
-   * it, or a replacement is about to re-create it), NOT any stop: a Hub
+   * `retireCapabilities` is the account going away for good (removed from the
+   * configuration), NOT any stop: a restart, a new revision, a disable, a Hub
    * shutdown, a monitor fault and a failed start all leave the durable reply
    * capabilities in place, because the Agents holding those MCP URLs outlive
-   * the process and must still be able to answer (D-W4-01). */
+   * the account handle and must still be able to answer (D-W4-01). Revoking on
+   * a restart silenced every session of the account for good. */
   private async stopHandle(
     handle: AccountHandle,
     options: { cancelActive?: boolean; retireCapabilities?: boolean } = {},
@@ -1869,12 +1876,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
   }
 
-  /** Stop + forget one handle (reconcile removes, replacement re-creates). */
+  /** Stop + forget one handle before `startAccount` re-creates it. */
   private async teardown(handle: AccountHandle | undefined): Promise<void> {
     if (handle === undefined) return;
     this.handles.delete(handleKey(handle.channel, handle.accountId));
     this.accountState.delete(handleKey(handle.channel, handle.accountId));
-    await this.stopHandle(handle, { cancelActive: true, retireCapabilities: true });
+    await this.stopHandle(handle, { cancelActive: true });
   }
 
   /** Keep the account's keyed-store root: the QR link path awaits its `flush`
