@@ -20,6 +20,7 @@ export class PendingEventBudget {
   private events = 0;
   private readonly sessionEvents = new Map<string, number>();
   private readonly sessions = new Map<string, number>();
+  private readonly drainWaiters = new Map<string, (() => void)[]>();
   constructor(private readonly limits: PendingEventLimits = PENDING_SESSION_EVENT_LIMITS) {}
   reserve(agentId: string, event: unknown): () => void {
     const eventCount = this.sessionEvents.get(agentId) ?? 0;
@@ -51,11 +52,28 @@ export class PendingEventBudget {
       this.events--;
       const remainingEvents = (this.sessionEvents.get(agentId) ?? 0) - 1;
       if (remainingEvents) this.sessionEvents.set(agentId, remainingEvents);
-      else this.sessionEvents.delete(agentId);
+      else {
+        this.sessionEvents.delete(agentId);
+        this.resolveDrainWaiters(agentId);
+      }
       const remaining = (this.sessions.get(agentId) ?? 0) - bytes;
       if (remaining > 0) this.sessions.set(agentId, remaining);
       else this.sessions.delete(agentId);
     };
+  }
+  /** Resolves once the agent holds no reservation, immediately when it already holds none. */
+  whenSessionDrained(agentId: string): Promise<void> {
+    if (!this.sessionEvents.has(agentId)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const waiters = this.drainWaiters.get(agentId) ?? [];
+      waiters.push(resolve);
+      this.drainWaiters.set(agentId, waiters);
+    });
+  }
+  private resolveDrainWaiters(agentId: string): void {
+    const waiters = this.drainWaiters.get(agentId);
+    this.drainWaiters.delete(agentId);
+    for (const resolve of waiters ?? []) resolve();
   }
   get pendingEvents(): number {
     return this.events;
@@ -65,6 +83,9 @@ export class PendingEventBudget {
   }
   sessionBytes(agentId: string): number {
     return this.sessions.get(agentId) ?? 0;
+  }
+  sessionEventCount(agentId: string): number {
+    return this.sessionEvents.get(agentId) ?? 0;
   }
 }
 

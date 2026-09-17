@@ -109,6 +109,7 @@ import { withTimeout } from "../../utils/promise-timeout.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
+const TIMELINE_WRITE_STALL_WARNING_MS = 10_000;
 const IMPORTABLE_SESSION_LIST_TIMEOUT_MS = 90_000;
 const STORED_AGENT_CAPABILITIES: AgentCapabilityFlags = {
   supportsStreaming: false,
@@ -4136,13 +4137,58 @@ export class AgentManager {
     if (this.timelineWriteErrors.has(agentId)) return;
     const failure = error instanceof Error ? error : new Error(String(error));
     this.timelineWriteErrors.set(agentId, failure);
+    this.logSessionEventAdmissionFailure(agentId, failure);
     const snapshot = this.agents.get(agentId);
-    if (!snapshot?.session) return;
-    const agent = this.requireSessionAgent(agentId);
-    agent.lastError = `Session history was not saved: ${failure.message}`;
-    agent.lifecycle = "error";
-    this.emitState(agent);
-    this.abortSessionAfterHistoryFailure(agentId);
+    if (snapshot?.session) {
+      const agent = this.requireSessionAgent(agentId);
+      agent.lastError = `Session history was not saved: ${failure.message}`;
+      agent.lifecycle = "error";
+      this.emitState(agent);
+      this.abortSessionAfterHistoryFailure(agentId);
+    }
+    if (failure instanceof PendingEventBudgetError)
+      this.recoverAfterSessionEventOverload(agentId, failure);
+  }
+
+  // An overload is transient, unlike a failed write: the interrupted turn keeps its reported
+  // error, and once every held event has been written or released the committed history is
+  // complete again, so the agent can be read and prompted without a daemon restart.
+  private recoverAfterSessionEventOverload(agentId: string, failure: Error): void {
+    const task = (async () => {
+      await this.historyFailureInterrupts.get(agentId);
+      await pendingSessionEvents.whenSessionDrained(agentId);
+      await this.timelineWriteTails.get(agentId);
+      if (this.timelineWriteErrors.get(agentId) !== failure) return;
+      this.timelineWriteErrors.delete(agentId);
+      this.historyFailureInterrupts.delete(agentId);
+      this.logger.info({ agentId }, "Session event admission recovered after overload");
+    })();
+    this.trackBackgroundTask(task.catch(() => undefined));
+  }
+
+  // Logged once per agent: names which holder kept the reservations so an overflow is diagnosable.
+  private logSessionEventAdmissionFailure(agentId: string, failure: Error): void {
+    const agent = this.agents.get(agentId);
+    const pendingRun = this.runs.getPendingRun(agentId);
+    this.logger.error(
+      {
+        err: failure,
+        agentId,
+        provider: agent?.provider,
+        lifecycle: agent?.lifecycle,
+        activeForegroundTurnId: agent?.activeForegroundTurnId ?? undefined,
+        sessionPendingEvents: pendingSessionEvents.sessionEventCount(agentId),
+        sessionPendingBytes: pendingSessionEvents.sessionBytes(agentId),
+        totalPendingEvents: pendingSessionEvents.pendingEvents,
+        totalPendingBytes: pendingSessionEvents.pendingBytes,
+        pendingRunStatus: pendingRun?.start.status,
+        pendingRunStagedEvents: pendingRun?.stagedEvents.length,
+        steerBarrierEvents: this.steerEventBarriers.get(agentId)?.events.length,
+        sessionEventTailActive: this.sessionEventTails.has(agentId),
+        timelineWriteTailActive: this.timelineWriteTails.has(agentId),
+      },
+      "Session event admission failed; session history is incomplete",
+    );
   }
 
   private abortSessionAfterHistoryFailure(agentId: string): void {
@@ -5585,12 +5631,32 @@ export class AgentManager {
     if (error) throw error;
   }
 
+  // A stalled write holds every later session event behind it; make the stall visible before
+  // the pending-event budget overflows.
+  private warnWhenTimelineWriteStalls(agentId: string, write: Promise<void>): void {
+    const startedAt = Date.now();
+    const timer = setTimeout(() => {
+      this.logger.warn(
+        {
+          agentId,
+          elapsedMs: Date.now() - startedAt,
+          sessionPendingEvents: pendingSessionEvents.sessionEventCount(agentId),
+        },
+        "Session history write is stalled",
+      );
+    }, TIMELINE_WRITE_STALL_WARNING_MS);
+    timer.unref?.();
+    const clear = () => clearTimeout(timer);
+    void write.then(clear, clear);
+  }
+
   private enqueueTimelineWrite(agentId: string, operation: () => Promise<void>): void {
     const previousError = this.timelineWriteErrors.get(agentId);
     if (previousError) throw previousError;
     // The durable store admits bytes before waiting for I/O; do not put an unbounded
     // promise queue in front of that admission limit.
     const write = operation();
+    this.warnWhenTimelineWriteStalls(agentId, write);
     const previous = this.timelineWriteTails.get(agentId);
     const tail = previous ? Promise.all([previous, write]).then(() => undefined) : write;
     this.timelineWriteTails.set(agentId, tail);

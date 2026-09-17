@@ -27,6 +27,23 @@ describe("pre-journal provider event admission", () => {
     }
     expect(budget.pendingBytes).toBe(0);
   });
+  it("resolves a drain waiter only when the agent's last reservation is released", async () => {
+    const budget = new PendingEventBudget({ sessionBytes: 1024 * 1024, totalBytes: 1024 * 1024 });
+    await budget.whenSessionDrained("agent");
+    const first = budget.reserve("agent", event);
+    const second = budget.reserve("agent", event);
+    let drained = false;
+    const waiting = budget.whenSessionDrained("agent").then(() => {
+      drained = true;
+      return undefined;
+    });
+    first();
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    second();
+    await waiting;
+    expect(budget.sessionEventCount("agent")).toBe(0);
+  });
   it("rejects a slow turn consumer and frees queued events without hanging after yield", async () => {
     const budget = new PendingEventBudget({ sessionBytes: 1024, totalBytes: 2048 });
     const stream = new ForegroundTurnStream("turn", (next) => budget.reserve("agent", next));

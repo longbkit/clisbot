@@ -11117,6 +11117,65 @@ test("slow journal admission bounds provider events before the manager promise q
   }
 });
 
+test("an agent reads and appends history again once an event overload has drained", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-event-overload-recovery-"));
+  let release!: () => void;
+  let writing = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class DelayedStore extends RecordingTimelineStore {
+    override async bulkInsert(id: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      writing = true;
+      await gate;
+      await super.bulkInsert(id, rows);
+    }
+  }
+  const session = new TestAgentSession({ provider: "codex", cwd: workdir });
+  const client = new (class extends TestAgentClient {
+    override async createSession(): Promise<AgentSession> {
+      return session;
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: new DelayedStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "user_message", text: "first" },
+    });
+    await vi.waitFor(() => expect(writing).toBe(true));
+    for (let index = 0; index < 1100; index += 1)
+      session.pushEvent({
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "chunk", messageId: `${index}` },
+      });
+    expect(manager.getAgent(agent.id)?.lastError).toContain("pending provider event count limit");
+    release();
+    await manager.flush();
+    await vi.waitFor(() => expect(manager.pendingSessionEventBytes).toBe(0));
+    await vi.waitFor(async () => {
+      await expect(
+        manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "after" }),
+      ).resolves.not.toThrow();
+    });
+    await expect(manager.waitForTimelinePersistence(agent.id)).resolves.toBeUndefined();
+    expect(manager.getAgent(agent.id)?.lastError).toContain("pending provider event count limit");
+  } finally {
+    release();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("failed canonical prompt persistence interrupts and settles an accepted foreground run", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-accepted-write-failure-"));
   class FailingStore extends RecordingTimelineStore {

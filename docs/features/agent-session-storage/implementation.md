@@ -96,6 +96,22 @@ renderer; full app integration remains under validation. Current derived documen
 storage uses immutable node files: disk allocation/write amplification is an
 explicit pending measurement, not an accepted performance result.
 
+Provider events reserve a slot in the
+[pending event budget](../../../packages/server/src/server/agent/session-storage/pending-event-budget.ts)
+(1,024 events / 8 MiB per agent) until they are written or released. A write that
+never finishes holds every later event for that agent, so a stall on a slow disk shows
+up as `Session history overloaded: pending provider event count limit exceeded`, not as
+a write error. Grep `daemon.log` for `Session history write is stalled` (after 10 s) and
+`Session event admission failed`; the second names the holder (pending run, steer
+barrier, session queue, write tail). The two failures recover differently:
+
+- **Failed write** (disk full, I/O error): stays failed until the daemon restarts,
+  because acknowledged history may be missing.
+- **Overload:** the turn is interrupted with its error kept on the agent. When every
+  held event is written or released, the agent reads and accepts prompts again
+  (`Session event admission recovered after overload`). While the write stays stuck,
+  the agent stays locked.
+
 App work includes actor labels/profile tabs, workspace Show/Hide and User/Channel
 filters, one shared relative-time clock, authorship cache round trips, explicit
 source-range coverage, parent/global retained-page budgets, subagent projected page
