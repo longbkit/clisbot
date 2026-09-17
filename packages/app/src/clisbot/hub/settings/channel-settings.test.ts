@@ -8,6 +8,9 @@ import {
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
+  channelRouteFollowUp,
+  DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+  parseChannelFollowUpTtlMinutes,
 } from "../channel-configuration";
 
 describe("buildChannelAccountCandidate", () => {
@@ -191,6 +194,8 @@ describe("buildChannelAccountCandidate", () => {
       conversationIds: "C_SUPPORT",
       behavior: {
         requireMention: false,
+        followUpMode: "mention-only",
+        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "relay",
         finalAnswers: true,
@@ -224,6 +229,8 @@ describe("buildChannelAccountCandidate", () => {
       audience: "conversationParticipants",
       behavior: {
         requireMention: false,
+        followUpMode: "mention-only",
+        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "tool",
         finalAnswers: false,
@@ -307,6 +314,8 @@ describe("buildChannelAccountCandidate", () => {
       conversationIds: "C2",
       behavior: {
         requireMention: false,
+        followUpMode: "mention-only",
+        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "relay",
         finalAnswers: true,
@@ -449,5 +458,145 @@ describe("buildChannelAccountCandidate", () => {
       workflow: "triage",
     });
     expect(automated.resource).toEqual({ agents: {}, environments: {} });
+  });
+});
+
+describe("Route follow-up policy", () => {
+  function memberRoute(
+    behavior: Partial<typeof DEFAULT_MEMBER_ROUTE_BEHAVIOR>,
+    matchKind: "channel" | "dm" = "channel",
+  ) {
+    return buildChannelRouteCandidate({
+      accountId: "support",
+      matchKind,
+      conversationIds: "C_SUPPORT",
+      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, ...behavior },
+      target: { kind: "automation", automationName: "triage" },
+      resource: {},
+    }).route;
+  }
+
+  /** Loads `interaction` into the form, applies the user's edits, and saves over it. */
+  function savedInteraction(
+    interaction: Record<string, unknown>,
+    edits: Partial<typeof DEFAULT_MEMBER_ROUTE_BEHAVIOR> = {},
+    matchKind: "channel" | "dm" = "channel",
+  ) {
+    const currentRoute = {
+      match: { kind: matchKind, ids: ["C_SUPPORT"] },
+      audience: { kind: "members" },
+      workflow: "triage",
+      interaction,
+    };
+    return replaceChannelRouteCandidate({
+      accountId: "support",
+      matchKind,
+      conversationIds: "C_SUPPORT",
+      behavior: {
+        ...DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+        ...channelRouteFollowUp(interaction),
+        ...edits,
+      },
+      target: { kind: "automation", automationName: "triage" },
+      resource: {},
+      currentRoute,
+      accounts: [{ accountId: "support", routes: [currentRoute] }],
+    }).route["interaction"];
+  }
+
+  it("leaves an inherited policy unwritten until the user changes it", () => {
+    expect(memberRoute({}).interaction).toEqual({ requireMention: true });
+    expect(savedInteraction({ requireMention: true })).toEqual({ requireMention: true });
+  });
+
+  it("writes back an authored policy the user did not change, window included", () => {
+    const followUp = { mode: "mention-only", ttlMinutes: 15, note: "kept" };
+    expect(savedInteraction({ requireMention: true, followUp })).toEqual({
+      requireMention: true,
+      followUp,
+    });
+  });
+
+  it("writes auto with its window when the user turns it on", () => {
+    expect(
+      savedInteraction({ requireMention: true }, { followUpMode: "auto", followUpEdited: true }),
+    ).toEqual({ requireMention: true, followUp: { mode: "auto", ttlMinutes: 5 } });
+    expect(
+      savedInteraction(
+        { followUp: { mode: "mention-only", ttlMinutes: 15 } },
+        { followUpMode: "auto", followUpEdited: true },
+      ),
+    ).toEqual({ requireMention: true, followUp: { mode: "auto", ttlMinutes: 15 } });
+  });
+
+  it("keeps a known window when the user turns auto off", () => {
+    const off = { followUpMode: "mention-only", followUpEdited: true } as const;
+    expect(savedInteraction({ followUp: { mode: "auto", ttlMinutes: 20 } }, off)).toEqual({
+      requireMention: true,
+      followUp: { mode: "mention-only", ttlMinutes: 20 },
+    });
+    expect(savedInteraction({ followUp: { mode: "auto" } }, off)).toEqual({
+      requireMention: true,
+      followUp: { mode: "mention-only" },
+    });
+    expect(
+      savedInteraction(
+        { followUp: { mode: "auto" } },
+        { ...off, followUpTtlMinutes: 9, followUpTtlAuthored: true },
+      ),
+    ).toEqual({ requireMention: true, followUp: { mode: "mention-only", ttlMinutes: 9 } });
+  });
+
+  it("never adds a policy to a DM Route but keeps one it already has", () => {
+    const edited = { followUpMode: "auto", followUpEdited: true } as const;
+    expect(memberRoute(edited, "dm").interaction).toEqual({ requireMention: true });
+    expect(savedInteraction({ requireMention: true }, edited, "dm")).toEqual({
+      requireMention: true,
+    });
+    const followUp = { mode: "auto", ttlMinutes: 7 };
+    expect(savedInteraction({ followUp }, edited, "dm")).toEqual({
+      requireMention: true,
+      followUp,
+    });
+  });
+
+  it("reads the authored policy and defaults what is missing or invalid", () => {
+    expect(channelRouteFollowUp({ followUp: { mode: "auto", ttlMinutes: 12 } })).toEqual({
+      followUpMode: "auto",
+      followUpTtlMinutes: 12,
+      followUpTtlAuthored: true,
+      followUpAuthored: { mode: "auto", ttlMinutes: 12 },
+    });
+    expect(channelRouteFollowUp({ requireMention: true })).toEqual({
+      followUpMode: "mention-only",
+      followUpTtlMinutes: 5,
+      followUpTtlAuthored: false,
+    });
+    expect(channelRouteFollowUp({ followUp: { mode: "auto", ttlMinutes: -1 } })).toEqual({
+      followUpMode: "auto",
+      followUpTtlMinutes: 5,
+      followUpTtlAuthored: false,
+      followUpAuthored: { mode: "auto", ttlMinutes: -1 },
+    });
+  });
+
+  it("accepts only positive whole minutes", () => {
+    expect(parseChannelFollowUpTtlMinutes(" 5 ")).toBe(5);
+    for (const draft of ["", "0", "-3", "2.5", "1e3", "abc"]) {
+      expect(parseChannelFollowUpTtlMinutes(draft)).toBeNull();
+    }
+  });
+
+  it("keeps the fixed policy on public Routes", () => {
+    const open = buildChannelRouteCandidate({
+      accountId: "support",
+      matchKind: "channel",
+      conversationIds: "C_PUBLIC",
+      audience: "conversationParticipants",
+      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, followUpMode: "auto" },
+      target: { kind: "automation", automationName: "triage" },
+      resource: {},
+    });
+    expect(open.route["interaction"]).toEqual({ requireMention: true });
   });
 });

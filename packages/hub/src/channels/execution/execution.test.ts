@@ -986,6 +986,72 @@ describe("workflow route", () => {
     assert.equal(harness.fake.created.length, 0);
   });
 
+  it("leaves an identity-link command addressed to no bot to the bot it names", async () => {
+    let consumed = 0;
+    const account = makeAccount(makeRoute());
+    const harness = makeHarness({
+      account,
+      consumeChannelIdentityChallenge: async () => {
+        consumed += 1;
+        return "invalid";
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    for (const text of ["/link ABCDE-23456", "<@B0OTHER> /link ABCDE-23456"]) {
+      harness.next.message = message({ mentionedBot: false, text });
+      const outcome = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.deepEqual(outcome.outcome, {
+        kind: "ignored",
+        reason: "command not addressed to this bot",
+      });
+    }
+    assert.equal(consumed, 0);
+    assert.deepEqual(harness.posted, []);
+    assert.equal(harness.fake.created.length, 0);
+
+    harness.next.message = message({
+      mentionedBot: false,
+      text: "/link ABCDE-23456",
+      conversation: { kind: "dm", id: "D0DM", rootConversationId: "D0DM", threadId: null },
+    });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    assert.equal(consumed, 1, "a DM always addresses this bot");
+    await harness.plane.stop();
+  });
+
+  it("counts the follow-up window from the agent's latest stream activity", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: { ...DEFAULTS, followUp: { mode: "auto", ttlMinutes: 5 } },
+    };
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const inbound = (mentionedBot: boolean) => {
+      harness.next.message = message({ mentionedBot, text: mentionedBot ? "start" : "more" });
+      return harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    };
+
+    const bound = await inbound(true);
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    // A long turn: its final event lands 4 minutes after the mention.
+    harness.clock.advance(4 * 60_000);
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "long-turn",
+    });
+    harness.clock.advance(4 * 60_000);
+    assert.equal((await inbound(false)).outcome?.kind, "steered");
+
+    harness.clock.advance(6 * 60_000);
+    assert.equal((await inbound(false)).outcome?.kind, "ignored");
+    await harness.plane.stop();
+  });
+
   it("applies follow-up mode and idle TTL to an existing workflow binding", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
@@ -2769,6 +2835,103 @@ describe("inbound event kinds", () => {
     // Commands answer where they were asked, never at the conversation root.
     assert.deepEqual(harness.postedThreads, ["1712000000.000900"]);
     assert.equal(harness.fake.created.length, 0);
+  });
+
+  it("answers a command outside a DM only when it names this bot", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const inbound = () =>
+      harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+
+    harness.next.message = message({ text: "/help", mentionedBot: false });
+    assert.deepEqual((await inbound()).outcome, {
+      kind: "ignored",
+      reason: "command not addressed to this bot",
+    });
+    assert.deepEqual(harness.posted, []);
+
+    harness.next.message = message({
+      text: "/help",
+      mentionedBot: false,
+      conversation: { kind: "dm", id: "D0HELP", rootConversationId: "D0HELP", threadId: null },
+    });
+    assert.equal((await inbound()).outcome?.kind, "command");
+
+    harness.next.message = message({ text: "<@B0BOT> /help", mentionedBot: true });
+    assert.equal((await inbound()).outcome?.kind, "command");
+    assert.equal(harness.posted.length, 2);
+    await harness.plane.stop();
+  });
+
+  it("changes and reports this conversation's follow-up mode with /followup", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    // Inside a thread: a root-level marker keys its own minted thread under `reply.anchor: thread`.
+    const conversation: InboundMessage["conversation"] = {
+      kind: "thread",
+      id: "1712000000.000100",
+      rootConversationId: "C0FOLLOWUP",
+      threadId: "1712000000.000100",
+    };
+    const run = async (text: string, externalMessageId: string) => {
+      harness.next.message = message({ text, conversation, externalMessageId });
+      await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+      return harness.posted.at(-1) ?? "";
+    };
+
+    assert.match(await run("/followup pause", "1712000000.000101"), /^Follow-up paused/u);
+    const paused = await run("/followup", "1712000000.000102");
+    assert.match(paused, /`paused` until the next mention/u);
+    assert.match(await run("/followup auto", "1712000000.000103"), /set to `auto`/u);
+    assert.match(
+      await run("/followup resume", "1712000000.000104"),
+      /^Follow-up for this thread reset to the route's/u,
+    );
+    assert.doesNotMatch(await run("/followup status", "1712000000.000105"), /- here:/u);
+    await harness.plane.stop();
+  });
+
+  it("refuses a conversation /followup at a channel root that would open its own thread", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "/followup auto",
+      externalMessageId: "1712000000.000200",
+      conversation: {
+        kind: "channel",
+        id: "C0FOLLOWROOT",
+        rootConversationId: "C0FOLLOWROOT",
+        threadId: null,
+      },
+    });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    assert.match(harness.posted.at(-1) ?? "", /Run \/followup inside the thread/u);
+    const key = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack" as const,
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0FOLLOWROOT",
+      externalThreadId: "1712000000.000200",
+    };
+    assert.equal(await store.access.findConversationFollowUp(key), undefined);
+    await harness.plane.stop();
+  });
+
+  it("hands prose that starts with followup to the agent instead of a usage reply", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ text: "followup on the PR review please" });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.notEqual(result.outcome?.kind, "command");
+    assert.equal(
+      harness.posted.some((text) => text.startsWith("Usage:")),
+      false,
+    );
+    await harness.plane.stop();
   });
 
   it("reports /help as unhandled when the reply never reached the channel", async () => {

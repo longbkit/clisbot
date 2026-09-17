@@ -245,7 +245,10 @@ export const ORG_DEFAULTS = {
   defaultRoles: [],
   interaction: {
     requireMention: true,
-    followUp: { mode: "auto", ttlMinutes: 60 },
+    // Every message in a group must mention the bot. `auto` lets an
+    // unmentioned message continue a bound session within `ttlMinutes` of its
+    // last turn — 5, clisbot's `followUp.participationTtlMin`.
+    followUp: { mode: "mention-only", ttlMinutes: 5 },
   },
   binding: { key: "thread" },
   reply: { anchor: "default" },

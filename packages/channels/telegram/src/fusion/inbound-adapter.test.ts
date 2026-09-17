@@ -85,7 +85,7 @@ describe("mention facts", () => {
     expect(buildTelegramMessageEvent([msg], 7, PARAMS)).toBeNull();
   });
 
-  it("treats /cmd@our_bot and a bare /cmd as ours", () => {
+  it("treats /cmd@our_bot as ours, and a bare /cmd only in a DM", () => {
     const addressed = message({
       text: "/status@longluong3bot",
       entities: [{ type: "bot_command", offset: 0, length: 21 }],
@@ -96,8 +96,14 @@ describe("mention facts", () => {
       entities: [{ type: "bot_command", offset: 0, length: 7 }],
     });
     const facts = resolveTelegramMentionFacts(bare, PARAMS);
-    expect(facts.wasMentioned).toBe(true);
+    expect(facts.wasMentioned).toBe(false);
     expect(facts.command).toBe("/status");
+    const direct = message({
+      text: "/status",
+      entities: [{ type: "bot_command", offset: 0, length: 7 }],
+      chat: { id: 42, type: "private", first_name: "Human" },
+    });
+    expect(resolveTelegramMentionFacts(direct, PARAMS).wasMentioned).toBe(true);
   });
 });
 
@@ -151,7 +157,8 @@ describe("message events", () => {
       PARAMS,
     );
     expect(build?.kind).toBe("command");
-    expect(build?.event.wasMentioned).toBe(true);
+    // A bare `/new` in a group names no bot: the kind stays a command, not a mention.
+    expect(build?.event.wasMentioned).toBe(false);
   });
 
   it("folds reply, quote and forward context into the body", () => {

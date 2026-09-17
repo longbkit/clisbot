@@ -75,25 +75,26 @@ conversations outside a narrower list. A Guest never holds it. See
 Implementation and verification notes are in [implementation-plan.md](implementation-plan.md).
 `•` = applies on that route kind.
 
-| Command                                                         | Does                                                                                                           | Requires                | Direct | Automation |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------- | :----: | :--------: |
-| `/cowork` (`/open`, `/app`)                                     | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact          |   •    |     •      |
-| `/me`                                                           | Your channel identity and access here.                                                                         | — (public)              |   •    |     •      |
-| `/resume <id>`                                                  | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create            |   •    |     —      |
-| `/steer <message>`                                              | Admit `<message>` into the running turn.                                                                       | agent.interact          |   •    |     —      |
-| `/queue <message>`                                              | Hold `<message>` until the current turn ends.                                                                  | agent.interact          |   •    |     —      |
-| `/provider [list]` · `/provider search <kw>` · `/provider <id>` | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant² |   •    |     —      |
-| `/model [list]` · `/model search <kw>`                          | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant² |   •    |     —      |
-| `/effort [list]` · `/effort <id>`                               | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant² |   •    |     —      |
-| `/permission [<mode>]` (`/mode`)                                | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact          |   •    |     —      |
-| `/skill [list]` · `/skill search <kw>` · `/skill <name>`        | List/search skills; run one on the agent.                                                                      | agent.interact          |   •    |     —      |
-| `/command [list]` · `/command search <kw>`                      | List/search dynamic commands.                                                                                  | agent.interact          |   •    |     —      |
-| `/command add <name> <prompt>` · `/command remove <name>`       | Create or remove a dynamic command.                                                                            | approval.config         |   •    |     —      |
-| `/fork [message]`                                               | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | agent.create            |   •    |     —      |
-| `/side <message>`                                               | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | agent.create            |   •    |     —      |
-| `/quick <message>`                                              | One-off question in a fresh, unrelated session; binding unchanged.                                             | agent.create            |   •    |     —      |
-| `/routedefault`                                                 | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | agent.interact          |   •    |     —      |
-| `/promoteroutedefault` · `/promoteroutedefault undo`            | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³         |   •    |     —      |
+| Command                                                                                                   | Does                                                                                                           | Requires                                            | Direct | Automation |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | :----: | :--------: |
+| `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact                                      |   •    |     •      |
+| `/me`                                                                                                     | Your channel identity and access here.                                                                         | — (public)                                          |   •    |     •      |
+| `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).              | agent.interact; `route` changes need channel.manage |   •    |     •      |
+| `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create                                        |   •    |     —      |
+| `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                       | agent.interact                                      |   •    |     —      |
+| `/queue <message>`                                                                                        | Hold `<message>` until the current turn ends.                                                                  | agent.interact                                      |   •    |     —      |
+| `/provider [list]` · `/provider search <kw>` · `/provider <id>`                                           | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant²                             |   •    |     —      |
+| `/model [list]` · `/model search <kw>`                                                                    | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant²                             |   •    |     —      |
+| `/effort [list]` · `/effort <id>`                                                                         | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant²                             |   •    |     —      |
+| `/permission [<mode>]` (`/mode`)                                                                          | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact                                      |   •    |     —      |
+| `/skill [list]` · `/skill search <kw>` · `/skill <name>`                                                  | List/search skills; run one on the agent.                                                                      | agent.interact                                      |   •    |     —      |
+| `/command [list]` · `/command search <kw>`                                                                | List/search dynamic commands.                                                                                  | agent.interact                                      |   •    |     —      |
+| `/command add <name> <prompt>` · `/command remove <name>`                                                 | Create or remove a dynamic command.                                                                            | approval.config                                     |   •    |     —      |
+| `/fork [message]`                                                                                         | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | agent.create                                        |   •    |     —      |
+| `/side <message>`                                                                                         | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | agent.create                                        |   •    |     —      |
+| `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                             | agent.create                                        |   •    |     —      |
+| `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | agent.interact                                      |   •    |     —      |
+| `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                     |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -240,9 +241,62 @@ the parser runs.
   direct @mention but not `@all`. The shared normalizer strips the leading/glued
   mention and the `/`, `\`, or bare prefix before matching, so every spelling
   reaches the same verb (`stripMentions` in `commands.ts`).
+- **Several bots share a room.** Outside a DM a command, `/link`, or a dynamic
+  command runs only when it names this bot (`mentionedBot`); otherwise it is
+  ignored, never forwarded to the agent (`commandAddressesThisBot` in
+  `execution.ts`). A Slack, Discord, or Google Chat native command reaches one
+  app, and its vertical reports it as a mention. A bare Telegram `/status` names
+  no bot and every admin or privacy-off bot in the group receives it, so it
+  counts only in a DM; the group command menu inserts `/status@bot`. Typed
+  `approve`/`deny` are exempt: they answer a prompt this bot posted and stay
+  silent when it has none.
 - **Slack `/` collisions.** When a team already owns a native `/status`, or a
   client blocks unregistered `/…`, the **backslash** form (`\status`,
   `\approve`) is the conflict-free spelling and rides the same parser.
+
+### Follow-up
+
+`interaction.followUp` decides whether an **unmentioned** message continues a
+bound session. It refines `requireMention`: a DM, or a Route with
+`requireMention: false`, admits every message.
+
+- `mention-only` (the default): every message needs a mention.
+- `auto`: after a mention, unmentioned messages in that conversation continue
+  the session for `ttlMinutes` (default 5, clisbot's `participationTtlMin`)
+  after the agent's latest activity — every stream event refreshes it, so a long
+  turn keeps it open; then a new mention is needed. The window is kept in Hub
+  memory, so after a Hub restart the next message needs a mention. A pause ends
+  only when a mention is accepted, not when a refused or throttled one arrives.
+
+Two scopes change it:
+
+| Form                                           | Changes                                                                                                            | Needs            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| `/followup auto\|mention-only\|pause\|resume`  | This conversation only: its binding key, so one thread, one topic, or a whole channel under `binding.key: channel` | `agent.interact` |
+| `/followup route auto [minutes]\|mention-only` | The Route serving the conversation, for every conversation it serves                                               | `channel.manage` |
+
+- **Conversation override.** `pause` requires a mention until the next accepted
+  one; `resume` returns to the Route. The reply names the scope (`this thread`,
+  `this topic`, `this channel`). The override lives in
+  `channel_conversation_follow_ups`, apart from the `/agent` and `/model`
+  selection, so `/promoteroutedefault` does not clear it. In a DM, or on a Route
+  without `requireMention`, a change is refused: it would have no effect.
+- **Channel root on a thread-anchored Slack Route.** The message there opens its
+  own thread, so an override would only cover that thread. Clisbot stores it
+  anyway; the Hub refuses and points to running it in the thread or to
+  `/followup route`.
+- **Route change.** It publishes a Channel revision through the same path as
+  `/promoteroutedefault` (compile guard, delegation check, attributed to the
+  sender). It writes `interaction.followUp` on the Route and keeps the authored
+  leaves it does not name, so `mention-only` keeps a custom `ttlMinutes` for a
+  later `auto`. Conversation overrides stay until `/followup resume`. Clisbot has
+  no chat form for this; it is config-file only there.
+- **Route editor.** It shows the leaf as **Continue without a mention**. Saving a
+  Route writes `followUp` only when you changed that control or the Route
+  already authored it, so a Route inheriting `auto` from its account keeps
+  inheriting.
+- **Arguments.** Only the forms above parse as the command. Anything else, such
+  as `followup on the PR`, goes to the agent as a prompt.
 
 ### Platform commands vs the agent's own commands
 

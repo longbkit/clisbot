@@ -19,6 +19,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import type { FollowUpMode } from "../config/enums.js";
 import {
   bindingSummary,
   deriveBindingKey,
@@ -33,6 +34,12 @@ import {
   findChannelExecutionAgent,
   type SessionCreateContext,
 } from "./session-create.js";
+import {
+  admitFollowUp,
+  conversationFollowUpMode,
+  endFollowUpPause,
+  type FollowUpAdmission,
+} from "./follow-up.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { processingSurfaceFor } from "../plane/processing.js";
@@ -148,6 +155,7 @@ export class BindingEngine {
         message,
         route.defaults,
         this.isIdle(binding.agentId, route.defaults),
+        await this.followUpMode(message, route),
       );
       if (!followUp.allowed) return followUp;
     } else if (route.defaults.requireMention && !message.mentionedBot) {
@@ -168,6 +176,19 @@ export class BindingEngine {
    * whole exchange (which is why a channel turn's `turn_started` never arrived).
    */
   async bindOrSteer(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    subscribe?: (agentId: string) => Promise<void> | void,
+  ): Promise<InboundOutcome> {
+    const outcome = await this.dispatch(message, account, route, subscribe);
+    if (outcome.kind === "bound" || outcome.kind === "steered") {
+      await endFollowUpPause(this.context.store, this.context.organizationId, message, route);
+    }
+    return outcome;
+  }
+
+  private async dispatch(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
@@ -480,7 +501,12 @@ export class BindingEngine {
     agentId: string,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const admission = admitFollowUp(message, route.defaults, this.isIdle(agentId, route.defaults));
+    const admission = admitFollowUp(
+      message,
+      route.defaults,
+      this.isIdle(agentId, route.defaults),
+      await this.followUpMode(message, route),
+    );
     if (!admission.allowed) {
       return {
         kind: "ignored",
@@ -517,12 +543,23 @@ export class BindingEngine {
 
   // --- Idle window ----------------------------------------------------------
 
-  /** True when the agent's last activity is older than the idle window. An
-   * agent with no recorded activity in this process is not idle. */
+  /** True when the agent's last activity is older than the follow-up window.
+   * The window lives in memory, so an agent with no recorded activity in this
+   * process (a Hub restart) is outside it: the next message must mention the
+   * bot, as clisbot's `participationTtl` does with no recorded bot reply. */
   isIdle(agentId: string, defaults: EffectiveDefaults): boolean {
     const last = this.lastActivity.get(agentId);
-    if (last === undefined) return false;
+    if (last === undefined) return true;
     return this.context.clock.now() - last > defaults.followUp.ttlMinutes * 60_000;
+  }
+
+  private followUpMode(message: InboundMessage, route: CompiledRoute): Promise<FollowUpMode> {
+    return conversationFollowUpMode(
+      this.context.store,
+      this.context.organizationId,
+      message,
+      route,
+    );
   }
 
   /** Record that the agent is active now (a steer or a fresh create). */
@@ -577,40 +614,6 @@ export class BindingEngine {
   }
 }
 
-/** A follow-up admission result over a bound session. */
-export interface FollowUpAdmission {
-  allowed: boolean;
-  reason?: string | undefined;
-}
-
-/**
- * Admit a follow-up into a bound session. A mention always steers. An
- * unmentioned follow-up steers only in `followUp.mode: auto` while the session
- * is still active — `mention-only` always re-mentions, and an idle `auto`
- * session idled out and needs a fresh mention (implementation doc §4.3.4:
- * `interaction.followUp.mode` gates whether an unmentioned follow-up is
- * admitted; `binding` decides which session it lands in).
- */
-export function admitFollowUp(
-  message: { mentionedBot: boolean },
-  defaults: EffectiveDefaults,
-  idle: boolean,
-): FollowUpAdmission {
-  if (message.mentionedBot) return { allowed: true };
-  if (defaults.followUp.mode === "mention-only") {
-    return {
-      allowed: false,
-      reason: "route requires a mention for every message",
-    };
-  }
-  if (idle)
-    return {
-      allowed: false,
-      reason: "session idled out; mention the bot to resume",
-    };
-  return { allowed: true };
-}
-
 /**
  * The compact route summary stored on the binding row. `selection` pins the
  * immutable revision decision without promoting routes into durable resources:
@@ -618,3 +621,5 @@ export function admitFollowUp(
  * later revision retained equivalent target and policy before continuation.
  * Older rows without `selection` remain readable through the legacy match key.
  */
+
+export { admitFollowUp, type FollowUpAdmission } from "./follow-up.js";

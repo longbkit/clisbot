@@ -1,5 +1,5 @@
-// Publishing a Route default from a conversation (`/promoteroutedefault`). The
-// change is an ordinary Channel revision: the same compile guard and
+// Publishing a Route default from a conversation (`/promoteroutedefault`,
+// `/followup route`). The change is an ordinary Channel revision: the same compile guard and
 // delegation check as a Hub UI save, attributed to the Member who sent the
 // command, and written only if nobody published in between.
 
@@ -9,12 +9,17 @@ import { ChannelConfigurationConflictError } from "../../db/errors.js";
 import { catchAllRoute } from "../approvals/index.js";
 import type { AgentControls } from "../config/agent-controls.js";
 import type { CompiledRoute } from "../config/compile.js";
+import type { FollowUp } from "../config/schema.js";
 import { loadChannelControlPlane, type ChannelControlPlaneSnapshot } from "../control-plane.js";
+import type { HubBundleFile } from "../../config/bundle-contract.js";
+import type { RouteFollowUpChange } from "../commands-follow-up-arguments.js";
 import { deployRevision, type ChannelConfigurationCandidate } from "../http/configuration.js";
 import {
+  authoredRoute,
   previousRouteAgentControls,
   routeIdentity,
   writeRouteAgentControls,
+  writeRouteFollowUp,
   type RoutePosition,
 } from "./files.js";
 
@@ -36,16 +41,29 @@ export interface RouteDefaultTarget {
   principal: RouteDefaultPrincipal;
 }
 
-export type RouteDefaultOutcome =
-  | { status: "published"; agentControls: AgentControls | undefined }
+/** Why a publish did not happen. */
+export type RouteDefaultRefusal =
   | { status: "route_changed" }
   | { status: "nothing_to_undo" }
   /** Delegation refused: the Route would start an agent the Member cannot. */
   | { status: "outside_access" };
 
+export type RouteDefaultOutcome =
+  | { status: "published"; agentControls: AgentControls | undefined }
+  | RouteDefaultRefusal;
+
+export type RouteFollowUpOutcome =
+  | { status: "published"; followUp: FollowUp }
+  | RouteDefaultRefusal;
+
 export interface RouteDefaultPublisher {
   promote(target: RouteDefaultTarget, controls: AgentControls): Promise<RouteDefaultOutcome>;
   undo(target: RouteDefaultTarget): Promise<RouteDefaultOutcome>;
+  /** Change the Route's `interaction.followUp`, keeping authored leaves the change does not name. */
+  setFollowUp(
+    target: RouteDefaultTarget,
+    change: RouteFollowUpChange,
+  ): Promise<RouteFollowUpOutcome>;
   /** Bring running accounts to the active revision. Call after the reply is posted. */
   apply(): void;
 }
@@ -65,12 +83,13 @@ export interface RouteDefaultPublisherOptions {
 export function createRouteDefaultPublisher(
   options: RouteDefaultPublisherOptions,
 ): RouteDefaultPublisher {
-  const publish = async (
+  /** `write` returns the next files and what they publish, or undefined for nothing to do. */
+  const publish = async <Published>(
     target: RouteDefaultTarget,
-    controls: (
+    write: (
       snapshot: ChannelControlPlaneSnapshot,
-    ) => { value: AgentControls | undefined } | undefined,
-  ): Promise<RouteDefaultOutcome> => {
+    ) => { files: HubBundleFile[]; published: Published } | undefined,
+  ): Promise<{ status: "published"; published: Published } | RouteDefaultRefusal> => {
     const snapshot = await loadChannelControlPlane(
       options.database,
       target.organizationId,
@@ -80,17 +99,10 @@ export function createRouteDefaultPublisher(
     if (current === undefined || routeIdentity(current) !== routeIdentity(target.route)) {
       return { status: "route_changed" };
     }
-    const next = controls(snapshot);
+    const next = write(snapshot);
     if (next === undefined) return { status: "nothing_to_undo" };
-    const files = writeRouteAgentControls(
-      snapshot.files,
-      target.channel,
-      target.accountId,
-      target.position,
-      next.value,
-    );
     try {
-      await deployRevision(options.database, snapshot, files, {
+      await deployRevision(options.database, snapshot, next.files, {
         createdByUserId: target.principal.userId,
         expectedRevisionId: snapshot.revision?.id ?? null,
         authorize: (candidate) =>
@@ -109,17 +121,37 @@ export function createRouteDefaultPublisher(
       if (error instanceof AccessPolicyError) return { status: "outside_access" };
       throw error;
     }
-    return { status: "published", agentControls: next.value };
+    return { status: "published", published: next.published };
+  };
+
+  const publishControls = async (
+    target: RouteDefaultTarget,
+    controls: (
+      snapshot: ChannelControlPlaneSnapshot,
+    ) => { value: AgentControls | undefined } | undefined,
+  ): Promise<RouteDefaultOutcome> => {
+    const outcome = await publish(target, (snapshot) => {
+      const next = controls(snapshot);
+      if (next === undefined) return undefined;
+      const { channel, accountId, position } = target;
+      return {
+        files: writeRouteAgentControls(snapshot.files, channel, accountId, position, next.value),
+        published: next.value,
+      };
+    });
+    return outcome.status === "published"
+      ? { status: "published", agentControls: outcome.published }
+      : outcome;
   };
 
   return {
-    promote: (target, controls) => publish(target, () => ({ value: controls })),
+    promote: (target, controls) => publishControls(target, () => ({ value: controls })),
     undo: async (target) => {
       const revisions = await options.database.listChannelConfigurationRevisions(
         target.organizationId,
         UNDO_REVISION_LIMIT,
       );
-      return publish(target, (snapshot) => {
+      return publishControls(target, (snapshot) => {
         const activeVersion = snapshot.revision?.version ?? 0;
         const older = revisions.filter(({ version }) => version < activeVersion);
         const previous = previousRouteAgentControls(
@@ -130,6 +162,17 @@ export function createRouteDefaultPublisher(
         );
         return previous.found ? { value: previous.controls } : undefined;
       });
+    },
+    setFollowUp: async (target, change) => {
+      const outcome = await publish(target, (snapshot) => {
+        const { channel, accountId, position } = target;
+        const files = writeRouteFollowUp(snapshot.files, channel, accountId, position, change);
+        const followUp = authoredRoute(files, channel, accountId, position)?.interaction?.followUp;
+        return { files, published: followUp ?? change };
+      });
+      return outcome.status === "published"
+        ? { status: "published", followUp: outcome.published }
+        : outcome;
     },
     apply: options.apply,
   };

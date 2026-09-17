@@ -1,6 +1,11 @@
 import { AutomationInputDraftContext } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
+import {
+  useChannelSettingsQueries,
+  useReportDraftEditing,
+  useScrollToTopOn,
+} from "./channel-settings-hooks";
 import { AdvancedConfigurationSection, useChannelYamlForm } from "./channel-advanced-configuration";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -16,6 +21,11 @@ import {
 } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
+import {
+  RouteBehaviorSwitch,
+  RouteFollowUpFields,
+  SettingRow,
+} from "./channel-route-behavior-rows";
 import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -46,6 +56,8 @@ import {
   buildChannelAccountCandidate,
   buildChannelRouteCandidate,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+  channelRouteFollowUp,
+  parseChannelFollowUpTtlMinutes,
   DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
   hasRequiredChannelConversationIds,
   insertChannelRoute,
@@ -83,7 +95,6 @@ import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 import { ChannelOperationsView } from "./channel-operations-view";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import { useHubSettingsDetailScroll } from "./detail-scroll";
 import { ConversationSelectionFields } from "./conversation-picker-field";
 import { DaemonProjectField } from "./daemon-project-field";
 import {
@@ -106,6 +117,7 @@ type RouteCondition = "all" | "contains";
 type RouteAudience = "members" | "conversationParticipants";
 type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 type RouteLimitsDraft = Record<keyof ChannelRouteLimits, string>;
+const FOLLOW_UP_TTL_ERROR = "Use a positive whole number of minutes.";
 type ConfigurationKind = "account" | "route";
 type HubConnection = z.infer<typeof HubConnectionsSchema>["connections"][number];
 type HubConnections = z.infer<typeof HubConnectionsSchema>;
@@ -232,124 +244,39 @@ const CHANNEL_SECONDARY_VIEWS: Partial<Record<ChannelView, () => ReactElement>> 
 
 function ChannelSettingsContent({
   automationName,
-  embedded = false,
-}: Partial<AutomationChannelScope> & { embedded?: boolean }) {
+  embedded,
+}: Partial<AutomationChannelScope> & { embedded: boolean }) {
   const [choosingInput, setChoosingInput] = useState(false);
+  const toggleChoosingInput = useCallback(() => setChoosingInput((current) => !current), []);
   const confirmDialog = useConfirmation();
   const queryClient = useQueryClient();
-  const hub = useHubAccount();
   const router = useRouter();
-  const organizationId = hub.signedIn?.organization.id ?? "";
-  const hubAccountId = hub.signedIn?.account.id ?? null;
-  const queryScope = {
-    origin: hub.origin,
-    organizationId,
-    accountId: hubAccountId,
-  };
-  const canManage = hub.signedIn?.capabilities.manageResources === true;
-  const isInstanceOperator = hub.signedIn?.isInstanceOperator === true;
-  const channelQuery = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "channel-configuration"),
-    queryFn: () => hub.api().get("channel-configuration", HubChannelConfigurationSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const inputDraft = useContext(AutomationInputDraftContext);
-  const channels = useMemo(
-    () => ({
-      ...channelQuery,
-      data:
-        channelQuery.data === undefined
-          ? undefined
-          : {
-              ...channelQuery.data,
-              ...(inputDraft?.draft
-                ? {
-                    accounts: inputDraft.draft.accounts,
-                    resource: inputDraft.draft.resource,
-                    policy: inputDraft.draft.policy,
-                    revision:
-                      inputDraft.draft.expectedRevisionId !== null && channelQuery.data.revision
-                        ? {
-                            ...channelQuery.data.revision,
-                            id: inputDraft.draft.expectedRevisionId,
-                          }
-                        : null,
-                  }
-                : {}),
-            },
-    }),
-    [channelQuery, inputDraft?.draft],
-  );
+  const {
+    hub,
+    scope: queryScope,
+    canManage,
+    isInstanceOperator,
+    inputDraft,
+    draftPending,
+    channels,
+    connections,
+    channelConnections,
+    statusRefreshing,
+    automations,
+    daemons,
+    history,
+    runtimeStatus,
+    teams,
+    assignments,
+  } = useChannelSettingsQueries();
+  const { organizationId, accountId: hubAccountId } = queryScope;
   const yamlForm = useChannelYamlForm(channels.data);
-  const connections = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "connections"),
-    queryFn: () => hub.api().get("connections", HubConnectionsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const automations = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "automations"),
-    queryFn: () => hub.api().get("automations", HubAutomationsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const daemons = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "daemons"),
-    queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const history = useFetchQuery({
-    queryKey: [...hubResourceQueryKey(queryScope, "channel-configuration"), "revisions"],
-    queryFn: () => hub.api().get("channel-configuration/revisions", HubChannelRevisionsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const runtimeStatus = useFetchQuery({
-    queryKey: [...hubResourceQueryKey(queryScope, "channel-accounts"), "status"],
-    queryFn: () => hub.api().get("channel-accounts/status", HubChannelRuntimeStatusSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const teams = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "teams"),
-    queryFn: () => hub.api().get("teams", HubTeamsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const assignments = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "access-assignments"),
-    queryFn: () => hub.api().get("access-assignments", HubAccessAssignmentsSchema),
-    enabled: organizationId.length > 0,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [mutationPending, setPending] = useState(false);
-  const pending = mutationPending || inputDraft?.pending === true;
+  const pending = mutationPending || draftPending;
   const [editor, setEditor] = useState<ChannelEditor | null>(null);
-  const setDraftEditing = inputDraft?.setEditing;
-  useEffect(() => {
-    setDraftEditing?.(editor !== null);
-    return () => setDraftEditing?.(false);
-  }, [editor, setDraftEditing]);
+  useReportDraftEditing(editor !== null);
   const [editorRevisionId, setEditorRevisionId] = useState<string | null>(null);
   const beginEdit = useCallback(
     (next: ChannelEditor) => {
@@ -366,11 +293,14 @@ function ChannelSettingsContent({
     setActivityState(initialChannelActivityState(selectedAccountKey ?? "all"));
     setChannelView("activity");
   }, [selectedAccountKey]);
-  const scrollToTop = useHubSettingsDetailScroll();
-  const usesParentScroll = !embedded && !inputDraft;
-  useEffect(() => {
-    if (usesParentScroll) scrollToTop?.();
-  }, [editor, selectedAccountKey, channelView, scrollToTop, usesParentScroll]);
+  // An embedded or draft editor scrolls inside its own container.
+  useScrollToTopOn(
+    !embedded && !inputDraft,
+    useMemo(
+      () => [editor, selectedAccountKey, channelView],
+      [editor, selectedAccountKey, channelView],
+    ),
+  );
 
   const mutate = useCallback(async (operation: () => Promise<void>) => {
     setMutationError(null);
@@ -606,13 +536,6 @@ function ChannelSettingsContent({
     [hub, mutate, runtimeStatus],
   );
 
-  const channelConnections = useMemo(
-    () =>
-      (connections.data?.connections ?? []).filter((connection) =>
-        ["slack", "telegram"].includes(connection.provider),
-      ),
-    [connections.data?.connections],
-  );
   const refreshStatus = useCallback(() => {
     void Promise.all([
       channels.refetch(),
@@ -780,11 +703,7 @@ function ChannelSettingsContent({
         automations={automations.data}
         daemons={daemons.data}
         teams={teams.data}
-        channelConnections={
-          inputDraft
-            ? channelConnections.filter((connection) => connection.provider === inputDraft.provider)
-            : channelConnections
-        }
+        channelConnections={channelConnections}
         pending={pending}
         isInstanceOperator={isInstanceOperator}
         cancelRouteEdit={cancelRouteEdit}
@@ -795,66 +714,24 @@ function ChannelSettingsContent({
     );
   if (automationName !== undefined) {
     return (
-      <AutomationInputSection
+      <AutomationChannelInputs
+        automationName={automationName}
         embedded={embedded}
-        trailing={
-          !embedded && !inputDraft ? (
-            <Button size="sm" variant="outline" onPress={() => setChoosingInput(!choosingInput)}>
-              {choosingInput ? "Cancel" : "Add input"}
-            </Button>
-          ) : undefined
-        }
-      >
-        <QueryFeedback queries={[channels, connections, automations]} />
-        {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-        {testResult ? <Alert variant="success" title={testResult} /> : null}
-        {!inputDraft &&
-        !choosingInput &&
-        channels.data &&
-        !channels.data.accounts.some(
-          (account) =>
-            arrayField(account, "routes").some(
-              (route) => (route as RecordValue).workflow === automationName,
-            ) || objectField(account, "fallback")?.workflow === automationName,
-        ) ? (
-          <Text style={settingsStyles.rowHint}>No Channel inputs configured.</Text>
-        ) : null}
-        {(channels.data?.accounts ?? [])
-          .filter((account) =>
-            inputDraft
-              ? account.channel === inputDraft.provider
-              : choosingInput ||
-                arrayField(account, "routes").some(
-                  (route) => (route as RecordValue).workflow === automationName,
-                ) ||
-                objectField(account, "fallback")?.workflow === automationName,
-          )
-          .map((account) => (
-            <AutomationChannelAccount
-              key={channelAccountKey(account)}
-              account={account}
-              choosing={Boolean(inputDraft) || choosingInput}
-              automationName={automationName}
-              pending={pending}
-              editRoute={editRoute}
-              addRoute={beginEdit}
-              moveRoute={moveRoute}
-              runtimes={inputDraft ? [] : (runtimeStatus.data?.accounts ?? [])}
-              removeRoute={removeRoute}
-              testRoute={testRoute}
-            />
-          ))}
-        {choosingInput || inputDraft ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending || channels.data === undefined}
-            onPress={addAccount}
-          >
-            Connect a new account
-          </Button>
-        ) : null}
-      </AutomationInputSection>
+        accounts={channels.data?.accounts}
+        queries={[channels, connections, automations]}
+        runtimes={runtimeStatus.data?.accounts}
+        mutationError={mutationError}
+        testResult={testResult}
+        choosingInput={choosingInput}
+        toggleChoosingInput={toggleChoosingInput}
+        pending={pending}
+        editRoute={editRoute}
+        beginEdit={beginEdit}
+        addAccount={addAccount}
+        moveRoute={moveRoute}
+        removeRoute={removeRoute}
+        testRoute={testRoute}
+      />
     );
   }
   const navigation = (
@@ -897,7 +774,7 @@ function ChannelSettingsContent({
         teams={teams.data}
         assignments={assignments.data}
         queries={[channels, connections, runtimeStatus, teams, assignments]}
-        refreshing={connections.isFetching || runtimeStatus.isFetching}
+        refreshing={statusRefreshing}
         mutationError={mutationError}
         testResult={testResult}
         selectedAccountKey={selectedAccountKey}
@@ -932,6 +809,106 @@ function ChannelSettingsContent({
         save={saveAdvancedConfiguration}
       />
     </View>
+  );
+}
+
+/** The Channel Routes that feed one Automation, and the picker that adds one. */
+function AutomationChannelInputs({
+  automationName,
+  embedded,
+  accounts,
+  queries,
+  runtimes = [],
+  mutationError,
+  testResult,
+  choosingInput,
+  toggleChoosingInput,
+  pending,
+  editRoute,
+  beginEdit,
+  addAccount,
+  moveRoute,
+  removeRoute,
+  testRoute,
+}: {
+  automationName: string;
+  embedded: boolean;
+  accounts: RecordValue[] | undefined;
+  queries: Array<{ isPending: boolean; error: Error | null }>;
+  runtimes: HubRuntimeAccount[] | undefined;
+  mutationError: string | null;
+  testResult: string | null;
+  choosingInput: boolean;
+  toggleChoosingInput(): void;
+  pending: boolean;
+  editRoute(route: EditingRoute): void;
+  beginEdit(editor: ChannelEditor): void;
+  addAccount(): void;
+  moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
+  removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
+  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
+}) {
+  const inputDraft = useContext(AutomationInputDraftContext);
+  const choosing = Boolean(inputDraft) || choosingInput;
+  const inputAccounts = (accounts ?? []).filter((account) =>
+    inputDraft
+      ? account.channel === inputDraft.provider
+      : choosingInput || accountFeedsAutomation(account, automationName),
+  );
+  const trailing = useMemo(
+    () =>
+      embedded || inputDraft ? undefined : (
+        <Button size="sm" variant="outline" onPress={toggleChoosingInput}>
+          {choosingInput ? "Cancel" : "Add input"}
+        </Button>
+      ),
+    [choosingInput, embedded, inputDraft, toggleChoosingInput],
+  );
+  const empty =
+    !choosing &&
+    accounts !== undefined &&
+    !accounts.some((account) => accountFeedsAutomation(account, automationName));
+  return (
+    <AutomationInputSection embedded={embedded} trailing={trailing}>
+      <QueryFeedback queries={queries} />
+      {mutationError ? <Alert variant="error" title={mutationError} /> : null}
+      {testResult ? <Alert variant="success" title={testResult} /> : null}
+      {empty ? <Text style={settingsStyles.rowHint}>No Channel inputs configured.</Text> : null}
+      {inputAccounts.map((account) => (
+        <AutomationChannelAccount
+          key={channelAccountKey(account)}
+          account={account}
+          choosing={choosing}
+          automationName={automationName}
+          pending={pending}
+          editRoute={editRoute}
+          addRoute={beginEdit}
+          moveRoute={moveRoute}
+          runtimes={inputDraft ? [] : runtimes}
+          removeRoute={removeRoute}
+          testRoute={testRoute}
+        />
+      ))}
+      {choosing ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || accounts === undefined}
+          onPress={addAccount}
+        >
+          Connect a new account
+        </Button>
+      ) : null}
+    </AutomationInputSection>
+  );
+}
+
+/** True when one of the account's Routes, or its fallback, runs this Automation. */
+function accountFeedsAutomation(account: RecordValue, automationName: string): boolean {
+  return (
+    arrayField(account, "routes").some(
+      (route) => (route as RecordValue).workflow === automationName,
+    ) || objectField(account, "fallback")?.workflow === automationName
   );
 }
 
@@ -2051,8 +2028,7 @@ function ChannelAccountForm({
   }, []);
   const initial = channelFormInitialState(existingAccounts, editing, resource);
   const { editedAccount, editedRoute, editedWorkflow, isEditing } = initial;
-  const configurationKind: ConfigurationKind =
-    isEditing || initialAccountKey !== null ? "route" : "account";
+  const configurationKind = channelConfigurationKind(isEditing, initialAccountKey);
   const existingAccountKey = initial.accountKey ?? initialAccountKey;
   const [connectionId, setConnectionId] = useState<string | null>(null);
   useEffect(() => {
@@ -2061,16 +2037,17 @@ function ChannelAccountForm({
   const [accountId, setAccountId] = useState("");
   const [matchKind, setMatchKind] = useState<MatchKind>(initial.matchKind);
   const [conversationIds, setConversationIds] = useState(initial.conversationIds);
-  const [conversationScope, setConversationScope] = useState(
-    initial.conversationIds.length > 0 || initial.audience === "conversationParticipants"
-      ? "specific"
-      : "all",
+  const [conversationScope, setConversationScope] = useState(() =>
+    initialConversationScope(initial),
   );
   const [routeCondition, setRouteCondition] = useState<RouteCondition>(initial.routeCondition);
   const [audience, setAudience] = useState<RouteAudience>(initial.audience);
   const [behavior, setBehavior] = useState<ChannelRouteBehavior>(initial.behavior.behavior);
   const [approvalChoice, setApprovalChoice] = useState<RouteApprovalChoice>(
     initial.behavior.approvalChoice,
+  );
+  const [followUpTtlDraft, setFollowUpTtlDraft] = useState(() =>
+    String(initial.behavior.behavior.followUpTtlMinutes),
   );
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const memberAudienceLabel = channelMembersAudienceLabel({
@@ -2138,8 +2115,7 @@ function ChannelAccountForm({
       })),
     [daemons],
   );
-  const selectedDaemonServerId =
-    daemons.find((daemon) => daemon.id === daemonId)?.connectionOffer?.serverId ?? null;
+  const selectedDaemonServerId = daemonServerId(daemons, daemonId);
   const automationOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
       automations.map((automation) => ({
@@ -2149,7 +2125,14 @@ function ChannelAccountForm({
       })),
     [automations],
   );
+  const followUpTtlValid = isFollowUpTtlDraftValid({
+    audience,
+    matchKind,
+    behavior,
+    draft: followUpTtlDraft,
+  });
   const canSave = canSaveChannelRoute({
+    followUpTtlValid,
     selectedConnection,
     effectiveAccountId,
     configurationKind,
@@ -2171,12 +2154,7 @@ function ChannelAccountForm({
   });
   const duplicateAccount =
     configurationKind === "account" &&
-    selectedConnection !== undefined &&
-    existingAccounts.some(
-      (account) =>
-        stringField(account, "channel") === selectedConnection.provider &&
-        stringField(account, "accountId") === accountId.trim(),
-    );
+    isDuplicateChannelAccount(existingAccounts, selectedConnection, accountId);
 
   const connectionDisplay = useMemo(
     () => selectedOptionDisplay(connectionOptions, connectionId),
@@ -2242,6 +2220,26 @@ function ChannelAccountForm({
     (requireMention: boolean) => setBehavior((current) => ({ ...current, requireMention })),
     [],
   );
+  const changeFollowUpAuto = useCallback(
+    (auto: boolean) =>
+      setBehavior((current) => ({
+        ...current,
+        followUpMode: auto ? "auto" : "mention-only",
+        followUpEdited: true,
+      })),
+    [],
+  );
+  const changeFollowUpTtlMinutes = useCallback((value: string) => {
+    setFollowUpTtlDraft(value);
+    const minutes = parseChannelFollowUpTtlMinutes(value);
+    if (minutes === null) return;
+    setBehavior((current) => ({
+      ...current,
+      followUpTtlMinutes: minutes,
+      followUpEdited: true,
+      followUpTtlAuthored: true,
+    }));
+  }, []);
   const changeReplyThread = useCallback(
     (thread: boolean) =>
       setBehavior((current) => ({
@@ -2660,6 +2658,10 @@ function ChannelAccountForm({
         conversationIds={conversationIds}
         pending={pending}
         changeRequireMention={changeRequireMention}
+        followUpTtlDraft={followUpTtlDraft}
+        followUpTtlError={followUpTtlValid ? null : FOLLOW_UP_TTL_ERROR}
+        changeFollowUpAuto={changeFollowUpAuto}
+        changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
         changeReplyThread={changeReplyThread}
         changeOutboundPath={changeOutboundPath}
         changeFinalAnswers={changeFinalAnswers}
@@ -2752,6 +2754,41 @@ function ChannelAccountForm({
   );
 }
 
+function channelConfigurationKind(
+  isEditing: boolean,
+  initialAccountKey: string | null,
+): ConfigurationKind {
+  return isEditing || initialAccountKey !== null ? "route" : "account";
+}
+
+/** A Route that names Conversations, or admits participants, starts on the selected list. */
+function initialConversationScope(initial: {
+  conversationIds: string;
+  audience: RouteAudience;
+}): string {
+  return initial.conversationIds.length > 0 || initial.audience === "conversationParticipants"
+    ? "specific"
+    : "all";
+}
+
+function daemonServerId(daemons: HubDaemon[], daemonId: string | null): string | null {
+  return daemons.find((daemon) => daemon.id === daemonId)?.connectionOffer?.serverId ?? null;
+}
+
+/** True when the provider already has a Channel Account with this name. */
+function isDuplicateChannelAccount(
+  existingAccounts: RecordValue[],
+  connection: { provider: string } | undefined,
+  accountId: string,
+): boolean {
+  if (connection === undefined) return false;
+  return existingAccounts.some(
+    (account) =>
+      stringField(account, "channel") === connection.provider &&
+      stringField(account, "accountId") === accountId.trim(),
+  );
+}
+
 function AutomationReplyAuthority({
   automation,
   channel,
@@ -2827,6 +2864,10 @@ function MemberRouteBehaviorFields({
   conversationIds,
   pending,
   changeRequireMention,
+  followUpTtlDraft,
+  followUpTtlError,
+  changeFollowUpAuto,
+  changeFollowUpTtlMinutes,
   changeReplyThread,
   changeOutboundPath,
   changeFinalAnswers,
@@ -2845,6 +2886,10 @@ function MemberRouteBehaviorFields({
   conversationIds: string;
   pending: boolean;
   changeRequireMention(value: boolean): void;
+  followUpTtlDraft: string;
+  followUpTtlError: string | null;
+  changeFollowUpAuto(value: boolean): void;
+  changeFollowUpTtlMinutes(value: string): void;
   changeReplyThread(value: boolean): void;
   changeOutboundPath(value: string): void;
   changeFinalAnswers(value: boolean): void;
@@ -2865,6 +2910,16 @@ function MemberRouteBehaviorFields({
           disabled={pending}
         />
       )}
+      {matchKind !== "dm" && behavior.requireMention ? (
+        <RouteFollowUpFields
+          behavior={behavior}
+          followUpTtlDraft={followUpTtlDraft}
+          followUpTtlError={followUpTtlError}
+          pending={pending}
+          changeFollowUpAuto={changeFollowUpAuto}
+          changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
+        />
+      ) : null}
       {matchKind === "dm" ? null : (
         <RouteBehaviorSwitch
           label="Reply in a thread"
@@ -3274,16 +3329,6 @@ function ChoiceRow({
   );
 }
 
-/** Label left, control right — the one row shape the behavior block is built from. */
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={settingsStyles.formRow}>
-      <Text style={[settingsStyles.rowTitle, settingsStyles.formRowContent]}>{label}</Text>
-      <View style={settingsStyles.formRowControls}>{children}</View>
-    </View>
-  );
-}
-
 function ChoiceButton({
   value,
   selected,
@@ -3307,29 +3352,6 @@ function ChoiceButton({
     >
       {label}
     </Button>
-  );
-}
-
-function RouteBehaviorSwitch({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: boolean;
-  onChange(value: boolean): void;
-  disabled: boolean;
-}) {
-  return (
-    <SettingRow label={label}>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        accessibilityLabel={label}
-      />
-    </SettingRow>
   );
 }
 
@@ -3566,6 +3588,7 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
         interaction["requireMention"],
         DEFAULT_MEMBER_ROUTE_BEHAVIOR.requireMention,
       ),
+      ...channelRouteFollowUp(interaction),
       replyAnchor: initialChannelReplyAnchor(route !== undefined, stringField(reply, "anchor")),
       outboundPath: routeOutboundPath(stringField(outbound, "path")),
       finalAnswers: booleanValue(sync["finalAnswers"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.finalAnswers),
@@ -3933,7 +3956,23 @@ function channelFormTitle(
   return `Edit Route ${String((editing?.routeIndex ?? 0) + 1)}`;
 }
 
+/** The minutes field only blocks saving while it is shown. */
+function isFollowUpTtlDraftValid(input: {
+  audience: RouteAudience;
+  matchKind: MatchKind;
+  behavior: ChannelRouteBehavior;
+  draft: string;
+}): boolean {
+  const shown =
+    input.audience === "members" &&
+    input.matchKind !== "dm" &&
+    input.behavior.requireMention &&
+    input.behavior.followUpMode === "auto";
+  return !shown || parseChannelFollowUpTtlMinutes(input.draft) !== null;
+}
+
 function canSaveChannelRoute(input: {
+  followUpTtlValid: boolean;
   selectedConnection: { id: string } | undefined;
   effectiveAccountId: string;
   configurationKind: ConfigurationKind;
@@ -3954,6 +3993,7 @@ function canSaveChannelRoute(input: {
   providerOptionsValid: boolean;
 }): boolean {
   if (input.selectedConnection === undefined || input.effectiveAccountId.length === 0) return false;
+  if (!input.followUpTtlValid) return false;
   if (input.configurationKind === "route" && input.selectedAccount === undefined) return false;
   if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
   if (

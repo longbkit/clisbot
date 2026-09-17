@@ -135,9 +135,10 @@ export function resolveTelegramMentionFacts(
   const wasMentioned =
     (username !== "" && hasBotMention(msg, username)) ||
     hasTelegramTextMentionOfBot(msg, params.botId) ||
-    // A `/command` with no `@bot` suffix addresses whichever bots own it; a
-    // `/command@us` suffix is already caught by `hasBotMention`.
-    (command !== undefined && match?.[2] === undefined);
+    // A bare `/command` names no bot. In a group every admin or privacy-off bot
+    // receives it, so only a DM counts it as ours; the command menu in a group
+    // inserts `/command@bot`, which `hasBotMention` already catches.
+    (command !== undefined && match?.[2] === undefined && msg.chat?.type === "private");
   return { wasMentioned, addressedToOtherBot: false, ...(command ? { command } : {}) };
 }
 

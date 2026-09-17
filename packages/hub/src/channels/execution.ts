@@ -31,6 +31,7 @@ import {
   textCommandHelpText,
   normalizeChannelCommandText,
   type ChannelTextCommand,
+  commandAddressesThisBot,
 } from "./commands.js";
 import { redeemChannelCommandButton } from "./command-buttons.js";
 import {
@@ -54,6 +55,7 @@ import {
   routeFingerprint,
   routePosition,
 } from "./bindings/index.js";
+import { conversationFollowUpMode, endFollowUpPause } from "./bindings/follow-up.js";
 import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./relay/index.js";
 import { ChannelStreamingProducer } from "./streaming/index.js";
 import { realClock } from "./plane/clock.js";
@@ -291,6 +293,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       }
       const identityCode = parseChannelIdentityLinkCommand(message.text);
       if (identityCode !== null && deps.consumeChannelIdentityChallenge !== undefined) {
+        // A code belongs to one bot's Connection, and an unaddressed code is
+        // never forwarded to an agent.
+        if (!commandAddressesThisBot(message)) return unaddressedCommand();
         return await handleIdentityLinkCommand(message, account, identityCode);
       }
       const command = parseApprovalCommand(message.text);
@@ -381,6 +386,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     },
 
     async onStreamEvent(agentId, event) {
+      // The follow-up window counts from the agent's latest activity, so a
+      // long turn keeps it open and it closes `ttlMinutes` after the turn ends.
+      bindings?.markActive(agentId);
       await consumeAgentStream(agentId, event);
       await lifecycleCommands?.onStream(agentId, event);
       if (isTerminalStreamEvent(event)) {
@@ -1091,6 +1099,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       throw error;
     }
     workflowBindingActivity.set(workflowActivityKey(bindingKey, workflow), clock.now());
+    await endFollowUpPause(store, deps.organizationId, message, route);
     return recordChannelActivity(message, account, route, {
       result: result(true, { kind: "workflow", workflow, deliveryId }),
       limitDecision: "allowed",
@@ -1237,6 +1246,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       message,
       route.defaults,
       clock.now() - lastActivity > route.defaults.followUp.ttlMinutes * 60_000,
+      await conversationFollowUpMode(store, deps.organizationId, message, route),
     );
   }
 
@@ -1309,6 +1319,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     inbound: InboundKindReading,
   ): Promise<PlaneInboundResult> {
     const textCommand = resolveTextCommand(message.text, inbound);
+    if (textCommand !== null && !commandAddressesThisBot(message)) {
+      return unaddressedCommand();
+    }
     const workflowCommandRoute = textCommand === null ? undefined : activeWorkflowRouteFor(message);
     if (textCommand !== null && workflowCommandRoute !== undefined) {
       return await handleWorkflowTextCommand(message, account, workflowCommandRoute, textCommand);
@@ -1327,11 +1340,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         : await admitAccess(message, account, route);
     if (gated !== undefined) return gated;
     // The channel's other plain-text commands (/status, /stop, /new, /help —
-    // shared, channel-agnostic; see commands.ts). Commands are deliberately
-    // NOT mention-gated: `requireMention` is about waking the agent, and an
-    // admitted sender controlling their own session already addressed the bot
-    // by naming a command. The same holds for `kind: command` (a native slash
-    // command) and for a button callback, which carry no mention at all.
+    // shared, channel-agnostic; see commands.ts). `requireMention` and the
+    // follow-up policy do not gate them: `commandAddressesThisBot` already
+    // required this bot to be named outside a DM.
     if (textCommand !== null) {
       return await handleTextCommand(message, account, route, textCommand);
     }
@@ -1385,6 +1396,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             message.text,
           );
     if (expanded !== undefined) {
+      if (!commandAddressesThisBot(message)) return unaddressedCommand();
       return handleTextCommand(message, account, route, {
         name: "command",
         value: normalizeChannelCommandText(message.text, true)
@@ -2042,6 +2054,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       approval: channel.route.approval,
       ...(channel.route.limits === undefined ? {} : { limits: channel.route.limits }),
     };
+  }
+
+  function unaddressedCommand(): PlaneInboundResult {
+    return result(false, { kind: "ignored", reason: "command not addressed to this bot" });
   }
 
   function result(dispatched: boolean, outcome: InboundOutcome): PlaneInboundResult {

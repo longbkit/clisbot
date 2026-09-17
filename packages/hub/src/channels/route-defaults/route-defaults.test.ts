@@ -3,7 +3,12 @@ import { describe, it } from "vitest";
 import type { HubBundleFile } from "../../config/bundle-contract.js";
 import { applyAgentControls, sameAgentControls } from "../config/agent-controls.js";
 import { compileChannelControlPlane } from "../config/compile.js";
-import { previousRouteAgentControls, routeIdentity, writeRouteAgentControls } from "./files.js";
+import {
+  previousRouteAgentControls,
+  routeIdentity,
+  writeRouteAgentControls,
+  writeRouteFollowUp,
+} from "./files.js";
 import { revisionSignature } from "./signature.js";
 
 const POLICY = `
@@ -145,5 +150,33 @@ describe("applyAgentControls", () => {
       ),
       true,
     );
+  });
+});
+
+describe("route follow-up", () => {
+  const followUp = (revision: readonly HubBundleFile[]) =>
+    compile(revision).accounts[0]!.routes[0]!.defaults.followUp;
+
+  it("writes the change onto the Route and keeps authored leaves it does not name", () => {
+    const authored = files("    interaction: { followUp: { mode: auto, ttlMinutes: 15 } }");
+    const mentionOnly = writeRouteFollowUp(authored, "slack", "support", 0, {
+      mode: "mention-only",
+    });
+    assert.deepEqual(followUp(mentionOnly), { mode: "mention-only", ttlMinutes: 15 });
+    const auto = writeRouteFollowUp(mentionOnly, "slack", "support", 0, { mode: "auto" });
+    assert.deepEqual(followUp(auto), { mode: "auto", ttlMinutes: 15 });
+    const shorter = writeRouteFollowUp(auto, "slack", "support", 0, {
+      mode: "auto",
+      ttlMinutes: 3,
+    });
+    assert.deepEqual(followUp(shorter), { mode: "auto", ttlMinutes: 3 });
+  });
+
+  it("adds the leaf to a Route that inherited it, leaving other interaction keys alone", () => {
+    const inherited = files("    interaction: { requireMention: false }");
+    const written = writeRouteFollowUp(inherited, "slack", "support", 0, { mode: "auto" });
+    const route = compile(written).accounts[0]!.routes[0]!;
+    assert.equal(route.defaults.requireMention, false);
+    assert.equal(route.defaults.followUp.mode, "auto");
   });
 });

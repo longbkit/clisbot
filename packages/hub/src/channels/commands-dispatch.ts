@@ -1,4 +1,5 @@
 import { runExtensionCommand } from "./commands-extension.js";
+import { runFollowUpCommand } from "./commands-follow-up.js";
 import { APPROVAL_PRIVILEGES } from "../access/contract.js";
 import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
@@ -24,6 +25,10 @@ import {
   validateAgentConfigurationAuthority,
 } from "./commands-config.js";
 import type { ChannelLifecycleCommands, LifecycleCommandContext } from "./commands-lifecycle.js";
+import {
+  followUpActionChangesState,
+  parseFollowUpArguments,
+} from "./commands-follow-up-arguments.js";
 import { promoteRouteDefault, routeDefaultText } from "./commands-route-default.js";
 import type { AgentControls } from "./config/agent-controls.js";
 
@@ -97,6 +102,7 @@ export class ChannelCommandDispatcher {
           ),
           "me",
         );
+      if (command.name === "followup") return this.followUp(command.value, context);
       if (context.route.target.kind === "workflow") return this.workflow(command, context);
       const lifecycle = await this.deps.lifecycle.handle(command, context);
       if (lifecycle) return lifecycle;
@@ -362,6 +368,18 @@ export class ChannelCommandDispatcher {
     };
   }
 
+  private async followUp(
+    value: string | undefined,
+    context: LifecycleCommandContext,
+  ): Promise<CommandResult> {
+    const { plane, store } = this.deps;
+    const result = await runFollowUpCommand({ plane, store, context, value });
+    const replied = await this.reply(context, result.text, "followup");
+    // Reply first: applying the revision can replace this account's plane.
+    if (result.published) plane.routeDefaults?.apply();
+    return replied;
+  }
+
   private async routeDefault(
     command: Extract<ChannelTextCommand, { name: "routedefault" | "promoteroutedefault" }>,
     context: LifecycleCommandContext,
@@ -521,6 +539,8 @@ export class ChannelCommandDispatcher {
 
 function isMutation(command: ChannelTextCommand): boolean {
   if (["help", "me", "status", "cowork", "routedefault"].includes(command.name)) return false;
+  if (command.name === "followup")
+    return followUpActionChangesState(parseFollowUpArguments(command.value));
   if (
     ["agent", "provider", "model", "effort", "permission", "skill", "command"].includes(
       command.name,

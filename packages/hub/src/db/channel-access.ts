@@ -3,7 +3,7 @@
 // `channel_conversation_selections` (the `/agent` and `/model` choice). Kept
 // out of `channels.ts` so neither file grows past the size the standards allow;
 // `ChannelStore.access` is the one way in.
-import { ChannelCommandStore } from "./channel-commands.js";
+import { ChannelFollowUpStore } from "./channel-follow-ups.js";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import * as schema from "./schema.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
@@ -51,7 +51,7 @@ export interface ChannelAccountKey {
   accountId: string;
 }
 
-export class ChannelAccessStore extends ChannelCommandStore {
+export class ChannelAccessStore extends ChannelFollowUpStore {
   /**
    * The senders an operator approved, in the form upstream's
    * `mergeDmAllowFromSources` expects for `storeAllowFrom`: the native id, not

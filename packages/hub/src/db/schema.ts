@@ -2007,6 +2007,44 @@ export const channelConversationSelections = pgTable(
   ],
 );
 
+/**
+ * A conversation's `/followup` override of the Route's `interaction.followUp.mode`.
+ *
+ * Kept apart from `channel_conversation_selections`: that row is the agent
+ * configuration a Route default can absorb and clear, while this is how the
+ * bot listens in the conversation. `paused` lasts until the next mention.
+ */
+export const channelConversationFollowUps = pgTable(
+  "channel_conversation_follow_ups",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<SupportedChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    externalConversationId: text("external_conversation_id").notNull(),
+    externalThreadId: text("external_thread_id"),
+    mode: text().$type<"auto" | "mention-only" | "paused">().notNull(),
+    setBy: text("set_by").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_conversation_follow_ups_key_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.externalConversationId,
+      sql`coalesce(${table.externalThreadId}, '')`,
+    ),
+    check("channel_conversation_follow_ups_channel_check", channelNameCheck(table.channel)),
+    check(
+      "channel_conversation_follow_ups_mode_check",
+      sql`${table.mode} in ('auto', 'mention-only', 'paused')`,
+    ),
+  ],
+);
+
 /** Shared prompt commands, owned by one organization and channel account. */
 export const channelCommands = pgTable(
   "channel_commands",

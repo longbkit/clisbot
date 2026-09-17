@@ -714,7 +714,75 @@ describe("follow-up (resume / steer)", () => {
       route,
     );
     assert.equal(cold.kind, "ignored");
-    assert.match(cold.kind === "ignored" ? cold.reason : "", /idled out/u);
+    assert.match(cold.kind === "ignored" ? cold.reason : "", /window ended/u);
+  });
+
+  it("requires a mention for a bound session with no activity in this process", async () => {
+    const { daemon } = makeFakeDaemon();
+    const { route, conversation } = await bindFirst("C0RESTART");
+    // A new engine is a Hub restart: the in-memory follow-up window is gone.
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(makeAccount(route)),
+      logger: SILENT,
+      clock: new ManualClock(0),
+      store,
+      daemon,
+      resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
+    });
+    const unmentioned = await engine.bindOrSteer(
+      message({ mentionedBot: false, conversation }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(unmentioned.kind, "ignored");
+    const mentioned = await engine.bindOrSteer(
+      message({ mentionedBot: true, conversation }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(mentioned.kind, "steered");
+  });
+
+  it("applies the conversation override and ends a pause at the next mention", async () => {
+    const { engine, conversation } = await bindFirst("C0OVERRIDE");
+    const route = makeRoute("C0OVERRIDE", {
+      defaults: { ...DEFAULTS, followUp: { mode: "mention-only", ttlMinutes: 5 } },
+    });
+    const key = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack" as const,
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0OVERRIDE",
+      externalThreadId: null,
+    };
+    const unmentioned = () =>
+      engine.bindOrSteer(message({ mentionedBot: false, conversation }), makeAccount(route), route);
+
+    await store.access.setConversationFollowUp(key, { mode: "auto", setBy: INITIATOR });
+    assert.equal((await unmentioned()).kind, "steered", "the override replaces mention-only");
+
+    await store.access.setConversationFollowUp(key, { mode: "paused", setBy: INITIATOR });
+    assert.equal((await unmentioned()).kind, "ignored", "a pause needs a mention");
+    const refused = await engine.bindOrSteer(
+      message({ mentionedBot: true, senderIdentity: "slack:U0STRANGER", conversation }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(refused.kind, "ignored");
+    assert.equal(
+      (await store.access.findConversationFollowUp(key))?.mode,
+      "paused",
+      "a refused mention leaves the pause in place",
+    );
+    const mentioned = await engine.bindOrSteer(
+      message({ mentionedBot: true, conversation }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(mentioned.kind, "steered");
+    assert.equal(await store.access.findConversationFollowUp(key), undefined);
+    assert.equal((await unmentioned()).kind, "ignored", "back to the Route's mention-only");
   });
 });
 
@@ -736,6 +804,16 @@ describe("admitFollowUp", () => {
   });
   it("denies an idle auto follow-up", () => {
     assert.equal(admitFollowUp({ mentionedBot: false }, DEFAULTS, true).allowed, false);
+  });
+  it("admits every message on a route that does not require a mention", () => {
+    const open = { ...DEFAULTS, requireMention: false };
+    assert.equal(admitFollowUp({ mentionedBot: false }, open, true, "mention-only").allowed, true);
+  });
+  it("lets the conversation mode replace the Route mode", () => {
+    assert.equal(
+      admitFollowUp({ mentionedBot: false }, DEFAULTS, false, "mention-only").allowed,
+      false,
+    );
   });
 });
 

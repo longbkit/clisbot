@@ -29,8 +29,29 @@ export interface ChannelRouteLimits {
   maxRuntimeSeconds: number;
 }
 
+/**
+ * How a bound group thread continues after a mention. `mention-only` needs a
+ * mention on every message; `auto` lets unmentioned messages continue for
+ * `followUpTtlMinutes` after the last turn. Ignored for DMs and when
+ * `requireMention` is off.
+ */
+export type ChannelRouteFollowUpMode = "auto" | "mention-only";
+
+export const DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES = 5;
+
 export interface ChannelRouteBehavior {
   requireMention: boolean;
+  followUpMode: ChannelRouteFollowUpMode;
+  followUpTtlMinutes: number;
+  /**
+   * The Route's own `interaction.followUp` as loaded. Absent means the Route
+   * inherits the policy from its account or organization.
+   */
+  followUpAuthored?: ChannelConfigurationRecord;
+  /** The user changed the follow-up switch or minutes in the form. */
+  followUpEdited?: boolean;
+  /** `followUpTtlMinutes` came from the Route or the user, not the default. */
+  followUpTtlAuthored?: boolean;
   replyAnchor: "default" | "thread";
   outboundPath: "relay" | "tool";
   finalAnswers: boolean;
@@ -42,6 +63,8 @@ export interface ChannelRouteBehavior {
 
 export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   requireMention: true,
+  followUpMode: "mention-only",
+  followUpTtlMinutes: DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES,
   replyAnchor: "thread",
   outboundPath: "tool",
   finalAnswers: true,
@@ -188,7 +211,9 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
       }
     : {
         audience: { kind: "members" },
-        ...(input.behavior === undefined ? {} : routeBehaviorSettings(input.behavior)),
+        ...(input.behavior === undefined
+          ? {}
+          : routeBehaviorSettings(input.behavior, input.matchKind)),
       };
   let resource = input.resource;
   let route: ChannelConfigurationRecord;
@@ -253,9 +278,16 @@ function buildDirectAgentTarget(
   };
 }
 
-function routeBehaviorSettings(behavior: ChannelRouteBehavior): ChannelConfigurationRecord {
+function routeBehaviorSettings(
+  behavior: ChannelRouteBehavior,
+  matchKind: ChannelRouteMatchKind,
+): ChannelConfigurationRecord {
+  const followUp = routeFollowUpSetting(behavior, matchKind);
   return {
-    interaction: { requireMention: behavior.requireMention },
+    interaction: {
+      requireMention: behavior.requireMention,
+      ...(followUp === undefined ? {} : { followUp }),
+    },
     reply: { anchor: behavior.replyAnchor },
     outbound: { path: behavior.outboundPath },
     sync: {
@@ -270,6 +302,51 @@ function routeBehaviorSettings(behavior: ChannelRouteBehavior): ChannelConfigura
       ? {}
       : { approval: [{ match: "*", mode: behavior.approvalMode }] }),
   };
+}
+
+/**
+ * The `interaction.followUp` to write. Untouched controls keep what the Route
+ * authored, or leave the key out so the account or organization policy still
+ * applies. DMs ignore follow-up, so they never gain one.
+ */
+function routeFollowUpSetting(
+  behavior: ChannelRouteBehavior,
+  matchKind: ChannelRouteMatchKind,
+): ChannelConfigurationRecord | undefined {
+  if (!behavior.followUpEdited || matchKind === "dm") return behavior.followUpAuthored;
+  if (behavior.followUpMode === "auto") {
+    return { mode: "auto", ttlMinutes: behavior.followUpTtlMinutes };
+  }
+  return behavior.followUpTtlAuthored
+    ? { mode: "mention-only", ttlMinutes: behavior.followUpTtlMinutes }
+    : { mode: "mention-only" };
+}
+
+/** Reads an authored `interaction.followUp`; anything unrecognized falls back to the defaults. */
+export function channelRouteFollowUp(
+  interaction: ChannelConfigurationRecord,
+): Pick<
+  ChannelRouteBehavior,
+  "followUpMode" | "followUpTtlMinutes" | "followUpAuthored" | "followUpTtlAuthored"
+> {
+  const authored = interaction["followUp"];
+  const followUp = recordField(interaction, "followUp");
+  const ttlMinutes = followUp["ttlMinutes"];
+  const ttlValid = typeof ttlMinutes === "number" && Number.isInteger(ttlMinutes) && ttlMinutes > 0;
+  return {
+    followUpMode: followUp["mode"] === "auto" ? "auto" : DEFAULT_MEMBER_ROUTE_BEHAVIOR.followUpMode,
+    followUpTtlMinutes: ttlValid ? ttlMinutes : DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES,
+    followUpTtlAuthored: ttlValid,
+    ...(isRecord(authored) ? { followUpAuthored: authored } : {}),
+  };
+}
+
+/** A follow-up window typed as text: a positive whole number of minutes, or null. */
+export function parseChannelFollowUpTtlMinutes(draft: string): number | null {
+  const trimmed = draft.trim();
+  if (!/^\d+$/u.test(trimmed)) return null;
+  const minutes = Number(trimmed);
+  return Number.isSafeInteger(minutes) && minutes > 0 ? minutes : null;
 }
 
 /**

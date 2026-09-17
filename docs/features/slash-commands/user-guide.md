@@ -8,6 +8,8 @@ you type them in. The full list and what each needs is the
 ## The short version
 
 - `/help` shows every command in the conversation you're in.
+- Outside a DM, mention the bot with the command (`@paseo /status`). Several bots
+  can share a group, so a command that names no bot is ignored.
 - Most commands act on **this conversation's** agent. `/new` starts one, `/stop`
   stops it, `/cowork` opens it in the Clisbot app.
 - If a command needs a permission you don't have, the bot says so and does
@@ -53,6 +55,35 @@ whatever session was bound here before, after checking your access to the target
 These apply to a directly-bound agent. In a conversation that runs an
 **automation**, use `/stop` to cancel the run and just send a normal message to
 start a new one.
+
+## Keep talking without a mention
+
+In a group, every message needs a mention by default. `/followup` changes that
+for the conversation you type it in:
+
+| You want                                                   | Type                     |
+| ---------------------------------------------------------- | ------------------------ |
+| To see the current setting                                 | `/followup`              |
+| Messages to continue for a few minutes after the bot works | `/followup auto`         |
+| A mention on every message                                 | `/followup mention-only` |
+| A mention on every message until the next mention          | `/followup pause`        |
+| The Route's own setting back                               | `/followup resume`       |
+
+With `auto`, the window is counted from the agent's last turn (5 minutes unless
+the operator set another value); after it, mention the bot again. The reply says
+what changed: in a thread it is that thread, in a topic that topic. On Slack,
+where each message at the channel root starts its own thread, type it inside the
+thread you want to change.
+
+To change it for every conversation on the route, you need `channel.manage`:
+
+| You want                                                  | Type                           |
+| --------------------------------------------------------- | ------------------------------ |
+| The route's setting                                       | `/followup route`              |
+| Every conversation to continue without a mention (10 min) | `/followup route auto 10`      |
+| A mention on every message, everywhere on the route       | `/followup route mention-only` |
+
+Conversations that set their own `/followup` keep it until `/followup resume`.
 
 ## Switch agent, provider, model, effort, and mode
 
@@ -188,11 +219,12 @@ The commands are the same everywhere, but a few channels get in the way. Any of
 these fixes works and reaches the same command:
 
 - **Slack** — if `/status` collides with one of Slack's or another app's slash
-  commands, use the backslash form instead: `\status`, `\approve`. You can also
+  commands, use the backslash form instead: `\status`, `\approve`. In a channel,
   address the bot first: `@paseo status`.
 - **Telegram** — on mobile, tapping the bot then typing can produce
-  `@paseo/status` glued together; that still works. So does `/status@paseo` from
-  autocomplete, and a plain `/status` in a group where the bot is a member.
+  `@paseo/status` glued together; that still works. So does `/status@paseo`,
+  which the command menu inserts when you pick the bot's line. In a group a plain
+  `/status` names no bot and is ignored; in a DM it works.
 - **Feishu / Lark** — there are no slash menus; type the command as text and
   @mention the bot in a group so it sees the message. `@everyone` alone does not
   count as addressing the bot.

@@ -91,6 +91,7 @@ function harness(
     undo: vi.fn(
       async () => options.outcome ?? { status: "published" as const, agentControls: undefined },
     ),
+    setFollowUp: vi.fn(),
     apply: vi.fn(),
   };
   const clearConversationSelection = vi.fn(async (_key: ChannelConversationKey) => undefined);

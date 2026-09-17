@@ -34,6 +34,9 @@
 // specific open prompt. Every prefix spelling (`verb`, `/verb`, `\verb`) and
 // the `@bot` mention forms are accepted on both channels.
 
+import { parseFollowUpArguments } from "./commands-follow-up-arguments.js";
+import type { InboundMessage } from "./plane/types.js";
+
 /** A parsed approval command. `requestId` absent = "latest open prompt".
  * `answer` carries the question answer (option label or "Other <free
  * text>") — question prompts only; tool-permission prompts ignore it. */
@@ -62,6 +65,16 @@ export const CHANNEL_COMMANDS = [
     directOnly: false,
     usage: "/stop",
     description: "stop the turn or active automation runs",
+  },
+  {
+    name: "followup",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: false,
+    usage:
+      "/followup [status|auto|mention-only|pause|resume] · /followup route [auto [minutes]|mention-only]",
+    description: "whether messages need a mention: here, or on the whole route (channel.manage)",
   },
   {
     name: "new",
@@ -249,6 +262,10 @@ export function channelCommandPrivilege(command: ChannelTextCommand) {
   if (command.name === "command" && /^(add|remove)(?:\s|$)/iu.test(command.value ?? "")) {
     return "approval.config" as const;
   }
+  if (command.name === "followup") {
+    const action = parseFollowUpArguments(command.value);
+    if (action?.scope === "route" && action.action === "set") return "channel.manage" as const;
+  }
   return channelCommandSpec(command.name).privilege;
 }
 
@@ -390,6 +407,7 @@ export function parseChannelTextCommand(text: string): ChannelTextCommand | null
   // An argument on a no-argument verb is prose ("stop doing that"), not a
   // command; only `/agent` and `/model` carry one.
   if (!channelCommandSpec(name).args) return null;
+  if (name === "followup" && parseFollowUpArguments(argument) === null) return null;
   return { name, value: argument };
 }
 
@@ -401,6 +419,7 @@ export function textCommandHelpText(routeKind?: "agent" | "workflow"): string {
       (command) => `- \`${command.usage}\` — ${command.description}`,
     ),
     "Approvals: `/approve [id] [answer]` or `/deny [id]` answers an open prompt.",
+    "In a group, name the bot with the command (`@bot /status`, or `/status@bot` on Telegram); a command that names no bot is ignored.",
     "Slack: use the backslash form (\\status) if / collides with a native command.",
   ].join("\n");
 }
@@ -409,4 +428,16 @@ export function textCommandHelpText(routeKind?: "agent" | "workflow"): string {
 export function normalizeChannelCommandText(text: string, dynamic = false): string {
   const normalized = stripMentions(text, dynamic);
   return normalized.replace(/^\s*[/\\]paseo(?:\s+|$)/iu, "/").replace(/^\/\s*$/u, "/help");
+}
+
+/**
+ * Outside a DM every bot in the room can receive a command, so only the bot it
+ * names answers. A native slash command reaches one app, and its vertical
+ * reports it as a mention. Typed approval answers are exempt: they resolve a
+ * prompt this bot posted and stay silent when it has none.
+ */
+export function commandAddressesThisBot(
+  message: Pick<InboundMessage, "conversation" | "mentionedBot">,
+): boolean {
+  return message.conversation.kind === "dm" || message.mentionedBot;
 }

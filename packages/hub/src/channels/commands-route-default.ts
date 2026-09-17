@@ -57,7 +57,7 @@ export async function promoteRouteDefault(
   if (value !== undefined && !undo) return reply("Usage: /promoteroutedefault [undo]");
   const publisher = deps.plane.routeDefaults;
   if (publisher === undefined) return reply("Route defaults cannot be changed on this Hub.");
-  const target = await routeDefaultTarget(deps, context);
+  const target = await routeDefaultTarget(deps.plane, context);
   if (target === undefined)
     return reply("/promoteroutedefault requires channel.manage access here.");
   if (undo) {
@@ -88,22 +88,23 @@ export async function promoteRouteDefault(
   );
 }
 
-async function routeDefaultTarget(
-  deps: RouteDefaultCommandDependencies,
+/** The Route serving this conversation and the Member changing it; undefined without channel.manage. */
+export async function routeDefaultTarget(
+  plane: ChannelPlaneDeps,
   context: LifecycleCommandContext,
 ): Promise<RouteDefaultTarget | undefined> {
   const request = commandAccessRequest(
-    deps.plane,
+    plane,
     context.message,
     context.account,
     context.route,
     "channel.manage",
     context.accessTarget,
   );
-  const principal = await deps.plane.commandAccess?.authorizeChannelAccountManagement?.(request);
+  const principal = await plane.commandAccess?.authorizeChannelAccountManagement?.(request);
   if (principal === undefined) return undefined;
   return {
-    organizationId: deps.plane.organizationId,
+    organizationId: plane.organizationId,
     channel: context.account.channel,
     accountId: context.account.accountId,
     position: routePosition(context.account, context.route),
@@ -121,7 +122,7 @@ function outcomeText(outcome: Exclude<RouteDefaultOutcome, { status: "published"
 }
 
 /** `route #3 (mention, contains "deploy")`, or `the fallback route`. */
-function routeLabel(context: LifecycleCommandContext): string {
+export function routeLabel(context: LifecycleCommandContext): string {
   const position = routePosition(context.account, context.route);
   if (position === "fallback") return FALLBACK_LABEL;
   const traits = [

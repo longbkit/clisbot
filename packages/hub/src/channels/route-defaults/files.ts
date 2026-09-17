@@ -1,12 +1,14 @@
-// Reading and writing one Route's `agentControls:` leaf in the authored account
-// file, and finding the value it had before its last change. Pure functions of
-// revision files; `publish.ts` owns loading, authority and deployment.
+// Reading and writing one Route's `agentControls:` and `interaction.followUp:`
+// leaves in the authored account file, and finding the controls it had before
+// their last change. Pure functions of revision files; `publish.ts` owns
+// loading, authority and deployment.
 
 import { dump, load } from "js-yaml";
 import { CHANNELS_DIRECTORY, type HubBundleFile } from "../../config/bundle-contract.js";
 import { routeFingerprint } from "../bindings/stored-route.js";
 import type { AgentControls } from "../config/agent-controls.js";
 import type { CompiledRoute } from "../config/compile.js";
+import type { RouteFollowUpChange } from "../commands-follow-up-arguments.js";
 import { AccountFileSchema, type AccountFile, type Route } from "../config/schema.js";
 
 /** A Route's place in its account file: an index into `routes`, or the fallback. */
@@ -51,6 +53,39 @@ export function writeRouteAgentControls(
   position: RoutePosition,
   controls: AgentControls | undefined,
 ): HubBundleFile[] {
+  return writeRoute(files, channel, accountId, position, (route) => {
+    if (controls === undefined) delete route.agentControls;
+    else route.agentControls = controls;
+  });
+}
+
+/**
+ * Replace the account file with one whose Route at `position` has `change`
+ * applied to its `interaction.followUp`. Authored leaves the change does not
+ * name stay, so `mention-only` keeps a window for a later `auto`.
+ */
+export function writeRouteFollowUp(
+  files: readonly HubBundleFile[],
+  channel: string,
+  accountId: string,
+  position: RoutePosition,
+  change: RouteFollowUpChange,
+): HubBundleFile[] {
+  return writeRoute(files, channel, accountId, position, (route) => {
+    route.interaction = {
+      ...route.interaction,
+      followUp: { ...route.interaction?.followUp, ...change },
+    };
+  });
+}
+
+function writeRoute(
+  files: readonly HubBundleFile[],
+  channel: string,
+  accountId: string,
+  position: RoutePosition,
+  edit: (route: Route) => void,
+): HubBundleFile[] {
   const path = accountFilePath(channel, accountId);
   const account = authoredAccount(files, channel, accountId);
   if (account === undefined) throw new Error(`account file ${path} is not in the revision`);
@@ -59,8 +94,7 @@ export function writeRouteAgentControls(
     position === "fallback" ? (next.fallback as Route | undefined) : next.routes?.[position];
   if (route === undefined || "deny" in route)
     throw new Error(`route ${position} is not in ${path}`);
-  if (controls === undefined) delete route.agentControls;
-  else route.agentControls = controls;
+  edit(route);
   const content = dump(next, { lineWidth: -1 });
   return files.map((file) => (file.path === path ? { path, content } : file));
 }
