@@ -1,4 +1,6 @@
 import { FileAgentTimelineStore } from "./session-storage/file-agent-timeline-store.js";
+import { pendingSessionEvents } from "./session-storage/pending-event-budget.js";
+import { SessionStorageOverloadError } from "./session-storage/store-admission.js";
 import { expect, test, vi } from "vitest";
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -11642,6 +11644,150 @@ test("rollout-off durable reads do not install automatic permission capture", as
     await manager.closeAgent(agent.id);
   } finally {
     await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("each held session event keeps one pending reservation while a write is stalled", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-reservation-count-"));
+  let release!: () => void;
+  let writing = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class DelayedStore extends RecordingTimelineStore {
+    override async bulkInsert(id: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      writing = true;
+      await gate;
+      await super.bulkInsert(id, rows);
+    }
+  }
+  const session = new TestAgentSession({ provider: "codex", cwd: workdir });
+  const client = new (class extends TestAgentClient {
+    override async createSession(): Promise<AgentSession> {
+      return session;
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: new DelayedStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    for (let index = 0; index < 50; index += 1)
+      session.pushEvent({
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "chunk", messageId: `${index}` },
+      });
+    await vi.waitFor(() => expect(writing).toBe(true));
+    // The event whose write is in flight holds its event slot and its row slot; every queued
+    // event holds exactly one. Holding two per event would halve the budget.
+    expect(pendingSessionEvents.sessionEventCount(agent.id)).toBe(51);
+  } finally {
+    release();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("a store refusal after a row has its seq stays failed, leaving no silent hole", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-store-overload-"));
+  class OverloadOnceStore extends RecordingTimelineStore {
+    calls = 0;
+    override async bulkInsert(id: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      this.calls += 1;
+      if (this.calls === 1)
+        throw new SessionStorageOverloadError(
+          "Session storage overloaded: operation queue limit exceeded",
+        );
+      await super.bulkInsert(id, rows);
+    }
+  }
+  const store = new OverloadOnceStore();
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    durableTimelineStore: store,
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    await expect(
+      manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "refused" }),
+    ).rejects.toThrow("operation queue limit exceeded");
+    await manager.flush();
+    await expect(
+      manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "after" }),
+    ).rejects.toThrow("operation queue limit exceeded");
+    expect(store.writes.flat()).toHaveLength(0);
+  } finally {
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("a failed write replaces an event overload that is waiting to recover", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-overload-then-failure-"));
+  let release!: () => void;
+  let writing = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class FailFirstStore extends RecordingTimelineStore {
+    calls = 0;
+    override async bulkInsert(id: string, rows: readonly AgentTimelineRow[]): Promise<void> {
+      this.calls += 1;
+      if (this.calls === 1) {
+        writing = true;
+        await gate;
+        throw new Error("disk full");
+      }
+      await super.bulkInsert(id, rows);
+    }
+  }
+  const session = new TestAgentSession({ provider: "codex", cwd: workdir });
+  const client = new (class extends TestAgentClient {
+    override async createSession(): Promise<AgentSession> {
+      return session;
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: new FailFirstStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "user_message", text: "first" },
+    });
+    await vi.waitFor(() => expect(writing).toBe(true));
+    for (let index = 0; index < 1100; index += 1)
+      session.pushEvent({
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "chunk", messageId: `${index}` },
+      });
+    expect(manager.getAgent(agent.id)?.lastError).toContain("pending provider event count limit");
+    release();
+    await manager.flush();
+    await vi.waitFor(() => expect(manager.pendingSessionEventBytes).toBe(0));
+    await manager.flush();
+    await expect(
+      manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "later" }),
+    ).rejects.toThrow("disk full");
+  } finally {
+    release();
+    await manager.closeAgent(agent.id);
     rmSync(workdir, { recursive: true, force: true });
   }
 });

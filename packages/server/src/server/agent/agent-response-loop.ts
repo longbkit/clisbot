@@ -78,6 +78,20 @@ export interface StructuredAgentGenerationOptions<T> {
   schema: z.ZodType<T> | JsonSchema;
   maxRetries?: number;
   schemaName?: string;
+  /** Deadline for the whole generation, retries included. */
+  timeoutMs?: number;
+}
+
+// Generation runs an internal agent nobody watches; a hung run must still reach its cleanup.
+const STRUCTURED_GENERATION_TIMEOUT_MS = 180_000;
+const STRUCTURED_GENERATION_PERMISSION_DENIAL =
+  "Structured generation answers from the prompt alone; tool use is not available.";
+
+export class StructuredAgentTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Structured generation timed out after ${timeoutMs}ms`);
+    this.name = "StructuredAgentTimeoutError";
+  }
 }
 
 export interface StructuredAgentGenerationWithFallbackOptions<T> {
@@ -360,9 +374,11 @@ export async function generateStructuredAgentResponse<T>(
     persistSession,
     workspaceId: undefined,
   });
+  const stopDenyingPermissions = denyPermissionRequests(manager, agent.id);
+  const deadline = startDeadline(options.timeoutMs ?? STRUCTURED_GENERATION_TIMEOUT_MS);
   try {
     const caller: AgentCaller = async (nextPrompt) => {
-      const result = await manager.runAgent(agent.id, nextPrompt);
+      const result = await deadline.race(manager.runAgent(agent.id, nextPrompt));
       if (typeof result.finalText === "string" && result.finalText.length > 0) {
         return result.finalText;
       }
@@ -377,7 +393,14 @@ export async function generateStructuredAgentResponse<T>(
       maxRetries,
       schemaName,
     });
+  } catch (error) {
+    if (error instanceof StructuredAgentTimeoutError) {
+      await manager.cancelAgentRun(agent.id).catch(() => undefined);
+    }
+    throw error;
   } finally {
+    deadline.clear();
+    stopDenyingPermissions();
     try {
       await manager.closeAgent(agent.id);
     } catch {
@@ -386,6 +409,43 @@ export async function generateStructuredAgentResponse<T>(
       await manager.deleteAgentState(agent.id).catch(() => undefined);
     }
   }
+}
+
+/** No client shows an internal agent's permission request, so an unanswered one would hang the run. */
+function denyPermissionRequests(manager: AgentManager, agentId: string): () => void {
+  return manager.subscribe(
+    (event) => {
+      if (event.type !== "agent_stream" || event.event.type !== "permission_requested") return;
+      void manager
+        .respondToPermission(agentId, event.event.request.id, {
+          behavior: "deny",
+          message: STRUCTURED_GENERATION_PERMISSION_DENIAL,
+        })
+        .catch(() => undefined);
+    },
+    { agentId, replayState: false },
+  );
+}
+
+interface Deadline {
+  race<R>(operation: Promise<R>): Promise<R>;
+  clear(): void;
+}
+
+function startDeadline(timeoutMs: number): Deadline {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new StructuredAgentTimeoutError(timeoutMs)), timeoutMs);
+  });
+  expired.catch(() => undefined);
+  return {
+    race(operation) {
+      // The losing run settles later, when cleanup cancels or closes it.
+      operation.catch(() => undefined);
+      return Promise.race([operation, expired]);
+    },
+    clear: () => clearTimeout(timer),
+  };
 }
 
 function errorMessage(error: unknown): string {

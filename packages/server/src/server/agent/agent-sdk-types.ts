@@ -703,6 +703,12 @@ export interface AgentSession {
   interrupt(): Promise<void>;
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
+  /**
+   * True only when the provider has observed every kind of work its runtime can hold between turns
+   * (background shells, subagents, watches, scheduled wake-ups) and none is left. The daemon closes
+   * an idle runtime only on this answer; a provider that cannot know leaves this unimplemented.
+   */
+  isIdleForRelease?(): boolean;
   listCommands?(): Promise<AgentSlashCommand[]>;
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;

@@ -454,6 +454,8 @@ export interface PaseoDaemonConfig {
   downloadTokenTtlMs?: number;
   agentProviderSettings?: AgentProviderRuntimeSettingsMap;
   providerCatalogRefreshTimeoutMs?: number;
+  /** Default idle window before an agent's certified-idle provider session closes; 0 disables. */
+  closeIdleSessionsAfterMs?: number;
   metadataGeneration?: {
     providers?: Array<{
       provider: string;
@@ -1040,6 +1042,9 @@ export async function createPaseoDaemon(
     registry: agentStorage,
     ...sessionStorage.agentManagerOptions,
     appendSystemPrompt: config.appendSystemPrompt,
+    closeIdleSessionsAfterMs: config.closeIdleSessionsAfterMs,
+    resolveProviderIdleSessionCloseMs: (provider) =>
+      config.providerOverrides?.[provider]?.closeIdleSessionsAfterMs,
     onWorkspaceStateMayHaveChanged: ({ cwd }) => {
       workspaceGitService.onWorkspaceStateMayHaveChanged(cwd);
     },
@@ -1918,6 +1923,12 @@ export async function createPaseoDaemon(
               workspaceLabelService,
             );
             pluginRuntime.bindPaseoSessionHost(wsServer);
+            const timelineViewers = wsServer;
+            agentManager.setAgentTimelineViewedProbe((agentId) =>
+              timelineViewers
+                .listSessions()
+                .some((session) => session.isViewingAgentTimeline(agentId)),
+            );
             await pluginRuntime.start();
             wsServer.beginAcceptingConnections();
             relayRuntime = createRelayRuntime({

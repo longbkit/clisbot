@@ -5522,6 +5522,7 @@ describe("agent config setters", () => {
   } {
     return {
       waitForAgentClose: vi.fn().mockResolvedValue(undefined),
+      markAgentInUse: vi.fn(),
       getAgent: vi.fn(() => ({ id: "agent-1" })),
       ...overrides,
     };

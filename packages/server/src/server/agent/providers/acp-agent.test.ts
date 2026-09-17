@@ -1,5 +1,7 @@
 import { type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import pino from "pino";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   AgentSideConnection,
@@ -4291,5 +4293,152 @@ describe("ACP session/load invariant — cwd and mcpServers always passed", () =
       cwd: "/tmp/paseo-acp-test",
       mcpServers: [],
     });
+  });
+});
+
+// A spawned ACP agent that accepts the pipes but never answers a request.
+function createSilentACPChild(): ChildProcessWithoutNullStreams {
+  const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+  child.stdin = new PassThrough() as unknown as ChildProcessWithoutNullStreams["stdin"];
+  child.stdout = new PassThrough() as unknown as ChildProcessWithoutNullStreams["stdout"];
+  child.stderr = new PassThrough() as unknown as ChildProcessWithoutNullStreams["stderr"];
+  child.kill = vi.fn(() => true) as ChildProcessWithoutNullStreams["kill"];
+  return child;
+}
+
+describe("ACP process release when the agent stops answering", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  test("close() terminates the child when session/cancel and session/close never answer", async () => {
+    vi.useFakeTimers();
+    const terminator = new FakeTerminator();
+    const session = createSession(terminator.terminate);
+    const child = createTerminalChildStub();
+    const never = () => new Promise<void>(() => {});
+    Object.assign(asInternals<Record<string, unknown>>(session), {
+      child,
+      sessionId: "session-1",
+      activeForegroundTurnId: "turn-1",
+      agentCapabilities: { sessionCapabilities: { close: {} } },
+      connection: { cancel: vi.fn(never), unstable_closeSession: vi.fn(never) },
+    });
+
+    const closed = session.close();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(terminator.terminated).toContain(child);
+    await closed;
+  });
+
+  test("a new session whose agent never answers initialize is terminated", async () => {
+    const terminator = new FakeTerminator();
+    const child = createSilentACPChild();
+    vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(child);
+    const session = new ACPAgentSession(
+      { provider: "grok", cwd: "/tmp/paseo-acp-test" },
+      {
+        provider: "grok",
+        logger: createTestLogger(),
+        defaultCommand: ["node"],
+        defaultModes: [],
+        capabilities: { supportsStreaming: true, supportsSessionPersistence: true },
+        terminateProcess: terminator.terminate,
+        handshakeTimeoutMs: 20,
+      },
+    );
+
+    await expect(session.initializeNewSession()).rejects.toThrow("ACP initialize timed out");
+    expect(terminator.terminated).toContain(child);
+  });
+
+  test("logs the provider pid when a session process spawns and is terminated", async () => {
+    const records: Array<Record<string, unknown>> = [];
+    const logger = pino(
+      { level: "info" },
+      { write: (line: string) => records.push(JSON.parse(line) as Record<string, unknown>) },
+    );
+    const child = createSilentACPChild();
+    Object.defineProperty(child, "pid", { value: 4242 });
+    vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(child);
+    const session = new ACPAgentSession(
+      { provider: "grok", cwd: "/tmp/paseo-acp-test" },
+      {
+        provider: "grok",
+        logger,
+        defaultCommand: ["node"],
+        defaultModes: [],
+        capabilities: { supportsStreaming: true, supportsSessionPersistence: true },
+        agentId: "agent-1",
+        terminateProcess: new FakeTerminator().terminate,
+        handshakeTimeoutMs: 20,
+      },
+    );
+
+    await expect(session.initializeNewSession()).rejects.toThrow("ACP initialize timed out");
+
+    const lifecycle = records
+      .filter((record) => record.pid === 4242)
+      .map(({ msg, agentId, provider }) => ({ msg, agentId, provider }));
+    expect(lifecycle).toEqual([
+      { msg: "ACP process spawned", agentId: "agent-1", provider: "grok" },
+      { msg: "ACP session process terminated", agentId: "agent-1", provider: "grok" },
+    ]);
+  });
+
+  test("a resumed session whose agent never answers session/load is terminated", async () => {
+    const terminator = new FakeTerminator();
+    const child = createProbeChildStub();
+
+    class SilentLoadSession extends ACPAgentSession {
+      protected override async spawnProcess(): Promise<SpawnedACPProcess> {
+        return {
+          child,
+          connection: {
+            loadSession: vi.fn(() => new Promise(() => {})),
+          } as unknown as ClientSideConnection,
+          initialize: { agentCapabilities: { loadSession: true } },
+        };
+      }
+    }
+
+    const session = new SilentLoadSession(
+      { provider: "grok", cwd: "/tmp/paseo-acp-test" },
+      {
+        provider: "grok",
+        logger: createTestLogger(),
+        defaultCommand: ["grok", "agent", "stdio"],
+        defaultModes: [],
+        capabilities: { supportsStreaming: true, supportsSessionPersistence: true },
+        handle: { provider: "grok", sessionId: "session-1" },
+        terminateProcess: terminator.terminate,
+        handshakeTimeoutMs: 20,
+      },
+    );
+
+    await expect(session.initializeResumedSession()).rejects.toThrow("ACP session/load timed out");
+    expect(terminator.terminated).toContain(child);
+  });
+
+  test("a feature probe whose agent never answers initialize is terminated", async () => {
+    const terminator = new FakeTerminator();
+    const child = createSilentACPChild();
+    vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(child);
+    const client = new ACPAgentClient({
+      provider: "grok",
+      logger: createTestLogger(),
+      defaultCommand: ["node"],
+      defaultModes: [],
+      configFeatureOptions: [COPILOT_AGENT_FEATURE_OPTION],
+      terminateProcess: terminator.terminate,
+      handshakeTimeoutMs: 20,
+    });
+
+    await expect(
+      client.listFeatures({ provider: "grok", cwd: "/tmp/paseo-acp-test" }),
+    ).rejects.toThrow("ACP initialize timed out");
+    expect(terminator.terminated).toContain(child);
   });
 });

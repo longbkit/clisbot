@@ -106,6 +106,7 @@ import {
   type ProviderSubagentStoreEvent,
 } from "./provider-subagents/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
+import { IdleSessionReaper, type IdleSessionClock } from "./idle-session-reaper.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
@@ -345,6 +346,14 @@ export interface AgentManagerOptions {
     agentId: string;
     expectedTurnId: string;
   }) => Promise<void>;
+  /**
+   * Close the provider session of an agent idle this long, when its provider certifies the idle
+   * state. Unset or 0 keeps idle agents resident unless a provider window says otherwise.
+   */
+  closeIdleSessionsAfterMs?: number;
+  /** Per-provider idle window; undefined falls back to `closeIdleSessionsAfterMs`. */
+  resolveProviderIdleSessionCloseMs?: (provider: AgentProvider) => number | undefined;
+  idleSessionClock?: IdleSessionClock;
   logger: Logger;
 }
 
@@ -799,6 +808,8 @@ export class AgentManager {
   private readonly rescueTimeouts: Required<AgentManagerRescueTimeouts>;
   private readonly beforeSteerUnavailableFallback?: AgentManagerOptions["beforeSteerUnavailableFallback"];
   private acceptingAgentRegistrations = true;
+  private readonly idleSessionReaper: IdleSessionReaper | null;
+  private isAgentTimelineViewed: (agentId: string) => boolean = () => false;
 
   constructor(options: AgentManagerOptions) {
     this.serverId = options.serverId;
@@ -865,6 +876,7 @@ export class AgentManager {
       providerDefinitions: options.providerDefinitions ?? {},
       clients: options.clients ?? {},
     });
+    this.idleSessionReaper = this.startIdleSessionReaper(options);
   }
 
   private configurePaseoTools(options: AgentManagerOptions): void {
@@ -928,6 +940,12 @@ export class AgentManager {
 
   prepareForShutdown(): void {
     this.acceptingAgentRegistrations = false;
+    this.idleSessionReaper?.stop();
+  }
+
+  /** Clients viewing an agent's timeline keep its provider session resident. */
+  setAgentTimelineViewedProbe(probe: (agentId: string) => boolean): void {
+    this.isAgentTimelineViewed = probe;
   }
 
   setPaseoToolsEnabled(enabled: boolean): void {
@@ -1860,15 +1878,20 @@ export class AgentManager {
   }
 
   closeAgent(agentId: string): Promise<void> {
+    return this.trackAgentClose(agentId, async () => {
+      // A preceding reload or archive may already have closed the durable agent.
+      if (this.agents.has(agentId)) await this.closeAgentRuntime(agentId);
+    });
+  }
+
+  /** Registers a close so loads wait for it instead of resuming a second writer. */
+  private trackAgentClose(agentId: string, closeRuntime: () => Promise<void>): Promise<void> {
     const existing = this.inFlightAgentCloses.get(agentId);
     if (existing) {
       return existing;
     }
 
-    const close = this.runLifecycleMutation(agentId, async () => {
-      // A preceding reload or archive may already have closed the durable agent.
-      if (this.agents.has(agentId)) await this.closeAgentRuntime(agentId);
-    });
+    const close = this.runLifecycleMutation(agentId, closeRuntime);
     this.inFlightAgentCloses.set(agentId, close);
     const clearClose = () => {
       if (this.inFlightAgentCloses.get(agentId) === close) {
@@ -1879,7 +1902,88 @@ export class AgentManager {
     return close;
   }
 
-  private async closeAgentRuntime(agentId: string): Promise<void> {
+  private startIdleSessionReaper(options: AgentManagerOptions): IdleSessionReaper | null {
+    const resolveProviderWindow = options.resolveProviderIdleSessionCloseMs;
+    const defaultWindowMs = options.closeIdleSessionsAfterMs ?? 0;
+    if (defaultWindowMs <= 0 && !resolveProviderWindow) return null;
+    const reaper = new IdleSessionReaper({
+      logger: this.logger,
+      clock: options.idleSessionClock,
+      host: {
+        listLiveAgentIds: () => Array.from(this.agents.keys()),
+        resolveIdleWindowMs: (agentId) => {
+          const provider = this.agents.get(agentId)?.provider;
+          const providerWindowMs = provider ? resolveProviderWindow?.(provider) : undefined;
+          return providerWindowMs ?? defaultWindowMs;
+        },
+        isSessionIdle: (agentId) => this.isSessionIdle(agentId),
+        closeIdleSession: (agentId, idleForMs) => this.closeIdleSession(agentId, idleForMs),
+      },
+    });
+    reaper.start();
+    return reaper;
+  }
+
+  /**
+   * Keeps an agent resident for a full idle window. Loads call this before they start work, so an
+   * idle close that has not reached its final check yet gives way to the caller.
+   */
+  markAgentInUse(agentId: string): void {
+    this.idleSessionReaper?.markActive(agentId);
+  }
+
+  /**
+   * An idle session has nothing that its close would cut short: no run, no question waiting on
+   * a human, no lifecycle work in flight, no client showing its timeline, and a provider that
+   * positively reports no background work. A provider that cannot report it is never closed.
+   */
+  private isSessionIdle(agentId: string): boolean {
+    return (
+      !this.inFlightAgentCloses.has(agentId) &&
+      !this.lifecycleMutationTails.has(agentId) &&
+      this.hasIdleSessionState(agentId)
+    );
+  }
+
+  private hasIdleSessionState(agentId: string): boolean {
+    const agent = this.agents.get(agentId);
+    if (!agent || agent.internal) return false;
+    if (agent.lifecycle !== "idle" && agent.lifecycle !== "error") return false;
+    return (
+      !this.hasInFlightRun(agentId) &&
+      !agent.pendingReplacement &&
+      agent.pendingPermissions.size === 0 &&
+      agent.inFlightPermissionResponses.size === 0 &&
+      !this.foregroundMutationTails.has(agentId) &&
+      !this.sessionEventTails.has(agentId) &&
+      !this.steerEventBarriers.has(agentId) &&
+      !this.providerSubagents.list(agentId).some((subagent) => subagent.status === "running") &&
+      !this.isAgentTimelineViewed(agentId) &&
+      agent.session.isIdleForRelease?.() === true
+    );
+  }
+
+  private closeIdleSession(agentId: string, idleMs: number): Promise<void> {
+    const stillIdle = () =>
+      this.hasIdleSessionState(agentId) && this.idleSessionReaper?.elapsedIdleMs(agentId) != null;
+    return this.trackAgentClose(agentId, async () => {
+      // Work may have arrived between the sweep and this turn of the lifecycle lane.
+      if (!stillIdle()) return;
+      const agent = this.requireAgent(agentId);
+      const closed = await this.closeAgentRuntime(agentId, { beforeClosure: stillIdle });
+      if (!closed) return;
+      this.logger.info(
+        { agentId, provider: agent.provider, idleMs },
+        "Closed idle agent session; the next prompt or load resumes it",
+      );
+    });
+  }
+
+  /** Returns false when `beforeClosure` declines, which leaves the agent live and untouched. */
+  private async closeAgentRuntime(
+    agentId: string,
+    options?: { beforeClosure?: () => boolean },
+  ): Promise<boolean> {
     const agent = this.requireAgent(agentId);
     this.logger.trace(
       {
@@ -1895,6 +1999,8 @@ export class AgentManager {
     );
     await this.drainSessionEvents(agentId);
     await this.cancelRunningProviderSubagents(agentId);
+    // Checked with no await before closure removes the agent, so nothing can start in between.
+    if (options?.beforeClosure && !options.beforeClosure()) return false;
     const closedAgent = this.prepareAgentForClosure(agent, "agent closed");
     let closeError: unknown;
     try {
@@ -1925,6 +2031,7 @@ export class AgentManager {
     if (persistError !== undefined) {
       throw persistError;
     }
+    return true;
   }
 
   private async cancelRunningProviderSubagents(parentAgentId: string): Promise<void> {
@@ -5657,30 +5764,38 @@ export class AgentManager {
     // promise queue in front of that admission limit.
     const write = operation();
     this.warnWhenTimelineWriteStalls(agentId, write);
-    const previous = this.timelineWriteTails.get(agentId);
-    const tail = previous ? Promise.all([previous, write]).then(() => undefined) : write;
-    this.timelineWriteTails.set(agentId, tail);
-    const observed = tail.then(
-      () => {
-        if (this.timelineWriteTails.get(agentId) === tail) this.timelineWriteTails.delete(agentId);
-        return undefined;
-      },
-      (cause: unknown) => {
-        const error = cause instanceof Error ? cause : new Error(String(cause));
-        if (!this.timelineWriteErrors.has(agentId)) {
-          this.timelineWriteErrors.set(agentId, error);
-          const agent = this.agents.get(agentId);
-          if (agent) {
-            agent.lastError = `Session history was not saved: ${error.message}`;
-            agent.lifecycle = "error";
-            this.emitState(agent);
-          }
-          this.logger.error({ err: error, agentId }, "Session history was not saved");
-          this.abortSessionAfterHistoryFailure(agentId);
-        }
-      },
+    // Each write reports its own failure, so an earlier overload cannot mask a later I/O error.
+    // The tail never rejects; waiters read the outcome from timelineWriteErrors.
+    const settled = write.then(
+      () => undefined,
+      (cause: unknown) => this.failTimelineWrite(agentId, cause),
     );
+    const previous = this.timelineWriteTails.get(agentId);
+    const tail = previous ? Promise.all([previous, settled]).then(() => undefined) : settled;
+    this.timelineWriteTails.set(agentId, tail);
+    const observed = tail.then(() => {
+      if (this.timelineWriteTails.get(agentId) === tail) this.timelineWriteTails.delete(agentId);
+      return undefined;
+    });
     this.trackBackgroundTask(observed);
+  }
+
+  // Every row reaching the store already has its seq, so any failure — a store overload
+  // included — may leave a hole in the durable log and stays until the daemon restarts. It
+  // replaces an event-budget overload (refused before a seq existed) still waiting to recover.
+  private failTimelineWrite(agentId: string, cause: unknown): void {
+    const error = cause instanceof Error ? cause : new Error(String(cause));
+    const existing = this.timelineWriteErrors.get(agentId);
+    if (existing && !(existing instanceof PendingEventBudgetError)) return;
+    this.timelineWriteErrors.set(agentId, error);
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      agent.lastError = `Session history was not saved: ${error.message}`;
+      agent.lifecycle = "error";
+      this.emitState(agent);
+    }
+    this.logger.error({ err: error, agentId }, "Session history was not saved");
+    this.abortSessionAfterHistoryFailure(agentId);
   }
 
   private enqueueDurableTimelineAppend(
@@ -5814,13 +5929,12 @@ export class AgentManager {
     );
     const write = this.timelineWriteTails.get(agentId);
     if (write && this.durableTimelineStore) {
-      void write.then(
-        () => {
+      // The write owner reports failure; never publish an uncommitted cursor.
+      void write.then(() => {
+        if (!this.timelineWriteErrors.has(agentId))
           this.dispatch({ type: "agent_stream", agentId, event, ...metadata });
-          return undefined;
-        },
-        () => undefined,
-      ); // The write owner reports failure; never publish an uncommitted cursor.
+        return undefined;
+      });
       return;
     }
     if (metadata?.seq !== undefined && this.timelineWriteErrors.has(agentId)) return;
@@ -5836,6 +5950,11 @@ export class AgentManager {
   }
 
   private dispatch(event: AgentManagerEvent): void {
+    if (this.idleSessionReaper && event.type === "agent_state") {
+      this.idleSessionReaper.markActive(event.agent.id);
+    } else if (this.idleSessionReaper && event.type === "agent_stream") {
+      this.idleSessionReaper.markActive(event.agentId);
+    }
     for (const subscriber of this.subscribers) {
       if (
         subscriber.agentId &&

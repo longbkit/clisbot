@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import pino from "pino";
 import { SESSION_STORAGE_LIMITS } from "../../src/server/agent/session-storage/paged-journal.js";
+import { STORE_ADMISSION_LIMITS } from "../../src/server/agent/session-storage/store-admission.js";
 import { instrumentReads, measure, type PhaseResult } from "./metrics.js";
 import { directoryBenchmarks } from "./directory.js";
 import { command, sourceState } from "./source-state.js";
@@ -16,6 +17,7 @@ function option(name: string, fallback: string): string {
 }
 const smoke = process.argv.includes("--smoke");
 const ceiling = process.argv.includes("--ceiling");
+const writersOnly = process.argv.includes("--writers-only");
 const root = path.resolve(
   option("data", path.join(os.tmpdir(), `session-storage-benchmark-${Date.now()}`)),
 );
@@ -83,7 +85,7 @@ const report = {
   limits: {
     ...SESSION_STORAGE_LIMITS,
     fileStoreOwners: 128,
-    fileStoreQueuedOperations: 1024,
+    fileStoreAdmission: STORE_ADMISSION_LIMITS,
     projectionOperationBytes: 16 * 1024 * 1024,
     projectionGlobalBytes: 32 * 1024 * 1024,
   },
@@ -143,10 +145,12 @@ assert(!(await fs.readdir(root)).length, `Benchmark data directory must be empty
 await fs.writeFile(path.join(root, ".session-storage-benchmark"), report.startedAt);
 try {
   const context = { root, baselineRoot, samples, phase };
-  for (const count of report.datasets.sessions)
-    await directoryBenchmarks(context, count, pino({ level: "silent" }));
-  for (const count of report.datasets.rows) await timelineBenchmarks(context, count);
-  await writerBenchmarks(context, { writerRows, cycles, owners: smoke ? 12 : 160 });
+  if (!writersOnly) {
+    for (const count of report.datasets.sessions)
+      await directoryBenchmarks(context, count, pino({ level: "silent" }));
+    for (const count of report.datasets.rows) await timelineBenchmarks(context, count);
+  }
+  await writerBenchmarks(context, { writerRows, cycles, owners: smoke ? 12 : 160, writersOnly });
 } finally {
   reads.restore();
   await save();

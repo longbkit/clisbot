@@ -40,6 +40,19 @@ describe("server config", () => {
     expect(config.providerCatalogRefreshTimeoutMs).toBe(180_000);
   });
 
+  test("closes idle agent sessions after 30 minutes unless config sets another value", async () => {
+    const defaultHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-idle-default-"));
+    const disabledHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-idle-disabled-"));
+    roots.push(defaultHome, disabledHome);
+    await writeFile(
+      path.join(disabledHome, "config.json"),
+      JSON.stringify({ agents: { closeIdleSessionsAfterMs: 0 } }),
+    );
+
+    expect(loadConfig(defaultHome, { env: {} }).closeIdleSessionsAfterMs).toBe(30 * 60_000);
+    expect(loadConfig(disabledHome, { env: {} }).closeIdleSessionsAfterMs).toBe(0);
+  });
+
   test("resolves reload state from the supplied validated snapshot", async () => {
     const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-snapshot-"));
     roots.push(paseoHome);

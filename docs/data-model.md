@@ -236,6 +236,9 @@ snapshot so a mixed edit can apply its live subset and still name the paths that
     // current shape on load via `migrateProviderSettings`. Custom provider IDs must declare
     // `extends` (one of the built-ins or `"acp"`) and `label`. See `provider-launch-config.ts`.
     providers: Record<providerId, ProviderOverride>,
+    // Idle window for providers that certify idle runtimes (none built in); default 1800000,
+    // 0 disables; a provider entry's `closeIdleSessionsAfterMs` overrides it. Startup-only.
+    closeIdleSessionsAfterMs: number,
     metadataGeneration: {
       providers: [{ provider, model?, thinkingOptionId? }]
     }

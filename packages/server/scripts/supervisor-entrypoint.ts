@@ -13,6 +13,7 @@ import { loadPersistedConfig } from "../src/server/persisted-config.js";
 import { runSupervisor } from "./supervisor.js";
 import { resolveSupervisorLogFile } from "./supervisor-log-config.js";
 import { applySherpaLoaderEnv } from "../src/server/speech/providers/local/sherpa/sherpa-runtime-env.js";
+import { applyDaemonThreadpoolEnv } from "../src/server/agent/session-storage/session-storage-io.js";
 
 process.title = "Paseo Supervisor";
 
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
       : null;
 
   applySherpaLoaderEnv(workerEnv);
+  applyDaemonThreadpoolEnv(workerEnv);
 
   const paseoHome = resolvePaseoHome(workerEnv);
   const persistedConfig = loadPersistedConfig(paseoHome);

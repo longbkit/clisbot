@@ -1,13 +1,25 @@
+import { tmpdir } from "node:os";
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import {
   getStructuredAgentResponse,
+  generateStructuredAgentResponse,
   generateStructuredAgentResponseWithFallback,
   StructuredAgentFallbackError,
   StructuredAgentResponseError,
+  StructuredAgentTimeoutError,
   type AgentCaller,
 } from "./agent-response-loop.js";
-import type { AgentManager } from "./agent-manager.js";
+import { AgentManager } from "./agent-manager.js";
+import { createTestLogger } from "../../test-utils/test-logger.js";
+import type {
+  AgentCapabilityFlags,
+  AgentClient,
+  AgentPermissionResponse,
+  AgentRunResult,
+  AgentSession,
+  AgentStreamEvent,
+} from "./agent-sdk-types.js";
 
 function createScriptedCaller(responses: string[]) {
   const prompts: string[] = [];
@@ -277,5 +289,152 @@ describe("generateStructuredAgentResponseWithFallback", () => {
         },
       }),
     ).rejects.toBeInstanceOf(StructuredAgentFallbackError);
+  });
+});
+
+const INTERNAL_AGENT_CAPABILITIES: AgentCapabilityFlags = {
+  supportsStreaming: false,
+  supportsSessionPersistence: false,
+  supportsDynamicModes: false,
+  supportsMcpServers: false,
+  supportsReasoningStream: false,
+  supportsToolInvocations: true,
+};
+
+/** An internal agent turn that only ends when someone answers its permission request or interrupts it. */
+class BlockedTurnSession implements AgentSession {
+  readonly provider = "codex" as const;
+  readonly capabilities = INTERNAL_AGENT_CAPABILITIES;
+  readonly id = "blocked-session";
+  readonly permissionResponses: AgentPermissionResponse[] = [];
+  interrupted = false;
+  closed = false;
+  private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
+
+  constructor(private readonly asksPermission: boolean) {}
+
+  async run(): Promise<AgentRunResult> {
+    return { sessionId: this.id, finalText: "", timeline: [] };
+  }
+
+  async startTurn(): Promise<{ turnId: string }> {
+    setTimeout(() => {
+      this.push({ type: "turn_started", provider: this.provider, turnId: "turn-1" });
+      if (!this.asksPermission) return;
+      this.push({
+        type: "permission_requested",
+        provider: this.provider,
+        turnId: "turn-1",
+        request: { id: "permission-1", provider: this.provider, name: "shell", kind: "tool" },
+      });
+    }, 0);
+    return { turnId: "turn-1" };
+  }
+
+  async respondToPermission(_requestId: string, response: AgentPermissionResponse): Promise<void> {
+    this.permissionResponses.push(response);
+    this.push({
+      type: "permission_resolved",
+      provider: this.provider,
+      requestId: "permission-1",
+      resolution: response,
+      turnId: "turn-1",
+    });
+    this.push({
+      type: "timeline",
+      provider: this.provider,
+      turnId: "turn-1",
+      item: { type: "assistant_message", text: '{"title":"without tools"}' },
+    });
+    this.push({ type: "turn_completed", provider: this.provider, turnId: "turn-1" });
+  }
+
+  async interrupt(): Promise<void> {
+    this.interrupted = true;
+    this.push({ type: "turn_canceled", provider: this.provider, turnId: "turn-1", reason: "x" });
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  subscribe(callback: (event: AgentStreamEvent) => void): () => void {
+    this.subscribers.add(callback);
+    return () => this.subscribers.delete(callback);
+  }
+
+  private push(event: AgentStreamEvent): void {
+    for (const callback of this.subscribers) callback(event);
+  }
+
+  async *streamHistory(): AsyncGenerator<AgentStreamEvent> {}
+  async getRuntimeInfo() {
+    return { provider: this.provider, sessionId: this.id, model: null, modeId: null };
+  }
+  async getAvailableModes() {
+    return [];
+  }
+  async getCurrentMode() {
+    return null;
+  }
+  async setMode(): Promise<void> {}
+  getPendingPermissions() {
+    return [];
+  }
+  describePersistence() {
+    return { provider: this.provider, sessionId: this.id };
+  }
+}
+
+function createInternalAgentManager(session: BlockedTurnSession): AgentManager {
+  const client: AgentClient = {
+    provider: "codex",
+    capabilities: INTERNAL_AGENT_CAPABILITIES,
+    isAvailable: async () => true,
+    fetchCatalog: async () => ({ models: [], modes: [] }),
+    createSession: async () => session,
+    resumeSession: async () => session,
+  };
+  return new AgentManager({ clients: { codex: client }, logger: createTestLogger() });
+}
+
+describe("generateStructuredAgentResponse", () => {
+  const schema = z.object({ title: z.string() });
+
+  it("closes the internal agent when its run outlives the deadline", async () => {
+    const session = new BlockedTurnSession(false);
+    const manager = createInternalAgentManager(session);
+
+    await expect(
+      generateStructuredAgentResponse({
+        manager,
+        agentConfig: { provider: "codex", cwd: tmpdir(), internal: true },
+        persistSession: false,
+        prompt: "Return JSON",
+        schema,
+        timeoutMs: 50,
+      }),
+    ).rejects.toBeInstanceOf(StructuredAgentTimeoutError);
+
+    expect(session.interrupted).toBe(true);
+    expect(session.closed).toBe(true);
+  });
+
+  it("denies permission requests nobody can answer", async () => {
+    const session = new BlockedTurnSession(true);
+    const manager = createInternalAgentManager(session);
+
+    const result = await generateStructuredAgentResponse({
+      manager,
+      agentConfig: { provider: "codex", cwd: tmpdir(), internal: true },
+      persistSession: false,
+      prompt: "Return JSON",
+      schema,
+      timeoutMs: 5_000,
+    });
+
+    expect(result).toEqual({ title: "without tools" });
+    expect(session.permissionResponses).toEqual([expect.objectContaining({ behavior: "deny" })]);
+    expect(session.closed).toBe(true);
   });
 });

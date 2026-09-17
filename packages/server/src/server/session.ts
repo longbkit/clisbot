@@ -1260,6 +1260,11 @@ export class Session {
     this.rebuildViewedTimelineAgentIds();
   }
 
+  /** Whether a client of this session has the agent's timeline subscribed (selective clients only). */
+  public isViewingAgentTimeline(agentId: string): boolean {
+    return this.viewedTimelineAgentIds.has(agentId);
+  }
+
   private rebuildViewedTimelineAgentIds(): void {
     const viewedAgentIds = new Set<string>();
     for (const agentIds of this.viewedTimelineAgentIdsBySource.values()) {

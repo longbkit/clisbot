@@ -61,6 +61,8 @@ export const ProviderOverrideSchema = z.object({
   paseoTools: ProviderPaseoToolsPolicySchema.optional(),
   enabled: z.boolean().optional(),
   order: z.number().optional(),
+  /** Overrides `agents.closeIdleSessionsAfterMs` for this provider; 0 keeps its agents resident. */
+  closeIdleSessionsAfterMs: z.number().int().nonnegative().max(2_147_483_647).optional(),
 });
 
 const BUILTIN_PROVIDER_IDS = ["claude", "codex", "copilot", "opencode", "pi", "omp"] as const;

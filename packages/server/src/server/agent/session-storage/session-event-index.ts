@@ -32,6 +32,21 @@ export interface SessionEventIndex {
   ids: Record<string, number>;
   tools: Record<string, number[]>;
   summary?: unknown;
+  /**
+   * Per-kind seq bounds, so reading a stream head never walks every pointer. Optional and
+   * derived: an index without it, or one whose `scannedBytes` moved on without it (an older
+   * daemon appended), recomputes it from `pointers` on load.
+   */
+  seqRanges?: SeqRanges;
+}
+
+export interface SeqRange {
+  minSeq: number;
+  maxSeq: number;
+}
+export interface SeqRanges {
+  scannedBytes: number;
+  kinds: Record<string, SeqRange>;
 }
 
 export interface SessionEventEnvelope<T> extends JournalEntry<T> {
@@ -42,9 +57,27 @@ export interface SessionEventEnvelope<T> extends JournalEntry<T> {
 const PREVIEW_LIMIT = 120;
 /** Past this a tool's lifecycle is no longer cheap to complete from an index alone. */
 export const TOOL_OCCURRENCE_LIMIT = 256;
-/** Checkpoint interval. Rewriting the whole index per append would cost O(rows²) bytes. */
+/**
+ * Minimum checkpoint interval. Rewriting the whole index per append would cost O(rows²) bytes,
+ * so the interval also grows with the index: see `checkpointDue`.
+ */
 export const CHECKPOINT_ROWS = 64;
 export const CHECKPOINT_BYTES = 256 * 1024;
+
+/**
+ * A checkpoint serializes the whole index, so it is due only once the unsaved tail is
+ * comparable to the index itself. Checkpoint cost per appended row stays constant as history
+ * grows, and the tail a crash leaves to rescan stays proportional to one checkpoint.
+ */
+export function checkpointDue(
+  pending: { rows: number; bytes: number },
+  saved: { pointers: number; bytes: number },
+): boolean {
+  return (
+    pending.rows >= Math.max(CHECKPOINT_ROWS, Math.floor(saved.pointers / 4)) ||
+    pending.bytes >= Math.max(CHECKPOINT_BYTES, saved.bytes)
+  );
+}
 
 /** Collapse whitespace so a preview never carries layout from the original message. */
 export function messagePreview(text: string): string {
@@ -65,7 +98,43 @@ export function emptyIndex(epoch: string = randomUUID()): SessionEventIndex {
     anchors: [],
     ids: {},
     tools: {},
+    seqRanges: { scannedBytes: 0, kinds: {} },
   };
+}
+
+/** Trusts persisted seq ranges only when they describe exactly the bytes the index covers. */
+export function ensureSeqRanges(index: SessionEventIndex): void {
+  const saved = index.seqRanges;
+  if (saved?.scannedBytes === index.scannedBytes && saved.kinds && typeof saved.kinds === "object")
+    return;
+  const kinds: Record<string, SeqRange> = {};
+  for (const key of Object.keys(index.pointers)) {
+    const separator = key.indexOf(":");
+    const seq = Number(key.slice(separator + 1));
+    if (separator < 0 || !Number.isSafeInteger(seq)) continue;
+    widenSeqRange(kinds, key.slice(0, separator), seq);
+  }
+  index.seqRanges = { scannedBytes: index.scannedBytes, kinds };
+}
+
+/** Records how far the log has been folded in; seq ranges always move with it. */
+export function markScanned(index: SessionEventIndex, bytes: number): void {
+  index.scannedBytes = bytes;
+  if (index.seqRanges) index.seqRanges.scannedBytes = bytes;
+}
+
+export function seqRange(index: SessionEventIndex, kind: string): SeqRange {
+  return index.seqRanges?.kinds[kind] ?? { minSeq: 0, maxSeq: 0 };
+}
+
+function widenSeqRange(kinds: Record<string, SeqRange>, kind: string, seq: number): void {
+  const range = kinds[kind];
+  if (!range) kinds[kind] = { minSeq: seq, maxSeq: seq };
+  else {
+    // Zero never names a row; keep it out of the lower bound like the pointer scan did.
+    range.minSeq = range.minSeq === 0 ? seq : Math.min(range.minSeq, seq);
+    range.maxSeq = Math.max(range.maxSeq, seq);
+  }
 }
 
 export function isIndex(value: unknown): value is SessionEventIndex {
@@ -97,12 +166,25 @@ export function absorbLine(
   } catch {
     return;
   }
+  absorbEnvelope(index, anchors, envelope, offset, Buffer.byteLength(line) + 1);
+}
+
+/**
+ * The derivation behind `absorbLine`, for a writer that still holds the envelope it just
+ * serialized. `length` is the persisted line's byte length including its newline.
+ */
+export function absorbEnvelope(
+  index: SessionEventIndex,
+  anchors: { set(messageId: string, anchor: SessionMessageAnchor): unknown },
+  envelope: SessionEventEnvelope<unknown>,
+  offset: number,
+  length: number,
+): void {
   if (typeof envelope.kind !== "string" || typeof envelope.seq !== "number") return;
   if (typeof envelope.epoch === "string") index.epoch = envelope.epoch;
-  index.pointers[`${envelope.kind}:${envelope.seq}`] = {
-    offset,
-    length: Buffer.byteLength(line) + 1,
-  };
+  index.pointers[`${envelope.kind}:${envelope.seq}`] = { offset, length };
+  if (index.seqRanges && Number.isSafeInteger(envelope.seq))
+    widenSeqRange(index.seqRanges.kinds, envelope.kind, envelope.seq);
   if (envelope.operation)
     index.operationOrder = Math.max(index.operationOrder, envelope.operation.order);
   for (const [key, seq] of derivedIds(envelope))

@@ -324,6 +324,9 @@ export class DaemonExecutions implements HubExecutionAgents {
       mcpServers: input.mcpServers,
     };
     let agent: ManagedAgent;
+    // An idle close must not remove the agent between this liveness check and the reload.
+    this.agentManager.markAgentInUse(record.id);
+    await this.agentManager.waitForAgentClose(record.id);
     if (this.agentManager.getAgent(record.id) && !record.archivedAt) {
       agent = await this.agentManager.reloadAgentSession(record.id, overrides, { owner });
     } else {

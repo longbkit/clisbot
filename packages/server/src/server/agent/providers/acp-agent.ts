@@ -283,6 +283,12 @@ export function buildACPClientCapabilities(
 const PROBE_ENV: Record<string, string> = { NO_BROWSER: "true" };
 const ACP_DIAGNOSTIC_PHASE_TIMEOUT_MS = 20_000;
 const ACP_PROBE_CLOSE_TIMEOUT_MS = 2_000;
+// session/cancel + session/close together; kept under the manager's 3s reload close timeout
+// so the process termination that follows starts well before a reload gives up.
+const ACP_SHUTDOWN_REQUEST_TIMEOUT_MS = 1_000;
+// Bounds each handshake step (initialize, session/new, session/load, session/resume). A child
+// that never answers is terminated instead of living on as an orphan.
+const ACP_HANDSHAKE_TIMEOUT_MS = 90_000;
 // Below the manager's 2s interrupt timeout, so a locally closed turn still counts as acknowledged.
 const ACP_CANCEL_SETTLE_TIMEOUT_MS = 1_500;
 const ABANDONED_PROMPT_OUTPUT_UPDATES = new Set<string>([
@@ -459,6 +465,8 @@ interface ACPAgentClientOptions {
   waitForInitialCommands?: boolean;
   initialCommandsWaitTimeoutMs?: number;
   terminateProcess?: ProcessTerminator;
+  /** Per-step bound on the ACP handshake of sessions and probes. */
+  handshakeTimeoutMs?: number;
   now?: () => number;
 }
 
@@ -494,6 +502,7 @@ interface ACPAgentSessionOptions {
   waitForInitialCommands?: boolean;
   initialCommandsWaitTimeoutMs?: number;
   terminateProcess?: ProcessTerminator;
+  handshakeTimeoutMs?: number;
 }
 
 export interface SpawnedACPProcess {
@@ -924,10 +933,12 @@ export class ACPAgentClient implements AgentClient {
   private readonly importPromptCache = new Map<string, ACPImportPromptCacheEntry>();
   private readonly now: () => number;
   protected readonly terminateProcess: ProcessTerminator;
+  protected readonly handshakeTimeoutMs: number;
 
   constructor(options: ACPAgentClientOptions) {
     this.provider = options.provider;
     this.terminateProcess = options.terminateProcess ?? terminateWithTreeKill;
+    this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? ACP_HANDSHAKE_TIMEOUT_MS;
     this.capabilities = options.capabilities ?? DEFAULT_ACP_CAPABILITIES;
     this.logger = options.logger.child({
       module: "agent",
@@ -986,6 +997,8 @@ export class ACPAgentClient implements AgentClient {
         exactMcpPreapproval: this.exactMcpPreapproval,
         waitForInitialCommands: this.waitForInitialCommands,
         initialCommandsWaitTimeoutMs: this.initialCommandsWaitTimeoutMs,
+        terminateProcess: this.terminateProcess,
+        handshakeTimeoutMs: this.handshakeTimeoutMs,
       },
     );
     await session.initializeNewSession();
@@ -1038,6 +1051,8 @@ export class ACPAgentClient implements AgentClient {
       exactMcpPreapproval: this.exactMcpPreapproval,
       waitForInitialCommands: this.waitForInitialCommands,
       initialCommandsWaitTimeoutMs: this.initialCommandsWaitTimeoutMs,
+      terminateProcess: this.terminateProcess,
+      handshakeTimeoutMs: this.handshakeTimeoutMs,
     });
     await session.initializeResumedSession();
     return session;
@@ -1152,11 +1167,15 @@ export class ACPAgentClient implements AgentClient {
     const probe = await this.spawnProcess(PROBE_ENV);
     let probeSessionId: string | null = null;
     try {
-      const response = await this.runACPRequest(() =>
-        probe.connection.newSession({
-          cwd: config.cwd,
-          mcpServers: [],
-        }),
+      const response = await withTimeout(
+        this.runACPRequest(() =>
+          probe.connection.newSession({
+            cwd: config.cwd,
+            mcpServers: [],
+          }),
+        ),
+        this.handshakeTimeoutMs,
+        `ACP probe session/new timed out after ${this.handshakeTimeoutMs}ms`,
       );
       probeSessionId = response.sessionId;
       const transformed = this.transformSessionResponse(response);
@@ -1340,7 +1359,10 @@ export class ACPAgentClient implements AgentClient {
     };
     options?.onSpawned?.(probe);
     try {
-      const initialize = await this.initializeTransport(transport, options?.initializeTimeoutMs);
+      const initialize = await this.initializeTransport(
+        transport,
+        options?.initializeTimeoutMs ?? this.handshakeTimeoutMs,
+      );
       const initializedProbe: SpawnedACPProcess = {
         ...probe,
         initialize,
@@ -1367,6 +1389,16 @@ export class ACPAgentClient implements AgentClient {
       stdio: ["pipe", "pipe", "pipe"],
     });
     assertChildWithPipes(child);
+    this.logger.info(
+      { provider: this.provider, pid: child.pid, purpose: "probe" },
+      "ACP process spawned",
+    );
+    child.once("exit", (code, signal) => {
+      this.logger.info(
+        { provider: this.provider, pid: child.pid, purpose: "probe", code, signal },
+        "ACP process exited",
+      );
+    });
 
     const stderrChunks: string[] = [];
     child.stderr.on("data", (chunk: Buffer | string) => {
@@ -1727,10 +1759,12 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   private replayingHistory = false;
   private bootstrapThreadEventPending = false;
   private readonly terminateProcess: ProcessTerminator;
+  private readonly handshakeTimeoutMs: number;
 
   constructor(config: AgentSessionConfig, options: ACPAgentSessionOptions) {
     this.provider = options.provider;
     this.terminateProcess = options.terminateProcess ?? terminateWithTreeKill;
+    this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? ACP_HANDSHAKE_TIMEOUT_MS;
     this.capabilities = options.capabilities;
     this.logger = options.logger.child({ module: "agent", provider: options.provider });
     this.runtimeSettings = options.runtimeSettings;
@@ -1773,7 +1807,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       this.connection = spawned.connection;
       this.agentCapabilities = spawned.initialize.agentCapabilities ?? null;
 
-      const response = await this.runACPRequest(() =>
+      const response = await this.runHandshakeStep("session/new", () =>
         this.connection!.newSession({
           cwd: this.config.cwd,
           mcpServers: this.acpMcpServers(),
@@ -1813,7 +1847,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       const sessionCapabilities = this.agentCapabilities?.sessionCapabilities;
       if (this.agentCapabilities?.loadSession) {
         this.replayingHistory = true;
-        const response = await this.runACPRequest(() =>
+        const response = await this.runHandshakeStep("session/load", () =>
           this.connection!.loadSession({
             sessionId: handle.sessionId,
             cwd: this.config.cwd,
@@ -1825,7 +1859,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
         this.historyPending = this.persistedHistory.length > 0;
         this.applySessionState(response);
       } else if (sessionCapabilities?.resume) {
-        const response = await this.runACPRequest(() =>
+        const response = await this.runHandshakeStep("session/resume", () =>
           this.connection!.unstable_resumeSession({
             sessionId: handle.sessionId,
             cwd: this.config.cwd,
@@ -2524,39 +2558,73 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     }
     this.pendingPermissions.clear();
 
-    if (this.connection && this.sessionId) {
-      try {
-        if (this.activeForegroundTurnId) {
-          await this.connection.cancel({ sessionId: this.sessionId });
-        }
-      } catch {}
-
-      try {
-        if (this.agentCapabilities?.sessionCapabilities?.close) {
-          await this.connection.unstable_closeSession({ sessionId: this.sessionId });
-        }
-      } catch (error) {
-        this.logger.debug({ err: error }, "ACP closeSession failed during shutdown");
+    try {
+      if (this.connection && this.sessionId) {
+        // An agent that never answers must not keep its process alive: the requests are
+        // courtesy notices, the termination below is what releases the child.
+        await withTimeout(
+          this.requestSessionShutdown(this.connection, this.sessionId),
+          ACP_SHUTDOWN_REQUEST_TIMEOUT_MS,
+          `ACP session shutdown requests timed out after ${ACP_SHUTDOWN_REQUEST_TIMEOUT_MS}ms`,
+        );
       }
+    } catch (error) {
+      this.logger.debug(
+        { err: error, agentId: this.agentId, sessionId: this.sessionId },
+        "ACP session shutdown requests did not finish; terminating the process",
+      );
+    } finally {
+      await this.terminateSessionProcesses();
     }
+  }
 
+  private async requestSessionShutdown(
+    connection: ClientSideConnection,
+    sessionId: string,
+  ): Promise<void> {
+    try {
+      if (this.activeForegroundTurnId) {
+        await connection.cancel({ sessionId });
+      }
+    } catch {}
+
+    try {
+      if (this.agentCapabilities?.sessionCapabilities?.close) {
+        await connection.unstable_closeSession({ sessionId });
+      }
+    } catch (error) {
+      this.logger.debug({ err: error }, "ACP closeSession failed during shutdown");
+    }
+  }
+
+  private async terminateSessionProcesses(): Promise<void> {
     const terminalTerminations = Array.from(this.terminalEntries.values(), (terminal) =>
       this.terminateProcess(terminal.child, {
         gracefulTimeoutMs: 2_000,
         forceTimeoutMs: 2_000,
       }),
     );
-    await Promise.all(terminalTerminations);
-    this.terminalEntries.clear();
+    try {
+      await Promise.allSettled(terminalTerminations);
+      this.terminalEntries.clear();
 
-    if (this.child) {
-      await this.terminateProcess(this.child, { gracefulTimeoutMs: 2_000, forceTimeoutMs: 2_000 });
+      const child = this.child;
+      if (child) {
+        const result = await this.terminateProcess(child, {
+          gracefulTimeoutMs: 2_000,
+          forceTimeoutMs: 2_000,
+        });
+        this.logger.info(
+          { agentId: this.agentId, provider: this.provider, pid: child.pid, result },
+          "ACP session process terminated",
+        );
+      }
+    } finally {
+      this.subscribers.clear();
+      this.connection = null;
+      this.child = null;
+      this.activeForegroundTurnId = null;
     }
-
-    this.subscribers.clear();
-    this.connection = null;
-    this.child = null;
-    this.activeForegroundTurnId = null;
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -2866,12 +2934,27 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       stdio: ["pipe", "pipe", "pipe"],
     });
     assertChildWithPipes(child);
+    this.logger.info(
+      { agentId: this.agentId, provider: this.provider, pid: child.pid, purpose: "session" },
+      "ACP process spawned",
+    );
 
     const stderrChunks: string[] = [];
     child.stderr.on("data", (chunk: Buffer | string) => {
       stderrChunks.push(chunk.toString());
     });
     child.once("exit", (code, signal) => {
+      this.logger.info(
+        {
+          agentId: this.agentId,
+          provider: this.provider,
+          pid: child.pid,
+          purpose: "session",
+          code,
+          signal,
+        },
+        "ACP process exited",
+      );
       if (this.closed) {
         return;
       }
@@ -2897,7 +2980,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     // close the process even when the ACP handshake itself rejects.
     this.child = child;
     this.connection = connection;
-    const initialize = await this.runACPRequest(() =>
+    const initialize = await this.runHandshakeStep("initialize", () =>
       connection.initialize({
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: buildACPClientCapabilities(
@@ -2909,6 +2992,15 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     );
 
     return { child, connection, initialize };
+  }
+
+  /** A handshake step the agent never answers fails the initialization, which kills the child. */
+  private runHandshakeStep<T>(step: string, request: () => Promise<T>): Promise<T> {
+    return withTimeout(
+      this.runACPRequest(request),
+      this.handshakeTimeoutMs,
+      `ACP ${step} timed out after ${this.handshakeTimeoutMs}ms`,
+    );
   }
 
   private async runACPRequest<T>(request: () => Promise<T>): Promise<T> {

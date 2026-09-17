@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { createDurableDirectory, syncDirectory, writeDurableJson } from "./durable-file.js";
+import { IoSemaphore } from "./session-storage-io.js";
 
 export const SESSION_STORAGE_LIMITS = {
   queueBytes: 16 * 1024 * 1024,
@@ -135,19 +136,10 @@ function validateCheckpoint(checkpoint: Checkpoint): void {
 }
 
 let queuedBytes = 0;
-let activeIo = 0;
-const ioWaiters: (() => void)[] = [];
-export async function withSessionStorageIo<T>(operation: () => Promise<T>): Promise<T> {
-  if (activeIo >= SESSION_STORAGE_LIMITS.concurrentIo)
-    await new Promise<void>((resolve) => ioWaiters.push(resolve));
-  else activeIo += 1;
-  try {
-    return await operation();
-  } finally {
-    const next = ioWaiters.shift();
-    if (next) next();
-    else activeIo -= 1;
-  }
+const legacyStorageIo = new IoSemaphore(SESSION_STORAGE_LIMITS.concurrentIo);
+/** Pre-canonical journal and metadata I/O. Session-log writes use `withSessionLogWriteIo`. */
+export function withSessionStorageIo<T>(operation: () => Promise<T>): Promise<T> {
+  return legacyStorageIo.run(operation);
 }
 
 /** One owner per directory. Payloads never remain cached after the operation settles. */

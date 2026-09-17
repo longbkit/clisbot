@@ -29,6 +29,8 @@ import {
   type JournalOperation,
 } from "./paged-journal.js";
 import { ProjectedTimeline, type ProjectedTimelineFetchResult } from "./projected-timeline.js";
+import { admitStoreOperation, type StoreOperationKind } from "./store-admission.js";
+import { GroupCommit } from "./group-commit.js";
 import {
   AMBIGUOUS_ID,
   SessionEventLog,
@@ -40,9 +42,6 @@ type DirectoryResolver = (agentId: string) => Promise<string>;
 type TimelineStream = SessionEventStream<AgentTimelineRow>;
 type PermissionStream = SessionEventStream<AgentPermissionResponseRecord>;
 type SubmissionStream = SessionEventStream<MessageSubmission>;
-
-let pendingStoreBytes = 0;
-let pendingStoreOperations = 0;
 
 function selectRowRange(
   state: SessionEventState,
@@ -72,6 +71,10 @@ function selectRowRange(
  */
 export class FileAgentTimelineStore implements AgentTimelineStore {
   private readonly tails = new Map<string, Promise<unknown>>();
+  private readonly appends = new GroupCommit<AgentTimelineRow>({
+    schedule: (agentId, operation) => this.schedule(agentId, operation),
+    commit: async (agentId, rows) => this.writeRows(agentId, await this.timeline(agentId), rows),
+  });
   private readonly deleting = new Set<string>();
   private authorshipObserver?: (agentId: string, value: DurableSessionSummary) => Promise<void>;
   private readonly recovery = new AuthorshipRecoveryQueue({
@@ -101,24 +104,37 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     return this.recovery.schedule(agentId, prioritize);
   }
 
-  private run<T>(agentId: string, operation: () => Promise<T>, bytes = 0): Promise<T> {
-    if (this.deleting.has(agentId)) return Promise.reject(new Error("Session is being deleted"));
-    if (
-      pendingStoreBytes + bytes > SESSION_STORAGE_LIMITS.queueBytes ||
-      pendingStoreOperations >= 1024
-    )
-      return Promise.reject(
-        new Error("Session storage overloaded: operation queue limit exceeded"),
-      );
-    pendingStoreBytes += bytes;
-    pendingStoreOperations += 1;
+  /** Admits and queues one operation behind every earlier operation for the same agent. */
+  private run<T>(
+    agentId: string,
+    operation: () => Promise<T>,
+    kind: StoreOperationKind,
+    bytes = 0,
+  ): Promise<T> {
+    let release: () => void;
+    try {
+      release = this.admit(agentId, kind, bytes);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const task = this.schedule(agentId, operation);
+    void task.finally(release).catch(() => undefined);
+    return task;
+  }
+
+  private admit(agentId: string, kind: StoreOperationKind, bytes: number): () => void {
+    if (this.deleting.has(agentId)) throw new Error("Session is being deleted");
+    return admitStoreOperation(agentId, kind, bytes);
+  }
+
+  private schedule<T>(agentId: string, operation: () => Promise<T>): Promise<T> {
+    // Anything queued after an open batch fixes its position: later rows must not overtake it.
+    this.appends.close(agentId);
     const previous = this.tails.get(agentId) ?? Promise.resolve();
     const task = previous.catch(() => undefined).then(operation);
     this.tails.set(agentId, task);
     void task
       .finally(() => {
-        pendingStoreBytes -= bytes;
-        pendingStoreOperations -= 1;
         if (this.tails.get(agentId) === task) this.tails.delete(agentId);
       })
       .catch(() => undefined);
@@ -143,7 +159,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   }
 
   async recoverAuthorship(agentId: string): Promise<DurableSessionSummary> {
-    return this.run(agentId, () => this.syncAuthorship(agentId));
+    return this.run(agentId, () => this.syncAuthorship(agentId), "write");
   }
   private async syncAuthorship(agentId: string): Promise<DurableSessionSummary> {
     const value = await recoverSessionSummary(
@@ -155,10 +171,18 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   }
 
   async getEpoch(agentId: string): Promise<string> {
-    return this.run(agentId, async () => (await (await this.timeline(agentId)).state()).epoch);
+    return this.run(
+      agentId,
+      async () => (await (await this.timeline(agentId)).state()).epoch,
+      "read",
+    );
   }
   async getLatestCommittedSeq(agentId: string): Promise<number> {
-    return this.run(agentId, async () => (await (await this.timeline(agentId)).state()).maxSeq);
+    return this.run(
+      agentId,
+      async () => (await (await this.timeline(agentId)).state()).maxSeq,
+      "read",
+    );
   }
 
   async appendCommitted(
@@ -181,18 +205,24 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
         await this.writeRows(agentId, timeline, [row]);
         return row;
       },
+      "write",
       bytes,
     );
   }
 
+  /**
+   * Resolves only after the fsync that covers these rows. While an earlier operation for the
+   * agent is still running, consecutive calls join one batch: one append, one fsync, and every
+   * call in it resolves or rejects together.
+   */
   async bulkInsert(agentId: string, rows: readonly AgentTimelineRow[]): Promise<void> {
     const bytes = Buffer.byteLength(JSON.stringify(rows));
-    const snapshot = structuredClone(rows);
-    return this.run(
-      agentId,
-      async () => this.writeRows(agentId, await this.timeline(agentId), snapshot),
-      bytes,
-    );
+    const release = this.admit(agentId, "write", bytes);
+    try {
+      await this.appends.append(agentId, structuredClone(rows), bytes);
+    } finally {
+      release();
+    }
   }
   async updateCommittedRow(agentId: string, row: AgentTimelineRow): Promise<void> {
     await this.bulkInsert(agentId, [row]);
@@ -207,24 +237,33 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     await this.syncAuthorship(agentId);
   }
 
-  /** Attaches the durable submission operation that admitted each user message. */
+  /**
+   * Attaches the durable submission operation that admitted each user message. A batch
+   * annotates exactly as consecutive single-row appends would: a row rewriting a seq written
+   * earlier in the same batch keeps that earlier row's operation.
+   */
   private async annotateRows(
     agentId: string,
     timeline: TimelineStream,
     rows: readonly AgentTimelineRow[],
   ): Promise<JournalEntry<AgentTimelineRow>[]> {
     const submissions = await this.submissions(agentId);
-    const head = await timeline.state();
+    let maxSeq = (await timeline.state()).maxSeq;
+    const batched = new Map<number, JournalEntry<AgentTimelineRow>>();
     const entries: JournalEntry<AgentTimelineRow>[] = [];
     for (const row of rows) {
       let operation: JournalOperation | undefined;
       if (row.item.type === "user_message" && row.item.clientMessageId) {
-        operation =
-          row.seq <= head.maxSeq
-            ? await this.existingOperation(timeline, row)
-            : (await readMessageSubmission(submissions, row.item.clientMessageId))?.operation;
+        if (row.seq > maxSeq)
+          operation = (await readMessageSubmission(submissions, row.item.clientMessageId))
+            ?.operation;
+        else if (batched.has(row.seq)) operation = batched.get(row.seq)!.operation;
+        else operation = await this.existingOperation(timeline, row);
       }
-      entries.push({ seq: row.seq, value: row, ...(operation ? { operation } : {}) });
+      const entry = { seq: row.seq, value: row, ...(operation ? { operation } : {}) };
+      entries.push(entry);
+      batched.set(row.seq, entry);
+      maxSeq = Math.max(maxSeq, row.seq);
     }
     return entries;
   }
@@ -273,34 +312,48 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     agentId: string,
     options?: AgentTimelineFetchOptions,
   ): Promise<AgentTimelineFetchResult> {
-    return this.run(agentId, async () => this.fetchPage(await this.timeline(agentId), options));
+    return this.run(
+      agentId,
+      async () => this.fetchPage(await this.timeline(agentId), options),
+      "read",
+    );
   }
   async fetchProjectedCommitted(
     agentId: string,
     options?: AgentTimelineFetchOptions,
   ): Promise<ProjectedTimelineFetchResult> {
-    return this.run(agentId, async () =>
-      new ProjectedTimeline(await this.timeline(agentId)).fetch(options),
+    return this.run(
+      agentId,
+      async () => new ProjectedTimeline(await this.timeline(agentId)).fetch(options),
+      "read",
     );
   }
   async readProjectedPayload(agentId: string, options: TimelineDocumentReadOptions) {
-    return this.run(agentId, async () =>
-      new ProjectedTimeline(await this.timeline(agentId)).payload(options),
+    return this.run(
+      agentId,
+      async () => new ProjectedTimeline(await this.timeline(agentId)).payload(options),
+      "read",
     );
   }
   async readProjectedSourceRanges(agentId: string, options: TimelineDocumentReadOptions) {
-    return this.run(agentId, async () =>
-      new ProjectedTimeline(await this.timeline(agentId)).sourceRanges(options),
+    return this.run(
+      agentId,
+      async () => new ProjectedTimeline(await this.timeline(agentId)).sourceRanges(options),
+      "read",
     );
   }
 
   async getCommittedRows(agentId: string): Promise<AgentTimelineRow[]> {
-    return this.run(agentId, async () => {
-      const timeline = await this.timeline(agentId);
-      const state = await timeline.state();
-      // Legacy full-history API has a byte ceiling; paged consumers must use fetchCommitted.
-      return (await timeline.read(state.minSeq, state.maxSeq)).map((entry) => entry.value);
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const timeline = await this.timeline(agentId);
+        const state = await timeline.state();
+        // Legacy full-history API has a byte ceiling; paged consumers must use fetchCommitted.
+        return (await timeline.read(state.minSeq, state.maxSeq)).map((entry) => entry.value);
+      },
+      "read",
+    );
   }
 
   async getLastItem(agentId: string): Promise<AgentTimelineItem | null> {
@@ -308,69 +361,85 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   }
 
   async getLastAssistantMessage(agentId: string): Promise<string | null> {
-    return this.run(agentId, async () => {
-      const timeline = await this.timeline(agentId);
-      let cursor: { epoch: string; seq: number } | undefined;
-      const chunks: string[] = [];
-      let bytes = 0;
-      do {
-        const page = await this.fetchPage(timeline, {
-          direction: cursor ? "before" : "tail",
-          cursor,
-          limit: 40,
-        });
-        for (const row of page.rows.toReversed()) {
-          if (row.item.type === "assistant_message") {
-            bytes += Buffer.byteLength(row.item.text);
-            if (bytes > SESSION_STORAGE_LIMITS.readPageBytes)
-              throw new Error("Assistant message exceeds read byte budget");
-            chunks.push(row.item.text);
-          } else if (chunks.length) return chunks.toReversed().join("");
-        }
-        cursor = page.hasOlder ? { epoch: page.epoch, seq: page.rows[0]!.seq } : undefined;
-      } while (cursor);
-      return chunks.length ? chunks.toReversed().join("") : null;
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const timeline = await this.timeline(agentId);
+        let cursor: { epoch: string; seq: number } | undefined;
+        const chunks: string[] = [];
+        let bytes = 0;
+        do {
+          const page = await this.fetchPage(timeline, {
+            direction: cursor ? "before" : "tail",
+            cursor,
+            limit: 40,
+          });
+          for (const row of page.rows.toReversed()) {
+            if (row.item.type === "assistant_message") {
+              bytes += Buffer.byteLength(row.item.text);
+              if (bytes > SESSION_STORAGE_LIMITS.readPageBytes)
+                throw new Error("Assistant message exceeds read byte budget");
+              chunks.push(row.item.text);
+            } else if (chunks.length) return chunks.toReversed().join("");
+          }
+          cursor = page.hasOlder ? { epoch: page.epoch, seq: page.rows[0]!.seq } : undefined;
+        } while (cursor);
+        return chunks.length ? chunks.toReversed().join("") : null;
+      },
+      "read",
+    );
   }
 
   /** Anchors are already derived; listing prompts never reads `events.jsonl`. */
   async listPromptIndex(agentId: string): Promise<TimelinePromptIndex> {
-    return this.run(agentId, async () => {
-      const log = await this.open(agentId);
-      const state = await log.state("timeline");
-      const prompts = (await log.anchors())
-        .filter((anchor) => anchor.epoch === state.epoch)
-        .map(({ seq, timestamp, preview }) => ({ seq, timestamp, preview }));
-      return { epoch: state.epoch, prompts };
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const log = await this.open(agentId);
+        const state = await log.state("timeline");
+        const prompts = (await log.anchors())
+          .filter((anchor) => anchor.epoch === state.epoch)
+          .map(({ seq, timestamp, preview }) => ({ seq, timestamp, preview }));
+        return { epoch: state.epoch, prompts };
+      },
+      "read",
+    );
   }
 
   async getSubmittedUserMessage(
     agentId: string,
     clientMessageId: string,
   ): Promise<AgentTimelineRow | null> {
-    return this.run(agentId, async () => {
-      const log = await this.open(agentId);
-      const timeline = log.stream<AgentTimelineRow>("timeline");
-      const seq = await log.lookupId("client", clientMessageId);
-      if (seq === undefined || seq === AMBIGUOUS_ID) return null;
-      const row = (await timeline.read(seq, seq))[0]?.value;
-      return row?.item.type === "user_message" && row.item.clientMessageId === clientMessageId
-        ? row
-        : null;
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const log = await this.open(agentId);
+        const timeline = log.stream<AgentTimelineRow>("timeline");
+        const seq = await log.lookupId("client", clientMessageId);
+        if (seq === undefined || seq === AMBIGUOUS_ID) return null;
+        const row = (await timeline.read(seq, seq))[0]?.value;
+        return row?.item.type === "user_message" && row.item.clientMessageId === clientMessageId
+          ? row
+          : null;
+      },
+      "read",
+    );
   }
 
   async getUserMessageByProviderId(agentId: string, id: string): Promise<AgentTimelineRow | null> {
-    return this.run(agentId, async () => {
-      const log = await this.open(agentId);
-      const timeline = log.stream<AgentTimelineRow>("timeline");
-      const seq = await log.lookupId("provider", id);
-      if (seq === undefined || seq === AMBIGUOUS_ID) return null;
-      const row = (await timeline.read(seq, seq))[0]?.value;
-      if (row?.item.type !== "user_message") return null;
-      return row.providerMessageId === id || row.item.messageId === id ? row : null;
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const log = await this.open(agentId);
+        const timeline = log.stream<AgentTimelineRow>("timeline");
+        const seq = await log.lookupId("provider", id);
+        if (seq === undefined || seq === AMBIGUOUS_ID) return null;
+        const row = (await timeline.read(seq, seq))[0]?.value;
+        if (row?.item.type !== "user_message") return null;
+        return row.providerMessageId === id || row.item.messageId === id ? row : null;
+      },
+      "read",
+    );
   }
 
   async writeMessageSubmission(
@@ -390,6 +459,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
         };
         return writeMessageSubmission(log.stream<MessageSubmission>("submission"), snapshot);
       },
+      "write",
       bytes,
     );
   }
@@ -401,6 +471,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     return this.run(
       agentId,
       async () => (await findPermissionEntry(await this.permissions(agentId), id))?.value ?? null,
+      "read",
     );
   }
 
@@ -438,6 +509,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
         ]);
         await this.syncAuthorship(agentId);
       },
+      "write",
       bytes,
     );
   }
@@ -446,33 +518,37 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     agentId: string,
     options?: { cursor?: number; limit?: number },
   ): Promise<{ records: AgentPermissionResponseRecord[]; nextCursor?: number }> {
-    return this.run(agentId, async () => {
-      const permissions = await this.permissions(agentId);
-      const state = await permissions.state();
-      const end = Math.min(state.maxSeq, (options?.cursor ?? state.maxSeq + 1) - 1);
-      const limit = Math.max(1, Math.min(200, options?.limit ?? 40));
-      const records = new Map<string, AgentPermissionResponseRecord>();
-      let bytes = 2;
-      let cursor = end + 1;
-      // Physical status positions define continuation. Resolve current records one at a time;
-      // a late large error must be charged even if its scanned pending record was tiny.
-      for (let seq = end; seq > 0 && end - seq < limit; seq--) {
-        const entry = (await permissions.read(seq, seq))[0];
-        if (!entry) throw new Error("Permission history index omitted a committed record");
-        if (!records.has(entry.value.id)) {
-          const latest = await findPermissionEntry(permissions, entry.value.id);
-          if (!latest) throw new Error("Permission history latest record is missing");
-          const size = Buffer.byteLength(JSON.stringify(latest.value)) + (records.size ? 1 : 0);
-          if (bytes + size > SESSION_STORAGE_LIMITS.readPageBytes) break;
-          records.set(latest.value.id, latest.value);
-          bytes += size;
+    return this.run(
+      agentId,
+      async () => {
+        const permissions = await this.permissions(agentId);
+        const state = await permissions.state();
+        const end = Math.min(state.maxSeq, (options?.cursor ?? state.maxSeq + 1) - 1);
+        const limit = Math.max(1, Math.min(200, options?.limit ?? 40));
+        const records = new Map<string, AgentPermissionResponseRecord>();
+        let bytes = 2;
+        let cursor = end + 1;
+        // Physical status positions define continuation. Resolve current records one at a time;
+        // a late large error must be charged even if its scanned pending record was tiny.
+        for (let seq = end; seq > 0 && end - seq < limit; seq--) {
+          const entry = (await permissions.read(seq, seq))[0];
+          if (!entry) throw new Error("Permission history index omitted a committed record");
+          if (!records.has(entry.value.id)) {
+            const latest = await findPermissionEntry(permissions, entry.value.id);
+            if (!latest) throw new Error("Permission history latest record is missing");
+            const size = Buffer.byteLength(JSON.stringify(latest.value)) + (records.size ? 1 : 0);
+            if (bytes + size > SESSION_STORAGE_LIMITS.readPageBytes) break;
+            records.set(latest.value.id, latest.value);
+            bytes += size;
+          }
+          cursor = seq;
         }
-        cursor = seq;
-      }
-      if (end > 0 && cursor === end + 1)
-        throw new Error("Permission history record exceeds page byte limit");
-      return { records: [...records.values()], ...(cursor > 1 ? { nextCursor: cursor } : {}) };
-    });
+        if (end > 0 && cursor === end + 1)
+          throw new Error("Permission history record exceeds page byte limit");
+        return { records: [...records.values()], ...(cursor > 1 ? { nextCursor: cursor } : {}) };
+      },
+      "read",
+    );
   }
 
   async replaceCommitted(
@@ -491,6 +567,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
         await this.syncAuthorship(agentId);
         return epoch;
       },
+      "write",
       bytes,
     );
   }
@@ -523,15 +600,19 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   }
 
   async resetCommitted(agentId: string, options?: { epoch?: string }): Promise<string> {
-    return this.run(agentId, async () => {
-      const epoch = await (await this.timeline(agentId)).reset(options?.epoch);
-      await this.syncAuthorship(agentId);
-      return epoch;
-    });
+    return this.run(
+      agentId,
+      async () => {
+        const epoch = await (await this.timeline(agentId)).reset(options?.epoch);
+        await this.syncAuthorship(agentId);
+        return epoch;
+      },
+      "write",
+    );
   }
 
   async deleteAgent(agentId: string): Promise<void> {
-    const task = this.run(agentId, async () => (await this.open(agentId)).remove());
+    const task = this.run(agentId, async () => (await this.open(agentId)).remove(), "write");
     this.deleting.add(agentId);
     await task;
   }

@@ -1,25 +1,29 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createDurableDirectory, writeDurableFile, writeDurableJson } from "./durable-file.js";
+import { createDurableDirectory, writeDurableFile } from "./durable-file.js";
 import {
   SESSION_STORAGE_LIMITS,
   type JournalEntry,
   type JournalOperation,
 } from "./paged-journal.js";
 import {
-  CHECKPOINT_BYTES,
-  CHECKPOINT_ROWS,
   TOOL_OCCURRENCE_LIMIT,
+  absorbEnvelope,
   absorbLine,
+  checkpointDue,
   emptyIndex,
+  ensureSeqRanges,
   isIndex,
+  markScanned,
   mergeId,
+  seqRange,
   type EventPointer,
   type SessionEventEnvelope,
   type SessionEventIndex,
   type SessionMessageAnchor,
 } from "./session-event-index.js";
+import { withSessionLogWriteIo } from "./session-storage-io.js";
 
 export { AMBIGUOUS_ID, messagePreview, type SessionMessageAnchor } from "./session-event-index.js";
 
@@ -49,6 +53,8 @@ export class SessionEventLog {
   private busy = 0;
   private pendingRows = 0;
   private pendingBytes = 0;
+  /** Size of the last checkpoint, which sets how much tail the next one waits for. */
+  private saved = { pointers: 0, bytes: 0 };
 
   private constructor(directory: string) {
     this.directory = directory;
@@ -148,6 +154,7 @@ export class SessionEventLog {
     }
     if (!isIndex(parsed)) return this.rebuild();
     const index: SessionEventIndex = parsed;
+    ensureSeqRanges(index);
     this.index = index;
     const size = await fs.stat(this.eventPath).then(
       (stat) => stat.size,
@@ -176,7 +183,7 @@ export class SessionEventLog {
       offset += Buffer.byteLength(line) + 1;
     }
     index.anchors = [...anchors.values()].sort((left, right) => left.seq - right.seq);
-    index.scannedBytes = size;
+    markScanned(index, size);
   }
 
   /** Reconstructs pointers, anchors, id lookups and the operation order from the log alone. */
@@ -198,7 +205,7 @@ export class SessionEventLog {
       offset += length;
     }
     index.anchors = [...anchors.values()].sort((left, right) => left.seq - right.seq);
-    index.scannedBytes = offset === 0 ? 0 : Buffer.byteLength(text);
+    markScanned(index, offset === 0 ? 0 : Buffer.byteLength(text));
     await this.save(index);
     return index;
   }
@@ -207,29 +214,22 @@ export class SessionEventLog {
     this.index = index;
     this.pendingRows = 0;
     this.pendingBytes = 0;
-    await writeDurableJson(this.indexPath, index);
+    const text = JSON.stringify(index);
+    this.saved = { pointers: Object.keys(index.pointers).length, bytes: Buffer.byteLength(text) };
+    await withSessionLogWriteIo(() => writeDurableFile(this.indexPath, text));
   }
 
   /** Checkpoints only when the unwritten tail is large enough to be worth rescanning. */
   private async checkpoint(index: SessionEventIndex, rows: number, bytes: number): Promise<void> {
     this.pendingRows += rows;
     this.pendingBytes += bytes;
-    if (this.pendingRows >= CHECKPOINT_ROWS || this.pendingBytes >= CHECKPOINT_BYTES)
+    if (checkpointDue({ rows: this.pendingRows, bytes: this.pendingBytes }, this.saved))
       await this.save(index);
   }
 
   async state(kind: SessionEventKind): Promise<SessionEventState> {
     const index = await this.lease(() => this.load());
-    let minSeq = 0;
-    let maxSeq = 0;
-    const prefix = `${kind}:`;
-    for (const key of Object.keys(index.pointers)) {
-      if (!key.startsWith(prefix)) continue;
-      const seq = Number(key.slice(prefix.length));
-      if (!Number.isSafeInteger(seq)) continue;
-      minSeq = minSeq === 0 ? seq : Math.min(minSeq, seq);
-      maxSeq = Math.max(maxSeq, seq);
-    }
+    const { minSeq, maxSeq } = seqRange(index, kind);
     return {
       epoch: index.epoch,
       minSeq,
@@ -239,35 +239,56 @@ export class SessionEventLog {
     };
   }
 
+  /**
+   * Appends every entry with one write and one fsync. The index learns about the entries only
+   * after the fsync returns, so a failed append leaves no pointer to an unacknowledged line.
+   */
   async append<T>(kind: SessionEventKind, entries: readonly JournalEntry<T>[]): Promise<void> {
     if (!entries.length) return;
     return this.exclusive(async () => {
       if (this.removed) throw new Error("Session log is deleted");
       const index = await this.load();
-      const anchors = new Map(index.anchors.map((anchor) => [anchor.messageId, anchor]));
-      const handle = await fs.open(this.eventPath, "a", 0o600);
-      let offset = (await handle.stat()).size;
-      const written = offset;
+      // JSON.stringify never mutates, so the envelope can reference the caller's entry directly.
+      const envelopes = entries.map((entry) => ({ kind, epoch: index.epoch, ...entry }));
+      const lines = envelopes.map((envelope) => Buffer.from(`${JSON.stringify(envelope)}\n`));
+      let start: number;
       try {
-        for (const entry of entries) {
-          const envelope = { kind, epoch: index.epoch, ...structuredClone(entry) };
-          const line = `${JSON.stringify(envelope)}\n`;
-          const bytes = Buffer.from(line);
-          // An in-place rewrite of an existing seq is a revision, not a new row.
-          if (index.pointers[`${kind}:${entry.seq}`]) index.revision += 1;
-          await handle.write(bytes);
-          // Re-deriving from the persisted line keeps append and rebuild on one code path.
-          absorbLine(index, anchors, line.slice(0, -1), offset);
-          offset += bytes.length;
-        }
-        await handle.sync();
-      } finally {
-        await handle.close();
+        start = await withSessionLogWriteIo(() => this.appendLines(lines));
+      } catch (error) {
+        // Whether the lines reached the disk is unknown. Forget the cached index so the next
+        // reader folds in exactly what the log holds, as a restart would.
+        this.index = null;
+        throw error;
       }
-      index.anchors = [...anchors.values()].sort((left, right) => left.seq - right.seq);
-      index.scannedBytes = offset;
-      await this.checkpoint(index, entries.length, offset - written);
+      // Anchors change only for user messages; most appends never rebuild the sorted list.
+      const anchors = new LazyAnchors(index.anchors);
+      let offset = start;
+      for (const [position, envelope] of envelopes.entries()) {
+        // An in-place rewrite of an existing seq is a revision, not a new row.
+        if (index.pointers[`${kind}:${envelope.seq}`]) index.revision += 1;
+        const length = lines[position]!.length;
+        absorbEnvelope(index, anchors, envelope, offset, length);
+        offset += length;
+      }
+      if (anchors.changed) index.anchors = anchors.sorted();
+      markScanned(index, offset);
+      await this.checkpoint(index, entries.length, offset - start);
     });
+  }
+
+  /** Returns the offset the first line landed at. */
+  private async appendLines(lines: readonly Buffer[]): Promise<number> {
+    const handle = await fs.open(this.eventPath, "a", 0o600);
+    try {
+      const start = (await handle.stat()).size;
+      const expected = lines.reduce((total, line) => total + line.length, 0);
+      const { bytesWritten } = await handle.writev(lines);
+      if (bytesWritten !== expected) throw new Error("Session log append was short");
+      await handle.sync();
+      return start;
+    } finally {
+      await handle.close();
+    }
   }
 
   async read<T>(kind: SessionEventKind, start: number, end: number): Promise<JournalEntry<T>[]> {
@@ -329,7 +350,9 @@ export class SessionEventLog {
       const written = entries.map(
         (entry) => `${JSON.stringify({ kind, epoch, ...structuredClone(entry) })}\n`,
       );
-      await writeDurableFile(this.eventPath, [...kept, ...written].join(""));
+      await withSessionLogWriteIo(() =>
+        writeDurableFile(this.eventPath, [...kept, ...written].join("")),
+      );
       const index = emptyIndex(epoch);
       index.operationOrder = previous.operationOrder;
       index.revision = previous.revision + 1;
@@ -344,7 +367,7 @@ export class SessionEventLog {
       const rewritten = [...anchors.values()].sort((left, right) => left.seq - right.seq);
       for (const anchor of rewritten) anchor.epoch = epoch;
       index.anchors = rewritten;
-      index.scannedBytes = offset;
+      markScanned(index, offset);
       await this.save(index);
       return epoch;
     });
@@ -454,6 +477,22 @@ async function readPointers<T>(
     });
   }
   return result;
+}
+
+/** Copies the anchor list into a map only once an append actually derives an anchor. */
+class LazyAnchors {
+  private map: Map<string, SessionMessageAnchor> | null = null;
+  constructor(private readonly known: readonly SessionMessageAnchor[]) {}
+  get changed(): boolean {
+    return this.map !== null;
+  }
+  set(messageId: string, anchor: SessionMessageAnchor): void {
+    this.map ??= new Map(this.known.map((existing) => [existing.messageId, existing]));
+    this.map.set(messageId, anchor);
+  }
+  sorted(): SessionMessageAnchor[] {
+    return [...(this.map?.values() ?? [])].sort((left, right) => left.seq - right.seq);
+  }
 }
 
 /** A kind-scoped view. Shares the log's lock, index and file with every other kind. */

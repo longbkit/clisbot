@@ -10,6 +10,8 @@ import { parallelIndices } from "./directory.js";
 import { percentile } from "./metrics.js";
 import type { BenchmarkContext } from "./run.js";
 
+const PIPELINE_BURST_ROWS = 100;
+
 async function verifyCanonical(store: FileAgentTimelineStore, id: string, count: number) {
   const epoch = await store.getEpoch(id);
   let verified = 0;
@@ -159,7 +161,7 @@ export async function timelineBenchmarks(context: BenchmarkContext, count: numbe
 
 export async function writerBenchmarks(
   context: BenchmarkContext,
-  options: { writerRows: number; cycles: number; owners: number },
+  options: { writerRows: number; cycles: number; owners: number; writersOnly?: boolean },
 ) {
   const { root, phase } = context;
   const store = new FileAgentTimelineStore(async (id) => path.join(root, "writers", id));
@@ -191,6 +193,43 @@ export async function writerBenchmarks(
       scope: "FileStore only; daemon/provider queue layers excluded",
     };
   });
+  // The daemon enqueues each timeline row without waiting for the previous one, so rows that
+  // arrive while an append is in flight can share its successor's fsync.
+  await phase("current.timeline.10-pipelined-writers", async (sample) => {
+    const pipelined = new FileAgentTimelineStore(async (id) => path.join(root, "pipelined", id));
+    await parallelIndices(10, 10, async (writer) => {
+      const id = `writer-${writer}`;
+      // Ten writers × 100 outstanding rows stays under every store admission limit, including
+      // the single 1,024-operation cap older builds had, so before/after runs are comparable.
+      for (let first = 1; first <= options.writerRows; first += PIPELINE_BURST_ROWS) {
+        const writes: Promise<void>[] = [];
+        const last = Math.min(options.writerRows, first + PIPELINE_BURST_ROWS - 1);
+        for (let seq = first; seq <= last; seq++) {
+          const row = mixedRow(seq);
+          const start = performance.now();
+          writes.push(
+            pipelined.bulkInsert(id, [row]).then(() => {
+              sample.acknowledge(performance.now() - start, Buffer.byteLength(JSON.stringify(row)));
+              return undefined;
+            }),
+          );
+        }
+        await Promise.all(writes);
+      }
+      await verifyCanonical(
+        new FileAgentTimelineStore(async (agentId) => path.join(root, "pipelined", agentId)),
+        id,
+        options.writerRows,
+      );
+    });
+    return {
+      writers: 10,
+      rowsPerWriter: options.writerRows,
+      perWriterOutstandingCalls: PIPELINE_BURST_ROWS,
+      scope: "FileStore only; daemon/provider queue layers excluded",
+    };
+  });
+  if (options.writersOnly) return;
   const retained = new FileAgentTimelineStore(async (id) => path.join(root, "retention", id));
   for (let index = 0; index < options.owners; index++)
     await retained.bulkInsert(`owner-${index}`, [mixedRow(1)]);

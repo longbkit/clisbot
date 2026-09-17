@@ -25,8 +25,34 @@ Reload releases the old runtime before resuming its durable session: an idle pro
 still own an exclusive writer. A close failure retains that runtime for cleanup and blocks the
 replacement. Once closure succeeds, a failed resume leaves the durable agent closed and retryable.
 
-Idle agents remain resident indefinitely. Runtime closure happens only through an explicit lifecycle
-action such as archive, replacement, reload, workspace teardown, or daemon shutdown.
+Besides explicit lifecycle actions (archive, replacement, reload, workspace teardown, daemon
+shutdown), the daemon can close the runtime of an idle agent, but only when its provider certifies
+that the runtime holds no work. A provider certifies by implementing `AgentSession.isIdleForRelease()`,
+and it may do so only when every kind of work its runtime can keep between turns is observable. If
+the daemon is not certain, the agent stays resident: losing parked work or failing a message costs
+more than a resident process.
+
+No built-in provider certifies today, so idle closing never fires in practice:
+
+| Provider                                                  | Why it does not certify                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claude                                                    | Background shells, Task subagents and workflows arrive as SDK tasks, but the adapter tracks status only for subagents and workflows, `Monitor` watches are not verified on the wire, and session crons (`CronCreate`, `ScheduleWakeup`, `/loop`) are reported in `session_crons`, which the adapter does not read. |
+| Codex app-server                                          | Background terminals can outlive the turn that started them, and the provider adapter does not observe them.                                                                                                                                                                                                       |
+| OpenCode                                                  | `session.status` reports the foreground session only; the adapter has no signal that no child task session is still working.                                                                                                                                                                                       |
+| ACP providers (Grok, Copilot, Cursor, Kimi, custom `acp`) | The ACP protocol has no background-work signal.                                                                                                                                                                                                                                                                    |
+| Pi, OMP                                                   | Not assessed; they do not implement the check.                                                                                                                                                                                                                                                                     |
+
+For a certifying provider, `agents.closeIdleSessionsAfterMs` sets the idle window (default 30
+minutes, `0` disables) and `agents.providers.<id>.closeIdleSessionsAfterMs` overrides it per
+provider. Windows under a minute are raised to a minute. Both are read at startup. The close is the
+same close as daemon shutdown: the record lands in `closed` and the next prompt, Hub execution, or
+load resumes it. An agent counts as idle only while it has no run, no pending permission or
+permission response, no in-flight lifecycle or foreground mutation, no queued session events or
+steer, no running provider subagent, and no client subscribed to its timeline. Any of those, and
+every `ensureAgentLoaded()` call, restarts its idle clock, and the close checks again after
+draining events with nothing awaited before the agent is removed. A prompt that loads the agent
+therefore either keeps it resident or waits for a close already past that check and then resumes
+it. Internal agents are never closed this way.
 
 A provider runtime can still die on its own — crash, OOM kill, host suspend. Work the agent parked
 inside that process dies with it: Claude Code's background Bash shells, `Monitor` watches, and
