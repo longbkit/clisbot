@@ -129,7 +129,10 @@ Hub enrollment and permission updates exchange these semantic permissions direct
 Channel commands use **org Access privileges**, separate from the daemon service
 principal's permissions. The Hub resolves the sender's channel identity through
 `channelIdentities` to a Member, then checks the command's privilege against its
-Channel Connection and authorized daemon/Project. The route's `channel.use` /
+Channel Connection and authorized daemon/Project. An identity is linked once per
+realm — a Slack workspace (`slack:<team id>`), or Telegram — and resolves on every
+bot Connection of that realm; the same user id in another Slack workspace never
+resolves to it. The route's `channel.use` /
 `mayTrigger` admission remains the baseline. The old channel role projection and
 session initiator do not grant command authority.
 

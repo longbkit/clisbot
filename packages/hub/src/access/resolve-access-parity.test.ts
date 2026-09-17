@@ -8,6 +8,11 @@ import { createDatabase } from "../db/pg.js";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { enrollTestDaemon, TEST_DAEMON_ID } from "../test-utils/project-configuration.js";
 import * as schema from "../db/schema.js";
+import {
+  insertTestSlackConnection,
+  TEST_SLACK_CONNECTION_ID,
+  TEST_SLACK_TEAM_ID,
+} from "../test-utils/channel-identity.js";
 import { AccessStore, type ChannelPrivilegeRequest } from "./store.js";
 
 // Locks the shared resolve-access core against drift: identical grants for one
@@ -39,7 +44,8 @@ it("channel and app adapters agree on the privilege decision for the same Member
     await db.insert(schema.channelIdentities).values({
       organizationId: "org",
       memberId: "membership",
-      connectionId: "slack-connection",
+      identityRealm: `slack:${TEST_SLACK_TEAM_ID}`,
+      connectionId: TEST_SLACK_CONNECTION_ID,
       externalSubjectId: "UMEMBER",
       verificationMethod: "administrator",
       verifiedAt: new Date(),
@@ -74,10 +80,11 @@ it("channel and app adapters agree on the privilege decision for the same Member
       },
     ]);
 
+    await insertTestSlackConnection(db, { organizationId: "org" });
     const access = new AccessStore(bundle.runtime);
     const channelInput: ChannelPrivilegeRequest = {
       organizationId: "org",
-      connectionId: "slack-connection",
+      connectionId: TEST_SLACK_CONNECTION_ID,
       channel: "slack",
       accountId: "support",
       senderIdentity: "slack:UMEMBER",
@@ -152,7 +159,8 @@ it("channel and app adapters agree when authority comes only from a Host assignm
     await db.insert(schema.channelIdentities).values({
       organizationId: "org",
       memberId: "membership",
-      connectionId: "slack-connection",
+      identityRealm: `slack:${TEST_SLACK_TEAM_ID}`,
+      connectionId: TEST_SLACK_CONNECTION_ID,
       externalSubjectId: "UMEMBER",
       verificationMethod: "administrator",
       verifiedAt: new Date(),
@@ -188,6 +196,7 @@ it("channel and app adapters agree when authority comes only from a Host assignm
       },
     ]);
 
+    await insertTestSlackConnection(db, { organizationId: "org" });
     const access = new AccessStore(bundle.runtime);
     const appAccess = await access.resolveDaemonAccess({
       organizationId: "org",
@@ -201,7 +210,7 @@ it("channel and app adapters agree when authority comes only from a Host assignm
     for (const projectId of ["project-a", "project-gone"]) {
       const channelInput: ChannelPrivilegeRequest = {
         organizationId: "org",
-        connectionId: "slack-connection",
+        connectionId: TEST_SLACK_CONNECTION_ID,
         channel: "slack",
         accountId: "support",
         senderIdentity: "slack:UMEMBER",
@@ -231,7 +240,7 @@ it("channel and app adapters agree when authority comes only from a Host assignm
       for (const privilege of ["approval.other", "approval.file"] as const) {
         const channelApproves = await access.allowsChannelApproval({
           organizationId: "org",
-          connectionId: "slack-connection",
+          connectionId: TEST_SLACK_CONNECTION_ID,
           channel: "slack",
           senderIdentity: "slack:UMEMBER",
           daemonReference: TEST_DAEMON_ID,

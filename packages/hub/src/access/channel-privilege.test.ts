@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { it } from "vitest";
 import { embeddedDatabaseRuntime } from "../db/runtime/index.js";
 import * as schema from "../db/schema.js";
+import {
+  insertTestSlackConnection,
+  TEST_SLACK_CONNECTION_ID,
+} from "../test-utils/channel-identity.js";
 import { AccessStore, type ChannelPrivilegeRequest } from "./store.js";
 
 it("diagnoses unlinked senders separately from missing grants without bypassing Connection scope", async () => {
@@ -22,10 +26,22 @@ it("diagnoses unlinked senders separately from missing grants without bypassing 
       { id: "owner-membership", organizationId: "org", userId: "owner", role: "owner" },
       { id: "member-membership", organizationId: "org", userId: "member", role: "member" },
     ]);
+    await insertTestSlackConnection(db, { organizationId: "org", teamId: "T1" });
+    // A second bot in the same workspace, and a bot in an unrelated workspace.
+    const sameWorkspace = await insertTestSlackConnection(db, {
+      organizationId: "org",
+      id: "00000000-0000-4000-8000-000000005101",
+      teamId: "T1",
+    });
+    const otherWorkspace = await insertTestSlackConnection(db, {
+      organizationId: "org",
+      id: "00000000-0000-4000-8000-000000005102",
+      teamId: "T2",
+    });
     const access = new AccessStore(runtime);
     const input: ChannelPrivilegeRequest = {
       organizationId: "org",
-      connectionId: "slack-connection",
+      connectionId: TEST_SLACK_CONNECTION_ID,
       channel: "slack",
       accountId: "support",
       senderIdentity: "slack:UOWNER",
@@ -42,7 +58,8 @@ it("diagnoses unlinked senders separately from missing grants without bypassing 
       {
         organizationId: "org",
         memberId: "owner-membership",
-        connectionId: "slack-connection",
+        identityRealm: "slack:T1",
+        connectionId: TEST_SLACK_CONNECTION_ID,
         externalSubjectId: "UOWNER",
         verificationMethod: "channel_challenge",
         verifiedAt: new Date(),
@@ -50,7 +67,8 @@ it("diagnoses unlinked senders separately from missing grants without bypassing 
       {
         organizationId: "org",
         memberId: "member-membership",
-        connectionId: "slack-connection",
+        identityRealm: "slack:T1",
+        connectionId: TEST_SLACK_CONNECTION_ID,
         externalSubjectId: "UMEMBER",
         verificationMethod: "channel_challenge",
         verifiedAt: new Date(),
@@ -58,7 +76,17 @@ it("diagnoses unlinked senders separately from missing grants without bypassing 
     ]);
     assert.deepEqual(await access.authorizeChannelPrivilege(input), { allowed: true });
     assert.deepEqual(
-      await access.authorizeChannelPrivilege({ ...input, connectionId: "another-workspace" }),
+      await access.authorizeChannelPrivilege({ ...input, connectionId: sameWorkspace }),
+      { allowed: true },
+      "one link resolves on every bot in the workspace",
+    );
+    assert.deepEqual(
+      await access.authorizeChannelPrivilege({ ...input, connectionId: otherWorkspace }),
+      unlinked,
+      "the same user id in another workspace is not the same person",
+    );
+    assert.deepEqual(
+      await access.authorizeChannelPrivilege({ ...input, connectionId: "another-connection" }),
       unlinked,
     );
     assert.deepEqual(

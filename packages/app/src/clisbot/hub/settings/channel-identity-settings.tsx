@@ -12,7 +12,13 @@ import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
-import { channelCatalogLabel } from "../channel-catalog";
+import {
+  channelConnectionDetail,
+  channelConnectionLabel,
+  channelIdentityRealmDetail,
+  identityRealmConnections,
+  type ChannelConnectionNaming,
+} from "../channel-identity-directory";
 import { useChannelCatalog } from "./channel-catalog-queries";
 import { hubResourceQueryKey } from "../query-keys";
 import {
@@ -79,40 +85,51 @@ function ChannelIdentitySelfLinkForm({
     dataShape: "value",
     staleTimeMs: 15_000,
   });
-  const channelConnections = useMemo(
-    () =>
-      (connections.data?.connections ?? [])
-        .filter(({ provider }) => ["slack", "telegram"].includes(provider))
-        .filter(({ canLinkIdentity }) => canLinkIdentity === true),
-    [connections.data?.connections],
-  );
-  const connectionOptions = useMemo<SelectFieldOption<string>[]>(
-    () =>
-      channelConnections.map((connection) => ({
-        id: connection.id,
-        value: connection.id,
-        label: `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`,
-        description: connection.externalName ?? undefined,
-      })),
-    // The catalog arrives after the Connections do; without it here the options
-    // would keep the fallback label for the rest of the session.
-    [channelConnections, catalog.entries],
-  );
+  const allConnections = connections.data?.connections;
   const ownIdentities = useMemo(
     () => (identities.data?.identities ?? []).filter(({ memberId }) => memberId === membershipId),
     [identities.data?.identities, membershipId],
   );
+  const channelConnections = useMemo(
+    () =>
+      (allConnections ?? [])
+        .filter(({ provider }) => ["slack", "telegram"].includes(provider))
+        .filter(({ canLinkIdentity }) => canLinkIdentity === true),
+    [allConnections],
+  );
+  const connectionOptions = useMemo<SelectFieldOption<string>[]>(
+    () =>
+      channelConnections
+        // One link covers every bot of a realm (a Slack workspace, or Telegram),
+        // so a realm already linked offers nothing more to link.
+        .filter(
+          (connection) =>
+            !ownIdentities.some((identity) =>
+              identityRealmConnections(identity, [connection]).includes(connection),
+            ),
+        )
+        .map((connection) => ({
+          id: connection.id,
+          value: connection.id,
+          label: channelConnectionLabel(catalog.entries, [connection]),
+          description: channelConnectionDetail(connection),
+        })),
+    // The catalog arrives after the Connections do; without it here the options
+    // would keep the fallback label for the rest of the session.
+    [channelConnections, ownIdentities, catalog.entries],
+  );
 
   useEffect(() => {
+    const challenged = channelConnections.find(({ id }) => id === challenge?.connectionId);
     if (
-      challenge !== null &&
-      ownIdentities.some(
-        ({ connectionId: linkedConnectionId }) => linkedConnectionId === challenge.connectionId,
+      challenged !== undefined &&
+      ownIdentities.some((identity) =>
+        identityRealmConnections(identity, [challenged]).includes(challenged),
       )
     ) {
       setChallenge(null);
     }
-  }, [challenge, ownIdentities]);
+  }, [challenge, channelConnections, ownIdentities]);
 
   const selectedConnection = channelConnections.find(({ id }) => id === connectionId);
   const createChallenge = useCallback(async () => {
@@ -139,7 +156,8 @@ function ChannelIdentitySelfLinkForm({
     async (id: string) => {
       const confirmed = await confirmDialog({
         title: "Unlink your Channel identity?",
-        message: "Messages from this provider identity will stop resolving to your Hub account.",
+        message:
+          "Messages from this provider identity will stop resolving to your Hub account on every bot of its workspace.",
         confirmLabel: "Unlink identity",
         destructive: true,
       });
@@ -199,9 +217,7 @@ function ChannelIdentitySelfLinkForm({
               </View>
             ) : (
               ownIdentities.map((identity, index) => {
-                const connection = channelConnections.find(
-                  ({ id }) => id === identity.connectionId,
-                );
+                const realm = identityRealmConnections(identity, allConnections ?? []);
                 return (
                   <View
                     key={identity.id}
@@ -216,8 +232,8 @@ function ChannelIdentitySelfLinkForm({
                         {identity.displayName ?? identity.externalSubjectId}
                       </Text>
                       <Text style={settingsStyles.rowHint}>
-                        {connection
-                          ? `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`
+                        {realm.length > 0
+                          ? `${channelConnectionLabel(catalog.entries, realm)} · ${channelIdentityRealmDetail(identity, realm)}`
                           : "Connection unavailable"}
                       </Text>
                     </View>
@@ -388,8 +404,8 @@ export function ChannelIdentitySettings() {
       channelConnections.map((connection) => ({
         id: connection.id,
         value: connection.id,
-        label: `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`,
-        description: connection.externalName ?? undefined,
+        label: channelConnectionLabel(catalog.entries, [connection]),
+        description: channelConnectionDetail(connection),
       })),
     // The catalog arrives after the Connections do; without it here the options
     // would keep the fallback label for the rest of the session.
@@ -398,13 +414,6 @@ export function ChannelIdentitySettings() {
   const memberById = useMemo(
     () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
     [members.data?.members],
-  );
-  const connectionById = useMemo(
-    () =>
-      new Map(
-        (connections.data?.connections ?? []).map((connection) => [connection.id, connection]),
-      ),
-    [connections.data?.connections],
   );
 
   const remove = useCallback(
@@ -470,7 +479,7 @@ export function ChannelIdentitySettings() {
       <ChannelIdentityRows
         identities={identities.data?.identities ?? []}
         members={memberById}
-        connections={connectionById}
+        connections={connections.data?.connections ?? []}
         canManage={canManage}
         pending={pending}
         remove={remove}
@@ -517,12 +526,13 @@ function ChannelIdentityRows({
   identities: Array<{
     id: string;
     memberId: string;
+    identityRealm?: string | undefined;
     connectionId: string;
     displayName?: string | null;
     externalSubjectId: string;
   }>;
   members: Map<string, { name: string }>;
-  connections: Map<string, { provider: string; name: string }>;
+  connections: readonly ChannelConnectionNaming[];
   canManage: boolean;
   pending: boolean;
   remove(id: string): Promise<void>;
@@ -541,10 +551,11 @@ function ChannelIdentityRows({
     <View style={settingsStyles.card}>
       {identities.map((identity, index) => {
         const member = members.get(identity.memberId);
-        const connection = connections.get(identity.connectionId);
-        const connectionLabel = connection
-          ? `${channelCatalogLabel(catalog.entries, connection.provider)} · ${connection.name}`
-          : "Connection unavailable";
+        const realm = identityRealmConnections(identity, connections);
+        const connectionLabel =
+          realm.length > 0
+            ? `${channelConnectionLabel(catalog.entries, realm)} · ${channelIdentityRealmDetail(identity, realm)}`
+            : "Connection unavailable";
         return (
           <View
             key={identity.id}

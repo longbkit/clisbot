@@ -29,7 +29,7 @@ const initial = [
   },
 ];
 describe("onboarding configuration defaults", () => {
-  it("does not reassign another Member's verified identity as an onboarding side effect", async () => {
+  it("does not reassign another Member's verified workspace identity as an onboarding side effect", async () => {
     const bindChannelIdentity = vi.fn();
     const services = {
       runtime: {
@@ -38,8 +38,14 @@ describe("onboarding configuration defaults", () => {
         }),
       },
       access: {
+        channelIdentityRealm: async () => "slack:T1",
         listChannelIdentities: async () => [
-          { connectionId: "connection-1", externalSubjectId: "U1", memberId: "another-member" },
+          {
+            identityRealm: "slack:T1",
+            connectionId: "another-bot",
+            externalSubjectId: "U1",
+            memberId: "another-member",
+          },
         ],
         bindChannelIdentity,
       },

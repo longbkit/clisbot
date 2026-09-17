@@ -123,7 +123,11 @@ function ChannelAccountHealthRow({
 }
 
 function identityLine(account: ChannelAccountHealth): string {
-  if (account.identity !== null) return account.identity;
+  if (account.connectionName !== null) {
+    return account.identity === null
+      ? account.connectionName
+      : `${account.identity} · ${account.connectionName}`;
+  }
   if (account.connectionId === null) return "No Connection is referenced by this account.";
   return "The referenced Connection is unavailable.";
 }

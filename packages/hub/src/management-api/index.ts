@@ -37,6 +37,11 @@ import {
   assertAutomationConfigurationDelegation,
   assertChannelConfigurationDelegation,
 } from "../access/delegation.js";
+import {
+  deleteUnreachableChannelIdentities,
+  slackIdentityRealm,
+  TELEGRAM_IDENTITY_REALM,
+} from "../access/channel-identity-realm.js";
 import { AccessPolicyError, AccessStore } from "../access/store.js";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -349,6 +354,8 @@ interface ManagementConnectionView {
   name: string;
   externalName: string | null;
   status: string;
+  /** The realm a Channel identity verified through this Connection resolves across; null when none can be linked. */
+  identityRealm: string | null;
   consumers: readonly ConnectionConsumer[];
 }
 
@@ -921,6 +928,7 @@ export class ManagementApi {
           name: row.name,
           externalName: externalIdentityLabel(row.identity),
           status: "active",
+          identityRealm: provider === "telegram" ? TELEGRAM_IDENTITY_REALM : null,
         });
       }
     }
@@ -928,10 +936,11 @@ export class ManagementApi {
   }
 
   /**
-   * Deletes a Channel-owned bot Connection and the identities linked to it,
-   * reporting whether the id belonged to one. The id decides, not the provider
-   * label: `discord` names both the upstream per-guild connection (which the
-   * provider lifecycle disconnects) and this Channel bot connection.
+   * Deletes a Channel-owned bot Connection, and the identities no remaining
+   * Connection can resolve, reporting whether the id belonged to one. The id
+   * decides, not the provider label: `discord` names both the upstream per-guild
+   * connection (which the provider lifecycle disconnects) and this Channel bot
+   * connection.
    */
   private async deleteChannelBotConnection(
     organizationId: string,
@@ -942,17 +951,9 @@ export class ManagementApi {
     await this.options.runtime.transaction(async (transaction) => {
       await transaction
         .drizzle()
-        .delete(schema.channelIdentities)
-        .where(
-          and(
-            eq(schema.channelIdentities.organizationId, organizationId),
-            eq(schema.channelIdentities.connectionId, connectionId),
-          ),
-        );
-      await transaction
-        .drizzle()
         .delete(table)
         .where(and(eq(table.id, connectionId), eq(table.organizationId, organizationId)));
+      await deleteUnreachableChannelIdentities(transaction.drizzle(), organizationId);
     });
     return true;
   }
@@ -1082,6 +1083,7 @@ export class ManagementApi {
           name: connection.slug,
           externalName: connection.accountLogin,
           status: connection.status,
+          identityRealm: null,
         }),
       ),
       ...usage.discord.map(
@@ -1092,6 +1094,7 @@ export class ManagementApi {
           name: connection.slug,
           externalName: connection.guildName,
           status: "active",
+          identityRealm: null,
         }),
       ),
       ...usage.slack.map(
@@ -1102,6 +1105,7 @@ export class ManagementApi {
           name: connection.slug,
           externalName: connection.teamName,
           status: "active",
+          identityRealm: slackIdentityRealm(connection.teamId),
         }),
       ),
       ...usage.linear.map(
@@ -1112,6 +1116,7 @@ export class ManagementApi {
           name: connection.slug,
           externalName: connection.linearOrganizationName,
           status: "active",
+          identityRealm: null,
         }),
       ),
       ...channelBots,
@@ -1202,15 +1207,10 @@ export class ManagementApi {
         organizationSlug: access.organization.slug,
       });
       if (!response.ok) return response;
-      await this.options.runtime
-        .drizzle()
-        .delete(schema.channelIdentities)
-        .where(
-          and(
-            eq(schema.channelIdentities.organizationId, access.organization.id),
-            eq(schema.channelIdentities.connectionId, connectionId),
-          ),
-        );
+      await deleteUnreachableChannelIdentities(
+        this.options.runtime.drizzle(),
+        access.organization.id,
+      );
     }
     await this.revokeOrganizationAccessLeases(access.organization.id);
     return new Response(null, { status: 204 });

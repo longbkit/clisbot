@@ -8,6 +8,11 @@ import { createDatabase } from "../db/pg.js";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { enrollTestDaemon, TEST_DAEMON_ID } from "../test-utils/project-configuration.js";
 import * as schema from "../db/schema.js";
+import {
+  insertTestSlackConnection,
+  TEST_SLACK_CONNECTION_ID,
+  TEST_SLACK_TEAM_ID,
+} from "../test-utils/channel-identity.js";
 import { AccessStore, type ChannelPrivilegeRequest } from "./store.js";
 
 it("Guest grants are explicit, conversation-scoped and separate from linked Member grants", async () => {
@@ -32,10 +37,11 @@ it("Guest grants are explicit, conversation-scoped and separate from linked Memb
         name: "Project A",
       })
       .returning();
+    await insertTestSlackConnection(db, { organizationId: "org" });
     const access = new AccessStore(bundle.runtime);
     const input: ChannelPrivilegeRequest = {
       organizationId: "org",
-      connectionId: "slack-connection",
+      connectionId: TEST_SLACK_CONNECTION_ID,
       channel: "slack",
       accountId: "support",
       senderIdentity: "slack:UGUEST",
@@ -134,7 +140,8 @@ it("Guest grants are explicit, conversation-scoped and separate from linked Memb
     await db.insert(schema.channelIdentities).values({
       organizationId: "org",
       memberId: "membership",
-      connectionId: "slack-connection",
+      identityRealm: `slack:${TEST_SLACK_TEAM_ID}`,
+      connectionId: TEST_SLACK_CONNECTION_ID,
       externalSubjectId: "ULINKED",
       verificationMethod: "administrator",
       verifiedAt: new Date(),

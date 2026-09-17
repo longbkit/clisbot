@@ -131,8 +131,22 @@ vi.mock("@/components/ui/select-field", () => ({
   },
 }));
 const connections = [
-  { id: "slack-connection", provider: "slack", name: "Support workspace", canLinkIdentity: true },
-  { id: "telegram-connection", provider: "telegram", name: "Support bot", canLinkIdentity: true },
+  {
+    id: "slack-connection",
+    provider: "slack",
+    name: "Support workspace",
+    externalName: null,
+    consumers: [],
+    canLinkIdentity: true,
+  },
+  {
+    id: "telegram-connection",
+    provider: "telegram",
+    name: "Support bot",
+    externalName: null,
+    consumers: [],
+    canLinkIdentity: true,
+  },
 ];
 const challenge = { command: "/link TEST-CODE", expiresAt: "2026-09-06T00:00:00Z" };
 let client: QueryClient;

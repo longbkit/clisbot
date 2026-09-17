@@ -194,6 +194,8 @@ export const HubConnectionSchema = z.object({
   name: z.string(),
   externalName: z.string().nullable(),
   status: z.string(),
+  /** Where a Channel identity linked through this Connection resolves; absent from older Hubs. */
+  identityRealm: z.string().nullable().optional(),
   consumers: z.array(HubConnectionConsumerSchema),
   canLinkIdentity: z.boolean().optional(),
 });
@@ -655,6 +657,8 @@ export const HubChannelIdentitySchema = z
     id: z.string(),
     organizationId: z.string(),
     memberId: z.string(),
+    /** The Slack workspace or Telegram realm the identity resolves across; absent from older Hubs. */
+    identityRealm: z.string().optional(),
     connectionId: z.string(),
     externalSubjectId: z.string(),
     displayName: z.string().nullable(),

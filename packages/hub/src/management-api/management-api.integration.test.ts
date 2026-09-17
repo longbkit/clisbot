@@ -1633,6 +1633,107 @@ it("stores provider credentials in the Connection owner and never returns them",
   assert.equal((await unavailableConnection.json()).error, "resource_unavailable");
 });
 
+// A Channel identity is verified once per realm: every Telegram bot sees the
+// same user id, so a link made through one bot resolves on the others and
+// survives removing any bot but the last.
+it("links a Channel identity once per realm and keeps it while a bot of that realm remains", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.organizations)
+    .values({ id: ORGANIZATION_ID, name: "Org", slug: "org" });
+  await bundle.runtime.drizzle().insert(schema.users).values({
+    id: USER_ID,
+    name: "Owner",
+    email: "owner@example.test",
+    emailVerified: true,
+  });
+  await bundle.runtime.drizzle().insert(schema.members).values({
+    id: MEMBERSHIP_ID,
+    organizationId: ORGANIZATION_ID,
+    userId: USER_ID,
+    role: "owner",
+  });
+  const access = new AccessStore(bundle.runtime);
+  const api = new ManagementApi({
+    database,
+    runtime: bundle.runtime,
+    auth: ownerAccess(),
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  });
+  const connect = async (accountId: string) => {
+    const created = await api.handle(
+      request("/connections", "POST", {
+        provider: "telegram",
+        accountId,
+        credentials: { botToken: `${accountId}-token` },
+      }),
+    );
+    assert.equal(created.status, 201);
+    return ((await created.json()) as { id: string }).id;
+  };
+  const first = await connect("first");
+  const second = await connect("second");
+  const listed = await (await api.handle(request("/connections", "GET"))).json();
+  assert.deepEqual(
+    listed.connections.map(({ identityRealm }: { identityRealm: string | null }) => identityRealm),
+    ["telegram", "telegram"],
+  );
+  const identities = async () =>
+    (await (await api.handle(request("/channel-identities", "GET"))).json()).identities as Array<{
+      identityRealm: string;
+      connectionId: string;
+    }>;
+
+  const linked = await api.handle(
+    request("/channel-identities", "POST", {
+      memberId: MEMBERSHIP_ID,
+      connectionId: first,
+      externalSubjectId: "10001",
+    }),
+  );
+  assert.equal(linked.status, 201);
+  const sender = {
+    organizationId: ORGANIZATION_ID,
+    channel: "telegram",
+    senderIdentity: "telegram:10001",
+  };
+  assert.equal(
+    (await access.resolveChannelMember({ ...sender, connectionId: second }))?.membershipId,
+    MEMBERSHIP_ID,
+    "a link made through one bot resolves on another bot of the realm",
+  );
+
+  const relinked = await api.handle(
+    request("/channel-identities", "POST", {
+      memberId: MEMBERSHIP_ID,
+      connectionId: second,
+      externalSubjectId: "10001",
+    }),
+  );
+  assert.equal(relinked.status, 201);
+  assert.deepEqual(
+    (await identities()).map(({ identityRealm, connectionId }) => ({
+      identityRealm,
+      connectionId,
+    })),
+    [{ identityRealm: "telegram", connectionId: second }],
+    "linking again through another bot updates the one realm row",
+  );
+
+  assert.equal((await api.handle(request(`/connections/${second}`, "DELETE"))).status, 204);
+  assert.equal((await identities()).length, 1, "the other bot still resolves the identity");
+  assert.equal(
+    (await access.resolveChannelMember({ ...sender, connectionId: first }))?.membershipId,
+    MEMBERSHIP_ID,
+  );
+
+  assert.equal((await api.handle(request(`/connections/${first}`, "DELETE"))).status, 204);
+  assert.deepEqual(await identities(), [], "no bot of the realm remains to resolve it");
+});
+
 // A channel bot credential is a live token into an outside workspace, so it is
 // `channel.manage` authority — not `hub.configure`. Writing and deleting one
 // used to require `manageResources`, which made the separate `manageChannels`

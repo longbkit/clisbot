@@ -87,6 +87,7 @@ import {
 } from "../contracts";
 import { buildHubSettingsRoute } from "../navigation";
 import { splitConversationIds } from "../conversation-picker";
+import { channelConnectionDetail } from "../channel-identity-directory";
 import { ChannelActivity, initialChannelActivityState } from "./channel-activity";
 import { AddChannelConnection } from "./channel-connection-add";
 import { ChannelCatalogView } from "./channel-catalog-view";
@@ -3471,7 +3472,8 @@ function channelAccountStatus(
   routeCount: number,
 ): string {
   const runtimeLabel = enabled ? channelRuntimeLabel(runtimeAvailable, runtime) : "Disabled";
-  const connectionLabel = connection?.externalName ?? connection?.name ?? "Connection unavailable";
+  const connectionLabel =
+    connection === undefined ? "Connection unavailable" : channelConnectionDetail(connection);
   const routeSuffix = routeCount === 1 ? "" : "s";
   return `${runtimeLabel} · ${connectionLabel} · ${String(routeCount)} route${routeSuffix}`;
 }

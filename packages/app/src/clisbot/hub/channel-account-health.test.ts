@@ -48,6 +48,7 @@ describe("account health join", () => {
       transport: "started",
       transportLabel: "Running",
       identity: "@longluong3bot",
+      connectionName: "support",
       ingressSummary: "2 pending · 1 dead-lettered",
       oldestPending: "2m",
       severity: "error",
@@ -63,6 +64,7 @@ describe("account health join", () => {
       detail: "invalid_auth",
       identity: null,
       connectionId: "conn-missing",
+      connectionName: null,
       ingress: null,
       severity: "error",
     });

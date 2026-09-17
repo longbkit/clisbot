@@ -48,6 +48,8 @@ export interface ChannelAccountHealth {
   /** The Connection's provider identity, when the account references one. */
   identity: string | null;
   connectionId: string | null;
+  /** The Connection's own id-like name, e.g. `slack-a0123-t0456`, when it resolves. */
+  connectionName: string | null;
   ingress: HubChannelIngressCounts | null;
   ingressSummary: string | null;
   oldestPending: string | null;
@@ -114,6 +116,7 @@ export function channelAccountHealthRows(input: {
         detail: status?.detail ?? null,
         identity: connection?.externalName ?? null,
         connectionId,
+        connectionName: connection?.name ?? null,
         ingress,
         ingressSummary: ingress === null ? null : channelIngressSummary(ingress),
         oldestPending: ingress === null ? null : formatChannelQueueAge(ingress.oldestPendingAgeMs),

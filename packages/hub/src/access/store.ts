@@ -8,6 +8,7 @@ import type { WorktreeTarget } from "../config/schema.js";
 import { CHANNELS_DIRECTORY, CHANNEL_POLICY_PATH } from "../config/bundle-contract.js";
 import * as schema from "../db/schema.js";
 import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
+import { channelConnectionIdentityRealm } from "./channel-identity-realm.js";
 import {
   AccessAssignmentInputSchema,
   AccessConstraintsSchema,
@@ -178,6 +179,9 @@ export interface ChannelIdentityRecord {
   id: string;
   organizationId: string;
   memberId: string;
+  /** The Slack workspace or Telegram realm this identity resolves across. */
+  identityRealm: string;
+  /** The Connection the identity was verified through. */
   connectionId: string;
   externalSubjectId: string;
   displayName: string | null;
@@ -585,7 +589,7 @@ export class AccessStore {
       .where(eq(schema.channelIdentities.organizationId, organizationId))
       .orderBy(
         asc(schema.channelIdentities.memberId),
-        asc(schema.channelIdentities.connectionId),
+        asc(schema.channelIdentities.identityRealm),
         asc(schema.channelIdentities.externalSubjectId),
       )
       .then((rows) => rows.map(toChannelIdentity));
@@ -602,13 +606,17 @@ export class AccessStore {
     verifiedAt?: Date;
   }): Promise<ChannelIdentityRecord> {
     await this.assertSubject(input.organizationId, "member", input.memberId);
-    await this.assertChannelConnection(input.organizationId, input.connectionId);
+    const identityRealm = await this.channelConnectionRealm(
+      input.organizationId,
+      input.connectionId,
+    );
     const verifiedAt = input.verifiedAt ?? new Date();
     const [row] = await this.database
       .insert(schema.channelIdentities)
       .values({
         organizationId: input.organizationId,
         memberId: input.memberId,
+        identityRealm,
         connectionId: input.connectionId,
         externalSubjectId: input.externalSubjectId,
         displayName: input.displayName ?? null,
@@ -619,11 +627,12 @@ export class AccessStore {
       .onConflictDoUpdate({
         target: [
           schema.channelIdentities.organizationId,
-          schema.channelIdentities.connectionId,
+          schema.channelIdentities.identityRealm,
           schema.channelIdentities.externalSubjectId,
         ],
         set: {
           memberId: input.memberId,
+          connectionId: input.connectionId,
           displayName: input.displayName ?? null,
           verificationMethod: input.verificationMethod,
           verifiedByUserId: input.verifiedByUserId ?? null,
@@ -634,6 +643,11 @@ export class AccessStore {
       .returning();
     if (row === undefined) throw new Error("channel identity write returned no row");
     return toChannelIdentity(row);
+  }
+
+  /** The identity realm of a Slack or Telegram Connection; `undefined` when the organization has none by that id. */
+  channelIdentityRealm(organizationId: string, connectionId: string): Promise<string | undefined> {
+    return channelConnectionIdentityRealm(this.database, organizationId, connectionId);
   }
 
   async deleteChannelIdentity(organizationId: string, identityId: string): Promise<boolean> {
@@ -854,13 +868,19 @@ export class AccessStore {
         .for("update")
         .limit(1);
       if (challenge === undefined) return { status: "invalid" };
+      const identityRealm = await channelConnectionIdentityRealm(
+        database,
+        input.organizationId,
+        input.connectionId,
+      );
+      if (identityRealm === undefined) return { status: "invalid" };
       const [existing] = await database
         .select()
         .from(schema.channelIdentities)
         .where(
           and(
             eq(schema.channelIdentities.organizationId, input.organizationId),
-            eq(schema.channelIdentities.connectionId, input.connectionId),
+            eq(schema.channelIdentities.identityRealm, identityRealm),
             eq(schema.channelIdentities.externalSubjectId, input.externalSubjectId),
           ),
         )
@@ -877,6 +897,7 @@ export class AccessStore {
                 .values({
                   organizationId: input.organizationId,
                   memberId: challenge.memberId,
+                  identityRealm,
                   connectionId: input.connectionId,
                   externalSubjectId: input.externalSubjectId,
                   displayName: input.displayName ?? null,
@@ -1135,6 +1156,8 @@ export class AccessStore {
     const externalSubjectId = input.senderIdentity.startsWith(prefix)
       ? input.senderIdentity.slice(prefix.length)
       : input.senderIdentity;
+    const identityRealm = await this.channelIdentityRealm(input.organizationId, input.connectionId);
+    if (identityRealm === undefined) return undefined;
     const [identity] = await this.database
       .select({
         membershipId: schema.members.id,
@@ -1149,7 +1172,7 @@ export class AccessStore {
       .where(
         and(
           eq(schema.channelIdentities.organizationId, input.organizationId),
-          eq(schema.channelIdentities.connectionId, input.connectionId),
+          eq(schema.channelIdentities.identityRealm, identityRealm),
           or(
             eq(schema.channelIdentities.externalSubjectId, externalSubjectId),
             eq(schema.channelIdentities.externalSubjectId, input.senderIdentity),
@@ -1511,36 +1534,12 @@ export class AccessStore {
     }
   }
 
-  private async assertChannelConnection(
-    organizationId: string,
-    connectionId: string,
-    database: DrizzleHandle = this.database,
-  ): Promise<void> {
-    const [slack, telegram] = await Promise.all([
-      database
-        .select({ id: schema.slackConnections.id })
-        .from(schema.slackConnections)
-        .where(
-          and(
-            eq(schema.slackConnections.id, connectionId),
-            eq(schema.slackConnections.organizationId, organizationId),
-          ),
-        )
-        .limit(1),
-      database
-        .select({ id: schema.telegramConnections.id })
-        .from(schema.telegramConnections)
-        .where(
-          and(
-            eq(schema.telegramConnections.id, connectionId),
-            eq(schema.telegramConnections.organizationId, organizationId),
-          ),
-        )
-        .limit(1),
-    ]);
-    if (slack.length === 0 && telegram.length === 0) {
+  private async channelConnectionRealm(organizationId: string, connectionId: string) {
+    const realm = await this.channelIdentityRealm(organizationId, connectionId);
+    if (realm === undefined) {
       throw new AccessPolicyError("resource_unavailable", "Connection is unavailable");
     }
+    return realm;
   }
 
   private async activeChannelAccounts(
@@ -1839,6 +1838,7 @@ function toChannelIdentity(
     id: row.id,
     organizationId: row.organizationId,
     memberId: row.memberId,
+    identityRealm: row.identityRealm,
     connectionId: row.connectionId,
     externalSubjectId: row.externalSubjectId,
     displayName: row.displayName,

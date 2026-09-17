@@ -641,7 +641,11 @@ export const daemonProjects = pgTable(
   ],
 );
 
-/** A Hub member mapped to one verified sender identity on an installed Connection. */
+/**
+ * A Hub member mapped to one verified sender identity within an identity realm
+ * (`access/channel-identity-realm.ts`): a Slack workspace, or Telegram. Verified
+ * once through any Connection of the realm, it resolves on all of them.
+ */
 export const channelIdentities = pgTable(
   "channel_identities",
   {
@@ -652,6 +656,8 @@ export const channelIdentities = pgTable(
     memberId: text("member_id")
       .notNull()
       .references(() => members.id, { onDelete: "cascade" }),
+    identityRealm: text("identity_realm").notNull(),
+    /** The Connection the identity was verified through; it may since have been removed. */
     connectionId: text("connection_id").notNull(),
     externalSubjectId: text("external_subject_id").notNull(),
     displayName: text("display_name"),
@@ -666,9 +672,9 @@ export const channelIdentities = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("channel_identities_connection_subject_unique").on(
+    uniqueIndex("channel_identities_realm_subject_unique").on(
       table.organizationId,
-      table.connectionId,
+      table.identityRealm,
       table.externalSubjectId,
     ),
     index("channel_identities_member_idx").on(table.organizationId, table.memberId),

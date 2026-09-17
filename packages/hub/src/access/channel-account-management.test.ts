@@ -5,12 +5,17 @@ import { join } from "node:path";
 import { it } from "vitest";
 import { embeddedDatabaseRuntime } from "../db/runtime/index.js";
 import * as schema from "../db/schema.js";
+import {
+  insertTestSlackConnection,
+  TEST_SLACK_CONNECTION_ID,
+  TEST_SLACK_TEAM_ID,
+} from "../test-utils/channel-identity.js";
 import { formatChannelAccountResourceId } from "./contract.js";
 import { AccessPolicyError, AccessStore } from "./store.js";
 
 const ACCOUNT = {
   organizationId: "org",
-  connectionId: "slack-connection",
+  connectionId: TEST_SLACK_CONNECTION_ID,
   channel: "slack",
   accountId: "support",
 };
@@ -34,11 +39,13 @@ it("lets channel-managing roles and account managers change a Channel Route, and
         role: id === "owner" || id === "admin" ? id : "member",
       })),
     );
+    await insertTestSlackConnection(db, { organizationId: "org" });
     await db.insert(schema.channelIdentities).values(
       people.map((id) => ({
         organizationId: "org",
         memberId: `${id}-membership`,
-        connectionId: "slack-connection",
+        identityRealm: `slack:${TEST_SLACK_TEAM_ID}`,
+        connectionId: TEST_SLACK_CONNECTION_ID,
         externalSubjectId: `U${id.toUpperCase()}`,
         verificationMethod: "channel_challenge" as const,
         verifiedAt: new Date(),

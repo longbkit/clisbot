@@ -152,14 +152,15 @@ export async function linkOnboardingOwner(
   input: ChannelOnboarding,
 ): Promise<{ ready: boolean; command?: string; expiresAt?: string }> {
   const owner = await onboardingOwner(services, organizationId, input.ownerEmail);
-  const identities = await services.access.listChannelIdentities(organizationId);
+  const realm = await services.access.channelIdentityRealm(organizationId, connectionId);
+  const identities = (await services.access.listChannelIdentities(organizationId)).filter(
+    (identity) => identity.identityRealm === realm,
+  );
   if (
     input.ownerIdentity &&
     identities.some(
       (identity) =>
-        identity.connectionId === connectionId &&
-        identity.externalSubjectId === input.ownerIdentity &&
-        identity.memberId !== owner.id,
+        identity.externalSubjectId === input.ownerIdentity && identity.memberId !== owner.id,
     )
   ) {
     throw conflict(
@@ -177,12 +178,7 @@ export async function linkOnboardingOwner(
       verifiedByUserId: owner.user_id,
     });
   }
-  if (
-    input.ownerIdentity ||
-    identities.some(
-      (identity) => identity.memberId === owner.id && identity.connectionId === connectionId,
-    )
-  ) {
+  if (input.ownerIdentity || identities.some((identity) => identity.memberId === owner.id)) {
     return { ready: true };
   }
   const challenge = await services.access.issueChannelIdentityChallenge({

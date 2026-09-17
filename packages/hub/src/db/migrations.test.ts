@@ -136,7 +136,7 @@ describe("a pre-0065 channel database migrates to latest", () => {
     root = await mkdtemp(join(tmpdir(), "hub-migration-0065-"));
     const dataDirectory = join(root, "pgdata");
     const migrations = readMigrationFiles({ migrationsFolder: runtimeFile("drizzle") });
-    const applied = await seedPre0065(dataDirectory, migrations);
+    const applied = await seedBeforeMigration(dataDirectory, migrations, "0065_");
     assert.ok(
       applied > 0 && applied < migrations.length,
       "0065 is not the first or last migration",
@@ -393,46 +393,129 @@ describe("a pre-0065 channel database migrates to latest", () => {
       },
     );
   }, 180_000);
-
-  /** Replay every migration before `0065` against a raw client, then close it
-   * so the production runtime can reopen the same directory. Returns how many
-   * ran. */
-  async function seedPre0065(
-    dataDirectory: string,
-    migrations: ReturnType<typeof readMigrationFiles>,
-  ): Promise<number> {
-    const journal: { entries: { when: number; tag: string }[] } = JSON.parse(
-      readFileSync(runtimeFile("drizzle", "meta", "_journal.json"), "utf8"),
-    );
-    const cutoff = journal.entries.find((entry) => entry.tag.startsWith("0065_"))?.when;
-    assert.ok(cutoff !== undefined, "the journal still carries the 0065 entry");
-    const client = new PGlite(dataDirectory);
-    try {
-      await client.waitReady;
-      await client.exec(`
-        create schema if not exists drizzle;
-        create table if not exists drizzle.__drizzle_migrations (
-          id serial primary key,
-          hash text not null,
-          created_at bigint
-        );
-      `);
-      let count = 0;
-      for (const migration of migrations) {
-        if (migration.folderMillis >= cutoff) continue;
-        for (const statement of migration.sql) await client.exec(statement);
-        await client.query(
-          `insert into drizzle.__drizzle_migrations (hash, created_at) values ($1, $2)`,
-          [migration.hash, migration.folderMillis],
-        );
-        count += 1;
-      }
-      return count;
-    } finally {
-      await client.close();
-    }
-  }
 });
+
+// 0079: a Channel identity moves from one row per Connection to one row per
+// identity realm (a Slack workspace, or Telegram).
+describe("a pre-0079 database collapses Channel identities into realms", () => {
+  let root: string | undefined;
+  let bundle: DatabaseRuntimeBundle | undefined;
+
+  afterEach(async () => {
+    await bundle?.runtime.close();
+    if (root !== undefined) await rm(root, { recursive: true, force: true });
+    bundle = undefined;
+    root = undefined;
+  });
+
+  it("backfills realms, drops identities of removed Connections and keeps the latest duplicate", async () => {
+    root = await mkdtemp(join(tmpdir(), "hub-migration-0079-"));
+    const dataDirectory = join(root, "pgdata");
+    const migrations = readMigrationFiles({ migrationsFolder: runtimeFile("drizzle") });
+    const bot = (n: number) => `00000000-0000-4000-8000-00000000007${n}`;
+    await seedBeforeMigration(dataDirectory, migrations, "0079_", async (client) => {
+      await client.exec(`
+        insert into organization (id, name, slug) values ('org', 'Org', 'org');
+        insert into "user" (id, name, email) values
+          ('alex', 'Alex', 'alex@example.test'), ('sam', 'Sam', 'sam@example.test');
+        insert into member (id, organization_id, user_id, role) values
+          ('alex-member', 'org', 'alex', 'member'), ('sam-member', 'org', 'sam', 'member');
+        insert into slack_connections
+          (id, organization_id, team_id, provider_application_id, slug, team_name, bot_user_id, credential_envelope)
+        values
+          ('${bot(1)}', 'org', 'T1', 'A1', 'slack-a1-t1', 'One', 'UB1', '{}'),
+          ('${bot(2)}', 'org', 'T1', 'A2', 'slack-a2-t1', 'One', 'UB2', '{}'),
+          ('${bot(3)}', 'org', 'T2', 'A1', 'slack-a1-t2', 'Two', 'UB3', '{}');
+        insert into telegram_connections (id, organization_id, account_id, credential_envelope) values
+          ('${bot(4)}', 'org', 'first', '{}'), ('${bot(5)}', 'org', 'second', '{}');
+        insert into channel_identities
+          (organization_id, member_id, connection_id, external_subject_id, verification_method, verified_at)
+        values
+          ('org', 'alex-member', '${bot(1)}', 'U1', 'channel_challenge', '2026-09-01T00:00:00Z'),
+          ('org', 'alex-member', '${bot(2)}', 'U1', 'channel_challenge', '2026-09-03T00:00:00Z'),
+          ('org', 'sam-member', '${bot(3)}', 'U1', 'channel_challenge', '2026-09-02T00:00:00Z'),
+          ('org', 'alex-member', '${bot(4)}', '42', 'channel_challenge', '2026-09-01T00:00:00Z'),
+          ('org', 'alex-member', '${bot(5)}', '42', 'channel_challenge', '2026-09-02T00:00:00Z'),
+          ('org', 'sam-member', '${bot(9)}', 'U9', 'channel_challenge', '2026-09-01T00:00:00Z');
+      `);
+    });
+
+    bundle = await embeddedDatabaseRuntime(dataDirectory);
+    await bundle.runtime.migrate();
+
+    const rows = await bundle.runtime.query<{
+      identity_realm: string;
+      external_subject_id: string;
+      member_id: string;
+      connection_id: string;
+    }>(
+      `select identity_realm, external_subject_id, member_id, connection_id
+         from channel_identities order by identity_realm, external_subject_id`,
+    );
+    assert.deepEqual(rows.rows, [
+      {
+        identity_realm: "slack:T1",
+        external_subject_id: "U1",
+        member_id: "alex-member",
+        connection_id: bot(2),
+      },
+      {
+        identity_realm: "slack:T2",
+        external_subject_id: "U1",
+        member_id: "sam-member",
+        connection_id: bot(3),
+      },
+      {
+        identity_realm: "telegram",
+        external_subject_id: "42",
+        member_id: "alex-member",
+        connection_id: bot(5),
+      },
+    ]);
+  }, 180_000);
+});
+
+/** Replay every migration before the one tagged `prefix` against a raw client,
+ * run `seed` on the result, then close it so the production runtime can reopen
+ * the same directory. Returns how many ran. */
+async function seedBeforeMigration(
+  dataDirectory: string,
+  migrations: ReturnType<typeof readMigrationFiles>,
+  prefix: string,
+  seed?: (client: PGlite) => Promise<void>,
+): Promise<number> {
+  const journal: { entries: { when: number; tag: string }[] } = JSON.parse(
+    readFileSync(runtimeFile("drizzle", "meta", "_journal.json"), "utf8"),
+  );
+  const cutoff = journal.entries.find((entry) => entry.tag.startsWith(prefix))?.when;
+  assert.ok(cutoff !== undefined, `the journal still carries the ${prefix} entry`);
+  const client = new PGlite(dataDirectory);
+  try {
+    await client.waitReady;
+    await client.exec(`
+      create schema if not exists drizzle;
+      create table if not exists drizzle.__drizzle_migrations (
+        id serial primary key,
+        hash text not null,
+        created_at bigint
+      );
+    `);
+    let count = 0;
+    for (const migration of migrations) {
+      if (migration.folderMillis >= cutoff) continue;
+      for (const statement of migration.sql) await client.exec(statement);
+      await client.query(
+        `insert into drizzle.__drizzle_migrations (hash, created_at) values ($1, $2)`,
+        [migration.hash, migration.folderMillis],
+      );
+      count += 1;
+    }
+    await seed?.(client);
+    return count;
+  } finally {
+    await client.close();
+  }
+}
 
 async function tableExists(runtime: DatabaseRuntime, table: string): Promise<boolean> {
   const result = await runtime.query<{ exists: string | null }>(
