@@ -21,7 +21,11 @@ export function slackIdentityRealm(teamId: string): ChannelIdentityRealm {
   return `slack:${teamId}`;
 }
 
-/** The realm of a linkable Connection, or `undefined` when the organization has no such Connection. */
+/**
+ * The realm of a linkable Connection, or `undefined` when the organization has no such Connection.
+ * Queries run one after another: callers pass a transaction handle, whose single
+ * client must not run queries concurrently.
+ */
 export async function channelConnectionIdentityRealm(
   database: DrizzleHandle,
   organizationId: string,
@@ -29,31 +33,28 @@ export async function channelConnectionIdentityRealm(
 ): Promise<ChannelIdentityRealm | undefined> {
   // Connection ids are uuids; anything else names no Connection and must not reach a uuid cast.
   if (!UUID.test(connectionId)) return undefined;
-  const [slack, telegram] = await Promise.all([
-    database
-      .select({ teamId: schema.slackConnections.teamId })
-      .from(schema.slackConnections)
-      .where(
-        and(
-          eq(schema.slackConnections.id, connectionId),
-          eq(schema.slackConnections.organizationId, organizationId),
-        ),
-      )
-      .limit(1),
-    database
-      .select({ id: schema.telegramConnections.id })
-      .from(schema.telegramConnections)
-      .where(
-        and(
-          eq(schema.telegramConnections.id, connectionId),
-          eq(schema.telegramConnections.organizationId, organizationId),
-        ),
-      )
-      .limit(1),
-  ]);
-  if (slack[0] !== undefined) return slackIdentityRealm(slack[0].teamId);
-  if (telegram[0] !== undefined) return TELEGRAM_IDENTITY_REALM;
-  return undefined;
+  const [slack] = await database
+    .select({ teamId: schema.slackConnections.teamId })
+    .from(schema.slackConnections)
+    .where(
+      and(
+        eq(schema.slackConnections.id, connectionId),
+        eq(schema.slackConnections.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (slack !== undefined) return slackIdentityRealm(slack.teamId);
+  const [telegram] = await database
+    .select({ id: schema.telegramConnections.id })
+    .from(schema.telegramConnections)
+    .where(
+      and(
+        eq(schema.telegramConnections.id, connectionId),
+        eq(schema.telegramConnections.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  return telegram === undefined ? undefined : TELEGRAM_IDENTITY_REALM;
 }
 
 /**
@@ -65,17 +66,15 @@ export async function deleteUnreachableChannelIdentities(
   database: DrizzleHandle,
   organizationId: string,
 ): Promise<void> {
-  const [slack, telegram] = await Promise.all([
-    database
-      .selectDistinct({ teamId: schema.slackConnections.teamId })
-      .from(schema.slackConnections)
-      .where(eq(schema.slackConnections.organizationId, organizationId)),
-    database
-      .select({ id: schema.telegramConnections.id })
-      .from(schema.telegramConnections)
-      .where(eq(schema.telegramConnections.organizationId, organizationId))
-      .limit(1),
-  ]);
+  const slack = await database
+    .selectDistinct({ teamId: schema.slackConnections.teamId })
+    .from(schema.slackConnections)
+    .where(eq(schema.slackConnections.organizationId, organizationId));
+  const telegram = await database
+    .select({ id: schema.telegramConnections.id })
+    .from(schema.telegramConnections)
+    .where(eq(schema.telegramConnections.organizationId, organizationId))
+    .limit(1);
   const reachable = [
     ...slack.map(({ teamId }) => slackIdentityRealm(teamId)),
     ...(telegram.length > 0 ? [TELEGRAM_IDENTITY_REALM] : []),

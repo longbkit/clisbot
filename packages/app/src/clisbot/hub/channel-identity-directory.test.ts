@@ -3,7 +3,9 @@ import { describe, it } from "vitest";
 import { CHANNEL_CATALOG_FIXTURE } from "./channel-catalog.fixture";
 import {
   channelConnectionDetail,
+  channelIdentityLine,
   channelIdentityRealmDetail,
+  identityCoversConnection,
   linkedChannelIdentities,
 } from "./channel-identity-directory";
 
@@ -122,5 +124,44 @@ describe("linkedChannelIdentities", () => {
     );
     assert.equal(linked?.label, "Slack · dai, oai");
     assert.equal(channelIdentityRealmDetail(linkedIdentity, realm), "Acme · slack:T1");
+  });
+
+  it("covers every Connection of the identity's realm, or only its own on a Hub without realms", () => {
+    const realmIdentity = { connectionId: "c1", identityRealm: "slack:T1" };
+    assert.equal(
+      identityCoversConnection(realmIdentity, { id: "c2", identityRealm: "slack:T1" }),
+      true,
+    );
+    assert.equal(
+      identityCoversConnection(realmIdentity, { id: "c1", identityRealm: "slack:T2" }),
+      false,
+    );
+    assert.equal(identityCoversConnection({ connectionId: "c1" }, { id: "c1" }), true);
+    assert.equal(identityCoversConnection({ connectionId: "c1" }, { id: "c2" }), false);
+  });
+
+  it("still describes an identity whose verifying bot was removed while its workspace remains", () => {
+    const remaining = {
+      ...connection,
+      id: "c2",
+      provider: "slack",
+      name: "slack-a2-t1",
+      externalName: "Acme",
+      identityRealm: "slack:T1",
+    };
+    const line = channelIdentityLine(
+      CHANNEL_CATALOG_FIXTURE,
+      { connectionId: "removed-bot", identityRealm: "slack:T1" },
+      [remaining],
+    );
+    assert.equal(line, "Slack · slack-a2-t1 · Acme · slack:T1");
+    assert.equal(
+      channelIdentityLine(
+        CHANNEL_CATALOG_FIXTURE,
+        { connectionId: "gone", identityRealm: "slack:T9" },
+        [remaining],
+      ),
+      "Connection unavailable",
+    );
   });
 });

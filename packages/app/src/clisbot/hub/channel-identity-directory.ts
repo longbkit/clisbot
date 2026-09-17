@@ -24,6 +24,8 @@ export interface LinkedChannelIdentity {
   channel: string | undefined;
   /** "Slack · acme-bot", or a plain notice when the Connection is unavailable. */
   label: string;
+  /** The label with its workspace and realm id: "Slack · acme-bot · Acme · slack:T0456". */
+  description: string;
   subject: string;
   verifiedAt: string;
 }
@@ -102,6 +104,7 @@ export function linkedChannelIdentities(
       connectionId: identity.connectionId,
       channel: realm[0]?.provider,
       label: channelConnectionLabel(catalog, realm),
+      description: channelIdentityLine(catalog, identity, connections),
       subject: identity.displayName ?? identity.externalSubjectId,
       verifiedAt: identity.verifiedAt,
     };
@@ -120,13 +123,25 @@ export type ChannelConnectionNaming = Pick<
  * Connection it was verified through.
  */
 export function identityRealmConnections<T extends ChannelConnectionNaming>(
-  identity: { connectionId: string; identityRealm?: string | undefined },
+  identity: LinkedIdentityScope,
   connections: readonly T[],
 ): T[] {
-  const realm = identity.identityRealm;
-  return realm === undefined
-    ? connections.filter(({ id }) => id === identity.connectionId)
-    : connections.filter(({ identityRealm }) => identityRealm === realm);
+  return connections.filter((connection) => identityCoversConnection(identity, connection));
+}
+
+interface LinkedIdentityScope {
+  connectionId: string;
+  identityRealm?: string | undefined;
+}
+
+/** Whether messages through this Connection resolve to the identity. */
+export function identityCoversConnection(
+  identity: LinkedIdentityScope,
+  connection: Pick<ChannelConnectionNaming, "id" | "identityRealm">,
+): boolean {
+  return identity.identityRealm === undefined
+    ? connection.id === identity.connectionId
+    : connection.identityRealm === identity.identityRealm;
 }
 
 /**
@@ -161,7 +176,7 @@ export function channelConnectionDetail(connection: ChannelConnectionNaming): st
  * the Connection id stands in when the Hub reports no realm.
  */
 export function channelIdentityRealmDetail(
-  identity: { connectionId: string; identityRealm?: string | undefined },
+  identity: LinkedIdentityScope,
   connections: readonly ChannelConnectionNaming[],
 ): string {
   const workspace = connections.find(
@@ -172,4 +187,16 @@ export function channelIdentityRealmDetail(
     connections.find((connection) => connection.id === identity.connectionId)?.name ??
     identity.connectionId;
   return workspace === undefined || workspace === null ? realmId : `${workspace} · ${realmId}`;
+}
+
+/** One line naming where an identity resolves: "Slack · acme-bot · Acme · slack:T0456". */
+export function channelIdentityLine(
+  catalog: readonly ChannelCatalogEntry[],
+  identity: LinkedIdentityScope,
+  connections: readonly ChannelConnectionNaming[],
+): string {
+  const realm = identityRealmConnections(identity, connections);
+  return realm.length === 0
+    ? "Connection unavailable"
+    : `${channelConnectionLabel(catalog, realm)} · ${channelIdentityRealmDetail(identity, realm)}`;
 }

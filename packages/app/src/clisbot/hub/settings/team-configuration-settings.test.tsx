@@ -84,6 +84,9 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
 vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
+vi.mock("./channel-catalog-queries", () => ({
+  useChannelCatalog: () => ({ entries: [], availability: "available", message: null }),
+}));
 vi.mock("./channel-connection-add", () => ({
   AddChannelConnection: ({
     allowProviderApplications,

@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
+import type { z } from "zod";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -15,16 +16,18 @@ import { useHubAccount } from "../account-provider";
 import {
   channelConnectionDetail,
   channelConnectionLabel,
-  channelIdentityRealmDetail,
-  identityRealmConnections,
+  channelIdentityLine,
+  identityCoversConnection,
   type ChannelConnectionNaming,
 } from "../channel-identity-directory";
 import { useChannelCatalog } from "./channel-catalog-queries";
+import type { ChannelCatalogEntry } from "../channel-catalog";
 import { hubResourceQueryKey } from "../query-keys";
 import {
   HubChannelIdentitiesSchema,
   HubChannelIdentityChallengeSchema,
   HubChannelIdentitySchema,
+  HubConnectionSchema,
   HubConnectionsSchema,
   HubMembersSchema,
 } from "../contracts";
@@ -90,48 +93,33 @@ function ChannelIdentitySelfLinkForm({
     () => (identities.data?.identities ?? []).filter(({ memberId }) => memberId === membershipId),
     [identities.data?.identities, membershipId],
   );
-  const channelConnections = useMemo(
-    () =>
-      (allConnections ?? [])
-        .filter(({ provider }) => ["slack", "telegram"].includes(provider))
-        .filter(({ canLinkIdentity }) => canLinkIdentity === true),
-    [allConnections],
-  );
-  const connectionOptions = useMemo<SelectFieldOption<string>[]>(
-    () =>
-      channelConnections
-        // One link covers every bot of a realm (a Slack workspace, or Telegram),
-        // so a realm already linked offers nothing more to link.
-        .filter(
-          (connection) =>
-            !ownIdentities.some((identity) =>
-              identityRealmConnections(identity, [connection]).includes(connection),
-            ),
-        )
-        .map((connection) => ({
-          id: connection.id,
-          value: connection.id,
-          label: channelConnectionLabel(catalog.entries, [connection]),
-          description: channelConnectionDetail(connection),
-        })),
-    // The catalog arrives after the Connections do; without it here the options
-    // would keep the fallback label for the rest of the session.
-    [channelConnections, ownIdentities, catalog.entries],
-  );
+  const {
+    channelConnections,
+    isLinked,
+    connectionOptions,
+    selectedConnection,
+    selectedConnectionId,
+    requestedReady,
+    requestedLinked,
+    emptyText,
+  } = useLinkableConnections({
+    connections: allConnections,
+    ownIdentities,
+    identitiesLoaded: identities.data !== undefined,
+    catalog: catalog.entries,
+    connectionId,
+    requestedConnectionId: initialConnectionId,
+  });
 
+  // The link landed: its workspace leaves the options, so drop the code and the choice.
   useEffect(() => {
     const challenged = channelConnections.find(({ id }) => id === challenge?.connectionId);
-    if (
-      challenged !== undefined &&
-      ownIdentities.some((identity) =>
-        identityRealmConnections(identity, [challenged]).includes(challenged),
-      )
-    ) {
+    if (challenged !== undefined && isLinked(challenged)) {
       setChallenge(null);
+      setConnectionId(null);
     }
-  }, [challenge, channelConnections, ownIdentities]);
+  }, [challenge, channelConnections, isLinked]);
 
-  const selectedConnection = channelConnections.find(({ id }) => id === connectionId);
   const createChallenge = useCallback(async () => {
     if (selectedConnection === undefined) return;
     setPending(true);
@@ -203,8 +191,9 @@ function ChannelIdentitySelfLinkForm({
         </Button>
         <RequestedConnectionFeedback
           requested={initialConnectionId}
-          ready={connections.data !== undefined}
+          ready={requestedReady}
           selected={selectedConnection !== undefined}
+          alreadyLinked={requestedLinked}
         />
         {mutationError ? <Alert variant="error" title={mutationError} /> : null}
       </SettingsSection>
@@ -216,35 +205,30 @@ function ChannelIdentitySelfLinkForm({
                 <Text style={settingsStyles.rowHint}>No provider identities are linked.</Text>
               </View>
             ) : (
-              ownIdentities.map((identity, index) => {
-                const realm = identityRealmConnections(identity, allConnections ?? []);
-                return (
-                  <View
-                    key={identity.id}
-                    style={[
-                      settingsStyles.row,
-                      styles.row,
-                      index > 0 ? settingsStyles.rowBorder : null,
-                    ]}
-                  >
-                    <View style={settingsStyles.rowContent}>
-                      <Text style={settingsStyles.rowTitle}>
-                        {identity.displayName ?? identity.externalSubjectId}
-                      </Text>
-                      <Text style={settingsStyles.rowHint}>
-                        {realm.length > 0
-                          ? `${channelConnectionLabel(catalog.entries, realm)} · ${channelIdentityRealmDetail(identity, realm)}`
-                          : "Connection unavailable"}
-                      </Text>
-                    </View>
-                    <IdentityUnlinkButton
-                      identityId={identity.id}
-                      pending={pending}
-                      unlink={unlink}
-                    />
+              ownIdentities.map((identity, index) => (
+                <View
+                  key={identity.id}
+                  style={[
+                    settingsStyles.row,
+                    styles.row,
+                    index > 0 ? settingsStyles.rowBorder : null,
+                  ]}
+                >
+                  <View style={settingsStyles.rowContent}>
+                    <Text style={settingsStyles.rowTitle}>
+                      {identity.displayName ?? identity.externalSubjectId}
+                    </Text>
+                    <Text style={settingsStyles.rowHint}>
+                      {channelIdentityLine(catalog.entries, identity, allConnections ?? [])}
+                    </Text>
                   </View>
-                );
-              })
+                  <IdentityUnlinkButton
+                    identityId={identity.id}
+                    pending={pending}
+                    unlink={unlink}
+                  />
+                </View>
+              ))
             )}
           </View>
         ) : null}
@@ -253,12 +237,12 @@ function ChannelIdentitySelfLinkForm({
         <View style={[settingsStyles.card, styles.form]}>
           <SelectField
             label="Connection"
-            value={connectionId}
+            value={selectedConnectionId}
             selectedDisplay={selectedOptionDisplay(connectionOptions, connectionId)}
             options={connectionOptions}
             onChange={setSelectedConnection}
             placeholder="Choose a Channel account"
-            emptyText="No Channel account is available to your Hub Member."
+            emptyText={emptyText}
             searchable={connectionOptions.length > 6}
             title="Connection"
             disabled={pending}
@@ -284,16 +268,94 @@ function ChannelIdentitySelfLinkForm({
   );
 }
 
+/**
+ * The Connections the Member may link through, less those whose realm (a Slack
+ * workspace, or Telegram) is already linked: one link covers every bot of a realm.
+ */
+type HubConnection = z.infer<typeof HubConnectionSchema>;
+type HubChannelIdentity = z.infer<typeof HubChannelIdentitySchema>;
+
+function useLinkableConnections({
+  connections,
+  ownIdentities,
+  identitiesLoaded,
+  catalog,
+  connectionId,
+  requestedConnectionId,
+}: {
+  connections: readonly HubConnection[] | undefined;
+  ownIdentities: readonly HubChannelIdentity[];
+  identitiesLoaded: boolean;
+  catalog: readonly ChannelCatalogEntry[];
+  connectionId: string | null;
+  requestedConnectionId: string | null;
+}) {
+  const channelConnections = useMemo(
+    () =>
+      (connections ?? [])
+        .filter(({ provider }) => ["slack", "telegram"].includes(provider))
+        .filter(({ canLinkIdentity }) => canLinkIdentity === true),
+    [connections],
+  );
+  const isLinked = useCallback(
+    (connection: HubConnection) =>
+      ownIdentities.some((identity) => identityCoversConnection(identity, connection)),
+    [ownIdentities],
+  );
+  const unlinkedConnections = useMemo(
+    () => channelConnections.filter((connection) => !isLinked(connection)),
+    [channelConnections, isLinked],
+  );
+  const connectionOptions = useMemo<SelectFieldOption<string>[]>(
+    () =>
+      unlinkedConnections.map((connection) => ({
+        id: connection.id,
+        value: connection.id,
+        label: channelConnectionLabel(catalog, [connection]),
+        description: channelConnectionDetail(connection),
+      })),
+    // The catalog arrives after the Connections do; without it here the options
+    // would keep the fallback label for the rest of the session.
+    [unlinkedConnections, catalog],
+  );
+  const requested = channelConnections.find(({ id }) => id === requestedConnectionId);
+  const selectedConnection = unlinkedConnections.find(({ id }) => id === connectionId);
+  return {
+    channelConnections,
+    isLinked,
+    connectionOptions,
+    selectedConnection,
+    selectedConnectionId: selectedConnection?.id ?? null,
+    requestedReady: connections !== undefined && identitiesLoaded,
+    requestedLinked: requested !== undefined && isLinked(requested),
+    emptyText:
+      channelConnections.length > 0
+        ? "Every Slack workspace and Telegram account available to you is already linked."
+        : "No Channel account is available to your Hub Member.",
+  };
+}
+
 function RequestedConnectionFeedback({
   requested,
   ready,
   selected,
+  alreadyLinked,
 }: {
   requested: string | null;
   ready: boolean;
   selected: boolean;
+  alreadyLinked: boolean;
 }) {
   if (requested === null || !ready || selected) return null;
+  if (alreadyLinked) {
+    return (
+      <Alert
+        variant="info"
+        title="You are already linked here"
+        description="Your identity is linked for this Connection's workspace, so every bot in it already recognizes you. Send your message again."
+      />
+    );
+  }
   return (
     <Alert
       variant="warning"
@@ -551,11 +613,6 @@ function ChannelIdentityRows({
     <View style={settingsStyles.card}>
       {identities.map((identity, index) => {
         const member = members.get(identity.memberId);
-        const realm = identityRealmConnections(identity, connections);
-        const connectionLabel =
-          realm.length > 0
-            ? `${channelConnectionLabel(catalog.entries, realm)} · ${channelIdentityRealmDetail(identity, realm)}`
-            : "Connection unavailable";
         return (
           <View
             key={identity.id}
@@ -566,7 +623,7 @@ function ChannelIdentityRows({
                 {`${member?.name ?? identity.displayName ?? "Member"} · ${identity.displayName ?? identity.externalSubjectId}`}
               </Text>
               <Text style={settingsStyles.rowHint}>
-                {`${connectionLabel} · ${identity.externalSubjectId}`}
+                {`${channelIdentityLine(catalog.entries, identity, connections)} · ${identity.externalSubjectId}`}
               </Text>
             </View>
             {canManage ? (

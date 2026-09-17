@@ -19,6 +19,8 @@ import { ProfileSettings } from "./profile-settings";
 import { OrganizationHeader } from "./organization-header";
 import { OrganizationSelection } from "./organization-selection";
 import { ChannelIdentitiesSection } from "./channel-identities-section";
+import { channelIdentityLine } from "../channel-identity-directory";
+import { useChannelCatalog } from "./channel-catalog-queries";
 import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-entry-form";
 import {
   HubChannelIdentitiesSchema,
@@ -2027,7 +2029,7 @@ function MemberDetail({
     }
     return [];
   });
-  const connectionById = new Map(connections.map((connection) => [connection.id, connection]));
+  const catalog = useChannelCatalog();
   const setMemberRole = useCallback(() => void setRole("member"), [setRole]);
   const setAdminRole = useCallback(() => void setRole("admin"), [setRole]);
   const removeSelectedMember = useCallback(() => void remove(), [remove]);
@@ -2106,21 +2108,14 @@ function MemberDetail({
           {memberIdentities.length === 0 ? (
             <EmptyRow message="No Channel identities linked" />
           ) : (
-            memberIdentities.map((identity, index) => {
-              const connection = connectionById.get(identity.connectionId);
-              return (
-                <InfoRow
-                  key={identity.id}
-                  title={identity.displayName ?? identity.externalSubjectId}
-                  hint={
-                    connection === undefined
-                      ? "Connection unavailable"
-                      : `${channelLabel(connection.provider)} · ${connection.name}`
-                  }
-                  bordered={index > 0}
-                />
-              );
-            })
+            memberIdentities.map((identity, index) => (
+              <InfoRow
+                key={identity.id}
+                title={identity.displayName ?? identity.externalSubjectId}
+                hint={channelIdentityLine(catalog.entries, identity, connections)}
+                bordered={index > 0}
+              />
+            ))
           )}
         </View>
         <Text style={settingsStyles.rowHint}>
