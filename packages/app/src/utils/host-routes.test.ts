@@ -9,6 +9,8 @@ import {
   resolveKnownHostRoute,
   buildSessionsRoute,
   buildSettingsAddHostRoute,
+  buildWelcomeRoute,
+  isDeliberateWelcomeVisit,
   buildProjectSettingsRoute,
   buildProjectsSettingsRoute,
   decodeFilePathFromPathSegment,
@@ -211,6 +213,15 @@ describe("projects settings routes", () => {
 describe("global routes", () => {
   it("buildSessionsRoute returns the all-host Sessions route", () => {
     expect(buildSessionsRoute()).toBe("/sessions");
+  });
+
+  it("marks a Welcome visit that must not bounce to the home screen", () => {
+    expect(buildWelcomeRoute()).toBe("/welcome");
+    expect(buildWelcomeRoute({ stay: true })).toBe("/welcome?stay=1");
+    expect(isDeliberateWelcomeVisit({ stay: "1" })).toBe(true);
+    expect(isDeliberateWelcomeVisit({ stay: ["1"] })).toBe(true);
+    expect(isDeliberateWelcomeVisit({})).toBe(false);
+    expect(isDeliberateWelcomeVisit({ stay: "0" })).toBe(false);
   });
 
   it("buildNewWorkspaceRoute returns the all-host New Workspace route", () => {

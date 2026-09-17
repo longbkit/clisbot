@@ -391,6 +391,41 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
   example Tailscale Serve on HTTPS 8444 as in
   [docs/development.md](../../development.md).
 
+### Welcome lists Host sources, and never hides the ones you connect yourself
+
+- **Date:** 2026-09-17.
+- **Context:** Welcome used to show the Hub card only while signed out
+  (`packages/app/src/clisbot/hub/welcome-sign-in.tsx`), then leave the screen once
+  a sign-in started here. A Member whose Host never arrived — Hub had no offer, or
+  synchronization failed — landed on a Welcome with nothing about Hub on it, and
+  Welcome itself was only reachable when no Host was saved.
+- **Problem:** that screen could not be read or left. Nothing named the account it
+  was already signed into, nothing named the step that was missing, and there was
+  no way out except adding a Host by hand.
+- **Options considered:**
+  1. Keep hiding the card and send every signed-in visit to Settings → Account.
+  2. Keep the card on screen with the account, the Host status, and its own
+     recovery actions, and make Welcome closable.
+  3. Replace Welcome with Settings → Account once a Hub account exists.
+- **Decision:** option 2. Welcome is the screen that lists where Hosts come from:
+  `Managed Hosts` (a Hub) and `Your own computer` (QR, pairing link, direct,
+  Remote SSH). Both groups stay on screen in every state, ✕ closes Welcome to the
+  home screen, and the home screen's **Add a Host** tile opens it again.
+  Welcome leaves for the home screen the moment a Host comes online, which is
+  right for onboarding and wrong for a visit whose point is to add another Host,
+  so both the tile and the Hub sign-in return path carry
+  `?stay=1` (`buildWelcomeRoute` in `packages/app/src/utils/host-routes.ts`) and
+  that flag suppresses the exit.
+- **Rationale:**
+  - One account can hold managed Hosts and its own Hosts at the same time, so
+    hiding either group after sign-in states something untrue.
+  - Option 1 loops: Account's back returns to Welcome, which sends you to Account.
+  - A disabled `+ Add another Hub` row holds the place for several Hubs; one Hub
+    origin per app today (`packages/app/src/clisbot/hub/config.ts`).
+- **Consequence:** the card carries copy for every account status and Host state.
+  `resolveHubWelcomeCard` in `packages/app/src/clisbot/hub/welcome-status.ts` owns
+  that mapping so the component stays a renderer and the copy stays tested.
+
 ### `hub login` asks about the daemon before browser approval
 
 - **Date:** 2026-09-15.

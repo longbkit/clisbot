@@ -1497,6 +1497,10 @@ export const fr: TranslationResources = {
         title: "Fournisseurs d'installation",
         description: "ConfigurezClaude Code,Codexet plus",
       },
+      addHost: {
+        title: "Ajouter un Host",
+        description: "Connectez un autre ordinateur ou un Hub",
+      },
       pairDevice: {
         title: "Associer un appareil",
         description: "Connectez votre téléphone à ce démon",
@@ -1569,6 +1573,11 @@ export const fr: TranslationResources = {
     subtitle: "Connectez votre ordinateur pour commencer",
     actions: {
       settings: "Paramètres",
+      close: "Fermer",
+    },
+    groups: {
+      managedHosts: "Hosts gérés",
+      ownComputer: "Votre propre ordinateur",
     },
   },
   modelSelector: {

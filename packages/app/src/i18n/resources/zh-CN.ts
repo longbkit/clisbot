@@ -1434,6 +1434,10 @@ export const zhCN: TranslationResources = {
         title: "设置 providers",
         description: "配置 Claude Code、Codex 等",
       },
+      addHost: {
+        title: "添加 Host",
+        description: "连接另一台电脑或 Hub",
+      },
       pairDevice: {
         title: "配对设备",
         description: "将手机连接到此 daemon",
@@ -1504,6 +1508,11 @@ export const zhCN: TranslationResources = {
     subtitle: "连接你的电脑即可开始",
     actions: {
       settings: "设置",
+      close: "关闭",
+    },
+    groups: {
+      managedHosts: "托管 Host",
+      ownComputer: "你自己的电脑",
     },
   },
   modelSelector: {

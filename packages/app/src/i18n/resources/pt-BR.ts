@@ -1480,6 +1480,10 @@ export const ptBR: TranslationResources = {
         title: "Configurar provedores",
         description: "Configure Claude Code, Codex e outros",
       },
+      addHost: {
+        title: "Adicionar um Host",
+        description: "Conecte outro computador ou um Hub",
+      },
       pairDevice: {
         title: "Parear dispositivo",
         description: "Conecte seu celular a este daemon",
@@ -1551,6 +1555,11 @@ export const ptBR: TranslationResources = {
     subtitle: "Conecte seu computador para começar",
     actions: {
       settings: "Configurações",
+      close: "Fechar",
+    },
+    groups: {
+      managedHosts: "Hosts gerenciados",
+      ownComputer: "Seu próprio computador",
     },
   },
   modelSelector: {

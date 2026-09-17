@@ -34,3 +34,17 @@ export function setHubHostSynchronizationFailure(
 export function useHubHostSynchronizationFailure(key: string): SynchronizationFailure | null {
   return useSynchronizationFailures((state) => state.failures[key] ?? null);
 }
+
+/**
+ * The key of the first Host whose synchronization failed, for surfaces that summarize the whole
+ * account instead of listing one row per Host. Returns a key rather than the failure so the
+ * selector keeps returning the same value across renders; read it with
+ * `useHubHostSynchronizationFailure`.
+ */
+export function useFirstHubHostSynchronizationFailureKey(
+  keys: readonly string[],
+): string | undefined {
+  return useSynchronizationFailures((state) =>
+    keys.find((key) => state.failures[key] !== undefined),
+  );
+}

@@ -1494,6 +1494,10 @@ export const es: TranslationResources = {
         title: "Proveedores de configuración",
         description: "ConfigurarClaude Code,Codexy más",
       },
+      addHost: {
+        title: "Añadir un Host",
+        description: "Conecta otro ordenador o un Hub",
+      },
       pairDevice: {
         title: "Emparejar dispositivo",
         description: "Conecta tu teléfono a este demonio",
@@ -1565,6 +1569,11 @@ export const es: TranslationResources = {
     subtitle: "Conecte su computadora para comenzar",
     actions: {
       settings: "Ajustes",
+      close: "Cerrar",
+    },
+    groups: {
+      managedHosts: "Hosts gestionados",
+      ownComputer: "Tu propio ordenador",
     },
   },
   modelSelector: {

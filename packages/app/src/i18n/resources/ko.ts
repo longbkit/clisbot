@@ -1460,6 +1460,10 @@ export const ko: TranslationResources = {
         title: "프로바이더 설정",
         description: "Claude Code, Codex 등을 구성합니다",
       },
+      addHost: {
+        title: "Host 추가",
+        description: "다른 컴퓨터나 Hub 연결",
+      },
       pairDevice: {
         title: "기기 페어링",
         description: "휴대폰을 이 데몬에 연결합니다",
@@ -1531,6 +1535,11 @@ export const ko: TranslationResources = {
     subtitle: "시작하려면 컴퓨터를 연결하세요",
     actions: {
       settings: "설정",
+      close: "닫기",
+    },
+    groups: {
+      managedHosts: "관리형 Host",
+      ownComputer: "내 컴퓨터",
     },
   },
   modelSelector: {

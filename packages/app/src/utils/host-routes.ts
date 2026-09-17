@@ -432,6 +432,24 @@ export function buildOpenProjectRoute() {
   return "/open-project" as const;
 }
 
+/**
+ * Welcome sends the reader to the home screen as soon as a Host comes online, which is right for
+ * onboarding and wrong for someone who opened it to connect another Host. This flag marks the
+ * deliberate visit.
+ */
+export const WELCOME_STAY_PARAM = "stay";
+
+export function buildWelcomeRoute(options: { stay?: boolean } = {}) {
+  return options.stay ? (`/welcome?${WELCOME_STAY_PARAM}=1` as const) : ("/welcome" as const);
+}
+
+export function isDeliberateWelcomeVisit(params: {
+  [WELCOME_STAY_PARAM]?: string | string[];
+}): boolean {
+  const value = params[WELCOME_STAY_PARAM];
+  return (Array.isArray(value) ? value[0] : value) === "1";
+}
+
 interface NewWorkspaceRouteOptions {
   serverId?: string;
   sourceDirectory?: string;

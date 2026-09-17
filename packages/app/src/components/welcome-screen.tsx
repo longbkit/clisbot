@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   QrCode,
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Settings,
   Terminal,
+  X,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { HostProfile } from "@/types/host-connection";
@@ -17,22 +18,24 @@ import { getHostRuntimeStore, isHostRuntimeConnected, useHosts } from "@/runtime
 import { AddHostModal } from "./add-host-modal";
 import { AddRemoteSshHostModal } from "./add-remote-ssh-host-modal";
 import { PairLinkModal } from "./pair-link-modal";
-import { Button } from "@/components/ui/button";
 import { resolveAppVersion } from "@/utils/app-version";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
-import { buildOpenProjectRoute } from "@/utils/host-routes";
+import {
+  buildOpenProjectRoute,
+  isDeliberateWelcomeVisit,
+  WELCOME_STAY_PARAM,
+} from "@/utils/host-routes";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isFdroidBuild } from "@/constants/build-profile";
 import { isWeb, isNative } from "@/constants/platform";
 import { isElectronRuntime } from "@/desktop/host";
-import { HubWelcomeSignIn } from "@/clisbot/hub/welcome-sign-in";
+import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "@/clisbot/hub/welcome-sign-in";
 
 interface WelcomeAction {
   key: "scan-qr" | "direct-connection" | "remote-ssh" | "paste-pairing-link";
   label: string;
   testID: string;
-  primary: boolean;
   icon: typeof QrCode;
   onPress: () => void;
 }
@@ -118,9 +121,16 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     marginTop: theme.spacing[6],
   },
-  settingsButton: {
-    alignSelf: "center",
-    marginTop: theme.spacing[6],
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+  },
+  headerButton: {
+    padding: theme.spacing[3],
+    borderRadius: theme.borderRadius.md,
   },
 }));
 
@@ -179,11 +189,15 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
   const [isPasteLinkOpen, setIsPasteLinkOpen] = useState(false);
   const hosts = useHosts();
   const anyOnlineServerId = useAnyHostOnline(hosts.map((h) => h.serverId));
+  const params = useLocalSearchParams<{ [WELCOME_STAY_PARAM]?: string }>();
+  const stayOnWelcome = isDeliberateWelcomeVisit(params);
 
+  // Onboarding ends the moment a Host answers. Someone who opened Welcome to add another Host
+  // stays: there is nothing to finish, and leaving would hide the screen they asked for.
   useEffect(() => {
-    if (!anyOnlineServerId) return;
+    if (!anyOnlineServerId || stayOnWelcome) return;
     router.replace(buildOpenProjectRoute());
-  }, [anyOnlineServerId, router]);
+  }, [anyOnlineServerId, router, stayOnWelcome]);
 
   const finishOnboarding = useCallback(() => {
     router.replace(buildOpenProjectRoute());
@@ -195,6 +209,12 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
 
   const handleOpenSettings = useCallback(() => {
     router.push("/settings");
+  }, [router]);
+
+  // Welcome is reachable again from the home screen, so leaving it is a choice rather than a
+  // dead end while no Host is connected yet.
+  const handleClose = useCallback(() => {
+    router.replace(buildOpenProjectRoute());
   }, [router]);
 
   const handleOpenDirect = useCallback(() => setIsDirectOpen(true), []);
@@ -215,71 +235,78 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
     [onHostAdded, finishOnboarding],
   );
 
-  const actions: WelcomeAction[] =
-    isWeb || isFdroidBuild
-      ? [
-          {
-            key: "direct-connection",
-            label: t("pairing.connectionMethods.direct.title"),
-            testID: "welcome-direct-connection",
-            primary: true,
-            icon: Link2,
-            onPress: handleOpenDirect,
-          },
-          {
-            key: "paste-pairing-link",
-            label: t("pairing.connectionMethods.pasteLink.title"),
-            testID: "welcome-paste-pairing-link",
-            primary: false,
-            icon: ClipboardPaste,
-            onPress: handleOpenPasteLink,
-          },
-        ]
+  // One order on every platform, pairing methods first: scanning a QR code and pasting the link it
+  // encodes are the same connection, so they stay adjacent. Platforms drop the rows they lack
+  // instead of reordering the rest, and the first row that survives is the recommended one.
+  const actions: WelcomeAction[] = [
+    ...(isWeb || isFdroidBuild
+      ? []
       : [
           {
-            key: "scan-qr",
+            key: "scan-qr" as const,
             label: t("pairing.connectionMethods.scanQr.title"),
             testID: "welcome-scan-qr",
-            primary: true,
             icon: QrCode,
             onPress: handleScanQr,
           },
+        ]),
+    {
+      key: "paste-pairing-link",
+      label: t("pairing.connectionMethods.pasteLink.title"),
+      testID: "welcome-paste-pairing-link",
+      icon: ClipboardPaste,
+      onPress: handleOpenPasteLink,
+    },
+    {
+      key: "direct-connection",
+      label: t("pairing.connectionMethods.direct.title"),
+      testID: "welcome-direct-connection",
+      icon: Link2,
+      onPress: handleOpenDirect,
+    },
+    ...(isElectronRuntime()
+      ? [
           {
-            key: "direct-connection",
-            label: t("pairing.connectionMethods.direct.title"),
-            testID: "welcome-direct-connection",
-            primary: false,
-            icon: Link2,
-            onPress: handleOpenDirect,
+            key: "remote-ssh" as const,
+            label: t("pairing.connectionMethods.remoteSsh.title"),
+            testID: "welcome-remote-ssh",
+            icon: Terminal,
+            onPress: handleOpenRemoteSsh,
           },
-          {
-            key: "paste-pairing-link",
-            label: t("pairing.connectionMethods.pasteLink.title"),
-            testID: "welcome-paste-pairing-link",
-            primary: false,
-            icon: ClipboardPaste,
-            onPress: handleOpenPasteLink,
-          },
-        ];
-
-  if (isElectronRuntime()) {
-    actions.splice(1, 0, {
-      key: "remote-ssh",
-      label: t("pairing.connectionMethods.remoteSsh.title"),
-      testID: "welcome-remote-ssh",
-      primary: false,
-      icon: Terminal,
-      onPress: handleOpenRemoteSsh,
-    });
-  }
-
+        ]
+      : []),
+  ];
   const scrollContentContainerStyle = useMemo(
     () => [styles.container, { paddingBottom: theme.spacing[6] + insets.bottom }],
     [theme.spacing, insets.bottom],
   );
+  const headerStyle = useMemo(
+    () => [styles.header, { paddingTop: theme.spacing[2] + insets.top }],
+    [theme.spacing, insets.top],
+  );
 
   return (
     <View style={styles.root}>
+      <View style={headerStyle}>
+        <Pressable
+          onPress={handleOpenSettings}
+          style={styles.headerButton}
+          accessibilityRole="button"
+          accessibilityLabel={t("onboarding.actions.settings")}
+          testID="welcome-open-settings"
+        >
+          <Settings size={20} color={theme.colors.foregroundMuted} />
+        </Pressable>
+        <Pressable
+          onPress={handleClose}
+          style={styles.headerButton}
+          accessibilityRole="button"
+          accessibilityLabel={t("onboarding.actions.close")}
+          testID="welcome-close"
+        >
+          <X size={20} color={theme.colors.foregroundMuted} />
+        </Pressable>
+      </View>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={scrollContentContainerStyle}
@@ -299,25 +326,15 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
             ) : null}
           </View>
 
-          {/* COMPAT(clisbot-welcome-hub-sign-in): Hub sign-in beside adding a Host directly. */}
+          {/* COMPAT(clisbot-welcome-hub-sign-in): managed Hosts beside adding a Host directly. */}
           <HubWelcomeSignIn />
 
           <View style={styles.actions}>
-            {actions.map((action) => (
-              <WelcomeActionButton key={action.key} action={action} />
+            <WelcomeOwnComputerLabel />
+            {actions.map((action, index) => (
+              <WelcomeActionButton key={action.key} action={action} primary={index === 0} />
             ))}
           </View>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={Settings}
-            onPress={handleOpenSettings}
-            style={styles.settingsButton}
-            testID="welcome-open-settings"
-          >
-            {t("onboarding.actions.settings")}
-          </Button>
         </View>
         <Text style={styles.versionLabel}>{appVersionText}</Text>
 
@@ -345,25 +362,24 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
 
 interface WelcomeActionButtonProps {
   action: WelcomeAction;
+  /** The recommended way to connect on this platform: the first row that the platform keeps. */
+  primary: boolean;
 }
 
-function WelcomeActionButton({ action }: WelcomeActionButtonProps) {
+function WelcomeActionButton({ action, primary }: WelcomeActionButtonProps) {
   const { theme } = useUnistyles();
   const Icon = action.icon;
   const buttonStyle = useMemo(
-    () => [styles.actionButton, action.primary ? styles.actionButtonPrimary : null],
-    [action.primary],
+    () => [styles.actionButton, primary ? styles.actionButtonPrimary : null],
+    [primary],
   );
   const textStyle = useMemo(
-    () => [styles.actionText, action.primary ? styles.actionTextPrimary : null],
-    [action.primary],
+    () => [styles.actionText, primary ? styles.actionTextPrimary : null],
+    [primary],
   );
   return (
     <Pressable style={buttonStyle} onPress={action.onPress} testID={action.testID}>
-      <Icon
-        size={18}
-        color={action.primary ? theme.colors.accentForeground : theme.colors.foreground}
-      />
+      <Icon size={18} color={primary ? theme.colors.accentForeground : theme.colors.foreground} />
       <Text style={textStyle}>{action.label}</Text>
     </Pressable>
   );

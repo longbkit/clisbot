@@ -1460,6 +1460,10 @@ export const en = {
         title: "Setup providers",
         description: "Configure Claude Code, Codex, and more",
       },
+      addHost: {
+        title: "Add a Host",
+        description: "Connect another computer or a Hub",
+      },
       pairDevice: {
         title: "Pair device",
         description: "Connect your phone to this daemon",
@@ -1531,6 +1535,11 @@ export const en = {
     subtitle: "Connect your computer to get started",
     actions: {
       settings: "Settings",
+      close: "Close",
+    },
+    groups: {
+      managedHosts: "Managed Hosts",
+      ownComputer: "Your own computer",
     },
   },
   modelSelector: {

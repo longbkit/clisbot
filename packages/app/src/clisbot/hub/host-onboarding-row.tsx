@@ -3,16 +3,16 @@ import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
 import { buildHostRootRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { useHubAccount } from "./account-provider";
 import { CopyableCommand } from "./copyable-command";
 import {
-  hubHostConnectionOfferHint,
+  hubHostOfferHint,
+  hubHostStatusPresentation,
   type HubHostOnboardingItem,
-  type HubHostOnboardingStatus,
 } from "./host-onboarding";
 import {
   hubHostSynchronizationKey,
@@ -49,15 +49,12 @@ export function HubHostOnboardingRow({
       daemonId: item.daemonId,
     }),
   );
-  const status = hostStatusPresentation(failure === null ? item.status : "error");
+  const status = hubHostStatusPresentation(failure === null ? item.status : "error");
   const unreachable =
     failure === null &&
     item.serverId !== null &&
     (item.status === "offline" || item.status === "error");
-  const description =
-    item.serverId === null
-      ? hubHostConnectionOfferHint(item.status === "waiting" ? "connected" : item.status)
-      : status.description;
+  const description = item.serverId === null ? hubHostOfferHint(item.status) : status.description;
   return (
     <View style={[settingsStyles.row, styles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={styles.heading}>
@@ -146,49 +143,6 @@ function HostConnectionsAction({
       Connections
     </Button>
   );
-}
-
-function hostStatusPresentation(status: HubHostOnboardingStatus): {
-  label: string;
-  description: string;
-  variant: StatusBadgeVariant;
-} {
-  if (status === "online") {
-    return { label: "Online", description: "Ready for Projects and Agents", variant: "success" };
-  }
-  if (status === "connecting") {
-    return {
-      label: "Connecting",
-      description: "Paseo is connecting to this Host",
-      variant: "muted",
-    };
-  }
-  if (status === "waiting") {
-    return {
-      label: "Waiting for connection",
-      description: hubHostConnectionOfferHint("connected"),
-      variant: "muted",
-    };
-  }
-  if (status === "unavailable") {
-    return {
-      label: "Status unavailable",
-      description: hubHostConnectionOfferHint("unavailable"),
-      variant: "muted",
-    };
-  }
-  if (status === "offline" || status === "error") {
-    return {
-      label: status === "offline" ? "Offline" : "Connection failed",
-      description: "Paseo can't reach this Host. Reconnect, or check its daemon on that computer:",
-      variant: status === "offline" ? "muted" : "error",
-    };
-  }
-  return {
-    label: "Registering",
-    description: "Paseo is adding this Daemon as a Host",
-    variant: "muted",
-  };
 }
 
 const styles = StyleSheet.create((theme) => ({

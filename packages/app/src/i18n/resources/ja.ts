@@ -1465,6 +1465,10 @@ export const ja: TranslationResources = {
         title: "プロバイダーをセットアップ",
         description: "Claude Code、Codexなどを設定",
       },
+      addHost: {
+        title: "Host を追加",
+        description: "別のコンピューターまたは Hub に接続",
+      },
       pairDevice: {
         title: "デバイスをペアリング",
         description: "このデーモンにスマートフォンを接続",
@@ -1536,6 +1540,11 @@ export const ja: TranslationResources = {
     subtitle: "始めるにはコンピューターに接続してください",
     actions: {
       settings: "設定",
+      close: "閉じる",
+    },
+    groups: {
+      managedHosts: "管理された Host",
+      ownComputer: "自分のコンピューター",
     },
   },
   modelSelector: {

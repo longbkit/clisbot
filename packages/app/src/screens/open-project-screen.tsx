@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
-import { FolderOpen, Inbox, Plug, Smartphone } from "lucide-react-native";
+import { FolderOpen, Inbox, Plug, Server, Smartphone } from "lucide-react-native";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -20,7 +20,7 @@ import {
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { buildSettingsHostSectionRoute, buildWelcomeRoute } from "@/utils/host-routes";
 
 export function OpenProjectScreen() {
   const { t } = useTranslation();
@@ -43,6 +43,12 @@ export function OpenProjectScreen() {
   const handleOpenPicker = useCallback(() => {
     void openProjectPicker();
   }, [openProjectPicker]);
+
+  // Welcome owns every way to connect a Host — managed or your own — so this sends readers there
+  // instead of repeating those choices here.
+  const handleAddHost = useCallback(() => {
+    router.push(buildWelcomeRoute({ stay: true }));
+  }, [router]);
 
   const handleOpenPairDevice = useCallback(() => setIsPairDeviceOpen(true), []);
   const handleClosePairDevice = useCallback(() => setIsPairDeviceOpen(false), []);
@@ -86,6 +92,13 @@ export function OpenProjectScreen() {
             description={t("openProject.tiles.setupProviders.description")}
             onPress={handleOpenProviders}
             testID="open-project-setup-providers"
+          />
+          <HomeTile
+            icon={Server}
+            title={t("openProject.tiles.addHost.title")}
+            description={t("openProject.tiles.addHost.description")}
+            onPress={handleAddHost}
+            testID="open-project-add-host"
           />
           {localServerId ? (
             <HomeTile

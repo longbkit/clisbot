@@ -1476,6 +1476,10 @@ export const ru: TranslationResources = {
         title: "Настроить провайдеров",
         description: "Настройте Claude Code, Codex и другие провайдеры",
       },
+      addHost: {
+        title: "Добавить Host",
+        description: "Подключите другой компьютер или Hub",
+      },
       pairDevice: {
         title: "Подключить устройство",
         description: "Подключите свой телефон к этому демону",
@@ -1548,6 +1552,11 @@ export const ru: TranslationResources = {
     subtitle: "Подключите компьютер, чтобы начать",
     actions: {
       settings: "Настройки",
+      close: "Закрыть",
+    },
+    groups: {
+      managedHosts: "Управляемые Host",
+      ownComputer: "Ваш компьютер",
     },
   },
   modelSelector: {

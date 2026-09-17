@@ -1451,6 +1451,10 @@ export const ar: TranslationResources = {
         title: "موفري الإعداد",
         description: "قم بتكوين Claude Code و Codex والمزيد",
       },
+      addHost: {
+        title: "إضافة مضيف",
+        description: "وصّل جهاز كمبيوتر آخر أو Hub",
+      },
       pairDevice: {
         title: "إقران الجهاز",
         description: "قم بتوصيل هاتفك بهذا البرنامج الخفي",
@@ -1521,6 +1525,11 @@ export const ar: TranslationResources = {
     subtitle: "قم بتوصيل جهاز الكمبيوتر الخاص بك للبدء",
     actions: {
       settings: "إعدادات",
+      close: "إغلاق",
+    },
+    groups: {
+      managedHosts: "مضيفون مُدارون",
+      ownComputer: "جهاز الكمبيوتر الخاص بك",
     },
   },
   modelSelector: {
