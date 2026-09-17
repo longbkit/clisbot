@@ -142,14 +142,20 @@ function shouldRestoreWorkspaceSelection(input: {
   return input.workspaceSelection !== null && input.workspaceSelectionStatus !== "missing";
 }
 
+/**
+ * `missing` sends the reader to the home screen, so only a connected Host may say it. A workspace
+ * list loaded earlier in this session outlives the connection that produced it: while the Host is
+ * offline or reconnecting, its absence from that list is unknown, not proof it is gone.
+ */
 export function resolveWorkspaceSelectionStatus(input: {
   hasHydratedWorkspaces: boolean;
   workspaceExists: boolean;
+  isHostConnected: boolean;
 }): WorkspaceSelectionStatus {
   if (input.workspaceExists) {
     return "exists";
   }
-  return input.hasHydratedWorkspaces ? "missing" : "unknown";
+  return input.hasHydratedWorkspaces && input.isHostConnected ? "missing" : "unknown";
 }
 
 export function resolveHostIndexRoute(input: {

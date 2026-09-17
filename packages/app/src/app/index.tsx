@@ -6,7 +6,7 @@ import {
   resolveStartupRoute,
   resolveWorkspaceSelectionStatus,
 } from "@/navigation/host-runtime-bootstrap";
-import { useHostRegistryStatus, useHosts } from "@/runtime/host-runtime";
+import { useHostRegistryStatus, useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 import {
   useIsLastWorkspaceSelectionHydrated,
@@ -31,6 +31,9 @@ export default function Index() {
     workspaceSelectionServerId,
     workspaceSelectionWorkspaceId,
   );
+  const isWorkspaceSelectionHostConnected = useHostRuntimeIsConnected(
+    workspaceSelectionServerId ?? "",
+  );
 
   const startupRoute = resolveStartupRoute({
     route: { kind: "index", pathname },
@@ -42,6 +45,7 @@ export default function Index() {
     workspaceSelectionStatus: resolveWorkspaceSelectionStatus({
       hasHydratedWorkspaces: hasHydratedWorkspaceSelectionHost,
       workspaceExists: workspaceSelectionExists,
+      isHostConnected: isWorkspaceSelectionHostConnected,
     }),
     isWorkspaceSelectionLoaded,
     hasGivenUpWaitingForHost: bootstrapState.hasGivenUpWaitingForHost,

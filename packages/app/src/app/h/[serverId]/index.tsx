@@ -5,6 +5,7 @@ import {
   resolveWorkspaceSelectionStatus,
 } from "@/navigation/host-runtime-bootstrap";
 import { StartupSplashScreen } from "@/screens/startup-splash-screen";
+import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 import {
   useIsLastWorkspaceSelectionHydrated,
@@ -19,6 +20,7 @@ export default function HostIndexRoute() {
     workspaceSelection?.serverId === serverId ? workspaceSelection.workspaceId : null;
   const hasHydratedWorkspaces = useHasHydratedWorkspaces(serverId);
   const workspaceSelectionExists = useWorkspaceExists(serverId, workspaceSelectionWorkspaceId);
+  const isHostConnected = useHostRuntimeIsConnected(serverId ?? "");
 
   if (!serverId || !isWorkspaceSelectionLoaded) {
     return <StartupSplashScreen />;
@@ -32,6 +34,7 @@ export default function HostIndexRoute() {
         workspaceSelectionStatus: resolveWorkspaceSelectionStatus({
           hasHydratedWorkspaces,
           workspaceExists: workspaceSelectionExists,
+          isHostConnected,
         }),
       })}
     />

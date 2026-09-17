@@ -4,6 +4,7 @@ import {
   resolveStartupNavigationReady,
   resolveHostIndexRoute,
   resolveStartupRoute,
+  resolveWorkspaceSelectionStatus,
   shouldRunStartupGiveUpTimer,
   startHostRuntimeBootstrap,
   bindHostRuntimeAppState,
@@ -392,6 +393,46 @@ describe("resolveHostIndexRoute", () => {
         workspaceSelectionStatus: "unknown",
       }),
     ).toEqual("/open-project");
+  });
+});
+
+describe("resolveWorkspaceSelectionStatus", () => {
+  it("answers exists as soon as the workspace is in the list", () => {
+    expect(
+      resolveWorkspaceSelectionStatus({
+        hasHydratedWorkspaces: false,
+        workspaceExists: true,
+        isHostConnected: false,
+      }),
+    ).toBe("exists");
+  });
+
+  it("only a connected Host may prove a remembered workspace is gone", () => {
+    expect(
+      resolveWorkspaceSelectionStatus({
+        hasHydratedWorkspaces: true,
+        workspaceExists: false,
+        isHostConnected: true,
+      }),
+    ).toBe("missing");
+    // A list loaded before the connection dropped says nothing about the workspace now.
+    expect(
+      resolveWorkspaceSelectionStatus({
+        hasHydratedWorkspaces: true,
+        workspaceExists: false,
+        isHostConnected: false,
+      }),
+    ).toBe("unknown");
+  });
+
+  it("stays unknown until the Host's workspace list has loaded once", () => {
+    expect(
+      resolveWorkspaceSelectionStatus({
+        hasHydratedWorkspaces: false,
+        workspaceExists: false,
+        isHostConnected: true,
+      }),
+    ).toBe("unknown");
   });
 });
 
