@@ -8348,6 +8348,9 @@ export class Session {
         if (result.disposition === "turn_started") {
           await waitForAgentRunStartWithTimeout(this.agentManager, agentId);
         }
+        // Named after the run-start wait: an await between dispatch and that wait
+        // lets a fast turn end first, and the wait then finds no pending run.
+        await this.nameUntitledAgentFromPrompt(agentId, msg.text);
       };
       if (msg.messageId) {
         await this.agentRequests.send({
@@ -8388,6 +8391,20 @@ export class Session {
         },
       });
     }
+  }
+
+  /**
+   * An agent created without `initialPrompt` has no title: keyed creation
+   * requires the prompt to arrive here instead (docs/hub.md). Its first message
+   * names it by the rule `initialPrompt` would have used, and a title anyone
+   * already set is kept.
+   */
+  private async nameUntitledAgentFromPrompt(agentId: string, text: string): Promise<void> {
+    const title = resolveFirstAgentPromptTitle({ prompt: text });
+    if (title === null) return;
+    const record = await this.agentStorage.get(agentId);
+    if (record === null || record.title) return;
+    await this.agentManager.setTitle(agentId, title);
   }
 
   private async handleWaitForFinish(

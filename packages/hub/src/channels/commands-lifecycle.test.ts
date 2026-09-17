@@ -363,7 +363,6 @@ describe("channel lifecycle commands", () => {
     await f.lifecycle.handle({ name: "fork", value: "continue" }, f.context);
     expect((await f.bound())?.agentId).toBe(f.created.id);
     expect(f.createAgent).toHaveBeenCalledWith(expect.objectContaining({ model: "staged-model" }), {
-      title: "Channel /fork",
       source: f.context.message,
       workspaceId: "workspace-old",
     });
@@ -382,7 +381,6 @@ describe("channel lifecycle commands", () => {
       await f.lifecycle.handle({ name, value: "question" }, f.context);
       expect((await f.bound())?.agentId).toBe(f.old.id);
       expect(f.createAgent).toHaveBeenCalledWith(expect.anything(), {
-        title: `Channel /${name}`,
         source: f.context.message,
         autoArchive: true,
         // `/side` continues the bound session, so it inherits its workspace;
@@ -431,7 +429,6 @@ describe("channel lifecycle commands", () => {
     await f.lifecycle.handle({ name: "fork", value: "continue" }, context);
     expect(f.createWorkspace).not.toHaveBeenCalled();
     expect(f.createAgent).toHaveBeenCalledWith(expect.anything(), {
-      title: "Channel /fork",
       source: context.message,
     });
   });

@@ -48,7 +48,8 @@ Provider controls remain provider-native; see [providers.md](providers.md).
 
 `create_agent_request.idempotencyKey` identifies one creation operation. With a key, omit
 `initialPrompt`, persist the returned agent/workspace identity, then deliver the prompt using
-`send_agent_message_request` with a stable `messageId`. Request IDs correlate individual attempts;
+`send_agent_message_request` with a stable `messageId`. An agent created without a title is named
+from that first message, by the same rule `initialPrompt` uses. Request IDs correlate individual attempts;
 creation keys and message IDs identify the operation across attempts. A creation key is daemon-wide;
 a message ID is scoped to its agent. Reusing either with different arguments is a conflict.
 

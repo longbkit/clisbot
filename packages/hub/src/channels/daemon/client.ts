@@ -388,6 +388,7 @@ function createAgentPayload(config: CreateAgentConfig, options?: CreateAgentOpti
     ...(options?.initialPrompt === undefined ? {} : { initialPrompt: options.initialPrompt }),
     ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
     ...(options?.autoArchive === undefined ? {} : { autoArchive: options.autoArchive }),
+    ...(options?.labels === undefined ? {} : { labels: options.labels }),
     ...(projectId === undefined ? {} : { projectId }),
     ...(worktree === undefined ? {} : { worktree }),
   };

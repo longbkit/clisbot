@@ -109,6 +109,46 @@ test("ordinary Hub create and message retries do not duplicate agents or prompts
   ).toMatchObject({ payload: { accepted: false } });
 });
 
+test("a keyed agent is named by its first message, and a set title is kept", async () => {
+  const hub = await launchRelationship();
+  async function createAgent(key: string, title?: string): Promise<string> {
+    const response = await hub.requestOrdinary({
+      type: "create_agent_request",
+      requestId: `${key}-create`,
+      idempotencyKey: key,
+      config: { provider: "codex", cwd: hub.repoRoot(), ...(title ? { title } : {}) },
+    });
+    if (response.type !== "status" || response.payload.status !== "agent_created")
+      throw new Error("Agent was not created");
+    return response.payload.agentId;
+  }
+  async function send(agentId: string, messageId: string, text: string) {
+    expect(
+      await hub.requestOrdinary({
+        type: "send_agent_message_request",
+        requestId: `${messageId}-send`,
+        agentId,
+        messageId,
+        text,
+        activeTurnBehavior: "steer",
+      }),
+    ).toMatchObject({ payload: { accepted: true, error: null } });
+  }
+  const titleOf = async (agentId: string) =>
+    (await hub.storedSessionAuthorship(agentId)).record?.title ?? null;
+
+  const untitled = await createAgent("untitled-agent");
+  expect(await titleOf(untitled)).toBeNull();
+  await send(untitled, "first", "\n  Fix the flaky login test\nin the checkout flow");
+  expect(await titleOf(untitled)).toBe("Fix the flaky login test");
+  await send(untitled, "second", "Now update the docs");
+  expect(await titleOf(untitled)).toBe("Fix the flaky login test");
+
+  const titled = await createAgent("titled-agent", "Release checklist");
+  await send(titled, "titled-first", "Fix the flaky login test");
+  expect(await titleOf(titled)).toBe("Release checklist");
+});
+
 test("ordinary Hub requests survive daemon restart and restore an archived workspace", async () => {
   const hub = await launchRelationship();
   const create = {

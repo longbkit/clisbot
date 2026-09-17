@@ -21,7 +21,13 @@ import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig } from "
 import type { DaemonConnection } from "../daemon/client.js";
 import { ManualClock } from "../plane/clock.js";
 import type { InboundConversationDetail, InboundMessage, PlaneLogger } from "../plane/types.js";
-import { BindingEngine, admitFollowUp, deriveBindingKey, executionMarker } from "./index.js";
+import {
+  BindingEngine,
+  CHANNEL_EXECUTION_ID_LABEL,
+  admitFollowUp,
+  channelExecutionLabels,
+  deriveBindingKey,
+} from "./index.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 
 const ORGANIZATION_ID = "channel-org";
@@ -32,7 +38,11 @@ const SILENT: PlaneLogger = { warn: () => undefined, info: () => undefined };
 
 // --- Fixtures --------------------------------------------------------------
 
-function snapshotOf(id: string, title: string | null): AgentSnapshot {
+function snapshotOf(
+  id: string,
+  title: string | null,
+  labels: Record<string, string> = {},
+): AgentSnapshot {
   return {
     id,
     provider: "codex",
@@ -41,7 +51,7 @@ function snapshotOf(id: string, title: string | null): AgentSnapshot {
     status: "idle",
     createdAt: "2026-08-25T00:00:00Z",
     updatedAt: "2026-08-25T00:00:00Z",
-    labels: {},
+    labels,
   };
 }
 
@@ -49,6 +59,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
   const created: {
     config: CreateAgentConfig;
     title: string | null;
+    labels: Record<string, string>;
     workspaceId: string | null;
   }[] = [];
   const workspaces: { cwd: string; prompt: string | undefined }[] = [];
@@ -73,10 +84,14 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
       created.push({
         config,
         title: options?.title ?? null,
+        labels: options?.labels ?? {},
         workspaceId: options?.workspaceId ?? null,
       });
       const id = `agent-${seq++}`;
-      return { agentId: id, agent: snapshotOf(id, options?.title ?? null) };
+      return {
+        agentId: id,
+        agent: snapshotOf(id, options?.title ?? null, options?.labels ?? {}),
+      };
     },
     sendAgentMessage: async (agentId, text, options) => {
       sources.push(options?.source);
@@ -419,6 +434,10 @@ describe("bind (first mention)", () => {
 
     assert.deepEqual(workspaces, [{ cwd: "/tmp/repo", prompt: "start the build" }]);
     assert.equal(created[0]?.workspaceId, "workspace-0", "the session lands in that workspace");
+    // The daemon names the session from its first message; the execution id
+    // rides on a label for orphan recovery.
+    assert.equal(created[0]?.title, null);
+    assert.match(created[0]?.labels[CHANNEL_EXECUTION_ID_LABEL] ?? "", /^[0-9a-f-]{36}$/u);
   });
 
   it("leaves placement to the daemon when workspace organization is off (A6)", async () => {
@@ -723,7 +742,7 @@ describe("admitFollowUp", () => {
 // --- orphan recovery (restart/resume) --------------------------------------
 
 describe("orphan recovery (restart / resume)", () => {
-  it("re-binds a surviving agent by its marker title and never re-creates", async () => {
+  it("re-binds a surviving agent by its execution-id label and never re-creates", async () => {
     const executionId = "execution-orphan";
     await store.recordPendingThreadBinding({
       organizationId: ORGANIZATION_ID,
@@ -735,7 +754,7 @@ describe("orphan recovery (restart / resume)", () => {
       initiator: INITIATOR,
       route: {},
     });
-    const surviving = snapshotOf("agent-100", executionMarker(executionId));
+    const surviving = snapshotOf("agent-100", null, channelExecutionLabels(executionId));
     const { daemon, created } = makeFakeDaemon([surviving]);
     const engine = makeEngine(store, daemon);
 
@@ -747,6 +766,28 @@ describe("orphan recovery (restart / resume)", () => {
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0ORPHAN", null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, "agent-100", "re-bound to the surviving agent, no duplicate");
+  });
+
+  // COMPAT(channel-execution-title-marker): remove with the title fallback.
+  it("re-binds an agent created before the label by its old title marker", async () => {
+    const executionId = "execution-before-label";
+    await store.recordPendingThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0LEGACY",
+      externalThreadId: null,
+      pendingExecutionId: executionId,
+      initiator: INITIATOR,
+      route: {},
+    });
+    const { daemon } = makeFakeDaemon([
+      snapshotOf("agent-legacy", `clisbot-channel:${executionId}`),
+    ]);
+
+    assert.equal((await makeEngine(store, daemon).recoverOrphans()).rebound, 1);
+    const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0LEGACY", null);
+    assert.equal(binding?.agentId, "agent-legacy");
   });
 
   // The tool-path capability is what a Channel agent replies through, and two
@@ -873,7 +914,7 @@ describe("orphan recovery (restart / resume)", () => {
       initiator: INITIATOR,
       route: {},
     });
-    const surviving = snapshotOf("agent-200", executionMarker(executionId));
+    const surviving = snapshotOf("agent-200", null, channelExecutionLabels(executionId));
     const { daemon, created } = makeFakeDaemon([surviving]);
     const engine = makeEngine(store, daemon);
 
@@ -908,7 +949,7 @@ describe("orphan recovery (restart / resume)", () => {
     // A surviving agent exists, so the re-bind is technically possible — the
     // gate must still hold: the re-bind is the inbound driving it, and this
     // sender holds no role on the route.
-    const surviving = snapshotOf("agent-300", executionMarker(executionId));
+    const surviving = snapshotOf("agent-300", null, channelExecutionLabels(executionId));
     const { daemon, created } = makeFakeDaemon([surviving]);
     const engine = makeEngine(store, daemon);
     const locked: CompiledRoute = {
@@ -955,7 +996,7 @@ describe("orphan recovery (restart / resume)", () => {
       initiator: INITIATOR,
       route: {},
     });
-    const surviving = snapshotOf("agent-310", executionMarker(executionId));
+    const surviving = snapshotOf("agent-310", null, channelExecutionLabels(executionId));
     const { daemon, created } = makeFakeDaemon([surviving]);
     const engine = makeEngine(store, daemon);
     const route = makeRoute();
@@ -1003,7 +1044,7 @@ describe("orphan recovery (restart / resume)", () => {
       initiator: INITIATOR,
       route: {},
     });
-    const surviving = snapshotOf("agent-400", executionMarker(executionId));
+    const surviving = snapshotOf("agent-400", null, channelExecutionLabels(executionId));
     const { daemon, created } = makeFakeDaemon([surviving]);
     let lookups = 0;
     // Own-property override on a prototype chain: the store's methods (and its

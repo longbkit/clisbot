@@ -2,8 +2,8 @@
 // The Hub keeps one durable thread binding per thread key: the first mention in
 // an unbound thread records a pre-create pending marker, issues
 // `create_agent_request`, and resolves the marker to the new agent id; every
-// follow-up steers the bound session. The pending marker + a marker title on
-// the created agent make orphan recovery possible: on start the Hub scans its
+// follow-up steers the bound session. The pending marker + an execution-id
+// label on the created agent make orphan recovery possible: on start the Hub scans its
 // pending markers against `fetch_agents` and rebinds a surviving agent instead
 // of re-creating it (plan §10 "one agent, no duplicate" — the trusted path has
 // no create-dedup, so the marker is the idempotency). One decision path here:
@@ -30,7 +30,7 @@ import {
   ChannelConfigurationDeniedError,
   ChannelWorkflowTargetError,
   createRouteSession,
-  executionMarker,
+  findChannelExecutionAgent,
   type SessionCreateContext,
 } from "./session-create.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
@@ -57,7 +57,11 @@ export {
   type StoredRouteSummary,
   type ThreadKey,
 } from "./stored-route.js";
-export { ChannelWorkflowTargetError, executionMarker } from "./session-create.js";
+export {
+  CHANNEL_EXECUTION_ID_LABEL,
+  ChannelWorkflowTargetError,
+  channelExecutionLabels,
+} from "./session-create.js";
 
 const NO_AGENT_REASON = "thread binding has no agent; operator recovery required";
 
@@ -200,8 +204,8 @@ export class BindingEngine {
 
   /**
    * Orphan recovery (plan §10): scan the org's pending markers against
-   * `fetch_agents`; a marker whose agent survived (matched by the marker
-   * title) is re-bound instead of re-created. A marker with no surviving agent
+   * `fetch_agents`; a marker whose agent survived (matched by its
+   * execution-id label) is re-bound instead of re-created. A marker with no surviving agent
    * is left pending — the create may have timed out rather than failed, so a
    * later inbound (or a later restart) re-checks it.
    */
@@ -215,12 +219,10 @@ export class BindingEngine {
     );
     if (pending.length === 0) return { rebound: 0, leftPending: 0 };
     const agents = await this.context.daemon.listAgents();
-    const byTitle = new Map(agents.map((agent) => [agent.title ?? "", agent]));
     let rebound = 0;
     let leftPending = 0;
     for (const marker of pending) {
-      const title = executionMarker(marker.pendingExecutionId ?? "");
-      const agent = byTitle.get(title);
+      const agent = findChannelExecutionAgent(agents, marker.pendingExecutionId ?? "");
       if (agent === undefined) {
         leftPending += 1;
         continue;
@@ -440,7 +442,7 @@ export class BindingEngine {
     if (refusal !== undefined) return refusal;
     const executionId = pendingExecutionId ?? "";
     const agents = await this.context.daemon.listAgents();
-    const surviving = agents.find((agent) => agent.title === executionMarker(executionId));
+    const surviving = findChannelExecutionAgent(agents, executionId);
     if (surviving === undefined) {
       return {
         kind: "ignored",

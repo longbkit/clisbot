@@ -256,7 +256,6 @@ export class ChannelLifecycleCommands {
       const config = await this.deps.resolveConfig(context, capability);
       const workspaceId = await this.resolveSessionWorkspace(name, context, config, prompt);
       return await this.deps.daemon.createAgent(config, {
-        title: `Channel /${name}`,
         source: context.message,
         ...(oneOff ? { autoArchive: true } : {}),
         ...(workspaceId === undefined ? {} : { workspaceId }),

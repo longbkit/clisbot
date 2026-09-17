@@ -390,7 +390,7 @@ describe("channel trusted-client daemon connection", () => {
           base: "main",
         },
       },
-      { title: "channel-worker" },
+      { title: "channel-worker", labels: { "clisbot.channel-execution-id": "execution-1" } },
     );
     assert.equal(result.agentId, "agent-1");
     assert.equal(result.agent.id, "agent-1");
@@ -400,6 +400,8 @@ describe("channel trusted-client daemon connection", () => {
     assert.equal(config["provider"], "codex");
     assert.equal(config["cwd"], "/tmp/work");
     assert.equal(config["title"], "channel-worker");
+    assert.deepEqual(frame["labels"], { "clisbot.channel-execution-id": "execution-1" });
+    assert.equal(config["labels"], undefined);
     assert.equal(config["projectId"], undefined);
     assert.equal(config["worktree"], undefined);
     assert.equal(frame["projectId"], "project-channel");

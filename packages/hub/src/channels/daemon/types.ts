@@ -174,6 +174,8 @@ export interface CreateAgentOptions {
   source?: import("../plane/types.js").InboundMessage;
   clientMessageId?: string;
   title?: string;
+  /** Agent labels the daemon persists and reports back in `fetch_agents`. */
+  labels?: Record<string, string>;
   initialPrompt?: string;
   attachments?: TextAttachment[];
   autoArchive?: boolean;

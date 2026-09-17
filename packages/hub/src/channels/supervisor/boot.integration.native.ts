@@ -711,7 +711,9 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     assert.equal(config["provider"], "codex");
     assert.equal(config["model"], "gpt-5.6-luna");
     assert.equal(config["cwd"], ENV_CWD);
-    assert.match(String(config["title"]), /^clisbot-channel:[0-9a-f-]{36}$/u);
+    assert.equal(config["title"], undefined, "the daemon names the session from its first message");
+    const labels = create["labels"] as Record<string, unknown>;
+    assert.match(String(labels["clisbot.channel-execution-id"]), /^[0-9a-f-]{36}$/u);
 
     const send = daemon.messages.find(
       (message) => message["type"] === "send_agent_message_request",

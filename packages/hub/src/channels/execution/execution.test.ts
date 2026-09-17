@@ -37,7 +37,11 @@ import type {
 } from "../plane/types.js";
 import { planeInboundDeferral } from "../plane/types.js";
 import { ManualClock } from "../plane/clock.js";
-import { executionMarker, parseStoredRouteSelection, routeFingerprint } from "../bindings/index.js";
+import {
+  channelExecutionLabels,
+  parseStoredRouteSelection,
+  routeFingerprint,
+} from "../bindings/index.js";
 import { buttonValue, cardIdFor } from "../approvals/card.js";
 import { mintChannelCommandButton } from "../command-buttons.js";
 import { ApprovalPostureError } from "../policy.js";
@@ -143,7 +147,11 @@ function makeControlPlane(account: CompiledChannelAccount): ChannelControlPlane 
   };
 }
 
-function snapshotOf(id: string, title: string | null): AgentSnapshot {
+function snapshotOf(
+  id: string,
+  title: string | null,
+  labels: Record<string, string> = {},
+): AgentSnapshot {
   return {
     id,
     provider: "codex",
@@ -152,7 +160,7 @@ function snapshotOf(id: string, title: string | null): AgentSnapshot {
     status: "idle",
     createdAt: "2026-08-25T00:00:00Z",
     updatedAt: "2026-08-25T00:00:00Z",
-    labels: {},
+    labels,
   };
 }
 
@@ -188,7 +196,7 @@ function makeFakeDaemon(
       if (options.failCreate === true) throw new Error("create refused");
       created.push({ config, title: opts?.title ?? null });
       const id = `agent-${seq++}`;
-      return { agentId: id, agent: snapshotOf(id, opts?.title ?? null) };
+      return { agentId: id, agent: snapshotOf(id, opts?.title ?? null, opts?.labels ?? {}) };
     },
     sendAgentMessage: async (agentId, text, opts) => {
       options.order?.push("send");
@@ -1631,7 +1639,11 @@ describe("start-time recovery + posture", () => {
       initiator: "telegram:77",
       route: { kind: "group", id: "-100777" },
     });
-    const surviving = snapshotOf("telegram-agent", executionMarker(pendingExecutionId));
+    const surviving = snapshotOf(
+      "telegram-agent",
+      null,
+      channelExecutionLabels(pendingExecutionId),
+    );
     const harness = makeHarness({ daemonAgents: [surviving] });
 
     await harness.plane.start(harness.fake.daemon, store);
@@ -1657,7 +1669,7 @@ describe("start-time recovery + posture", () => {
       initiator: INITIATOR,
       route: {},
     });
-    const surviving = snapshotOf("agent-100", executionMarker(executionId));
+    const surviving = snapshotOf("agent-100", null, channelExecutionLabels(executionId));
     const { plane, posted } = makeHarness();
 
     const recovered = await plane.start(makeFakeDaemon([surviving]).daemon, store);

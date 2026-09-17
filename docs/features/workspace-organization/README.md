@@ -52,6 +52,16 @@ routes:
 
 A channel still creates the session first and sends the first request after. That request rides on the workspace-create step, not on `initialPrompt`: a prompt at create time races the stream subscription of the first turn.
 
+## Session names
+
+The Hub sends no session `title` on any path — first mention, `/new`, `/quick`, `/side`, `/fork`. The daemon names an untitled agent from its first `send_agent_message_request`, with the rule `initialPrompt` uses at create time: first non-empty line, whitespace collapsed, 60 characters (`nameUntitledAgentFromPrompt` in `packages/server/src/server/session.ts`). A title already set, by the user or a client, is kept. Until that first message lands the title is `null`, and the app shows its fallback label.
+
+Do not send a placeholder title. The daemon treats any client title as set, so the first message would never replace it.
+
+Orphan recovery used to find a crashed create's agent by a `clisbot-channel:<executionId>` title, which is how sessions ended up named that way. It now reads the `clisbot.channel-execution-id` agent label (`bindings/session-create.ts`). The old title is still matched for creates left pending across the upgrade, tagged `COMPAT(channel-execution-title-marker)`.
+
+A `/fork` without a message sends `Continue from the conversation context.`, so that is its name.
+
 ## Acceptance
 
 For the two shipped items — `/side` and `/fork` keep the source workspace, and a new workspace is named from the first request. Both wire into the existing workspace-selection and naming paths and add no rule to channel or workflow YAML.

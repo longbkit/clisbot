@@ -15,7 +15,7 @@
 import type { ChannelStore } from "../../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
-import type { CreateAgentConfig } from "../daemon/types.js";
+import type { AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import { resolveConversationConfiguration } from "../commands-config.js";
 import { resolveSessionWorkspaceId } from "../workspace-organization.js";
 import {
@@ -64,9 +64,28 @@ export interface SessionCreateContext {
   noteAgentCwd?: ((agentId: string, cwd: string) => void) | undefined;
 }
 
-/** The marker the plane stamps on a created agent so orphan recovery can match it. */
-export function executionMarker(pendingExecutionId: string): string {
-  return `clisbot-channel:${pendingExecutionId}`;
+/** The agent label carrying the pending execution id, so orphan recovery can
+ * find the agent a crashed create left behind. A label rather than the title:
+ * the title belongs to the reader, and the daemon names an untitled agent from
+ * its first message. */
+export const CHANNEL_EXECUTION_ID_LABEL = "clisbot.channel-execution-id";
+
+export function channelExecutionLabels(pendingExecutionId: string): Record<string, string> {
+  return { [CHANNEL_EXECUTION_ID_LABEL]: pendingExecutionId };
+}
+
+/** The agent a pending execution created, if it survived. */
+export function findChannelExecutionAgent(
+  agents: readonly AgentSnapshot[],
+  pendingExecutionId: string,
+): AgentSnapshot | undefined {
+  return agents.find(
+    (agent) =>
+      agent.labels?.[CHANNEL_EXECUTION_ID_LABEL] === pendingExecutionId ||
+      // COMPAT(channel-execution-title-marker): added 2026-09-17, remove after 2026-12-31.
+      // A create pending across the Hub upgrade still carries the old title marker.
+      agent.title === `clisbot-channel:${pendingExecutionId}`,
+  );
 }
 
 export class ChannelWorkflowTargetError extends Error {
@@ -185,7 +204,7 @@ export async function createRouteSession(
       );
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
     const created = await context.daemon.createAgent(config, {
-      title: executionMarker(executionId),
+      labels: channelExecutionLabels(executionId),
       source: requester,
       ...(workspaceId === undefined ? {} : { workspaceId }),
     });
