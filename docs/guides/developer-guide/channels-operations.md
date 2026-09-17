@@ -226,6 +226,8 @@ What to grep for, by question:
 
 **Did the reply go out?** `relay post started` then `relay post completed` with `externalMessageId`. A failure is `relay post failed; the ledger row stays recoverable`, and the transport-level warnings are `channel post failed`, `channel media post failed`, `channel in-place update failed`.
 
+**Can a `tool`-path session still reply?** `channel reply capability unknown` (with `verb`) means an Agent dialed a capability the Hub does not hold, and the Agent sees `unknown, expired, or revoked channel reply capability`. The daemon keeps the MCP URL a session was created with, so that session can never post again. The next admitted message in its conversation replaces it: `bound session lost its channel reply capability; starting a new one`. Capabilities survive a Hub restart, an account restart, a new revision and a disable; only removing the account from the configuration or 7 idle days end them.
+
 **Did streaming work?** `channel streaming draft failed`, `channel streaming finalize failed`, `channel streaming draft reached the channel text cap`, `channel streaming progress failed`.
 
 A silent `hub.log` around an inbound message that never got an answer means the event did not reach the plane at all — check the transport and the queue depth before reading anything else.

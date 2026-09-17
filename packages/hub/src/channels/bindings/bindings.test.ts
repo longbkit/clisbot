@@ -959,6 +959,57 @@ describe("orphan recovery (restart / resume)", () => {
     assert.notEqual(secondTurn, firstTurn, "the follow-up turn replaced the create-time one");
   });
 
+  // The daemon keeps the MCP URL a session was created with, so a session whose
+  // capability was revoked or expired answered "unknown, expired, or revoked
+  // channel reply capability" on every later turn. The next follow-up starts a
+  // fresh session holding a live capability instead of steering into silence.
+  it("replaces a bound session whose reply capability is gone", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const account = makeAccount(
+      makeRoute("C0SILENT", { defaults: { outbound: { path: "tool", template: null } } }),
+    );
+    const capabilities = new ChannelReplyCapabilityRegistry();
+    const issued: string[] = [];
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(account),
+      logger: SILENT,
+      clock: new ManualClock(),
+      store,
+      daemon,
+      resolveAgentSpec: (_target, _defaults, _ref, reply) => {
+        if (reply !== undefined) issued.push(reply.token);
+        return { provider: "codex", cwd: "/tmp/repo" };
+      },
+      resolveAgentAccessTarget: () => ({ daemonReference: "daemon-1", projectId: "project-1" }),
+      replyCapabilities: capabilities,
+    });
+    const inbound = () =>
+      message({
+        conversation: {
+          kind: "channel",
+          id: "C0SILENT",
+          rootConversationId: "C0SILENT",
+          threadId: null,
+        },
+      });
+    const route = account.routes[0] as CompiledRoute;
+    const first = await engine.bindOrSteer(inbound(), account, route);
+    assert.equal(first.kind, "bound");
+    capabilities.revokeAccount(ORGANIZATION_ID, "slack", account.accountId);
+
+    const next = await engine.bindOrSteer(inbound(), account, route);
+
+    assert.equal(next.kind, "bound");
+    assert.notEqual(next.kind === "bound" && next.agentId, first.kind === "bound" && first.agentId);
+    assert.equal(created.length, 2);
+    assert.equal(issued.length, 2);
+    assert.equal(
+      capabilities.resolve(issued[1] as string, ORGANIZATION_ID)?.agentId,
+      next.kind === "bound" ? next.agentId : undefined,
+    );
+  });
+
   it("leaves a marker pending when no agent survived the create", async () => {
     await store.recordPendingThreadBinding({
       organizationId: ORGANIZATION_ID,

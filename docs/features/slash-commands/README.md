@@ -402,7 +402,7 @@ served this message. That Route is the one changed, and `/routedefault` shows it
   Route starts uses the new value. The supervisor adopts a revision that differs
   only in `agentControls` in place (`route-defaults/signature.ts`,
   `ChannelPlane.refresh`) instead of restarting accounts, because a restart
-  cancels Route-owned turns and retires reply capabilities in every account.
+  cancels Route-owned turns in every account.
 - **Undo.** `/promoteroutedefault undo` restores the value the Route's default had
   before its most recent change, published as a new revision. It reads the
   revision history and stops where the Route itself was different, so it never

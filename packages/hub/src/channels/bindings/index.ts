@@ -220,6 +220,9 @@ export class BindingEngine {
       await this.retireRetargeted(binding);
       return this.firstMention(message, account, route, key, subscribe);
     }
+    if (this.lostReplyCapability(binding.agentId, route)) {
+      return this.replaceSilencedSession(message, account, route, binding, key, subscribe);
+    }
     return this.followUp(message, account, route, binding.agentId, subscribe);
   }
 
@@ -277,6 +280,58 @@ export class BindingEngine {
   ): Promise<InboundOutcome> {
     const refusal = await this.admitUnbound(message, account, route);
     if (refusal !== undefined) return refusal;
+    return this.startSession(message, account, route, key, subscribe);
+  }
+
+  /**
+   * A `tool`-path session whose reply capability is gone (revoked, expired)
+   * answers into silence for the rest of its life: the daemon keeps the MCP URL
+   * it was created with, so no new capability can reach it. The conversation
+   * gets a fresh session instead — admitted as the follow-up it is, so a
+   * message that could have steered the old session does not need a new mention.
+   */
+  private async replaceSilencedSession(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    binding: ThreadBindingRecord,
+    key: ThreadKey,
+    subscribe?: (agentId: string) => Promise<void> | void,
+  ): Promise<InboundOutcome> {
+    const agentId = binding.agentId ?? "";
+    const refusal = await this.admitBound(message, account, route, agentId);
+    if (refusal !== undefined) return refusal;
+    this.context.logger.warn(
+      "bound session lost its channel reply capability; starting a new one",
+      {
+        channel: account.channel,
+        accountId: account.accountId,
+        ...labelOf(message),
+        agentId,
+      },
+    );
+    await this.retireRetargeted(binding);
+    return this.startSession(message, account, route, key, subscribe);
+  }
+
+  /** A `tool`-path route whose bound session can no longer post its reply. */
+  private lostReplyCapability(agentId: string, route: CompiledRoute): boolean {
+    const capabilities = this.context.replyCapabilities;
+    return (
+      route.defaults.outbound.path === "tool" &&
+      capabilities !== undefined &&
+      !capabilities.holdsAgentCapability(agentId)
+    );
+  }
+
+  /** Mint and bind a session for an admitted inbound, then deliver its prompt. */
+  private async startSession(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    key: ThreadKey,
+    subscribe?: (agentId: string) => Promise<void> | void,
+  ): Promise<InboundOutcome> {
     const executionId = randomUUID();
     // Admitted: the turn is happening. Raise the surface before any daemon
     // call, keyed provisionally on the execution id and re-keyed to the
@@ -415,6 +470,29 @@ export class BindingEngine {
     return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
   }
 
+  /**
+   * The admission a BOUND thread needs to continue: the follow-up gate (mode,
+   * idle window) and then the route's `bot.interact` gate. `undefined` = admitted.
+   */
+  private async admitBound(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    agentId: string,
+  ): Promise<InboundOutcome | undefined> {
+    const admission = admitFollowUp(
+      message,
+      route.defaults,
+      this.isIdle(agentId, route.defaults),
+      await this.followUpMode(message, route),
+    );
+    if (!admission.allowed) {
+      return { kind: "ignored", reason: admission.reason ?? "follow-up not admitted" };
+    }
+    const authorization = await this.mayUse(message, account, route);
+    return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
+  }
+
   /** A definitive authorization refusal releases its marker; uncertain daemon failures retain it for recovery. */
   private async settleCreationFailure(
     error: unknown,
@@ -501,22 +579,8 @@ export class BindingEngine {
     agentId: string,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const admission = admitFollowUp(
-      message,
-      route.defaults,
-      this.isIdle(agentId, route.defaults),
-      await this.followUpMode(message, route),
-    );
-    if (!admission.allowed) {
-      return {
-        kind: "ignored",
-        reason: admission.reason ?? "follow-up not admitted",
-      };
-    }
-    const authorization = await this.mayUse(message, account, route);
-    if (!authorization.allowed) {
-      return { kind: "ignored", reason: authorization.reason };
-    }
+    const refusal = await this.admitBound(message, account, route, agentId);
+    if (refusal !== undefined) return refusal;
     const leaseId = randomUUID();
     this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
     this.context.processing?.bind(leaseId, agentId);
