@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ import { clisbotConfigSchema } from "../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 const tempDirs: string[] = [];
+const spawnedPids: number[] = [];
 const originalClisbotConfigPath = process.env.CLISBOT_CONFIG_PATH;
 const originalClisbotHome = process.env.CLISBOT_HOME;
 const originalClisbotPidPath = process.env.CLISBOT_PID_PATH;
@@ -23,6 +25,13 @@ const originalClisbotLogPath = process.env.CLISBOT_LOG_PATH;
 const originalClisbotRuntimeMonitorStatePath = process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH;
 
 afterEach(() => {
+  while (spawnedPids.length > 0) {
+    try {
+      process.kill(spawnedPids.pop()!, "SIGTERM");
+    } catch {
+      // Process already exited.
+    }
+  }
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop()!, { force: true, recursive: true });
   }
@@ -57,6 +66,15 @@ function createConfig() {
     botToken: "",
   };
   return config;
+}
+
+function spawnIdleProcess(args = ["-e", "setInterval(() => {}, 1000)"]) {
+  const child = spawn(process.execPath, args, { stdio: "ignore" });
+  if (!child.pid) {
+    throw new Error("failed to spawn test process");
+  }
+  spawnedPids.push(child.pid);
+  return child.pid;
 }
 
 describe("readRuntimeLog", () => {
@@ -187,13 +205,18 @@ describe("runtime monitor state", () => {
   test("prefers a live monitor pid from monitor state when the pid file is missing", async () => {
     const dir = createTempDir();
     const monitorStatePath = join(dir, "clisbot-monitor.json");
+    const monitorPid = spawnIdleProcess([
+      "-e",
+      "setInterval(() => {}, 1000)",
+      "serve-monitor",
+    ]);
     writeFileSync(
       monitorStatePath,
       `${JSON.stringify({
-        monitorPid: process.pid,
+        monitorPid,
         phase: "active",
-        startedAt: "2026-04-15T00:00:00.000Z",
-        updatedAt: "2026-04-15T00:01:00.000Z",
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }, null, 2)}\n`,
     );
 
@@ -205,8 +228,33 @@ describe("runtime monitor state", () => {
     });
 
     expect(status.running).toBe(true);
-    expect(status.pid).toBe(process.pid);
+    expect(status.pid).toBe(monitorPid);
     expect(status.serviceState).toBe("active");
+  });
+
+  test("rejects a stale monitor pid that was reused by an unrelated process", async () => {
+    const dir = createTempDir();
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    const unrelatedPid = spawnIdleProcess();
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid: unrelatedPid,
+        phase: "active",
+        startedAt: "2020-01-01T00:00:00.000Z",
+        updatedAt: "2020-01-01T00:00:01.000Z",
+      }, null, 2)}\n`,
+    );
+
+    const status = await getRuntimeStatus({
+      monitorStatePath,
+      pidPath: join(dir, "missing.pid"),
+      logPath: join(dir, "clisbot.log"),
+      configPath: join(dir, "clisbot.json"),
+    });
+
+    expect(status.running).toBe(false);
+    expect(status.pid).toBeUndefined();
   });
 });
 
@@ -216,14 +264,19 @@ describe("startDetachedRuntime", () => {
     const configPath = join(dir, "clisbot.json");
     const pidPath = join(dir, "clisbot.pid");
     const monitorStatePath = join(dir, "clisbot-monitor.json");
+    const monitorPid = spawnIdleProcess([
+      "-e",
+      "setInterval(() => {}, 1000)",
+      "serve-monitor",
+    ]);
     writeFileSync(configPath, "{}\n");
     writeFileSync(
       monitorStatePath,
       `${JSON.stringify({
-        monitorPid: process.pid,
+        monitorPid,
         phase: "active",
-        startedAt: "2026-04-15T00:00:00.000Z",
-        updatedAt: "2026-04-15T00:01:00.000Z",
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }, null, 2)}\n`,
     );
 
@@ -237,8 +290,49 @@ describe("startDetachedRuntime", () => {
     });
 
     expect(result.alreadyRunning).toBe(true);
-    expect(result.pid).toBe(process.pid);
-    expect(await readRuntimePid(pidPath)).toBe(process.pid);
+    expect(result.pid).toBe(monitorPid);
+    expect(await readRuntimePid(pidPath)).toBe(monitorPid);
+  });
+
+  test("starts a new monitor when a stale monitor pid was reused", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const pidPath = join(dir, "clisbot.pid");
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    const fakeMonitorPath = join(dir, "fake-monitor.mjs");
+    const unrelatedPid = spawnIdleProcess();
+    writeFileSync(configPath, "{}\n");
+    writeFileSync(pidPath, `${unrelatedPid}\n`);
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid: unrelatedPid,
+        phase: "active",
+        startedAt: "2020-01-01T00:00:00.000Z",
+        updatedAt: "2020-01-01T00:00:01.000Z",
+      }, null, 2)}\n`,
+    );
+    writeFileSync(
+      fakeMonitorPath,
+      [
+        'import { writeFileSync } from "node:fs";',
+        'writeFileSync(process.env.CLISBOT_PID_PATH, `${process.pid}\\n`);',
+        "setInterval(() => {}, 1000);",
+      ].join("\n"),
+    );
+
+    const result = await startDetachedRuntime({
+      scriptPath: fakeMonitorPath,
+      configPath,
+      pidPath,
+      monitorStatePath,
+      logPath: join(dir, "clisbot.log"),
+      runtimeCredentialsPath: join(dir, "runtime-credentials.json"),
+    });
+    spawnedPids.push(result.pid);
+
+    expect(result.alreadyRunning).toBe(false);
+    expect(result.pid).not.toBe(unrelatedPid);
   });
 });
 
@@ -278,6 +372,48 @@ describe("getProcessLiveness", () => {
 });
 
 describe("stopDetachedRuntime", () => {
+  test("does not signal stale monitor or worker pids reused by unrelated processes", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const pidPath = join(dir, "clisbot.pid");
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    const monitorPid = spawnIdleProcess();
+    const runtimePid = spawnIdleProcess();
+    writeFileSync(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`);
+    writeFileSync(pidPath, `${monitorPid}\n`);
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid,
+        runtimePid,
+        phase: "active",
+        startedAt: "2020-01-01T00:00:00.000Z",
+        updatedAt: "2020-01-01T00:00:01.000Z",
+      }, null, 2)}\n`,
+    );
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+
+    const result = await stopDetachedRuntime(
+      {
+        configPath,
+        pidPath,
+        monitorStatePath,
+        runtimeCredentialsPath: join(dir, "runtime-credentials.json"),
+      },
+      {
+        sendSignal: ((pid: number, signal: NodeJS.Signals) => {
+          signals.push({ pid, signal });
+          return true;
+        }) as typeof process.kill,
+      },
+    );
+
+    expect(result.stopped).toBe(false);
+    expect(signals).toEqual([]);
+    expect(() => process.kill(monitorPid, 0)).not.toThrow();
+    expect(() => process.kill(runtimePid, 0)).not.toThrow();
+  });
+
   test("deactivates persisted mem bots in config even when the runtime is already gone", async () => {
     const dir = createTempDir();
     const configPath = join(dir, "clisbot.json");
@@ -405,6 +541,7 @@ describe("stopDetachedRuntime", () => {
       },
       {
         processLiveness: () => livenessStates.shift() ?? "zombie",
+        processMatcher: () => true,
         sendSignal: ((pid: number, signal: NodeJS.Signals) => {
           signals.push({ pid, signal });
           return true;
@@ -449,6 +586,7 @@ describe("stopDetachedRuntime", () => {
           }
           return "missing";
         },
+        processMatcher: ({ role }) => role === "serve-foreground",
         sendSignal: ((pid: number, signal: NodeJS.Signals) => {
           signals.push({ pid, signal });
           if (pid === 434343 && signal === "SIGTERM") {
@@ -496,6 +634,7 @@ describe("stopDetachedRuntime", () => {
           }
           return "missing";
         },
+        processMatcher: ({ role }) => role === "serve-monitor",
         sendSignal: ((pid: number, signal: NodeJS.Signals) => {
           signals.push({ pid, signal });
           if (pid === 424242 && signal === "SIGTERM") {
