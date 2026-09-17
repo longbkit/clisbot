@@ -12,7 +12,11 @@
 // carried unchanged: the rest of that file is the OpenClaw pairing controller,
 // group-policy resolver and ingress-identity allowlist, all Hub-owned.
 
-import type { ChannelInboundEvent, ChannelInboundKind } from "@getpaseo/channels-shared";
+import {
+  readSlashCommand,
+  type ChannelInboundEvent,
+  type ChannelInboundKind,
+} from "@getpaseo/channels-shared";
 import { parseDateStringTimestampMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
 import { normalizeGoogleChatUserId } from "../ingress-identity.js";
 import { isGoogleChatGroupSpace } from "../targets.js";
@@ -147,15 +151,6 @@ function buildMessage(
         : { kind: "command" as ChannelInboundKind, facts: { command: slash } }),
     },
   };
-}
-
-/** A leading `/verb` line — Google Chat delivers native slash commands as text
- * plus a `SLASH_COMMAND` annotation, and a plain `/verb` is indistinguishable. */
-function readSlashCommand(body: string): { name: string; args: string } | undefined {
-  const match = /^\/([A-Za-z][\w-]*)(?:\s+([\s\S]*))?$/.exec(body.trim());
-  const name = match?.[1];
-  if (name === undefined) return undefined;
-  return { name: name.toLowerCase(), args: (match?.[2] ?? "").trim() };
 }
 
 function buildCardClick(

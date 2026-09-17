@@ -31,7 +31,11 @@
 //     leading `/verb` line in the MENTION-STRIPPED body, which is what makes
 //     "@bot /status" work in a group.
 
-import type { ChannelInboundEvent, ChannelInboundKind } from "@getpaseo/channels-shared";
+import {
+  readSlashCommand,
+  type ChannelInboundEvent,
+  type ChannelInboundKind,
+} from "@getpaseo/channels-shared";
 import { formatZalouserMessageSidFull } from "../message-sid.js";
 import type { ZaloInboundMessage } from "../types.js";
 
@@ -48,16 +52,6 @@ export type ZalouserInboundSkip = "own-message" | "empty-body" | "no-message-id"
 export type ZalouserInboundBuild =
   | { admit: true; event: ChannelInboundEvent }
   | { admit: false; reason: ZalouserInboundSkip };
-
-/** A leading `/verb` line. Zalo Personal has no native command surface, so a
- * command is exactly what the text says it is (the same rule the Google Chat
- * and Zalo Official Bot verticals apply). */
-function readSlashCommand(body: string): { name: string; args: string } | undefined {
-  const match = /^\/([A-Za-z][\w-]*)(?:\s+([\s\S]*))?$/.exec(body.trim());
-  const name = match?.[1];
-  if (name === undefined) return undefined;
-  return { name: name.toLowerCase(), args: (match?.[2] ?? "").trim() };
-}
 
 /** Upstream's mention facts, folded into the single boolean the Hub reads. */
 export function wasZalouserAddressed(message: ZaloInboundMessage): boolean {

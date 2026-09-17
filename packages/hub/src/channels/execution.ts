@@ -27,6 +27,7 @@ import {
 } from "./approvals/index.js";
 import { parseCardValue } from "./approvals/card.js";
 import {
+  parseChannelIdentityLinkCode,
   parseChannelTextCommand,
   textCommandHelpText,
   normalizeChannelCommandText,
@@ -291,7 +292,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         // (`inbound.editNotifications: all`); everything else is settled.
         if (roomEvent !== undefined) return roomEvent;
       }
-      const identityCode = parseChannelIdentityLinkCommand(message.text);
+      const identityCode = parseChannelIdentityLinkCode(message.text);
       if (identityCode !== null && deps.consumeChannelIdentityChallenge !== undefined) {
         // A code belongs to one bot's Connection, and an unaddressed code is
         // never forwarded to an agent.
@@ -2067,13 +2068,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   return plane;
-}
-
-function parseChannelIdentityLinkCommand(text: string): string | null {
-  const match = /^(?:<@[^>]+>\s*)?\/link(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9_-]+)\s*$/u.exec(
-    text.trim(),
-  );
-  return match?.[1] ?? null;
 }
 
 function workflowOutputDelivery(

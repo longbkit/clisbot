@@ -70,6 +70,7 @@ export type {
   InboundEventProcessorOptions,
 } from "./monitor.js";
 export { buildInboundCtxPayload, createInboundEventProcessor, inboundTurnId } from "./monitor.js";
+export { readSlashCommand } from "./slash-command.js";
 export type {
   DifferentialCase,
   DifferentialCorpus,

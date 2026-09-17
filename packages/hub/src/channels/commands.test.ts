@@ -5,7 +5,12 @@
 
 import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
-import { parseChannelTextCommand, CHANNEL_COMMANDS, textCommandHelpText } from "./commands.js";
+import {
+  CHANNEL_COMMANDS,
+  parseChannelIdentityLinkCode,
+  parseChannelTextCommand,
+  textCommandHelpText,
+} from "./commands.js";
 import { parseApprovalCommand } from "./approvals/command.js";
 
 describe("parseApprovalCommand", () => {
@@ -132,6 +137,27 @@ describe("parseApprovalCommand", () => {
     assert.equal(parseApprovalCommand("hello @longluong3bot"), null);
     assert.equal(parseApprovalCommand(""), null);
     assert.equal(parseApprovalCommand("deny me an extension"), null);
+  });
+});
+
+describe("parseChannelIdentityLinkCode", () => {
+  it("reads the code from every addressing form the other commands accept", () => {
+    for (const text of [
+      "/link ABCDE-23456",
+      "\\link ABCDE-23456",
+      "@longluong3bot /link ABCDE-23456",
+      "/link@longluong3bot ABCDE-23456",
+      "<@U0BOT> /link ABCDE-23456",
+      "/paseo link ABCDE-23456",
+    ]) {
+      assert.equal(parseChannelIdentityLinkCode(text), "ABCDE-23456", text);
+    }
+  });
+  it("ignores prose and a bare verb", () => {
+    assert.equal(parseChannelIdentityLinkCode("please /link ABCDE-23456"), null);
+    assert.equal(parseChannelIdentityLinkCode("/link"), null);
+    assert.equal(parseChannelIdentityLinkCode("/link two words"), null);
+    assert.equal(parseChannelIdentityLinkCode("link ABCDE-23456"), null);
   });
 });
 

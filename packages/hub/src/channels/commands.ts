@@ -282,7 +282,9 @@ export function isReservedChannelCommand(name: string): boolean {
   return COMMAND_ALIASES.has(name.toLowerCase()) || /^(approve|deny|paseo|link)$/iu.test(name);
 }
 
-const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "paseo"].join("|");
+const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "link", "paseo"].join(
+  "|",
+);
 
 /**
  * Normalize the mention/gluing forms a channel client can prepend or attach
@@ -387,6 +389,18 @@ export function parseApprovalCommand(text: string): ApprovalCommand | null {
     ...(requestId !== undefined ? { requestId } : {}),
     ...(answer !== "" ? { answer } : {}),
   };
+}
+
+/**
+ * Parse `/link <code>` — the identity-link challenge a Hub account shows in
+ * Settings — out of one inbound message; null for any other text. The code is
+ * returned as typed; the challenge store normalizes and verifies it. Every
+ * addressing form the other commands accept reaches it (`@bot /link`,
+ * `/link@bot`, `<@U…> /link`, `\link`, `/paseo link`).
+ */
+export function parseChannelIdentityLinkCode(text: string): string | null {
+  const match = /^\s*[/\\]link\s+([A-Za-z0-9_-]+)\s*$/iu.exec(normalizeChannelCommandText(text));
+  return match?.[1] ?? null;
 }
 
 /**

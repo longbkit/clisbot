@@ -22,7 +22,11 @@
 // account name (`getMe` → `account_name`, and any operator-configured aliases)
 // as a leading or embedded `@name` / bare name token.
 
-import type { ChannelInboundEvent, ChannelInboundKind } from "@getpaseo/channels-shared";
+import {
+  readSlashCommand,
+  type ChannelInboundEvent,
+  type ChannelInboundKind,
+} from "@getpaseo/channels-shared";
 import type { ZaloMessage, ZaloUpdate } from "../api.js";
 
 /** Upstream `monitor.ts`: a `date` this large is already milliseconds. */
@@ -62,16 +66,6 @@ export function resolveZaloTimestampMs(date: number | undefined): number | undef
     return undefined;
   }
   return date >= UNIX_MILLISECONDS_THRESHOLD ? date : date * 1000;
-}
-
-/** A leading `/verb` line — Zalo has no native command surface, so a command is
- * exactly what the text says it is (the same rule the Google Chat vertical
- * applies, `fusion/inbound-adapter.ts` there). */
-function readSlashCommand(body: string): { name: string; args: string } | undefined {
-  const match = /^\/([A-Za-z][\w-]*)(?:\s+([\s\S]*))?$/.exec(body.trim());
-  const name = match?.[1];
-  if (name === undefined) return undefined;
-  return { name: name.toLowerCase(), args: (match?.[2] ?? "").trim() };
 }
 
 /** True when `body` addresses one of the bot's names. `@name` wins; a bare name
