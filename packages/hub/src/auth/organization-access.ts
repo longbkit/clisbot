@@ -141,10 +141,23 @@ interface InvitationRow extends QueryRow {
   inviter_name: string;
   email: string;
   role: string;
-  team_id: string | null;
-  team_name: string | null;
+  teams: InvitationTeam[];
   expires_at: Date;
 }
+
+interface InvitationTeam {
+  id: string;
+  name: string;
+}
+
+/** The invitation's Teams as a name-ordered JSON array; the row source must expose `invitation`. */
+const INVITATION_TEAMS_COLUMN = `coalesce(
+  (select json_agg(json_build_object('id', team.id, 'name', team.name)
+                   order by lower(team.name), team.id)
+   from invitation_teams
+   join team on team.id = invitation_teams.team_id
+   where invitation_teams.invitation_id = invitation.id),
+  '[]'::json) as teams`;
 
 interface TargetMemberRow extends QueryRow {
   id: string;
@@ -158,6 +171,9 @@ const createInvitationBody = z
   .object({
     email: z.string().trim().email(),
     role: invitationRoleSchema,
+    teamIds: z.array(z.string().min(1)).max(100).optional(),
+    // COMPAT(invitationTeamId): single-Team invitation body from app builds before multi-Team
+    // invitations; remove after 2027-03-17
     teamId: z.string().min(1).optional(),
   })
   .strict();
@@ -521,18 +537,8 @@ export class OrganizationAccess {
       if (!capabilitiesFor(actorRole).manageMembers) {
         throw new ProductRequestError(403, "forbidden");
       }
-      const invitedTeam =
-        input.teamId === undefined
-          ? undefined
-          : (
-              await client.query<{ id: string; name: string }>(
-                `select id, name from team where id = $1 and organization_id = $2`,
-                [input.teamId, access.organization.id],
-              )
-            ).rows[0];
-      if (input.teamId !== undefined && invitedTeam === undefined) {
-        throw new ProductRequestError(404, "team_unavailable");
-      }
+      const teamIds = invitedTeamIds(input);
+      await requireOrganizationTeams(client, access.organization.id, teamIds);
       const existingMember = await client.query(
         `select 1 from member
          join "user" on "user".id = member.user_id
@@ -548,28 +554,23 @@ export class OrganizationAccess {
          where organization_id = $1 and status = 'pending' and expires_at <= now()`,
         [access.organization.id],
       );
-      const alreadyPending = await client.query<InvitationRow>(
-        `select id, organization_id, '' as organization_name, '' as inviter_name,
-                email, role, team_id, null::text as team_name, expires_at
-         from invitation
+      const alreadyPending = await client.query<{ id: string }>(
+        `select id from invitation
          where organization_id = $1 and lower(email) = $2 and status = 'pending'
            and expires_at > now()`,
         [access.organization.id, email],
       );
       const pendingReinvite = alreadyPending.rows[0];
       if (pendingReinvite !== undefined) {
-        const updated = await client.query<InvitationRow>(
-          `update invitation set role = $2, team_id = $3
-           where id = $1
-           returning id, organization_id, '' as organization_name, '' as inviter_name,
-                     email, role, team_id, null::text as team_name, expires_at`,
-          [pendingReinvite.id, input.role, invitedTeam?.id ?? null],
+        // The latest invite wins: it replaces the role and the Team set, and renews the expiry,
+        // so resending is how an admin keeps an invitation open.
+        await client.query(
+          `update invitation set role = $2, expires_at = now() + ($3 * interval '1 hour')
+           where id = $1`,
+          [pendingReinvite.id, input.role, INVITATION_LIFETIME_HOURS],
         );
-        const updatedInvitation = updated.rows[0];
-        if (updatedInvitation === undefined) {
-          throw new Error("pending invitation update returned no row");
-        }
-        return { ...updatedInvitation, team_name: invitedTeam?.name ?? null };
+        await replaceInvitationTeams(client, pendingReinvite.id, teamIds);
+        return await managedInvitation(client, pendingReinvite.id);
       }
       // A genuinely new invitee reserves a seat, so the organization must both be allowed to
       // invite at all and have a free seat. Both checks run under the membership advisory lock
@@ -577,13 +578,11 @@ export class OrganizationAccess {
       // another. Re-inviting an existing member or pending invitee (handled above) is exempt.
       await this.options.entitlements.requireFlag(access.organization.id, "canInviteMembers");
       await this.options.entitlements.requireHeadroom(access.organization.id, "seats");
-      const inserted = await client.query<InvitationRow>(
+      const inserted = await client.query<{ id: string }>(
         `insert into invitation
-          (id, organization_id, email, role, status, expires_at, inviter_id, created_at, team_id)
-         values ($1, $2, $3, $4, 'pending', now() + ($6 * interval '1 hour'), $5, now(), $7)
-         on conflict (organization_id, lower(email)) where status = 'pending' do nothing
-         returning id, organization_id, '' as organization_name, '' as inviter_name,
-                   email, role, team_id, null::text as team_name, expires_at`,
+          (id, organization_id, email, role, status, expires_at, inviter_id, created_at)
+         values ($1, $2, $3, $4, 'pending', now() + ($6 * interval '1 hour'), $5, now())
+         returning id`,
         [
           randomUUID(),
           access.organization.id,
@@ -591,22 +590,15 @@ export class OrganizationAccess {
           input.role,
           session.userId,
           INVITATION_LIFETIME_HOURS,
-          invitedTeam?.id ?? null,
         ],
       );
-      const created = inserted.rows[0];
-      if (created !== undefined) return { ...created, team_name: invitedTeam?.name ?? null };
-      const existing = await client.query<InvitationRow>(
-        `select id, organization_id, '' as organization_name, '' as inviter_name,
-                email, role, team_id, null::text as team_name, expires_at
-         from invitation
-         where organization_id = $1 and lower(email) = $2 and status = 'pending'
-           and expires_at > now()`,
-        [access.organization.id, email],
-      );
-      const pending = existing.rows[0];
-      if (pending === undefined) throw new Error("pending invitation conflict returned no row");
-      return { ...pending, team_name: invitedTeam?.name ?? null };
+      // No pending invitation exists for this email: the check above ran under the membership
+      // lock, so a concurrent invite cannot slip in, and the pending-email unique index would
+      // reject one rather than leave an invitation with stale Teams.
+      const createdId = inserted.rows[0]?.id;
+      if (createdId === undefined) throw new Error("invitation insert returned no row");
+      await replaceInvitationTeams(client, createdId, teamIds);
+      return await managedInvitation(client, createdId);
     });
     await this.notifyMembershipChanged(access.organization.id);
     const summary = managerInvitationSummary(invitation, this.options.baseURL);
@@ -889,12 +881,11 @@ export class OrganizationAccess {
     const invitations = await this.options.pool.query<InvitationRow>(
       `select invitation.id, invitation.organization_id,
               organization.name as organization_name, "user".name as inviter_name,
-              invitation.email, invitation.role, invitation.team_id,
-              team.name as team_name, invitation.expires_at
+              invitation.email, invitation.role, ${INVITATION_TEAMS_COLUMN},
+              invitation.expires_at
        from invitation
        join organization on organization.id = invitation.organization_id
        join "user" on "user".id = invitation.inviter_id
-       left join team on team.id = invitation.team_id
        where invitation.organization_id = $1
          and invitation.status = 'pending' and invitation.expires_at > now()
        order by invitation.created_at`,
@@ -916,12 +907,11 @@ export class OrganizationAccess {
     const result = await client.query<InvitationRow>(
       `select invitation.id, invitation.organization_id,
               organization.name as organization_name, "user".name as inviter_name,
-              invitation.email, invitation.role, invitation.team_id,
-              team.name as team_name, invitation.expires_at
+              invitation.email, invitation.role, ${INVITATION_TEAMS_COLUMN},
+              invitation.expires_at
        from invitation
        join organization on organization.id = invitation.organization_id
        join "user" on "user".id = invitation.inviter_id
-       left join team on team.id = invitation.team_id
        where invitation.id = $1 and invitation.status = 'pending'
          and invitation.expires_at > now() and lower(invitation.email) = $2`,
       [invitationId, normalizeEmail(accountEmail)],
@@ -936,12 +926,11 @@ export class OrganizationAccess {
     const result = await client.query<InvitationRow>(
       `select invitation.id, invitation.organization_id,
               organization.name as organization_name, "user".name as inviter_name,
-              invitation.email, invitation.role, invitation.team_id,
-              team.name as team_name, invitation.expires_at
+              invitation.email, invitation.role, ${INVITATION_TEAMS_COLUMN},
+              invitation.expires_at
        from invitation
        join organization on organization.id = invitation.organization_id
        join "user" on "user".id = invitation.inviter_id
-       left join team on team.id = invitation.team_id
        where invitation.id = $1 and invitation.status = 'pending'
          and invitation.expires_at > now()`,
       [invitationId],
@@ -1002,15 +991,17 @@ function invitationSummary(invitation: InvitationRow, includeEmail = false) {
     inviterName: invitation.inviter_name,
     role,
     expiresAt: invitation.expires_at.toISOString(),
-    ...(invitation.team_id === null
-      ? {}
-      : {
-          team: {
-            id: invitation.team_id,
-            name: invitation.team_name ?? "Team unavailable",
-          },
-        }),
+    ...invitationTeamsSummary(invitation.teams),
     ...(includeEmail ? { email: invitation.email } : {}),
+  };
+}
+
+function invitationTeamsSummary(teams: readonly InvitationTeam[]) {
+  const [first] = teams;
+  return {
+    teams: teams.map(({ id, name }) => ({ id, name })),
+    // COMPAT(invitationSingleTeam): older apps read one invitation Team; remove after 2027-03-17
+    ...(first === undefined ? {} : { team: { id: first.id, name: first.name } }),
   };
 }
 
@@ -1023,14 +1014,7 @@ function managerInvitationSummary(invitation: InvitationRow, baseURL: string) {
     role,
     expiresAt: invitation.expires_at.toISOString(),
     link: new URL(`/?invitation=${encodeURIComponent(invitation.id)}`, baseURL).toString(),
-    ...(invitation.team_id === null
-      ? {}
-      : {
-          team: {
-            id: invitation.team_id,
-            name: invitation.team_name ?? "Team unavailable",
-          },
-        }),
+    ...invitationTeamsSummary(invitation.teams),
   };
 }
 
@@ -1057,11 +1041,10 @@ export async function acceptInvitationForAccount(
   const invitationResult = await client.query<InvitationRow>(
     `select invitation.id, invitation.organization_id, organization.name as organization_name,
             "user".name as inviter_name, invitation.email, invitation.role,
-            invitation.team_id, team.name as team_name, invitation.expires_at
+            ${INVITATION_TEAMS_COLUMN}, invitation.expires_at
      from invitation
      join organization on organization.id = invitation.organization_id
      join "user" on "user".id = invitation.inviter_id
-     left join team on team.id = invitation.team_id
      where invitation.id = $1 and invitation.status = 'pending'
        and invitation.expires_at > now()
      for update of invitation`,
@@ -1076,35 +1059,90 @@ export async function acceptInvitationForAccount(
   }
   const role = parseInvitationRole(invitation.role);
   if (role === undefined) throw new ProductRequestError(404, "invitation_unavailable");
-  if (invitation.team_id !== null) {
-    const invitedTeam = await client.query(
-      `select id from team where id = $1 and organization_id = $2 for key share`,
-      [invitation.team_id, invitation.organization_id],
-    );
-    if (invitedTeam.rowCount !== 1) {
-      throw new ProductRequestError(404, "invitation_team_unavailable");
-    }
-  }
+  // Lock the invited Teams so a concurrent Team deletion cannot race the Team membership insert.
+  await client.query(
+    `select team.id from invitation_teams
+     join team on team.id = invitation_teams.team_id
+     where invitation_teams.invitation_id = $1
+     for key share of team`,
+    [invitation.id],
+  );
   await client.query(
     `insert into member (id, organization_id, user_id, role)
      values ($1, $2, $3, $4)
      on conflict (organization_id, user_id) do nothing`,
     [randomUUID(), invitation.organization_id, input.userId, role],
   );
-  if (invitation.team_id !== null) {
-    await client.query(
-      `insert into "teamMember" (id, team_id, user_id, created_at)
-       select $1, team.id, $3, now()
-       from team
-       where team.id = $2 and team.organization_id = $4
-       on conflict (team_id, user_id) do nothing`,
-      [randomUUID(), invitation.team_id, input.userId, invitation.organization_id],
-    );
-  }
+  await client.query(
+    `insert into "teamMember" (id, team_id, user_id, created_at)
+     select gen_random_uuid()::text, team.id, $2, now()
+     from invitation_teams
+     join team on team.id = invitation_teams.team_id
+     where invitation_teams.invitation_id = $1 and team.organization_id = $3
+     on conflict (team_id, user_id) do nothing`,
+    [invitation.id, input.userId, invitation.organization_id],
+  );
   await client.query(`update invitation set status = 'accepted' where id = $1`, [
     input.invitationId,
   ]);
   return invitation.organization_id;
+}
+
+function invitedTeamIds(input: z.output<typeof createInvitationBody>): string[] {
+  return [
+    ...new Set([...(input.teamIds ?? []), ...(input.teamId === undefined ? [] : [input.teamId])]),
+  ];
+}
+
+/** Rejects the invitation unless every id is a Team of the organization. */
+async function requireOrganizationTeams(
+  client: QueryHandle,
+  organizationId: string,
+  teamIds: readonly string[],
+): Promise<void> {
+  if (teamIds.length === 0) return;
+  const found = await client.query<{ count: number }>(
+    // Key-share locks keep the Teams from being deleted before the invitation rows reference them.
+    `select count(*)::int as count from (
+       select id from team where id = any($1::text[]) and organization_id = $2 for key share
+     ) as invited`,
+    [teamIds, organizationId],
+  );
+  if (found.rows[0]?.count !== teamIds.length) {
+    throw new ProductRequestError(404, "team_unavailable");
+  }
+}
+
+async function replaceInvitationTeams(
+  client: QueryHandle,
+  invitationId: string,
+  teamIds: readonly string[],
+): Promise<void> {
+  await client.query(`delete from invitation_teams where invitation_id = $1`, [invitationId]);
+  if (teamIds.length === 0) return;
+  await client.query(
+    `insert into invitation_teams (invitation_id, team_id)
+     select $1, unnest($2::text[])`,
+    [invitationId, teamIds],
+  );
+}
+
+/** Reads a written invitation back for the manager response, Teams included. */
+async function managedInvitation(
+  client: QueryHandle,
+  invitationId: string,
+): Promise<InvitationRow> {
+  const result = await client.query<InvitationRow>(
+    `select invitation.id, invitation.organization_id, '' as organization_name,
+            '' as inviter_name, invitation.email, invitation.role,
+            ${INVITATION_TEAMS_COLUMN}, invitation.expires_at
+     from invitation
+     where invitation.id = $1`,
+    [invitationId],
+  );
+  const invitation = result.rows[0];
+  if (invitation === undefined) throw new Error("written invitation returned no row");
+  return invitation;
 }
 
 async function parseBody<TSchema extends z.ZodType>(

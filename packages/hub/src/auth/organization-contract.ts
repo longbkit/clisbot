@@ -25,6 +25,7 @@ const activeMembershipSchema = z.object({
   id: z.string(),
   role: organizationRoleSchema,
 });
+const invitationTeamSchema = z.object({ id: z.string(), name: z.string() });
 const invitationSchema = z.object({
   id: z.string(),
   organization: z.object({ id: z.string(), name: z.string() }),
@@ -32,7 +33,9 @@ const invitationSchema = z.object({
   role: invitationRoleSchema,
   expiresAt: z.string(),
   email: z.string().email().optional(),
-  team: z.object({ id: z.string(), name: z.string() }).optional(),
+  teams: z.array(invitationTeamSchema),
+  // COMPAT(invitationSingleTeam): older apps read one invitation Team; remove after 2027-03-17
+  team: invitationTeamSchema.optional(),
 });
 const teamMemberSchema = z.object({
   id: z.string(),
@@ -47,7 +50,9 @@ const managerInvitationSchema = z.object({
   role: invitationRoleSchema,
   expiresAt: z.string(),
   link: z.string().url(),
-  team: z.object({ id: z.string(), name: z.string() }).optional(),
+  teams: z.array(invitationTeamSchema),
+  // COMPAT(invitationSingleTeam): older apps read one invitation Team; remove after 2027-03-17
+  team: invitationTeamSchema.optional(),
 });
 
 export const organizationCapabilitiesSchema = z.object({

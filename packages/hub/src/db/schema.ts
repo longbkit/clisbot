@@ -1565,9 +1565,6 @@ export const invitations = pgTable(
     inviterId: text("inviter_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    teamId: text("team_id").references(() => teams.id, {
-      onDelete: "set null",
-    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -1580,6 +1577,31 @@ export const invitations = pgTable(
       "invitations_status_check",
       sql`${table.status} in ('pending', 'accepted', 'rejected', 'canceled')`,
     ),
+  ],
+);
+
+/**
+ * The Teams an invitation adds its invitee to on acceptance. Deleting a Team only removes it from
+ * pending invitations; the invitation still admits the person to the organization and its other
+ * Teams.
+ */
+export const invitationTeams = pgTable(
+  "invitation_teams",
+  {
+    invitationId: text("invitation_id")
+      .notNull()
+      .references(() => invitations.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.invitationId, table.teamId],
+      name: "invitation_teams_invitation_team_pk",
+    }),
+    index("invitation_teams_team_id_idx").on(table.teamId),
   ],
 );
 
