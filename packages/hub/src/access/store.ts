@@ -8,7 +8,10 @@ import type { WorktreeTarget } from "../config/schema.js";
 import { CHANNELS_DIRECTORY, CHANNEL_POLICY_PATH } from "../config/bundle-contract.js";
 import * as schema from "../db/schema.js";
 import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
-import { channelConnectionIdentityRealm } from "./channel-identity-realm.js";
+import {
+  channelConnectionIdentityRealm,
+  identityRealmConnectionIds,
+} from "./channel-identity-realm.js";
 import {
   AccessAssignmentInputSchema,
   AccessConstraintsSchema,
@@ -645,9 +648,13 @@ export class AccessStore {
     return toChannelIdentity(row);
   }
 
-  /** The identity realm of a Slack or Telegram Connection; `undefined` when the organization has none by that id. */
-  channelIdentityRealm(organizationId: string, connectionId: string): Promise<string | undefined> {
-    return channelConnectionIdentityRealm(this.database, organizationId, connectionId);
+  /** The identity realm of a Channel Connection; `undefined` when the organization has none by that id. */
+  channelIdentityRealm(
+    organizationId: string,
+    connectionId: string,
+    channel?: string,
+  ): Promise<string | undefined> {
+    return channelConnectionIdentityRealm(this.database, organizationId, connectionId, channel);
   }
 
   async deleteChannelIdentity(organizationId: string, identityId: string): Promise<boolean> {
@@ -663,35 +670,21 @@ export class AccessStore {
     return rows.length > 0;
   }
 
-  /** True when the current Member owns, or is assigned, Channel behavior on this Connection. */
+  /**
+   * True when this Member may link a Channel identity through this Connection:
+   * any Member of the organization, on any Channel Connection. The proof is the
+   * code sent from the provider account itself, and a link grants nothing — the
+   * Member's grants still decide what the linked sender may do — so linking is
+   * not gated on Channel access.
+   */
   async canLinkChannelIdentity(input: {
     organizationId: string;
     userId: string;
     membershipId: string;
     connectionId: string;
   }): Promise<boolean> {
-    return (
-      await this.linkableChannelConnectionIds({
-        ...input,
-        connectionIds: [input.connectionId],
-      })
-    ).has(input.connectionId);
-  }
-
-  /**
-   * Resolves all linkable Channel Connections in one policy/database pass for
-   * management projections. The one-Connection method delegates here.
-   */
-  async linkableChannelConnectionIds(input: {
-    organizationId: string;
-    userId: string;
-    membershipId: string;
-    connectionIds: readonly string[];
-  }): Promise<ReadonlySet<string>> {
-    const connectionIds = [...new Set(input.connectionIds)];
-    if (connectionIds.length === 0) return new Set();
     const [membership] = await this.database
-      .select({ role: schema.members.role })
+      .select({ id: schema.members.id })
       .from(schema.members)
       .where(
         and(
@@ -701,87 +694,9 @@ export class AccessStore {
         ),
       )
       .limit(1);
-    if (membership === undefined) return new Set();
-    const [slack, telegram] = await Promise.all([
-      this.database
-        .select({ id: schema.slackConnections.id })
-        .from(schema.slackConnections)
-        .where(
-          and(
-            eq(schema.slackConnections.organizationId, input.organizationId),
-            inArray(schema.slackConnections.id, connectionIds),
-          ),
-        ),
-      this.database
-        .select({ id: schema.telegramConnections.id })
-        .from(schema.telegramConnections)
-        .where(
-          and(
-            eq(schema.telegramConnections.organizationId, input.organizationId),
-            inArray(schema.telegramConnections.id, connectionIds),
-          ),
-        ),
-    ]);
-    const validConnections = new Set([
-      ...slack.map(({ id }) => id),
-      ...telegram.map(({ id }) => id),
-    ]);
-    if (membership.role === "owner") return validConnections;
-
-    const accounts = (await this.activeChannelAccounts(input.organizationId))
-      .filter(({ connectionId }) => validConnections.has(connectionId))
-      .map(({ channel, accountId, connectionId }) => ({
-        connectionId,
-        resourceId: formatChannelAccountResourceId(channel, accountId),
-      }));
-    if (accounts.length === 0) return new Set();
-    const teamRows = await this.database
-      .select({ id: schema.teams.id })
-      .from(schema.teamMembers)
-      .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-      .where(
-        and(
-          eq(schema.teamMembers.userId, input.userId),
-          eq(schema.teams.organizationId, input.organizationId),
-        ),
-      );
-    const subject = or(
-      and(
-        eq(schema.accessAssignments.subjectKind, "member"),
-        eq(schema.accessAssignments.subjectId, input.membershipId),
-      ),
-      ...(teamRows.length === 0
-        ? []
-        : [
-            and(
-              eq(schema.accessAssignments.subjectKind, "team"),
-              inArray(
-                schema.accessAssignments.subjectId,
-                teamRows.map(({ id }) => id),
-              ),
-            ),
-          ]),
-    );
-    const assignments = await this.database
-      .select()
-      .from(schema.accessAssignments)
-      .where(and(eq(schema.accessAssignments.organizationId, input.organizationId), subject));
-    const grants = assignments
-      .map(toAssignment)
-      .filter(({ privileges }) => privileges.includes("channel.use"));
-    const organizationGrant = grants.some(
-      ({ resourceKind, resourceId }) =>
-        resourceKind === "organization" && resourceId === input.organizationId,
-    );
-    const accountGrants = new Set(
-      grants.flatMap(({ resourceKind, resourceId }) =>
-        resourceKind === "channel_account" ? [resourceId] : [],
-      ),
-    );
-    return new Set(
-      accounts.flatMap(({ connectionId, resourceId }) =>
-        organizationGrant || accountGrants.has(resourceId) ? [connectionId] : [],
-      ),
+    if (membership === undefined) return false;
+    return (
+      (await this.channelIdentityRealm(input.organizationId, input.connectionId)) !== undefined
     );
   }
 
@@ -804,6 +719,17 @@ export class AccessStore {
     const code = createChannelIdentityChallengeCode();
     await this.runtime.transaction(async (handle) => {
       const database = handle.drizzle();
+      // Any bot of the realm redeems a code, so a new code replaces the Member's
+      // open codes for the whole realm, not only for this Connection.
+      const realm = await channelConnectionIdentityRealm(
+        database,
+        input.organizationId,
+        input.connectionId,
+      );
+      const realmConnectionIds =
+        realm === undefined
+          ? [input.connectionId]
+          : await identityRealmConnectionIds(database, input.organizationId, realm);
       await database
         .update(schema.channelIdentityChallenges)
         .set({ consumedAt: now })
@@ -811,7 +737,7 @@ export class AccessStore {
           and(
             eq(schema.channelIdentityChallenges.organizationId, input.organizationId),
             eq(schema.channelIdentityChallenges.memberId, input.membershipId),
-            eq(schema.channelIdentityChallenges.connectionId, input.connectionId),
+            inArray(schema.channelIdentityChallenges.connectionId, realmConnectionIds),
             isNull(schema.channelIdentityChallenges.consumedAt),
           ),
         );
@@ -830,7 +756,11 @@ export class AccessStore {
     };
   }
 
-  /** Atomically consumes a valid Channel message challenge and binds its sender identity. */
+  /**
+   * Atomically consumes a valid Channel message challenge and binds its sender identity.
+   * The code is issued through one Connection but redeems through any bot of that
+   * Connection's realm, because the identity it proves covers the whole realm.
+   */
   async consumeChannelIdentityChallenge(input: {
     organizationId: string;
     connectionId: string;
@@ -848,6 +778,7 @@ export class AccessStore {
         .select({
           id: schema.channelIdentityChallenges.id,
           memberId: schema.channelIdentityChallenges.memberId,
+          connectionId: schema.channelIdentityChallenges.connectionId,
           userId: schema.members.userId,
         })
         .from(schema.channelIdentityChallenges)
@@ -859,7 +790,6 @@ export class AccessStore {
               channelIdentityChallengeVerifier(code),
             ),
             eq(schema.channelIdentityChallenges.organizationId, input.organizationId),
-            eq(schema.channelIdentityChallenges.connectionId, input.connectionId),
             eq(schema.members.organizationId, input.organizationId),
             isNull(schema.channelIdentityChallenges.consumedAt),
             gt(schema.channelIdentityChallenges.expiresAt, now),
@@ -874,6 +804,12 @@ export class AccessStore {
         input.connectionId,
       );
       if (identityRealm === undefined) return { status: "invalid" };
+      const issuedRealm = await channelConnectionIdentityRealm(
+        database,
+        input.organizationId,
+        challenge.connectionId,
+      );
+      if (issuedRealm !== identityRealm) return { status: "invalid" };
       const [existing] = await database
         .select()
         .from(schema.channelIdentities)
@@ -1156,7 +1092,11 @@ export class AccessStore {
     const externalSubjectId = input.senderIdentity.startsWith(prefix)
       ? input.senderIdentity.slice(prefix.length)
       : input.senderIdentity;
-    const identityRealm = await this.channelIdentityRealm(input.organizationId, input.connectionId);
+    const identityRealm = await this.channelIdentityRealm(
+      input.organizationId,
+      input.connectionId,
+      input.channel,
+    );
     if (identityRealm === undefined) return undefined;
     const [identity] = await this.database
       .select({
@@ -1540,35 +1480,6 @@ export class AccessStore {
       throw new AccessPolicyError("resource_unavailable", "Connection is unavailable");
     }
     return realm;
-  }
-
-  private async activeChannelAccounts(
-    organizationId: string,
-    database: DrizzleHandle = this.database,
-  ): Promise<Array<z.infer<typeof AccountFileSchema>>> {
-    const [configuration] = await database
-      .select({ files: schema.channelConfigurationRevisions.files })
-      .from(schema.organizationChannelConfigurations)
-      .innerJoin(
-        schema.channelConfigurationRevisions,
-        and(
-          eq(
-            schema.channelConfigurationRevisions.id,
-            schema.organizationChannelConfigurations.activeRevisionId,
-          ),
-          eq(
-            schema.channelConfigurationRevisions.organizationId,
-            schema.organizationChannelConfigurations.organizationId,
-          ),
-        ),
-      )
-      .where(eq(schema.organizationChannelConfigurations.organizationId, organizationId))
-      .limit(1);
-    return (configuration?.files ?? [])
-      .filter(
-        ({ path }) => path.startsWith(`${CHANNELS_DIRECTORY}/`) && path !== CHANNEL_POLICY_PATH,
-      )
-      .map(({ content }) => AccountFileSchema.parse(load(content)));
   }
 
   private async assertResource(

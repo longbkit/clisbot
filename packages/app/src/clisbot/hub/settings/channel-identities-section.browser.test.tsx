@@ -46,6 +46,7 @@ function bot(id: string, account: string) {
     externalName: "VeXeRe",
     status: "active",
     identityRealm: "slack:T1",
+    identityRealmScope: "tenant",
     consumers: [{ resourceKind: "channel_account", resourceId: `slack/${account}`, name: account }],
   };
 }
@@ -77,8 +78,8 @@ it("lists the Member's own linked identities on Account without opening Manage i
     </QueryClientProvider>,
   );
   expect(await screen.findByText("U8ZTVGJJF")).toBeTruthy();
-  // One row for the workspace, naming every bot that recognizes the identity.
-  expect(screen.getByText("Slack · dai-clisbot, oai-clisbot · VeXeRe · slack:T1")).toBeTruthy();
+  // One row for the workspace, naming every bot that recognizes the identity, never the realm id.
+  expect(screen.getByText("Slack · VeXeRe · works with dai-clisbot, oai-clisbot")).toBeTruthy();
   // An administrator's read includes other Members; Account shows only your own.
   expect(screen.queryByText("USAM")).toBeNull();
   expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
@@ -91,5 +92,5 @@ it("says so when nothing is linked yet", async () => {
       <ChannelIdentitiesSection pending={false} onManage={vi.fn()} />
     </QueryClientProvider>,
   );
-  expect(await screen.findByText("No provider identities are linked.")).toBeTruthy();
+  expect(await screen.findByText("No chat accounts are linked yet.")).toBeTruthy();
 });

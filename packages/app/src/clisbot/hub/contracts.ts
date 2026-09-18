@@ -211,6 +211,8 @@ export const HubConnectionSchema = z.object({
   status: z.string(),
   /** Where a Channel identity linked through this Connection resolves; absent from older Hubs. */
   identityRealm: z.string().nullable().optional(),
+  /** How far one link reaches: every bot of the Channel, one Slack workspace, or one bot. */
+  identityRealmScope: z.string().nullable().optional(),
   consumers: z.array(HubConnectionConsumerSchema),
   canLinkIdentity: z.boolean().optional(),
 });

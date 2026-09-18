@@ -4,7 +4,11 @@ import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { settingsStyles } from "@/styles/settings";
-import { channelIdentityLine, type ChannelConnectionNaming } from "../channel-identity-directory";
+import {
+  channelIdentityLine,
+  identityCoversConnection,
+  type ChannelConnectionNaming,
+} from "../channel-identity-directory";
 import { useChannelCatalog } from "./channel-catalog-queries";
 import { countLabel } from "./labels";
 import { EmptyRow } from "./resource-rows";
@@ -135,11 +139,18 @@ function identityStats(
       ? []
       : [{ label: "Members not linked", value: Math.max(members.length - linkedMembers, 0) }]),
     {
-      label: "Connections in use",
-      value: new Set(identities.map(({ connectionId }) => connectionId)).size,
-      hint: `of ${countLabel(connections.length, "Connection")}`,
+      label: "Bots recognizing someone",
+      value: connections.filter((connection) =>
+        identities.some((identity) => identityCoversConnection(identity, connection)),
+      ).length,
+      hint: `of ${countLabel(connections.filter(isChatBot).length, "bot")}`,
     },
   ];
+}
+
+/** A Connection a Channel identity can resolve on; GitHub or Linear Connections never do. */
+function isChatBot({ identityRealm }: ChannelConnectionNaming): boolean {
+  return typeof identityRealm === "string";
 }
 
 function rowTitle({ identity, member }: DirectoryRow): string {

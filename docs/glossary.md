@@ -101,6 +101,23 @@ It is separate from account passwords and the channel credential encryption key
   channel and account. `/command add` and `/command remove` manage it;
   `/command <name>` or `/name` invokes it. Platform reserved words cannot be
   shadowed. It is distinct from a provider's built-in slash command.
+- **Channel identity** — One chat-platform sender id linked to one Hub Member, so
+  that sender's messages run with the Member's grants instead of the Guest
+  group's. It resolves on every bot of its **Identity realm**. A Member links it
+  with `/link <code>` from their own chat account; linking grants nothing by
+  itself. UI: "Channel identities". Code: `channelIdentities`
+  (`packages/hub/src/db/schema.ts`).
+- **Identity realm** — The bots across which one chat-platform sender id names
+  one person, so one link covers all of them. Its scope is per Channel:
+  `channel` (Telegram, Discord, Google Chat: every bot), `tenant` (Slack: one
+  Slack workspace), or `bot` (Feishu, Zalo OA, Zalo personal: one bot each,
+  because their ids are per app or unverified). UI never shows the word; it
+  names the realm itself — "Telegram", "Slack · VeXeRe", "Feishu ·
+  support-bot" — and the link picker is labelled **Where you chat**. Code:
+  `identityRealm`, `CHANNEL_IDENTITY_REALM_SCOPE`
+  (`packages/hub/src/access/channel-identity-realm.ts`). Forbidden in UI copy:
+  bare "Workspace" (that is the Paseo cwd term; "Slack workspace" is fine),
+  "Connection" in Member-facing link copy.
 - **Guest group** — The org Access subject for a channel sender without a linked
   Hub Member. Its persisted identity is `(guest, guest)`, with no default grants.
   Linked Members do not inherit Guest grants.

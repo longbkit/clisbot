@@ -1,4 +1,8 @@
 import type { ChannelPrivilegeDecision } from "../access/store.js";
+import {
+  CHANNEL_IDENTITY_REALM_SCOPE,
+  type IdentityChannel,
+} from "../access/channel-identity-realm.js";
 // The channel execution plane facade (plan §4-S2): the thin object the loader
 // drives. It composes the three engines — bindings (thread + continuous
 // execution), relay (outbound + delivery ledger), approvals (prompt +
@@ -89,7 +93,7 @@ import type {
   PlaneLogger,
   StreamContext,
 } from "./plane/types.js";
-import { isSupportedChannel } from "./catalog.js";
+import { CHANNEL_CATALOG, isSupportedChannel } from "./catalog.js";
 import { ChannelWorkflowRequestPayloadSchema } from "../triggers/channel/provider.js";
 
 /**
@@ -207,21 +211,28 @@ function identityLinkReplyText(
   status: "linked" | "already_linked" | "identity_conflict" | "invalid",
   channel: string,
 ): string {
-  if (status === "linked") {
-    // One link covers the realm, so say so: people otherwise link each bot in turn.
-    const scope =
-      channel === "slack"
-        ? "in this Slack workspace"
-        : `on ${channel.charAt(0).toUpperCase()}${channel.slice(1)}`;
-    return `Identity linked. Every bot ${scope} now recognizes you, so there is no need to link each bot. What you can do through each bot still follows the Channel access assigned to your Hub account.`;
-  }
+  if (status === "linked") return `Identity linked. ${identityLinkReach(channel)}`;
   if (status === "already_linked") {
     return "This identity is already linked to your Hub account.";
   }
   if (status === "identity_conflict") {
     return "This provider identity is already linked to another Hub account.";
   }
-  return "That link code is invalid or expired, or was created for another workspace. Create a new code in Paseo Settings.";
+  return "That link code is invalid or expired, or was created for another workspace or bot. Create a new code in Paseo Settings.";
+}
+
+/** How far the new link reaches, so people neither re-link each bot nor assume a bot-scoped link covers the rest. */
+function identityLinkReach(channel: string): string {
+  const label = CHANNEL_CATALOG.find(({ id }) => id === channel)?.label ?? channel;
+  const access = "What you can do still follows the Channel access assigned to your Hub account.";
+  const scope = CHANNEL_IDENTITY_REALM_SCOPE[channel as IdentityChannel];
+  if (scope === "tenant") {
+    return `Every bot in this ${label} workspace now recognizes you, so there is no need to link each bot. ${access}`;
+  }
+  if (scope === "channel") {
+    return `Every ${label} bot now recognizes you, so there is no need to link each bot. ${access}`;
+  }
+  return `This bot now recognizes you. ${label} gives each bot its own user ids, so link other ${label} bots separately. ${access}`;
 }
 
 function workflowDeliveryId(message: InboundMessage, route: CompiledRoute): string | undefined {
@@ -316,8 +327,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       }
       const identityCode = parseChannelIdentityLinkCode(message.text);
       if (identityCode !== null && deps.consumeChannelIdentityChallenge !== undefined) {
-        // A code belongs to one bot's Connection, and an unaddressed code is
-        // never forwarded to an agent.
+        // A code redeems through any bot of its identity realm, but only the
+        // addressed bot answers it, and an unaddressed code is never forwarded
+        // to an agent.
         if (!commandAddressesThisBot(message)) return unaddressedCommand();
         return await handleIdentityLinkCommand(message, account, identityCode);
       }

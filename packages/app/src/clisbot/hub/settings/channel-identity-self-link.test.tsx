@@ -136,6 +136,8 @@ const connections = [
     provider: "slack",
     name: "Support workspace",
     externalName: null,
+    identityRealm: "slack:T1",
+    identityRealmScope: "tenant",
     consumers: [],
     canLinkIdentity: true,
   },
@@ -144,11 +146,13 @@ const connections = [
     provider: "telegram",
     name: "Support bot",
     externalName: null,
+    identityRealm: "telegram",
+    identityRealmScope: "channel",
     consumers: [],
     canLinkIdentity: true,
   },
 ];
-const challenge = { command: "/link TEST-CODE", expiresAt: "2026-09-06T00:00:00Z" };
+const challenge = { command: "/link TEST-CODE", expiresAt: "2099-01-01T00:00:00Z" };
 let client: QueryClient;
 beforeEach(() => {
   vi.stubGlobal("React", React);
@@ -212,9 +216,9 @@ describe("Channel identity recovery", () => {
         fireEvent.click(screen.getByRole("button", { name: "Manage identities" }));
       }
       await screen.findByRole("option", { name: "Slack · Support workspace" });
-      const select = screen.getByLabelText("Connection") as HTMLSelectElement;
-      if (connectionId) expect(select.value).toBe("slack-connection");
-      else fireEvent.change(select, { target: { value: "slack-connection" } });
+      const select = screen.getByLabelText("Where you chat") as HTMLSelectElement;
+      if (connectionId) expect(select.value).toBe("slack:T1");
+      else fireEvent.change(select, { target: { value: "slack:T1" } });
       expect(
         (screen.getByRole("button", { name: "Create link code" }) as HTMLButtonElement).disabled,
       ).toBe(false);
@@ -244,13 +248,13 @@ describe("Channel identity recovery", () => {
           (screen.getByRole("button", { name: "Create link code" }) as HTMLButtonElement).disabled,
         ).toBe(false),
       );
-      expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
-        "slack-connection",
-      );
+      expect((screen.getByLabelText("Where you chat") as HTMLSelectElement).value).toBe("slack:T1");
       expect(fixture.post).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "Create link code" }));
       expect(
-        await screen.findByText(/In Slack, mention the bot, then paste this command/),
+        await screen.findByText(
+          /In Slack, mention any bot of this workspace \(Support workspace\)/,
+        ),
       ).toBeTruthy();
       expect(fixture.post).toHaveBeenCalledWith(
         "channel-identities/challenges",
@@ -258,25 +262,25 @@ describe("Channel identity recovery", () => {
         expect.anything(),
       );
       fireEvent.click(screen.getByRole("button", { name: "Copy link command" }));
-      await screen.findByRole("button", { name: "Copied link command" });
+      await screen.findByRole("button", { name: "Copied" });
       expect(fixture.copy).toHaveBeenCalledExactlyOnceWith("/link TEST-CODE");
       expect(fixture.post).toHaveBeenCalledOnce();
       expect(fixture.completeAppSetup).not.toHaveBeenCalled();
     },
   );
-  it("does not fall back to another Connection when the requested one cannot be used", async () => {
+  it("does not fall back to another workspace when the requested one cannot be used", async () => {
     fixture.connectionId = "missing";
     render(view());
-    await screen.findByText(/The requested Connection is unavailable/);
+    await screen.findByText(/That bot is no longer available/);
     fireEvent.click(screen.getByRole("button", { name: "Create link code" }));
     expect(fixture.post).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Connection"), {
-      target: { value: "telegram-connection" },
+    fireEvent.change(screen.getByLabelText("Where you chat"), {
+      target: { value: "telegram" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create link code" }));
     expect(
       await screen.findByText(
-        /Send this command from your own Telegram account to the selected bot/,
+        /Send this command from your own Telegram account to any one of these bots: Support bot/,
       ),
     ).toBeTruthy();
     expect(fixture.post).toHaveBeenCalledWith(
@@ -304,9 +308,7 @@ describe("Channel identity recovery", () => {
     ui.rerender(view());
     await act(async () => resolve(challenge));
     expect(screen.queryByText(/TEST-CODE/)).toBeNull();
-    expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
-      "telegram-connection",
-    );
+    expect((screen.getByLabelText("Where you chat") as HTMLSelectElement).value).toBe("telegram");
   });
   it("clears the one-use command after polling observes the verified identity", async () => {
     render(view());

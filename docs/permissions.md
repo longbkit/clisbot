@@ -130,10 +130,23 @@ Channel commands use **org Access privileges**, separate from the daemon service
 principal's permissions. The Hub resolves the sender's channel identity through
 `channelIdentities` to a Member, then checks the command's privilege against its
 Channel Connection and authorized daemon/Project. An identity is linked once per
-realm — a Slack workspace (`slack:<team id>`), or Telegram — and resolves on every
-bot Connection of that realm; the same user id in another Slack workspace never
-resolves to it. The route's `channel.use` /
-`mayTrigger` admission remains the baseline. The old channel role projection and
+**identity realm** ([glossary](glossary.md)) and resolves on every bot Connection
+of that realm. Each Channel declares how far its sender id reaches, in
+`CHANNEL_IDENTITY_REALM_SCOPE` (`packages/hub/src/access/channel-identity-realm.ts`):
+every bot of the Channel (Telegram, Discord, Google Chat), one Slack workspace, or
+one bot (Feishu, Zalo OA, Zalo personal). Too wide a realm lets one person's id
+resolve to another Member, so a Channel stays bot-scoped until its id is shown to
+be wider. A `/link` code is issued through one Connection and redeems through any
+bot of the same realm; a new code retires the Member's open codes in that realm.
+
+Any Member may link on any Channel Connection of the organization, without a
+Channel grant, and every Member sees every Channel bot in the link list
+(decided 2026-09-19). The code sent from the provider account is the proof, and a
+link grants nothing: the linked sender gets the Member's grants, which may be none.
+Linking does replace the Guest group — a linked sender stops receiving Guest
+grants — so a Member with fewer grants than Guest can lose access by linking.
+
+The route's `channel.use` / `mayTrigger` admission remains the baseline. The old channel role projection and
 session initiator do not grant command authority.
 
 Chat is separate from Host and Project access

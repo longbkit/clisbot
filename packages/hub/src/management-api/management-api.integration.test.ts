@@ -24,6 +24,7 @@ import type {
 } from "../provider-applications/index.js";
 import { enrollTestDaemon, TEST_DAEMON_ID } from "../test-utils/project-configuration.js";
 import { insertTestSlackConnection } from "../test-utils/channel-identity.js";
+import { deleteUnreachableChannelIdentities } from "../access/channel-identity-realm.js";
 import { ManagementApi } from "./index.js";
 import { createHubApplication } from "../app.js";
 import { OrganizationTriggerStore } from "../triggers/store.js";
@@ -1771,6 +1772,122 @@ it("links a Channel identity once per realm and keeps it while a bot of that rea
 
   assert.equal((await api.handle(request(`/connections/${first}`, "DELETE"))).status, 204);
   assert.deepEqual(await identities(), [], "no bot of the realm remains to resolve it");
+});
+
+// Each Channel declares how far one sender id reaches. Discord ids are global,
+// so one link covers every Discord bot; Feishu `open_id` is per app, so a
+// Feishu link stays on its bot. Linking needs no Channel grant: the code sent
+// from the provider account is the proof, and a link grants nothing.
+it("links on every Channel within that Channel's identity realm, without a Channel grant", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  const drizzle = bundle.runtime.drizzle();
+  await drizzle
+    .insert(schema.organizations)
+    .values({ id: ORGANIZATION_ID, name: "Org", slug: "org" });
+  await drizzle.insert(schema.users).values({
+    id: "member-user",
+    name: "Member",
+    email: "member@example.test",
+    emailVerified: true,
+  });
+  await drizzle.insert(schema.members).values({
+    id: "member-membership",
+    organizationId: ORGANIZATION_ID,
+    userId: "member-user",
+    role: "member",
+  });
+  const access = new AccessStore(bundle.runtime);
+  const memberApi = new ManagementApi({
+    database,
+    runtime: bundle.runtime,
+    auth: memberAccess(),
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  });
+  const bot = async (table: typeof schema.telegramConnections, accountId: string) => {
+    const [row] = await drizzle
+      .insert(table)
+      .values({
+        organizationId: ORGANIZATION_ID,
+        accountId,
+        credentialEnvelope: {} as never,
+      })
+      .returning({ id: table.id });
+    return row!.id;
+  };
+  const discordTable = schema.discordBotConnections as unknown as typeof schema.telegramConnections;
+  const feishuTable = schema.feishuConnections as unknown as typeof schema.telegramConnections;
+  const discordA = await bot(discordTable, "discord-a");
+  const discordB = await bot(discordTable, "discord-b");
+  const feishuA = await bot(feishuTable, "feishu-a");
+  const feishuB = await bot(feishuTable, "feishu-b");
+
+  const listed = (await (await memberApi.handle(request("/connections", "GET"))).json()) as {
+    connections: Array<{ id: string; identityRealm: string | null; canLinkIdentity: boolean }>;
+  };
+  assert.deepEqual(
+    Object.fromEntries(listed.connections.map(({ id, identityRealm }) => [id, identityRealm])),
+    {
+      [discordA]: "discord",
+      [discordB]: "discord",
+      [feishuA]: `feishu:bot:${feishuA}`,
+      [feishuB]: `feishu:bot:${feishuB}`,
+    },
+    "a Member without any Channel grant sees every Channel bot",
+  );
+  assert.ok(listed.connections.every(({ canLinkIdentity }) => canLinkIdentity));
+
+  const issue = async (connectionId: string) => {
+    const issued = await memberApi.handle(
+      request("/channel-identities/challenges", "POST", { connectionId }),
+    );
+    assert.equal(issued.status, 201);
+    return ((await issued.json()) as { command: string }).command.slice("/link ".length);
+  };
+  const redeem = async (connectionId: string, externalSubjectId: string, code: string) =>
+    (
+      await access.consumeChannelIdentityChallenge({
+        organizationId: ORGANIZATION_ID,
+        connectionId,
+        externalSubjectId,
+        code,
+      })
+    ).status;
+  const resolves = async (channel: string, connectionId: string, sender: string) =>
+    (
+      await access.resolveChannelMember({
+        organizationId: ORGANIZATION_ID,
+        connectionId,
+        channel,
+        senderIdentity: `${channel}:${sender}`,
+      })
+    )?.membershipId;
+
+  assert.equal(await redeem(discordB, "D1", await issue(discordA)), "linked");
+  assert.equal(await resolves("discord", discordA, "D1"), "member-membership");
+  assert.equal(await resolves("discord", discordB, "D1"), "member-membership");
+
+  const feishuCode = await issue(feishuA);
+  assert.equal(
+    await redeem(feishuB, "F1", feishuCode),
+    "invalid",
+    "a bot-scoped code does not redeem through another bot of the Channel",
+  );
+  assert.equal(await redeem(feishuA, "F1", feishuCode), "linked");
+  assert.equal(await resolves("feishu", feishuA, "F1"), "member-membership");
+  assert.equal(
+    await resolves("feishu", feishuB, "F1"),
+    undefined,
+    "the same open_id on another Feishu app names someone else",
+  );
+
+  await drizzle.delete(feishuTable).where(eq(feishuTable.id, feishuA));
+  await deleteUnreachableChannelIdentities(drizzle, ORGANIZATION_ID);
+  const remaining = (await access.listChannelIdentities(ORGANIZATION_ID)).map(
+    ({ identityRealm }) => identityRealm,
+  );
+  assert.deepEqual(remaining, ["discord"], "deleting the Feishu bot drops its bot-scoped link");
 });
 
 // A channel bot credential is a live token into an outside workspace, so it is

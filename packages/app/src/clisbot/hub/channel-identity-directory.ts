@@ -41,23 +41,27 @@ export interface ChannelIdentityDirectory {
   error: Error | null;
 }
 
-export function useChannelIdentityDirectory(options?: {
-  refetchIntervalMs?: number;
+/**
+ * The signed-in viewer's Channel identities and Connections, as Hub scopes them.
+ * Every surface that shows or links identities reads through here so they share
+ * one cache entry.
+ */
+export function useChannelIdentityReads(options?: {
+  refetchIntervalMs?: number | false;
   /** Skip the reads entirely when the caller already knows it has nobody to look up. */
   enabled?: boolean;
-}): ChannelIdentityDirectory {
+}) {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
   const scope = { origin: hub.origin, organizationId, accountId };
   const enabled = organizationId.length > 0 && options?.enabled !== false;
-  const refetchInterval = options?.refetchIntervalMs ?? false;
   const identities = useFetchQuery({
     queryKey: [...hubResourceQueryKey(scope, "channel-identities"), "self"],
     queryFn: () => hub.api().get("channel-identities", HubChannelIdentitiesSchema),
     enabled,
     retry: false,
-    refetchInterval,
+    refetchInterval: options?.refetchIntervalMs ?? false,
     dataShape: "value",
     staleTimeMs: 15_000,
   });
@@ -69,6 +73,15 @@ export function useChannelIdentityDirectory(options?: {
     dataShape: "value",
     staleTimeMs: 15_000,
   });
+  return { identities, connections };
+}
+
+export function useChannelIdentityDirectory(options?: {
+  refetchIntervalMs?: number;
+  /** Skip the reads entirely when the caller already knows it has nobody to look up. */
+  enabled?: boolean;
+}): ChannelIdentityDirectory {
+  const { identities, connections } = useChannelIdentityReads(options);
   const catalog = useChannelCatalog();
   const linked = useMemo(
     () =>
@@ -103,7 +116,7 @@ export function linkedChannelIdentities(
       memberId: identity.memberId,
       connectionId: identity.connectionId,
       channel: realm[0]?.provider,
-      label: channelConnectionLabel(catalog, realm),
+      label: identityRealmLabel(catalog, realm),
       description: channelIdentityLine(catalog, identity, connections),
       subject: identity.displayName ?? identity.externalSubjectId,
       verifiedAt: identity.verifiedAt,
@@ -114,13 +127,13 @@ export function linkedChannelIdentities(
 /** The parts of a Connection its labels read. */
 export type ChannelConnectionNaming = Pick<
   z.infer<typeof HubConnectionSchema>,
-  "id" | "provider" | "name" | "externalName" | "consumers" | "identityRealm"
+  "id" | "provider" | "name" | "externalName" | "consumers" | "identityRealm" | "identityRealmScope"
 >;
 
 /**
- * The Connections an identity resolves on: every one sharing its realm (a Slack
- * workspace, or Telegram). A Hub that reports no realm scopes it to the one
- * Connection it was verified through.
+ * The Connections an identity resolves on: every one sharing its identity realm
+ * (every bot of a Channel, one Slack workspace, or one bot). A Hub that reports
+ * no realm scopes it to the one Connection it was verified through.
  */
 export function identityRealmConnections<T extends ChannelConnectionNaming>(
   identity: LinkedIdentityScope,
@@ -155,13 +168,41 @@ export function channelConnectionLabel(
 ): string {
   const first = connections[0];
   if (first === undefined) return "Connection unavailable";
-  const names = connections.flatMap((connection) => {
+  return `${channelCatalogLabel(catalog, first.provider)} · ${channelBotNames(connections).join(", ")}`;
+}
+
+/**
+ * The bots behind these Connections, named the way people find them: a Telegram
+ * bot by its `@username` when the Hub knows it, otherwise the Channel accounts
+ * using the Connection, or its slug when no account uses it yet.
+ */
+export function channelBotNames(connections: readonly ChannelConnectionNaming[]): string[] {
+  return connections.flatMap((connection) => {
+    if (connection.provider === "telegram" && isTelegramBotUsername(connection.externalName)) {
+      return [`@${connection.externalName}`];
+    }
     const accounts = connection.consumers
       .filter(({ resourceKind }) => resourceKind === "channel_account")
       .map(({ resourceId }) => resourceId.slice(resourceId.indexOf("/") + 1));
     return accounts.length > 0 ? accounts : [connection.name];
   });
-  return `${channelCatalogLabel(catalog, first.provider)} · ${names.join(", ")}`;
+}
+
+// A Telegram bot username always ends in "bot"; the Hub's external name falls
+// back to a display name or numeric id, which people cannot search for.
+function isTelegramBotUsername(value: string | null): value is string {
+  // Telegram usernames are 5-32 characters: a letter first, "bot" last.
+  return value !== null && /^[a-z][a-z0-9_]{1,28}bot$/iu.test(value);
+}
+
+/**
+ * The key of the realm a link through this Connection covers. A Hub that reports
+ * no realm scopes the link to the Connection itself.
+ */
+export function connectionIdentityRealmKey(
+  connection: Pick<ChannelConnectionNaming, "id" | "identityRealm">,
+): string {
+  return connection.identityRealm ?? `connection:${connection.id}`;
 }
 
 /** The provider workspace and the Connection id, e.g. "Acme · slack-a0123-t0456". */
@@ -171,32 +212,45 @@ export function channelConnectionDetail(connection: ChannelConnectionNaming): st
     : `${connection.externalName} · ${connection.name}`;
 }
 
-/**
- * The provider workspace and the realm id of an identity, e.g. "Acme · slack:T0456";
- * the Connection id stands in when the Hub reports no realm.
- */
-export function channelIdentityRealmDetail(
-  identity: LinkedIdentityScope,
-  connections: readonly ChannelConnectionNaming[],
-): string {
-  const workspace = connections.find(
-    (connection) => connection.externalName !== null,
-  )?.externalName;
-  const realmId =
-    identity.identityRealm ??
-    connections.find((connection) => connection.id === identity.connectionId)?.name ??
-    identity.connectionId;
-  return workspace === undefined || workspace === null ? realmId : `${workspace} · ${realmId}`;
+export type IdentityRealmScope = "channel" | "tenant" | "bot";
+
+/** How far one link reaches; a realm the Hub does not scope links one bot at a time. */
+export function identityRealmScopeOf(
+  connections: readonly Pick<ChannelConnectionNaming, "identityRealmScope">[],
+): IdentityRealmScope {
+  const scope = connections[0]?.identityRealmScope;
+  return scope === "channel" || scope === "tenant" ? scope : "bot";
 }
 
-/** One line naming where an identity resolves: "Slack · acme-bot · Acme · slack:T0456". */
+/**
+ * Names an identity realm the way people know it: "Telegram" for every bot of a
+ * Channel, "Slack · VeXeRe" for a Slack workspace, "Feishu · support-bot" for
+ * one bot. Never the realm id.
+ */
+export function identityRealmLabel(
+  catalog: readonly ChannelCatalogEntry[],
+  connections: readonly ChannelConnectionNaming[],
+): string {
+  const first = connections[0];
+  if (first === undefined) return "Bot unavailable";
+  const channel = channelCatalogLabel(catalog, first.provider);
+  const scope = identityRealmScopeOf(connections);
+  if (scope === "channel") return channel;
+  if (scope === "bot") return `${channel} · ${channelBotNames([first]).join(", ")}`;
+  const tenant = connections.find(({ externalName }) => externalName !== null)?.externalName;
+  return `${channel} · ${tenant ?? first.name}`;
+}
+
+/** One line naming where an identity resolves: "Slack · VeXeRe · works with dai, oai". */
 export function channelIdentityLine(
   catalog: readonly ChannelCatalogEntry[],
   identity: LinkedIdentityScope,
   connections: readonly ChannelConnectionNaming[],
 ): string {
   const realm = identityRealmConnections(identity, connections);
-  return realm.length === 0
-    ? "Connection unavailable"
-    : `${channelConnectionLabel(catalog, realm)} · ${channelIdentityRealmDetail(identity, realm)}`;
+  if (realm.length === 0) return "No bot left to recognize this identity";
+  const label = identityRealmLabel(catalog, realm);
+  return identityRealmScopeOf(realm) === "bot"
+    ? label
+    : `${label} · works with ${channelBotNames(realm).join(", ")}`;
 }

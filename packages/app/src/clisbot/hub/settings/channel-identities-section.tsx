@@ -26,8 +26,8 @@ export function ChannelIdentitiesSection({
           <View style={settingsStyles.rowContent}>
             <Text style={settingsStyles.rowTitle}>Your Channel identities</Text>
             <Text style={settingsStyles.rowHint}>
-              Link your Slack or Telegram account so messages you send there run with your Hub
-              access.
+              Link the accounts you use in Slack, Telegram, Discord, and other chat apps so the
+              organization&apos;s bots recognize you and run your messages with your Hub access.
             </Text>
           </View>
           <Button size="sm" variant="outline" disabled={pending} onPress={onManage}>
@@ -57,7 +57,7 @@ function LinkedIdentityRows({
     return (
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <Text style={settingsStyles.rowHint}>
-          {error?.message ?? "No provider identities are linked."}
+          {error?.message ?? "No chat accounts are linked yet."}
         </Text>
       </View>
     );

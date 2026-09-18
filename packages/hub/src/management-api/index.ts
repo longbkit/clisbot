@@ -39,8 +39,9 @@ import {
 } from "../access/delegation.js";
 import {
   deleteUnreachableChannelIdentities,
+  channelBotIdentityRealm,
+  identityRealmScope,
   slackIdentityRealm,
-  TELEGRAM_IDENTITY_REALM,
 } from "../access/channel-identity-realm.js";
 import { AccessPolicyError, AccessStore } from "../access/store.js";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
@@ -878,15 +879,14 @@ export class ManagementApi {
       return problem(requestId, 405, "method_not_allowed", "Use GET or POST for Connections.");
     }
     const connections = await this.connectionViews(access.organization.id);
-    const linkableConnectionIds = await this.options.access.linkableChannelConnectionIds({
-      organizationId: access.organization.id,
-      userId: access.account.id,
-      membershipId: access.membership.id,
-      connectionIds: connections.map(({ id }) => id),
-    });
+    // Every Member may link through any Channel Connection: a link proves who
+    // sends, it grants nothing (`AccessStore.canLinkChannelIdentity`).
     const connectionAccess = connections.map((connection) =>
       Object.assign({}, connection, {
-        canLinkIdentity: linkableConnectionIds.has(connection.id),
+        canLinkIdentity: connection.identityRealm !== null,
+        // How far one link reaches, so the app names the realm without parsing it.
+        identityRealmScope:
+          connection.identityRealm === null ? null : identityRealmScope(connection.identityRealm),
       }),
     );
     if (!access.capabilities.manageResources) {
@@ -929,7 +929,7 @@ export class ManagementApi {
           name: row.name,
           externalName: externalIdentityLabel(row.identity),
           status: "active",
-          identityRealm: provider === "telegram" ? TELEGRAM_IDENTITY_REALM : null,
+          identityRealm: channelBotIdentityRealm(provider, row.id),
         });
       }
     }

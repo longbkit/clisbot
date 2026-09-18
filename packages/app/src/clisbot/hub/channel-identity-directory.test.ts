@@ -4,7 +4,6 @@ import { CHANNEL_CATALOG_FIXTURE } from "./channel-catalog.fixture";
 import {
   channelConnectionDetail,
   channelIdentityLine,
-  channelIdentityRealmDetail,
   identityCoversConnection,
   linkedChannelIdentities,
 } from "./channel-identity-directory";
@@ -52,9 +51,9 @@ describe("linkedChannelIdentities", () => {
     assert.equal(linked?.label, "Zalouser · Acme");
   });
 
-  it("says so plainly when the Connection is gone rather than showing a bare id", () => {
+  it("says so plainly when the bot is gone rather than showing a bare id", () => {
     const [linked] = linkedChannelIdentities([identity], [], CHANNEL_CATALOG_FIXTURE);
-    assert.equal(linked?.label, "Connection unavailable");
+    assert.equal(linked?.label, "Bot unavailable");
     assert.equal(linked?.channel, undefined);
   });
 
@@ -99,7 +98,7 @@ describe("linkedChannelIdentities", () => {
     );
   });
 
-  it("names one link by every bot of its workspace, and never by a bot of another", () => {
+  it("names a workspace link by its workspace and every bot of it, never a bot of another", () => {
     const bot = (id: string, account: string, identityRealm: string) => ({
       ...connection,
       id,
@@ -107,6 +106,7 @@ describe("linkedChannelIdentities", () => {
       name: `slack-${id}`,
       externalName: identityRealm === "slack:T1" ? "Acme" : "Other",
       identityRealm,
+      identityRealmScope: "tenant",
       consumers: [
         {
           resourceKind: "channel_account" as const,
@@ -122,8 +122,8 @@ describe("linkedChannelIdentities", () => {
       [...realm, bot("c3", "elsewhere", "slack:T2")],
       CHANNEL_CATALOG_FIXTURE,
     );
-    assert.equal(linked?.label, "Slack · dai, oai");
-    assert.equal(channelIdentityRealmDetail(linkedIdentity, realm), "Acme · slack:T1");
+    assert.equal(linked?.label, "Slack · Acme");
+    assert.equal(linked?.description, "Slack · Acme · works with dai, oai");
   });
 
   it("covers every Connection of the identity's realm, or only its own on a Hub without realms", () => {
@@ -148,20 +148,57 @@ describe("linkedChannelIdentities", () => {
       name: "slack-a2-t1",
       externalName: "Acme",
       identityRealm: "slack:T1",
+      identityRealmScope: "tenant",
     };
     const line = channelIdentityLine(
       CHANNEL_CATALOG_FIXTURE,
       { connectionId: "removed-bot", identityRealm: "slack:T1" },
       [remaining],
     );
-    assert.equal(line, "Slack · slack-a2-t1 · Acme · slack:T1");
+    assert.equal(line, "Slack · Acme · works with slack-a2-t1");
     assert.equal(
       channelIdentityLine(
         CHANNEL_CATALOG_FIXTURE,
         { connectionId: "gone", identityRealm: "slack:T9" },
         [remaining],
       ),
-      "Connection unavailable",
+      "No bot left to recognize this identity",
+    );
+  });
+
+  it("names a Channel-wide link by the Channel and a bot-scoped link by its bot", () => {
+    const telegram = {
+      ...connection,
+      id: "t1",
+      provider: "telegram",
+      name: "support",
+      externalName: "acme_bot",
+      identityRealm: "telegram",
+      identityRealmScope: "channel",
+    };
+    const feishu = {
+      ...connection,
+      id: "f1",
+      provider: "feishu",
+      name: "feishu-a",
+      identityRealm: "feishu:bot:f1",
+      identityRealmScope: "bot",
+    };
+    assert.equal(
+      channelIdentityLine(
+        CHANNEL_CATALOG_FIXTURE,
+        { connectionId: "t1", identityRealm: "telegram" },
+        [telegram],
+      ),
+      "Telegram · works with @acme_bot",
+    );
+    assert.equal(
+      channelIdentityLine(
+        CHANNEL_CATALOG_FIXTURE,
+        { connectionId: "f1", identityRealm: "feishu:bot:f1" },
+        [feishu],
+      ),
+      "Feishu / Lark · feishu-a",
     );
   });
 });
