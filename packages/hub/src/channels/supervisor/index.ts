@@ -92,6 +92,7 @@ import type {
   TypingFn,
 } from "../plane/types.js";
 import { planeInboundDeferral } from "../plane/types.js";
+import { OutboundPacer } from "../plane/outbound-pacer.js";
 import type { StagedChannelMedia } from "../media/outbound-stager.js";
 
 /**
@@ -313,6 +314,25 @@ function postFor(
       });
       return { ok: false, error: errorMessage(error) };
     }
+  };
+}
+
+/**
+ * `messagesSentPerMinute` (Bot, Conversation, Route): every new message the
+ * account posts, including the tool-path MCP reply that posts through
+ * `handle.post`, waits its turn here. Delayed, never dropped.
+ */
+function pacedAccountSends(
+  account: CompiledChannelAccount,
+  logger: PlaneLogger,
+  post: PostFn,
+  media: ChannelMediaPostFn | undefined,
+): { pacer: OutboundPacer; post: PostFn; media: ChannelMediaPostFn | undefined } {
+  const pacer = new OutboundPacer({ account, logger });
+  return {
+    pacer,
+    post: pacer.paced(post),
+    media: media === undefined ? undefined : pacer.paced(media),
   };
 }
 
@@ -1283,13 +1303,21 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
     // Kept on the handle: the tool-path MCP endpoint's `channelReplyPost`
     // posts through this SAME outbound seam (the vertical's `sendText`).
-    const planePost = postFor(handle, cfg, loaded.hostRuntime, this.logger);
     // COMPAT(clisbot-control-plane): the account's native-media post (the
     // plugin's outbound.sendMedia, G7–G11); undefined when the plugin has no
     // sendMedia, which keeps the relay's media path a no-op (byte-identical).
     // The media home-root fallback is the shared daemon/Hub home — the same
     // home daemon discovery resolves (one home, one rule).
-    const planeMediaPost = mediaPostFor(handle, cfg, loaded.hostRuntime, this.logger);
+    const {
+      pacer,
+      post: planePost,
+      media: planeMediaPost,
+    } = pacedAccountSends(
+      compiled,
+      this.logger,
+      postFor(handle, cfg, loaded.hostRuntime, this.logger),
+      mediaPostFor(handle, cfg, loaded.hostRuntime, this.logger),
+    );
     // The turn-lifecycle surface (the plugin's optional outbound.typing);
     // undefined leaves the seam unmounted — an absent capability, not a fault.
     const planeTyping = typingFor(handle, cfg, loaded.hostRuntime);
@@ -1331,6 +1359,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       logger: this.logger,
       post: planePost,
       mediaPost: planeMediaPost,
+      noteOutboundRoute: (conversationId, route) => pacer.noteRoute(conversationId, route),
       homeRoot: resolveHome(this.options.daemon?.home, this.env),
       // The approval card's in-place update (the plugin's optional
       // outbound.updateText; absent plugins fail closed per update).

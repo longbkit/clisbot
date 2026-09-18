@@ -39,14 +39,6 @@ export interface SessionCreateContext {
   logger: PlaneLogger;
   store: Pick<ChannelStore, "access">;
   daemon: DaemonConnection;
-  authorizeConfiguration?:
-    | ((input: {
-        message: InboundMessage;
-        account: CompiledChannelAccount;
-        route: CompiledRoute;
-        config: CreateAgentConfig;
-      }) => Promise<{ allowed: boolean; reason?: string }>)
-    | undefined;
   replyCapabilities?: ChannelReplyCapabilityService | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config.
    * The route's effective defaults select the outbound path (E4/E6); on a
@@ -94,9 +86,6 @@ export class ChannelWorkflowTargetError extends Error {
     this.name = "ChannelWorkflowTargetError";
   }
 }
-
-/** A configuration the sender may not deploy; the engine releases its marker. */
-export class ChannelConfigurationDeniedError extends Error {}
 
 function issueReplyCapability(
   context: SessionCreateContext,
@@ -191,17 +180,10 @@ export async function createRouteSession(
           },
       undefined,
     );
+    // No per-sender Access check: the Route publisher delegated this
+    // configuration and the conversation selection was checked against whoever
+    // made it. Chat authority was settled at admission.
     const config = resolveConversationConfiguration(baseConfig, chosen);
-    const authorization = await context.authorizeConfiguration?.({
-      message: requester,
-      account,
-      route,
-      config,
-    });
-    if (authorization?.allowed === false)
-      throw new ChannelConfigurationDeniedError(
-        authorization.reason ?? "Agent configuration is outside your access.",
-      );
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
     const created = await context.daemon.createAgent(config, {
       labels: channelExecutionLabels(executionId),

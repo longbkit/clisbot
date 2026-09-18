@@ -1,5 +1,7 @@
 # Channel plane admission & authorization
 
+> Superseded in part 2026-09-18: a channel sender no longer needs their own Host/Project grants to start or continue a session with the Route's configuration. See [2026-09-18-channel-chat-authority-and-limits.md](2026-09-18-channel-chat-authority-and-limits.md).
+
 How a chat is authorized across the Paseo app and channels, why the channel plane cannot
 yet run against a managed daemon, and the decided plan to fix it. **Read the top three
 sections to review or implement**; everything under "Details & discussion" is supporting

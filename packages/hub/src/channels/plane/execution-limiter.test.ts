@@ -5,7 +5,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { RouteExecutionLimiter } from "./route-execution-limiter.js";
+import { ChannelExecutionLimiter } from "./execution-limiter.js";
 
 const defaults: EffectiveDefaults = {
   requireMention: true,
@@ -68,7 +68,7 @@ function fixture() {
   const timers = new Map<number, () => void>();
   let sequence = 0;
   const cancelled: string[] = [];
-  const limiter = new RouteExecutionLimiter({
+  const limiter = new ChannelExecutionLimiter({
     now: () => now,
     cancelAgent: async (agentId) => {
       cancelled.push(agentId);
@@ -94,13 +94,14 @@ function fixture() {
   };
 }
 
-describe("RouteExecutionLimiter", () => {
+describe("ChannelExecutionLimiter", () => {
   it("enforces input, concurrency, sender, and aggregate rate limits", () => {
     const f = fixture();
     assert.equal(
       f.limiter.admit({
         account: f.account,
         route: f.route,
+        conversationId: "C_PUBLIC",
         senderIdentity: "slack:alice",
         text: "123456789",
       }).allowed,
@@ -109,6 +110,7 @@ describe("RouteExecutionLimiter", () => {
     const first = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "one",
     });
@@ -116,6 +118,7 @@ describe("RouteExecutionLimiter", () => {
     const concurrent = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:bob",
       text: "two",
     });
@@ -126,6 +129,7 @@ describe("RouteExecutionLimiter", () => {
     const second = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "two",
     });
@@ -134,6 +138,7 @@ describe("RouteExecutionLimiter", () => {
     const senderLimited = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "three",
     });
@@ -145,6 +150,7 @@ describe("RouteExecutionLimiter", () => {
       const admitted = aggregate.limiter.admit({
         account: aggregate.account,
         route: aggregate.route,
+        conversationId: "C_PUBLIC",
         senderIdentity: `slack:${sender}`,
         text: sender,
       });
@@ -154,6 +160,7 @@ describe("RouteExecutionLimiter", () => {
     const routeLimited = aggregate.limiter.admit({
       account: aggregate.account,
       route: aggregate.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:four",
       text: "four",
     });
@@ -167,6 +174,7 @@ describe("RouteExecutionLimiter", () => {
     const tooLong = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "123456789",
     });
@@ -178,6 +186,7 @@ describe("RouteExecutionLimiter", () => {
     const running = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "one",
     });
@@ -185,6 +194,7 @@ describe("RouteExecutionLimiter", () => {
     const concurrent = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:bob",
       text: "two",
     });
@@ -195,6 +205,7 @@ describe("RouteExecutionLimiter", () => {
     const second = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "two",
     });
@@ -206,6 +217,7 @@ describe("RouteExecutionLimiter", () => {
     const senderLimited = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "three",
     });
@@ -218,6 +230,7 @@ describe("RouteExecutionLimiter", () => {
     const first = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "one",
     });
@@ -228,6 +241,7 @@ describe("RouteExecutionLimiter", () => {
     const second = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:bob",
       text: "two",
     });
@@ -244,6 +258,7 @@ describe("RouteExecutionLimiter", () => {
     const admitted = f.limiter.admit({
       account: f.account,
       route: f.route,
+      conversationId: "C_PUBLIC",
       senderIdentity: "slack:alice",
       text: "one",
     });
@@ -252,5 +267,71 @@ describe("RouteExecutionLimiter", () => {
     f.limiter.bind(admitted.lease, "agent-1");
     await f.limiter.cancelActive();
     assert.deepEqual(f.cancelled, ["agent-1"]);
+  });
+
+  it("counts the Bot and each Conversation on their own", () => {
+    const f = fixture();
+    delete f.route.limits;
+    f.account.limits = {
+      bot: { messagesPerMinute: 3 },
+      perConversation: { maxConcurrentRuns: 1 },
+    };
+    const admit = (conversationId: string, sender: string) =>
+      f.limiter.admit({
+        account: f.account,
+        route: f.route,
+        conversationId,
+        senderIdentity: `slack:${sender}`,
+        text: "hi",
+      });
+    const first = admit("C_ONE", "alice");
+    assert.equal(first.allowed, true);
+    // One run per conversation: C_ONE is busy, C_TWO is not.
+    const busy = admit("C_ONE", "bob");
+    assert.equal(busy.allowed, false);
+    if (!busy.allowed) assert.match(busy.reason, /^Conversation concurrency/u);
+    const other = admit("C_TWO", "bob");
+    assert.equal(other.allowed, true);
+    f.limiter.complete(first.allowed ? first.lease : undefined);
+    f.limiter.complete(other.allowed ? other.lease : undefined);
+    // The Bot counted three admitted messages across both conversations.
+    assert.equal(admit("C_ONE", "carol").allowed, true);
+    const botLimited = admit("C_THREE", "dave");
+    assert.equal(botLimited.allowed, false);
+    if (!botLimited.allowed) assert.match(botLimited.reason, /^Bot rate limit exceeded$/u);
+  });
+
+  it("admits without a lease when no scope limits anything", () => {
+    const f = fixture();
+    delete f.route.limits;
+    const admitted = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      conversationId: "C_PUBLIC",
+      senderIdentity: "slack:alice",
+      text: "x".repeat(100_000),
+    });
+    assert.deepEqual(admitted, { allowed: true });
+  });
+
+  it("cancels only open-audience runs when the policy is replaced", async () => {
+    const f = fixture();
+    const member = { ...f.route, audience: { kind: "members" as const }, limits: {} };
+    f.account.limits = { bot: { maxConcurrentRuns: 5 } };
+    const admit = (route: typeof f.route, sender: string) =>
+      f.limiter.admit({
+        account: f.account,
+        route,
+        conversationId: "C_PUBLIC",
+        senderIdentity: `slack:${sender}`,
+        text: "hi",
+      });
+    const open = admit(f.route, "alice");
+    const members = admit(member, "bob");
+    if (!open.allowed || !members.allowed) throw new Error("both should be admitted");
+    f.limiter.bind(open.lease, "agent-open");
+    f.limiter.bind(members.lease, "agent-member");
+    await f.limiter.cancelActive();
+    assert.deepEqual(f.cancelled, ["agent-open"]);
   });
 });

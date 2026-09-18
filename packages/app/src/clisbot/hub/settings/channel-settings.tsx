@@ -2,6 +2,8 @@ import { AutomationInputDraftContext } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
 import {
+  useChannelConfigurationPreview,
+  useChannelRouteWarnings,
   useChannelSettingsQueries,
   useReportDraftEditing,
   useScrollToTopOn,
@@ -58,17 +60,25 @@ import {
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
   channelRouteFollowUp,
   parseChannelFollowUpTtlMinutes,
+  DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
   DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
-  hasRequiredChannelConversationIds,
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
   type ChannelConfigurationRecord,
   type ChannelRouteBehavior,
-  type ChannelRouteLimits,
   type ChannelRouteMatchKind,
   type ChannelRouteTarget,
 } from "../channel-configuration";
+import {
+  ChannelAccountLimitsPanel,
+  ChannelLimitsFields,
+  NO_DEFAULTS,
+  channelLimitsDraft,
+  channelLimitsSummary,
+  parseChannelLimitsDraft,
+  type ChannelLimitsDraft,
+} from "./channel-limits-fields";
 import {
   HubAutomationsSchema,
   HubAccessAssignmentsSchema,
@@ -117,7 +127,6 @@ type MatchKind = ChannelRouteMatchKind;
 type RouteCondition = "all" | "contains";
 type RouteAudience = "members" | "conversationParticipants";
 type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
-type RouteLimitsDraft = Record<keyof ChannelRouteLimits, string>;
 const FOLLOW_UP_TTL_ERROR = "Use a positive whole number of minutes.";
 type ConfigurationKind = "account" | "route";
 type HubConnection = z.infer<typeof HubConnectionsSchema>["connections"][number];
@@ -454,12 +463,13 @@ function ChannelSettingsContent({
     [mutate, replaceAccountRoutes],
   );
 
-  const setAccountEnabled = useCallback(
-    async (account: RecordValue, enabled: boolean) => {
+  /** One account-level edit (`enabled`, `limits`); an undefined value removes the key. */
+  const updateAccount = useCallback(
+    async (account: RecordValue, patch: RecordValue) => {
       await mutate(() =>
         replaceConfiguration(
           (channels.data?.accounts ?? []).map((candidate) =>
-            candidate === account ? Object.assign({}, candidate, { enabled }) : candidate,
+            candidate === account ? withAccountPatch(candidate, patch) : candidate,
           ),
         ),
       );
@@ -783,7 +793,7 @@ function ChannelSettingsContent({
         pending={pending}
         refreshStatus={refreshStatus}
         selectAccount={setSelectedAccountKey}
-        setAccountEnabled={setAccountEnabled}
+        updateAccount={updateAccount}
         removeAccount={removeAccount}
         openAccess={openAccess}
         retryAccount={retryAccount}
@@ -1013,7 +1023,7 @@ function ChannelAccountsSection({
   pending,
   refreshStatus,
   selectAccount,
-  setAccountEnabled,
+  updateAccount,
   removeAccount,
   openAccess,
   retryAccount,
@@ -1039,7 +1049,7 @@ function ChannelAccountsSection({
   pending: boolean;
   refreshStatus(): void;
   selectAccount(key: string | null): void;
-  setAccountEnabled(account: RecordValue, enabled: boolean): Promise<void>;
+  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
   openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
@@ -1089,7 +1099,7 @@ function ChannelAccountsSection({
         canManage={canManage}
         pending={pending}
         selectAccount={selectAccount}
-        setAccountEnabled={setAccountEnabled}
+        updateAccount={updateAccount}
         removeAccount={removeAccount}
         openAccess={openAccess}
         retryAccount={retryAccount}
@@ -1252,7 +1262,7 @@ function ChannelAccountList({
   canManage,
   pending,
   selectAccount,
-  setAccountEnabled,
+  updateAccount,
   removeAccount,
   openAccess,
   retryAccount,
@@ -1272,7 +1282,7 @@ function ChannelAccountList({
   canManage: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
-  setAccountEnabled(account: RecordValue, enabled: boolean): Promise<void>;
+  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
   openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
@@ -1310,7 +1320,7 @@ function ChannelAccountList({
             canManage={canManage}
             pending={pending}
             selectAccount={selectAccount}
-            setAccountEnabled={setAccountEnabled}
+            updateAccount={updateAccount}
             removeAccount={removeAccount}
             openAccess={openAccess}
             retryAccount={retryAccount}
@@ -1337,7 +1347,7 @@ function ChannelAccountRow({
   canManage,
   pending,
   selectAccount,
-  setAccountEnabled,
+  updateAccount,
   removeAccount,
   openAccess,
   retryAccount,
@@ -1358,7 +1368,7 @@ function ChannelAccountRow({
   canManage: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
-  setAccountEnabled(account: RecordValue, enabled: boolean): Promise<void>;
+  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
   openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
@@ -1383,9 +1393,9 @@ function ChannelAccountRow({
   }, [key, selectAccount, selected]);
   const toggleEnabled = useCallback(
     (value: boolean) => {
-      void setAccountEnabled(account, value);
+      void updateAccount(account, { enabled: value });
     },
-    [account, setAccountEnabled],
+    [account, updateAccount],
   );
   const remove = useCallback(() => {
     void removeAccount(account);
@@ -1442,6 +1452,7 @@ function ChannelAccountRow({
         pending={pending}
         openAccess={openAccess}
         retryAccount={retryAccount}
+        updateAccount={updateAccount}
       />
       <ChannelAccountRouteList
         visible={selected}
@@ -1476,6 +1487,7 @@ function ChannelAccountDetails({
   pending,
   openAccess,
   retryAccount,
+  updateAccount,
 }: {
   visible: boolean;
   account: RecordValue;
@@ -1491,8 +1503,11 @@ function ChannelAccountDetails({
   pending: boolean;
   openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
+  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
 }) {
   const [showRuntimeDetails, setShowRuntimeDetails] = useState(false);
+  const [showLimits, setShowLimits] = useState(false);
+  const toggleLimits = useCallback(() => setShowLimits((value) => !value), []);
   const toggleRuntimeDetails = useCallback(() => setShowRuntimeDetails((value) => !value), []);
   const [showAccess, setShowAccess] = useState(false);
   const toggleAccess = useCallback(() => setShowAccess((value) => !value), []);
@@ -1516,6 +1531,8 @@ function ChannelAccountDetails({
         showingAccess={showAccess}
         showingRuntimeDetails={showRuntimeDetails}
         showingLinking={showLinking}
+        showingLimits={showLimits}
+        toggleLimits={toggleLimits}
         toggleAccess={toggleAccess}
         toggleRuntimeDetails={toggleRuntimeDetails}
         toggleLinking={toggleLinking}
@@ -1528,6 +1545,13 @@ function ChannelAccountDetails({
         </View>
       ) : null}
       {showLinking ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
+      {showLimits ? (
+        <ChannelAccountLimitsSection
+          account={account}
+          pending={pending}
+          updateAccount={updateAccount}
+        />
+      ) : null}
       {showAccess ? (
         <ChannelAccountAccess
           channel={channel}
@@ -1550,6 +1574,22 @@ function ChannelAccountDetails({
   );
 }
 
+function ChannelAccountLimitsSection({
+  account,
+  pending,
+  updateAccount,
+}: {
+  account: RecordValue;
+  pending: boolean;
+  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
+}) {
+  const save = useCallback(
+    (limits: RecordValue | undefined) => updateAccount(account, { limits }),
+    [account, updateAccount],
+  );
+  return <ChannelAccountLimitsPanel limits={account["limits"]} pending={pending} save={save} />;
+}
+
 /** The account's row of runtime actions. What is on offer is entirely the Hub's
  * report: an unconnected Connection, an account waiting to be linked, or a
  * transport that is not running. */
@@ -1563,9 +1603,11 @@ function ChannelAccountActions({
   showingAccess,
   showingRuntimeDetails,
   showingLinking,
+  showingLimits,
   toggleAccess,
   toggleRuntimeDetails,
   toggleLinking,
+  toggleLimits,
   openConfiguration,
   retryAccount,
 }: {
@@ -1578,9 +1620,11 @@ function ChannelAccountActions({
   showingAccess: boolean;
   showingRuntimeDetails: boolean;
   showingLinking: boolean;
+  showingLimits: boolean;
   toggleAccess(): void;
   toggleRuntimeDetails(): void;
   toggleLinking(): void;
+  toggleLimits(): void;
   openConfiguration(): void;
   retryAccount(account: RecordValue): Promise<void>;
 }) {
@@ -1596,6 +1640,9 @@ function ChannelAccountActions({
     <View style={[settingsStyles.row, styles.actions]}>
       <Button size="sm" variant="ghost" onPress={toggleAccess}>
         {showingAccess ? "Hide access" : "Who can use this?"}
+      </Button>
+      <Button size="sm" variant="ghost" onPress={toggleLimits}>
+        {showingLimits ? "Hide limits" : "Limits"}
       </Button>
       <Button size="sm" variant="ghost" onPress={toggleRuntimeDetails}>
         {showingRuntimeDetails ? "Hide status details" : "Status details"}
@@ -1791,6 +1838,22 @@ function ChannelAccountRouteList({
   );
 }
 
+/** Collapsed to a count, so a Route configured wide on purpose does not shout forever. */
+function RouteWarnings({ warnings }: { warnings: string[] }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((value) => !value), []);
+  if (warnings.length === 0) return null;
+  const count = `${String(warnings.length)} warning${warnings.length === 1 ? "" : "s"}`;
+  return (
+    <View>
+      <Button size="xs" variant="ghost" onPress={toggle}>
+        {open ? `Hide ${count}` : count}
+      </Button>
+      {open ? <Alert variant="warning" title={count} description={warnings.join("\n")} /> : null}
+    </View>
+  );
+}
+
 function ChannelRouteRow({
   automationScoped,
   account,
@@ -1840,6 +1903,11 @@ function ChannelRouteRow({
   const remove = useCallback(() => {
     void removeRoute(account, routeIndex);
   }, [account, removeRoute, routeIndex]);
+  const warnings = useChannelRouteWarnings(
+    stringField(account, "channel"),
+    stringField(account, "accountId"),
+    routeIndex,
+  );
   return (
     <View
       style={[
@@ -1861,6 +1929,8 @@ function ChannelRouteRow({
         </Text>
         <Text style={settingsStyles.rowHint}>{routeMatchSummary(route, metadata)}</Text>
         <Text style={settingsStyles.rowHint}>{routeBehaviorSummary(route)}</Text>
+        <Text style={settingsStyles.rowHint}>{channelLimitsSummary(route["limits"])}</Text>
+        <RouteWarnings warnings={warnings} />
       </View>
       {canManage ? (
         <View style={styles.actions}>
@@ -2019,6 +2089,7 @@ function ChannelAccountForm({
 }) {
   const inputDraft = useContext(AutomationInputDraftContext);
   const hub = useHubAccount();
+  const previewWarnings = useChannelConfigurationPreview();
   const confirmDialog = useConfirmation();
   const mounted = useRef(true);
   useEffect(() => {
@@ -2062,7 +2133,7 @@ function ChannelAccountForm({
   );
 
   const [contains, setContains] = useState(initial.contains);
-  const [routeLimits, setRouteLimits] = useState<RouteLimitsDraft>(initial.routeLimits);
+  const [routeLimits, setRouteLimits] = useState<ChannelLimitsDraft>(initial.routeLimits);
   const [target, setTarget] = useState<RouteTarget>(() =>
     initialChannelRouteTarget(isEditing, editedWorkflow),
   );
@@ -2096,7 +2167,7 @@ function ChannelAccountForm({
     observedAccountId,
   } = selection;
   const parsedProviderOptions = parseOptionalObject(providerOptions);
-  const parsedRouteLimits = parseRouteLimits(routeLimits);
+  const parsedRouteLimits = parseChannelLimitsDraft(routeLimits);
   const connectionOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
       connections.map((connection) => ({
@@ -2182,41 +2253,19 @@ function ChannelAccountForm({
     (value: string) => setRouteCondition(value as RouteCondition),
     [],
   );
+  // Switching who can use the Route starts from that audience's behavior;
+  // everything stays editable afterwards.
   const changeAudience = useCallback((value: string) => {
     const nextAudience = value as RouteAudience;
     setAudience(nextAudience);
-    if (nextAudience !== "conversationParticipants") return;
-    setConversationScope("specific");
-    setAgentConfiguration((current) => {
-      const featureValues = { ...current.featureValues };
-      delete featureValues["fast_mode"];
-      return { ...current, featureValues };
-    });
+    const defaults =
+      nextAudience === "conversationParticipants"
+        ? DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR
+        : DEFAULT_MEMBER_ROUTE_BEHAVIOR;
+    setBehavior(defaults);
+    setApprovalChoice(defaults.approvalMode ?? "custom");
+    setFollowUpTtlDraft(String(defaults.followUpTtlMinutes));
   }, []);
-  const changeMaxInputCharacters = useCallback(
-    (value: string) => setRouteLimits((current) => ({ ...current, maxInputCharacters: value })),
-    [],
-  );
-  const changeMessagesPerMinutePerSender = useCallback(
-    (value: string) =>
-      setRouteLimits((current) => ({
-        ...current,
-        messagesPerMinutePerSender: value,
-      })),
-    [],
-  );
-  const changeMessagesPerMinute = useCallback(
-    (value: string) => setRouteLimits((current) => ({ ...current, messagesPerMinute: value })),
-    [],
-  );
-  const changeMaxConcurrentRuns = useCallback(
-    (value: string) => setRouteLimits((current) => ({ ...current, maxConcurrentRuns: value })),
-    [],
-  );
-  const changeMaxRuntimeSeconds = useCallback(
-    (value: string) => setRouteLimits((current) => ({ ...current, maxRuntimeSeconds: value })),
-    [],
-  );
   const changeRequireMention = useCallback(
     (requireMention: boolean) => setBehavior((current) => ({ ...current, requireMention })),
     [],
@@ -2335,12 +2384,8 @@ function ChannelAccountForm({
       conversationIds,
       ...(routeCondition === "contains" ? { contains } : {}),
       audience,
-      ...(audience === "conversationParticipants" && parsedRouteLimits.valid
-        ? { limits: parsedRouteLimits.value }
-        : {}),
-      ...(audience === "members"
-        ? { behavior: behaviorWithApprovalChoice(behavior, approvalChoice) }
-        : {}),
+      ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
+      behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
       target: routeTarget,
       resource,
     };
@@ -2396,6 +2441,11 @@ function ChannelAccountForm({
       nextRoute = candidate.route;
     }
     const review: RouteReviewInput = {
+      warnings: warningsForRoute(
+        await previewWarnings(nextAccounts, nextResource),
+        nextAccounts,
+        nextRoute,
+      ),
       route: nextRoute,
       target: routeTargetReviewLabel(target, automationName, agentConfiguration),
       teams: teams.filter(({ id }) => selectedTeamIds.includes(id)).map(({ name }) => name),
@@ -2444,6 +2494,7 @@ function ChannelAccountForm({
     target,
     teams,
     workspace,
+    previewWarnings,
   ]);
 
   const renderAccountSelection = () => (
@@ -2560,8 +2611,7 @@ function ChannelAccountForm({
         />
       ) : (
         <Text style={settingsStyles.rowHint}>
-          Any conversation of the selected type can match this Route. Member access rules still
-          apply.
+          Any conversation of the selected type the bot is in can match this Route.
         </Text>
       )}
       <ChoiceRow
@@ -2597,62 +2647,45 @@ function ChannelAccountForm({
       />
     </>
   );
-  const renderPublicLimits = () => {
-    if (audience !== "conversationParticipants") return null;
+  const renderLimits = () => {
+    const open = audience === "conversationParticipants";
     return (
       <>
-        <Alert
-          variant="warning"
-          title="Public access to a fixed Route"
-          description="Select at least one exact Conversation. Group messages must mention the app, output is final-answer text only, and tool approvals are denied. This does not grant Paseo or Project access."
-        />
-        <RouteLimitField
-          label="Maximum input characters"
-          hint={`Up to ${String(DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxInputCharacters)} characters per message.`}
-          value={routeLimits.maxInputCharacters}
-          onChange={changeMaxInputCharacters}
-          disabled={pending}
-        />
-        <RouteLimitField
-          label="Messages per minute, per sender"
-          hint={`Up to ${String(DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.messagesPerMinutePerSender)}.`}
-          value={routeLimits.messagesPerMinutePerSender}
-          onChange={changeMessagesPerMinutePerSender}
-          disabled={pending}
-        />
-        <RouteLimitField
-          label="Messages per minute, total"
-          hint={`Up to ${String(DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.messagesPerMinute)} across this Route.`}
-          value={routeLimits.messagesPerMinute}
-          onChange={changeMessagesPerMinute}
-          disabled={pending}
-        />
-        <RouteLimitField
-          label="Concurrent runs"
-          hint={`Up to ${String(DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxConcurrentRuns)} active runs.`}
-          value={routeLimits.maxConcurrentRuns}
-          onChange={changeMaxConcurrentRuns}
-          disabled={pending}
-        />
-        <RouteLimitField
-          label="Maximum runtime (seconds)"
-          hint={`Up to ${String(DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxRuntimeSeconds)} seconds per run.`}
-          value={routeLimits.maxRuntimeSeconds}
-          onChange={changeMaxRuntimeSeconds}
+        {open ? (
+          <Alert
+            variant="warning"
+            title="Anyone in the matching conversations can use this Route"
+            description="They can talk to the Agent this Route runs, with the settings below. This does not give them Paseo, Host or Project access. The Hub warns about wide choices after you save."
+          />
+        ) : null}
+        <Text style={styles.formHeading}>Limits</Text>
+        <Text style={settingsStyles.rowHint}>
+          Counted across every conversation this Route matches. Messages over a rate or run limit
+          wait their turn; a message longer than the input limit is refused. The bot&apos;s own
+          limits are under Manage → Limits.
+        </Text>
+        <ChannelLimitsFields
+          draft={routeLimits}
+          setDraft={setRouteLimits}
+          defaults={open ? DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS : NO_DEFAULTS}
           error={parsedRouteLimits.valid ? null : parsedRouteLimits.error}
           disabled={pending}
         />
       </>
     );
   };
-  const renderMemberBehavior = () => {
-    if (audience !== "members") return null;
+  const renderBehavior = () => {
     return (
-      <MemberRouteBehaviorFields
+      <RouteBehaviorFields
         matchKind={matchKind}
         behavior={behavior}
         approvalChoice={approvalChoice}
-        showTeamAccess={configurationKind === "account" && !isEditing && teams.length > 0}
+        showTeamAccess={
+          audience === "members" &&
+          configurationKind === "account" &&
+          !isEditing &&
+          teams.length > 0
+        }
         teams={teams}
         selectedTeamIds={selectedTeamIds}
         setSelectedTeamIds={setSelectedTeamIds}
@@ -2698,7 +2731,6 @@ function ChannelAccountForm({
       selectedDaemonServerId={selectedDaemonServerId}
       agentConfiguration={agentConfiguration}
       setAgentConfiguration={setAgentConfiguration}
-      allowFastMode={audience === "members"}
       parsedProviderOptions={parsedProviderOptions}
       setProviderOptions={setProviderOptions}
       pending={pending}
@@ -2734,8 +2766,8 @@ function ChannelAccountForm({
           ) : (
             <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
           )}
-          {renderPublicLimits()}
-          {renderMemberBehavior()}
+          {renderBehavior()}
+          {renderLimits()}
           {target === "automation" && automationName !== null ? (
             <AutomationReplyAuthority
               automation={automations.find((item) => item.name === automationName)}
@@ -2763,13 +2795,8 @@ function channelConfigurationKind(
 }
 
 /** A Route that names Conversations, or admits participants, starts on the selected list. */
-function initialConversationScope(initial: {
-  conversationIds: string;
-  audience: RouteAudience;
-}): string {
-  return initial.conversationIds.length > 0 || initial.audience === "conversationParticipants"
-    ? "specific"
-    : "all";
+function initialConversationScope(initial: { conversationIds: string }): string {
+  return initial.conversationIds.length > 0 ? "specific" : "all";
 }
 
 function daemonServerId(daemons: HubDaemon[], daemonId: string | null): string | null {
@@ -2827,34 +2854,7 @@ function AutomationReplyAuthority({
   );
 }
 
-function RouteLimitField({
-  label,
-  hint,
-  value,
-  onChange,
-  error,
-  disabled,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange(value: string): void;
-  error?: string | null;
-  disabled: boolean;
-}) {
-  return (
-    <Field label={label} hint={hint} error={error}>
-      <FormTextInput
-        initialValue={value}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        editable={!disabled}
-      />
-    </Field>
-  );
-}
-
-function MemberRouteBehaviorFields({
+function RouteBehaviorFields({
   matchKind,
   behavior,
   approvalChoice,
@@ -3052,7 +3052,6 @@ function RouteTargetFields({
   selectedDaemonServerId,
   agentConfiguration,
   setAgentConfiguration,
-  allowFastMode,
   parsedProviderOptions,
   setProviderOptions,
   pending,
@@ -3080,7 +3079,6 @@ function RouteTargetFields({
   selectedDaemonServerId: string | null;
   agentConfiguration: ManagedAgentConfigurationValue;
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
-  allowFastMode: boolean;
   parsedProviderOptions: ReturnType<typeof parseOptionalObject>;
   setProviderOptions(value: string): void;
   pending: boolean;
@@ -3123,7 +3121,6 @@ function RouteTargetFields({
           selectedDaemonServerId={selectedDaemonServerId}
           agentConfiguration={agentConfiguration}
           setAgentConfiguration={setAgentConfiguration}
-          allowFastMode={allowFastMode}
           parsedProviderOptions={parsedProviderOptions}
           setProviderOptions={setProviderOptions}
           pending={pending}
@@ -3198,7 +3195,6 @@ function AgentTargetFields({
   selectedDaemonServerId,
   agentConfiguration,
   setAgentConfiguration,
-  allowFastMode,
   parsedProviderOptions,
   setProviderOptions,
   pending,
@@ -3216,7 +3212,6 @@ function AgentTargetFields({
   selectedDaemonServerId: string | null;
   agentConfiguration: ManagedAgentConfigurationValue;
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
-  allowFastMode: boolean;
   parsedProviderOptions: ReturnType<typeof parseOptionalObject>;
   setProviderOptions(value: string): void;
   pending: boolean;
@@ -3253,7 +3248,6 @@ function AgentTargetFields({
         cwd={cwd}
         value={agentConfiguration}
         onChange={setAgentConfiguration}
-        allowFastMode={allowFastMode}
         showFastMode={false}
         disabled={pending}
       />
@@ -3263,7 +3257,6 @@ function AgentTargetFields({
           serverId={selectedDaemonServerId}
           value={agentConfiguration}
           onChange={setAgentConfiguration}
-          allowFastMode={allowFastMode}
           disabled={pending}
         />
         <Field
@@ -3498,65 +3491,17 @@ function stringArrayField(record: RecordValue, key: string): string[] {
     .map(String);
 }
 
+function withAccountPatch(account: RecordValue, patch: RecordValue): RecordValue {
+  const next: RecordValue = { ...account, ...patch };
+  for (const [key, value] of Object.entries(patch)) if (value === undefined) delete next[key];
+  return next;
+}
+
 function objectField(record: RecordValue, key: string): RecordValue | null {
   const value = record[key];
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as RecordValue)
     : null;
-}
-
-function routeLimitsDraft(record: RecordValue): RouteLimitsDraft {
-  const value = <K extends keyof ChannelRouteLimits>(key: K): string => {
-    const candidate = record[key];
-    return String(
-      typeof candidate === "number" ? candidate : DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS[key],
-    );
-  };
-  return {
-    maxInputCharacters: value("maxInputCharacters"),
-    messagesPerMinutePerSender: value("messagesPerMinutePerSender"),
-    messagesPerMinute: value("messagesPerMinute"),
-    maxConcurrentRuns: value("maxConcurrentRuns"),
-    maxRuntimeSeconds: value("maxRuntimeSeconds"),
-  };
-}
-
-function parseRouteLimits(
-  draft: RouteLimitsDraft,
-): { valid: true; value: ChannelRouteLimits } | { valid: false; error: string } {
-  const parse = (value: string, maximum: number): number | null => {
-    const parsed = Number(value.trim());
-    return Number.isInteger(parsed) && parsed > 0 && parsed <= maximum ? parsed : null;
-  };
-  const value = {
-    maxInputCharacters: parse(
-      draft.maxInputCharacters,
-      DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxInputCharacters,
-    ),
-    messagesPerMinutePerSender: parse(
-      draft.messagesPerMinutePerSender,
-      DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.messagesPerMinutePerSender,
-    ),
-    messagesPerMinute: parse(
-      draft.messagesPerMinute,
-      DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.messagesPerMinute,
-    ),
-    maxConcurrentRuns: parse(
-      draft.maxConcurrentRuns,
-      DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxConcurrentRuns,
-    ),
-    maxRuntimeSeconds: parse(
-      draft.maxRuntimeSeconds,
-      DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS.maxRuntimeSeconds,
-    ),
-  };
-  if (Object.values(value).some((candidate) => candidate === null)) {
-    return {
-      valid: false,
-      error: "Use positive whole numbers no higher than the limits shown.",
-    };
-  }
-  return { valid: true, value: value as ChannelRouteLimits };
 }
 
 function routeTargetSummary(route: RecordValue): string {
@@ -3641,19 +3586,13 @@ function behaviorWithApprovalChoice(
   return approvalChoice === "custom" ? settings : { ...settings, approvalMode: approvalChoice };
 }
 
-function isPublicAudienceRoute(route: RecordValue): boolean {
-  return stringField(objectField(route, "audience") ?? {}, "kind") === "conversationParticipants";
-}
-
 function routeReplySummary(route: RecordValue): string {
-  if (isPublicAudienceRoute(route)) return "Final answers only";
   return routeBehaviorDraft(route).behavior.outboundPath === "tool"
     ? "Use Channel tool: text and Project files, preapproved"
     : "Text forward";
 }
 
 function routeToolRequestSummary(route: RecordValue): string {
-  if (isPublicAudienceRoute(route)) return "Requests denied · Conservative limits";
   return approvalSummary(routeBehaviorDraft(route).approvalChoice);
 }
 
@@ -3672,6 +3611,27 @@ interface RouteReviewInput {
   route: RecordValue;
   target: string;
   teams: string[];
+  /** The Hub's warnings for this Route, from validating the candidate. */
+  warnings: string[];
+}
+
+/** The warnings the Hub gave for `route`, wherever it sits in the candidate. */
+function warningsForRoute(
+  warnings: { channel: string; accountId: string; route: number; message: string }[] | undefined,
+  accounts: RecordValue[],
+  route: RecordValue,
+): string[] {
+  const holder = accounts.find((account) => arrayField(account, "routes").includes(route));
+  if (holder === undefined) return [];
+  const index = arrayField(holder, "routes").indexOf(route);
+  return (warnings ?? [])
+    .filter(
+      (warning) =>
+        warning.channel === stringField(holder, "channel") &&
+        warning.accountId === stringField(holder, "accountId") &&
+        warning.route === index,
+    )
+    .map(({ message }) => message);
 }
 
 /** One source for the review the owner confirms, so the sheet body and the
@@ -3689,6 +3649,9 @@ function routeReviewFacts(input: RouteReviewInput): { label: string; value: stri
           ? "owners and existing assignments"
           : `owners and ${input.teams.join(", ")}`,
     },
+    ...(input.warnings.length === 0
+      ? []
+      : [{ label: "Warnings", value: input.warnings.join("\n") }]),
   ];
 }
 
@@ -3767,7 +3730,7 @@ function routeMatchSummary(
   const audience = objectField(route, "audience");
   const audienceLabel =
     stringField(audience ?? undefined, "kind") === "conversationParticipants"
-      ? "Anyone in conversation"
+      ? "Anyone in matching conversations"
       : "Members with access";
   const condition = contains === null ? scope : `${scope} · Contains “${contains}”`;
   return `${condition} · ${audienceLabel}`;
@@ -3879,7 +3842,7 @@ function channelFormInitialState(
       : "members") as RouteAudience,
     behavior: routeBehaviorDraft(editedRoute),
     contains,
-    routeLimits: routeLimitsDraft(editedLimits),
+    routeLimits: channelLimitsDraft(editedLimits),
     ...environment,
     agentConfiguration: managedAgentConfiguration(editedAgent),
     providerOptions: formatOptionalObject(objectField(editedAgent ?? EMPTY_RECORD, "options")),
@@ -3982,7 +3945,7 @@ function canSaveChannelRoute(input: {
   routeCondition: RouteCondition;
   contains: string;
   audience: RouteAudience;
-  parsedRouteLimits: ReturnType<typeof parseRouteLimits>;
+  parsedRouteLimits: ReturnType<typeof parseChannelLimitsDraft>;
   conversationScope: string;
   conversationIds: string;
   target: RouteTarget;
@@ -4003,10 +3966,7 @@ function canSaveChannelRoute(input: {
     splitConversationIds(input.conversationIds).length === 0
   )
     return false;
-  if (input.audience === "conversationParticipants") {
-    if (!input.parsedRouteLimits.valid) return false;
-    if (!hasRequiredChannelConversationIds(input.audience, input.conversationIds)) return false;
-  }
+  if (!input.parsedRouteLimits.valid) return false;
   if (input.target === "automation") return input.automationName !== null;
   return (
     input.daemonId !== null &&
@@ -4060,7 +4020,9 @@ function routeConfirmationTitle(
   approvalChoice: RouteApprovalChoice,
   isEditing: boolean,
 ): string {
-  if (audience === "conversationParticipants") return "Activate public Route?";
+  if (audience === "conversationParticipants") {
+    return "Open this Route to anyone in matching conversations?";
+  }
   if (approvalChoice === "auto-allow") return "Activate automatic tool access?";
   return isEditing ? "Save Route?" : "Activate Route?";
 }

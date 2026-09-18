@@ -42,29 +42,11 @@ it.each(["memory", "embedded"])(
         organizationId: "org",
         bindingKey: "binding",
         workflowName: "work",
-        authorizeTarget: async () => true,
         recoverExecutions: async (ids: readonly string[]) => {
           recovered.push(...ids);
         },
       };
-      await expect(
-        stopChannelWorkflowRuns({
-          ...input,
-          authorizeTarget: async (target) => target.projectId !== "project-second",
-        }),
-      ).rejects.toThrow("every target Project");
-      expect((await database.findTriggerRunById(stopped.runId))?.status).toBe("running");
-      let lateRun: Awaited<ReturnType<typeof createRun>> | undefined;
-      expect(
-        await stopChannelWorkflowRuns({
-          ...input,
-          authorizeTarget: async () => {
-            if (!lateRun) lateRun = await createRun(database);
-            return true;
-          },
-        }),
-      ).toBe(1);
-      expect((await database.findTriggerRunById(lateRun!.runId))?.status).toBe("running");
+      expect(await stopChannelWorkflowRuns(input)).toBe(1);
       expect(recovered).toEqual([stopped.executionId]);
       expect(await database.findTriggerRunById(stopped.runId)).toMatchObject({
         status: "failed",
@@ -80,7 +62,6 @@ it.each(["memory", "embedded"])(
       for (const run of [otherConversation, otherOrganization, otherWorkflow, otherProvider]) {
         expect((await database.findTriggerRunById(run.runId))?.status).toBe("running");
       }
-      expect(await stopChannelWorkflowRuns(input)).toBe(1);
       expect(await stopChannelWorkflowRuns(input)).toBe(0);
       await database.completeWorkflowStep(stopped.executionId, "succeeded", { done: true });
       expect((await database.findTriggerRunById(stopped.runId))?.status).toBe("failed");
@@ -111,14 +92,7 @@ it("reads all active workflow runs with pending steps and the actual execution H
       organizationId: "org",
       workflowName: "work",
       bindingKey: "binding",
-      authorizeTarget: async () => true,
     };
-    await expect(
-      readChannelWorkflowRuns({
-        ...input,
-        authorizeTarget: async (target) => target.projectId !== "project-second",
-      }),
-    ).rejects.toThrow("every target Project");
     const results = await readChannelWorkflowRuns(input);
     expect(results).toHaveLength(2);
     expect(results.find(({ id }) => id === first.runId)?.steps).toEqual([

@@ -1,8 +1,4 @@
-import {
-  compileAutomationDocument,
-  automationAgents,
-  editableAutomationYaml,
-} from "../triggers/configuration/workflow-document.js";
+import type { compileAutomationDocument } from "../triggers/configuration/workflow-document.js";
 // The channel control-plane source (plan S8 / implementation doc §4.3): the one
 // builder that turns the active organization Channel revision into the control
 // plane everything above it consumes — the control-plane ops, the supervisor,
@@ -22,7 +18,6 @@ import {
 // thinkingOptionId, providerOptions) plus the environment's `cwd`.
 
 import { compileHubBundle, type CompiledHubBundle, type HubBundleFile } from "../config/bundle.js";
-import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
 import type {
   ChannelConfigurationRevisionRecord,
   Database,
@@ -30,7 +25,6 @@ import type {
 } from "../db/types.js";
 import type { CreateAgentConfig } from "./daemon/types.js";
 import {
-  ChannelCompilationError,
   compileChannelControlPlane,
   type ChannelControlPlane,
   type EffectiveDefaults,
@@ -143,7 +137,7 @@ async function compileControlPlaneSnapshot(
   database: Database,
   organizationId: string,
   revision: ChannelConfigurationRevisionRecord | null,
-  options: { skipOpenAudienceTargetSafety?: boolean; publicBaseUrl?: string } = {},
+  options: { publicBaseUrl?: string } = {},
 ): Promise<ChannelControlPlaneSnapshot> {
   const files = revision?.files ?? [];
   if (files.some((file) => file.path.startsWith(".paseo/workflows/"))) {
@@ -171,9 +165,6 @@ async function compileControlPlaneSnapshot(
     environmentNames: channelEnvironmentNames(bundle),
     workflowNames,
   });
-  if (!options.skipOpenAudienceTargetSafety) {
-    await assertOpenAudienceTargetSafety(database, organizationId, bundle, controlPlane, triggers);
-  }
   return {
     organizationId,
     revision,
@@ -186,65 +177,8 @@ async function compileControlPlaneSnapshot(
   };
 }
 
-/** Open Routes are intentionally cheaper and narrower than Member Routes.
- * This cross-document check catches controls that the Channel file cannot see. */
-export async function assertOpenAudienceTargetSafety(
-  database: Database,
-  organizationId: string,
-  bundle: CompiledHubBundle,
-  controlPlane: ChannelControlPlane,
-  triggerRecords?: Awaited<ReturnType<Database["listOrganizationTriggers"]>>,
-): Promise<void> {
-  const issues: Array<{ path: readonly (string | number)[]; message: string }> = [];
-  const openTargets = controlPlane.accounts.flatMap((account) =>
-    account.routes.flatMap((route, index) =>
-      route.audience?.kind === "conversationParticipants"
-        ? [{ accountId: account.accountId, index, target: route.target, defaults: route.defaults }]
-        : [],
-    ),
-  );
-  const records = triggerRecords ?? (await database.listOrganizationTriggers(organizationId));
-  const triggerByName = new Map(records.map((trigger) => [trigger.name, trigger]));
-  for (const { accountId, index, target, defaults } of openTargets) {
-    const path = ["channel-accounts", accountId, "routes", index, "target"] as const;
-    if (target.kind === "agent") {
-      const agent = bundle.agents[target.agent];
-      appendOpenAudienceAgentIssues(
-        [agent === undefined ? undefined : applyAgentControls(agent, defaults.agentControls)],
-        path,
-        issues,
-      );
-      continue;
-    }
-    const trigger = triggerByName.get(target.workflow);
-    if (trigger === undefined) {
-      issues.push({
-        path,
-        message: "external participants require an active Automation",
-      });
-      continue;
-    }
-    const revision = await database.findOrganizationTriggerRevision(
-      trigger.id,
-      trigger.activeRevisionId,
-    );
-    if (revision === undefined) {
-      issues.push({
-        path,
-        message: "external participants require an active Automation revision",
-      });
-      continue;
-    }
-    const choices = automationAgents(
-      compileAutomationDocument(editableAutomationYaml(revision.yaml, trigger.enabled)),
-    );
-    appendOpenAudienceAgentIssues(choices, path, issues);
-  }
-  if (issues.length > 0) throw new ChannelCompilationError(issues);
-}
-
-/** Prevents an active open-audience Route from being widened indirectly by an Automation edit. */
-export async function assertOpenAudienceAutomationUpdateSafety(input: {
+/** A Channel Route names its Automation; renaming or disabling it would leave the Route without a target. */
+export async function assertAutomationRouteTargetKept(input: {
   database: Database;
   organizationId: string;
   automationId: string;
@@ -253,90 +187,25 @@ export async function assertOpenAudienceAutomationUpdateSafety(input: {
   const triggerRecords = await input.database.listOrganizationTriggers(input.organizationId);
   const current = triggerRecords.find(({ id }) => id === input.automationId);
   if (current === undefined) return;
+  if (input.candidate.authored.enabled && input.candidate.authored.name === current.name) return;
   const activeRevision = await input.database.findActiveChannelConfiguration(input.organizationId);
   const snapshot = await compileControlPlaneSnapshot(
     input.database,
     input.organizationId,
     activeRevision ?? null,
-    { skipOpenAudienceTargetSafety: true },
   );
-  const hasOpenAudienceBacklink = snapshot.controlPlane.accounts.some((account) =>
+  const targeted = snapshot.controlPlane.accounts.some((account) =>
     account.routes.some(
-      (route) =>
-        route.audience?.kind === "conversationParticipants" &&
-        route.target.kind === "workflow" &&
-        route.target.workflow === current.name,
+      (route) => route.target.kind === "workflow" && route.target.workflow === current.name,
     ),
   );
-  if (!hasOpenAudienceBacklink) return;
-  if (!input.candidate.authored.enabled || input.candidate.authored.name !== current.name) {
-    throw new TriggerDocumentError([
-      {
-        path: [input.candidate.authored.name !== current.name ? "name" : "enabled"],
-        message: "must remain active while an external-participant Channel Route uses it",
-      },
-    ]);
-  }
-  const choices = automationAgents(input.candidate);
-  const issues: Array<{ path: readonly (string | number)[]; message: string }> = [];
-  appendOpenAudienceAgentIssues(choices, ["steps", "agent"], issues);
-  if (issues.length > 0) throw new TriggerDocumentError(issues);
-}
-
-function appendOpenAudienceAgentIssues(
-  agents: readonly (
-    | {
-        provider: string;
-        mode?: string | undefined;
-        featureValues?: Readonly<Record<string, unknown>> | undefined;
-        options?: Readonly<Record<string, unknown>> | undefined;
-      }
-    | undefined
-  )[],
-  path: readonly (string | number)[],
-  issues: Array<{ path: readonly (string | number)[]; message: string }>,
-): void {
-  if (agents.some((agent) => agent?.featureValues?.["fast_mode"] === true)) {
-    issues.push({
-      path,
-      message: "Fast mode is unavailable to external participants",
-    });
-  }
-  for (const agent of agents) {
-    const modeIssue = openAudienceAgentModeIssue(agent);
-    if (modeIssue !== undefined) issues.push({ path, message: modeIssue });
-  }
-}
-
-function openAudienceAgentModeIssue(
-  agent:
-    | {
-        provider: string;
-        mode?: string | undefined;
-        featureValues?: Readonly<Record<string, unknown>> | undefined;
-        options?: Readonly<Record<string, unknown>> | undefined;
-      }
-    | undefined,
-): string | undefined {
-  if (agent === undefined) return "external participants require a known Agent configuration";
-  if (agent.mode === undefined) {
-    return "external participants require an explicit known-safe Agent Mode";
-  }
-  const provider = AGENT_PROVIDER_DEFINITIONS.find(({ id }) => id === agent.provider);
-  const mode = provider?.modes.find(({ id }) => id === agent.mode);
-  if (mode === undefined) {
-    return `external participants cannot use unverified Mode "${agent.mode}" for Provider "${agent.provider}"`;
-  }
-  if (mode.isUnattended === true) {
-    return `external participants cannot use unattended Mode "${agent.mode}"`;
-  }
-  if (agent.featureValues?.["auto_accept"] === true) {
-    return "external participants cannot enable automatic tool acceptance";
-  }
-  if (agent.options?.["approval_policy"] === "never") {
-    return "external participants cannot disable tool approvals through Provider options";
-  }
-  return undefined;
+  if (!targeted) return;
+  throw new TriggerDocumentError([
+    {
+      path: [input.candidate.authored.name !== current.name ? "name" : "enabled"],
+      message: "must remain active while a Channel Route uses it",
+    },
+  ]);
 }
 
 function createChannelAgentAccessTargetResolver(bundle: CompiledHubBundle) {

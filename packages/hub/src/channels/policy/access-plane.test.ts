@@ -332,6 +332,18 @@ describe("allowlist enforcement", () => {
     await harness.plane.stop();
   });
 
+  it("tells a sender the Member rules do not admit why, once a day", async () => {
+    const harness = makeHarness({ route: makeRoute({}) });
+    await harness.plane.start(harness.daemon, store);
+    const refused = await deliver(harness, dm({ senderIdentity: STRANGER }));
+    assert.equal(refused.dispatched, false);
+    await deliver(harness, dm({ senderIdentity: STRANGER, text: "hello again" }));
+    assert.equal(harness.posted.length, 1);
+    assert.match(harness.posted[0] ?? "", /can't use this bot here yet/u);
+    assert.equal(harness.created.length, 0);
+    await harness.plane.stop();
+  });
+
   it("leaves admission alone when no access block was authored", async () => {
     const harness = makeHarness({ route: makeRoute({}) });
     await harness.plane.start(harness.daemon, store);
@@ -518,7 +530,7 @@ describe("org Access command authority and live configuration", () => {
     await harness.plane.stop();
   });
 
-  it("refuses restricted Guests even when the route allows their conversation", async () => {
+  it("lets a Guest control the session but not change its configuration", async () => {
     const harness = await boundHarness("guest-command", {
       authorizeChannelPrivilege: async (request) =>
         request.senderIdentity === STRANGER
@@ -530,11 +542,15 @@ describe("org Access command authority and live configuration", () => {
       }),
       resolveChannelMember: async () => undefined,
     });
-    for (const text of ["/stop", "/model gpt-5.6-luna"]) {
-      const result = await deliver(harness, conversationCommand("guest-command", text, STRANGER));
-      assert.equal(result.outcome?.kind === "command" && result.outcome.handled, false);
-    }
-    assert.equal(harness.cancelled.length, 0);
+    const agentId = harness.agents[0]!.id;
+    const stopped = await deliver(harness, conversationCommand("guest-command", "/stop", STRANGER));
+    assert.equal(stopped.outcome?.kind === "command" && stopped.outcome.handled, true);
+    assert.deepEqual(harness.cancelled, [agentId]);
+    const changed = await deliver(
+      harness,
+      conversationCommand("guest-command", "/model gpt-5.6-luna", STRANGER),
+    );
+    assert.equal(changed.outcome?.kind === "command" && changed.outcome.handled, false);
     assert.equal(harness.agents[0]?.model, undefined);
     assert.match(harness.posted.at(-1) ?? "", /agent.interact/u);
     await harness.plane.stop();

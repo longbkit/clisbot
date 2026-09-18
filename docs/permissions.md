@@ -136,18 +136,29 @@ resolves to it. The route's `channel.use` /
 `mayTrigger` admission remains the baseline. The old channel role projection and
 session initiator do not grant command authority.
 
-`/help` and `/me` are public command entry points. `agent.interact` gates session
-status, cowork links, turn controls and configuration; `agent.create` gates
-new/resume/fork/side/quick. Dynamic-command changes need `approval.config`.
-Approvals retain the open prompt's two authority checks; an unattended mode also
-needs the matching `approval.*` privilege. Configuration menus and mutations
-must fit the sender's `AgentConfigurationGrant` and conversation visibility.
-A final configuration with `featureValues.fast_mode: true` additionally requires
-`agent.fast.use`. Profile menus/application, live edits, session creation and
-resume enforce this separately. Validation includes features preserved from a
-running session when a staged provider selection returns to that provider.
-Omitting a feature from a new profile therefore does not bypass its authority
-check when the daemon preserves that live feature.
+Chat is separate from Host and Project access
+([decision](audits/2026-09-18-channel-chat-authority-and-limits.md)). A sender
+with chat authority (`channel.use`, or admission by an open-audience Route) talks
+to the Route's Agent, starts sessions with the Route's configuration, and uses the
+commands that stay inside it: status, stop, new, fork/side/quick, steer/queue,
+skills and dynamic commands. Nobody re-checks the sender's Project grants for
+that, because the Route's publisher passed the delegation check for the Route's
+daemon, Project, Agent configuration and automatic approvals when publishing it
+(`access/delegation.ts`).
+
+`/help` and `/me` are public command entry points. `agent.interact` gates cowork
+links and changing the configuration (`/agent`, `/model`, `/provider`,
+`/effort`, `/permission`); `agent.create` gates `/resume`. Dynamic-command
+changes need `approval.config`. Approvals retain the open prompt's two authority
+checks; an unattended mode also needs the matching `approval.*` privilege.
+Configuration menus and mutations must fit the sender's `AgentConfigurationGrant`
+and conversation visibility. A final configuration with
+`featureValues.fast_mode: true` additionally requires `agent.fast.use`. The check
+runs when a sender makes the change; later sessions in the conversation use the
+stored choice without re-checking whoever speaks next. Validation includes
+features preserved from a running session when a staged provider selection
+returns to that provider. Omitting a feature from a new profile therefore does
+not bypass its authority check when the daemon preserves that live feature.
 
 An unlinked sender uses the first-class **Guest group**, stored as
 `subjectKind: guest`, `subjectId: guest`. Guest receives no grants by default.

@@ -1213,6 +1213,8 @@ authority may continue the conversation but cannot approve the blocked operation
 
 ### Open-audience safeguards
 
+> Superseded 2026-09-18: these are now defaults and warnings, not rules — the configurator may widen any of them, and Route limits have defaults but no ceiling. See [2026-09-18-channel-chat-authority-and-limits.md](2026-09-18-channel-chat-authority-and-limits.md).
+
 Selecting an open Audience starts from a conservative preset:
 
 - Specific Conversation IDs rather than a future-expanding scope.

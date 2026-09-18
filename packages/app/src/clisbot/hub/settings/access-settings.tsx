@@ -486,21 +486,22 @@ function PublicRoutesAccessSection() {
   const retry = useCallback(() => void configuration.refetch(), [configuration]);
   const routes = publicAccessRoutes(configuration.data?.accounts ?? []);
   return (
-    <SettingsSection title="Public Routes">
+    <SettingsSection title="Routes open to anyone">
       <Text style={settingsStyles.rowHint}>
-        Anyone in these matching conversations can use the Route without a Member assignment. Manage
-        the audience, limits, and target in Channels.
+        Anyone in these matching conversations can chat with the Route&apos;s Agent without a Member
+        assignment. Chatting gives no Host or Project access. Manage the audience, limits, and
+        target in Channels.
       </Text>
       <QueryFeedback queries={[configuration]} />
       {configuration.error ? (
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry Public Routes
+          Retry
         </Button>
       ) : null}
       {configuration.data ? (
         <View style={settingsStyles.card}>
           {routes.length === 0 ? (
-            <EmptyRow message="No public Routes are configured." />
+            <EmptyRow message="No Routes are open to anyone." />
           ) : (
             routes.map((route, index) => (
               <View

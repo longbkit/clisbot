@@ -6,6 +6,7 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
+import { openRouteWarnings } from "../configuration-warnings.js";
 
 const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
 const ENVIRONMENTS = ["repo-app", "repo-infra", "personal-lab"];
@@ -22,6 +23,17 @@ function input(
     workflowNames: WORKFLOWS,
     ...overrides,
   };
+}
+
+/** The Route compiles, and its open-audience warnings include `message`. */
+function expectRouteWarning(files: Record<string, string>, message: RegExp): void {
+  const route = compileChannelControlPlane(input(files)).accounts[0]?.routes[0];
+  assert.ok(route !== undefined);
+  const warnings = openRouteWarnings(route);
+  assert.ok(
+    warnings.some((warning) => message.test(warning)),
+    JSON.stringify(warnings),
+  );
 }
 
 function expectCompileError(files: Record<string, string>, message: RegExp): void {
@@ -181,7 +193,7 @@ config:
     });
   });
 
-  it("requires explicit safe boundaries for an open-audience Route", () => {
+  it("compiles wide open-audience Routes and warns about each choice", () => {
     const safe = compileChannelControlPlane(
       input({
         [".paseo/channels/slack/public.yml"]: `
@@ -212,7 +224,7 @@ routes:
     });
     assert.deepEqual(safe.accounts[0]?.routes[0]?.limits, OPEN_AUDIENCE_ROUTE_LIMITS);
 
-    expectCompileError(
+    expectRouteWarning(
       {
         [".paseo/channels/slack/public.yml"]: `
 channel: slack
@@ -236,9 +248,9 @@ routes:
     approval: [{ match: "*", mode: auto-deny }]
 `,
       },
-      /must name at least one Conversation ID/u,
+      /Anyone in any channel/u,
     );
-    expectCompileError(
+    expectRouteWarning(
       {
         [".paseo/channels/slack/public.yml"]: `
 channel: slack
@@ -253,9 +265,9 @@ routes:
     interaction: { requireMention: false }
 `,
       },
-      /must require a mention/u,
+      /answers every message/u,
     );
-    expectCompileError(
+    expectRouteWarning(
       {
         [".paseo/channels/slack/public.yml"]: `
 channel: slack
@@ -272,9 +284,9 @@ routes:
       - { match: "*", mode: auto-deny }
 `,
       },
-      /cannot auto-allow tool approvals/u,
+      /allowed automatically/u,
     );
-    expectCompileError(
+    expectRouteWarning(
       {
         [".paseo/channels/slack/public.yml"]: `
 channel: slack
@@ -289,8 +301,46 @@ routes:
     approval: [{ match: "*", mode: auto-deny }]
 `,
       },
-      /final-answer-only synchronization/u,
+      /not only the final answer/u,
     );
+  });
+
+  it("folds limits over the open-audience defaults, with no ceiling and an off switch", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+limits:
+  maxConcurrentRuns: 40
+  messagesSentPerMinute: 120
+  perConversation: { messagesPerMinute: 20, maxRuntimeSeconds: off }
+routes:
+  - match: { kind: channel, ids: [C_OPEN] }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    limits: { maxConcurrentRuns: 25, maxInputCharacters: off }
+  - match: { kind: channel, ids: [C_MEMBERS] }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.deepEqual(account.limits, {
+      bot: { maxConcurrentRuns: 40, messagesSentPerMinute: 120 },
+      perConversation: { messagesPerMinute: 20 },
+    });
+    assert.deepEqual(account.routes[0]?.limits, {
+      messagesPerMinutePerSender: 10,
+      messagesPerMinute: 60,
+      maxConcurrentRuns: 25,
+      maxRuntimeSeconds: 900,
+    });
+    assert.equal(account.routes[1]?.limits, undefined);
   });
 
   it("defaults the account config block to empty when omitted", () => {

@@ -1,6 +1,3 @@
-import { dump } from "js-yaml";
-import { compileTriggerDocument } from "../triggers/configuration/index.js";
-import { editableAutomationYaml } from "../triggers/configuration/workflow-document.js";
 import { CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -26,6 +23,7 @@ import type {
   ProviderApplications,
 } from "../provider-applications/index.js";
 import { enrollTestDaemon, TEST_DAEMON_ID } from "../test-utils/project-configuration.js";
+import { insertTestSlackConnection } from "../test-utils/channel-identity.js";
 import { ManagementApi } from "./index.js";
 import { createHubApplication } from "../app.js";
 import { OrganizationTriggerStore } from "../triggers/store.js";
@@ -595,7 +593,7 @@ it("runs an Automation through the shared dispatcher with current Member access"
   assert.equal(calls.length, 2);
 });
 
-it("preserves a safe Automation revision when an open-audience Channel backlink would become unsafe", async () => {
+it("keeps an Automation a Channel Route uses enabled, but lets its Mode widen", async () => {
   const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
   await bundle.runtime.drizzle().insert(schema.organizations).values({
     id: ORGANIZATION_ID,
@@ -662,63 +660,29 @@ routes:
   });
   const path = `/automations/${automation.id}`;
 
-  const rejected = await api.handle(
+  const disabled = await api.handle(
+    request(path, "PUT", {
+      expectedRevisionId: automation.activeRevisionId,
+      yaml: automationYaml("auto").replace("enabled: true", "enabled: false"),
+    }),
+  );
+  assert.equal(disabled.status, 422, JSON.stringify(await disabled.clone().json()));
+  assert.equal((await disabled.json()).error, "invalid_automation");
+  assert.equal(reconciliations, 0);
+
+  // Widening the Automation's Mode is the configurator's call; the Channel
+  // configuration warns about it instead of refusing the edit.
+  const widened = await api.handle(
     request(path, "PUT", {
       expectedRevisionId: automation.activeRevisionId,
       yaml: automationYaml("full-access"),
     }),
   );
-  assert.equal(rejected.status, 422, JSON.stringify(await rejected.clone().json()));
-  assert.equal((await rejected.json()).error, "invalid_automation");
-  assert.equal(
+  assert.equal(widened.status, 200, JSON.stringify(await widened.clone().json()));
+  assert.notEqual(
     (await store.list()).find(({ id }) => id === automation.id)?.activeRevisionId,
     automation.activeRevisionId,
   );
-  assert.equal(reconciliations, 0);
-
-  const compiled = compileTriggerDocument(safeYaml);
-  const firstStep = compiled.events[0]!.steps[0]!;
-  const workflowYaml = (mode: string) =>
-    editableAutomationYaml(
-      dump({
-        legacy_multistep: {
-          environments: [compiled.environment],
-          trigger: {
-            ...compiled.events[0],
-            steps: [firstStep, { ...firstStep, id: "respond", agent: { provider: "codex", mode } }],
-          },
-        },
-      }),
-      true,
-    );
-  const unsafeWorkflow = await api.handle(
-    request(path, "PUT", {
-      expectedRevisionId: automation.activeRevisionId,
-      yaml: workflowYaml("full-access"),
-    }),
-  );
-  assert.equal(unsafeWorkflow.status, 422, JSON.stringify(await unsafeWorkflow.clone().json()));
-  assert.equal((await store.activeRevision(automation)).version, 1);
-
-  const updated = await api.handle(
-    request(path, "PUT", {
-      expectedRevisionId: automation.activeRevisionId,
-      yaml: workflowYaml("auto"),
-    }),
-  );
-  assert.equal(updated.status, 200, JSON.stringify(await updated.clone().json()));
-  const savedWorkflow = await updated.json();
-  assert.equal(savedWorkflow.format, "workflow");
-  assert.equal(savedWorkflow.definition.steps.length, 2);
-  const reloaded = await api.handle(request(path, "GET"));
-  assert.equal((await reloaded.json()).yaml, savedWorkflow.yaml);
-  const staleWorkflow = await api.handle(
-    request(path, "PUT", {
-      expectedRevisionId: automation.activeRevisionId,
-      yaml: workflowYaml("auto"),
-    }),
-  );
-  assert.equal(staleWorkflow.status, 409);
   assert.equal(reconciliations, 1);
 });
 
@@ -891,7 +855,38 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     request("/channel-configuration/validate", "POST", candidateWithoutRevision),
   );
   assert.equal(validation.status, 200, JSON.stringify(await validation.clone().json()));
-  assert.equal((await validation.json()).effective.accounts.length, 1);
+  const validated = await validation.json();
+  assert.equal(validated.effective.accounts.length, 1);
+  assert.deepEqual(validated.warnings, []);
+
+  // A wide open-audience Route saves; the Hub names what is wide about it.
+  const openValidation = await api.handle(
+    request("/channel-configuration/validate", "POST", {
+      ...candidateWithoutRevision,
+      accounts: [
+        {
+          ...candidate.accounts[0],
+          routes: [
+            {
+              match: { kind: "dm" },
+              audience: { kind: "conversationParticipants" },
+              agent: "coding",
+              environment: "work",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+  assert.equal(openValidation.status, 200, JSON.stringify(await openValidation.clone().json()));
+  const openWarnings = (await openValidation.json()).warnings as {
+    route: number;
+    message: string;
+  }[];
+  assert.ok(
+    openWarnings.some(({ route, message }) => route === 0 && /Anyone in any dm/u.test(message)),
+    JSON.stringify(openWarnings),
+  );
   assert.equal((await database.findActiveChannelConfiguration(ORGANIZATION_ID))?.id, initial.id);
 
   const invalidValidation = await api.handle(
@@ -912,6 +907,7 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
   const update = await api.handle(request("/channel-configuration", "PUT", candidate));
   assert.equal(update.status, 200, JSON.stringify(await update.clone().json()));
   const body = await update.json();
+  assert.deepEqual(body.warnings, []);
   assert.equal(body.accounts[0].routes[0].agent, "coding");
   assert.equal(body.accounts[0].routes[1].workflow, "handoff");
   assert.equal(body.resource.agents.coding.model, "gpt-5.6");
@@ -1722,6 +1718,49 @@ it("links a Channel identity once per realm and keeps it while a bot of that rea
     [{ identityRealm: "telegram", connectionId: second }],
     "linking again through another bot updates the one realm row",
   );
+
+  const issue = async (connectionId: string) => {
+    const issued = await api.handle(
+      request("/channel-identities/challenges", "POST", { connectionId }),
+    );
+    assert.equal(issued.status, 201);
+    return ((await issued.json()) as { command: string }).command.slice("/link ".length);
+  };
+  const redeem = (connectionId: string, code: string) =>
+    access.consumeChannelIdentityChallenge({
+      organizationId: ORGANIZATION_ID,
+      connectionId,
+      externalSubjectId: "10002",
+      code,
+    });
+  const slack = await insertTestSlackConnection(bundle.runtime.drizzle(), {
+    organizationId: ORGANIZATION_ID,
+  });
+  const replaced = await issue(first);
+  const code = await issue(second);
+  assert.equal(
+    (await redeem(first, replaced)).status,
+    "invalid",
+    "a new code through another bot of the realm retires the open one",
+  );
+  assert.equal(
+    (await redeem(slack, code)).status,
+    "invalid",
+    "a code issued for one realm does not redeem through a bot of another",
+  );
+  assert.equal(
+    (await redeem(first, code)).status,
+    "linked",
+    "a code issued through one bot redeems through any bot of its realm",
+  );
+  await bundle.runtime
+    .drizzle()
+    .delete(schema.slackConnections)
+    .where(eq(schema.slackConnections.id, slack));
+  await bundle.runtime
+    .drizzle()
+    .delete(schema.channelIdentities)
+    .where(eq(schema.channelIdentities.externalSubjectId, "10002"));
 
   assert.equal((await api.handle(request(`/connections/${second}`, "DELETE"))).status, 204);
   assert.equal((await identities()).length, 1, "the other bot still resolves the identity");

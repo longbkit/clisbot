@@ -15,7 +15,7 @@ import {
   classifyToolClass,
   effectivePrivileges,
   effectiveRoles,
-  externalParticipantMayTrigger,
+  isOpenAudienceRoute,
   fallbackRoleScope,
   isEnabled,
   mayApprove,
@@ -721,43 +721,13 @@ describe("mayTrigger", () => {
     assert.equal(mayTrigger("slack:U0UNKNOWN", plane, account, route), false);
   });
 
-  it("admits an external participant only on an explicit selected-conversation audience", () => {
+  it("admits an external participant only on an open-audience Route", () => {
     const plane = makePlane({ assignments: [], identityOwners: {}, users: {} });
     const account = makeAccount({ defaultRoles: [] });
-    const route = {
-      ...routeFor(plane, account, { defaultRoles: [], routeAssignments: [] }),
-      audience: { kind: "conversationParticipants" as const },
-    };
-    assert.equal(
-      externalParticipantMayTrigger(
-        {
-          mentionedBot: true,
-          conversation: {
-            kind: "channel",
-            id: "C0APP",
-            rootConversationId: "C0APP",
-            threadId: null,
-          },
-        },
-        route,
-      ),
-      true,
-    );
-    assert.equal(
-      externalParticipantMayTrigger(
-        {
-          mentionedBot: false,
-          conversation: {
-            kind: "channel",
-            id: "C0APP",
-            rootConversationId: "C0APP",
-            threadId: null,
-          },
-        },
-        route,
-      ),
-      false,
-    );
+    const members = routeFor(plane, account, { defaultRoles: [], routeAssignments: [] });
+    const open = { ...members, audience: { kind: "conversationParticipants" as const } };
+    assert.equal(isOpenAudienceRoute(open), true);
+    assert.equal(isOpenAudienceRoute(members), false);
   });
 });
 

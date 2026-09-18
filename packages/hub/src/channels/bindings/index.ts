@@ -28,7 +28,6 @@ import {
   type ThreadKey,
 } from "./stored-route.js";
 import {
-  ChannelConfigurationDeniedError,
   ChannelWorkflowTargetError,
   createRouteSession,
   findChannelExecutionAgent,
@@ -378,7 +377,7 @@ export class BindingEngine {
     try {
       created = await createRouteSession(this.context, account, route, key, executionId, message);
     } catch (error) {
-      return this.settleCreationFailure(error, account, key, executionId);
+      return this.settleCreationFailure(error, account, executionId);
     }
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
@@ -493,22 +492,13 @@ export class BindingEngine {
     return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
   }
 
-  /** A definitive authorization refusal releases its marker; uncertain daemon failures retain it for recovery. */
+  /** A failed create keeps its marker: the daemon may have created the Agent anyway. */
   private async settleCreationFailure(
     error: unknown,
     account: CompiledChannelAccount,
-    key: ThreadKey,
     executionId: string,
   ): Promise<InboundOutcome> {
     this.context.processing?.close(executionId);
-    if (error instanceof ChannelConfigurationDeniedError) {
-      await this.context.store.releaseThreadBinding({
-        organizationId: this.context.organizationId,
-        accountId: account.accountId,
-        ...key,
-      });
-      return { kind: "ignored", reason: error.message };
-    }
     // The daemon may have created an Agent before the RPC timed out: the
     // pending marker is the recovery identity, so never recreate or release it.
     this.context.logger.warn("agent create failed; the thread marker stays pending", {

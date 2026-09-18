@@ -26,18 +26,25 @@ sender to a Hub Member via `channelIdentities` and checks the privilege with
 `AgentConfigurationGrant` (which providers/models/thinking they may use) and by the
 conversation-visibility constraint.
 
+Chat is separate from Host and Project access. Everything that stays inside the
+Route's configuration needs only `channel.use`: the Route's publisher was checked
+for that configuration when they published it, and a conversation's `/model` or
+`/agent` choice was checked against whoever made it. Personal grants are for
+changing the configuration or reaching outside it
+([decision](../../audits/2026-09-18-channel-chat-authority-and-limits.md)).
+
 Each privilege, and what it unlocks — grant these to a Member, Team, or the Guest
 group:
 
-| Privilege         | What it unlocks                                               | Commands                                                                                                                                                          |
-| ----------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _public_          | anyone, even an unlinked guest                                | `/help`, `/me`                                                                                                                                                    |
-| `channel.use`     | use the channel account (chat) — the baseline to give a Guest | — (floor, not tied to a command)                                                                                                                                  |
-| `agent.interact`  | drive the bound session                                       | `/status`, `/cowork`, `/stop`, `/steer`, `/queue`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/skill`, `/command` (list/search), `/routedefault` |
-| `agent.create`    | start or rebind a session                                     | `/new`, `/resume`, `/fork`, `/side`, `/quick`                                                                                                                     |
-| `approval.config` | manage dynamic commands                                       | `/command add`, `/command remove`                                                                                                                                 |
-| `approval.*`      | answer or suppress prompts                                    | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                             |
-| `channel.manage`  | change a Channel Route's Route defaults³                      | `/promoteroutedefault`                                                                                                                                            |
+| Privilege         | What it unlocks                                            | Commands                                                                                                                                                             |
+| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _public_          | anyone, even an unlinked guest                             | `/help`, `/me`                                                                                                                                                       |
+| `channel.use`     | chat with the Route's Agent — the baseline to give a Guest | `/status`, `/stop`, `/new`, `/followup` (this conversation), `/steer`, `/queue`, `/skill`, `/command` (list/search/run), `/fork`, `/side`, `/quick`, `/routedefault` |
+| `agent.interact`  | change or leave the Route's configuration                  | `/cowork`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`                                                                                                 |
+| `agent.create`    | bring a session from elsewhere                             | `/resume`                                                                                                                                                            |
+| `approval.config` | manage dynamic commands                                    | `/command add`, `/command remove`                                                                                                                                    |
+| `approval.*`      | answer or suppress prompts                                 | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
+| `channel.manage`  | change a Channel Route's Route defaults³                   | `/promoteroutedefault`                                                                                                                                               |
 
 The per-command **Requires** columns below repeat this at the row level.
 
@@ -45,9 +52,9 @@ The per-command **Requires** columns below repeat this at the row level.
 
 | Command                                 | Does                                                                                                                                                   | Requires                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| `/status`                               | Agent + session state.                                                                                                                                 | agent.interact          |
-| `/stop`                                 | Stop the running turn.                                                                                                                                 | agent.interact          |
-| `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | agent.create            |
+| `/status`                               | Agent + session state.                                                                                                                                 | channel.use             |
+| `/stop`                                 | Stop the running turn.                                                                                                                                 | channel.use             |
+| `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | channel.use             |
 | `/agent [<name>]`                       | Switch the conversation's agent. Apply an **agent profile** bounded by the caller's configuration grant ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
 | `/model [<name>]`                       | Bare: show the model menu. `/model <name>`: switch this conversation's model.                                                                          | agent.interact + grant² |
 | `/help`                                 | This command list.                                                                                                                                     | — (public)              |
@@ -75,26 +82,26 @@ conversations outside a narrower list. A Guest never holds it. See
 Implementation and verification notes are in [implementation-plan.md](implementation-plan.md).
 `•` = applies on that route kind.
 
-| Command                                                                                                   | Does                                                                                                           | Requires                                            | Direct | Automation |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | :----: | :--------: |
-| `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact                                      |   •    |     •      |
-| `/me`                                                                                                     | Your channel identity and access here.                                                                         | — (public)                                          |   •    |     •      |
-| `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).              | agent.interact; `route` changes need channel.manage |   •    |     •      |
-| `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create                                        |   •    |     —      |
-| `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                       | agent.interact                                      |   •    |     —      |
-| `/queue <message>`                                                                                        | Hold `<message>` until the current turn ends.                                                                  | agent.interact                                      |   •    |     —      |
-| `/provider [list]` · `/provider search <kw>` · `/provider <id>`                                           | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant²                             |   •    |     —      |
-| `/model [list]` · `/model search <kw>`                                                                    | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant²                             |   •    |     —      |
-| `/effort [list]` · `/effort <id>`                                                                         | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant²                             |   •    |     —      |
-| `/permission [<mode>]` (`/mode`)                                                                          | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact                                      |   •    |     —      |
-| `/skill [list]` · `/skill search <kw>` · `/skill <name>`                                                  | List/search skills; run one on the agent.                                                                      | agent.interact                                      |   •    |     —      |
-| `/command [list]` · `/command search <kw>`                                                                | List/search dynamic commands.                                                                                  | agent.interact                                      |   •    |     —      |
-| `/command add <name> <prompt>` · `/command remove <name>`                                                 | Create or remove a dynamic command.                                                                            | approval.config                                     |   •    |     —      |
-| `/fork [message]`                                                                                         | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | agent.create                                        |   •    |     —      |
-| `/side <message>`                                                                                         | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | agent.create                                        |   •    |     —      |
-| `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                             | agent.create                                        |   •    |     —      |
-| `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | agent.interact                                      |   •    |     —      |
-| `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                     |   •    |     —      |
+| Command                                                                                                   | Does                                                                                                           | Requires                                         | Direct | Automation |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :----: | :--------: |
+| `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact                                   |   •    |     •      |
+| `/me`                                                                                                     | Your channel identity and access here.                                                                         | — (public)                                       |   •    |     •      |
+| `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).              | channel.use; `route` changes need channel.manage |   •    |     •      |
+| `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create                                     |   •    |     —      |
+| `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                       | channel.use                                      |   •    |     —      |
+| `/queue <message>`                                                                                        | Hold `<message>` until the current turn ends.                                                                  | channel.use                                      |   •    |     —      |
+| `/provider [list]` · `/provider search <kw>` · `/provider <id>`                                           | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant²                          |   •    |     —      |
+| `/model [list]` · `/model search <kw>`                                                                    | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant²                          |   •    |     —      |
+| `/effort [list]` · `/effort <id>`                                                                         | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant²                          |   •    |     —      |
+| `/permission [<mode>]` (`/mode`)                                                                          | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact                                   |   •    |     —      |
+| `/skill [list]` · `/skill search <kw>` · `/skill <name>`                                                  | List/search skills; run one on the agent.                                                                      | channel.use                                      |   •    |     —      |
+| `/command [list]` · `/command search <kw>`                                                                | List/search dynamic commands.                                                                                  | channel.use                                      |   •    |     —      |
+| `/command add <name> <prompt>` · `/command remove <name>`                                                 | Create or remove a dynamic command.                                                                            | approval.config                                  |   •    |     —      |
+| `/fork [message]`                                                                                         | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | channel.use                                      |   •    |     —      |
+| `/side <message>`                                                                                         | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | channel.use                                      |   •    |     —      |
+| `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                             | channel.use                                      |   •    |     —      |
+| `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | channel.use                                      |   •    |     —      |
+| `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                  |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -111,8 +118,10 @@ Gating uses org Access, whose subjects are Members and Teams — a channel sende
 resolved to a Member through `channelIdentities`. A sender with **no linked Member**
 (the common case in a public channel) acts as the **Guest** group: a first-class
 subject a public deployment assigns privileges to, exactly like a Team. Grant the
-Guest group, say, `channel.use` (chat) and leave `/help`/`/me` public, and a public
-channel works for anyone; grant it more and guests can do more. Nothing above is
+Guest group `channel.use` (chat) and leave `/help`/`/me` public, and a public
+channel works for anyone, including starting sessions with the Route's
+configuration. An open-audience Route admits Guests without that grant. Grant the
+Guest group more and guests can also change the configuration. Nothing above is
 reachable without the named privilege, so a guest gets only what the Guest group
 holds. The Guest subject is persisted as `(guest, guest)` in org Access with no default grants; linked Members do not inherit it. See
 see [implementation-plan.md](implementation-plan.md#resolved-decisions).
@@ -272,7 +281,7 @@ Two scopes change it:
 
 | Form                                           | Changes                                                                                                            | Needs            |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| `/followup auto\|mention-only\|pause\|resume`  | This conversation only: its binding key, so one thread, one topic, or a whole channel under `binding.key: channel` | `agent.interact` |
+| `/followup auto\|mention-only\|pause\|resume`  | This conversation only: its binding key, so one thread, one topic, or a whole channel under `binding.key: channel` | `channel.use`    |
 | `/followup route auto [minutes]\|mention-only` | The Route serving the conversation, for every conversation it serves                                               | `channel.manage` |
 
 - **Conversation override.** `pause` requires a mention until the next accepted

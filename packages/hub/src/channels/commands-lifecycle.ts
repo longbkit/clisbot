@@ -16,6 +16,8 @@ export interface LifecycleCommandContext {
   agentId?: string | undefined;
   accessTarget?: import("./plane/types.js").ChannelAgentAccessTarget;
   post(text: string): Promise<boolean>;
+  /** Told the id of a session a command creates, so its run slot can follow it. */
+  onAgentCreated?: ((agentId: string) => void) | undefined;
 }
 
 export interface LifecycleCommandDependencies {
@@ -201,6 +203,7 @@ export class ChannelLifecycleCommands {
       oneOff,
       prompt,
     );
+    context.onAgentCreated?.(created.agentId);
     let change: BindingChange | undefined;
     try {
       if (

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { ChannelConversationKey } from "../db/channel-access.js";
 import type { ChannelStore } from "../db/channels.js";
-import { channelCommandPrivilege, parseChannelTextCommand } from "./commands.js";
+import { channelCommandAccess, parseChannelTextCommand } from "./commands.js";
 import { parseFollowUpArguments } from "./commands-follow-up-arguments.js";
 import { runFollowUpCommand } from "./commands-follow-up.js";
 import type { LifecycleCommandContext } from "./commands-lifecycle.js";
@@ -142,12 +142,9 @@ describe("/followup arguments", () => {
   });
 
   it("needs channel.manage only to change the route", () => {
-    assert.equal(channelCommandPrivilege({ name: "followup", value: "auto" }), "agent.interact");
-    assert.equal(channelCommandPrivilege({ name: "followup", value: "route" }), "agent.interact");
-    assert.equal(
-      channelCommandPrivilege({ name: "followup", value: "route auto" }),
-      "channel.manage",
-    );
+    assert.equal(channelCommandAccess({ name: "followup", value: "auto" }), "chat");
+    assert.equal(channelCommandAccess({ name: "followup", value: "route" }), "chat");
+    assert.equal(channelCommandAccess({ name: "followup", value: "route auto" }), "channel.manage");
   });
 });
 
@@ -188,7 +185,7 @@ describe("/followup", () => {
   it("does not change the route without channel.manage or after it moved", async () => {
     const denied = await harness({ manager: false }).run("route mention-only");
     assert.deepEqual(denied, {
-      text: "/followup route requires channel.manage access here.",
+      text: "/followup route needs permission to manage this Channel Route (channel.manage). Ask an admin, or send /me to see your access.",
       published: false,
     });
     const moved = await harness({ outcome: { status: "route_changed" } }).run("route auto");

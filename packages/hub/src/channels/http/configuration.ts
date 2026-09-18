@@ -5,9 +5,12 @@ import { compileHubBundle, HubBundleError, type HubBundleFile } from "../../conf
 import {
   channelAgentNames,
   channelEnvironmentNames,
-  assertOpenAudienceTargetSafety,
   type ChannelControlPlaneSnapshot,
 } from "../control-plane.js";
+import {
+  channelConfigurationWarnings,
+  type ChannelConfigurationWarning,
+} from "../configuration-warnings.js";
 import {
   ChannelCompilationError,
   compileChannelControlPlane,
@@ -30,7 +33,7 @@ export async function deployRevision(
     expectedRevisionId?: string | null;
     authorize?: (candidate: ChannelConfigurationCandidate) => Promise<void>;
   } = {},
-): Promise<void> {
+): Promise<ChannelConfigurationWarning[]> {
   const candidate = await prepareChannelConfigurationCandidate(database, snapshot, files);
   await options.authorize?.(candidate);
   const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
@@ -43,6 +46,7 @@ export async function deployRevision(
       ? {}
       : { expectedRevisionId: options.expectedRevisionId }),
   });
+  return candidate.warnings;
 }
 
 /** Compile a complete candidate with the same rules as deployment, without writing a revision. */
@@ -50,13 +54,20 @@ export async function validateChannelConfigurationCandidate(
   database: Database,
   snapshot: ChannelControlPlaneSnapshot,
   files: readonly HubBundleFile[],
-): Promise<ChannelControlPlane> {
-  return (await prepareChannelConfigurationCandidate(database, snapshot, files)).controlPlane;
+): Promise<Omit<ChannelConfigurationCandidate, "bundle">> {
+  const { bundle: _bundle, ...candidate } = await prepareChannelConfigurationCandidate(
+    database,
+    snapshot,
+    files,
+  );
+  return candidate;
 }
 
 export interface ChannelConfigurationCandidate {
   bundle: ReturnType<typeof compileHubBundle>;
   controlPlane: ChannelControlPlane;
+  /** Wide choices the configurator made on purpose; never a refusal. */
+  warnings: ChannelConfigurationWarning[];
 }
 
 /** Compiles the authored bundle and effective Channel policy used by activation
@@ -82,22 +93,22 @@ export async function prepareChannelConfigurationCandidate(
     const candidateBundle = compileHubBundle(candidateResourceFiles, {
       requireWorkflow: false,
     });
-    const workflowNames = (await database.listOrganizationTriggers(snapshot.organizationId))
-      .filter(({ enabled }) => enabled)
-      .map(({ name }) => name);
+    const triggers = await database.listOrganizationTriggers(snapshot.organizationId);
+    const workflowNames = triggers.filter(({ enabled }) => enabled).map(({ name }) => name);
     const controlPlane = compileChannelControlPlane({
       files,
       agentNames: channelAgentNames(candidateBundle),
       environmentNames: channelEnvironmentNames(candidateBundle),
       workflowNames,
     });
-    await assertOpenAudienceTargetSafety(
+    const warnings = await channelConfigurationWarnings({
       database,
-      snapshot.organizationId,
-      candidateBundle,
+      organizationId: snapshot.organizationId,
+      bundle: candidateBundle,
       controlPlane,
-    );
-    return { bundle: candidateBundle, controlPlane };
+      triggers,
+    });
+    return { bundle: candidateBundle, controlPlane, warnings };
   } catch (error) {
     if (error instanceof ChannelCompilationError || error instanceof HubBundleError) {
       throw invalidConfiguration(error.message);

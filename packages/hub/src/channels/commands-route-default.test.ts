@@ -187,7 +187,10 @@ describe("/promoteroutedefault", () => {
   it("refuses a sender who does not manage the Channel Route", async () => {
     const { deps, context, publisher } = harness({ conversation: OPUS, manager: false });
     const result = await promoteRouteDefault(deps, context, undefined);
-    assert.equal(result.text, "/promoteroutedefault requires channel.manage access here.");
+    assert.match(
+      result.text,
+      /^\/promoteroutedefault needs permission to manage .*\(channel\.manage\)/u,
+    );
     assert.equal(vi.mocked(publisher.promote).mock.calls.length, 0);
   });
 

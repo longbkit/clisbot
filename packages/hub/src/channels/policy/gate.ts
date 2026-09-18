@@ -13,7 +13,7 @@ import type {
 } from "../config/compile.js";
 import type { ChannelAccessStore } from "../../db/channel-access.js";
 import type { ChannelUseAuthorizer, InboundMessage, SupportedChannelName } from "../plane/types.js";
-import { externalParticipantMayTrigger, mayTrigger } from "../policy.js";
+import { isOpenAudienceRoute, mayTrigger } from "../policy.js";
 import { evaluateChannelAccess, type DmGroupAccessReasonCode } from "./access.js";
 import { mintPairingCode, pairingChallengeText } from "./pairing.js";
 
@@ -121,7 +121,7 @@ export async function mayUseChannelRoute(input: {
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
 }): Promise<ChannelPrivilegeDecision> {
   const { account, controlPlane, message, route } = input;
-  if (externalParticipantMayTrigger(message, route)) return { allowed: true };
+  if (isOpenAudienceRoute(route)) return { allowed: true };
   if (mayTrigger(message.senderIdentity, controlPlane, account, route)) return { allowed: true };
   if (route.defaults.access !== undefined && input.store !== undefined) {
     const storeAllowFrom = await input.store.listApprovedPairedSenders({

@@ -172,19 +172,79 @@ they change where the conversation goes:
 
 ## Who may do what
 
-Four roles, worked out per conversation from the identities and roles you
-already configured — there is no separate roster to maintain.
+Talking to a bot and reaching a Host or Project are separate permissions.
 
-| Role     | Who it is                                                     | May                                                              |
-| -------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `owner`  | Whoever started this conversation's session, or a `*` grant.  | Everything below, plus `/stop`, `/new`.                          |
-| `admin`  | Anyone holding an `approval.*` privilege on the route.        | Answer approvals, `/agent`, `/model`, and stop anyone's session. |
-| `member` | A linked identity with `bot.interact`.                        | Chat, `/status`.                                                 |
-| `guest`  | Admitted by an open-audience route or by the allowlist below. | Chat.                                                            |
+- **Chat.** A sender with `channel.use` on the account, or anyone in a
+  conversation matched by an open-audience route
+  (`audience: { kind: conversationParticipants }`), talks to the route's Agent.
+  They can start sessions with the route's configuration and use `/status`,
+  `/stop`, `/new`, `/fork`, `/side`, `/quick`, `/steer`, `/queue`, `/skill` and
+  `/command`. Chat gives no access to the Host, the Project, or the Paseo app.
+- **Changing the configuration.** `/agent`, `/model`, `/provider`, `/effort`,
+  `/permission`, `/cowork` and `/resume` need the sender's own Access grants on
+  the route's Project, and answering an approval needs an `approval.*`
+  privilege.
+
+The person who publishes a route vouches for what it runs: saving checks that
+they may hand out its Host, Project, Agent configuration and automatic
+approvals. A sender is checked only when they change or reach beyond that.
+
+An unlinked sender is the Guest group. Grant Guest `channel.use` to open a
+Member route to everyone, or use an open-audience route.
 
 Commands never need a mention. `requireMention` decides when a plain message
-wakes the agent; it has nothing to say about someone controlling a session they
-are allowed to control.
+wakes the agent.
+
+### Open-audience routes
+
+Configure an open-audience route like any other: every conversation of a kind or
+named ones, with or without a mention, any reply mode, any approval rule, any
+Agent mode. The Hub saves it and lists a warning on the route for each wide
+choice: no named conversations, no mention needed, a follow-up window that
+lets anyone talk without a mention, output beyond the final answer, tool
+approvals allowed automatically, Fast mode, or a mode that runs tools without
+asking. The app lists them before you confirm a save. New routes start from the safe side: a mention in groups,
+final answers only, tool requests denied.
+
+## Limits
+
+Limits are available on every route and on the account, with the same fields
+everywhere:
+
+| Field                        | Counts                                    |
+| ---------------------------- | ----------------------------------------- |
+| `maxInputCharacters`         | characters in one incoming message        |
+| `messagesPerMinutePerSender` | messages received from one sender         |
+| `messagesPerMinute`          | messages received                         |
+| `messagesSentPerMinute`      | new messages the bot posts                |
+| `maxConcurrentRuns`          | agent turns running at the same time      |
+| `maxRuntimeSeconds`          | how long one turn may run before it stops |
+
+```yaml
+limits: # the whole bot
+  maxConcurrentRuns: 20
+  messagesSentPerMinute: 120
+  perConversation: # each channel, group or DM; threads count toward their channel
+    messagesPerMinute: 30
+routes:
+  - match: { kind: channel, ids: [C0SUPPORT] }
+    limits: { maxConcurrentRuns: 5, maxRuntimeSeconds: off }
+```
+
+A message must fit the bot, its conversation and its route. Each field is a
+positive number, `off`, or left out. Left out means no limit, except on an
+open-audience route, which defaults to 8000 characters, 10 messages per sender
+and 60 per minute, 2 concurrent runs and 900 seconds. There is no ceiling: set
+any number or turn a default off.
+
+Over a limit, an incoming message waits in the ingress queue and runs when there
+is room, and the bot says once that it is queued. A message longer than
+`maxInputCharacters` is refused with a short reply. `/fork`, `/side`, `/quick`,
+`/steer` and `/queue` count like messages. Outgoing messages over
+`messagesSentPerMinute` are delayed and keep their order within a conversation.
+Typing, reactions, edits and streaming drafts are not counted. Delayed outgoing
+messages are held in memory: saving a change to the account, or restarting the
+Hub, drops the ones still waiting.
 
 ## Allowlists, pairing, and who may talk to the bot
 

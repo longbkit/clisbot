@@ -8,7 +8,8 @@ import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
 import type { ChannelPlaneDeps, InboundMessage } from "./plane/types.js";
 import { deriveBindingKey } from "./bindings/index.js";
 import {
-  channelCommandPrivilege,
+  channelCommandAccess,
+  commandRefusalText,
   channelCommandSpec,
   textCommandHelpText,
   type ChannelTextCommand,
@@ -132,8 +133,8 @@ export class ChannelCommandDispatcher {
       return `/${command.name} is not available on an automation route.`;
     }
     if (context.route.target.kind === "workflow") return undefined;
-    const privilege = channelCommandPrivilege(command);
-    if (privilege === null) return undefined;
+    const privilege = channelCommandAccess(command);
+    if (privilege === "public" || privilege === "chat") return undefined;
     const { plane } = this.deps;
     const request = commandAccessRequest(
       plane,
@@ -148,27 +149,26 @@ export class ChannelCommandDispatcher {
       privilege === "channel.manage"
         ? (await plane.commandAccess?.authorizeChannelAccountManagement?.(request)) !== undefined
         : (await plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed === true;
-    if (!allowed) return `/${command.name} requires ${privilege} access here.`;
+    if (!allowed) return commandRefusalText(`/${command.name}`, privilege);
     return undefined;
   }
 
+  /**
+   * What a new session in this conversation runs: the Route's configuration
+   * with the conversation's selection folded on. Neither is re-checked against
+   * the sender — the publisher and the selector were checked when they chose it.
+   */
   async resolveConfig(
     context: LifecycleCommandContext,
     capability?: import("./plane/types.js").ChannelReplyAgentCapability,
-    validate = true,
   ): Promise<CreateAgentConfig> {
     const selection = await this.deps.store.access.findConversationSelection(
       this.selectionKey(context),
     );
-    const config = resolveConversationConfiguration(
+    return resolveConversationConfiguration(
       this.routeConfig(context, undefined, capability),
       selection,
     );
-    if (validate) {
-      const decision = await this.authorizeConfiguration({ ...context, config });
-      if (!decision.allowed) throw new Error(decision.reason);
-    }
-    return config;
   }
 
   /** What the Route starts for this conversation, before the conversation's own choice. */
@@ -242,7 +242,7 @@ export class ChannelCommandDispatcher {
   }
 
   async authorizeResume(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<boolean> {
-    const config = await this.resolveConfig(context, undefined, false);
+    const config = await this.resolveConfig(context);
     if (config.projectId !== undefined) {
       if (!(await this.deps.daemon.isAgentInProject(agent, config.projectId))) return false;
     } else if (agent.cwd !== config.cwd) return false;
@@ -331,7 +331,7 @@ export class ChannelCommandDispatcher {
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) throw new Error("Agent configuration access is unavailable.");
-    const config = await this.resolveConfig(context, undefined, false);
+    const config = await this.resolveConfig(context);
     const boundAgent = context.agentId
       ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
       : undefined;
@@ -496,7 +496,7 @@ export class ChannelCommandDispatcher {
     command: ChannelTextCommand,
     context: LifecycleCommandContext,
   ): Promise<CommandResult> {
-    const { message, route, account } = context;
+    const { message, route } = context;
     if (route.target.kind !== "workflow") throw new Error("An automation route is required.");
     const key = deriveBindingKey(message, route);
     const input = {
@@ -508,13 +508,6 @@ export class ChannelCommandDispatcher {
         key.externalThreadId,
       ]),
       workflowName: route.target.workflow,
-      authorization: commandAccessRequest(
-        this.deps.plane,
-        message,
-        account,
-        route,
-        "agent.interact",
-      ),
     };
     if (command.name === "stop") {
       if (!this.deps.plane.cancelWorkflowRuns)

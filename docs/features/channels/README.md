@@ -288,6 +288,31 @@ Three shapes are worth knowing:
   create time — there is no set-model RPC, and pretending otherwise would report
   a model the agent is not running.
 
+## Limits
+
+Operator-facing behaviour is in [the public guide](../../../public-docs/hub/channels/index.md#limits);
+the decision is [2026-09-18](../../audits/2026-09-18-channel-chat-authority-and-limits.md).
+Two places enforce them, and each has a reason to be where it is:
+
+- **Inbound** is `plane/execution-limiter.ts`, reached through `admitExecution`
+  in `execution.ts` for every admitted message and for the commands that start
+  or steer a run outside the message path (`LIMITED_COMMANDS`). A refusal that clears with time carries `retryAfterMs`, so the
+  durable ingress holds the message instead of completing it. That is how "wait,
+  never drop" works for inbound. Leases hold the run slot in every scope
+  (Bot, Conversation, Route) until the run ends; the shortest `maxRuntimeSeconds`
+  of those scopes arms the cancel timer.
+- **Outbound** is `plane/outbound-pacer.ts`, wrapped around the account's
+  `sendText`/`sendMedia` in the supervisor, not inside the plane. The tool-path
+  MCP reply posts through `handle.post` and never passes the plane, so pacing
+  anywhere higher would miss it. The pacer learns which Route serves a
+  conversation from the plane's routing (`noteOutboundRoute`), because a post
+  carries only the conversation id.
+
+Both read their scopes from `plane/limit-scopes.ts`, so the two count the same
+Bot, Conversation and Route. Counters are in memory, per Hub process. A restart
+starts every window empty and drops outbound sends still waiting. Replacing a
+configuration cancels only open-audience runs (`cancelOnReplace`).
+
 ## What is still open
 
 Claimed nowhere else, so it belongs here rather than in a stale audit: secret redaction, callback authority, and SSRF limits are partial; delivery receipts and a diagnostics command have no operator surface. The goal ledger `docs/audits/2026-09-07-openclaw-channel-port-goal.md` tracks them slice by slice and is the current source of truth for what is done.

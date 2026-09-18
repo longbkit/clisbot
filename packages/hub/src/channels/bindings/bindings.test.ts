@@ -1269,33 +1269,3 @@ it("mints the persisted provider bundle after a session reset", async () => {
     featureValues: { fast: true },
   });
 });
-
-it("refuses a disallowed sticky configuration without leaving a pending binding", async () => {
-  const marker = "1700000000.990002";
-  const fake = makeFakeDaemon();
-  const account = makeAccount(makeRoute());
-  const engine = new BindingEngine({
-    organizationId: ORGANIZATION_ID,
-    controlPlane: makeControlPlane(account),
-    logger: SILENT,
-    clock: new ManualClock(),
-    store,
-    daemon: fake.daemon,
-    resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
-    authorizeConfiguration: async () => ({ allowed: false, reason: "outside grant" }),
-  });
-  const result = await engine.bindOrSteer(
-    message({ externalMessageId: marker }),
-    account,
-    makeRoute(),
-  );
-  assert.deepEqual(result, { kind: "ignored", reason: "outside grant" });
-  assert.equal(fake.created.length, 0);
-  // Workspace organization runs after the configuration gate: a refused
-  // sender leaves no empty workspace behind.
-  assert.deepEqual(fake.workspaces, []);
-  assert.equal(
-    await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, marker),
-    undefined,
-  );
-});

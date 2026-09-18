@@ -1,8 +1,4 @@
 import type { Database } from "../db/types.js";
-import {
-  authorizeChannelWorkflowRunTargets,
-  type ChannelWorkflowAccessTarget,
-} from "./channel-stop.js";
 
 export interface ChannelWorkflowRunSummary {
   id: string;
@@ -16,10 +12,8 @@ export async function readChannelWorkflowRuns(input: {
   organizationId: string;
   bindingKey: string;
   workflowName: string;
-  authorizeTarget: (target: ChannelWorkflowAccessTarget) => Promise<boolean>;
 }): Promise<ChannelWorkflowRunSummary[]> {
   const runs = await input.database.listActiveChannelWorkflowRuns(input);
-  await authorizeChannelWorkflowRunTargets(input.database, runs, input.authorizeTarget);
   return Promise.all(
     runs.map(async (run) => {
       const steps = await input.database.listWorkflowStepRunsForTriggerRun(run.id);

@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildChannelAccountCandidate,
   buildChannelRouteCandidate,
-  DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
+  DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
   formatChannelConfigurationYaml,
-  hasRequiredChannelConversationIds,
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
@@ -14,14 +13,6 @@ import {
 } from "../channel-configuration";
 
 describe("buildChannelAccountCandidate", () => {
-  it("requires explicit Conversation IDs only for public access", () => {
-    expect(hasRequiredChannelConversationIds("conversationParticipants", "  , ")).toBe(false);
-    expect(hasRequiredChannelConversationIds("conversationParticipants", " C_CUSTOMER ")).toBe(
-      true,
-    );
-    expect(hasRequiredChannelConversationIds("members", "")).toBe(true);
-  });
-
   it("round-trips the one Advanced YAML candidate without creating another store", () => {
     const candidate = {
       resource: { agents: { support: { provider: "codex" } } },
@@ -150,12 +141,14 @@ describe("buildChannelAccountCandidate", () => {
     expect(JSON.stringify(result.account)).not.toContain("routeId");
   });
 
-  it("makes an external-participant Route text-only and disables Fast mode", () => {
+  it("writes an open-audience Route from its own behavior, limits and Fast mode", () => {
     const result = buildChannelRouteCandidate({
       accountId: "support",
       matchKind: "channel",
       conversationIds: "C_CUSTOMER",
       audience: "conversationParticipants",
+      behavior: DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
+      limits: { maxConcurrentRuns: 10, messagesSentPerMinute: "off" },
       target: {
         kind: "agent",
         daemonId: "daemon-1",
@@ -170,24 +163,27 @@ describe("buildChannelAccountCandidate", () => {
     expect(result.route).toMatchObject({
       audience: { kind: "conversationParticipants" },
       interaction: { requireMention: true },
+      outbound: { path: "relay" },
       sync: {
         finalAnswers: true,
+        progress: { progressMessage: false, messageReaction: "off" },
         toolCalls: false,
         threadLink: "none",
+        subagents: { finalAnswers: false, progress: false, toolCalls: false },
       },
       approval: [{ match: "*", mode: "auto-deny" }],
-      limits: DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
+      limits: { maxConcurrentRuns: 10, messagesSentPerMinute: "off" },
     });
     expect(result.resource).toMatchObject({
       agents: {
         "channel-support": {
-          featureValues: { another_feature: "kept" },
+          featureValues: { fast_mode: true, another_feature: "kept" },
         },
       },
     });
   });
 
-  it("writes supported Member reply and approval controls without weakening public Routes", () => {
+  it("writes the same reply and approval controls for Member and open-audience Routes", () => {
     const member = buildChannelRouteCandidate({
       accountId: "support",
       matchKind: "channel",
@@ -243,10 +239,11 @@ describe("buildChannelAccountCandidate", () => {
       resource: {},
     });
     expect(open.route).toMatchObject({
-      interaction: { requireMention: true },
-      outbound: { path: "relay" },
-      sync: { finalAnswers: true, toolCalls: false, threadLink: "none" },
-      approval: [{ match: "*", mode: "auto-deny" }],
+      audience: { kind: "conversationParticipants" },
+      interaction: { requireMention: false },
+      outbound: { path: "tool" },
+      sync: { finalAnswers: false, toolCalls: true },
+      approval: [{ match: "*", mode: "auto-allow" }],
     });
   });
 
@@ -587,16 +584,19 @@ describe("Route follow-up policy", () => {
     }
   });
 
-  it("keeps the fixed policy on public Routes", () => {
+  it("writes an open-audience Route's follow-up like a Member Route's", () => {
     const open = buildChannelRouteCandidate({
       accountId: "support",
       matchKind: "channel",
       conversationIds: "C_PUBLIC",
       audience: "conversationParticipants",
-      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, followUpMode: "auto" },
+      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, followUpMode: "auto", followUpEdited: true },
       target: { kind: "automation", automationName: "triage" },
       resource: {},
     });
-    expect(open.route["interaction"]).toEqual({ requireMention: true });
+    expect(open.route["interaction"]).toEqual({
+      requireMention: true,
+      followUp: { mode: "auto", ttlMinutes: 5 },
+    });
   });
 });

@@ -48,8 +48,9 @@ import type { BrowserOrganizationAccess } from "../auth/browser-organization-acc
 import { listObservedChannelConversations } from "../channels/conversation-catalog.js";
 import type { CompiledChannelAccount } from "../channels/config/compile.js";
 import { AccountFileSchema, OrgPolicySchema } from "../channels/config/schema.js";
+import { channelConfigurationWarnings } from "../channels/configuration-warnings.js";
 import {
-  assertOpenAudienceAutomationUpdateSafety,
+  assertAutomationRouteTargetKept,
   loadChannelControlPlane,
 } from "../channels/control-plane.js";
 import {
@@ -1242,7 +1243,16 @@ export class ManagementApi {
     }
     const snapshot = await channelControlPlaneView(this.options.database, access.organization.id);
     if (request.method === "GET") {
-      return Response.json(channelConfigurationView(snapshot));
+      return Response.json({
+        ...channelConfigurationView(snapshot),
+        warnings: await channelConfigurationWarnings({
+          database: this.options.database,
+          organizationId: access.organization.id,
+          bundle: snapshot.bundle,
+          controlPlane: snapshot.controlPlane,
+          triggers: await this.options.database.listOrganizationTriggers(access.organization.id),
+        }),
+      });
     }
     if (request.method !== "PUT" && !isValidation) {
       return problem(
@@ -1276,15 +1286,15 @@ export class ManagementApi {
       input.resource,
     );
     if (isValidation) {
-      const effective = await validateChannelConfigurationCandidate(
+      const { controlPlane: effective, warnings } = await validateChannelConfigurationCandidate(
         this.options.database,
         snapshot,
         files,
       );
-      return Response.json({ valid: true, effective });
+      return Response.json({ valid: true, effective, warnings });
     }
     const expectedRevisionId = channelConfigurationRequestSchema.parse(input).expectedRevisionId;
-    await deployRevision(this.options.database, snapshot, files, {
+    const warnings = await deployRevision(this.options.database, snapshot, files, {
       createdByUserId: access.account.id,
       expectedRevisionId,
       authorize: ({ bundle, controlPlane }) =>
@@ -1300,6 +1310,7 @@ export class ManagementApi {
     const active = await channelControlPlaneView(this.options.database, access.organization.id);
     return Response.json({
       ...channelConfigurationView(active),
+      warnings,
       reconciliation: reconciliation ?? null,
     });
   }
@@ -1952,7 +1963,7 @@ export class ManagementApi {
             configuration: resolved.configuration,
           });
           if (isUpdate && automationId !== undefined) {
-            await assertOpenAudienceAutomationUpdateSafety({
+            await assertAutomationRouteTargetKept({
               database: this.options.database,
               organizationId: access.organization.id,
               automationId,

@@ -1,5 +1,4 @@
 import type { ChannelPrivilegeDecision } from "../access/store.js";
-import { REQUIRED_PRIVILEGE_BY_OPERATION } from "@getpaseo/protocol/managed-access-privileges";
 // The channel execution plane facade (plan §4-S2): the thin object the loader
 // drives. It composes the three engines — bindings (thread + continuous
 // execution), relay (outbound + delivery ledger), approvals (prompt +
@@ -17,7 +16,13 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { InboundReplyParams } from "./loader/host.js";
-import { isEnabled, mayTrigger, matchRoute, type InboundConversation } from "./policy.js";
+import {
+  isEnabled,
+  isOpenAudienceRoute,
+  mayTrigger,
+  matchRoute,
+  type InboundConversation,
+} from "./policy.js";
 import {
   ApprovalEngine,
   assertChannelPosture,
@@ -42,11 +47,7 @@ import {
 } from "./policy/gate.js";
 import { ChannelLifecycleCommands } from "./commands-lifecycle.js";
 import { ChannelCommandDispatcher } from "./commands-dispatch.js";
-import {
-  commandReplyAddress,
-  channelIdentityText,
-  commandAccessRequest,
-} from "./commands-context.js";
+import { commandReplyAddress, channelIdentityText } from "./commands-context.js";
 import { expandDynamicCommand } from "./commands-extension.js";
 import {
   admitFollowUp,
@@ -69,10 +70,8 @@ import {
   roomEventReason,
   type InboundKindReading,
 } from "./plane/inbound-kinds.js";
-import {
-  RouteExecutionLimiter,
-  type RouteExecutionLease,
-} from "./plane/route-execution-limiter.js";
+import { ChannelExecutionLimiter, type ExecutionLease } from "./plane/execution-limiter.js";
+import { OnceMemory } from "./plane/once-memory.js";
 import {
   asPermissionRequest,
   asPermissionResolved,
@@ -206,9 +205,15 @@ function rootKindOf(kind: InboundMessage["conversation"]["kind"]): "dm" | "chann
 
 function identityLinkReplyText(
   status: "linked" | "already_linked" | "identity_conflict" | "invalid",
+  channel: string,
 ): string {
   if (status === "linked") {
-    return "Identity linked. You can now use the Channel access assigned to your Hub account.";
+    // One link covers the realm, so say so: people otherwise link each bot in turn.
+    const scope =
+      channel === "slack"
+        ? "in this Slack workspace"
+        : `on ${channel.charAt(0).toUpperCase()}${channel.slice(1)}`;
+    return `Identity linked. Every bot ${scope} now recognizes you, so there is no need to link each bot. What you can do through each bot still follows the Channel access assigned to your Hub account.`;
   }
   if (status === "already_linked") {
     return "This identity is already linked to your Hub account.";
@@ -216,7 +221,7 @@ function identityLinkReplyText(
   if (status === "identity_conflict") {
     return "This provider identity is already linked to another Hub account.";
   }
-  return "That link code is invalid or expired. Create a new code in Paseo Settings.";
+  return "That link code is invalid or expired, or was created for another workspace. Create a new code in Paseo Settings.";
 }
 
 function workflowDeliveryId(message: InboundMessage, route: CompiledRoute): string | undefined {
@@ -229,6 +234,19 @@ function workflowDeliveryId(message: InboundMessage, route: CompiledRoute): stri
  * clock + post + logger, the agent-spec resolver, and the inbound normalizer.
  * The daemon + store are injected at `start` (they are per-connection).
  */
+/**
+ * Commands that start or steer a run without passing through the ordinary
+ * message path, so they are counted against the limits here. `/new <message>`,
+ * `/skill` and `/command` deliver through that path and are counted there.
+ */
+const LIMITED_COMMANDS: ReadonlySet<ChannelTextCommand["name"]> = new Set([
+  "fork",
+  "side",
+  "quick",
+  "steer",
+  "queue",
+]);
+
 export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   const clock = deps.clock ?? realClock();
   const logger: PlaneLogger = deps.logger;
@@ -241,7 +259,11 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   let approvals: ApprovalEngine | undefined;
   /** The turn-lifecycle surfaces opened by accepted inbounds (plane/processing.ts). */
   let processing: ProcessingController | undefined;
-  let routeExecutionLimiter: RouteExecutionLimiter | undefined;
+  let executionLimiter: ChannelExecutionLimiter | undefined;
+  /** Messages already told they are waiting for a limit, so a retry is not announced again. */
+  const waitingNotices = new OnceMemory(1_000);
+  /** Senders already told today that this bot does not admit them. */
+  const notAdmittedNotices = new OnceMemory(1_000);
   const subscribed = new Set<string>();
   const workflowExecutionAgents = new Map<
     string,
@@ -393,7 +415,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       await consumeAgentStream(agentId, event);
       await lifecycleCommands?.onStream(agentId, event);
       if (isTerminalStreamEvent(event)) {
-        routeExecutionLimiter?.completeAgent(agentId);
+        executionLimiter?.completeAgent(agentId);
       }
     },
 
@@ -420,10 +442,11 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           });
           return;
         }
-        routeExecutionLimiter?.bindOrRestore({
+        executionLimiter?.bindOrRestore({
           leaseId: channelWorkflowDeliveryId(execution.triggerContext),
           account,
           route,
+          conversationId: channel.external_conversation_id,
           startedAt: execution.startedAt,
           agentId,
         });
@@ -473,7 +496,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       }
       await consumeAgentStream(agentId, event);
       if (isTerminalStreamEvent(event)) {
-        routeExecutionLimiter?.completeById(channelWorkflowDeliveryId(execution.triggerContext));
+        executionLimiter?.completeById(channelWorkflowDeliveryId(execution.triggerContext));
         cleanupWorkflowStream(execution.id, agentId);
       }
     },
@@ -504,7 +527,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.typing !== undefined ? { drive: deps.typing } : {}),
         ...(deps.processingTtlMs !== undefined ? { ttlMs: deps.processingTtlMs } : {}),
       });
-      routeExecutionLimiter = new RouteExecutionLimiter({
+      executionLimiter = new ChannelExecutionLimiter({
         logger,
         now: () => clock.now(),
         cancelAgent: (agentId) => daemonConnection.cancelAgent(agentId),
@@ -547,23 +570,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         authorizeResume: (agent, context) => commandDispatcher!.authorizeResume(agent, context),
         authorizeQueued: async (context) => {
           if (!isEnabled(deps.envFlag, deps.controlPlane, context.account)) return false;
-          if (!(await mayUseChannel(context.message, context.account, context.route)).allowed)
-            return false;
-          // A queued turn is delivered as send_agent_message_request; derive the
-          // required privilege from the shared overlap map by that wire RPC.
-          return (
-            (
-              await deps.commandAccess?.authorizeChannelPrivilege(
-                commandAccessRequest(
-                  deps,
-                  context.message,
-                  context.account,
-                  context.route,
-                  REQUIRED_PRIVILEGE_BY_OPERATION.send_agent_message_request,
-                ),
-              )
-            )?.allowed === true
-          );
+          // A queued turn is chat into the Route's session: chat authority is enough.
+          return (await mayUseChannel(context.message, context.account, context.route)).allowed;
         },
         attach: async (binding, context) => {
           plane.attachStreamFor(binding, context.route, context.account, {
@@ -610,13 +618,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         get resolveAgentSpec() {
           return deps.resolveAgentSpec;
         },
-        ...(deps.commandAccess
-          ? {
-              authorizeConfiguration: (
-                input: Parameters<ChannelCommandDispatcher["authorizeConfiguration"]>[0],
-              ) => commandDispatcher!.authorizeConfiguration(input),
-            }
-          : {}),
         ...(deps.replyCapabilities === undefined
           ? {}
           : { replyCapabilities: deps.replyCapabilities }),
@@ -748,9 +749,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       if (daemon !== undefined) {
         await daemon.setTimelineSubscription([]).catch(() => undefined);
         if (options?.cancelActive === true) {
-          await routeExecutionLimiter?.cancelActive();
+          await executionLimiter?.cancelActive();
         } else {
-          routeExecutionLimiter?.clear();
+          executionLimiter?.clear();
         }
         daemon.stop();
       }
@@ -761,7 +762,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       approvals = undefined;
       processing?.stopAll();
       processing = undefined;
-      routeExecutionLimiter = undefined;
+      executionLimiter = undefined;
       subscribed.clear();
       workflowExecutionAgents.clear();
       workflowAgentsByBinding.clear();
@@ -842,7 +843,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       ...(message.conversation.threadId === null
         ? {}
         : { threadId: message.conversation.threadId }),
-      text: identityLinkReplyText(status),
+      text: identityLinkReplyText(status, channelName(account)),
     });
     if (!response.ok) {
       logger.warn("channel identity link reply failed", {
@@ -969,20 +970,99 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     );
   }
 
+  /**
+   * The Bot, Conversation and Route limits for one message that starts or
+   * steers work. A refusal that clears with time is back-pressure: it carries
+   * `deferred`, so a durable ingress returns the message instead of completing
+   * it, and the sender is told once that it is waiting. A refusal that never
+   * clears (too long) is said in the thread.
+   */
+  async function admitExecution(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    leaseId?: string,
+  ): Promise<{ lease: ExecutionLease | undefined } | { refused: PlaneInboundResult }> {
+    const admission = executionLimiter?.admit({
+      account,
+      route,
+      conversationId: message.conversation.rootConversationId,
+      senderIdentity: message.senderIdentity,
+      text: message.text,
+      ...(leaseId === undefined ? {} : { leaseId }),
+    }) ?? { allowed: true as const };
+    if (admission.allowed) return { lease: admission.lease };
+    const declined = result(false, { kind: "ignored", reason: admission.reason });
+    if (admission.retryAfterMs !== undefined) {
+      declined.deferred = { reason: admission.reason, retryAfterMs: admission.retryAfterMs };
+    }
+    await postLimitNotice(message, account, route, admission.retryAfterMs !== undefined);
+    return {
+      refused: await recordChannelActivity(message, account, route, {
+        result: declined,
+        limitDecision: "denied",
+        limitReason: admission.reason,
+      }),
+    };
+  }
+
+  /**
+   * A sender who addressed the bot on a Member Route that does not admit them
+   * hears why once a day, instead of silence. Unaddressed chatter, open Routes
+   * and Workflow Routes stay silent.
+   */
+  async function postNotAdmittedNotice(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<void> {
+    if (!message.mentionedBot || isOpenAudienceRoute(route) || route.target.kind !== "agent")
+      return;
+    if ((await mayUseChannel(message, account, route)).allowed) return;
+    const day = Math.floor(clock.now() / 86_400_000);
+    if (!notAdmittedNotices.remember(`${message.senderIdentity}:${String(day)}`)) return;
+    await deps.post({
+      channel: channelName(account),
+      accountId: account.accountId,
+      ...commandReplyAddress(message, route.defaults.replyAnchor),
+      text: "You can't use this bot here yet. Link your account with /link, or ask an admin for access. /me shows what you have.",
+    });
+  }
+
+  /** One short line instead of silence; a waiting message is announced once, not per retry. */
+  async function postLimitNotice(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    waiting: boolean,
+  ): Promise<void> {
+    const key = message.externalMessageId ?? message.ingressId;
+    if (waiting && (key === undefined || !waitingNotices.remember(key))) return;
+    await deps.post({
+      channel: channelName(account),
+      accountId: account.accountId,
+      ...commandReplyAddress(message, route.defaults.replyAnchor),
+      text: waiting
+        ? "Busy right now. Your message is queued and runs when there is room."
+        : "This message is longer than this bot accepts. Shorten it and send it again.",
+    });
+  }
+
   async function handleAgentMessage(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<PlaneInboundResult> {
-    const admission =
+    const sender =
       route.target.kind === "workflow"
         ? await admitWorkflowMessage(message, account, route)
         : await bindingsEngine().admit(message, account, route);
-    if (!admission.allowed) {
+    if (!sender.allowed) {
+      await postNotAdmittedNotice(message, account, route);
       return recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
-          reason: admission.reason ?? "message not admitted",
+          reason: sender.reason ?? "message not admitted",
         }),
         limitDecision: "not_evaluated",
       });
@@ -997,27 +1077,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       if (stale !== undefined) await bindingsEngine().retireBoundSession(stale);
     }
     const deliveryId = workflowDeliveryId(message, route);
-    const routeLimit = routeExecutionLimiter?.admit({
-      account,
-      route,
-      senderIdentity: message.senderIdentity,
-      text: message.text,
-      ...(deliveryId === undefined ? {} : { leaseId: deliveryId }),
-    }) ?? { allowed: true as const };
-    if (!routeLimit.allowed) {
-      // A ceiling that clears with time is back-pressure: say so, so a durable
-      // ingress returns the message instead of completing it as handled.
-      const declined = result(false, { kind: "ignored", reason: routeLimit.reason });
-      if (routeLimit.retryAfterMs !== undefined) {
-        declined.deferred = { reason: routeLimit.reason, retryAfterMs: routeLimit.retryAfterMs };
-      }
-      return recordChannelActivity(message, account, route, {
-        result: declined,
-        limitDecision: "denied",
-        limitReason: routeLimit.reason,
-      });
-    }
-    const executionLease = routeLimit.lease;
+    const admission = await admitExecution(message, account, route, deliveryId);
+    if ("refused" in admission) return admission.refused;
+    const executionLease = admission.lease;
     if (route.target.kind === "workflow") {
       return dispatchWorkflowMessage(
         message,
@@ -1037,7 +1099,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
     workflow: string,
     deliveryId: string,
-    executionLease: RouteExecutionLease | undefined,
+    executionLease: ExecutionLease | undefined,
   ): Promise<PlaneInboundResult> {
     const key = deriveBindingKey(message, route);
     const conversationLabel = message.conversationLabel?.trim().slice(0, 200);
@@ -1087,7 +1149,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         },
       });
     } catch (error) {
-      routeExecutionLimiter?.complete(executionLease);
+      executionLimiter?.complete(executionLease);
       await recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
@@ -1111,7 +1173,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    executionLease: RouteExecutionLease | undefined,
+    executionLease: ExecutionLease | undefined,
   ): Promise<PlaneInboundResult> {
     // The stream is subscribed from inside the dispatch, after the agent is
     // known and BEFORE its prompt is delivered — attaching afterwards is what
@@ -1139,7 +1201,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     try {
       outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
     } catch (error) {
-      routeExecutionLimiter?.complete(executionLease);
+      executionLimiter?.complete(executionLease);
       await recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
@@ -1152,9 +1214,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       throw error;
     }
     if (outcome.kind === "bound" || outcome.kind === "steered") {
-      routeExecutionLimiter?.bind(executionLease, outcome.agentId);
+      executionLimiter?.bind(executionLease, outcome.agentId);
     } else {
-      routeExecutionLimiter?.complete(executionLease);
+      executionLimiter?.complete(executionLease);
     }
     return recordChannelActivity(message, account, route, {
       result: result(outcome.kind === "bound" || outcome.kind === "steered", outcome),
@@ -1340,6 +1402,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ? undefined
         : await admitAccess(message, account, route);
     if (gated !== undefined) return gated;
+    deps.noteOutboundRoute?.(message.conversation.rootConversationId, route);
     // The channel's other plain-text commands (/status, /stop, /new, /help —
     // shared, channel-agnostic; see commands.ts). `requireMention` and the
     // follow-up policy do not gate them: `commandAddressesThisBot` already
@@ -1434,15 +1497,32 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       route.target.kind === "workflow"
         ? await workflowAccessTarget(message, route, agentId)
         : undefined;
-    const outcome = await commandDispatcher.handle(command, {
-      message,
-      account,
-      route,
-      ...(agentId ? { agentId } : {}),
-      ...(accessTarget ? { accessTarget } : {}),
-      post,
-    });
-    return result(outcome.handled, { kind: "command", ...outcome });
+    const limited = LIMITED_COMMANDS.has(command.name)
+      ? await admitExecution(message, account, route)
+      : { lease: undefined };
+    if ("refused" in limited) return limited.refused;
+    const lease = limited.lease;
+    // The run slot follows the session the command starts or steers.
+    let leased = false;
+    const holdLease = (id: string) => {
+      executionLimiter?.bind(lease, id);
+      leased = lease !== undefined;
+    };
+    if (agentId && (command.name === "steer" || command.name === "queue")) holdLease(agentId);
+    try {
+      const outcome = await commandDispatcher.handle(command, {
+        message,
+        account,
+        route,
+        ...(agentId ? { agentId } : {}),
+        ...(accessTarget ? { accessTarget } : {}),
+        post,
+        onAgentCreated: holdLease,
+      });
+      return result(outcome.handled, { kind: "command", ...outcome });
+    } finally {
+      if (!leased) executionLimiter?.complete(lease);
+    }
   }
 
   async function workflowAccessTarget(
@@ -1764,7 +1844,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     relay?.detach(agentId);
     approvals?.detach(agentId);
     processing?.closeAgent(agentId);
-    routeExecutionLimiter?.completeAgent(agentId);
+    executionLimiter?.completeAgent(agentId);
     if (subscribed.delete(agentId)) await resubscribe();
   }
 

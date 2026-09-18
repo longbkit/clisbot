@@ -21,13 +21,20 @@ export type ChannelRouteTarget =
       options?: Record<string, unknown>;
     };
 
-export interface ChannelRouteLimits {
-  maxInputCharacters: number;
-  messagesPerMinutePerSender: number;
-  messagesPerMinute: number;
-  maxConcurrentRuns: number;
-  maxRuntimeSeconds: number;
-}
+/** Mirrors `CHANNEL_LIMIT_NAMES` in packages/hub/src/channels/config/schema.ts. */
+export const CHANNEL_LIMIT_NAMES = [
+  "maxInputCharacters",
+  "messagesPerMinutePerSender",
+  "messagesPerMinute",
+  "messagesSentPerMinute",
+  "maxConcurrentRuns",
+  "maxRuntimeSeconds",
+] as const;
+export type ChannelLimitName = (typeof CHANNEL_LIMIT_NAMES)[number];
+/** A positive whole number, or `off` to turn a default off. Unset = the default. */
+export type ChannelLimits = Partial<Record<ChannelLimitName, number | "off">>;
+/** The account's `limits`: the whole bot's, plus what each Conversation gets. */
+export type ChannelAccountLimits = ChannelLimits & { perConversation?: ChannelLimits };
 
 /**
  * How a bound group thread continues after a mention. `mention-only` needs a
@@ -74,7 +81,20 @@ export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   approvalMode: "require",
 };
 
-export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: ChannelRouteLimits = {
+/**
+ * Where a new open-audience Route starts: final answers only, a mention in
+ * groups, tool requests denied. Every setting stays editable; the Hub warns
+ * about wide choices instead of refusing them.
+ */
+export const DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
+  ...DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+  outboundPath: "relay",
+  progressMessage: false,
+  approvalMode: "auto-deny",
+};
+
+/** Mirrors `OPEN_AUDIENCE_ROUTE_LIMITS` in the Hub: defaults, not ceilings. */
+export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: Partial<Record<ChannelLimitName, number>> = {
   maxInputCharacters: 8_000,
   messagesPerMinutePerSender: 10,
   messagesPerMinute: 60,
@@ -82,21 +102,13 @@ export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: ChannelRouteLimits = {
   maxRuntimeSeconds: 15 * 60,
 };
 
-/** Public access is always bounded to an explicit provider Conversation. */
-export function hasRequiredChannelConversationIds(
-  audience: "members" | "conversationParticipants",
-  conversationIds: string,
-): boolean {
-  return audience === "members" || splitConversationIds(conversationIds).length > 0;
-}
-
 interface ChannelRouteCandidateInput {
   accountId: string;
   matchKind: ChannelRouteMatchKind;
   conversationIds: string;
   contains?: string;
   audience?: "members" | "conversationParticipants";
-  limits?: ChannelRouteLimits;
+  limits?: ChannelLimits;
   behavior?: ChannelRouteBehavior;
   target: ChannelRouteTarget;
   resource: ChannelConfigurationRecord;
@@ -187,40 +199,20 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
     ...(contains ? { contains } : {}),
   };
   const openAudience = input.audience === "conversationParticipants";
-  const audiencePolicy = openAudience
-    ? {
-        audience: { kind: "conversationParticipants" },
-        interaction: { requireMention: input.matchKind !== "dm" },
-        outbound: { path: "relay" },
-        sync: {
-          finalAnswers: true,
-          progress: {
-            progressMessage: false,
-            typingIndicator: false,
-            messageReaction: "off",
-          },
-          toolCalls: false,
-          threadLink: "none",
-          subagents: { finalAnswers: false, progress: false, toolCalls: false },
-        },
-        approval: [{ match: "*", mode: "auto-deny" }],
-        limits: {
-          ...DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
-          ...input.limits,
-        },
-      }
-    : {
-        audience: { kind: "members" },
-        ...(input.behavior === undefined
-          ? {}
-          : routeBehaviorSettings(input.behavior, input.matchKind)),
-      };
+  const limits = authoredLimits(input.limits);
+  const behavior =
+    input.behavior === undefined ? {} : routeBehaviorSettings(input.behavior, input.matchKind);
+  const audiencePolicy = {
+    audience: { kind: openAudience ? "conversationParticipants" : "members" },
+    ...(openAudience ? withQuietSync(behavior) : behavior),
+    ...(limits === undefined ? {} : { limits }),
+  };
   let resource = input.resource;
   let route: ChannelConfigurationRecord;
   if (input.target.kind === "automation") {
     route = { match, ...audiencePolicy, workflow: input.target.automationName };
   } else {
-    const direct = buildDirectAgentTarget(input, input.target, openAudience);
+    const direct = buildDirectAgentTarget(input, input.target);
     resource = direct.resource;
     route = {
       match,
@@ -238,10 +230,8 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
 function buildDirectAgentTarget(
   input: ChannelRouteCandidateInput,
   target: Extract<ChannelRouteTarget, { kind: "agent" }>,
-  openAudience: boolean,
 ): { resourceName: string; resource: ChannelConfigurationRecord } {
   const featureValues = { ...target.featureValues };
-  if (openAudience) delete featureValues["fast_mode"];
   const resourceName =
     input.preferredResourceName?.trim() ||
     uniqueResourceName(input.accountId.trim(), input.resource);
@@ -391,19 +381,21 @@ function preserveRouteSettings(
   current: ChannelConfigurationRecord,
   replacement: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord {
-  const preservedKeys = ["template", "policy", "binding", "reply", "outbound", "limits"];
+  // `limits` is not preserved: the form shows every leaf, so what it sends is complete.
+  const preservedKeys = ["template", "policy", "binding", "reply", "outbound"];
   const preserved = Object.fromEntries(
     preservedKeys.flatMap((key) => (Object.hasOwn(current, key) ? [[key, current[key]]] : [])),
   );
-  const currentAudience = recordField(current, "audience")["kind"];
-  const replacementAudience = recordField(replacement, "audience")["kind"];
-  if (currentAudience === "members" && replacementAudience === "members") {
+  // Changing who can use the Route starts from that audience's defaults;
+  // keeping it keeps the settings the form does not show.
+  const sameAudience = audienceKind(current) === audienceKind(replacement);
+  if (sameAudience) {
     for (const key of ["interaction", "sync", "approval"] as const) {
       if (Object.hasOwn(current, key)) preserved[key] = current[key];
     }
   }
   const merged = { ...preserved, ...replacement };
-  if (currentAudience !== "members" || replacementAudience !== "members") return merged;
+  if (!sameAudience) return merged;
   for (const key of ["interaction", "reply", "outbound"] as const) {
     if (isRecord(current[key]) && isRecord(replacement[key])) {
       merged[key] = { ...current[key], ...replacement[key] };
@@ -421,6 +413,39 @@ function preserveRouteSettings(
     };
   }
   return merged;
+}
+
+function audienceKind(route: ChannelConfigurationRecord): string {
+  const kind = recordField(route, "audience")["kind"];
+  return kind === "conversationParticipants" ? kind : "members";
+}
+
+/**
+ * An open-audience Route posts nothing the form does not show: no session
+ * link, no sub-agent output, no reaction. These would otherwise come from the
+ * account or organization defaults.
+ */
+function withQuietSync(settings: ChannelConfigurationRecord): ChannelConfigurationRecord {
+  const sync = recordField(settings, "sync");
+  return {
+    ...settings,
+    sync: {
+      ...sync,
+      progress: { ...recordField(sync, "progress"), messageReaction: "off" },
+      threadLink: "none",
+      subagents: { finalAnswers: false, progress: false, toolCalls: false },
+    },
+  };
+}
+
+/** Only the leaves the user set; an empty set writes no `limits` at all. */
+export function authoredLimits(limits: ChannelLimits | undefined): ChannelLimits | undefined {
+  const authored: ChannelLimits = {};
+  for (const name of CHANNEL_LIMIT_NAMES) {
+    const value = limits?.[name];
+    if (value !== undefined) authored[name] = value;
+  }
+  return Object.keys(authored).length === 0 ? undefined : authored;
 }
 
 function removeUnusedPreviousTargets(input: {

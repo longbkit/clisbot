@@ -1095,7 +1095,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     fireEvent.click(screen.getByRole("button", { name: "Back to Channels" }));
     await act(async () => confirm(true));
-    expect(adapters.post).not.toHaveBeenCalled();
+    // Only the read-only preview ran; nothing was activated.
+    for (const [path] of adapters.post.mock.calls)
+      expect(path).toBe("channel-configuration/validate");
     expect(adapters.put).not.toHaveBeenCalled();
   });
 });
@@ -1189,17 +1191,10 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
 
   it("stages an Automation input with the shared editor without publishing a Route", async () => {
     const stage = vi.fn();
+    const draftContext = slackInputDraftContext(stage);
     render(
       <QueryClientProvider client={queryClient}>
-        <AutomationInputDraftContext.Provider
-          value={{
-            provider: "slack",
-            draft: null,
-            stage,
-            setEditing: vi.fn(),
-            pending: false,
-          }}
-        >
+        <AutomationInputDraftContext.Provider value={draftContext}>
           <ChannelSettings automationName="support" />
         </AutomationInputDraftContext.Provider>
       </QueryClientProvider>,
@@ -1236,3 +1231,10 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     expect(adapters.put).not.toHaveBeenCalled();
   });
 });
+
+/** An Automation input draft that stages instead of publishing. */
+function slackInputDraftContext(stage: DraftContextValue["stage"]): DraftContextValue {
+  return { provider: "slack", draft: null, stage, setEditing: vi.fn(), pending: false };
+}
+
+type DraftContextValue = NonNullable<React.ContextType<typeof AutomationInputDraftContext>>;

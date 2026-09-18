@@ -139,9 +139,6 @@ async function createOwnedApplicationRuntime(
         ...input,
         database: options.database,
         recoverExecutions: recoverChannelExecutions,
-        authorizeTarget: async (target) =>
-          (await accessStore?.authorizeChannelPrivilege({ ...input.authorization, ...target }))
-            ?.allowed === true,
       });
     },
     async (input) => {
@@ -149,9 +146,6 @@ async function createOwnedApplicationRuntime(
       return readChannelWorkflowRuns({
         ...input,
         database: options.database,
-        authorizeTarget: async (target) =>
-          (await accessStore?.authorizeChannelPrivilege({ ...input.authorization, ...target }))
-            ?.allowed === true,
       });
     },
   );

@@ -538,56 +538,47 @@ export const RouteAudienceSchema = z.discriminatedUnion("kind", [
 ]);
 export type RouteAudience = z.infer<typeof RouteAudienceSchema>;
 
+/** Every limit a Bot, a Conversation or a Route can carry, in display order. */
+export const CHANNEL_LIMIT_NAMES = [
+  "maxInputCharacters",
+  "messagesPerMinutePerSender",
+  "messagesPerMinute",
+  "messagesSentPerMinute",
+  "maxConcurrentRuns",
+  "maxRuntimeSeconds",
+] as const;
+export type ChannelLimitName = (typeof CHANNEL_LIMIT_NAMES)[number];
+
 /**
- * Instance safety ceilings for one Route. An authored value may be lower but
- * never higher. Open-audience Routes inherit the conservative preset when a
- * leaf is omitted; Member Routes remain unchanged unless they opt in.
+ * What an open-audience Route gets for a leaf it leaves unset. Only a default:
+ * the configurator may raise any of them or turn it `off`. Every other scope
+ * defaults to no limit.
  */
-export const ROUTE_LIMIT_CEILINGS = {
+export const OPEN_AUDIENCE_ROUTE_LIMITS: Readonly<Partial<Record<ChannelLimitName, number>>> = {
   maxInputCharacters: 8_000,
   messagesPerMinutePerSender: 10,
   messagesPerMinute: 60,
   maxConcurrentRuns: 2,
   maxRuntimeSeconds: 15 * 60,
-} as const;
+};
 
-export const OPEN_AUDIENCE_ROUTE_LIMITS = ROUTE_LIMIT_CEILINGS;
+/** A positive whole number, or `off` to turn a default off. */
+const ChannelLimitValueSchema = z.union([z.number().int().positive(), z.literal("off")]);
 
-export const RouteLimitsSchema = z
-  .object({
-    maxInputCharacters: z
-      .number()
-      .int()
-      .positive()
-      .max(ROUTE_LIMIT_CEILINGS.maxInputCharacters)
-      .optional(),
-    messagesPerMinutePerSender: z
-      .number()
-      .int()
-      .positive()
-      .max(ROUTE_LIMIT_CEILINGS.messagesPerMinutePerSender)
-      .optional(),
-    messagesPerMinute: z
-      .number()
-      .int()
-      .positive()
-      .max(ROUTE_LIMIT_CEILINGS.messagesPerMinute)
-      .optional(),
-    maxConcurrentRuns: z
-      .number()
-      .int()
-      .positive()
-      .max(ROUTE_LIMIT_CEILINGS.maxConcurrentRuns)
-      .optional(),
-    maxRuntimeSeconds: z
-      .number()
-      .int()
-      .positive()
-      .max(ROUTE_LIMIT_CEILINGS.maxRuntimeSeconds)
-      .optional(),
-  })
+export const ChannelLimitsSchema = z
+  .object(
+    Object.fromEntries(
+      CHANNEL_LIMIT_NAMES.map((name) => [name, ChannelLimitValueSchema.optional()]),
+    ) as Record<ChannelLimitName, z.ZodOptional<typeof ChannelLimitValueSchema>>,
+  )
   .strict();
-export type RouteLimits = z.infer<typeof RouteLimitsSchema>;
+export type ChannelLimits = z.infer<typeof ChannelLimitsSchema>;
+
+/** The Bot's own limits, plus the limits each of its Conversations gets. */
+export const AccountLimitsSchema = ChannelLimitsSchema.extend({
+  perConversation: ChannelLimitsSchema.optional(),
+}).strict();
+export type AccountLimits = z.infer<typeof AccountLimitsSchema>;
 
 /**
  * A route's target: exactly one of `agent` + `environment` (continuous session,
@@ -626,7 +617,7 @@ export const RouteSchema = z
     // Default Agent controls over the named `agent:` (`agent-controls.ts`).
     agentControls: AgentControlsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
-    limits: RouteLimitsSchema.optional(),
+    limits: ChannelLimitsSchema.optional(),
   })
   .strict();
 export type Route = z.infer<typeof RouteSchema>;
@@ -659,6 +650,7 @@ export const AccountFileSchema = z
     defaults: ChannelDefaultsSchema.optional(),
     routes: z.array(RouteSchema).optional(),
     fallback: FallbackSchema.optional(),
+    limits: AccountLimitsSchema.optional(),
   })
   .strict();
 export type AccountFile = z.infer<typeof AccountFileSchema>;

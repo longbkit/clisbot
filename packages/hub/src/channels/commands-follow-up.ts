@@ -12,6 +12,7 @@ import {
   type RouteFollowUpChange,
 } from "./commands-follow-up-arguments.js";
 import type { LifecycleCommandContext } from "./commands-lifecycle.js";
+import { commandRefusalText } from "./commands.js";
 import { routeDefaultTarget, routeLabel } from "./commands-route-default.js";
 import type { ChannelPlaneDeps } from "./plane/types.js";
 
@@ -77,7 +78,7 @@ async function runRouteAction(
   const publisher = plane.routeDefaults;
   if (publisher === undefined) return reply("Route settings cannot be changed on this Hub.");
   const target = await routeDefaultTarget(plane, context);
-  if (target === undefined) return reply("/followup route requires channel.manage access here.");
+  if (target === undefined) return reply(commandRefusalText("/followup route", "channel.manage"));
   const outcome = await publisher.setFollowUp(target, action.change);
   if (outcome.status === "outside_access") {
     return reply("This route starts an agent outside your own access, so you cannot change it.");

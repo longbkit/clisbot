@@ -1290,6 +1290,46 @@ describe("selected-conversation audience", () => {
     assert.deepEqual(planeInboundDeferral(limited), limited.deferred);
   });
 
+  it("counts session commands against the same limits and says why", async () => {
+    const conversationId = "C0PUBLIC-COMMANDS";
+    const route = {
+      ...openRoute(conversationId),
+      limits: { ...OPEN_AUDIENCE_ROUTE_LIMITS, maxConcurrentRuns: 1 },
+    };
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const external = {
+      senderIdentity: "slack:U0COMMANDS",
+      mentionedBot: true,
+      conversation: {
+        kind: "channel" as const,
+        id: conversationId,
+        rootConversationId: conversationId,
+        threadId: null,
+      },
+    };
+    const send = async (text: string, externalMessageId: string) => {
+      harness.next.message = message({ ...external, text, externalMessageId });
+      return harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    };
+
+    const oversized = await send(`/quick ${"x".repeat(8_001)}`, "1700000000.100001");
+    assert.equal(oversized.outcome?.kind, "ignored");
+    assert.equal(harness.fake.created.length, 0);
+    assert.match(harness.posted.at(-1) ?? "", /longer than this bot accepts/u);
+
+    await send("/quick first question", "1700000000.100002");
+    assert.equal(harness.fake.created.length, 1);
+    const busy = await send("/quick second question", "1700000000.100003");
+    assert.ok((busy.deferred?.retryAfterMs ?? 0) > 0);
+    assert.equal(harness.fake.created.length, 1);
+    assert.match(harness.posted.at(-1) ?? "", /queued/u);
+    // A retry of the same message is not announced twice.
+    const postedBefore = harness.posted.length;
+    await send("/quick second question", "1700000000.100003");
+    assert.equal(harness.posted.length, postedBefore);
+  });
+
   it("cancels active public Route work when its configuration is replaced", async () => {
     const conversationId = "C0PUBLIC-REVOKE";
     const route = openRoute(conversationId);
@@ -2050,8 +2090,6 @@ describe("channel session commands", () => {
     }
     assert.equal(requests.length, 2);
     assert.equal(requests[0]!.workflowName, "multi-host");
-    assert.equal(requests[0]!.authorization.privilege, "agent.interact");
-    assert.equal(requests[0]!.authorization.senderIdentity, INITIATOR);
     assert.equal(harness.fake.created.length, 0);
     await harness.plane.stop();
   });
@@ -3289,7 +3327,7 @@ describe("inbound event kinds", () => {
       },
     });
     await harness.plane.start(harness.fake.daemon, store);
-    for (const text of ["/help", "/me", "/new do work"]) {
+    for (const text of ["/help", "/me", "/model gpt-5.6-luna"]) {
       harness.next.message = message({
         text,
         conversation: {
@@ -3303,7 +3341,7 @@ describe("inbound event kinds", () => {
     }
     assert.match(harness.posted[0]!, /Commands:/);
     assert.match(harness.posted[1]!, /Guest/);
-    assert.match(harness.posted[2]!, /requires agent.create/);
+    assert.match(harness.posted[2]!, /needs Project access \(agent\.interact\)/);
     assert.equal(harness.fake.created.length, 0);
   });
 
@@ -3404,7 +3442,7 @@ describe("inbound event kinds", () => {
     assert.equal(harness.fake.created.length, 1);
     assert.equal(harness.fake.messages.length, 1);
   });
-  it("refuses an inherited unattended selection at final session creation", async () => {
+  it("starts a session with an inherited selection without re-checking the sender", async () => {
     const harness = makeHarness({
       commandAccess: {
         authorizeChannelPrivilege: async (request) =>
@@ -3445,21 +3483,11 @@ describe("inbound event kinds", () => {
       },
     );
     harness.next.message = message({ text: "/new work", conversation });
-    const outcome = await harness.plane.onInbound({
-      channel: "slack",
-      accountId: ACCOUNT_ID,
-      ctxPayload: {},
-    });
-    assert.equal(outcome.dispatched, false);
-    assert.equal(harness.fake.created.length, 0);
-    assert.equal(
-      await store.findThreadBinding(
-        ORGANIZATION_ID,
-        ACCOUNT_ID,
-        conversation.rootConversationId,
-        null,
-      ),
-      undefined,
-    );
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    // The selection was checked against the Member who made it; the next
+    // sender only needs chat authority to start a session with it.
+    assert.equal(harness.fake.created.length, 1);
+    assert.equal(harness.fake.created[0]?.config.modeId, "full-access");
+    await harness.plane.stop();
   });
 });

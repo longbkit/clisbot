@@ -46,13 +46,22 @@ export interface ApprovalCommand {
   answer?: string;
 }
 
-/** Metadata owns parsing, discovery, route applicability and Access gating. */
+/**
+ * Metadata owns parsing, discovery, route applicability and Access gating.
+ * `access` is who may run the command:
+ *   - `public`: anyone, even a sender the Route does not admit (`/help`, `/me`);
+ *   - `chat`: anyone the Route admits — the command stays inside the Route's
+ *     configuration, which its publisher was authorized to delegate;
+ *   - a privilege: a personal Access grant, for commands that change or reach
+ *     beyond that configuration.
+ * (docs/audits/2026-09-18-channel-chat-authority-and-limits.md)
+ */
 export const CHANNEL_COMMANDS = [
   {
     name: "status",
     aliases: ["state"],
     args: false,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: false,
     usage: "/status",
     description: "agent, session, context and access",
@@ -61,7 +70,7 @@ export const CHANNEL_COMMANDS = [
     name: "stop",
     aliases: ["cancel"],
     args: false,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: false,
     usage: "/stop",
     description: "stop the turn or active automation runs",
@@ -70,7 +79,7 @@ export const CHANNEL_COMMANDS = [
     name: "followup",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: false,
     usage:
       "/followup [status|auto|mention-only|pause|resume] · /followup route [auto [minutes]|mention-only]",
@@ -80,7 +89,7 @@ export const CHANNEL_COMMANDS = [
     name: "new",
     aliases: ["reset"],
     args: true,
-    privilege: "agent.create",
+    access: "chat",
     directOnly: true,
     usage: "/new [message]",
     description: "start fresh in this conversation",
@@ -89,7 +98,7 @@ export const CHANNEL_COMMANDS = [
     name: "help",
     aliases: [],
     args: false,
-    privilege: null,
+    access: "public",
     directOnly: false,
     usage: "/help",
     description: "this list",
@@ -98,7 +107,7 @@ export const CHANNEL_COMMANDS = [
     name: "me",
     aliases: [],
     args: false,
-    privilege: null,
+    access: "public",
     directOnly: false,
     usage: "/me",
     description: "your channel identity and access",
@@ -107,7 +116,7 @@ export const CHANNEL_COMMANDS = [
     name: "cowork",
     aliases: ["open", "app"],
     args: false,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: false,
     usage: "/cowork",
     description: "open this session in Paseo",
@@ -116,7 +125,7 @@ export const CHANNEL_COMMANDS = [
     name: "resume",
     aliases: [],
     args: true,
-    privilege: "agent.create",
+    access: "agent.create",
     directOnly: true,
     usage: "/resume <id>",
     description: "continue an existing session here",
@@ -125,7 +134,7 @@ export const CHANNEL_COMMANDS = [
     name: "steer",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: true,
     usage: "/steer <message>",
     description: "send into the running turn",
@@ -134,7 +143,7 @@ export const CHANNEL_COMMANDS = [
     name: "queue",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: true,
     usage: "/queue <message>",
     description: "send after the current turn ends",
@@ -143,7 +152,7 @@ export const CHANNEL_COMMANDS = [
     name: "agent",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: true,
     usage: "/agent [list|search <text>|name]",
     description: "list or apply an agent profile",
@@ -152,7 +161,7 @@ export const CHANNEL_COMMANDS = [
     name: "provider",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: true,
     usage: "/provider [list|search <text>|id]",
     description: "list or switch provider",
@@ -161,7 +170,7 @@ export const CHANNEL_COMMANDS = [
     name: "model",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: true,
     usage: "/model [list|search <text>|id]",
     description: "list or set this provider's model",
@@ -170,7 +179,7 @@ export const CHANNEL_COMMANDS = [
     name: "effort",
     aliases: ["thinking"],
     args: true,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: true,
     usage: "/effort [list|id]",
     description: "list or set this model's thinking option",
@@ -179,7 +188,7 @@ export const CHANNEL_COMMANDS = [
     name: "permission",
     aliases: ["mode"],
     args: true,
-    privilege: "agent.interact",
+    access: "agent.interact",
     directOnly: true,
     usage: "/permission [mode]",
     description: "list or set the provider's mode",
@@ -188,7 +197,7 @@ export const CHANNEL_COMMANDS = [
     name: "skill",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: true,
     usage: "/skill [list|search <text>|name]",
     description: "find or invoke an agent skill",
@@ -197,7 +206,7 @@ export const CHANNEL_COMMANDS = [
     name: "command",
     aliases: [],
     args: true,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: true,
     usage: "/command [list|search <text>|name|add <name> <prompt>|remove <name>]",
     description: "find, invoke or manage account commands",
@@ -206,7 +215,7 @@ export const CHANNEL_COMMANDS = [
     name: "fork",
     aliases: [],
     args: true,
-    privilege: "agent.create",
+    access: "chat",
     directOnly: true,
     usage: "/fork [message]",
     description: "copy context and continue here",
@@ -215,7 +224,7 @@ export const CHANNEL_COMMANDS = [
     name: "side",
     aliases: [],
     args: true,
-    privilege: "agent.create",
+    access: "chat",
     directOnly: true,
     usage: "/side <message>",
     description: "one-off question with this context",
@@ -224,7 +233,7 @@ export const CHANNEL_COMMANDS = [
     name: "quick",
     aliases: [],
     args: true,
-    privilege: "agent.create",
+    access: "chat",
     directOnly: true,
     usage: "/quick <message>",
     description: "one-off question in a fresh session",
@@ -233,7 +242,7 @@ export const CHANNEL_COMMANDS = [
     name: "routedefault",
     aliases: [],
     args: false,
-    privilege: "agent.interact",
+    access: "chat",
     directOnly: true,
     usage: "/routedefault",
     description: "show the route serving this conversation and its default",
@@ -242,7 +251,7 @@ export const CHANNEL_COMMANDS = [
     name: "promoteroutedefault",
     aliases: [],
     args: true,
-    privilege: "channel.manage",
+    access: "channel.manage",
     directOnly: true,
     usage: "/promoteroutedefault [undo]",
     description: "make this conversation's agent the route default",
@@ -258,7 +267,23 @@ export function channelCommandSpec(name: ChannelCommandName) {
   return CHANNEL_COMMANDS.find((command) => command.name === name)!;
 }
 
-export function channelCommandPrivilege(command: ChannelTextCommand) {
+const PRIVILEGE_NEEDS: Readonly<Record<string, string>> = {
+  "agent.interact": "Project access",
+  "agent.create": "Project access",
+  "approval.config": "permission to manage this Channel Route's commands",
+  "channel.manage": "permission to manage this Channel Route",
+};
+
+/**
+ * What a sender without the privilege is told: what it takes in plain words,
+ * the privilege name for whoever grants it, and where to look next.
+ */
+export function commandRefusalText(commandLabel: string, privilege: string): string {
+  const needs = PRIVILEGE_NEEDS[privilege] ?? "more access";
+  return `${commandLabel} needs ${needs} (${privilege}). Ask an admin, or send /me to see your access.`;
+}
+
+export function channelCommandAccess(command: ChannelTextCommand) {
   if (command.name === "command" && /^(add|remove)(?:\s|$)/iu.test(command.value ?? "")) {
     return "approval.config" as const;
   }
@@ -266,7 +291,7 @@ export function channelCommandPrivilege(command: ChannelTextCommand) {
     const action = parseFollowUpArguments(command.value);
     if (action?.scope === "route" && action.action === "set") return "channel.manage" as const;
   }
-  return channelCommandSpec(command.name).privilege;
+  return channelCommandSpec(command.name).access;
 }
 
 const COMMAND_ALIASES = new Map<string, ChannelCommandName>(

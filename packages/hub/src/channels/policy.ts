@@ -399,15 +399,15 @@ export function mayTrigger(
   return privilegeHolds(senderIdentity, [routeRoleScope(route)], controlPlane, "bot.interact");
 }
 
-/** Explicit open audience is bounded to named Conversations and requires a mention outside DMs. */
-export function externalParticipantMayTrigger(
-  message: Pick<import("./plane/types.js").InboundMessage, "mentionedBot" | "conversation">,
-  route: CompiledRoute,
-): boolean {
-  if (route.audience?.kind !== "conversationParticipants") return false;
-  if (route.match.ids.length === 0) return false;
-  if (message.conversation.kind === "dm") return true;
-  return message.mentionedBot;
+/**
+ * An open-audience Route admits anyone in the conversations it matches, so
+ * being one is enough to pass the sender gate. Which conversations, and whether
+ * a mention is needed, are the Route's own `match` and
+ * `interaction.requireMention` — the same gates a Member Route uses. The
+ * configuration warns about wide choices; it does not forbid them.
+ */
+export function isOpenAudienceRoute(route: CompiledRoute): boolean {
+  return route.audience?.kind === "conversationParticipants";
 }
 
 /** Legacy Channel identities count as Members only when explicitly mapped or assigned. */

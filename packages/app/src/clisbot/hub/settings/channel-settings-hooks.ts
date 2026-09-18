@@ -1,5 +1,5 @@
-import { useContext, useEffect, useMemo } from "react";
-import type { QueryKey } from "@tanstack/react-query";
+import { useCallback, useContext, useEffect, useMemo } from "react";
+import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import type { z } from "zod";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "../account-provider";
@@ -9,6 +9,7 @@ import {
   HubChannelConfigurationSchema,
   HubChannelRevisionsSchema,
   HubChannelRuntimeStatusSchema,
+  HubChannelValidationSchema,
   HubConnectionsSchema,
   HubDaemonsSchema,
   HubTeamsSchema,
@@ -63,6 +64,65 @@ export function useChannelSettingsQueries() {
     teams: useHubResource(scope, "teams", HubTeamsSchema),
     assignments: useHubResource(scope, "access-assignments", HubAccessAssignmentsSchema),
   };
+}
+
+/**
+ * Validate a candidate without saving it and return the Hub's warnings, so a
+ * confirmation can show them before anything changes. A candidate the Hub
+ * refuses returns no warnings: saving it reports the refusal.
+ */
+export function useChannelConfigurationPreview(): (
+  accounts: Record<string, unknown>[],
+  resource: Record<string, unknown>,
+) => Promise<z.infer<typeof HubChannelValidationSchema>["warnings"]> {
+  const hub = useHubAccount();
+  const queryClient = useQueryClient();
+  const scope = hubQueryScope(hub);
+  return useCallback(
+    async (accounts, resource) => {
+      // Read at call time, without subscribing: the editor already owns the query.
+      const policy = queryClient.getQueryData<HubChannelConfiguration>(
+        hubResourceQueryKey(scope, "channel-configuration"),
+      )?.policy;
+      try {
+        const candidate = { policy: policy ?? {}, accounts, resource };
+        return (
+          await hub
+            .api()
+            .post("channel-configuration/validate", candidate, HubChannelValidationSchema)
+        ).warnings;
+      } catch {
+        return [];
+      }
+    },
+    [hub, queryClient, scope],
+  );
+}
+
+/** The Hub's warnings for one Route, read from the shared Channel configuration query. */
+export function useChannelRouteWarnings(
+  channel: string | null,
+  accountId: string | null,
+  routeIndex: number,
+): string[] {
+  const scope = hubQueryScope(useHubAccount());
+  const configuration = useHubResource(
+    scope,
+    "channel-configuration",
+    HubChannelConfigurationSchema,
+  );
+  return useMemo(
+    () =>
+      (configuration.data?.warnings ?? [])
+        .filter(
+          (warning) =>
+            warning.channel === channel &&
+            warning.accountId === accountId &&
+            warning.route === routeIndex,
+        )
+        .map(({ message }) => message),
+    [accountId, channel, configuration.data?.warnings, routeIndex],
+  );
 }
 
 /**

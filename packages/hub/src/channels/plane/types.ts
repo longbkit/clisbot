@@ -426,13 +426,11 @@ export interface ChannelPlaneDeps {
     organizationId: string;
     bindingKey: string;
     workflowName: string;
-    authorization: import("../../access/store.js").ChannelPrivilegeRequest;
   }) => Promise<number>;
   readWorkflowRuns?: (input: {
     organizationId: string;
     bindingKey: string;
     workflowName: string;
-    authorization: import("../../access/store.js").ChannelPrivilegeRequest;
   }) => Promise<import("../../workflows/channel-status.js").ChannelWorkflowRunSummary[]>;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
   authorizeChannelApproval?: ChannelApprovalAuthorizer | undefined;
@@ -443,6 +441,11 @@ export interface ChannelPlaneDeps {
     | undefined;
   logger: PlaneLogger;
   post: PostFn;
+  /** Tell the outbound pacer which Route serves a conversation (its Route-scope
+   * `messagesSentPerMinute`). Absent = no Route-scope pacing. */
+  noteOutboundRoute?:
+    | ((conversationId: string, route: import("../config/compile.js").CompiledRoute) => void)
+    | undefined;
   /** COMPAT(clisbot-control-plane): the account's native-media post (the
    * vertical's `outbound.sendMedia`, one local media file per call; G7–G11),
    * driven by the relay's final-answer path. Absent = the relay's media path

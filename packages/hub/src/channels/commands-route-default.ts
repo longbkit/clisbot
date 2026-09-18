@@ -9,6 +9,7 @@ import type { ChannelStore } from "../db/channels.js";
 import { routePosition } from "./bindings/index.js";
 import { sameAgentControls, type AgentControls } from "./config/agent-controls.js";
 import { commandAccessRequest } from "./commands-context.js";
+import { commandRefusalText } from "./commands.js";
 import type { LifecycleCommandContext } from "./commands-lifecycle.js";
 import type { CreateAgentConfig } from "./daemon/types.js";
 import type { ChannelPlaneDeps } from "./plane/types.js";
@@ -59,7 +60,7 @@ export async function promoteRouteDefault(
   if (publisher === undefined) return reply("Route defaults cannot be changed on this Hub.");
   const target = await routeDefaultTarget(deps.plane, context);
   if (target === undefined)
-    return reply("/promoteroutedefault requires channel.manage access here.");
+    return reply(commandRefusalText("/promoteroutedefault", "channel.manage"));
   if (undo) {
     const outcome = await publisher.undo(target);
     if (outcome.status !== "published") return reply(outcomeText(outcome));

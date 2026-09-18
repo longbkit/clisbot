@@ -579,9 +579,19 @@ export const HubChannelRevisionsSchema = z.object({
   revisions: z.array(HubChannelRevisionSchema),
 });
 
+/** A wide open-audience choice the configurator made on purpose; never a refusal. */
+export const HubChannelConfigurationWarningSchema = z.object({
+  channel: z.string(),
+  accountId: z.string(),
+  route: z.number().int().nonnegative(),
+  message: z.string(),
+});
+
 export const HubChannelValidationSchema = z.object({
   valid: z.literal(true),
   effective: z.unknown(),
+  // COMPAT(channel-configuration-warnings): added 2026-09-19; an older Hub omits it.
+  warnings: z.array(HubChannelConfigurationWarningSchema).optional(),
 });
 
 export const HubChannelTestSchema = z.object({
@@ -698,6 +708,8 @@ export const HubChannelConfigurationSchema = z
     accounts: z.array(z.record(z.string(), z.unknown())),
     resource: z.record(z.string(), z.unknown()).nullable(),
     effective: z.unknown(),
+    // COMPAT(channel-configuration-warnings): added 2026-09-19; an older Hub omits it.
+    warnings: z.array(HubChannelConfigurationWarningSchema).optional(),
   })
   .passthrough();
 

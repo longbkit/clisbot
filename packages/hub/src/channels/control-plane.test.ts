@@ -21,6 +21,7 @@ import {
   type ChannelControlPlaneSnapshot,
 } from "./control-plane.js";
 import { composeMessageToolPrompt } from "./outbound-template.js";
+import { channelConfigurationWarnings } from "./configuration-warnings.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
@@ -163,6 +164,22 @@ async function withActiveConfiguration(database: Database): Promise<ChannelContr
     createdByUserId: null,
   });
   return loadChannelControlPlane(database);
+}
+
+/** The open-audience choice loads, and the configuration carries a matching warning. */
+async function assertLoadsWithWarning(database: Database, expected: RegExp): Promise<void> {
+  const snapshot = await loadChannelControlPlane(database);
+  const warnings = await channelConfigurationWarnings({
+    database,
+    organizationId: snapshot.organizationId,
+    bundle: snapshot.bundle,
+    controlPlane: snapshot.controlPlane,
+    triggers: await database.listOrganizationTriggers(snapshot.organizationId),
+  });
+  assert.ok(
+    warnings.some(({ message }) => expected.test(message)),
+    JSON.stringify(warnings),
+  );
 }
 
 describe("loadChannelControlPlane", () => {
@@ -329,7 +346,7 @@ describe("loadChannelControlPlane", () => {
     assert.deepEqual(snapshot.controlPlane.accounts, []);
   });
 
-  it("rejects Fast mode on a direct Agent exposed to external participants", async () => {
+  it("loads Fast mode on a direct open-audience Agent with a warning", async () => {
     const database = memoryDatabase();
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
@@ -361,10 +378,10 @@ routes:
       createdByUserId: null,
     });
 
-    await assert.rejects(loadChannelControlPlane(database), /Fast mode is unavailable/u);
+    await assertLoadsWithWarning(database, /Fast mode is on/u);
   });
 
-  it("rejects Fast mode in an Automation exposed to external participants", async () => {
+  it("loads Fast mode in an open-audience Automation with a warning", async () => {
     const database = memoryDatabase();
     await enrollTestDaemon(database, ORG_ID);
     await new OrganizationTriggerStore(database, ORG_ID).save({
@@ -410,10 +427,10 @@ routes:
       createdByUserId: null,
     });
 
-    await assert.rejects(loadChannelControlPlane(database), /Fast mode is unavailable/u);
+    await assertLoadsWithWarning(database, /Fast mode is on/u);
   });
 
-  it("rejects an unattended direct-Agent Mode exposed to external participants", async () => {
+  it("loads an unattended direct open-audience Agent Mode with a warning", async () => {
     const database = memoryDatabase();
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
@@ -445,10 +462,10 @@ routes:
       createdByUserId: null,
     });
 
-    await assert.rejects(loadChannelControlPlane(database), /unattended Mode "bypassPermissions"/u);
+    await assertLoadsWithWarning(database, /Mode "bypassPermissions" runs tools without asking/u);
   });
 
-  it("rejects an unattended Automation Mode exposed to external participants", async () => {
+  it("loads an unattended open-audience Automation Mode with a warning", async () => {
     const database = memoryDatabase();
     await enrollTestDaemon(database, ORG_ID);
     await new OrganizationTriggerStore(database, ORG_ID).save({
@@ -491,7 +508,7 @@ routes:
       createdByUserId: null,
     });
 
-    await assert.rejects(loadChannelControlPlane(database), /unattended Mode "full-access"/u);
+    await assertLoadsWithWarning(database, /Mode "full-access" runs tools without asking/u);
   });
 });
 
