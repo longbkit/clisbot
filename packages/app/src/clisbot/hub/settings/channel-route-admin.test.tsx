@@ -104,6 +104,36 @@ vi.mock("@/components/ui/switch", () => ({
     );
   },
 }));
+vi.mock("./multi-select-field", () => ({
+  MultiSelectField: function TestMultiSelectField(props: {
+    label: string;
+    disabled?: boolean;
+    options: { id: string; value: string; label: string }[];
+    value: "*" | readonly string[] | null;
+    onChange(value: "*" | readonly string[]): void;
+  }) {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLSelectElement>) =>
+        props.onChange([...event.target.selectedOptions].map((option) => option.value)),
+      [props],
+    );
+    return (
+      <select
+        multiple
+        aria-label={props.label}
+        disabled={props.disabled}
+        value={props.value === "*" || props.value === null ? [] : [...props.value]}
+        onChange={change}
+      >
+        {props.options.map((option) => (
+          <option key={option.id} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  },
+}));
 vi.mock("./conversation-picker-field", () => ({
   SenderSelectionFields: () => null,
   ConversationSelectionFields: function TestConversations(props: {

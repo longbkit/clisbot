@@ -16,19 +16,30 @@ import { splitConversationIds } from "../conversation-picker";
 import {
   AUDIENCE_ROLE_LABELS,
   audienceRuleSentence,
+  audienceWhereLabel,
+  audienceWhoLabel,
   channelReportsVisibility,
   emptyAudienceRule,
+  hasWherePart,
+  hasWhoPart,
   visibilityFilterMatchesNothing,
   type AudienceGroups,
   type AudienceNames,
   type AudienceRuleDraft,
 } from "./channel-route-audience";
 import { ConversationSelectionFields, SenderSelectionFields } from "./conversation-picker-field";
+import {
+  DisclosureRow,
+  OptionChips,
+  PickerRow,
+  ToggleChip,
+  toggled,
+  type AudienceOption,
+} from "./channel-route-audience-controls";
+import { MultiSelectField, type MultiSelection } from "./multi-select-field";
+import type { SelectFieldOption } from "@/components/ui/select-field";
 
-export interface AudienceOption {
-  id: string;
-  name: string;
-}
+export type { AudienceOption };
 
 export interface AudienceRulesEditorProps {
   rules: AudienceRuleDraft[];
@@ -65,9 +76,19 @@ export function AudienceRulesEditor({
   errors,
   disabled,
 }: AudienceRulesEditorProps) {
-  const addRule = useCallback(
-    () => setRules((current) => [...current, emptyAudienceRule()]),
-    [setRules],
+  // One rule open at a time, so the one being configured has the focus. A lone
+  // rule starts open; a new rule opens and folds the others to their summary.
+  const [openRuleId, setOpenRuleId] = useState<string | null>(() =>
+    rules.length === 1 ? (rules[0]?.id ?? null) : null,
+  );
+  const addRule = useCallback(() => {
+    const rule = emptyAudienceRule();
+    setRules((current) => [...current, rule]);
+    setOpenRuleId(rule.id);
+  }, [setRules]);
+  const toggleRule = useCallback(
+    (id: string) => setOpenRuleId((current) => (current === id ? null : id)),
+    [],
   );
   const updateRule = useCallback(
     (index: number, update: (rule: AudienceRuleDraft) => AudienceRuleDraft) =>
@@ -104,6 +125,8 @@ export function AudienceRulesEditor({
           place={place}
           names={names}
           error={errors.get(index) ?? null}
+          open={openRuleId === rule.id}
+          toggle={toggleRule}
           removable={rules.length > 1}
           disabled={disabled}
           update={updateRule}
@@ -140,6 +163,8 @@ function AudienceRuleRow({
   place,
   names,
   error,
+  open,
+  toggle,
   removable,
   disabled,
   update,
@@ -152,11 +177,14 @@ function AudienceRuleRow({
   place: AudiencePlace;
   names: AudienceNames;
   error: string | null;
+  open: boolean;
+  toggle(id: string): void;
   removable: boolean;
   disabled: boolean;
   update(index: number, update: (rule: AudienceRuleDraft) => AudienceRuleDraft): void;
   remove(index: number): void;
 }) {
+  const toggleOpen = useCallback(() => toggle(rule.id), [rule.id, toggle]);
   const setWho = useCallback(
     (patch: Partial<AudienceRuleDraft["who"]>) =>
       update(index, (current) => ({ ...current, who: { ...current.who, ...patch } })),
@@ -169,40 +197,79 @@ function AudienceRuleRow({
   );
   const removeRow = useCallback(() => remove(index), [index, remove]);
   const label = `Rule ${String(index + 1)}`;
+  const state = useMemo(() => ({ expanded: open }), [open]);
   return (
     <View style={styles.rule} accessibilityLabel={label}>
       <View style={styles.ruleHeader}>
-        <View style={styles.ruleHeading}>
-          <Text style={styles.ruleTitle}>{label}</Text>
-          <Text style={settingsStyles.rowHint}>{audienceRuleSentence(rule, names)}</Text>
-        </View>
-        {removable ? (
+        <Text style={styles.ruleTitle}>{label}</Text>
+        <View style={styles.actions}>
           <Button
             size="xs"
             variant="ghost"
-            disabled={disabled}
-            onPress={removeRow}
-            accessibilityLabel={`Remove ${label}`}
+            onPress={toggleOpen}
+            accessibilityState={state}
+            accessibilityLabel={`${open ? "Collapse" : "Edit"} ${label}`}
           >
-            Remove
+            {open ? "Done" : "Edit"}
           </Button>
-        ) : null}
+          {removable ? (
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={disabled}
+              onPress={removeRow}
+              accessibilityLabel={`Remove ${label}`}
+            >
+              Remove
+            </Button>
+          ) : null}
+        </View>
       </View>
-      <AudienceWhoFields
-        who={rule.who}
-        teams={teams}
-        members={members}
-        place={place}
-        disabled={disabled}
-        setWho={setWho}
-      />
-      <AudienceWhereFields
-        where={rule.where}
-        place={place}
-        disabled={disabled}
-        setWhere={setWhere}
-      />
+      {open ? (
+        <>
+          <Text style={settingsStyles.rowHint}>{audienceRuleSentence(rule, names)}</Text>
+          <AudienceWhoFields
+            who={rule.who}
+            teams={teams}
+            members={members}
+            place={place}
+            disabled={disabled}
+            setWho={setWho}
+          />
+          <AudienceWhereFields
+            where={rule.where}
+            place={place}
+            disabled={disabled}
+            setWhere={setWhere}
+          />
+        </>
+      ) : (
+        <AudienceRuleSummary rule={rule} names={names} />
+      )}
       {error === null ? null : <Text style={styles.errorText}>{error}</Text>}
+    </View>
+  );
+}
+
+/** A folded rule: the same Who and Where, one line each. */
+function AudienceRuleSummary({ rule, names }: { rule: AudienceRuleDraft; names: AudienceNames }) {
+  const complete = hasWhoPart(rule.who) && hasWherePart(rule.where);
+  return (
+    <View style={styles.summary}>
+      <SummaryLine label="Who" value={audienceWhoLabel(rule.who, names)} />
+      <SummaryLine label="Where" value={audienceWhereLabel(rule.where, names)} />
+      {complete ? null : (
+        <Text style={styles.errorText}>Choose both a Who and a Where to save.</Text>
+      )}
+    </View>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.summaryLine}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
 }
@@ -267,7 +334,34 @@ function AudienceWhoFields({
   );
 }
 
-/** The people a rule names: by role, Team, Member, or a sender outside the Hub. */
+const TEAM_PREFIX = "team:";
+const MEMBER_PREFIX = "member:";
+
+/** Teams, then Members, in one list: the same picker Access uses for a grant. */
+function teamAndMemberOptions(
+  teams: readonly AudienceOption[],
+  members: readonly AudienceOption[],
+): SelectFieldOption<string>[] {
+  return [
+    ...teams.map((team) => ({
+      id: `${TEAM_PREFIX}${team.id}`,
+      value: `${TEAM_PREFIX}${team.id}`,
+      label: team.name,
+      group: "Teams",
+    })),
+    ...members.map((member) => ({
+      id: `${MEMBER_PREFIX}${member.id}`,
+      value: `${MEMBER_PREFIX}${member.id}`,
+      label: member.name,
+      group: "Members",
+    })),
+  ];
+}
+
+/**
+ * The people a rule names: by role, by Team or Member, or by their channel id
+ * when they have no Hub account to match on.
+ */
 function AudiencePeopleFields({
   who,
   teams,
@@ -287,13 +381,27 @@ function AudiencePeopleFields({
     (role: string) => setWho({ roles: toggled(who.roles, role as HubAudienceRole) }),
     [setWho, who.roles],
   );
-  const toggleTeam = useCallback(
-    (id: string) => setWho({ teams: toggled(who.teams, id) }),
-    [setWho, who.teams],
+  const peopleOptions = useMemo(() => teamAndMemberOptions(teams, members), [members, teams]);
+  const people = useMemo(
+    () => [
+      ...who.teams.map((id) => `${TEAM_PREFIX}${id}`),
+      ...who.members.map((id) => `${MEMBER_PREFIX}${id}`),
+    ],
+    [who.members, who.teams],
   );
-  const toggleMember = useCallback(
-    (id: string) => setWho({ members: toggled(who.members, id) }),
-    [setWho, who.members],
+  const changePeople = useCallback(
+    (value: MultiSelection) => {
+      const ids = value === "*" ? [] : value;
+      setWho({
+        teams: ids
+          .filter((id) => id.startsWith(TEAM_PREFIX))
+          .map((id) => id.slice(TEAM_PREFIX.length)),
+        members: ids
+          .filter((id) => id.startsWith(MEMBER_PREFIX))
+          .map((id) => id.slice(MEMBER_PREFIX.length)),
+      });
+    },
+    [setWho],
   );
   const changeIdentities = useCallback((identities: string) => setWho({ identities }), [setWho]);
   const roleOptions = useMemo(
@@ -311,28 +419,17 @@ function AudiencePeopleFields({
           empty=""
         />
       </PickerRow>
-      {teams.length === 0 ? null : (
-        <DisclosureRow label="Teams" count={who.teams.length} disabled={disabled}>
-          <OptionChips
-            options={teams}
-            selected={who.teams}
-            disabled={disabled}
-            onToggle={toggleTeam}
-            empty="No Teams yet."
-          />
-        </DisclosureRow>
-      )}
-      <DisclosureRow label="Specific Members" count={who.members.length} disabled={disabled}>
-        <OptionChips
-          options={members}
-          selected={who.members}
-          disabled={disabled}
-          onToggle={toggleMember}
-          empty="No Members yet."
-        />
-      </DisclosureRow>
+      <MultiSelectField
+        label="Teams and Members"
+        options={peopleOptions}
+        value={people}
+        onChange={changePeople}
+        disabled={disabled}
+        placeholder="Choose Teams or Members"
+        searchPlaceholder="Search Teams and Members"
+      />
       <DisclosureRow
-        label="Senders outside the Hub"
+        label={`${place.channelName} users without a Hub account`}
         count={splitConversationIds(who.identities).length}
         disabled={disabled}
       >
@@ -439,113 +536,6 @@ function AudienceWhereFields({
   );
 }
 
-/** A labelled row whose control sits under the label. */
-function PickerRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.part}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-/** A labelled row folded to its count; it opens on its own when it holds a value. */
-function DisclosureRow({
-  label,
-  count,
-  disabled,
-  children,
-}: {
-  label: string;
-  count: number;
-  disabled: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(count > 0);
-  const toggle = useCallback(() => setOpen((value) => !value), []);
-  const state = useMemo(() => ({ expanded: open }), [open]);
-  return (
-    <View style={styles.part}>
-      <View style={styles.disclosureHeader}>
-        <Text style={styles.rowLabel}>{count > 0 ? `${label} (${String(count)})` : label}</Text>
-        <Button
-          size="xs"
-          variant="ghost"
-          disabled={disabled}
-          onPress={toggle}
-          accessibilityState={state}
-          accessibilityLabel={`${open ? "Hide" : "Choose"} ${label}`}
-        >
-          {open ? "Hide" : "Choose"}
-        </Button>
-      </View>
-      {open ? children : null}
-    </View>
-  );
-}
-
-function OptionChips({
-  options,
-  selected,
-  disabled,
-  onToggle,
-  empty,
-}: {
-  options: readonly AudienceOption[];
-  selected: readonly string[];
-  disabled: boolean;
-  onToggle(id: string): void;
-  empty: string;
-}) {
-  if (options.length === 0) return <Text style={settingsStyles.rowHint}>{empty}</Text>;
-  return (
-    <View style={styles.chips}>
-      {options.map((option) => (
-        <ToggleChip
-          key={option.id}
-          value={option.id}
-          label={option.name}
-          selected={selected.includes(option.id)}
-          disabled={disabled}
-          onToggle={onToggle}
-        />
-      ))}
-    </View>
-  );
-}
-
-function ToggleChip({
-  value,
-  label,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  value: string;
-  label: string;
-  selected: boolean;
-  disabled: boolean;
-  onToggle(value: string): void;
-}) {
-  const press = useCallback(() => onToggle(value), [onToggle, value]);
-  const state = useMemo(() => ({ selected }), [selected]);
-  return (
-    <Button
-      size="xs"
-      variant={selected ? "secondary" : "outline"}
-      disabled={disabled}
-      onPress={press}
-      accessibilityState={state}
-    >
-      {label}
-    </Button>
-  );
-}
-
-function toggled<T>(list: readonly T[], value: T): T[] {
-  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
-}
-
 const styles = StyleSheet.create((theme) => ({
   editor: { gap: theme.spacing[3] },
   rule: {
@@ -556,21 +546,23 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
   },
   ruleHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  ruleHeading: { flex: 1, gap: theme.spacing[1] },
-  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
-  disclosureHeader: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  rowLabel: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
+  summary: { gap: theme.spacing[1] },
+  summaryLine: { flexDirection: "row", gap: theme.spacing[3] },
+  summaryLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    width: 56,
   },
+  summaryValue: {
+    color: theme.colors.foreground,
+    flex: 1,
+    fontSize: theme.fontSize.sm,
+  },
+  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
   ruleTitle: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,

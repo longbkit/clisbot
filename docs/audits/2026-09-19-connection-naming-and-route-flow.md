@@ -72,10 +72,14 @@ Auto-accept:
   provider options); Replies (thread, reply method, what is sent); Limits,
   folded. Folded parts open on their own when they hold a value. Section
   explanations are header info tips, per `docs/design.md`.
-- **An audience rule reads as its sentence, then Who, then Where.** Who is one
-  choice first: people you choose (rows for Roles, Teams, Specific Members,
-  Senders outside the Hub) or Anyone in the conversation, which covers everyone
-  and so hides the people rows and saves alone. Where is three places of one
+- **An audience rule reads as its sentence, then Who, then Where.** Rules
+  fold like an accordion: one is open at a time, a lone rule starts open, and
+  Add rule opens the new one and folds the rest to the same Who / Where lines.
+  Who is one choice first: people you choose (Roles as chips, one searchable
+  multi-select for Teams and Members, the same shape Access uses, and
+  "<Channel> users without a Hub account" for channel ids) or Anyone in the
+  conversation, which covers everyone and so hides the people rows and saves
+  alone. Where is three places of one
   kind: Direct messages, Group chats (public/private filter), Specific
   conversations. The combined by-place summary under the rules is gone: it
   restated the rule sentences, and it showed raw conversation ids because the

@@ -56,7 +56,7 @@ const CONVERSATION_LABELS: IdPickerLabels = {
 const SENDER_LABELS: IdPickerLabels = {
   choose: "Choose people who messaged the bot",
   search: "Search by name, username or ID",
-  empty: "Nobody outside the Hub matches this search.",
+  empty: "Nobody without a Hub account matches this search.",
   none: "No senders selected.",
   manualField: "Sender IDs",
   manualHint:
@@ -187,7 +187,7 @@ export function SenderSelectionFields({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      hint="People outside the Hub, picked from those who already messaged this bot."
+      hint="People who message this bot but have no Hub account (or have not linked this channel to it), matched by their channel user id. Picked from those who already messaged the bot."
       placeholder="U0ALICE, U0BOB"
     />
   );

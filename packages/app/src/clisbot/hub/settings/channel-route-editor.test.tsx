@@ -161,6 +161,36 @@ vi.mock("@/components/ui/switch", () => ({
     );
   },
 }));
+vi.mock("./multi-select-field", () => ({
+  MultiSelectField: function TestMultiSelectField(props: {
+    label: string;
+    disabled?: boolean;
+    options: { id: string; value: string; label: string }[];
+    value: "*" | readonly string[] | null;
+    onChange(value: "*" | readonly string[]): void;
+  }) {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLSelectElement>) =>
+        props.onChange([...event.target.selectedOptions].map((option) => option.value)),
+      [props],
+    );
+    return (
+      <select
+        multiple
+        aria-label={props.label}
+        disabled={props.disabled}
+        value={props.value === "*" || props.value === null ? [] : [...props.value]}
+        onChange={change}
+      >
+        {props.options.map((option) => (
+          <option key={option.id} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  },
+}));
 vi.mock("./conversation-picker-field", () => ({
   SenderSelectionFields: () => null,
   ConversationSelectionFields: function TestConversations(props: {
@@ -494,22 +524,56 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
-    expect(screen.getAllByText("Roles")).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole("button", { name: "Anyone in the conversation" })[1]!);
+    // The new rule is the one open; the first folded to its summary.
+    expect(screen.getAllByText("Roles")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Anyone in the conversation" }));
     expect(
       screen.getByText("Anyone in the matching conversations can use this Route"),
     ).toBeTruthy();
     // Anyone covers everyone, so that rule no longer offers people to pick.
-    expect(screen.getAllByText("Roles")).toHaveLength(1);
-    fireEvent.click(screen.getAllByLabelText("Direct messages")[1]!);
+    expect(screen.queryByText("Roles")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Direct messages"));
     expect(screen.getByText("Anyone may talk in DMs")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+    // Adding a rule folded the first one to its Who and Where; editing it again
+    // folds the new one the same way.
+    expect(screen.getAllByText("Who")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Edit Rule 1" }));
+    expect(screen.getByText("Anyone")).toBeTruthy();
+    expect(screen.getByText("DMs")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Remove Rule 2" }));
     expect(screen.queryByText("Anyone may talk in DMs")).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove Rule 1" })).toBeNull();
     expect(adapters.put).not.toHaveBeenCalled();
+  });
+
+  it("picks Teams and Members from one list and saves each to its own list", async () => {
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "teams"
+        ? {
+            teams: [
+              {
+                id: "team-qc",
+                name: "QC",
+                createdAt: "2026-09-01T00:00:00Z",
+              },
+            ],
+          }
+        : data[resource],
+    );
+    await openEditor();
+    const people = screen.getByLabelText("Teams and Members") as HTMLSelectElement;
+    expect(Array.from(people.options, ({ value }) => value)).toEqual(["team:team-qc"]);
+    people.options[0]!.selected = true;
+    fireEvent.change(people);
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].audience[0].who).toEqual({
+      roles: ["member"],
+      teams: ["team-qc"],
+    });
   });
 
   it("lands the Hub's rule-level refusal on the rule it names", async () => {
