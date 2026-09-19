@@ -21,6 +21,7 @@ import type {
 import {
   invitationRoleSchema,
   organizationRoleSchema,
+  type InvitationRole,
   type OrganizationCapabilities,
   type OrganizationRole,
 } from "./organization-contract.js";
@@ -40,6 +41,7 @@ import { EntitlementDenied } from "../entitlements/catalog.js";
 import { entitlementDenialResponse } from "../entitlements/denial.js";
 import type { EntitlementsService } from "../entitlements/service.js";
 import type { InvitationMailer } from "../invitations/index.js";
+import { AccessStore } from "../access/store.js";
 
 const INVITATION_LIFETIME_HOURS = 48;
 
@@ -143,6 +145,8 @@ interface InvitationRow extends QueryRow {
   role: string;
   teams: InvitationTeam[];
   expires_at: Date;
+  /** Only selected by the manager listing. */
+  created_at?: Date;
 }
 
 interface InvitationTeam {
@@ -534,10 +538,10 @@ export class OrganizationAccess {
       );
       await lockOrganizationMembers(client, access.organization.id);
       const actorRole = await currentActorRole(client, access);
-      if (!capabilitiesFor(actorRole).manageMembers) {
-        throw new ProductRequestError(403, "forbidden");
-      }
       const teamIds = invitedTeamIds(input);
+      if (!capabilitiesFor(actorRole).manageMembers) {
+        await this.requireTeamAdminInvitation(client, access, input.role, teamIds);
+      }
       await requireOrganizationTeams(client, access.organization.id, teamIds);
       const existingMember = await client.query(
         `select 1 from member
@@ -622,6 +626,30 @@ export class OrganizationAccess {
     return Response.json(summary, {
       status: 201,
     });
+  }
+
+  /**
+   * A Team Admin (`hub.access.manage` on the Team, docs/features/access/scoped-admins.md)
+   * invites Members into their own Teams only: the role stays `member` and every
+   * Team named must be one they administer.
+   */
+  private async requireTeamAdminInvitation(
+    client: TransactionHandle,
+    access: OrganizationAccessValue,
+    role: InvitationRole,
+    teamIds: readonly string[],
+  ): Promise<void> {
+    if (role !== "member" || teamIds.length === 0) {
+      throw new ProductRequestError(403, "forbidden");
+    }
+    const administered = await new AccessStore(this.options.pool).listTeamsAdministeredBy(
+      access.organization.id,
+      { membershipId: access.membership.id, userId: access.account.id },
+      client.drizzle(),
+    );
+    if (teamIds.some((teamId) => !administered.includes(teamId))) {
+      throw new ProductRequestError(403, "forbidden");
+    }
   }
 
   private async cancelInvitation(request: Request): Promise<Response> {
@@ -882,7 +910,7 @@ export class OrganizationAccess {
       `select invitation.id, invitation.organization_id,
               organization.name as organization_name, "user".name as inviter_name,
               invitation.email, invitation.role, ${INVITATION_TEAMS_COLUMN},
-              invitation.expires_at
+              invitation.expires_at, invitation.created_at
        from invitation
        join organization on organization.id = invitation.organization_id
        join "user" on "user".id = invitation.inviter_id
@@ -1013,6 +1041,9 @@ function managerInvitationSummary(invitation: InvitationRow, baseURL: string) {
     email: invitation.email,
     role,
     expiresAt: invitation.expires_at.toISOString(),
+    ...(invitation.created_at === undefined
+      ? {}
+      : { createdAt: invitation.created_at.toISOString() }),
     link: new URL(`/?invitation=${encodeURIComponent(invitation.id)}`, baseURL).toString(),
     ...invitationTeamsSummary(invitation.teams),
   };

@@ -13,15 +13,16 @@ const adapters = vi.hoisted(() => ({
   confirm: vi.fn(),
   push: vi.fn(),
   params: { subjectKind: "member", subjectId: "membership" },
+  session: {
+    account: { id: "owner" },
+    organization: { id: "org" },
+    capabilities: { manageResources: true },
+  },
 }));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     origin: "https://hub.example.test",
-    signedIn: {
-      account: { id: "owner" },
-      organization: { id: "org" },
-      capabilities: { manageResources: true },
-    },
+    signedIn: adapters.session,
     api: () => ({
       get: adapters.get,
       post: adapters.post,
@@ -38,6 +39,7 @@ vi.mock("@/components/ui/switch", () => ({
   Switch: function TestSwitch(props: {
     value: boolean;
     disabled?: boolean;
+    accessibilityLabel?: string;
     onValueChange(value: boolean): void;
   }) {
     const change = React.useCallback(
@@ -46,7 +48,7 @@ vi.mock("@/components/ui/switch", () => ({
     );
     return (
       <input
-        aria-label="Use Fast mode"
+        aria-label={props.accessibilityLabel}
         type="checkbox"
         checked={props.value}
         disabled={props.disabled}
@@ -147,11 +149,14 @@ const assignment = {
   resourceId: "host",
   privileges: ["daemon.connect", "agent.fast.use", "custom.future"],
   constraints: { futureConstraint: { preserve: true } },
+  createdByUserId: "user",
   createdAt: "now",
   updatedAt: "now",
 };
 const resources = {
   "access-assignments": { assignments: [assignment] },
+  "access-assignments/effective": { owner: false, grants: [] },
+  "access-events": { events: [] },
   "access-catalog": {
     privileges: ["daemon.connect"],
     accessLevels: { daemon: { connect: ["daemon.connect"] } },
@@ -181,14 +186,23 @@ const resources = {
 };
 let queryClient: QueryClient;
 
+type ResourceName = keyof typeof resources;
+
+/** The app appends `?include=team` and `?limit=`; the fixtures are keyed by bare path. */
+function resourceOf(resource: string): ResourceName {
+  const [name] = resource.split("?");
+  return name as ResourceName;
+}
+
 beforeEach(() => {
   vi.stubGlobal("React", React);
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  adapters.session.capabilities.manageResources = true;
   adapters.get
     .mockReset()
-    .mockImplementation(async (resource: keyof typeof resources) => resources[resource]);
+    .mockImplementation(async (resource: string) => resources[resourceOf(resource)]);
   adapters.post.mockReset().mockResolvedValue(assignment);
   adapters.remove.mockReset();
   adapters.confirm.mockReset().mockResolvedValue(true);
@@ -304,7 +318,8 @@ describe("Access assignment editing", () => {
         conversation: { kind: "specific", conversationIds: ["C1"] },
       },
     };
-    adapters.get.mockImplementation(async (resource: keyof typeof resources) => {
+    adapters.get.mockImplementation(async (path: string) => {
+      const resource = resourceOf(path);
       if (resource === "access-assignments") return { assignments: [channelAssignment] };
       if (resource === "access-catalog")
         return {
@@ -370,7 +385,7 @@ describe("Access assignment editing", () => {
     expect(adapters.remove).not.toHaveBeenCalled();
   });
 
-  it("saves a Project edit atomically with the existing parent Host grant and grouped Agent constraints", async () => {
+  it("saves a Project edit alone when the parent Host already holds Connect, keeping grouped Agent constraints", async () => {
     const constraints = {
       agentConfigurations: [
         { providerId: "codex", modelIds: ["m1", "m2"], thinkingOptionIds: "*" },
@@ -393,7 +408,8 @@ describe("Access assignment editing", () => {
       label: id,
       thinkingOptions: [],
     }));
-    adapters.get.mockImplementation(async (resource: keyof typeof resources) => {
+    adapters.get.mockImplementation(async (path: string) => {
+      const resource = resourceOf(path);
       if (resource === "access-assignments")
         return { assignments: [projectAssignment, parentAssignment] };
       if (resource === "access-catalog")
@@ -425,30 +441,50 @@ describe("Access assignment editing", () => {
     fireEvent.click((await screen.findAllByRole("button", { name: "Edit" }))[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    // The Host row is left alone: a Project sharer who cannot share the Host must not rewrite it.
     expect(adapters.post.mock.calls[0]?.slice(0, 2)).toEqual([
-      "access-assignments/batch",
+      "access-assignments",
       {
-        assignments: [
-          {
-            subjectKind: "member",
-            subjectId: "membership",
-            resourceKind: "daemon",
-            resourceId: "host",
-            privileges: parentAssignment.privileges,
-            constraints: parentAssignment.constraints,
-          },
-          {
-            subjectKind: "member",
-            subjectId: "membership",
-            resourceKind: "project",
-            resourceId: "project",
-            privileges: projectAssignment.privileges,
-            constraints,
-          },
-        ],
+        subjectKind: "member",
+        subjectId: "membership",
+        resourceKind: "project",
+        resourceId: "project",
+        privileges: projectAssignment.privileges,
+        constraints,
       },
     ]);
     expect(adapters.remove).not.toHaveBeenCalled();
+  });
+
+  it("reads the catalog, assignments, and effective access with Team resources included", async () => {
+    renderAccess();
+    await screen.findByRole("button", { name: "Edit" });
+    const paths = adapters.get.mock.calls.map(([path]) => path as string);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "access-catalog?include=team",
+        "access-assignments?include=team",
+        "access-assignments/effective?include=team",
+      ]),
+    );
+  });
+
+  it("shows who made each grant, falling back to Hub for rows without an author", async () => {
+    adapters.get.mockImplementation(async (path: string) => {
+      const resource = resourceOf(path);
+      if (resource === "access-assignments")
+        return {
+          assignments: [
+            assignment,
+            // Different privileges keep it out of the first row's group.
+            { ...assignment, id: "by-hub", privileges: ["daemon.connect"], createdByUserId: null },
+          ],
+        };
+      return resources[resource];
+    });
+    renderAccess();
+    expect(await screen.findByText(/· by Member One$/)).toBeTruthy();
+    expect(screen.getByText(/· by Hub$/)).toBeTruthy();
   });
 });
 
@@ -472,7 +508,8 @@ describe("Access granted to more than one Resource at a time", () => {
     hostCatalog?: unknown,
     existingAssignments: unknown[] = [],
   ) {
-    adapters.get.mockImplementation(async (resource: keyof typeof resources) => {
+    adapters.get.mockImplementation(async (path: string) => {
+      const resource = resourceOf(path);
       if (resource === "access-assignments") return { assignments: existingAssignments };
       if (resource === "access-catalog")
         return {
@@ -728,5 +765,228 @@ describe("Access picker catalog", () => {
     expect(
       assignmentResourceOptions(catalogResources, true).map((option) => option.value),
     ).not.toContain("project\0p2");
+  });
+});
+
+describe("Can share and grant-at-most-what-you-hold", () => {
+  const OFFICE_WORKER = ["project.use", "agent.interact", "agent.create", "approval.file"];
+  const DEVELOPER = [...OFFICE_WORKER, "terminal.use"];
+  const levels = {
+    daemon: {
+      connect: ["daemon.connect"],
+      office_worker: ["daemon.connect", ...OFFICE_WORKER],
+      developer: ["daemon.connect", ...DEVELOPER],
+      full_access: ["daemon.connect", ...DEVELOPER, "workspace.manage", "hub.access.manage"],
+      administrator: ["daemon.connect", "daemon.manage", "hub.access.manage"],
+    },
+    project: { office_worker: OFFICE_WORKER, developer: DEVELOPER },
+    team: { admin: ["hub.access.manage"] },
+  };
+  const catalog = {
+    providers: [
+      { id: "codex", label: "Codex", models: [{ id: "m1", label: "M1", thinkingOptions: [] }] },
+    ],
+  };
+  const project = {
+    kind: "project",
+    id: "project",
+    name: "Project",
+    available: true,
+    parent: { kind: "daemon", id: "host" },
+    agentConfigurationCatalog: catalog,
+  };
+  const team = { kind: "team", id: "team", name: "QC", parent: null, available: true };
+
+  function mockHub(input: {
+    assignments?: unknown[];
+    effective?: unknown;
+    resources?: unknown[];
+    teams?: unknown[];
+  }) {
+    adapters.get.mockImplementation(async (path: string) => {
+      const resource = resourceOf(path);
+      if (resource === "access-assignments") return { assignments: input.assignments ?? [] };
+      if (resource === "teams") return { teams: input.teams ?? [] };
+      if (resource === "access-assignments/effective")
+        return input.effective ?? { owner: false, grants: [] };
+      if (resource === "access-catalog")
+        return {
+          privileges: [],
+          accessLevels: levels,
+          resources: [
+            { ...resources["access-catalog"].resources[0], agentConfigurationCatalog: catalog },
+            ...(input.resources ?? [project, team]),
+          ],
+        };
+      return resources[resource];
+    });
+  }
+
+  function chooseModels(values: string[]) {
+    const select = screen.getByLabelText("Models") as HTMLSelectElement;
+    for (const option of select.options) option.selected = values.includes(option.value);
+    fireEvent.change(select);
+  }
+
+  it("locks Can share on for Full access, hides it for Connect, and offers it for Developer", async () => {
+    mockHub({});
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
+    expect(screen.queryByLabelText("Can share")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "full_access" } });
+    const locked = screen.getByLabelText("Can share") as HTMLInputElement;
+    expect(locked.checked).toBe(true);
+    expect(locked.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    const optional = screen.getByLabelText("Can share") as HTMLInputElement;
+    expect(optional.checked).toBe(false);
+    expect(optional.disabled).toBe(false);
+    expect(
+      screen.getByText("Add, change, or remove people on this Host, up to their own level."),
+    ).toBeTruthy();
+  });
+
+  it("writes Can share into a Developer grant when switched on", async () => {
+    mockHub({});
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.click(screen.getByLabelText("Can share"));
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseModels(["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      privileges: ["daemon.connect", ...DEVELOPER, "hub.access.manage"],
+    });
+  });
+
+  it("asks before Administrator is selected and keeps the previous level on cancel", async () => {
+    mockHub({});
+    adapters.confirm.mockResolvedValue(false);
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "administrator" } });
+    await waitFor(() => expect(adapters.confirm).toHaveBeenCalledTimes(1));
+    const { message } = adapters.confirm.mock.calls[0]![0] as { message: string };
+    expect(message).toContain("This person will control the daemon");
+    expect(message).toContain("Organization Admins will be notified");
+    expect((screen.getByLabelText("Access level") as HTMLSelectElement).value).toBe("developer");
+    adapters.confirm.mockResolvedValue(true);
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "administrator" } });
+    await waitFor(() =>
+      expect((screen.getByLabelText("Access level") as HTMLSelectElement).value).toBe(
+        "administrator",
+      ),
+    );
+  });
+
+  it("offers a Team only the Admin level and words it as Admin", async () => {
+    mockHub({});
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), { target: { value: "team\0team" } });
+    const level = screen.getByLabelText("Access level") as HTMLSelectElement;
+    expect([...level.options].map((option) => option.textContent)).toEqual(["Choose", "Admin"]);
+    expect(screen.queryByLabelText("Can share")).toBeNull();
+  });
+
+  it("limits a Member who can share to their own resources and level, and locks higher rows", async () => {
+    adapters.session.capabilities.manageResources = false;
+    const higher = {
+      ...assignment,
+      id: "higher",
+      resourceKind: "project",
+      resourceId: "project",
+      privileges: DEVELOPER,
+      createdByUserId: "user",
+    };
+    // Inherited through the Team, so both rows show under the same Member.
+    const lower = {
+      ...higher,
+      id: "lower",
+      privileges: OFFICE_WORKER,
+      subjectKind: "team",
+      subjectId: "team",
+    };
+    mockHub({
+      assignments: [higher, lower],
+      teams: [{ id: "team", name: "QC", userIds: ["user"], createdAt: "now", updatedAt: null }],
+      effective: {
+        owner: false,
+        grants: [
+          {
+            assignmentId: "own",
+            resource: project,
+            privileges: [...OFFICE_WORKER, "hub.access.manage"],
+            constraints: {},
+            source: { kind: "direct" },
+          },
+        ],
+      },
+    });
+    renderAccess();
+    await screen.findByText("You grant what you hold");
+    const resource = screen.getByLabelText("Resource") as HTMLSelectElement;
+    expect([...resource.options].map((option) => option.value)).toEqual(["", "project\0project"]);
+    fireEvent.change(resource, { target: { value: "project\0project" } });
+    const level = screen.getByLabelText("Access level") as HTMLSelectElement;
+    expect([...level.options].map((option) => option.value)).toEqual(["", "office_worker"]);
+    expect(screen.getByText("Above your own level, not offered: Developer")).toBeTruthy();
+    // The Developer row on the same Project is above the viewer: no Edit, no Remove.
+    expect(screen.getAllByText("Locked · above your level")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+  });
+
+  it("shows the Hub's refusal inline when a grant exceeds the viewer", async () => {
+    const { HubApiError } = await import("../api-client");
+    mockHub({});
+    adapters.post.mockRejectedValueOnce(
+      new HubApiError(
+        403,
+        "access_exceeds_grantor",
+        "You do not hold terminal.use on this resource.",
+      ),
+    );
+    renderAccess();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await screen.findByText("Above what you can grant");
+    expect(screen.getByText("You do not hold terminal.use on this resource.")).toBeTruthy();
+  });
+
+  it("opens the Access page for a Member with Team Admin only, and not for one with nothing", async () => {
+    adapters.session.capabilities.manageResources = false;
+    mockHub({
+      effective: {
+        owner: false,
+        grants: [
+          {
+            assignmentId: "team-admin",
+            resource: team,
+            privileges: ["hub.access.manage"],
+            constraints: {},
+            source: { kind: "direct" },
+          },
+        ],
+      },
+    });
+    const view = renderAccess();
+    await screen.findByText("You grant what you hold");
+    view.unmount();
+    mockHub({});
+    renderAccess();
+    await screen.findByText("Access is managed by your organization");
+    expect(screen.queryByText("You grant what you hold")).toBeNull();
   });
 });

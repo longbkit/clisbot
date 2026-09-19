@@ -4,87 +4,86 @@ import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FormTextInput } from "@/components/ui/form-field";
-import { settingsStyles } from "@/styles/settings";
+import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { AccessSummary, EMPTY_ACCESS_LEVELS, subjectAssignments } from "../access-summary";
-import { countLabel } from "../labels";
-import { InfoRow } from "../resource-rows";
-import { TeamMembersSection } from "../team-members-section";
-import type { HubTeam, TeamResources } from "./types";
+import { TeamMemberRows } from "./team-member-rows";
+import { TeamSettingsTab } from "./team-settings-tab";
+import type { HubAccount, HubTeam, TeamResources } from "./types";
+import { useTeamAdminAction } from "./use-people-actions";
 import type { TeamActions } from "./use-team-actions";
 
+type TeamView = "members" | "access" | "settings";
+const TEAM_VIEWS: SegmentedControlOption<TeamView>[] = [
+  { value: "members", label: "Members" },
+  { value: "access", label: "Access" },
+  { value: "settings", label: "Settings" },
+];
+
 export function SelectedTeamDetail({
+  hub,
   team,
   resources,
   actions,
   back,
   manageAccess,
   addPeople,
-  canManage,
   canInvite,
 }: {
+  hub: HubAccount;
   team: HubTeam;
   resources: TeamResources;
   actions: TeamActions;
   back(): void;
   manageAccess(): void;
-  addPeople(teamIds: string[]): void;
-  canManage: boolean;
+  addPeople(team: HubTeam): void;
   /** Invitations need both Team management and Member management. */
   canInvite: boolean;
 }) {
+  const [view, setView] = useState<TeamView>("members");
   const { pending, mutationError } = actions;
+  const canManage = resources.canManageResources;
+  const teamAdmin = useTeamAdminAction(hub, resources, actions.run);
+  const removeMember = useCallback(
+    (userId: string) => actions.removeTeamMember(team.id, userId),
+    [actions, team.id],
+  );
+  const invite = useCallback(() => addPeople(team), [addPeople, team]);
   const assignments = subjectAssignments(
     resources.assignments.data?.assignments ?? [],
     "team",
     team.id,
   );
-  const addMembers = useCallback(
-    (userIds: string[]) => actions.addTeamMembers(team.id, userIds),
-    [actions, team.id],
-  );
-  const removeMember = useCallback(
-    (userId: string) => actions.removeTeamMember(team.id, userId),
-    [actions, team.id],
-  );
-  const remove = useCallback(async () => {
-    if (await actions.removeTeam(team.id, team.name)) back();
-  }, [actions, back, team.id, team.name]);
-  const removeTeam = useCallback(() => void remove(), [remove]);
-  const invite = useCallback(() => addPeople([team.id]), [addPeople, team.id]);
   return (
     <View>
       <SettingsSection title={team.name}>
         <View style={styles.actions}>
           <Button size="xs" variant="outline" disabled={pending} onPress={back}>
-            Back to Teams
+            Back to People
           </Button>
           {canInvite ? (
             <Button size="xs" variant="outline" disabled={pending} onPress={invite}>
-              Add people to this Team
+              Add people
             </Button>
           ) : null}
         </View>
         {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-        <View style={settingsStyles.card}>
-          <InfoRow
-            title={countLabel(team.userIds.length, "Member")}
-            hint={
-              canManage ? countLabel(assignments.length, "access assignment") : "Team membership"
-            }
-          />
-        </View>
-        {canManage ? <RenameTeam team={team} actions={actions} /> : null}
+        {canManage ? (
+          <SegmentedControl options={TEAM_VIEWS} value={view} onValueChange={setView} size="sm" />
+        ) : null}
       </SettingsSection>
-      <TeamMembersSection
-        teamUserIds={team.userIds}
-        members={resources.members.data?.members ?? []}
-        pending={pending}
-        canManage={canManage}
-        addMembers={addMembers}
-        removeMember={removeMember}
-      />
-      {canManage ? (
+      {view === "members" ? (
+        <SettingsSection title="Members">
+          <TeamMemberRows
+            team={team}
+            resources={resources}
+            pending={pending}
+            canManage={canManage}
+            teamAdmin={teamAdmin}
+            removeMember={removeMember}
+          />
+        </SettingsSection>
+      ) : null}
+      {view === "access" && canManage ? (
         <SettingsSection title="Access">
           <AccessSummary
             entries={assignments.map((assignment) => ({ assignment, source: team.name }))}
@@ -97,52 +96,13 @@ export function SelectedTeamDetail({
           </Button>
         </SettingsSection>
       ) : null}
-      {canManage ? (
-        <SettingsSection title="Danger zone">
-          <Button variant="destructive" disabled={pending} onPress={removeTeam}>
-            Delete Team
-          </Button>
-        </SettingsSection>
+      {view === "settings" && canManage ? (
+        <TeamSettingsTab team={team} actions={actions} onDeleted={back} />
       ) : null}
     </View>
   );
 }
 
-function RenameTeam({ team, actions }: { team: HubTeam; actions: TeamActions }) {
-  const [name, setName] = useState(team.name);
-  const rename = useCallback(
-    () => void actions.renameTeam(team.id, name.trim()),
-    [actions, name, team.id],
-  );
-  return (
-    <View style={[settingsStyles.card, styles.form]}>
-      <Field label="Team name">
-        <FormTextInput
-          key={team.id}
-          initialValue={team.name}
-          onChangeText={setName}
-          editable={!actions.pending}
-        />
-      </Field>
-      <Button
-        variant="outline"
-        disabled={actions.pending || name.trim().length === 0 || name.trim() === team.name}
-        onPress={rename}
-      >
-        Rename Team
-      </Button>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
-  form: {
-    padding: theme.spacing[4],
-    gap: theme.spacing[3],
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[2],
-  },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
 }));

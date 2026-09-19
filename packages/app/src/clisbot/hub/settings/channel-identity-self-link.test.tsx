@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubSettingsContent } from "./screen";
 import { HubSettingsDetailScrollProvider } from "./detail-scroll";
-import { ChannelIdentitySelfLinkSettings } from "./channel-identity-settings";
+import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
 
 const fixture = vi.hoisted(() => ({
   connectionId: "slack-connection",
@@ -49,6 +49,16 @@ vi.mock("./access-settings", () => ({ AccessSettings: () => null }));
 vi.mock("./api-key-settings", () => ({ ApiKeySettings: () => null }));
 vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings: () => null }));
 vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
+// People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
+vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
+// Account's own chat-account list has its browser test; here only its entry to the flow matters.
+vi.mock("./channel-identities-section", () => ({
+  ChannelIdentitiesSection: ({ onManage }: { onManage(): void }) => (
+    <button type="button" onClick={onManage}>
+      Manage chat accounts
+    </button>
+  ),
+}));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -213,7 +223,7 @@ describe("Channel identity recovery", () => {
       const ui = render(accountView());
       if (!connectionId) {
         expect(fixture.get).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole("button", { name: "Manage identities" }));
+        fireEvent.click(screen.getByRole("button", { name: "Manage chat accounts" }));
       }
       await screen.findByRole("option", { name: "Slack · Support workspace" });
       const select = screen.getByLabelText("Where you chat") as HTMLSelectElement;
@@ -231,7 +241,7 @@ describe("Channel identity recovery", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "Back to Account" }));
       ui.rerender(accountView());
-      expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Manage chat accounts" })).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Create link code" })).toBeNull();
       expect(fixture.scroll).toHaveBeenCalled();

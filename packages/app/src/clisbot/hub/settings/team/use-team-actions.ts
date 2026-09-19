@@ -8,7 +8,6 @@ export interface TeamActions {
   mutationError: string | null;
   setMutationError(value: string | null): void;
   run: HubRun;
-  createTeam(name: string): Promise<boolean>;
   addTeamMember(teamId: string, userId: string): Promise<void>;
   removeTeamMember(teamId: string, userId: string): void;
   addTeamMembers(teamId: string, userIds: string[]): Promise<string[]>;
@@ -48,14 +47,6 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
         .post(`teams/${encodeURIComponent(teamId)}/members`, { userId }, HubTeamMembershipSchema);
     },
     [hub],
-  );
-  const createTeam = useCallback(
-    (name: string) =>
-      run(async () => {
-        await hub.api().post("teams", { name }, HubTeamSchema);
-        await teams.refetch();
-      }),
-    [hub, run, teams],
   );
   const removeTeamMember = useCallback(
     (teamId: string, userId: string) =>
@@ -116,7 +107,6 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
   );
   return {
     ...runner,
-    createTeam,
     addTeamMember,
     removeTeamMember,
     addTeamMembers,

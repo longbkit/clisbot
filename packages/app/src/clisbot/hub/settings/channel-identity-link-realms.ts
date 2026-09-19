@@ -62,6 +62,28 @@ function linkRealms(
   });
 }
 
+/** One identity realm and the bots in it, named the way people know it. */
+export interface IdentityRealm {
+  key: string;
+  label: string;
+  connections: HubConnection[];
+}
+
+/** Every realm the organization's bots run in, whether or not a code can be issued there. */
+export function identityRealms(
+  connections: readonly HubConnection[],
+  catalog: readonly ChannelCatalogEntry[],
+): IdentityRealm[] {
+  const realmConnections = connections.filter(
+    ({ identityRealm }) => typeof identityRealm === "string",
+  );
+  return Array.from(groupByRealm(realmConnections), ([key, members]) => ({
+    key,
+    label: identityRealmLabel(catalog, members),
+    connections: members,
+  }));
+}
+
 function isCoveredByAny(
   identities: readonly HubChannelIdentity[],
   connection: HubConnection,

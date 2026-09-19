@@ -6,10 +6,12 @@ Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cầ
 
 ## Tạo Team và mời người
 
-1. Mở Settings → **Team**, tạo Team theo nhóm làm việc, ví dụ `Product` hoặc `AI Team`.
-2. Trong phần **Members**, dán một hoặc nhiều email vào ô **Emails** (ngăn cách bằng dấu phẩy, khoảng trắng hoặc xuống dòng; dạng `Tên <email>` cũng được). Chọn vai trò **Member** cho người chỉ cần làm việc trên tài nguyên, **Admin** khi người đó cần quản lý tổ chức. Cả danh sách nhận cùng vai trò và Team.
-3. Chọn Team nếu cần, bấm **Send N invitations**. Email nào bị từ chối (đã là Member, hết seat) được giữ lại trong ô để gửi lại; các email khác đã gửi.
-4. Người nhận tham gia như bảng dưới, rồi kiểm tra người đó đã có trong Members và đúng Team.
+Mở Settings → **People**. Trang có ba tab: **Members** (mọi người trong tổ chức, kèm vai trò, Team và tài khoản chat đã liên kết), **Teams**, và **Invitations** (lời mời đang chờ). Các ô đếm phía trên mỗi tab là bộ lọc: bấm **No Team** để xem ai chưa vào Team nào, **Expiring soon** để xem lời mời sắp hết hạn.
+
+1. Ở tab **Teams**, bấm **New Team** và đặt tên theo nhóm làm việc, ví dụ `Product` hoặc `AI Team`.
+2. Bấm **Invite people** (có ở mọi tab; mở từ trong một Team thì Team đó được chọn sẵn). Ô **People** nhận cả tên Member đã có lẫn email mới, ngăn cách bằng dấu phẩy hoặc xuống dòng; dạng `Tên <email>` cũng được. Chọn **Teams**; với email mới chọn thêm vai trò **Member** cho người chỉ cần làm việc trên tài nguyên, **Admin** khi người đó cần quản lý tổ chức.
+3. Đọc dòng xem trước, ví dụ `2 Members join Ops, BMS now · 1 invitation will be sent`, rồi bấm nút gửi. Member đã có vào Team ngay; email mới nhận một lời mời và vào đúng các Team đó khi đăng nhập. Email nào bị từ chối (đã là Member, hết seat) được giữ lại trong ô để gửi lại; các email khác đã gửi.
+4. Người nhận tham gia như bảng dưới, rồi kiểm tra ở tab **Members** là người đó đã có mặt và đúng Team.
 
 | Người được mời                                             | Có cần bấm link mời?                                                                                              |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -20,7 +22,9 @@ Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cầ
 
 Lời mời hết hạn sau **48 giờ**, gửi lại không gia hạn lời mời còn hạn. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Hết hạn thì gửi lại để tạo lời mời mới; muốn gia hạn sớm thì **Cancel** rồi gửi lại.
 
-Thêm Member đã có vào Team: mở Team, ở **Add Members** gõ tên hoặc email để tìm, chọn một hoặc nhiều người rồi bấm **Add to Team** / **Add N Members**. Danh sách bên dưới chỉ gồm người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team.
+Thêm Member đã có vào Team: mở Team → **Add people** rồi gõ tên hoặc email, hoặc bấm **Add to a Team** ngay trên dòng Member chưa có Team. Tab **Members** của Team liệt kê người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team. Vai trò **Admin** trong Team (Team Admin) cho phép người đó thêm, bớt và mời người vào Team này, không cho sửa quyền của Team.
+
+Đổi vai trò tổ chức ngay trên dòng Member (Member / Admin, Owner chỉ hiện với Owner và cần xác nhận). Owner cuối cùng không thể tự hạ vai trò; Admin không đổi được vai trò của Owner. Xóa Member nằm trong **Danger zone** của trang chi tiết Member. Tab **Invitations**: **Resend** gửi lại (lời mời tính lại 48 giờ), **Renew** cho lời mời đã hết hạn, **Cancel invitation** trong menu của dòng.
 
 Member mới không tự có quyền dùng tài nguyên. Nếu vào Team đã được cấp Access, người đó nhận các quyền của Team.
 
@@ -56,6 +60,25 @@ Chọn một Project làm tài nguyên, rồi chọn thêm ở **Also apply to**
 
 - Ô này không có lựa chọn "tất cả". Muốn mọi Project, kể cả Project thêm sau, thì cấp trên Host.
 - Nếu người đó đã có grant trên Project nào trong danh sách, grant cũ bị **thay thế**, kể cả cấu hình Agent của nó. Hộp xác nhận liệt kê các Project bị thay; đọc kỹ trước khi đồng ý.
+
+## Can share: cho người khác cấp tiếp
+
+Trên Host hoặc Project, dưới ô mức quyền có công tắc **Can share**: người được cấp có thể thêm, sửa, hoặc bỏ người trên đúng Host/Project đó, **tối đa bằng mức của chính họ**. Quy tắc chỉ có một: ai cũng chỉ cấp được những gì mình đang có.
+
+| Mức           | Can share              |
+| ------------- | ---------------------- |
+| Connect       | Không có               |
+| Office worker | Tắt mặc định, bật được |
+| Developer     | Tắt mặc định, bật được |
+| Full access   | Luôn bật               |
+| Administrator | Luôn bật               |
+
+- Người có Can share ở mức Office worker chỉ cấp được Office worker; ở Host thì cấp được mọi Project trên Host đó. Trong **Access** họ chỉ thấy tài nguyên mình chia sẻ được; mức cao hơn mức của họ không hiện trong ô chọn (có dòng "Above your own level"); grant cao hơn hiện **Locked**, không sửa hay xóa được.
+- Với Project, người nhận vẫn cần **Connect** trên Host. Nếu bạn không chia sẻ được Host đó, form báo "Needs Connect on … first": nhờ người chia sẻ được Host cấp Connect trước.
+- Mỗi grant hiện **by \<tên>** (ai đã cấp; **by Hub** khi Hub tự ghi) để thu hồi nhanh khi cần.
+- Với Team, Channel Route, hoặc Automation, mức tương ứng gọi là **Admin**: quản lý đúng tài nguyên đó và ai được vào (Team Admin chỉ quản lý thành viên, không đổi grant của Team). Owner/Admin tổ chức không bị giới hạn bởi quy tắc này.
+
+**Cảnh báo khi chọn Administrator.** Chọn mức này mở hộp xác nhận trước khi form nhận mức: người đó điều khiển daemon (restart, cài plugin, dùng mọi Model, thấy mọi Project). Mọi Admin tổ chức được thông báo kèm tên người cấp; Owner/Admin xem lại trong mục **Administrator grants** ở cuối trang Access.
 
 ## Cấp cho Guest
 

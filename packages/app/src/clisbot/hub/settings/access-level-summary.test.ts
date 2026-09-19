@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   accessChanges,
   accessLevelDescription,
+  canShareDescription,
   matchingAccessLevel,
+  sharesAccess,
   summarizeAccess,
 } from "./access-level-summary";
 
@@ -25,9 +27,11 @@ const LEVELS = {
   daemon: {
     connect: ["daemon.connect"],
     developer: ["daemon.connect", ...DEVELOPER],
-    full_access: ["daemon.connect", ...FULL_ACCESS],
+    full_access: ["daemon.connect", ...FULL_ACCESS, "hub.access.manage"],
   },
   project: { office_worker: OFFICE_WORKER, developer: DEVELOPER },
+  team: { admin: ["hub.access.manage"] },
+  automation: { run: ["automation.run"], admin: ["automation.run", "hub.access.manage"] },
 };
 
 describe("summarizeAccess", () => {
@@ -117,6 +121,65 @@ describe("level names", () => {
       "developer",
     );
     expect(matchingAccessLevel(LEVELS, "project", ["project.use"])).toBeUndefined();
-    expect(matchingAccessLevel(LEVELS, "automation", ["automation.run"])).toBeUndefined();
+    expect(matchingAccessLevel(LEVELS, "channel_account", ["channel.use"])).toBeUndefined();
+  });
+
+  it("matches a Host or Project level with or without Can share, and keeps Admin whole", () => {
+    // Can share rides on top of Office worker and Developer, like Fast mode.
+    expect(matchingAccessLevel(LEVELS, "project", [...DEVELOPER, "hub.access.manage"])).toBe(
+      "developer",
+    );
+    // A Full access row written before Can share existed still reads as Full access.
+    expect(matchingAccessLevel(LEVELS, "daemon", ["daemon.connect", ...FULL_ACCESS])).toBe(
+      "full_access",
+    );
+    // On a Team or Automation the privilege is the level itself.
+    expect(matchingAccessLevel(LEVELS, "team", ["hub.access.manage"])).toBe("admin");
+    expect(matchingAccessLevel(LEVELS, "automation", ["automation.run"])).toBe("run");
+    expect(matchingAccessLevel(LEVELS, "automation", ["automation.run", "hub.access.manage"])).toBe(
+      "admin",
+    );
+  });
+
+  it("describes Admin by the scope it manages", () => {
+    expect(accessLevelDescription("admin", "team")).toContain("Team Admin");
+    expect(accessLevelDescription("admin", "automation")).toContain("Automation");
+  });
+});
+
+describe("Can share", () => {
+  it("is the same privilege as Admin, but only a flag on a Host or Project", () => {
+    expect(sharesAccess("project", [...OFFICE_WORKER, "hub.access.manage"])).toBe(true);
+    expect(sharesAccess("daemon", ["daemon.connect", ...FULL_ACCESS])).toBe(false);
+    expect(sharesAccess("team", ["hub.access.manage"])).toBe(false);
+  });
+
+  it("words Can share the same in the summary and under the switch", () => {
+    expect(canShareDescription("daemon")).toBe(
+      "Add, change, or remove people on this Host, up to their own level",
+    );
+    const summary = summarizeAccess({
+      privileges: [...OFFICE_WORKER, "hub.access.manage"],
+      resourceKind: "project",
+    });
+    expect(summary.allows).toContain(canShareDescription("project"));
+    expect(
+      summarizeAccess({ privileges: OFFICE_WORKER, resourceKind: "project" }).allows,
+    ).not.toContain(canShareDescription("project"));
+    expect(
+      summarizeAccess({ privileges: ["daemon.connect", "daemon.manage"], resourceKind: "daemon" })
+        .allows,
+    ).toContain(canShareDescription("daemon"));
+  });
+
+  it("summarizes Team Admin as membership only", () => {
+    const summary = summarizeAccess({ privileges: ["hub.access.manage"], resourceKind: "team" });
+    expect(summary.allows).toEqual([
+      "Add or remove people in this Team and invite Members into it",
+      "Appoint another Team Admin",
+    ]);
+    expect(summary.withholds).toEqual([
+      "Cannot change the Team's access grants or delete the Team",
+    ]);
   });
 });

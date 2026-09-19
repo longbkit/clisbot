@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { ChannelIdentitySelfLinkSettings } from "./channel-identity-settings";
+import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
 
 const boundary = vi.hoisted(() => ({
   requestedConnectionId: undefined as string | undefined,

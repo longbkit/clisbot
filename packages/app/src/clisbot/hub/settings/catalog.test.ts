@@ -31,9 +31,24 @@ describe("Hub Settings navigation", () => {
       hubSettingsNavigationItems({
         signedIn: true,
         canManage: false,
-        canRunAutomations: true,
+        grants: [{ resourceKind: "automation", privileges: ["automation.run"] }],
       }).map(({ section }) => section),
       ["account", "automations", "access"],
+    );
+  });
+
+  it("opens Channels, Automations, and People to scoped Admins", () => {
+    assert.deepEqual(
+      hubSettingsNavigationItems({
+        signedIn: true,
+        canManage: false,
+        grants: [
+          { resourceKind: "channel_account", privileges: ["channel.use", "channel.manage"] },
+          { resourceKind: "project", privileges: ["project.use", "agent.interact"] },
+          { resourceKind: "team", privileges: ["hub.access.manage"] },
+        ],
+      }).map(({ section }) => section),
+      ["account", "channels", "automations", "team", "access"],
     );
   });
 

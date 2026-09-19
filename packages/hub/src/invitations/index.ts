@@ -1,5 +1,6 @@
 import {
   createResendInvitationMailer,
+  createResendNotificationMailer,
   createResendVerificationMailer,
   readResendConfig,
 } from "./internal/resend.js";
@@ -51,4 +52,28 @@ export function composeVerificationMailer(
 ): VerificationMailer | undefined {
   const config = readResendConfig(environment);
   return config === undefined ? undefined : createResendVerificationMailer(config);
+}
+
+/** A plain notice to a set of Members; the caller owns the wording. */
+export interface NotificationEmail {
+  /** Stable per notice, so a retried delivery is idempotent at the provider. */
+  id: string;
+  to: string[];
+  subject: string;
+  text: string;
+}
+
+export interface NotificationMailer {
+  send(notification: NotificationEmail): Promise<void>;
+}
+
+/**
+ * Notices share the invitation delivery configuration. Absent configuration
+ * means the Hub records the event and sends nothing.
+ */
+export function composeNotificationMailer(
+  environment: Record<string, string | undefined> = process.env,
+): NotificationMailer | undefined {
+  const config = readResendConfig(environment);
+  return config === undefined ? undefined : createResendNotificationMailer(config);
 }

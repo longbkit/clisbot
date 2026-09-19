@@ -231,7 +231,7 @@ Codex MultiAgentV2 real tests use local Codex authentication rather than the Ope
 
 Test suites in this repo are heavy. Running them in bulk freezes the machine, especially with multiple agents in parallel.
 
-- Run only the file you changed: `npx vitest run <path> --bail=1`
+- Run only the file you changed, **from the package directory** (`cd packages/app && npx vitest run src/… --bail=1`). From the repo root the package's vitest config is not used and app tests fail at load with `SyntaxError: Unexpected token 'typeof'`.
 - Never run `npm run test` for a whole workspace unless asked.
 - For a broad sweep, redirect to a file and read it after: `npx vitest run <path> --bail=1 > /tmp/test-output.txt 2>&1`
 - Never re-run a suite another agent already reported green.

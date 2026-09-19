@@ -352,8 +352,16 @@ export interface OrganizationTriggerRecord {
   enabled: boolean;
   format: "single_run" | "workflow" | "legacy_multistep";
   activeRevisionId: string;
+  /** Set when the Hub disabled the Automation itself (author lost access); a save clears it. */
+  pausedReason: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PauseOrganizationTriggerInput {
+  organizationId: string;
+  triggerId: string;
+  reason: string;
 }
 
 export interface OrganizationTriggerRevisionRecord {
@@ -1515,6 +1523,13 @@ export interface Database {
     revisionId: string,
   ): Promise<OrganizationTriggerRevisionRecord | undefined>;
   saveOrganizationTrigger(input: SaveOrganizationTriggerInput): Promise<OrganizationTriggerRecord>;
+  /**
+   * Disables one Automation with the reason the Hub did it. Undefined when the
+   * Automation is unknown or already paused, so one loss notifies once.
+   */
+  pauseOrganizationTrigger(
+    input: PauseOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord | undefined>;
   findActiveChannelConfiguration(
     organizationId: string,
   ): Promise<ChannelConfigurationRevisionRecord | undefined>;

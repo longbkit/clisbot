@@ -106,6 +106,7 @@ import type {
   ProjectTriggerRoute,
   OrganizationTriggerRecord,
   OrganizationTriggerRevisionRecord,
+  PauseOrganizationTriggerInput,
   SaveOrganizationTriggerInput,
   SaveChannelConfigurationInput,
   ChannelConfigurationRevisionRecord,
@@ -3236,9 +3237,11 @@ class PgDatabase implements Database {
             throw new OrganizationTriggerConflictError();
           }
         }
+        // A save re-runs the author's delegation check, so it lifts a pause.
         const updated = await client.query<OrganizationTriggerRow>(
           `update organization_triggers
-           set name = $3, enabled = $4, format = $5, updated_at = clock_timestamp()
+           set name = $3, enabled = $4, format = $5, paused_reason = null,
+               updated_at = clock_timestamp()
            where id = $1 and organization_id = $2 returning *`,
           [input.triggerId, input.organizationId, input.name, input.enabled, input.format],
         );
@@ -3293,6 +3296,27 @@ class PgDatabase implements Database {
         [trigger.id, revision.id],
       );
       return toOrganizationTriggerRecord(activated.rows[0]!);
+    });
+  }
+
+  async pauseOrganizationTrigger(
+    input: PauseOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord | undefined> {
+    return this.pool.transaction(async (client) => {
+      const paused = await client.query<OrganizationTriggerRow>(
+        `update organization_triggers
+         set enabled = false, paused_reason = $3, updated_at = clock_timestamp()
+         where id = $1 and organization_id = $2 and paused_reason is null
+           and active_revision_id is not null
+         returning *`,
+        [input.triggerId, input.organizationId, input.reason],
+      );
+      const row = paused.rows[0];
+      if (row === undefined) return undefined;
+      // Disabled Automations own no routes (`saveOrganizationTrigger` writes
+      // none for them), so an inbound event can no longer reach this one.
+      await client.query(`delete from organization_trigger_routes where trigger_id = $1`, [row.id]);
+      return toOrganizationTriggerRecord(row);
     });
   }
 
@@ -5254,6 +5278,7 @@ interface OrganizationTriggerRow extends QueryRow {
   enabled: boolean;
   format: "single_run" | "workflow" | "legacy_multistep";
   active_revision_id: string | null;
+  paused_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -5291,6 +5316,7 @@ function toOrganizationTriggerRecord(row: OrganizationTriggerRow): OrganizationT
     enabled: row.enabled,
     format: row.format,
     activeRevisionId: row.active_revision_id,
+    pausedReason: row.paused_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

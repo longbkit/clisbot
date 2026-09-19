@@ -33,7 +33,7 @@ import { ManagedHostRow } from "./managed-host-row";
 import { AutomationSettings } from "./automation-settings";
 import { AccessSettings } from "./access-settings";
 import { ApiKeySettings } from "./api-key-settings";
-import { ChannelIdentitySelfLinkSettings } from "./channel-identity-settings";
+import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
 import { ProviderApplicationSettings } from "./provider-application-settings";
 import { HubHostOnboardingSection } from "../host-onboarding-section";
 import { useHubSettingsDetailScroll } from "./detail-scroll";

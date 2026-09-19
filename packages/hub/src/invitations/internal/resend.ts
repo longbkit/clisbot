@@ -2,6 +2,8 @@ import { z } from "zod";
 import type {
   InvitationEmail,
   InvitationMailer,
+  NotificationEmail,
+  NotificationMailer,
   VerificationEmail,
   VerificationMailer,
 } from "../index.js";
@@ -73,6 +75,22 @@ export function createResendVerificationMailer(
   };
 }
 
+export function createResendNotificationMailer(
+  config: ResendConfig,
+  sendRequest: SendRequest = fetch,
+): NotificationMailer {
+  return {
+    send: (notification) =>
+      deliver(
+        config,
+        sendRequest,
+        `paseo-notification-${notification.id}`,
+        notificationMessage(config.from, notification),
+        "notification",
+      ),
+  };
+}
+
 async function deliver(
   config: ResendConfig,
   sendRequest: SendRequest,
@@ -121,6 +139,16 @@ function message(from: string, invitation: InvitationEmail) {
     subject: `Join ${invitation.organizationName} on Paseo`,
     text: `${introduction}\n\nAccept the invitation: ${invitation.link}\n\n${expiry}`,
     html: `<p>${escapeHtml(introduction)}</p><p><a href="${invitationLink}">Join ${organizationName}</a></p><p>${escapeHtml(expiry)}</p>`,
+  };
+}
+
+function notificationMessage(from: string, notification: NotificationEmail) {
+  return {
+    from,
+    to: notification.to,
+    subject: notification.subject,
+    text: notification.text,
+    html: `<p>${escapeHtml(notification.text)}</p>`,
   };
 }
 

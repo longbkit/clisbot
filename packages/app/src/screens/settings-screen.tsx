@@ -142,7 +142,7 @@ import { returnFromSettings, type SettingsView } from "@/navigation/settings-nav
 import { isNative, isWeb } from "@/constants/platform";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
-import { HubEffectiveAccessSchema } from "@/clisbot/hub/contracts";
+import { HUB_ACCESS_INCLUDE, HubEffectiveAccessSchema } from "@/clisbot/hub/contracts";
 import { hubResourceQueryKey } from "@/clisbot/hub/query-keys";
 import { buildHubSettingsRoute, type HubSectionSlug } from "@/clisbot/hub/navigation";
 import {
@@ -1146,24 +1146,21 @@ function SettingsSidebar({
       ),
       "effective",
     ],
-    queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
+    queryFn: () =>
+      hub.api().get(`access-assignments/effective${HUB_ACCESS_INCLUDE}`, HubEffectiveAccessSchema),
     enabled: hub.signedIn !== null && !canManageHub,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,
   });
-  const canRunAutomations =
-    effectiveHubAccess.data?.owner === true ||
-    effectiveHubAccess.data?.grants.some(
-      ({ resource, privileges }) =>
-        resource.kind === "automation" &&
-        resource.available &&
-        privileges.includes("automation.run"),
-    ) === true;
   const hubItems = hubSettingsNavigationItems({
     signedIn: hub.signedIn !== null,
     canManage: canManageHub,
-    canRunAutomations,
+    // Owners have `canManage`, so the effective read only ever runs for plain Members.
+    grants: effectiveHubAccess.data?.grants.map(({ resource, privileges }) => ({
+      resourceKind: resource.kind,
+      privileges,
+    })),
   });
   const items = SIDEBAR_SECTION_ITEMS.filter(
     (item) => (!item.desktopOnly || isDesktopApp) && (!item.webOnly || isWeb),

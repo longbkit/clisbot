@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyTeamAdditions,
   canApplyTeamAdditions,
+  invitePreview,
   pendingInvitationNotes,
   planTeamAdditions,
-  teamAdditionSummary,
+  readPeopleInput,
 } from "./team-additions";
 
 const alice = {
@@ -65,8 +66,28 @@ describe("planTeamAdditions", () => {
     ).toBe(false);
     const invite = plan({ emailText: "new@example.test" });
     expect(canApplyTeamAdditions(invite)).toBe(true);
-    expect(teamAdditionSummary(invite, teams)).toBe(
-      "Invite 1 person, joining after sign-in → the organization only",
+    expect(invitePreview(invite, teams)).toBe("1 invitation will be sent");
+  });
+  it("previews what one field of names and emails will do", () => {
+    const input = readPeopleInput("Alice, bob@example.test\nnew@example.test; Nobody", [
+      alice,
+      bob,
+    ]);
+    expect(input).toEqual({
+      pickedUserIds: ["u-1"],
+      emailText: "bob@example.test\nnew@example.test",
+      unknown: ["Nobody"],
+    });
+    const result = plan({
+      pickedUserIds: input.pickedUserIds,
+      emailText: `${input.emailText}\npending@example.test`,
+      teamIds: ["t-1", "t-2"],
+    });
+    expect(invitePreview(result, teams)).toBe(
+      "2 Members join Support, Sales now · 1 invitation will be sent · 1 pending invitation gains Teams",
+    );
+    expect(invitePreview(plan({ emailText: "pending@example.test" }), teams)).toBe(
+      "1 pending invitation is renewed",
     );
   });
   it("keeps the Teams of a pending invitation and says it is renewed", () => {

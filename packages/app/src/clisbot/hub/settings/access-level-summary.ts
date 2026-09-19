@@ -1,4 +1,5 @@
 import type { AccessResourceKind, SubjectKind } from "./access-catalog";
+import { CAN_SHARE_PRIVILEGE } from "./access-grantor";
 
 /**
  * Plain-language effects of an access grant. Every surface that explains a grant —
@@ -32,11 +33,32 @@ const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) =>
     kind === "daemon"
       ? "Developer, plus create Projects in any folder and manage every Project on this Host."
       : "Developer, plus rename, remove, and archive this Project and its workspaces.",
-  administrator: "Operate this Host with any model, including its access settings.",
+  administrator: "Operate this Host with any model. Always can share.",
   use: "Talk to the bot in the chosen conversations.",
   manage: "Use, plus change this Channel Route's defaults. Needs All conversations.",
   run: "Run this Automation.",
+  admin: (kind) =>
+    kind === "team"
+      ? "Add or remove people in this Team, invite into it, appoint another Team Admin."
+      : "Run, edit, enable, or delete this Automation, and grant Run or Admin on it.",
 };
+
+/**
+ * Can share on a Host or Project: the same `hub.access.manage` privilege that is
+ * Admin on a Team or Automation. Full access and Administrator always carry it;
+ * Office worker and Developer carry it only when the grant names it.
+ */
+export function sharesAccess(resourceKind: AccessResourceKind, privileges: readonly string[]) {
+  return (
+    (resourceKind === "daemon" || resourceKind === "project") &&
+    privileges.includes(CAN_SHARE_PRIVILEGE)
+  );
+}
+
+export function canShareDescription(resourceKind: AccessResourceKind): string {
+  const scope = resourceKind === "daemon" ? "Host" : "Project";
+  return `Add, change, or remove people on this ${scope}, up to their own level`;
+}
 
 /** One line for a level in the picker, or undefined for a level with no description. */
 export function accessLevelDescription(
@@ -58,6 +80,10 @@ export function summarizeAccess(input: {
   if (input.subjectKind === "guest") {
     summary.cautions.push("Guest is every channel sender without a linked Member, not one person");
   }
+  if (input.resourceKind === "team") {
+    summarizeTeamAdmin(held, summary);
+    return summary;
+  }
   if (input.resourceKind === "channel_account" || input.resourceKind === "automation") {
     summarizeRoutes(held, summary);
     return summary;
@@ -65,13 +91,22 @@ export function summarizeAccess(input: {
   if (held.has("daemon.manage")) {
     summary.allows.push("Operate this Host: restart, update, settings, providers, and plugins");
     summary.allows.push("Every Project, workspace, agent, and terminal on this Host");
+    summary.allows.push(canShareDescription(input.resourceKind));
     summary.cautions.push(
       "Not limited to the allowed models, and can change who reaches this Host",
     );
     return summary;
   }
   summarizeProjectWork(held, input.resourceKind, summary);
+  if (held.has(CAN_SHARE_PRIVILEGE)) summary.allows.push(canShareDescription(input.resourceKind));
   return summary;
+}
+
+function summarizeTeamAdmin(held: ReadonlySet<string>, summary: AccessSummary): void {
+  if (!held.has(CAN_SHARE_PRIVILEGE)) return;
+  summary.allows.push("Add or remove people in this Team and invite Members into it");
+  summary.allows.push("Appoint another Team Admin");
+  summary.withholds.push("Cannot change the Team's access grants or delete the Team");
 }
 
 function summarizeRoutes(held: ReadonlySet<string>, summary: AccessSummary): void {
@@ -80,6 +115,9 @@ function summarizeRoutes(held: ReadonlySet<string>, summary: AccessSummary): voi
     summary.allows.push("Change this Channel Route's defaults from a conversation");
   }
   if (held.has("automation.run")) summary.allows.push("Run this Automation");
+  if (held.has("automation.run") && held.has(CAN_SHARE_PRIVILEGE)) {
+    summary.allows.push("Edit, enable, or delete this Automation, and grant Run or Admin on it");
+  }
   if (held.has("channel.use")) {
     summary.withholds.push("Controlling an agent still needs access to its Project");
   }
@@ -188,21 +226,30 @@ export function accessChanges(input: {
 }
 
 /**
- * The built-in level whose privileges this grant holds exactly, ignoring Fast mode,
- * which the form adds on top of any level. Undefined for a custom grant.
+ * The built-in level whose privileges this grant holds exactly, ignoring what
+ * the form adds on top of any level: Fast mode, and Can share on a Host or
+ * Project. Undefined for a custom grant.
  */
 export function matchingAccessLevel(
   accessLevels: Record<string, Record<string, readonly string[]>>,
   resourceKind: AccessResourceKind,
   privileges: readonly string[],
 ): string | undefined {
-  const held = new Set(privileges.filter((privilege) => privilege !== "agent.fast.use"));
-  for (const [levelId, levelPrivileges] of Object.entries(accessLevels[resourceKind] ?? {})) {
-    if (levelPrivileges.length === held.size && levelPrivileges.every((p) => held.has(p))) {
-      return levelId;
-    }
+  const held = new Set(levelPrivileges(resourceKind, privileges));
+  for (const [levelId, candidate] of Object.entries(accessLevels[resourceKind] ?? {})) {
+    const expected = new Set(levelPrivileges(resourceKind, candidate));
+    if (expected.size === held.size && [...expected].every((p) => held.has(p))) return levelId;
   }
   return undefined;
+}
+
+/** The privileges that decide a level, with the flags the form adds on top removed. */
+function levelPrivileges(resourceKind: AccessResourceKind, privileges: readonly string[]) {
+  const flags =
+    resourceKind === "daemon" || resourceKind === "project"
+      ? ["agent.fast.use", CAN_SHARE_PRIVILEGE]
+      : ["agent.fast.use"];
+  return privileges.filter((privilege) => !flags.includes(privilege));
 }
 
 /** Effects as a bulleted text block under an optional heading, or null when there are none. */

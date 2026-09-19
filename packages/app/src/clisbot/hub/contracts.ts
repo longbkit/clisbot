@@ -49,6 +49,8 @@ const ManagedInvitationSummarySchema = z.object({
   email: z.string(),
   role: z.enum(["admin", "member"]),
   expiresAt: z.string(),
+  // COMPAT(invitationCreatedAt): Hubs before 2026-09-19 omit it; remove after 2027-03-19.
+  createdAt: z.string().optional(),
   link: z.string(),
   // COMPAT(invitationSingleTeam): see AccountInvitationSchema.
   team: InvitationTeamSchema.optional(),
@@ -607,14 +609,30 @@ export const HubAccessAssignmentSchema = z
     organizationId: z.string(),
     subjectKind: z.enum(["member", "team", "guest"]),
     subjectId: z.string(),
-    resourceKind: z.enum(["organization", "daemon", "project", "channel_account", "automation"]),
+    resourceKind: z.enum([
+      "organization",
+      "daemon",
+      "project",
+      "channel_account",
+      "automation",
+      // Sent only when the app asks with `?include=team` (see HUB_ACCESS_INCLUDE).
+      "team",
+    ]),
     resourceId: z.string(),
     privileges: z.array(z.string()),
     constraints: z.record(z.string(), z.unknown()),
+    /** Who made the grant; shown as "by <name>". Null for rows older than the field. */
+    createdByUserId: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
   .passthrough();
+
+/**
+ * Query string the app sends on access-catalog, access-assignments, and effective-access
+ * reads so the Hub includes Team resources (Team Admin). Older Hubs ignore it.
+ */
+export const HUB_ACCESS_INCLUDE = "?include=team";
 
 export const HubAccessAssignmentsSchema = z.object({
   assignments: z.array(HubAccessAssignmentSchema),
@@ -626,6 +644,7 @@ const HubAccessResourceKindSchema = z.enum([
   "project",
   "channel_account",
   "automation",
+  "team",
 ]);
 
 const HubAccessResourceSchema = z.object({
@@ -673,6 +692,21 @@ export const HubEffectiveAccessSchema = z.object({
   ),
 });
 
+/** One Administrator grant on a Host, recorded so Organization Admins can review who granted it. */
+export const HubAccessEventSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  kind: z.enum(["administrator_granted", "automation_paused"]),
+  resourceKind: HubAccessResourceKindSchema,
+  resourceId: z.string(),
+  subjectKind: z.enum(["member", "team", "guest"]),
+  subjectId: z.string(),
+  actorUserId: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const HubAccessEventsSchema = z.object({ events: z.array(HubAccessEventSchema) });
+
 export const HubAccessCatalogSchema = z.object({
   privileges: z.array(z.string()),
   accessLevels: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
@@ -714,6 +748,50 @@ export const HubChannelConfigurationSchema = z
     warnings: z.array(HubChannelConfigurationWarningSchema).optional(),
   })
   .passthrough();
+
+/** The organization roles a Route audience may name; `admin` includes Owners. */
+export const HUB_AUDIENCE_ROLES = ["owner", "admin", "member"] as const;
+export type HubAudienceRole = (typeof HUB_AUDIENCE_ROLES)[number];
+
+/**
+ * One "[who] may talk in [where]" rule of a Route
+ * (docs/audits/2026-09-19-route-audience-rules.md). Mirrors the Hub's
+ * `AudienceRuleSchema`; every part optional on the wire, the editor decides
+ * which are set.
+ */
+export const HubAudienceRuleSchema = z.object({
+  who: z.object({
+    roles: z.array(z.enum(HUB_AUDIENCE_ROLES)).optional(),
+    teams: z.array(z.string()).optional(),
+    /** Membership ids. */
+    members: z.array(z.string()).optional(),
+    anyone: z.boolean().optional(),
+    /** Channel identities outside the Hub (`slack:U0…` or the bare provider id). */
+    identities: z.array(z.string()).optional(),
+  }),
+  where: z.object({
+    dm: z.boolean().optional(),
+    groups: z.enum(["off", "all", "public", "private"]).optional(),
+    conversations: z.array(z.union([z.string(), z.number()])).optional(),
+  }),
+});
+export type HubAudienceRule = z.infer<typeof HubAudienceRuleSchema>;
+
+/**
+ * `GET|PUT channel-configuration/accounts/<channel>/<accountId>` — the one
+ * account a Channel Route Admin may read and save. `account` is the stored
+ * file in the audience-rules shape; `reconciliation` only follows a PUT.
+ */
+export const HubChannelAccountConfigurationSchema = z
+  .object({
+    revision: z.object({ id: z.string(), version: z.number() }).nullable(),
+    account: z.record(z.string(), z.unknown()).nullable(),
+    effective: z.unknown(),
+    warnings: z.array(HubChannelConfigurationWarningSchema),
+    reconciliation: z.unknown().optional(),
+  })
+  .passthrough();
+export type HubChannelAccountConfiguration = z.infer<typeof HubChannelAccountConfigurationSchema>;
 
 /**
  * One account's durable-ingress depth, as `channel-ingress` and the per-account

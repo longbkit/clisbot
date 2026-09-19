@@ -48,10 +48,27 @@ without granting daemon-wide `workspace.manage`. Project creation still requires
 
 ### Access scopes
 
-A Hub assignment names one Resource: an Organization, a Host, a Project, a Channel
-account, or an Automation. Host and Project both carry Project authority, and a
-Host assignment reaches every Project on that Host, including Projects added
+A Hub assignment names one Resource: an Organization, a Host, a Project, a Team, a
+Channel account, or an Automation. Host and Project both carry Project authority,
+and a Host assignment reaches every Project on that Host, including Projects added
 later. Use a Host assignment when the answer is "all of them".
+
+`hub.access.manage` on a Host or Project is **Can share**; on a Team, Channel
+account, or Automation it is that resource's **Admin**. It sits in the same grant
+row as the level. Full access and Administrator always carry it: the Hub adds it
+when it saves those levels and when it reads rows written before the privilege
+existed (`impliedPrivileges` in `contract.ts`). A holder grants at most what they
+hold on that resource, privileges and constraints alike, and may change or remove
+only grants inside that bound (`access/grantor.ts`, error `access_exceeds_grantor`);
+Organization Owners and Admins are not bound. A Host grant's Can share reaches its
+Projects. Team Admin covers Team membership, invitations into that Team with role
+`member`, and appointing another Team Admin; never the Team's own grants. Granting
+Administrator writes an `access_events` row and, when email is configured, tells
+every Organization Owner and Admin who granted it. The decision:
+[Delegated access](features/access/scoped-admins.md).
+
+The `team` resource kind reaches an app only when it asks (`?include=team`), because
+older apps parse the kind with a closed enum (`COMPAT(team-resource-kind)`).
 
 Grants combine by **union**. A Project assignment only adds to what a Host
 assignment already gave; it never narrows it. To give someone less on one

@@ -11,6 +11,7 @@ import type {
   SubjectKind,
 } from "./access-catalog";
 import type { AssignmentSelection } from "./access-assignment-selection";
+import { canShareResource, type ViewerAuthority } from "./access-grantor";
 import {
   uniqueAgentConfigurationGrants,
   type AgentConfigurationDraft,
@@ -50,8 +51,7 @@ export async function submitAccessAssignment(input: {
             candidate.resourceId === resource.id,
         ),
       );
-  const addsHostConnect =
-    daemonId !== null && existingDaemon?.privileges.includes("daemon.connect") !== true;
+  const addsHostConnect = daemonId !== null && !holdsHostConnect(existingDaemon);
   const confirmed = await confirmDialog({
     title: input.editing ? "Save this access?" : "Grant this access?",
     message: grantReviewMessage({
@@ -70,13 +70,45 @@ export async function submitAccessAssignment(input: {
       addsHostConnect,
       replacedNames: replaced.map(({ name }) => name),
       guestScope: guestScope(selection.subject.kind, selection.resource.kind),
-      // persistAccessAssignment writes the parent Host row whenever there is one.
-      assignmentCount: written.length + (daemonId === null ? 0 : 1),
+      assignmentCount: written.length + (addsHostConnect ? 1 : 0),
     }),
     confirmLabel: input.editing ? "Save access" : "Grant access",
   });
   if (!confirmed || !input.isCurrent()) return;
-  await persistAccessAssignment(input.save, written, selection.subject, daemonId, existingDaemon);
+  await persistAccessAssignment(
+    input.save,
+    written,
+    selection.subject,
+    addsHostConnect ? daemonId : null,
+    existingDaemon,
+  );
+}
+
+/**
+ * The Host whose Connect this Project grant needs and the viewer cannot write:
+ * a Project sharer who cannot share the Host has to ask a Host sharer first.
+ * Null when no Host row is needed or the viewer may write it.
+ */
+export function unshareableHostConnect(input: {
+  selection: AssignmentSelection;
+  assignments: AccessAssignment[];
+  authority: ViewerAuthority;
+  resources: AccessResource[];
+}): string | null {
+  const { subject, resource } = input.selection;
+  if (subject === null || resource === undefined) return null;
+  const daemonId = parentDaemonId(resource);
+  if (daemonId === null) return null;
+  if (holdsHostConnect(findSubjectDaemonAssignment(input.assignments, subject, daemonId))) {
+    return null;
+  }
+  const host = input.resources.find(({ kind, id }) => kind === "daemon" && id === daemonId);
+  if (host === undefined || canShareResource(input.authority, host, input.resources)) return null;
+  return host.name;
+}
+
+function holdsHostConnect(existingDaemon: AccessAssignment | undefined): boolean {
+  return existingDaemon?.privileges.includes("daemon.connect") === true;
 }
 
 function createAccessAssignment(
@@ -149,6 +181,11 @@ function findSubjectDaemonAssignment(
   );
 }
 
+/**
+ * One row goes alone; a Project grant that needs Connect on its Host, or several
+ * Projects at once, go as one batch. An existing Host row is left as it is, so a
+ * Project sharer who cannot share the Host never rewrites it.
+ */
 async function persistAccessAssignment(
   save: (body: unknown, batch?: boolean) => Promise<void>,
   written: Record<string, unknown>[],

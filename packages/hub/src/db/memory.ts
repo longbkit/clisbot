@@ -73,6 +73,7 @@ import type {
   ProjectTriggerRoute,
   OrganizationTriggerRecord,
   OrganizationTriggerRevisionRecord,
+  PauseOrganizationTriggerInput,
   SaveOrganizationTriggerInput,
   SaveChannelConfigurationInput,
   ChannelConfigurationRevisionRecord,
@@ -2667,6 +2668,7 @@ class MemoryDatabase implements Database {
       enabled: input.enabled,
       format: input.format,
       activeRevisionId: revisionId,
+      pausedReason: null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -2674,6 +2676,28 @@ class MemoryDatabase implements Database {
     this.organizationTriggers.set(trigger.id, trigger);
     this.organizationTriggerRoutes.set(trigger.id, [...input.routes]);
     return trigger;
+  }
+
+  async pauseOrganizationTrigger(
+    input: PauseOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord | undefined> {
+    const trigger = this.organizationTriggers.get(input.triggerId);
+    if (
+      trigger === undefined ||
+      trigger.organizationId !== input.organizationId ||
+      trigger.pausedReason !== null
+    ) {
+      return undefined;
+    }
+    const paused: OrganizationTriggerRecord = {
+      ...trigger,
+      enabled: false,
+      pausedReason: input.reason,
+      updatedAt: this.now(),
+    };
+    this.organizationTriggers.set(paused.id, paused);
+    this.organizationTriggerRoutes.set(paused.id, []);
+    return paused;
   }
 
   async findProjectForOrganization(organizationId: string, projectId: string) {

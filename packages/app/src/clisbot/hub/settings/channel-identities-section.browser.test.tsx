@@ -65,7 +65,7 @@ function identity(id: string, memberId: string, subject: string) {
   };
 }
 
-it("lists the Member's own linked identities on Account without opening Manage identities", async () => {
+it("lists the Member's own linked chat accounts on Account without opening Manage chat accounts", async () => {
   await page.viewport(1000, 700);
   boundary.connections = [bot("a1", "dai-clisbot"), bot("a2", "oai-clisbot")];
   boundary.identities = [
@@ -82,7 +82,7 @@ it("lists the Member's own linked identities on Account without opening Manage i
   expect(screen.getByText("Slack · VeXeRe · works with dai-clisbot, oai-clisbot")).toBeTruthy();
   // An administrator's read includes other Members; Account shows only your own.
   expect(screen.queryByText("USAM")).toBeNull();
-  expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Manage chat accounts" })).toBeTruthy();
   await page.screenshot({ path: "/tmp/account-channel-identities.png" });
 });
 

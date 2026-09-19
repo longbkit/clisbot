@@ -16,7 +16,8 @@ export type HubMember = z.infer<typeof HubMembersSchema>["members"][number];
 export type HubTeam = z.infer<typeof HubTeamsSchema>["teams"][number];
 export type AgentConfigurationCatalog = NonNullable<AccessResource["agentConfigurationCatalog"]>;
 
-export function resourceKey(resource: Pick<AccessResource, "kind" | "id">): string {
+/** Also accepts a raw kind, so a route param can address a resource before the catalog loads. */
+export function resourceKey(resource: { kind: string; id: string }): string {
   return `${resource.kind}\0${resource.id}`;
 }
 
@@ -29,6 +30,7 @@ export function assignmentResourceOptions(
     organization: "Organizations",
     daemon: "Hosts",
     project: "Projects",
+    team: "Teams",
     channel_account: "Channel Routes",
     automation: "Automations",
   };
@@ -113,6 +115,7 @@ export function resourceKindLabel(kind: AccessResourceKind): string {
     organization: "Organization",
     daemon: "Host",
     project: "Project",
+    team: "Team",
     channel_account: "Channel Route",
     automation: "Automation",
   }[kind];
@@ -128,7 +131,9 @@ export function accessLevelLabel(value: string): string {
       developer: "Developer",
       full_access: "Full access",
       use: "Use",
-      manage: "Manage",
+      // The wire key stays `manage`; the scope is always named (Channel Route Admin).
+      manage: "Admin",
+      admin: "Admin",
       run: "Run",
     }[value] ?? value
   );

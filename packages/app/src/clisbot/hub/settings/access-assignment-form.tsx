@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,23 @@ import { Switch } from "@/components/ui/switch";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { ConversationSelectionFields } from "./conversation-picker-field";
-import { accessConstraintDraft } from "./access-assignment-edit";
+import { useAccessAssignmentDraft } from "./access-assignment-draft";
 import { useMountedAccessScope } from "./access-mounted-scope";
 import {
   resolveAssignmentSelection,
   type AssignmentSelection,
 } from "./access-assignment-selection";
-import { grantedPrivileges, submitAccessAssignment } from "./access-assignment-submit";
+import {
+  grantedPrivileges,
+  submitAccessAssignment,
+  unshareableHostConnect,
+} from "./access-assignment-submit";
+import { CanShareField } from "./access-can-share-field";
+import {
+  canShareResource,
+  shareableAgentConfigurationCatalog,
+  type ViewerAuthority,
+} from "./access-grantor";
 import { AccessLevelSummary } from "./access-level-summary-view";
 import {
   assignmentResourceOptions,
@@ -22,7 +32,6 @@ import {
   conversationLabel,
   resourceKey,
   selectedOptionDisplay,
-  subjectKey,
   type AccessAssignment,
   type AccessCatalog,
   type AccessResource,
@@ -30,11 +39,9 @@ import {
   type HubTeam,
 } from "./access-catalog";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
-import { MultiSelectField, type MultiSelection } from "./multi-select-field";
+import { MultiSelectField } from "./multi-select-field";
 import {
   AgentConfigurationGrantEditor,
-  agentConfigurationDraftFrom,
-  createAgentConfigurationDraft,
   type AgentConfigurationDraft,
 } from "./agent-configuration-grant-fields";
 
@@ -49,31 +56,27 @@ const CONVERSATION_OPTIONS: SelectFieldOption<string>[] = [
   { id: "all", value: "all", label: "All conversations" },
 ];
 
-export function GrantAccessContent({
-  initialSubject,
-  initialResource,
-  editing,
-  cancelEdit,
-  assignableSubjects,
-  catalog,
-  assignments,
-  members,
-  teams,
-  pending,
-  save,
-}: {
-  editing: AccessAssignment | null;
-  cancelEdit(): void;
+interface AccessAssignmentFormProps {
   initialSubject: string | null;
   initialResource: string | null;
-  assignableSubjects: number;
+  editing: AccessAssignment | null;
+  cancelEdit(): void;
   catalog: AccessCatalog;
   assignments: AccessAssignment[];
   members: HubMember[];
   teams: HubTeam[];
+  /** What the viewer may grant; the form offers nothing beyond it. */
+  authority: ViewerAuthority;
+  /** The Hub's refusal of the last save, when it exceeded the viewer's own access. */
+  grantorError: string | null;
   pending: boolean;
   save(body: unknown, batch?: boolean): Promise<void>;
-}) {
+}
+
+export function GrantAccessContent({
+  assignableSubjects,
+  ...props
+}: AccessAssignmentFormProps & { assignableSubjects: number }) {
   if (assignableSubjects === 0) {
     return (
       <SettingsSection title="Grant access">
@@ -85,39 +88,7 @@ export function GrantAccessContent({
       </SettingsSection>
     );
   }
-  return (
-    <AccessAssignmentForm
-      initialSubject={initialSubject}
-      initialResource={initialResource}
-      editing={editing}
-      cancelEdit={cancelEdit}
-      catalog={catalog}
-      assignments={assignments}
-      members={members}
-      teams={teams}
-      pending={pending}
-      save={save}
-    />
-  );
-}
-
-function initialAssignmentDraft(
-  editing: AccessAssignment | null,
-  initialSubject: string | null,
-  initialResource: string | null,
-) {
-  const constraints = accessConstraintDraft(editing?.constraints ?? {});
-  return {
-    constraints,
-    subject: editing ? subjectKey(editing.subjectKind, editing.subjectId) : initialSubject,
-    resource: editing ? `${editing.resourceKind}\0${editing.resourceId}` : initialResource,
-    accessLevel: editing ? "current" : null,
-    fastMode: editing?.privileges.includes("agent.fast.use") ?? false,
-    agentConfigurations:
-      constraints.agentConfigurations.length > 0
-        ? constraints.agentConfigurations.map(agentConfigurationDraftFrom)
-        : [createAgentConfigurationDraft()],
-  };
+  return <AccessAssignmentForm {...props} />;
 }
 
 function AccessAssignmentForm({
@@ -129,71 +100,45 @@ function AccessAssignmentForm({
   assignments,
   members,
   teams,
+  authority,
+  grantorError,
   pending,
   save,
-}: {
-  initialSubject: string | null;
-  initialResource: string | null;
-  editing: AccessAssignment | null;
-  cancelEdit(): void;
-  catalog: AccessCatalog;
-  assignments: AccessAssignment[];
-  members: HubMember[];
-  teams: HubTeam[];
-  pending: boolean;
-  save(body: unknown, batch?: boolean): Promise<void>;
-}) {
+}: AccessAssignmentFormProps) {
   const isCurrent = useMountedAccessScope();
-  const [initial] = useState(() =>
-    initialAssignmentDraft(editing, initialSubject, initialResource),
-  );
+  const draft = useAccessAssignmentDraft(editing, initialSubject, initialResource, isCurrent);
   const identityDisabled = pending || editing !== null;
-  const [subjectKeyValue, setSubjectKeyValue] = useState(initial.subject);
-  const [resourceKeyValue, setResourceKeyValue] = useState(initial.resource);
-  const [alsoResourceKeys, setAlsoResourceKeys] = useState<readonly string[]>([]);
-  const [accessLevel, setAccessLevel] = useState(initial.accessLevel);
-  const [conversation, setConversation] = useState<string>(initial.constraints.conversation);
-  const [conversationIds, setConversationIds] = useState(initial.constraints.conversationIds);
-  const [agentConfigurations, setAgentConfigurations] = useState<AgentConfigurationDraft[]>(
-    initial.agentConfigurations,
-  );
-  const [fastMode, setFastMode] = useState(initial.fastMode);
   const subjectOptions = useMemo(() => assignmentSubjectOptions(members, teams), [members, teams]);
   const resourceOptions = useMemo(
-    () => assignmentResourceOptions(catalog.resources, true),
-    [catalog.resources],
+    () =>
+      assignmentResourceOptions(
+        catalog.resources.filter((resource) =>
+          canShareResource(authority, resource, catalog.resources),
+        ),
+        true,
+      ),
+    [authority, catalog.resources],
   );
   const selection = resolveAssignmentSelection({
     editing,
     catalog,
-    subjectKeyValue,
-    resourceKeyValue,
-    alsoResourceKeys,
-    accessLevel,
-    conversation,
-    conversationIds,
-    agentConfigurations,
+    authority,
+    subjectKeyValue: draft.subjectKeyValue,
+    resourceKeyValue: draft.resourceKeyValue,
+    alsoResourceKeys: draft.alsoResourceKeys,
+    accessLevel: draft.accessLevel,
+    canShare: draft.canShare,
+    conversation: draft.conversation,
+    conversationIds: draft.conversationIds,
+    agentConfigurations: draft.agentConfigurations,
   });
   const siblingOptions = useSiblingProjectOptions(catalog, selection.resource, editing);
-  const agentConfigurationCatalog = selection.resource?.agentConfigurationCatalog;
-  const changeResource = useCallback((value: string) => {
-    setResourceKeyValue(value);
-    setAlsoResourceKeys([]);
-    setAccessLevel(null);
-    setConversation("specific");
-    setConversationIds("");
-    setFastMode(false);
-    setAgentConfigurations([createAgentConfigurationDraft()]);
-  }, []);
-  // The field offers no "all" option here, so it only ever reports exact ids.
-  const changeAlsoResources = useCallback(
-    (value: MultiSelection) => setAlsoResourceKeys(value === "*" ? [] : value),
-    [],
-  );
-  const addAgentConfiguration = useCallback(
-    () => setAgentConfigurations((current) => [...current, createAgentConfigurationDraft()]),
-    [],
-  );
+  const unshareableHost = unshareableHostConnect({
+    selection,
+    assignments,
+    authority,
+    resources: catalog.resources,
+  });
   const submit = useCallback(
     () =>
       void submitAccessAssignment({
@@ -203,29 +148,18 @@ function AccessAssignmentForm({
         assignments,
         members,
         teams,
-        agentConfigurations,
-        fastMode,
-        accessLevel,
+        agentConfigurations: draft.agentConfigurations,
+        fastMode: draft.fastMode,
+        accessLevel: draft.accessLevel,
         save,
       }),
-    [
-      accessLevel,
-      agentConfigurations,
-      assignments,
-      editing,
-      fastMode,
-      isCurrent,
-      members,
-      save,
-      selection,
-      teams,
-    ],
+    [assignments, draft, editing, isCurrent, members, save, selection, teams],
   );
 
   return (
     <SettingsSection title={editing ? "Edit access" : "Grant access"}>
       <View style={[settingsStyles.card, styles.form]}>
-        {!initial.constraints.valid ? (
+        {!draft.constraintsValid ? (
           <Alert
             variant="error"
             title="These constraints cannot be edited by this app version."
@@ -234,10 +168,10 @@ function AccessAssignmentForm({
         ) : null}
         <SelectField
           label="Team, Member or Guest"
-          value={subjectKeyValue}
-          selectedDisplay={selectedOptionDisplay(subjectOptions, subjectKeyValue)}
+          value={draft.subjectKeyValue}
+          selectedDisplay={selectedOptionDisplay(subjectOptions, draft.subjectKeyValue)}
           options={subjectOptions}
-          onChange={setSubjectKeyValue}
+          onChange={draft.setSubjectKeyValue}
           placeholder="Choose a Team, Member or Guest"
           emptyText="Create a Team or invite a Member first."
           searchable
@@ -248,12 +182,12 @@ function AccessAssignmentForm({
         />
         <SelectField
           label="Resource"
-          value={resourceKeyValue}
-          selectedDisplay={selectedOptionDisplay(resourceOptions, resourceKeyValue)}
+          value={draft.resourceKeyValue}
+          selectedDisplay={selectedOptionDisplay(resourceOptions, draft.resourceKeyValue)}
           options={resourceOptions}
-          onChange={changeResource}
-          placeholder="Choose a Channel Route, Host, Project, or Automation"
-          emptyText="No resources are available."
+          onChange={draft.changeResource}
+          placeholder="Choose a Host, Project, Team, Channel Route, or Automation"
+          emptyText="No resources you can share are available."
           searchable
           searchPlaceholder="Search resources or parent Host"
           maxOptionsPerGroup={50}
@@ -265,55 +199,57 @@ function AccessAssignmentForm({
             label="Also apply to"
             hint="Projects on the same Host, each written as its own assignment. To cover every Project, including ones added later, grant the Host instead."
             options={siblingOptions}
-            value={alsoResourceKeys}
-            onChange={changeAlsoResources}
+            value={draft.alsoResourceKeys}
+            onChange={draft.changeAlsoResources}
             disabled={identityDisabled}
             placeholder="Only the Resource above"
             searchPlaceholder="Search Projects"
           />
         ) : null}
-        <SelectField
-          label="Access level"
-          value={accessLevel}
-          selectedDisplay={selectedOptionDisplay(selection.levelOptions, accessLevel)}
-          options={selection.levelOptions}
-          onChange={setAccessLevel}
-          placeholder="Choose an access level"
-          emptyText="Choose a supported resource first."
-          title="Access level"
-          disabled={pending || selection.resource === undefined}
+        <AccessLevelFields
+          selection={selection}
+          draft={draft}
+          editing={editing}
+          pending={pending}
         />
-        {selection.resource ? (
-          <AccessLevelSummary
-            privileges={grantedPrivileges(selection, fastMode)}
-            savedPrivileges={editing?.privileges}
-            resourceKind={selection.resource.kind}
-            subjectKind={selection.subject?.kind}
-          />
-        ) : null}
         {selection.resource?.kind === "channel_account" ? (
           <ConversationFields
             channelAccount={selection.channelAccount}
-            conversation={conversation}
-            setConversation={setConversation}
-            conversationIds={conversationIds}
-            setConversationIds={setConversationIds}
+            conversation={draft.conversation}
+            setConversation={draft.setConversation}
+            conversationIds={draft.conversationIds}
+            setConversationIds={draft.setConversationIds}
             pending={pending}
           />
         ) : null}
         {selection.needsAgentConfiguration ? (
           <AgentConfigurationSection
-            catalog={agentConfigurationCatalog}
-            configurations={agentConfigurations}
-            setConfigurations={setAgentConfigurations}
-            addConfiguration={addAgentConfiguration}
-            fastMode={fastMode}
-            setFastMode={setFastMode}
+            catalog={shareableAgentConfigurationCatalog(
+              selection.resource?.agentConfigurationCatalog,
+              selection.holdings,
+            )}
+            configurations={draft.agentConfigurations}
+            setConfigurations={draft.setAgentConfigurations}
+            addConfiguration={draft.addAgentConfiguration}
+            fastMode={draft.fastMode}
+            setFastMode={draft.setFastMode}
             pending={pending}
           />
         ) : null}
+        {unshareableHost !== null ? (
+          <Alert
+            variant="warning"
+            title={`Needs Connect on ${unshareableHost} first`}
+            description={`This person cannot reach the Project without Connect on its Host, and you cannot share ${unshareableHost}. Ask someone who can share that Host to grant Connect first.`}
+          />
+        ) : null}
+        {grantorError !== null ? (
+          <Alert variant="error" title="Above what you can grant" description={grantorError} />
+        ) : null}
         <Button
-          disabled={pending || !selection.valid || !initial.constraints.valid}
+          disabled={
+            pending || !selection.valid || !draft.constraintsValid || unshareableHost !== null
+          }
           onPress={submit}
         >
           {editing ? "Save access" : "Grant access"}
@@ -325,6 +261,57 @@ function AccessAssignmentForm({
         ) : null}
       </View>
     </SettingsSection>
+  );
+}
+
+/** The level picker, the levels held back, Can share, and what the choice does. */
+function AccessLevelFields({
+  selection,
+  draft,
+  editing,
+  pending,
+}: {
+  selection: AssignmentSelection;
+  draft: ReturnType<typeof useAccessAssignmentDraft>;
+  editing: AccessAssignment | null;
+  pending: boolean;
+}) {
+  return (
+    <>
+      <SelectField
+        label="Access level"
+        value={draft.accessLevel}
+        selectedDisplay={selectedOptionDisplay(selection.levelOptions, draft.accessLevel)}
+        options={selection.levelOptions}
+        onChange={draft.changeLevel}
+        placeholder="Choose an access level"
+        emptyText="Choose a supported resource first."
+        title="Access level"
+        disabled={pending || selection.resource === undefined}
+      />
+      {selection.levelsAboveOwn.length > 0 ? (
+        <Text style={settingsStyles.rowHint}>
+          Above your own level, not offered: {selection.levelsAboveOwn.join(", ")}
+        </Text>
+      ) : null}
+      {selection.resource ? (
+        <CanShareField
+          state={selection.canShare}
+          resourceKind={selection.resource.kind}
+          value={draft.canShare}
+          onChange={draft.setCanShare}
+          disabled={pending}
+        />
+      ) : null}
+      {selection.resource ? (
+        <AccessLevelSummary
+          privileges={grantedPrivileges(selection, draft.fastMode)}
+          savedPrivileges={editing?.privileges}
+          resourceKind={selection.resource.kind}
+          subjectKind={selection.subject?.kind}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -432,7 +419,12 @@ function AgentConfigurationSection({
             Off by default because Fast mode may cost more.
           </Text>
         </View>
-        <Switch value={fastMode} onValueChange={setFastMode} disabled={pending} />
+        <Switch
+          value={fastMode}
+          onValueChange={setFastMode}
+          disabled={pending}
+          accessibilityLabel="Use Fast mode"
+        />
       </View>
     </>
   );

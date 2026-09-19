@@ -568,6 +568,20 @@
       "when": 1789689777038,
       "tag": "0080_invitation_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1789792555248,
+      "tag": "0081_access_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1789794043886,
+      "tag": "0082_automation_paused_reason",
+      "breakpoints": true
     }
   ]
 }

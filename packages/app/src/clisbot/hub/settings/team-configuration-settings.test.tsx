@@ -14,6 +14,8 @@ const hub = vi.hoisted(() => ({
   signedIn: null as Record<string, unknown> | null,
   inviteMember: vi.fn(async (_input: { email: string }) => {}),
   cancelInvitation: vi.fn(async () => {}),
+  changeMemberRole: vi.fn(async (_input: { memberId: string; role: string }) => {}),
+  removeMember: vi.fn(async (_memberId: string) => {}),
   api: () => ({ post: fixtures.post, delete: fixtures.delete }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
@@ -64,33 +66,6 @@ vi.mock("@/data/query", () => ({
   useFetchQuery: ({ queryKey }: { queryKey: string[] }) => fixtures.queries[queryKey.at(-1)!],
 }));
 vi.mock("./managed-host-row", () => ({ ManagedHostRow: () => null }));
-// The section is covered by team-members-section.test.tsx (its Combobox pulls native-only
-// modules); this stub only exercises the wiring from the Team detail to the management API.
-vi.mock("./team-members-section", () => ({
-  TeamMembersSection: ({
-    addMembers,
-    removeMember,
-  }: {
-    addMembers(userIds: string[]): Promise<string[]>;
-    removeMember(userId: string): void;
-  }) => {
-    const add = React.useCallback(
-      () => void addMembers(["user-2", "user-3"]).then(fixtures.notAdded),
-      [addMembers],
-    );
-    const remove = React.useCallback(() => removeMember("user-1"), [removeMember]);
-    return (
-      <div>
-        <button type="button" onClick={add}>
-          Stub add
-        </button>
-        <button type="button" onClick={remove}>
-          Stub remove
-        </button>
-      </div>
-    );
-  },
-}));
 vi.mock("./connection-result", () => ({ HubConnectionResultNotice: () => null }));
 vi.mock("./connection-continuation", () => ({ HubConnectionContinuationNotice: () => null }));
 vi.mock("../use-connection-continuation", () => ({
@@ -143,8 +118,7 @@ vi.mock("./automation-settings", () => ({ AutomationSettings: () => null }));
 vi.mock("./access-settings", () => ({ AccessSettings: () => null }));
 vi.mock("./api-key-settings", () => ({ ApiKeySettings: () => null }));
 vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings: () => null }));
-vi.mock("./channel-identity-settings", () => ({
-  ChannelIdentitySettings: () => null,
+vi.mock("./channel-identity-self-link", () => ({
   ChannelIdentitySelfLinkSettings: () => null,
 }));
 vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
@@ -269,36 +243,141 @@ vi.mock("@/components/ui/select-field", () => ({
     value,
     options,
     onChange,
+    disabled,
+    hint,
   }: {
     label: string;
     value: string;
     options: { value: string; label: string }[];
     onChange(value: string): void;
+    disabled?: boolean;
+    hint?: string;
   }) => {
     const change = React.useCallback(
       (event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value),
       [onChange],
     );
     return (
-      <label>
-        {label}
-        <select value={value} onChange={change}>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div>
+        <label>
+          {label}
+          <select value={value} disabled={disabled} onChange={change}>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {hint === undefined ? null : <p>{hint}</p>}
+      </div>
     );
   },
 }));
-vi.mock("@/components/ui/form-field", () => ({
-  Field: ({ label, children }: { label: string; children: ReactNode }) => (
-    <label>
-      {label}
+vi.mock("@/components/ui/status-badge", () => ({
+  StatusBadge: ({ label }: { label: string }) => <span>{label}</span>,
+}));
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ accessibilityLabel }: { accessibilityLabel: string }) => (
+    <span>{accessibilityLabel}</span>
+  ),
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onSelect,
+    disabled,
+  }: {
+    children: ReactNode;
+    onSelect(): void;
+    disabled?: boolean;
+  }) => (
+    <button type="button" disabled={disabled} onClick={onSelect}>
       {children}
-    </label>
+    </button>
+  ),
+}));
+vi.mock("@/components/adaptive-modal-sheet", () => ({
+  AdaptiveModalSheet: ({
+    header,
+    visible,
+    children,
+    footer,
+  }: {
+    header: { title: string };
+    visible: boolean;
+    children: ReactNode;
+    footer?: ReactNode;
+  }) =>
+    visible ? (
+      <div role="dialog" aria-label={header.title}>
+        {children}
+        {footer}
+      </div>
+    ) : null,
+}));
+vi.mock("@/components/rename-modal", () => ({
+  AdaptiveRenameModal: ({
+    title,
+    submitLabel,
+    onSubmit,
+    onClose,
+  }: {
+    title: string;
+    submitLabel: string;
+    onSubmit(value: string): Promise<void>;
+    onClose(): void;
+  }) => (
+    <StubRenameModal
+      title={title}
+      submitLabel={submitLabel}
+      onSubmit={onSubmit}
+      onClose={onClose}
+    />
+  ),
+}));
+
+function StubRenameModal({
+  title,
+  submitLabel,
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  submitLabel: string;
+  onSubmit(value: string): Promise<void>;
+  onClose(): void;
+}) {
+  const [value, setValue] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const change = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => setValue(event.target.value),
+    [],
+  );
+  const submit = React.useCallback(() => {
+    void onSubmit(value)
+      .then(onClose)
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "failed"));
+  }, [onClose, onSubmit, value]);
+  return (
+    <div role="dialog" aria-label={title}>
+      <input aria-label="Team name" value={value} onChange={change} />
+      {error === null ? null : <div role="alert">{error}</div>}
+      <button type="button" onClick={submit}>
+        {submitLabel}
+      </button>
+    </div>
+  );
+}
+vi.mock("@/components/ui/form-field", () => ({
+  Field: ({ label, error, children }: { label: string; error?: string; children: ReactNode }) => (
+    <div>
+      <label>
+        {label}
+        {children}
+      </label>
+      {error === undefined ? null : <p>{error}</p>}
+    </div>
   ),
   FormTextInput: ({
     initialValue,
@@ -375,7 +454,7 @@ vi.mock("@/components/ui/button", () => ({
   ),
 }));
 
-const capabilities = { manageMembers: true, manageResources: true };
+const capabilities = { manageMembers: true, manageOwners: true, manageResources: true };
 const account = { id: "owner", name: "Owner", email: "owner@example.test" };
 const member = {
   id: "membership-1",
@@ -383,6 +462,22 @@ const member = {
   name: "Alice",
   email: "alice@example.test",
   role: "member",
+};
+const bao = {
+  id: "membership-2",
+  userId: "user-2",
+  name: "Nguyễn Bảo",
+  email: "bao@example.test",
+  role: "admin",
+};
+const teamGrant = {
+  id: "grant-1",
+  subjectKind: "team",
+  subjectId: "team-1",
+  resourceKind: "channel_account",
+  resourceId: "channel-1",
+  privileges: ["channel.read", "channel.reply"],
+  constraints: {},
 };
 function query(data: unknown) {
   return { data, isPending: false, isError: false, error: null, refetch: vi.fn(async () => ({})) };
@@ -402,21 +497,9 @@ beforeEach(() => {
       ],
     }),
     "channel-identities": query({ identities: [] }),
-    "access-assignments": query({
-      assignments: [
-        {
-          id: "grant-1",
-          subjectKind: "team",
-          subjectId: "team-1",
-          resourceKind: "channel",
-          resourceId: "channel-1",
-          privileges: ["channel.read", "channel.reply"],
-          constraints: {},
-        },
-      ],
-    }),
-    "access-catalog": query({
-      resources: [{ kind: "channel", id: "channel-1", name: "Customer chat" }],
+    "access-assignments?include=team": query({ assignments: [teamGrant] }),
+    "access-catalog?include=team": query({
+      resources: [{ kind: "channel_account", id: "channel-1", name: "Customer chat" }],
       accessLevels: {},
     }),
     connections: query({ connections: [], providerApplications: [] }),
@@ -433,65 +516,112 @@ function chooseTeam(name: string) {
   fireEvent.click(screen.getByLabelText(`Teams: ${name}`));
 }
 
-describe("Team settings tabs", () => {
-  it("opens on Members with counts and a search across name, email, and Team", () => {
-    fixtures.queries.members = query({
-      members: [
-        member,
-        {
-          id: "membership-2",
-          userId: "user-2",
-          name: "Nguyễn Bảo",
-          email: "bao@example.test",
-          role: "admin",
-        },
-      ],
-    });
+function openInvite() {
+  fireEvent.click(screen.getByRole("button", { name: "Invite people" }));
+  return screen.getByRole("dialog", { name: "Invite people" });
+}
+
+function typePeople(text: string) {
+  fireEvent.change(screen.getByLabelText("People"), { target: { value: text } });
+}
+
+function openMember(name: string) {
+  const row = screen.getByText(name).parentElement!.parentElement!;
+  fireEvent.click(within(row).getByRole("button", { name: "View" }));
+}
+
+function openTeam(name: string) {
+  route.params = { view: "teams" };
+  render(<HubSettingsContent section="team" />);
+  const row = screen.getByText(name).parentElement!.parentElement!;
+  fireEvent.click(within(row).getByRole("button", { name: "View" }));
+}
+
+describe("People tabs", () => {
+  it("opens on Members with filter chips and a search across name, email, and Team", () => {
+    fixtures.queries.members = query({ members: [member, bao] });
     render(<HubSettingsContent section="team" />);
-    const overview = screen.getByRole("heading", { name: "Overview" }).closest("section")!;
-    expect(within(overview).getByText("Without a Team").previousSibling?.textContent).toBe("1");
-    expect(screen.getByText("Support · 0 Channel identities")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "People" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Admins (1)" })).toBeTruthy();
+    expect(screen.getAllByText("No chat bots yet")).toHaveLength(2);
     fireEvent.change(screen.getByLabelText("Search name, email, or Team"), {
       target: { value: "nguyen" },
     });
     expect(screen.getByText("1 of 2 Members")).toBeTruthy();
     expect(screen.queryByText("Alice")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "Without a Team" }));
+    fireEvent.change(screen.getByLabelText("Search name, email, or Team"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "No Team (1)" }));
     expect(screen.getByText("Nguyễn Bảo")).toBeTruthy();
+    expect(screen.queryByText("Alice")).toBeNull();
   });
-  it("keeps the chosen tab in the route", () => {
+  it("keeps the chosen tab in the route and offers Invitations only to Member managers", () => {
     render(<HubSettingsContent section="team" />);
     openTab("Teams");
     expect(route.params).toEqual({ view: "teams" });
-    expect(screen.getByRole("heading", { name: "Add people to Teams" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New Team" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Invitations" })).toBeTruthy();
+  });
+  it("shows where each Member is recognized when they chat", () => {
+    fixtures.queries.connections = query({
+      connections: [
+        {
+          id: "c1",
+          provider: "slack",
+          providerApplicationId: null,
+          name: "slack-c1",
+          externalName: "VeXeRe",
+          status: "active",
+          identityRealm: "slack:T1",
+          identityRealmScope: "tenant",
+          consumers: [{ resourceKind: "channel_account", resourceId: "slack/dai", name: "dai" }],
+        },
+      ],
+      providerApplications: [],
+    });
+    fixtures.queries.members = query({ members: [member, bao] });
+    fixtures.queries["channel-identities"] = query({
+      identities: [
+        {
+          id: "i1",
+          memberId: member.id,
+          identityRealm: "slack:T1",
+          connectionId: "c1",
+          externalSubjectId: "U1",
+          displayName: null,
+        },
+      ],
+    });
+    render(<HubSettingsContent section="team" />);
+    expect(screen.getByText("✓ Slack · VeXeRe")).toBeTruthy();
+    expect(screen.getByText("Slack · VeXeRe · not linked")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "No chat account (1)" }));
+    expect(screen.getByText("Nguyễn Bảo")).toBeTruthy();
+    expect(screen.queryByText("Alice")).toBeNull();
   });
 });
 
-describe("Add people to Teams", () => {
-  it("starts a fresh draft when the signed-in account changes", () => {
-    route.params = { view: "teams" };
-    const ui = render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Emails"), {
-      target: { value: "private-draft@example.test" },
-    });
+describe("Invite people", () => {
+  it("starts a fresh draft each time the modal opens", () => {
+    render(<HubSettingsContent section="team" />);
+    openInvite();
+    typePeople("private-draft@example.test");
     chooseTeam("Support");
-    hub.signedIn = {
-      account: { ...account, id: "other-owner" },
-      organization: { id: "organization" },
-      capabilities,
-    };
-    ui.rerender(<HubSettingsContent section="team" />);
-    expect((screen.getByLabelText("Emails") as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    openInvite();
+    expect((screen.getByLabelText("People") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Teams: Support") as HTMLInputElement).checked).toBe(false);
   });
-  it("sends one invitation that joins every chosen Team, after showing their access", async () => {
-    route.params = { view: "teams" };
+  it("sends one invitation that joins every chosen Team, after previewing their access", async () => {
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
+    openInvite();
+    typePeople("new@example.test");
     chooseTeam("Support");
     chooseTeam("Sales");
-    expect(screen.getByText("Customer chat")).toBeTruthy();
-    expect(screen.getByText("channel read, channel reply")).toBeTruthy();
+    expect(screen.getByText("1 invitation will be sent")).toBeTruthy();
+    expect(screen.getByText(/1 Channel Route/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     await waitFor(() =>
       expect(hub.inviteMember).toHaveBeenCalledWith({
@@ -501,15 +631,17 @@ describe("Add people to Teams", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText("Sent 1 invitation.")).toBeTruthy());
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
-  it("adds existing Members now and invites only new emails", async () => {
-    route.params = { view: "teams" };
+  it("recognizes Members by name or email, adds them now, and invites only new emails", async () => {
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Emails"), {
-      target: { value: "Alice@example.test, new@example.test" },
-    });
+    openInvite();
+    typePeople("Alice, new@example.test");
     chooseTeam("Support");
     chooseTeam("Sales");
+    expect(
+      screen.getByText("1 Member joins Support, Sales now · 1 invitation will be sent"),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add 1 and invite 1" }));
     await waitFor(() => expect(hub.inviteMember).toHaveBeenCalledOnce());
     // Alice is already in Support, so only Sales is added.
@@ -519,23 +651,16 @@ describe("Add people to Teams", () => {
       { userId: "user-1" },
       expect.anything(),
     );
-    expect(hub.inviteMember).toHaveBeenCalledWith({
-      email: "new@example.test",
-      role: "member",
-      teamIds: ["team-1", "team-2"],
-    });
   });
-  it("keeps refused addresses for retry", async () => {
+  it("keeps refused addresses in the field for retry", async () => {
     hub.inviteMember.mockImplementation(async (input: { email: string }) => {
       if (input.email === "taken@example.test") {
         throw new Error("Hub account request failed (409).");
       }
     });
-    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Emails"), {
-      target: { value: "One@example.test, taken@example.test one@example.test" },
-    });
+    openInvite();
+    typePeople("One@example.test, taken@example.test one@example.test");
     fireEvent.click(screen.getByRole("button", { name: "Send 2 invitations" }));
     await waitFor(() =>
       expect(
@@ -543,16 +668,23 @@ describe("Add people to Teams", () => {
       ).toBeTruthy(),
     );
     expect(hub.inviteMember).toHaveBeenCalledWith({ email: "one@example.test", role: "member" });
+    expect(screen.getByRole("dialog", { name: "Invite people" })).toBeTruthy();
     hub.inviteMember.mockImplementation(async () => {});
   });
+  it("names an entry that is neither a Member nor an email", () => {
+    render(<HubSettingsContent section="team" />);
+    openInvite();
+    typePeople("Nobody, bad@");
+    expect(screen.getByText("Not an email: bad@ · Not a Member: Nobody")).toBeTruthy();
+  });
   it("blocks until failed Team access can be reviewed and offers retry", () => {
-    const access = fixtures.queries["access-assignments"]!;
+    const access = fixtures.queries["access-assignments?include=team"]!;
     access.data = undefined;
     access.isError = true;
     access.error = new Error("Access unavailable");
-    route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
-    fireEvent.change(screen.getByLabelText("Emails"), { target: { value: "new@example.test" } });
+    openInvite();
+    typePeople("new@example.test");
     chooseTeam("Support");
     const submit = screen.getByRole("button", { name: "Send invitation" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
@@ -560,69 +692,180 @@ describe("Add people to Teams", () => {
     expect(hub.inviteMember).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(access.refetch).toHaveBeenCalledOnce();
-    expect(fixtures.queries["access-catalog"]!.refetch).toHaveBeenCalledOnce();
   });
-  it("starts a draft for a Team from its detail", () => {
-    route.params = { view: "teams" };
-    render(<HubSettingsContent section="team" />);
-    const section = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
-    fireEvent.click(within(section).getAllByRole("button", { name: "View" })[0]!);
-    fireEvent.click(screen.getByRole("button", { name: "Add people to this Team" }));
-    expect((screen.getByLabelText("Teams: Support") as HTMLInputElement).checked).toBe(true);
+  it("opens with the Team chosen from its detail, and with the Member from a No Team row", () => {
+    fixtures.queries.members = query({ members: [member, bao] });
+    const ui = render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to a Team" }));
+    expect((screen.getByLabelText("People") as HTMLInputElement).value).toBe("bao@example.test");
+    ui.unmount();
+    openTeam("Sales");
+    fireEvent.click(screen.getByRole("button", { name: "Add people" }));
+    expect((screen.getByLabelText("Teams: Sales") as HTMLInputElement).checked).toBe(true);
   });
 });
 
-describe("Team settings regressions", () => {
+describe("Member roles", () => {
+  it("asks before making someone an Owner, then changes the role", async () => {
+    const { confirmDialog } = await import("@/utils/confirm-dialog");
+    vi.mocked(confirmDialog).mockResolvedValue(true);
+    render(<HubSettingsContent section="team" />);
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "owner" } });
+    await waitFor(() =>
+      expect(hub.changeMemberRole).toHaveBeenCalledWith({
+        memberId: "membership-1",
+        role: "owner",
+      }),
+    );
+    expect(confirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Make Alice an Owner?", confirmLabel: "Make Owner" }),
+    );
+  });
+  it("changes to Admin without asking, and shows the Hub's refusal", async () => {
+    const { confirmDialog } = await import("@/utils/confirm-dialog");
+    hub.changeMemberRole.mockRejectedValueOnce(new Error("Hub account request failed (403)."));
+    render(<HubSettingsContent section="team" />);
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "admin" } });
+    await waitFor(() => expect(hub.changeMemberRole).toHaveBeenCalledOnce());
+    expect(confirmDialog).not.toHaveBeenCalled();
+    openMember("Alice");
+    await waitFor(() =>
+      expect(screen.getByText("Only an Owner changes an Owner's role.")).toBeTruthy(),
+    );
+  });
+  it("locks an Owner's role for an Admin, and the last Owner for everyone", () => {
+    const owner = { ...bao, role: "owner" };
+    fixtures.queries.members = query({ members: [member, owner] });
+    hub.signedIn = {
+      account,
+      organization: { id: "organization" },
+      capabilities: { ...capabilities, manageOwners: false },
+    };
+    const ui = render(<HubSettingsContent section="team" />);
+    const [aliceRole, ownerRole] = screen.getAllByLabelText("Role") as HTMLSelectElement[];
+    expect(aliceRole!.disabled).toBe(false);
+    expect(within(aliceRole!).queryByRole("option", { name: "Owner" })).toBeNull();
+    expect(ownerRole!.disabled).toBe(true);
+    expect(screen.getByText("Only an Owner changes an Owner's role.")).toBeTruthy();
+    ui.unmount();
+    hub.signedIn = { account, organization: { id: "organization" }, capabilities };
+    render(<HubSettingsContent section="team" />);
+    expect(screen.getByText("The last Owner cannot step down.")).toBeTruthy();
+  });
+});
+
+describe("Member detail", () => {
   it("stays on the Member when removing fails, and shows why", async () => {
     const { confirmDialog } = await import("@/utils/confirm-dialog");
     vi.mocked(confirmDialog).mockResolvedValue(true);
-    (hub as Record<string, unknown>)["removeMember"] = vi.fn(async () => {
-      throw new Error("Owner cannot be removed.");
-    });
+    hub.removeMember.mockRejectedValueOnce(new Error("Owner cannot be removed."));
     render(<HubSettingsContent section="team" />);
-    fireEvent.click(screen.getAllByRole("button", { name: "View" })[0]!);
+    openMember("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Remove Member" }));
     await waitFor(() => expect(screen.getByText("Owner cannot be removed.")).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Back to Members" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to People" })).toBeTruthy();
   });
-  it("clears the new Team name after creating it", async () => {
+  it("groups access by resource kind with its source, and keeps raw privileges behind Details", () => {
+    fixtures.queries["access-assignments?include=team"] = query({
+      assignments: [
+        teamGrant,
+        {
+          id: "grant-2",
+          subjectKind: "member",
+          subjectId: member.id,
+          resourceKind: "daemon",
+          resourceId: "host-1",
+          privileges: ["daemon.connect", "project.use"],
+          constraints: {},
+        },
+      ],
+    });
+    fixtures.queries["access-catalog?include=team"] = query({
+      resources: [
+        { kind: "channel_account", id: "channel-1", name: "Customer chat" },
+        { kind: "daemon", id: "host-1", name: "sandbox" },
+      ],
+      accessLevels: { daemon: { office_worker: ["daemon.connect", "project.use"] } },
+    });
+    render(<HubSettingsContent section="team" />);
+    openMember("Alice");
+    const access = screen.getByRole("heading", { name: "Access" }).closest("section")!;
+    expect(within(access).getByText("Hosts").nextSibling?.textContent).toContain("sandbox");
+    expect(within(access).getByText("Office worker · Direct")).toBeTruthy();
+    expect(
+      within(access).getByText("Every Project on this Host, including Projects added later"),
+    ).toBeTruthy();
+    expect(within(access).getByText("2 privileges · Via Support")).toBeTruthy();
+    expect(within(access).queryByText("channel read, channel reply")).toBeNull();
+    const chatRow = within(access).getByText("Customer chat").parentElement!.parentElement!;
+    fireEvent.click(within(chatRow).getByRole("button", { name: "Details" }));
+    expect(within(access).getByText("channel read, channel reply")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Chat accounts" })).toBeTruthy();
+  });
+});
+
+describe("Teams", () => {
+  it("creates a Team from the New Team dialog", async () => {
     route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
-    const inputs = screen.getAllByRole("textbox");
-    const name = inputs[inputs.length - 1] as HTMLInputElement;
-    fireEvent.change(name, { target: { value: "Ops" } });
+    fireEvent.click(screen.getByRole("button", { name: "New Team" }));
+    fireEvent.change(screen.getByLabelText("Team name"), { target: { value: "Ops" } });
     fireEvent.click(screen.getByRole("button", { name: "Create Team" }));
     await waitFor(() =>
       expect(fixtures.post).toHaveBeenCalledWith("teams", { name: "Ops" }, expect.anything()),
     );
-    await waitFor(() =>
-      expect(
-        (screen.getByRole("button", { name: "Create Team" }) as HTMLButtonElement).disabled,
-      ).toBe(true),
-    );
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New Team" })).toBeNull());
   });
-  it("renews a pending invitation with its Teams", async () => {
+  it("lists each Team with its people and a one-line access summary", () => {
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    expect(screen.getByText("1 Channel Route")).toBeTruthy();
+    expect(screen.getByText("No access")).toBeTruthy();
+  });
+  it("does not show access data or invitations to a Member who cannot manage them", () => {
+    hub.signedIn = {
+      account,
+      organization: { id: "organization" },
+      capabilities: { manageMembers: false, manageOwners: false, manageResources: false },
+    };
+    const ui = render(<HubSettingsContent section="team" />);
+    expect(screen.queryByRole("button", { name: "Invite people" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Invitations" })).toBeNull();
+    expect(screen.queryByLabelText("Role")).toBeNull();
+    ui.unmount();
+    route.params = { view: "teams" };
+    render(<HubSettingsContent section="team" />);
+    expect(screen.queryByRole("button", { name: "New Team" })).toBeNull();
+    expect(screen.getByText("1 Member")).toBeTruthy();
+    expect(screen.queryByText("No access")).toBeNull();
+  });
+});
+
+describe("Invitations", () => {
+  const invitation = {
+    id: "invitation-1",
+    email: "pending@example.test",
+    role: "admin",
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    link: "https://hub.example.test/?invitation=invitation-1",
+    teams: [{ id: "team-1", name: "Support" }],
+  };
+  it("resends a pending invitation with its Teams and filters by expiry", async () => {
     hub.signedIn = {
       account,
       organization: { id: "organization" },
       capabilities,
-      team: {
-        invitations: [
-          {
-            id: "invitation-1",
-            email: "pending@example.test",
-            role: "admin",
-            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
-            link: "https://hub.example.test/?invitation=invitation-1",
-            teams: [{ id: "team-1", name: "Support" }],
-          },
-        ],
-      },
+      team: { invitations: [invitation] },
     };
-    route.params = { view: "teams" };
+    route.params = { view: "invitations" };
     render(<HubSettingsContent section="team" />);
     expect(screen.getByText("Admin · Support")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+    expect(screen.getByText(/Expiring soon · 59 min/)).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Expiring soon (1)" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Expired (0)" }));
+    expect(screen.getByText("No invitations match.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Invitations (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resend" }));
     await waitFor(() =>
       expect(hub.inviteMember).toHaveBeenCalledWith({
         email: "pending@example.test",
@@ -630,74 +873,96 @@ describe("Team settings regressions", () => {
         teamId: "team-1",
       }),
     );
-  });
-  it("does not show access data to a Member who cannot manage it", () => {
-    hub.signedIn = {
-      account,
-      organization: { id: "organization" },
-      capabilities: { manageMembers: false, manageResources: false },
-    };
-    const ui = render(<HubSettingsContent section="team" />);
-    expect(screen.queryByRole("button", { name: "Add people" })).toBeNull();
-    ui.unmount();
-    route.params = { view: "teams" };
-    render(<HubSettingsContent section="team" />);
-    expect(screen.queryByRole("heading", { name: "Add people to Teams" })).toBeNull();
-    expect(screen.getByText("1 Member")).toBeTruthy();
-    expect(screen.queryByText(/access assignment/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel invitation" }));
+    await waitFor(() => expect(hub.cancelInvitation).toHaveBeenCalledWith("invitation-1"));
   });
 });
 
 describe("Team access navigation", () => {
-  it.each([
-    { tab: "Members", label: "Members", kind: "member", id: "membership-1" },
-    { tab: "Teams", label: "Teams", kind: "team", id: "team-1" },
-  ])("preserves $kind context when managing access", ({ tab, label, kind, id }) => {
+  it("preserves the Member context when managing access", () => {
     render(<HubSettingsContent section="team" />);
-    openTab(tab);
-    const section = screen.getByRole("heading", { name: label }).closest("section")!;
-    fireEvent.click(within(section).getAllByRole("button", { name: "View" })[0]!);
+    openMember("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
     expect(fixtures.push).toHaveBeenCalledWith({
       pathname: "/settings/hub/[hubSection]",
-      params: { hubSection: "access", subjectKind: kind, subjectId: id },
+      params: { hubSection: "access", subjectKind: "member", subjectId: "membership-1" },
+    });
+  });
+  it("preserves the Team context when managing access", () => {
+    openTeam("Support");
+    openTab("Access");
+    fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
+    expect(fixtures.push).toHaveBeenCalledWith({
+      pathname: "/settings/hub/[hubSection]",
+      params: { hubSection: "access", subjectKind: "team", subjectId: "team-1" },
     });
   });
 });
 
-describe("Team detail Members wiring", () => {
-  function openTeam() {
-    route.params = { view: "teams" };
-    render(<HubSettingsContent section="team" />);
-    const section = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
-    const row = within(section).getByText("Support").parentElement!.parentElement!;
-    fireEvent.click(within(row).getByRole("button", { name: "View" }));
-  }
-  it("adds each picked Member and reports the refused ones back to the picker", async () => {
-    fixtures.post.mockImplementation(async (_path: string, body?: unknown) => {
-      if ((body as { userId: string }).userId === "user-3") throw new Error("Member unavailable.");
+describe("Team detail Members", () => {
+  it("adds people to the Team through Invite people and keeps refusals for retry", async () => {
+    fixtures.post.mockImplementation(async (path: string) => {
+      if (path === "teams/team-2/members") throw new Error("Member unavailable.");
       return {};
     });
-    openTeam();
-    fireEvent.click(screen.getByRole("button", { name: "Stub add" }));
-    await waitFor(() => expect(fixtures.notAdded).toHaveBeenCalledWith(["user-3"]));
+    openTeam("Sales");
+    fireEvent.click(screen.getByRole("button", { name: "Add people" }));
+    typePeople("Alice");
+    fireEvent.click(screen.getByRole("button", { name: "Add to Teams" }));
+    // The modal and the Team behind it share one mutation error.
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("0 of 1 done. alice@example.test: Member unavailable.").length,
+      ).toBeGreaterThan(0),
+    );
     expect(fixtures.post).toHaveBeenCalledWith(
-      "teams/team-1/members",
-      { userId: "user-2" },
+      "teams/team-2/members",
+      { userId: "user-1" },
       expect.anything(),
     );
-    expect(fixtures.queries.members!.refetch).toHaveBeenCalled();
-    expect(
-      screen.getByText("Added 1 of 2 Members. Member unavailable. The rest are still selected."),
-    ).toBeTruthy();
     fixtures.post.mockImplementation(async () => ({}));
   });
   it("removes a Member from the Team, not from the organization", async () => {
-    openTeam();
-    fireEvent.click(screen.getByRole("button", { name: "Stub remove" }));
+    openTeam("Support");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() =>
       expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1/members/user-1"),
     );
+    expect(hub.removeMember).not.toHaveBeenCalled();
+  });
+  it("appoints a Team Admin as an access assignment on the Team", async () => {
+    openTeam("Support");
+    fireEvent.change(screen.getByLabelText("Team role"), { target: { value: "admin" } });
+    await waitFor(() =>
+      expect(fixtures.post).toHaveBeenCalledWith(
+        "access-assignments",
+        {
+          subjectKind: "member",
+          subjectId: "membership-1",
+          resourceKind: "team",
+          resourceId: "team-1",
+          privileges: ["hub.access.manage"],
+          constraints: {},
+        },
+        expect.anything(),
+      ),
+    );
+  });
+  it("disables Team Admin when the Hub does not know the Team resource yet", async () => {
+    const { HubApiError } = await import("../api-client");
+    fixtures.post.mockRejectedValueOnce(new HubApiError(404, "not_found", "Not found (404)."));
+    openTeam("Support");
+    fireEvent.change(screen.getByLabelText("Team role"), { target: { value: "admin" } });
+    await waitFor(() => expect(screen.getByText("Team Admin needs a newer Hub.")).toBeTruthy());
+    expect((screen.getByLabelText("Team role") as HTMLSelectElement).disabled).toBe(true);
+  });
+  it("renames and deletes the Team from its Settings tab", async () => {
+    const { confirmDialog } = await import("@/utils/confirm-dialog");
+    vi.mocked(confirmDialog).mockResolvedValue(true);
+    openTeam("Support");
+    openTab("Settings");
+    fireEvent.click(screen.getByRole("button", { name: "Delete Team" }));
+    await waitFor(() => expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1"));
   });
 });
 

@@ -2427,7 +2427,12 @@ it("atomically grants Project access with its preserved Daemon connection access
   assert.equal(response.status, 201, JSON.stringify(await response.clone().json()));
   const assignments = (await response.json()).assignments;
   assert.equal(assignments.length, 2);
-  assert.deepEqual(assignments[0].privileges, ["daemon.connect", "daemon.manage"]);
+  // Administrator always carries Can share (`impliedPrivileges`).
+  assert.deepEqual(assignments[0].privileges, [
+    "daemon.connect",
+    "daemon.manage",
+    "hub.access.manage",
+  ]);
   const authority = await access.resolveDaemonAccess({
     organizationId: ORGANIZATION_ID,
     daemonId: TEST_DAEMON_ID,

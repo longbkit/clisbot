@@ -280,6 +280,12 @@ export const organizationTriggers = pgTable(
     activeRevisionId: uuid("active_revision_id").references(
       (): AnyPgColumn => organizationTriggerRevisions.id,
     ),
+    /**
+     * Why the Hub disabled this Automation on its own: its author lost access
+     * to a target the runs need (docs/features/access/scoped-admins.md). Null
+     * while the Automation is enabled or was disabled by a person; a save clears it.
+     */
+    pausedReason: text("paused_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -723,7 +729,7 @@ export const accessAssignments = pgTable(
     subjectKind: text("subject_kind").$type<"member" | "team" | "guest">().notNull(),
     subjectId: text("subject_id").notNull(),
     resourceKind: text("resource_kind")
-      .$type<"organization" | "daemon" | "project" | "channel_account" | "automation">()
+      .$type<"organization" | "daemon" | "project" | "team" | "channel_account" | "automation">()
       .notNull(),
     resourceId: text("resource_id").notNull(),
     privileges: jsonb().$type<string[]>().notNull(),
@@ -753,7 +759,42 @@ export const accessAssignments = pgTable(
     ),
     check(
       "access_assignments_resource_kind_check",
-      sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel_account', 'automation')`,
+      sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'team', 'channel_account', 'automation')`,
+    ),
+  ],
+);
+
+/**
+ * Access changes an Organization Admin is told about. Today one kind: a grant
+ * gained Host Administrator (`daemon.manage`). The row is what the app lists;
+ * email is best effort on top of it (`access/administrator-notice.ts`).
+ */
+export const accessEvents = pgTable(
+  "access_events",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: text().$type<"administrator_granted" | "automation_paused">().notNull(),
+    resourceKind: text("resource_kind")
+      .$type<"organization" | "daemon" | "project" | "team" | "channel_account" | "automation">()
+      .notNull(),
+    resourceId: text("resource_id").notNull(),
+    subjectKind: text("subject_kind").$type<"member" | "team" | "guest">().notNull(),
+    subjectId: text("subject_id").notNull(),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("access_events_organization_created_idx").on(
+      table.organizationId,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    check(
+      "access_events_kind_check",
+      sql`${table.kind} in ('administrator_granted', 'automation_paused')`,
     ),
   ],
 );

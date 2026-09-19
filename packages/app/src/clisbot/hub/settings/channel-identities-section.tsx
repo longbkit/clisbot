@@ -8,7 +8,7 @@ import {
   type LinkedChannelIdentity,
 } from "../channel-identity-directory";
 
-/** Account's view of the Member's own linked Slack or Telegram identities, and the entry to linking more. */
+/** Account's view of the Member's own linked chat accounts, and the entry to linking more. */
 export function ChannelIdentitiesSection({
   pending,
   onManage,
@@ -20,18 +20,18 @@ export function ChannelIdentitiesSection({
   const directory = useChannelIdentityDirectory();
   const identities = directory.identitiesOf(hub.signedIn?.membership.id);
   return (
-    <SettingsSection title="Channel identities">
+    <SettingsSection title="Chat accounts">
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>Your Channel identities</Text>
+            <Text style={settingsStyles.rowTitle}>Your chat accounts</Text>
             <Text style={settingsStyles.rowHint}>
               Link the accounts you use in Slack, Telegram, Discord, and other chat apps so the
               organization&apos;s bots recognize you and run your messages with your Hub access.
             </Text>
           </View>
           <Button size="sm" variant="outline" disabled={pending} onPress={onManage}>
-            Manage identities
+            Manage chat accounts
           </Button>
         </View>
         <LinkedIdentityRows

@@ -49,6 +49,8 @@ const managerInvitationSchema = z.object({
   email: z.string(),
   role: invitationRoleSchema,
   expiresAt: z.string(),
+  /** When the invitation was sent. */
+  createdAt: z.string().optional(),
   link: z.string().url(),
   teams: z.array(invitationTeamSchema),
   // COMPAT(invitationSingleTeam): older apps read one invitation Team; remove after 2027-03-17

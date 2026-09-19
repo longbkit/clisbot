@@ -5,6 +5,7 @@ import {
   type CompiledHubConfig,
 } from "../config/compiler.js";
 import type { Database } from "../db/types.js";
+import type { OrganizationAccessValue } from "../auth/organization-access.js";
 import type { ChannelControlPlane, RouteTarget } from "../channels/config/compile.js";
 import type { ApprovalRule } from "../channels/config/schema.js";
 import { applyAgentControls, type AgentControls } from "../channels/config/agent-controls.js";
@@ -16,6 +17,15 @@ export interface DelegationPrincipal {
   organizationId: string;
   userId: string;
   membershipId: string;
+}
+
+/** The signed-in Member as the principal a management write delegates for. */
+export function delegationPrincipal(access: OrganizationAccessValue): DelegationPrincipal {
+  return {
+    organizationId: access.organization.id,
+    userId: access.account.id,
+    membershipId: access.membership.id,
+  };
 }
 
 /** One Route of one Channel account: an index into its `routes`, or its fallback. */

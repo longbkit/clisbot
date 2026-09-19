@@ -7,7 +7,19 @@ import type {
   SubjectKind,
 } from "./access-catalog";
 import type { SelectFieldOption } from "@/components/ui/select-field";
-import { accessLevelDescription, matchingAccessLevel } from "./access-level-summary";
+import {
+  privilegesWithinHoldings,
+  viewerHoldings,
+  type ViewerAuthority,
+  type ViewerHoldings,
+} from "./access-grantor";
+import {
+  canShareState,
+  levelOptionsWithinHoldings,
+  withCanShare,
+  type CanShareState,
+} from "./access-level-choice";
+import { matchingAccessLevel } from "./access-level-summary";
 import {
   isCompleteAgentConfiguration,
   type AgentConfigurationDraft,
@@ -19,6 +31,11 @@ export interface AssignmentSelection {
   alsoResources: AccessResource[];
   channelAccount: ReturnType<typeof parseChannelAccountResourceId>;
   levelOptions: SelectFieldOption<string>[];
+  /** Level names the viewer cannot grant here because they exceed the viewer's own. */
+  levelsAboveOwn: string[];
+  /** What the viewer holds on the chosen resource; every choice stays within it. */
+  holdings: ViewerHoldings;
+  canShare: CanShareState;
   privileges: string[];
   needsAgentConfiguration: boolean;
   conversation: string;
@@ -29,10 +46,12 @@ export interface AssignmentSelection {
 export function resolveAssignmentSelection(input: {
   editing: AccessAssignment | null;
   catalog: AccessCatalog;
+  authority: ViewerAuthority;
   subjectKeyValue: string | null;
   resourceKeyValue: string | null;
   alsoResourceKeys: readonly string[];
   accessLevel: string | null;
+  canShare: boolean;
   conversation: string;
   conversationIds: string;
   agentConfigurations: AgentConfigurationDraft[];
@@ -46,15 +65,19 @@ export function resolveAssignmentSelection(input: {
   );
   const channelAccount =
     resource?.kind === "channel_account" ? parseChannelAccountResourceId(resource.id) : null;
-  const levelOptions: SelectFieldOption<string>[] =
+  const holdings = viewerHoldings(
+    input.authority,
+    resource ?? { kind: "organization", id: "", parent: null },
+    input.catalog.resources,
+  );
+  const { options: levelOptions, aboveOwn: levelsAboveOwn } =
     resource === undefined
-      ? []
-      : Object.keys(input.catalog.accessLevels[resource.kind] ?? {}).map((id) => ({
-          id,
-          value: id,
-          label: accessLevelLabel(id),
-          description: accessLevelDescription(id, resource.kind),
-        }));
+      ? { options: [], aboveOwn: [] }
+      : levelOptionsWithinHoldings(
+          input.catalog.accessLevels[resource.kind] ?? {},
+          resource.kind,
+          holdings,
+        );
   if (input.editing)
     levelOptions.unshift({
       id: "current",
@@ -62,10 +85,16 @@ export function resolveAssignmentSelection(input: {
       label: "Current privileges",
       description: currentPrivilegesDescription(input.catalog, input.editing),
     });
-  const privileges =
+  const levelPrivileges =
     input.editing && input.accessLevel === "current"
       ? input.editing.privileges
       : selectedAccessLevelPrivileges(input.catalog, resource, input.accessLevel);
+  const canShare =
+    resource === undefined ? "hidden" : canShareState(resource.kind, levelPrivileges);
+  const privileges =
+    resource === undefined
+      ? levelPrivileges
+      : withCanShare(resource.kind, levelPrivileges, input.canShare);
   // A Host assignment fans out to every Project on that Host, so it names Agent
   // choices for the same reason a Project assignment does.
   const needsAgentConfiguration =
@@ -76,6 +105,7 @@ export function resolveAssignmentSelection(input: {
     subject !== null &&
     resource !== undefined &&
     privileges.length > 0 &&
+    privilegesWithinHoldings(holdings, privileges) &&
     constraintsAreComplete({
       resourceKind: resource.kind,
       conversation: input.conversation,
@@ -89,6 +119,9 @@ export function resolveAssignmentSelection(input: {
     alsoResources,
     channelAccount,
     levelOptions,
+    levelsAboveOwn,
+    holdings,
+    canShare,
     privileges: needsAgentConfiguration
       ? privileges.filter((privilege) => privilege !== "agent.fast.use")
       : privileges,

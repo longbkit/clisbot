@@ -48,11 +48,15 @@ export const GUEST_ACCESS_SUBJECT_ID = "guest";
 export const AccessSubjectKindSchema = z.enum(ACCESS_SUBJECT_KINDS);
 export type AccessSubjectKind = z.infer<typeof AccessSubjectKindSchema>;
 
-/** `organization` carries Hub privileges; the other values address product resources. */
+/**
+ * `organization` carries Hub privileges; the other values address product
+ * resources. `team` carries only Team Admin (`hub.access.manage` on the Team).
+ */
 export const ACCESS_RESOURCE_KINDS = [
   "organization",
   "daemon",
   "project",
+  "team",
   "channel_account",
   "automation",
 ] as const;
@@ -173,11 +177,25 @@ const DEVELOPER_PROJECT_PRIVILEGES = [
 
 /**
  * Developer plus creating and managing Projects, workspaces, and worktrees. On a
- * Host it may create a Project at any path; on a Project, only inside it.
+ * Host it may create a Project at any path; on a Project, only inside it. Full
+ * access always carries Can share (`hub.access.manage`); see
+ * `impliedPrivileges`.
  */
 const FULL_ACCESS_PROJECT_PRIVILEGES = [
   ...DEVELOPER_PROJECT_PRIVILEGES,
   "workspace.manage",
+  "hub.access.manage",
+] as const satisfies readonly AccessPrivilege[];
+
+/**
+ * The privileges that carry Can share on a Host or Project without naming it:
+ * Full access (`workspace.manage`) and Administrator (`daemon.manage`) always
+ * share. Office worker and Developer share only when the grant names
+ * `hub.access.manage` (docs/features/access/scoped-admins.md).
+ */
+const CAN_SHARE_IMPLYING_PRIVILEGES = [
+  "workspace.manage",
+  "daemon.manage",
 ] as const satisfies readonly AccessPrivilege[];
 
 /**
@@ -192,12 +210,17 @@ export const RESOURCE_ACCESS_LEVELS = {
     office_worker: ["daemon.connect", ...OFFICE_WORKER_PROJECT_PRIVILEGES],
     developer: ["daemon.connect", ...DEVELOPER_PROJECT_PRIVILEGES],
     full_access: ["daemon.connect", ...FULL_ACCESS_PROJECT_PRIVILEGES],
-    administrator: ["daemon.connect", "daemon.manage"],
+    administrator: ["daemon.connect", "daemon.manage", "hub.access.manage"],
   },
   project: {
     office_worker: OFFICE_WORKER_PROJECT_PRIVILEGES,
     developer: DEVELOPER_PROJECT_PRIVILEGES,
     full_access: FULL_ACCESS_PROJECT_PRIVILEGES,
+  },
+  team: {
+    // Team Admin: who is in the Team, invitations into it, appointing another
+    // Team Admin. Never the Team's own grants.
+    admin: ["hub.access.manage"],
   },
   channel_account: {
     use: ["channel.use"],
@@ -207,10 +230,29 @@ export const RESOURCE_ACCESS_LEVELS = {
   },
   automation: {
     run: ["automation.run"],
+    // Automation Admin: edit, enable, delete, and grant Run or Admin on this one.
+    admin: ["automation.run", "hub.access.manage"],
   },
 } as const satisfies Partial<
   Record<AccessResourceKind, Record<string, readonly AccessPrivilege[]>>
 >;
+
+/**
+ * The privileges a grant holds once its level's implications are applied: a
+ * Host or Project grant that is Full access or Administrator also shares. The
+ * Hub applies this when it saves and when it reads, so a row written before
+ * Can share existed reads the same as one written after.
+ */
+export function impliedPrivileges(
+  resourceKind: AccessResourceKind,
+  privileges: readonly AccessPrivilege[],
+): AccessPrivilege[] {
+  const implies =
+    (resourceKind === "daemon" || resourceKind === "project") &&
+    CAN_SHARE_IMPLYING_PRIVILEGES.some((privilege) => privileges.includes(privilege));
+  if (!implies || privileges.includes("hub.access.manage")) return [...privileges];
+  return [...privileges, "hub.access.manage"];
+}
 
 /** Opaque, stable Access resource id for the existing `(channel, accountId)` identity. */
 export function formatChannelAccountResourceId(channel: string, accountId: string): string {

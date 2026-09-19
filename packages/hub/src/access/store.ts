@@ -19,6 +19,7 @@ import {
   AgentConfigurationCatalogSchema,
   APPROVAL_PRIVILEGES,
   GUEST_ACCESS_SUBJECT_ID,
+  impliedPrivileges,
   type AccessAssignmentInput,
   type AccessPrivilege,
   type AccessResourceKind,
@@ -39,8 +40,11 @@ const DAEMON_ADMIN_SESSION_PERMISSIONS = [
 const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivilege>> = {
   // Hub administration is derived from the organization role at the HTTP
   // boundary. It is never persisted as a Team/Member resource assignment.
+  // `hub.access.manage` on a product resource is Can share (Host, Project) or
+  // scoped Admin (Team, Channel Route, Automation): docs/features/access/scoped-admins.md.
   organization: new Set(),
   daemon: new Set([
+    "hub.access.manage",
     "daemon.connect",
     "daemon.manage",
     "project.use",
@@ -58,6 +62,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.other",
   ]),
   project: new Set([
+    "hub.access.manage",
     "project.use",
     "workspace.create",
     "workspace.manage",
@@ -72,8 +77,9 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.channel",
     "approval.other",
   ]),
-  channel_account: new Set(["channel.use", "channel.manage"]),
-  automation: new Set(["automation.run"]),
+  team: new Set(["hub.access.manage"]),
+  channel_account: new Set(["hub.access.manage", "channel.use", "channel.manage"]),
+  automation: new Set(["hub.access.manage", "automation.run"]),
 };
 
 const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
@@ -240,6 +246,7 @@ export class AccessPolicyError extends Error {
   constructor(
     readonly code:
       | "access_denied"
+      | "access_exceeds_grantor"
       | "invalid_assignment"
       | "subject_unavailable"
       | "resource_unavailable",
@@ -272,20 +279,24 @@ export class AccessStore {
     return rows.map(toAssignment);
   }
 
-  /** Reads only grants that contribute to the current Member, with their direct/Team source. */
+  /**
+   * Reads only grants that contribute to one Member, with their direct/Team
+   * source. `userId` pins the read to the caller's own membership; without it
+   * the membership id alone names the Member (an admin reading someone else).
+   */
   async listEffectiveAccess(input: {
     organizationId: string;
-    userId: string;
+    userId?: string;
     membershipId: string;
   }): Promise<EffectiveAccessRecord | undefined> {
     const [membership] = await this.database
-      .select({ id: schema.members.id, role: schema.members.role })
+      .select({ id: schema.members.id, role: schema.members.role, userId: schema.members.userId })
       .from(schema.members)
       .where(
         and(
           eq(schema.members.id, input.membershipId),
           eq(schema.members.organizationId, input.organizationId),
-          eq(schema.members.userId, input.userId),
+          ...(input.userId === undefined ? [] : [eq(schema.members.userId, input.userId)]),
         ),
       )
       .limit(1);
@@ -298,7 +309,7 @@ export class AccessStore {
       .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
       .where(
         and(
-          eq(schema.teamMembers.userId, input.userId),
+          eq(schema.teamMembers.userId, membership.userId),
           eq(schema.teams.organizationId, input.organizationId),
         ),
       )
@@ -389,7 +400,7 @@ export class AccessStore {
     inputs: readonly AccessAssignmentInput[],
     createdByUserId: string,
   ): Promise<AccessAssignmentRecord[]> {
-    const assignments = inputs.map((input) => AccessAssignmentInputSchema.parse(input));
+    const assignments = inputs.map((input) => withImpliedPrivileges(input));
     if (assignments.length === 0) {
       throw new AccessPolicyError("invalid_assignment", "at least one assignment is required");
     }
@@ -471,59 +482,69 @@ export class AccessStore {
     organizationId: string,
     database: DrizzleHandle = this.database,
   ): Promise<AccessResourceRecord[]> {
-    const [organizationRows, daemonRows, projectRows, automationRows, channelConfigurationRows] =
-      await Promise.all([
-        database
-          .select({
-            id: schema.organizations.id,
-            name: schema.organizations.name,
-          })
-          .from(schema.organizations)
-          .where(eq(schema.organizations.id, organizationId)),
-        database
-          .select({
-            id: schema.daemons.id,
-            name: schema.daemons.slug,
-            status: schema.daemons.status,
-          })
-          .from(schema.daemons)
-          .where(eq(schema.daemons.organizationId, organizationId)),
-        database
-          .select({
-            id: schema.daemonProjects.id,
-            daemonId: schema.daemonProjects.daemonId,
-            name: schema.daemonProjects.name,
-            metadata: schema.daemonProjects.metadata,
-            available: schema.daemonProjects.available,
-          })
-          .from(schema.daemonProjects)
-          .where(eq(schema.daemonProjects.organizationId, organizationId)),
-        database
-          .select({
-            id: schema.organizationTriggers.id,
-            name: schema.organizationTriggers.name,
-          })
-          .from(schema.organizationTriggers)
-          .where(eq(schema.organizationTriggers.organizationId, organizationId)),
-        database
-          .select({ files: schema.channelConfigurationRevisions.files })
-          .from(schema.organizationChannelConfigurations)
-          .innerJoin(
-            schema.channelConfigurationRevisions,
-            and(
-              eq(
-                schema.channelConfigurationRevisions.id,
-                schema.organizationChannelConfigurations.activeRevisionId,
-              ),
-              eq(
-                schema.channelConfigurationRevisions.organizationId,
-                schema.organizationChannelConfigurations.organizationId,
-              ),
+    const [
+      organizationRows,
+      daemonRows,
+      projectRows,
+      teamRows,
+      automationRows,
+      channelConfigurationRows,
+    ] = await Promise.all([
+      database
+        .select({
+          id: schema.organizations.id,
+          name: schema.organizations.name,
+        })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, organizationId)),
+      database
+        .select({
+          id: schema.daemons.id,
+          name: schema.daemons.slug,
+          status: schema.daemons.status,
+        })
+        .from(schema.daemons)
+        .where(eq(schema.daemons.organizationId, organizationId)),
+      database
+        .select({
+          id: schema.daemonProjects.id,
+          daemonId: schema.daemonProjects.daemonId,
+          name: schema.daemonProjects.name,
+          metadata: schema.daemonProjects.metadata,
+          available: schema.daemonProjects.available,
+        })
+        .from(schema.daemonProjects)
+        .where(eq(schema.daemonProjects.organizationId, organizationId)),
+      database
+        .select({ id: schema.teams.id, name: schema.teams.name })
+        .from(schema.teams)
+        .where(eq(schema.teams.organizationId, organizationId)),
+      database
+        .select({
+          id: schema.organizationTriggers.id,
+          name: schema.organizationTriggers.name,
+        })
+        .from(schema.organizationTriggers)
+        .where(eq(schema.organizationTriggers.organizationId, organizationId)),
+      database
+        .select({ files: schema.channelConfigurationRevisions.files })
+        .from(schema.organizationChannelConfigurations)
+        .innerJoin(
+          schema.channelConfigurationRevisions,
+          and(
+            eq(
+              schema.channelConfigurationRevisions.id,
+              schema.organizationChannelConfigurations.activeRevisionId,
             ),
-          )
-          .where(eq(schema.organizationChannelConfigurations.organizationId, organizationId))
-          .limit(1),
-      ]);
+            eq(
+              schema.channelConfigurationRevisions.organizationId,
+              schema.organizationChannelConfigurations.organizationId,
+            ),
+          ),
+        )
+        .where(eq(schema.organizationChannelConfigurations.organizationId, organizationId))
+        .limit(1),
+    ]);
     const organization = organizationRows[0];
     if (organization === undefined) return [];
     const parent = { kind: "organization" as const, id: organizationId };
@@ -564,6 +585,13 @@ export class AccessStore {
           parseAgentConfigurationCatalog(project.metadata),
         ),
       ),
+      ...teamRows.map((team) => ({
+        kind: "team" as const,
+        id: team.id,
+        name: team.name,
+        parent,
+        available: true,
+      })),
       ...channelAccounts.map((account) => ({
         kind: "channel_account" as const,
         id: formatChannelAccountResourceId(account.channel, account.accountId),
@@ -988,6 +1016,34 @@ export class AccessStore {
         ? { kind: "guest" }
         : { kind: "member", membershipId: identity.membershipId, userId: identity.userId },
     );
+  }
+
+  /** Every grant that applies to one Member: direct rows plus the rows of their Teams. */
+  listMemberAssignments(
+    organizationId: string,
+    member: { membershipId: string; userId: string },
+    database: DrizzleHandle = this.database,
+  ): Promise<AccessAssignmentRecord[]> {
+    return this.subjectAssignments(organizationId, { kind: "member", ...member }, database);
+  }
+
+  /** The Teams this Member is Team Admin of (`hub.access.manage` on `team:<id>`). */
+  async listTeamsAdministeredBy(
+    organizationId: string,
+    member: { membershipId: string; userId: string },
+    database: DrizzleHandle = this.database,
+  ): Promise<string[]> {
+    const assignments = await this.listMemberAssignments(organizationId, member, database);
+    return [
+      ...new Set(
+        assignments
+          .filter(
+            ({ resourceKind, privileges }) =>
+              resourceKind === "team" && privileges.includes("hub.access.manage"),
+          )
+          .map(({ resourceId }) => resourceId),
+      ),
+    ];
   }
 
   /**
@@ -1501,6 +1557,15 @@ export class AccessStore {
   }
 }
 
+/** Parses one assignment input and applies the level implications (`impliedPrivileges`). */
+function withImpliedPrivileges(input: AccessAssignmentInput): AccessAssignmentInput {
+  const assignment = AccessAssignmentInputSchema.parse(input);
+  return {
+    ...assignment,
+    privileges: impliedPrivileges(assignment.resourceKind, assignment.privileges),
+  };
+}
+
 function validatePrivilegeScope(
   resourceKind: AccessResourceKind,
   privileges: readonly AccessPrivilege[],
@@ -1709,7 +1774,14 @@ function toAssignment(row: typeof schema.accessAssignments.$inferSelect): Access
     subjectId: row.subjectId,
     resourceKind: row.resourceKind,
     resourceId: row.resourceId,
-    privileges: z.array(AccessPrivilegeSchema).parse(row.privileges),
+    // COMPAT(can-share-implied): added 2026-09-19, remove after 2027-03-19. Rows
+    // written before Can share existed lack `hub.access.manage` on Full access
+    // and Administrator; reading them through the same rule as saving keeps
+    // every reader (listing, effective access, grantor checks) on one answer.
+    privileges: impliedPrivileges(
+      row.resourceKind,
+      z.array(AccessPrivilegeSchema).parse(row.privileges),
+    ),
     constraints: AccessConstraintsSchema.parse(row.constraints),
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,

@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/select-field";
@@ -10,9 +9,11 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { HubApiError } from "../api-client";
 import { hubResourceQueryKey } from "../query-keys";
 import { buildHubSettingsRoute } from "../navigation";
 import {
+  HUB_ACCESS_INCLUDE,
   HubAccessAssignmentSchema,
   HubAccessAssignmentsSchema,
   HubAccessCatalogSchema,
@@ -29,16 +30,21 @@ import {
 import { useMountedAccessScope } from "./access-mounted-scope";
 import { ExplicitAssignments } from "./access-assignment-list";
 import { GrantAccessContent } from "./access-assignment-form";
+import { MemberAccessSettings } from "./access-effective-section";
+import { AccessEventsSection } from "./access-events-section";
+import {
+  canShareResource,
+  holdsCanShareAnywhere,
+  viewerAuthority,
+  type ViewerAuthority,
+} from "./access-grantor";
 import {
   assignmentResourceOptions,
   assignmentSubjectOptions,
   parseSubjectKey,
-  privilegeLabel,
   resourceKey,
-  resourceKindLabel,
   selectedOptionDisplay,
   subjectKey,
-  constraintSummary,
   type AccessAssignment,
   type AccessCatalog,
   type HubMember,
@@ -47,12 +53,28 @@ import {
 import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
 
+/** A Hub refusal the form shows in place; anything else shows at the top of the page. */
+const GRANTOR_ERROR_CODE = "access_exceeds_grantor";
+
+interface MutationError {
+  code: string | null;
+  message: string;
+}
+
+/**
+ * Access opens for Organization Owners and Admins, and for any Member whose
+ * effective access shares something (Can share, Team Admin, Automation Admin).
+ * Everyone else sees only their own effective access.
+ */
 export function AccessSettings() {
   const hub = useHubAccount();
   const canManage = hub.signedIn?.capabilities.manageResources === true;
+  const effective = useEffectiveAccess();
   const params = useLocalSearchParams<{
     subjectKind?: string;
     subjectId?: string;
+    resourceKind?: string;
+    resourceId?: string;
   }>();
   const initialSubject =
     (params.subjectKind === "team" ||
@@ -61,137 +83,89 @@ export function AccessSettings() {
     typeof params.subjectId === "string"
       ? subjectKey(params.subjectKind, params.subjectId)
       : null;
-  return canManage ? (
+  // A resource page (e.g. a Channel Route's Access tab) opens the page on that resource.
+  const initialResource =
+    typeof params.resourceKind === "string" && typeof params.resourceId === "string"
+      ? resourceKey({ kind: params.resourceKind, id: params.resourceId })
+      : null;
+  if (!canManage && !holdsCanShareAnywhere(effective.data)) {
+    return (
+      <View>
+        <QueryFeedback queries={[effective]} />
+        {effective.isPending ? null : <MemberAccessSettings access={effective.data} />}
+      </View>
+    );
+  }
+  return (
     <ManagedAccessSettings
       key={JSON.stringify([
         hub.origin,
         hub.signedIn?.account.id,
         hub.signedIn?.organization.id,
         initialSubject,
+        initialResource,
       ])}
       initialSubject={initialSubject}
+      initialResource={initialResource}
+      authority={viewerAuthority(canManage, effective.data)}
     />
-  ) : (
-    <MemberAccessSettings />
   );
 }
 
-function MemberAccessSettings() {
+function useHubScope() {
   const hub = useHubAccount();
-  const organizationId = hub.signedIn?.organization.id ?? "";
-  const accountId = hub.signedIn?.account.id ?? null;
-  const effectiveAccess = useFetchQuery({
-    queryKey: [
-      ...hubResourceQueryKey(
-        { origin: hub.origin, organizationId, accountId },
-        "access-assignments",
-      ),
-      "effective",
-    ],
-    queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
-    dataShape: "value",
-    enabled: organizationId.length > 0,
-    retry: false,
-    staleTimeMs: 0,
-  });
-  return (
-    <View>
-      <SettingsSection title="Access overview">
-        <Alert
-          variant="info"
-          title="Access is managed by your organization"
-          description="Ask an owner or administrator to change Team or resource access."
-        />
-        <QueryFeedback queries={[effectiveAccess]} />
-      </SettingsSection>
-      {effectiveAccess.data ? <EffectiveAccessSection access={effectiveAccess.data} /> : null}
-    </View>
-  );
-}
-
-function EffectiveAccessSection({ access }: { access: z.infer<typeof HubEffectiveAccessSchema> }) {
-  if (access.owner) {
-    return (
-      <SettingsSection title="Effective access">
-        <Alert
-          variant="info"
-          title="Owner access is automatic"
-          description="You can use every current and future Hub resource."
-        />
-      </SettingsSection>
-    );
-  }
-  return (
-    <SettingsSection title="Effective access">
-      <View style={settingsStyles.card}>
-        {access.grants.length === 0 ? (
-          <EmptyRow message="No resource access has been granted yet." />
-        ) : (
-          access.grants.map((grant, index) => (
-            <EffectiveAccessRow
-              key={`${grant.assignmentId}:${grant.source.kind}`}
-              grant={grant}
-              bordered={index > 0}
-            />
-          ))
-        )}
-      </View>
-    </SettingsSection>
-  );
-}
-
-function EffectiveAccessRow({
-  grant,
-  bordered,
-}: {
-  grant: z.infer<typeof HubEffectiveAccessSchema>["grants"][number];
-  bordered: boolean;
-}) {
-  const details = [
-    resourceKindLabel(grant.resource.kind),
-    grant.source.kind === "team" ? `Via ${grant.source.teamName}` : "Direct access",
-    grant.resource.available ? null : "Unavailable",
-  ].filter((value): value is string => value !== null);
-  const constraint = constraintSummary(grant.constraints);
-  return (
-    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{grant.resource.name}</Text>
-        <Text style={settingsStyles.rowHint}>{details.join(" · ")}</Text>
-        <Text style={settingsStyles.rowHint}>
-          {grant.privileges.length > 0
-            ? grant.privileges.map(privilegeLabel).join(", ")
-            : "No privileges"}
-          {constraint === null ? "" : ` · ${constraint}`}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function ManagedAccessSettings({ initialSubject }: { initialSubject: string | null }) {
-  const isCurrent = useMountedAccessScope();
-  const hub = useHubAccount();
-  const queryScope = hub.signedIn
+  return hub.signedIn
     ? {
         origin: hub.origin,
         organizationId: hub.signedIn.organization.id,
         accountId: hub.signedIn.account.id,
       }
     : { origin: hub.origin, organizationId: null, accountId: null };
+}
+
+/** The viewer's own grants, Team resources included; also what the form may hand on. */
+function useEffectiveAccess() {
+  const hub = useHubAccount();
+  const scope = useHubScope();
+  return useFetchQuery({
+    queryKey: hubResourceQueryKey(scope, "access-assignments/effective"),
+    queryFn: () =>
+      hub.api().get(`access-assignments/effective${HUB_ACCESS_INCLUDE}`, HubEffectiveAccessSchema),
+    dataShape: "value",
+    enabled: scope.organizationId !== null,
+    retry: false,
+    staleTimeMs: 0,
+  });
+}
+
+function ManagedAccessSettings({
+  initialSubject,
+  initialResource,
+  authority,
+}: {
+  initialSubject: string | null;
+  initialResource: string | null;
+  authority: ViewerAuthority;
+}) {
+  const isCurrent = useMountedAccessScope();
+  const hub = useHubAccount();
+  const queryScope = useHubScope();
+  const enabled = queryScope.organizationId !== null;
+  // Query keys keep the bare resource name so existing invalidations still match.
   const assignments = useFetchQuery({
     queryKey: hubResourceQueryKey(queryScope, "access-assignments"),
-    queryFn: () => hub.api().get("access-assignments", HubAccessAssignmentsSchema),
+    queryFn: () =>
+      hub.api().get(`access-assignments${HUB_ACCESS_INCLUDE}`, HubAccessAssignmentsSchema),
     dataShape: "value",
-    enabled: queryScope.organizationId !== null,
+    enabled,
     retry: false,
     staleTimeMs: 0,
   });
   const catalog = useFetchQuery({
     queryKey: hubResourceQueryKey(queryScope, "access-catalog"),
-    queryFn: () => hub.api().get("access-catalog", HubAccessCatalogSchema),
+    queryFn: () => hub.api().get(`access-catalog${HUB_ACCESS_INCLUDE}`, HubAccessCatalogSchema),
     dataShape: "value",
-    enabled: queryScope.organizationId !== null,
+    enabled,
     retry: false,
     staleTimeMs: 0,
   });
@@ -199,7 +173,7 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
     queryKey: hubResourceQueryKey(queryScope, "members"),
     queryFn: () => hub.api().get("members", HubMembersSchema),
     dataShape: "value",
-    enabled: queryScope.organizationId !== null,
+    enabled,
     retry: false,
     staleTimeMs: 0,
   });
@@ -207,14 +181,30 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
     queryKey: hubResourceQueryKey(queryScope, "teams"),
     queryFn: () => hub.api().get("teams", HubTeamsSchema),
     dataShape: "value",
-    enabled: queryScope.organizationId !== null,
+    enabled,
     retry: false,
     staleTimeMs: 0,
   });
   const [pending, setPending] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<MutationError | null>(null);
   const [editing, setEditing] = useState<AccessAssignment | null>(null);
   const cancelEdit = useCallback(() => setEditing(null), []);
+  const runMutation = useCallback(
+    async (operation: () => Promise<void>) => {
+      setPending(true);
+      setMutationError(null);
+      try {
+        await operation();
+        await assignments.refetch();
+        setEditing(null);
+      } catch (error) {
+        setMutationError(describeMutationError(error));
+      } finally {
+        setPending(false);
+      }
+    },
+    [assignments],
+  );
 
   const removeAssignment = useCallback(
     async (assignmentId: string) => {
@@ -225,27 +215,17 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
         destructive: true,
       });
       if (!confirmed || !isCurrent()) return;
-      setPending(true);
-      setMutationError(null);
-      try {
-        await hub.api().delete(`access-assignments/${encodeURIComponent(assignmentId)}`);
-        await assignments.refetch();
-        setEditing(null);
-      } catch (error) {
-        setMutationError(error instanceof Error ? error.message : "Hub request failed.");
-      } finally {
-        setPending(false);
-      }
+      await runMutation(() =>
+        hub.api().delete(`access-assignments/${encodeURIComponent(assignmentId)}`),
+      );
     },
-    [assignments, hub, isCurrent],
+    [hub, isCurrent, runMutation],
   );
 
   const saveAssignment = useCallback(
     async (body: unknown, batch?: boolean) => {
       if (!isCurrent()) return;
-      setPending(true);
-      setMutationError(null);
-      try {
+      await runMutation(async () => {
         await hub
           .api()
           .post(
@@ -253,15 +233,9 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
             body,
             batch ? HubAccessAssignmentsSchema : HubAccessAssignmentSchema,
           );
-        await assignments.refetch();
-        setEditing(null);
-      } catch (error) {
-        setMutationError(error instanceof Error ? error.message : "Hub request failed.");
-      } finally {
-        setPending(false);
-      }
+      });
     },
-    [assignments, hub, isCurrent],
+    [hub, isCurrent, runMutation],
   );
 
   const queryFailed = [assignments, catalog, members, teams].some((query) => query.error !== null);
@@ -273,6 +247,7 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
       teams.refetch(),
     ]);
   }, [assignments, catalog, members, teams]);
+  const grantorError = mutationError?.code === GRANTOR_ERROR_CODE ? mutationError.message : null;
 
   return (
     <View>
@@ -282,16 +257,21 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
           Retry Access
         </Button>
       ) : null}
-      {mutationError ? <Alert variant="error" title={mutationError} /> : null}
+      {mutationError && grantorError === null ? (
+        <Alert variant="error" title={mutationError.message} />
+      ) : null}
       {assignments.data && catalog.data && members.data && teams.data ? (
         <ManagedAccessContent
           initialSubject={initialSubject}
+          initialResource={initialResource}
+          authority={authority}
           assignments={assignments.data.assignments}
           catalog={catalog.data}
           members={members.data.members}
           teams={teams.data.teams}
           pending={pending}
           editing={editing}
+          grantorError={grantorError}
           edit={setEditing}
           cancelEdit={cancelEdit}
           save={saveAssignment}
@@ -302,34 +282,45 @@ function ManagedAccessSettings({ initialSubject }: { initialSubject: string | nu
   );
 }
 
+function describeMutationError(error: unknown): MutationError {
+  if (error instanceof HubApiError) return { code: error.code, message: error.message };
+  return { code: null, message: error instanceof Error ? error.message : "Hub request failed." };
+}
+
 function ManagedAccessContent({
   initialSubject,
+  initialResource,
+  authority,
   assignments,
   catalog,
   members,
   teams,
   pending,
   editing,
+  grantorError,
   edit,
   cancelEdit,
   save,
   remove,
 }: {
   initialSubject: string | null;
+  initialResource: string | null;
+  authority: ViewerAuthority;
   assignments: AccessAssignment[];
   catalog: AccessCatalog;
   members: HubMember[];
   teams: HubTeam[];
   pending: boolean;
   editing: AccessAssignment | null;
+  grantorError: string | null;
   edit(assignment: AccessAssignment | null): void;
   cancelEdit(): void;
   save(body: unknown, batch?: boolean): Promise<void>;
   remove(assignmentId: string): Promise<void>;
 }) {
   const [subjectValue, setSubjectValue] = useState(initialSubject);
-  const [resourceValue, setResourceValue] = useState<string | null>(null);
-  const [viewBy, setViewBy] = useState("subject");
+  const [resourceValue, setResourceValue] = useState(initialResource);
+  const [viewBy, setViewBy] = useState(initialResource === null ? "subject" : "resource");
   const changeSubject = useCallback(
     (value: string) => {
       setSubjectValue(value);
@@ -337,25 +328,28 @@ function ManagedAccessContent({
     },
     [edit],
   );
-  const resourceByKey = new Map(
-    catalog.resources.map((resource) => [resourceKey(resource), resource]),
+  const directory = useAccessDirectory(members, teams);
+  const rowContext = useMemo(
+    () => ({
+      accessLevels: catalog.accessLevels,
+      resources: catalog.resources,
+      resourceByKey: new Map(
+        catalog.resources.map((resource) => [resourceKey(resource), resource]),
+      ),
+      memberNameByUserId: directory.memberNameByUserId,
+      authority,
+    }),
+    [authority, catalog, directory.memberNameByUserId],
   );
-  const teamById = new Map(teams.map((team) => [team.id, team.name]));
-  const teamMembersById = new Map(
-    teams.map((team) => [
-      team.id,
-      members
-        .filter((member) => team.userIds.includes(member.userId))
-        .map((member) => `${member.name} · ${member.email}`)
-        .join(", ") || "No Members in this Team",
-    ]),
-  );
-  const memberById = new Map(
-    members.map((member) => [member.id, `${member.name} · ${member.email}`]),
-  );
+  const { resourceByKey } = rowContext;
   const subjectOptions = assignmentSubjectOptions(members, teams);
   const selectedSubject = subjectValue ?? subjectOptions[0]?.value ?? null;
-  const resourceOptions = assignmentResourceOptions(catalog.resources, false);
+  const resourceOptions = assignmentResourceOptions(
+    catalog.resources.filter((resource) =>
+      canShareResource(authority, resource, catalog.resources),
+    ),
+    false,
+  );
   const selectedResource = resourceValue ?? resourceOptions[0]?.value ?? null;
   const visibleAssignments =
     viewBy === "subject"
@@ -375,8 +369,12 @@ function ManagedAccessContent({
       <SettingsSection title="Access">
         <Alert
           variant="info"
-          title="Owner access is automatic"
-          description="The owner can use every current and future resource. Members and Guest start with no resource access. Guest grants apply to channel senders without a linked Member."
+          title={authority.unrestricted ? "Owner access is automatic" : "You grant what you hold"}
+          description={
+            authority.unrestricted
+              ? "The owner can use every current and future resource. Members and Guest start with no resource access. Guest grants apply to channel senders without a linked Member."
+              : "You can add, change, or remove people on the resources you can share, up to your own level. Grants above your level show locked."
+          }
         />
         <View style={[settingsStyles.card, styles.form]}>
           <SelectField
@@ -435,11 +433,10 @@ function ManagedAccessContent({
         </View>
         <ExplicitAssignments
           assignments={visibleAssignments}
-          accessLevels={catalog.accessLevels}
-          resourceByKey={resourceByKey}
-          teamById={teamById}
-          teamMembersById={teamMembersById}
-          memberById={memberById}
+          context={rowContext}
+          teamById={directory.teamById}
+          teamMembersById={directory.teamMembersById}
+          memberById={directory.memberById}
           pending={pending}
           remove={remove}
           edit={edit}
@@ -456,11 +453,42 @@ function ManagedAccessContent({
         assignments={assignments}
         members={members}
         teams={teams}
+        authority={authority}
+        grantorError={grantorError}
         pending={pending}
         save={save}
       />
+      {authority.unrestricted ? (
+        <AccessEventsSection
+          resources={catalog.resources}
+          memberNameByUserId={directory.memberNameByUserId}
+          teamById={directory.teamById}
+          memberById={directory.memberById}
+        />
+      ) : null}
       <PublicRoutesAccessSection />
     </View>
+  );
+}
+
+/** Names for the ids that rows, events, and confirmations show. */
+function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
+  return useMemo(
+    () => ({
+      teamById: new Map(teams.map((team) => [team.id, team.name])),
+      teamMembersById: new Map(
+        teams.map((team) => [
+          team.id,
+          members
+            .filter((member) => team.userIds.includes(member.userId))
+            .map((member) => `${member.name} · ${member.email}`)
+            .join(", ") || "No Members in this Team",
+        ]),
+      ),
+      memberById: new Map(members.map((member) => [member.id, `${member.name} · ${member.email}`])),
+      memberNameByUserId: new Map(members.map((member) => [member.userId, member.name])),
+    }),
+    [members, teams],
   );
 }
 

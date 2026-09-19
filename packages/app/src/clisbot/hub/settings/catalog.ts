@@ -23,34 +23,69 @@ const ACCOUNT_ITEM: HubSettingsNavigationItem = {
   icon: UserRound,
 };
 
+const CHANNELS_ITEM: HubSettingsNavigationItem = {
+  section: "channels",
+  label: "Channels",
+  icon: MessageSquare,
+};
+const AUTOMATIONS_ITEM: HubSettingsNavigationItem = {
+  section: "automations",
+  label: "Automations",
+  icon: Workflow,
+};
+const PEOPLE_ITEM: HubSettingsNavigationItem = {
+  section: "team",
+  label: "People",
+  icon: UsersRound,
+};
+const ACCESS_ITEM: HubSettingsNavigationItem = {
+  section: "access",
+  label: "Access",
+  icon: ShieldCheck,
+};
+
 const SIGNED_IN_ITEMS: readonly HubSettingsNavigationItem[] = [
-  { section: "channels", label: "Channels", icon: MessageSquare },
-  { section: "automations", label: "Automations", icon: Workflow },
-  { section: "team", label: "Team", icon: UsersRound },
-  { section: "access", label: "Access", icon: ShieldCheck },
+  CHANNELS_ITEM,
+  AUTOMATIONS_ITEM,
+  PEOPLE_ITEM,
+  ACCESS_ITEM,
   { section: "configuration", label: "Configuration", icon: Settings2 },
 ];
 
-const MEMBER_ITEMS: readonly HubSettingsNavigationItem[] = [
-  { section: "access", label: "Access", icon: ShieldCheck },
-];
+/** One effective grant of the viewer, enough to decide which destinations they can use. */
+export interface HubNavigationGrant {
+  resourceKind: string;
+  privileges: readonly string[];
+}
 
+/**
+ * Which Hub destinations a Member reaches without the organization's management role:
+ * Channels when they administer a Channel Route, Automations when they may run or create one,
+ * People when they administer a Team, and Access always (their own effective access).
+ */
 export function hubSettingsNavigationItems(input: {
   signedIn: boolean;
   canManage?: boolean;
-  canRunAutomations?: boolean;
+  grants?: readonly HubNavigationGrant[];
 }): readonly HubSettingsNavigationItem[] {
   if (!input.signedIn) {
     return [{ section: "account", label: "Sign in to Hub", icon: KeyRound }];
   }
-  let destinations = MEMBER_ITEMS;
-  if (input.canManage) destinations = SIGNED_IN_ITEMS;
-  else if (input.canRunAutomations) {
-    destinations = [
-      { section: "automations", label: "Automations", icon: Workflow },
-      ...MEMBER_ITEMS,
-    ];
-  }
+  if (input.canManage) return [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS];
+  const holds = (kind: string, privilege: string) =>
+    input.grants?.some(
+      (grant) => grant.resourceKind === kind && grant.privileges.includes(privilege),
+    ) === true;
+  const destinations = [
+    ...(holds("channel_account", "channel.manage") ? [CHANNELS_ITEM] : []),
+    ...(holds("automation", "automation.run") ||
+    holds("project", "project.use") ||
+    holds("daemon", "project.use")
+      ? [AUTOMATIONS_ITEM]
+      : []),
+    ...(holds("team", "hub.access.manage") ? [PEOPLE_ITEM] : []),
+    ACCESS_ITEM,
+  ];
   return [ACCOUNT_ITEM, ...destinations];
 }
 

@@ -1,6 +1,16 @@
+import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
-import { capitalizeLabel, plural } from "./labels";
+import {
+  accessLevelLabel,
+  constraintSummary,
+  privilegeLabel,
+  type AccessResourceKind,
+} from "./access-catalog";
+import { accessLevelDescription, matchingAccessLevel } from "./access-level-summary";
+import { plural } from "./labels";
 import { EmptyRow } from "./resource-rows";
 import type { HubAccessLevels, HubAccessResource, HubAssignment } from "./team/types";
 
@@ -13,57 +23,125 @@ export interface AccessSummaryEntry {
   source: string;
 }
 
-/** Read-only list of resource access assignments with their level and source. */
+const KIND_ORDER: AccessResourceKind[] = [
+  "daemon",
+  "project",
+  "channel_account",
+  "automation",
+  "team",
+  "organization",
+];
+const GROUP_LABELS: Record<AccessResourceKind, string> = {
+  daemon: "Hosts",
+  project: "Projects",
+  channel_account: "Channel Routes",
+  automation: "Automations",
+  team: "Teams",
+  organization: "Organization",
+};
+
+export interface AccessGroup {
+  kind: AccessResourceKind;
+  label: string;
+  entries: AccessSummaryEntry[];
+}
+
+/** Entries by resource kind, Hosts first; a kind with no entry is absent. */
+export function groupAccessEntries(entries: readonly AccessSummaryEntry[]): AccessGroup[] {
+  return KIND_ORDER.flatMap((kind) => {
+    const inKind = entries.filter(({ assignment }) => assignment.resourceKind === kind);
+    return inKind.length === 0 ? [] : [{ kind, label: GROUP_LABELS[kind], entries: inKind }];
+  });
+}
+
+/** Read-only access assignments grouped by resource kind, each with its level and source. */
 export function AccessSummary({
   entries,
   resources,
   accessLevels,
   emptyMessage,
 }: {
-  entries: AccessSummaryEntry[];
-  resources: HubAccessResource[];
+  entries: readonly AccessSummaryEntry[];
+  resources: readonly HubAccessResource[];
   accessLevels: HubAccessLevels;
   emptyMessage: string;
 }) {
-  const resourceByKey = new Map(
-    resources.map((resource) => [`${resource.kind}\0${resource.id}`, resource]),
-  );
-  return (
-    <View style={settingsStyles.card}>
-      {entries.length === 0 ? (
+  const groups = groupAccessEntries(entries);
+  if (groups.length === 0) {
+    return (
+      <View style={settingsStyles.card}>
         <EmptyRow message={emptyMessage} />
-      ) : (
-        entries.map(({ assignment, source }, index) => {
-          const resource = resourceByKey.get(
-            `${assignment.resourceKind}\0${assignment.resourceId}`,
-          );
-          const level = assignmentAccessLevel(accessLevels, assignment);
-          const constraints = accessConstraintSummary(assignment.constraints);
-          return (
-            <View
-              key={`${assignment.id}:${source}`}
-              style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
-            >
-              <View style={settingsStyles.rowContent}>
-                <Text style={settingsStyles.rowTitle}>
-                  {resource?.name ?? "Unavailable resource"}
-                </Text>
-                <Text style={settingsStyles.rowHint}>
-                  {`${hubResourceKindLabel(assignment.resourceKind)} · ${level} · ${source}`}
-                </Text>
-                <Text style={settingsStyles.rowHint}>
-                  {assignment.privileges
-                    .map((privilege) => privilege.replaceAll(".", " "))
-                    .join(", ") || "No privileges"}
-                </Text>
-                {constraints === null ? null : (
-                  <Text style={settingsStyles.rowHint}>{constraints}</Text>
-                )}
-              </View>
-            </View>
-          );
-        })
-      )}
+      </View>
+    );
+  }
+  const resourceByKey = new Map(resources.map((resource) => [resourceKey(resource), resource]));
+  return (
+    <View style={styles.groups}>
+      {groups.map((group) => (
+        <View key={group.kind} style={styles.group}>
+          <Text style={styles.groupLabel}>{group.label}</Text>
+          <View style={settingsStyles.card}>
+            {group.entries.map((entry, index) => (
+              <AccessRow
+                key={`${entry.assignment.id}:${entry.source}`}
+                entry={entry}
+                resource={resourceByKey.get(resourceKey(entry.assignment))}
+                accessLevels={accessLevels}
+                bordered={index > 0}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function AccessRow({
+  entry: { assignment, source },
+  resource,
+  accessLevels,
+  bordered,
+}: {
+  entry: AccessSummaryEntry;
+  resource: HubAccessResource | undefined;
+  accessLevels: HubAccessLevels;
+  bordered: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const level = accessLevelLine(accessLevels, assignment);
+  const constraints = constraintSummary(assignment.constraints);
+  return (
+    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>{resource?.name ?? "Unavailable resource"}</Text>
+        <Text style={settingsStyles.rowHint}>{`${level.label} · ${source}`}</Text>
+        {level.description === undefined ? null : (
+          <Text style={settingsStyles.rowHint}>{level.description}</Text>
+        )}
+        {assignment.resourceKind === "daemon" ? (
+          <Text style={settingsStyles.rowHint}>
+            Every Project on this Host, including Projects added later
+          </Text>
+        ) : null}
+        {open ? (
+          <Text style={settingsStyles.rowHint}>
+            {[
+              assignment.privileges.map(privilegeLabel).join(", ") || "No privileges",
+              ...(constraints === null ? [] : [constraints]),
+            ].join(" · ")}
+          </Text>
+        ) : null}
+      </View>
+      <Button
+        size="xs"
+        variant="ghost"
+        onPress={toggle}
+        accessibilityLabel={`Details of ${resource?.name ?? "access"}`}
+      >
+        {open ? "Hide details" : "Details"}
+      </Button>
     </View>
   );
 }
@@ -79,47 +157,36 @@ export function subjectAssignments(
   );
 }
 
-function assignmentAccessLevel(levels: HubAccessLevels, assignment: HubAssignment): string {
-  const fastMode = assignment.privileges.includes("agent.fast.use");
-  const target = [
-    ...new Set(assignment.privileges.filter((privilege) => privilege !== "agent.fast.use")),
-  ].sort();
-  const level = Object.entries(levels[assignment.resourceKind] ?? {}).find(([, privileges]) => {
-    const candidate = [...new Set(privileges)].sort();
-    return (
-      candidate.length === target.length &&
-      candidate.every((value, index) => value === target[index])
-    );
-  })?.[0];
-  const label =
-    level === undefined
-      ? `${String(target.length)} ${plural(target.length, "privilege")}`
-      : capitalizeLabel(level.replaceAll("_", " "));
-  return fastMode ? `${label} · Fast mode` : label;
+function resourceKey(resource: { resourceKind: string; resourceId: string } | HubAccessResource) {
+  return "kind" in resource
+    ? `${resource.kind}\0${resource.id}`
+    : `${resource.resourceKind}\0${resource.resourceId}`;
 }
 
-function hubResourceKindLabel(kind: HubAssignment["resourceKind"]): string {
+/** The built-in level a grant matches, worded by access-level-summary; a custom grant counts its privileges. */
+function accessLevelLine(
+  levels: HubAccessLevels,
+  assignment: HubAssignment,
+): { label: string; description: string | undefined } {
+  const levelId = matchingAccessLevel(levels, assignment.resourceKind, assignment.privileges);
+  const fastMode = assignment.privileges.includes("agent.fast.use") ? " · Fast mode" : "";
+  if (levelId === undefined) {
+    const count = assignment.privileges.filter(
+      (privilege) => privilege !== "agent.fast.use",
+    ).length;
+    return {
+      label: `${String(count)} ${plural(count, "privilege")}${fastMode}`,
+      description: undefined,
+    };
+  }
   return {
-    organization: "Organization",
-    daemon: "Host",
-    project: "Project",
-    channel_account: "Channel Route",
-    automation: "Automation",
-  }[kind];
+    label: `${accessLevelLabel(levelId)}${fastMode}`,
+    description: accessLevelDescription(levelId, assignment.resourceKind),
+  };
 }
 
-function accessConstraintSummary(constraints: Record<string, unknown>): string | null {
-  const details: string[] = [];
-  const configurations = constraints["agentConfigurations"];
-  if (Array.isArray(configurations)) {
-    details.push(
-      `${String(configurations.length)} Agent ${plural(configurations.length, "configuration")}`,
-    );
-  }
-  const conversation = constraints["conversation"];
-  if (typeof conversation === "object" && conversation !== null) {
-    const kind = Reflect.get(conversation, "kind");
-    if (typeof kind === "string") details.push(capitalizeLabel(kind.replaceAll("_", " ")));
-  }
-  return details.length === 0 ? null : details.join(" · ");
-}
+const styles = StyleSheet.create((theme) => ({
+  groups: { gap: theme.spacing[3] },
+  group: { gap: theme.spacing[1] },
+  groupLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+}));

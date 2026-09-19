@@ -73,6 +73,29 @@ describe("Access overview projections", () => {
     ]);
   });
 
+  it("lists a Team Admin grant under the Team resource, with who made it", () => {
+    const teamAdmin = HubAccessAssignmentSchema.parse({
+      id: "team-admin",
+      organizationId: "org",
+      subjectKind: "member",
+      subjectId: "membership",
+      resourceKind: "team",
+      resourceId: "team",
+      privileges: ["hub.access.manage"],
+      constraints: {},
+      createdByUserId: "lead",
+      createdAt: "now",
+      updatedAt: "now",
+    });
+    const rows = [...assignments, teamAdmin];
+    expect(
+      assignmentsForResource(rows, { kind: "team", id: "team", parent: null }).map(({ id }) => id),
+    ).toEqual(["team-admin"]);
+    expect(teamAdmin.createdByUserId).toBe("lead");
+    // Rows older than the field parse without it.
+    expect(assignments[0]!.createdByUserId).toBeUndefined();
+  });
+
   it("finds direct access by membership ID and inherited Teams by user ID", () => {
     expect(
       assignmentsForSubject(assignments, { kind: "member", id: member.id }, [member], [team]).map(

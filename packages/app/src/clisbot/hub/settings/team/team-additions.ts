@@ -1,6 +1,6 @@
 import { invitationTeams } from "../../contracts";
 import { invitationFailureMessage, parseInvitationEmails } from "../invitation-emails";
-import { capitalizeLabel, plural } from "../labels";
+import { capitalizeLabel, countLabel } from "../labels";
 import type { HubManagedInvitation, HubMember, HubTeam, InvitationRole } from "./types";
 
 /**
@@ -137,20 +137,57 @@ export function invitationTeamBody(teamIds: readonly string[]): {
   return teamIds.length === 1 && only !== undefined ? { teamId: only } : { teamIds: [...teamIds] };
 }
 
-/** One line that says what the plan will do, for the form's review. */
-export function teamAdditionSummary(plan: TeamAdditionPlan, teams: readonly HubTeam[]): string {
+/**
+ * Reads the one People field of the Invite modal: entries separated by commas, semicolons, or new
+ * lines. An entry with an address is an email (a Member's email is recognized by the plan); any
+ * other entry is a name matched to a Member, case-insensitively.
+ */
+export function readPeopleInput(
+  text: string,
+  members: readonly HubMember[],
+): { pickedUserIds: string[]; emailText: string; unknown: string[] } {
+  const pickedUserIds: string[] = [];
+  const emailParts: string[] = [];
+  const unknown: string[] = [];
+  for (const raw of text.split(/[,;\n]+/)) {
+    const entry = raw.trim();
+    if (entry.length === 0) continue;
+    if (entry.includes("@")) {
+      emailParts.push(entry);
+      continue;
+    }
+    const match = members.find(({ name }) => name.trim().toLowerCase() === entry.toLowerCase());
+    if (match === undefined) unknown.push(entry);
+    else if (!pickedUserIds.includes(match.userId)) pickedUserIds.push(match.userId);
+  }
+  return { pickedUserIds, emailText: emailParts.join("\n"), unknown };
+}
+
+/**
+ * One line that says what the plan will do, for the Invite modal's preview:
+ * "2 Members join Ops, BMS now · 1 invitation will be sent · 1 pending invitation gains Teams".
+ */
+export function invitePreview(plan: TeamAdditionPlan, teams: readonly HubTeam[]): string {
   const teamNames = plan.teamIds.flatMap((id) => teams.find((team) => team.id === id)?.name ?? []);
-  const target = teamNames.length === 0 ? "the organization only" : teamNames.join(", ");
+  const pendingCount = Object.keys(plan.pending).length;
+  const newCount = plan.invitees.length - pendingCount;
   const parts: string[] = [];
   if (plan.members.length > 0 && teamNames.length > 0) {
-    parts.push(`Add ${String(plan.members.length)} ${plural(plan.members.length, "Member")} now`);
+    const verb = plan.members.length === 1 ? "joins" : "join";
+    parts.push(`${countLabel(plan.members.length, "Member")} ${verb} ${teamNames.join(", ")} now`);
   }
-  if (plan.invitees.length > 0) {
-    const people =
-      plan.invitees.length === 1 ? "1 person" : `${String(plan.invitees.length)} people`;
-    parts.push(`Invite ${people}, joining after sign-in`);
+  if (newCount > 0) parts.push(`${countLabel(newCount, "invitation")} will be sent`);
+  if (pendingCount > 0) {
+    const effect = pendingInvitationEffect(pendingCount, teamNames.length > 0);
+    parts.push(`${countLabel(pendingCount, "pending invitation")} ${effect}`);
   }
-  return parts.length === 0 ? "" : `${parts.join(" · ")} → ${target}`;
+  return parts.join(" · ");
+}
+
+/** "gains Teams" when Teams are chosen, otherwise only the lifetime restarts. */
+function pendingInvitationEffect(count: number, joinsTeams: boolean): string {
+  if (joinsTeams) return count === 1 ? "gains Teams" : "gain Teams";
+  return count === 1 ? "is renewed" : "are renewed";
 }
 
 /** Notes for invitees who already have a pending invitation: its Teams stay, its role and expiry are renewed. */

@@ -46,13 +46,22 @@ vi.mock("./provider-application-settings", () => ({
     <section aria-label="Provider applications">Slack Connected · 1 Connection</section>
   ),
 }));
-vi.mock("./channel-identity-settings", () => ({
-  ChannelIdentitySettings: () => null,
+vi.mock("./channel-identity-self-link", () => ({
   ChannelIdentitySelfLinkSettings: () => (
     <div data-testid="identity-settings">{navigation.params.channelConnectionId}</div>
   ),
 }));
 vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
+// People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
+vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
+// Account's own chat-account list has its browser test; here only its entry to the flow matters.
+vi.mock("./channel-identities-section", () => ({
+  ChannelIdentitiesSection: ({ onManage }: { onManage(): void }) => (
+    <button type="button" onClick={onManage}>
+      Manage chat accounts
+    </button>
+  ),
+}));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: vi.fn() }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn() }));
 vi.mock("@/components/ui/select-field", () => ({ SelectField: () => null }));
@@ -184,10 +193,10 @@ describe("Account entry lifecycle and recovery", () => {
     expect(screen.getByText(/Full organization access/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
     expect(screen.queryByTestId("identity-settings")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Manage identities" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage chat accounts" }));
     expect(screen.getByTestId("identity-settings")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back to Account" }));
-    expect(screen.getByRole("button", { name: "Manage identities" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Manage chat accounts" })).toBeTruthy();
     expect(screen.queryByTestId("identity-settings")).toBeNull();
     expect(hub.completeAppSetup).not.toHaveBeenCalled();
   });

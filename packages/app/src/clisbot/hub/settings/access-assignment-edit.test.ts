@@ -64,6 +64,16 @@ describe("Access assignment constraint editing", () => {
     ).toEqual({ futureConstraint: true });
   });
 
+  it("keeps a Team Admin or Automation Admin row's empty constraints as they are", () => {
+    expect(accessConstraintDraft({})).toEqual({
+      valid: true,
+      conversation: "specific",
+      conversationIds: "",
+      agentConfigurations: [],
+    });
+    expect(mergeAccessConstraints({}, {})).toEqual({});
+  });
+
   it.each([
     { conversation: { kind: "future_scope" } },
     { conversation: { kind: "specific", conversationIds: [] } },

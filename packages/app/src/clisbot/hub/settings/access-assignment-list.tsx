@@ -13,7 +13,8 @@ import {
   type AccessResource,
   type SubjectKind,
 } from "./access-catalog";
-import { matchingAccessLevel } from "./access-level-summary";
+import { privilegesWithinHoldings, viewerHoldings, type ViewerAuthority } from "./access-grantor";
+import { matchingAccessLevel, sharesAccess } from "./access-level-summary";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { EmptyRow } from "./access-settings-feedback";
 
@@ -53,10 +54,19 @@ function groupAssignments(assignments: AccessAssignment[]): AccessAssignment[][]
   return [...groups.values()];
 }
 
+/** What every row needs to name itself and decide whether the viewer may touch it. */
+export interface AssignmentRowContext {
+  accessLevels: AccessCatalog["accessLevels"];
+  resources: AccessResource[];
+  resourceByKey: Map<string, AccessResource>;
+  /** Member names by user id, for "by <name>" (`createdByUserId` is a user id). */
+  memberNameByUserId: Map<string, string>;
+  authority: ViewerAuthority;
+}
+
 export function ExplicitAssignments({
   assignments,
-  accessLevels,
-  resourceByKey,
+  context,
   teamById,
   teamMembersById,
   memberById,
@@ -65,8 +75,7 @@ export function ExplicitAssignments({
   edit,
 }: {
   assignments: AccessAssignment[];
-  accessLevels: AccessCatalog["accessLevels"];
-  resourceByKey: Map<string, AccessResource>;
+  context: AssignmentRowContext;
   teamById: Map<string, string>;
   teamMembersById: Map<string, string>;
   memberById: Map<string, string>;
@@ -84,8 +93,7 @@ export function ExplicitAssignments({
           <AssignmentGroupRows
             key={group[0]!.id}
             group={group}
-            accessLevels={accessLevels}
-            resourceByKey={resourceByKey}
+            context={context}
             subjectName={assignmentSubjectName(
               { kind: group[0]!.subjectKind, id: group[0]!.subjectId },
               teamById,
@@ -109,8 +117,7 @@ export function ExplicitAssignments({
 
 function AssignmentGroupRows({
   group,
-  accessLevels,
-  resourceByKey,
+  context,
   subjectName,
   subjectDetail,
   bordered,
@@ -119,8 +126,7 @@ function AssignmentGroupRows({
   edit,
 }: {
   group: AccessAssignment[];
-  accessLevels: AccessCatalog["accessLevels"];
-  resourceByKey: Map<string, AccessResource>;
+  context: AssignmentRowContext;
   subjectName: string | undefined;
   subjectDetail: string | undefined;
   bordered: boolean;
@@ -130,6 +136,7 @@ function AssignmentGroupRows({
 }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
+  const { resourceByKey } = context;
   const resourceOf = useCallback(
     (assignment: AccessAssignment) =>
       resourceByKey.get(`${assignment.resourceKind}\0${assignment.resourceId}`),
@@ -139,8 +146,7 @@ function AssignmentGroupRows({
     return (
       <ExplicitAssignmentRow
         assignment={group[0]!}
-        accessLevels={accessLevels}
-        resource={resourceOf(group[0]!)}
+        context={context}
         subjectName={subjectName}
         subjectDetail={subjectDetail}
         bordered={bordered}
@@ -174,7 +180,7 @@ function AssignmentGroupRows({
             {`${subjectName ?? "Unavailable subject"} · ${String(group.length)} ${resourceKindLabel(first.resourceKind)}s`}
             {parents.length > 0 ? ` · ${parents.join(", ")}` : ""}
           </Text>
-          <Text style={settingsStyles.rowHint}>{assignmentDetail(first, accessLevels)}</Text>
+          <Text style={settingsStyles.rowHint}>{assignmentDetail(first, context)}</Text>
           {subjectDetail ? (
             <Text style={settingsStyles.rowHint}>Members: {subjectDetail}</Text>
           ) : null}
@@ -185,8 +191,7 @@ function AssignmentGroupRows({
             <ExplicitAssignmentRow
               key={assignment.id}
               assignment={assignment}
-              accessLevels={accessLevels}
-              resource={resourceOf(assignment)}
+              context={context}
               subjectName={subjectName}
               subjectDetail={undefined}
               bordered
@@ -200,17 +205,37 @@ function AssignmentGroupRows({
   );
 }
 
-function assignmentDetail(
-  assignment: AccessAssignment,
-  accessLevels: AccessCatalog["accessLevels"],
-): string {
+function assignmentDetail(assignment: AccessAssignment, context: AssignmentRowContext): string {
   const summary = constraintSummary(assignment.constraints);
   return [
     SUBJECT_ASSIGNMENT_LABELS[assignment.subjectKind],
     resourceKindLabel(assignment.resourceKind),
-    grantedAccessLabel(assignment, accessLevels),
+    grantedAccessLabel(assignment, context.accessLevels),
+    ...(sharesAccess(assignment.resourceKind, assignment.privileges) ? ["Can share"] : []),
     ...(summary ? [summary] : []),
+    grantedByLabel(assignment, context.memberNameByUserId),
   ].join(" · ");
+}
+
+/** Who made the grant, so it can be revoked at once. Null means the Hub itself wrote it. */
+function grantedByLabel(
+  assignment: AccessAssignment,
+  memberNameByUserId: Map<string, string>,
+): string {
+  const userId = assignment.createdByUserId ?? null;
+  if (userId === null) return "by Hub";
+  return `by ${memberNameByUserId.get(userId) ?? "a former Member"}`;
+}
+
+/** A row above the viewer's own level shows locked: no Edit, no Remove. */
+function withinViewer(assignment: AccessAssignment, context: AssignmentRowContext): boolean {
+  const resource = context.resourceByKey.get(
+    `${assignment.resourceKind}\0${assignment.resourceId}`,
+  ) ?? { kind: assignment.resourceKind, id: assignment.resourceId, parent: null };
+  return privilegesWithinHoldings(
+    viewerHoldings(context.authority, resource, context.resources),
+    assignment.privileges,
+  );
 }
 
 /** The level name when the grant still equals one; the privilege list only for custom grants. */
@@ -228,8 +253,7 @@ function grantedAccessLabel(
 
 function ExplicitAssignmentRow({
   assignment,
-  accessLevels,
-  resource,
+  context,
   subjectName,
   subjectDetail,
   bordered,
@@ -238,8 +262,7 @@ function ExplicitAssignmentRow({
   edit,
 }: {
   assignment: AccessAssignment;
-  accessLevels: AccessCatalog["accessLevels"];
-  resource: AccessResource | undefined;
+  context: AssignmentRowContext;
   subjectName: string | undefined;
   subjectDetail: string | undefined;
   bordered: boolean;
@@ -249,28 +272,38 @@ function ExplicitAssignmentRow({
 }) {
   const handleRemove = useCallback(() => void remove(assignment.id), [assignment.id, remove]);
   const handleEdit = useCallback(() => edit(assignment), [assignment, edit]);
+  const resource = context.resourceByKey.get(
+    `${assignment.resourceKind}\0${assignment.resourceId}`,
+  );
+  const locked = !withinViewer(assignment, context);
   return (
     <View style={[settingsStyles.row, styles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>
           {`${subjectName ?? "Unavailable subject"} · ${resource?.name ?? assignment.resourceId}`}
         </Text>
-        <Text style={settingsStyles.rowHint}>{assignmentDetail(assignment, accessLevels)}</Text>
+        <Text style={settingsStyles.rowHint}>{assignmentDetail(assignment, context)}</Text>
         {subjectDetail ? (
           <Text style={settingsStyles.rowHint}>Members: {subjectDetail}</Text>
         ) : null}
       </View>
-      <Button
-        size="xs"
-        variant="outline"
-        disabled={pending || !resource?.available}
-        onPress={handleEdit}
-      >
-        Edit
-      </Button>
-      <Button size="xs" variant="ghost" disabled={pending} onPress={handleRemove}>
-        Remove
-      </Button>
+      {locked ? (
+        <Text style={settingsStyles.rowHint}>Locked · above your level</Text>
+      ) : (
+        <>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={pending || !resource?.available}
+            onPress={handleEdit}
+          >
+            Edit
+          </Button>
+          <Button size="xs" variant="ghost" disabled={pending} onPress={handleRemove}>
+            Remove
+          </Button>
+        </>
+      )}
     </View>
   );
 }
