@@ -40,7 +40,9 @@ import { ChannelActionsMenu } from "./channel-actions-menu";
 import { ChoiceRow } from "./channel-route-behavior-rows";
 import {
   FoldedRouteFormSection,
+  FoldedRouteFormSubgroup,
   RouteFormSection,
+  RouteFormSubgroup,
   RoutePermissionFields,
   RouteReplyFields,
   approvalSummary,
@@ -2844,90 +2846,89 @@ function ChannelAccountForm({
       />
     </RouteFormSection>
   );
-  const renderPermissions = () => (
-    <RouteFormSection title="Permissions" info={PERMISSIONS_INFO}>
-      <RoutePermissionFields
-        approvalChoice={approvalChoice}
-        questions={behavior.questions ?? DEFAULT_ROUTE_QUESTIONS}
-        pending={pending}
-        changeApprovalChoice={changeApprovalChoice}
-        changeQuestions={changeQuestions}
-      />
-    </RouteFormSection>
+  // How the Agent runs belongs with what runs: its permissions, then its
+  // provider settings folded under Advanced.
+  const renderRunSettings = () => (
+    <>
+      <RouteFormSubgroup title="Permissions">
+        <RoutePermissionFields
+          approvalChoice={approvalChoice}
+          questions={behavior.questions ?? DEFAULT_ROUTE_QUESTIONS}
+          pending={pending}
+          changeApprovalChoice={changeApprovalChoice}
+          changeQuestions={changeQuestions}
+        />
+      </RouteFormSubgroup>
+      {adminScoped || fixedAutomationName !== undefined || target !== "agent" ? null : (
+        <FoldedRouteFormSubgroup
+          title="Advanced"
+          summary="Fast mode and provider options"
+          inUse={
+            initial.providerOptions.trim().length > 0 ||
+            initial.agentConfiguration.featureValues["fast_mode"] === true
+          }
+        >
+          <AgentAdvancedFields
+            selectedDaemonServerId={selectedDaemonServerId}
+            agentConfiguration={agentConfiguration}
+            setAgentConfiguration={setAgentConfiguration}
+            providerOptions={providerOptions}
+            parsedProviderOptions={parsedProviderOptions}
+            setProviderOptions={setProviderOptions}
+            pending={pending}
+          />
+        </FoldedRouteFormSubgroup>
+      )}
+    </>
   );
-  const renderTarget = () => {
+  const renderTargetChoice = () => {
     if (fixedAutomationName !== undefined)
-      return (
-        <RouteFormSection title="What runs">
-          <Text style={settingsStyles.rowTitle}>{`Automation · ${fixedAutomationName}`}</Text>
-        </RouteFormSection>
-      );
+      return <Text style={settingsStyles.rowTitle}>{`Automation · ${fixedAutomationName}`}</Text>;
     if (adminScoped)
       return (
-        <RouteFormSection title="What runs">
-          <ChannelRouteAdminTarget
-            editedRoute={editedRoute}
-            routes={arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[]}
-            selectedIndex={existingTargetIndex}
-            onChange={setExistingTargetIndex}
-            disabled={pending}
-          />
-        </RouteFormSection>
+        <ChannelRouteAdminTarget
+          editedRoute={editedRoute}
+          routes={arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[]}
+          selectedIndex={existingTargetIndex}
+          onChange={setExistingTargetIndex}
+          disabled={pending}
+        />
       );
     return (
-      <RouteFormSection title="What runs">
-        <RouteTargetFields
-          target={target}
-          changeTarget={changeTarget}
-          automationName={automationName}
-          automationDisplay={automationDisplay}
-          automationOptions={automationOptions}
-          setAutomationName={setAutomationName}
-          automationCreatePending={automationCreatePending}
-          showAutomationCreator={showAutomationCreator}
-          showAutomationForm={showAutomationForm}
-          automationCreateError={automationCreateError}
-          daemonId={daemonId}
-          daemonDisplay={daemonDisplay}
-          daemonOptions={daemonOptions}
-          changeDaemon={changeDaemon}
-          projectId={projectId}
-          setProjectId={setProjectId}
-          cwd={cwd}
-          setCwd={setCwd}
-          workspace={workspace}
-          setWorkspace={setWorkspace}
-          selectedDaemonServerId={selectedDaemonServerId}
-          agentConfiguration={agentConfiguration}
-          setAgentConfiguration={setAgentConfiguration}
-          pending={pending}
-        />
-      </RouteFormSection>
+      <RouteTargetFields
+        target={target}
+        changeTarget={changeTarget}
+        automationName={automationName}
+        automationDisplay={automationDisplay}
+        automationOptions={automationOptions}
+        setAutomationName={setAutomationName}
+        automationCreatePending={automationCreatePending}
+        showAutomationCreator={showAutomationCreator}
+        showAutomationForm={showAutomationForm}
+        automationCreateError={automationCreateError}
+        daemonId={daemonId}
+        daemonDisplay={daemonDisplay}
+        daemonOptions={daemonOptions}
+        changeDaemon={changeDaemon}
+        projectId={projectId}
+        setProjectId={setProjectId}
+        cwd={cwd}
+        setCwd={setCwd}
+        workspace={workspace}
+        setWorkspace={setWorkspace}
+        selectedDaemonServerId={selectedDaemonServerId}
+        agentConfiguration={agentConfiguration}
+        setAgentConfiguration={setAgentConfiguration}
+        pending={pending}
+      />
     );
   };
-  const renderAdvanced = () => {
-    if (adminScoped || fixedAutomationName !== undefined || target !== "agent") return null;
-    return (
-      <FoldedRouteFormSection
-        title="Advanced"
-        summary="Fast mode and provider options"
-        inUse={
-          initial.providerOptions.trim().length > 0 ||
-          initial.agentConfiguration.featureValues["fast_mode"] === true
-        }
-      >
-        <AgentAdvancedFields
-          selectedDaemonServerId={selectedDaemonServerId}
-          agentConfiguration={agentConfiguration}
-          setAgentConfiguration={setAgentConfiguration}
-          providerOptions={providerOptions}
-          parsedProviderOptions={parsedProviderOptions}
-          setProviderOptions={setProviderOptions}
-          pending={pending}
-        />
-      </FoldedRouteFormSection>
-    );
-  };
+  const renderTarget = () => (
+    <RouteFormSection title="What runs" info={WHAT_RUNS_INFO}>
+      {renderTargetChoice()}
+      {renderRunSettings()}
+    </RouteFormSection>
+  );
   const renderAutomationCreator = () => {
     if (target !== "automation" || !showAutomationCreator) return null;
     return (
@@ -2952,9 +2953,7 @@ function ChannelAccountForm({
       {renderAudience()}
       {renderTarget()}
       {renderReplies()}
-      {renderPermissions()}
       {renderLimits()}
-      {renderAdvanced()}
       {target === "automation" && automationName !== null && !adminScoped ? (
         <AutomationReplyAuthority
           automation={automations.find((item) => item.name === automationName)}
@@ -2978,8 +2977,8 @@ const AUDIENCE_INFO =
   "A sender is admitted when any row matches both who they are and where they write. Anyone no Route admits is refused.";
 const LIMITS_INFO =
   "Counted across every conversation this Route matches. Messages over a rate or run limit wait their turn; a message longer than the input limit is refused. The bot's own limits are on the Connection, under Limits.";
-const PERMISSIONS_INFO =
-  "What happens when the Agent's provider asks before it runs a tool. Accept automatically answers every request with Allow: use it when the provider has no mode that runs unattended, or when its own auto mode still asks for review.";
+const WHAT_RUNS_INFO =
+  "The Agent or Automation that answers, and how it runs. Permissions: what happens when the provider asks before running a tool. Accept automatically answers every request with Allow, for a provider with no mode that runs unattended, or whose own auto mode still asks for review. A question from the Agent is not a permission; anyone who may talk here can answer it.";
 
 /**
  * The accounts and resource a save writes: the edited Route replaced in place, a Connection's first Route (a new account) appended, or a Route inserted into

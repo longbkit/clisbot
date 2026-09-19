@@ -65,10 +65,12 @@ Auto-accept:
   open Connection, the card's own **Add Route** fixes the Connection and the
   list header's Add Route is hidden.
 - **The Route form is sections, one card each**, in the order an operator
-  answers them: Connection, Who can talk and where, What runs, Replies,
-  Permissions, then Limits and Advanced (fast mode, provider options), which
-  start folded to a one-line summary and open on their own when they hold a
-  value. Section explanations are header info tips, per `docs/design.md`.
+  answers them: Connection, Who can talk and where, What runs, Replies, then
+  Limits. How the Agent runs stays with what runs: What runs holds the target,
+  then a Permissions subgroup and an Advanced subgroup (fast mode, provider
+  options). Limits and Advanced start folded to a one-line summary and open on
+  their own when they hold a value. Section explanations are header info tips,
+  per `docs/design.md`.
 - **Accept automatically** (was "Allow automatically") answers every permission
   request with Allow. The plane no longer refuses it; the configuration warns
   "Every permission request is accepted automatically." on any Route.

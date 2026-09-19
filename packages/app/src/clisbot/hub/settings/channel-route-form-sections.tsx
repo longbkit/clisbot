@@ -9,9 +9,10 @@ import type { ChannelRouteBehavior, ChannelRouteQuestions } from "../channel-con
 import { ChoiceRow, RouteBehaviorSwitch, RouteFollowUpFields } from "./channel-route-behavior-rows";
 
 // The Route form is a stack of sections, each one card: Connection, Who and
-// where, What runs, Replies, Permissions, then Limits and Advanced, which stay
-// folded until opened or until they hold a value. The order follows the
-// questions an operator answers: which bot, who may talk, what answers, how.
+// where, What runs, Replies, then Limits, folded until opened or until it holds
+// a value. What runs also holds how the Agent runs: its Permissions and, folded,
+// its Advanced provider settings. The order follows the questions an operator
+// answers: which bot, who may talk, what answers and how it runs, how it replies.
 
 export type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 
@@ -88,6 +89,57 @@ export function FoldedRouteFormSection({
     <RouteFormSection title={title} info={info} trailing={trailing}>
       {open ? children : <Text style={settingsStyles.rowHint}>{summary}</Text>}
     </RouteFormSection>
+  );
+}
+
+/** A titled group inside a section's card, set off from the fields above it. */
+export function RouteFormSubgroup({
+  title,
+  trailing,
+  children,
+}: {
+  title: string;
+  trailing?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <View style={styles.subgroup}>
+      <View style={styles.subgroupHeader}>
+        <Text style={styles.subgroupTitle}>{title}</Text>
+        {trailing}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** A subgroup folded to a one-line summary; it opens on its own when in use. */
+export function FoldedRouteFormSubgroup({
+  title,
+  summary,
+  inUse,
+  children,
+}: {
+  title: string;
+  summary: string;
+  inUse: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(inUse);
+  const toggle = useCallback(() => setOpen((value) => !value), []);
+  const state = useMemo(() => ({ expanded: open }), [open]);
+  const trailing = useMemo(
+    () => (
+      <Button size="xs" variant="ghost" onPress={toggle} accessibilityState={state}>
+        {open ? "Hide" : "Show"}
+      </Button>
+    ),
+    [open, state, toggle],
+  );
+  return (
+    <RouteFormSubgroup title={title} trailing={trailing}>
+      {open ? children : <Text style={settingsStyles.rowHint}>{summary}</Text>}
+    </RouteFormSubgroup>
   );
 }
 
@@ -257,5 +309,21 @@ const styles = StyleSheet.create((theme) => ({
   card: {
     padding: theme.spacing[4],
     gap: theme.spacing[3],
+  },
+  subgroup: {
+    gap: theme.spacing[3],
+    paddingTop: theme.spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  subgroupHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  subgroupTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
   },
 }));
