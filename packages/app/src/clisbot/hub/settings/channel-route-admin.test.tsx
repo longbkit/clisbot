@@ -152,7 +152,10 @@ vi.mock("./managed-agent-configuration-fields", () => ({
   ManagedAgentConfigurationFields: () => null,
   ManagedAgentFastModeSwitch: () => null,
 }));
-vi.mock("./managed-workspace-fields", () => ({ ManagedWorkspaceFields: () => null }));
+vi.mock("./managed-workspace-fields", () => ({
+  WORK_LOCATION_OPTIONS: [],
+  WorktreeTargetFields: () => null,
+}));
 vi.mock("./automation-settings", () => ({ SingleAgentAutomationForm: () => null }));
 vi.mock("./channel-pairing-panel", () => ({ ChannelPairingPanel: () => null }));
 

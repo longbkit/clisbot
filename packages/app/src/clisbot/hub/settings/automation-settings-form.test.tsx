@@ -49,13 +49,28 @@ vi.mock("@/components/ui/segmented-control", () => ({
   }) => (
     <nav>
       {options.map((option) => (
-        <button key={option.value} onClick={() => onValueChange(option.value)}>
-          {option.label}
-        </button>
+        <SegmentButton
+          key={option.value}
+          value={option.value}
+          label={option.label}
+          onValueChange={onValueChange}
+        />
       ))}
     </nav>
   ),
 }));
+function SegmentButton(props: {
+  value: string;
+  label: string;
+  onValueChange(value: string): void;
+}) {
+  const press = React.useCallback(() => props.onValueChange(props.value), [props]);
+  return (
+    <button type="button" onClick={press}>
+      {props.label}
+    </button>
+  );
+}
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({ hidden: { display: "none" } }) },
   withUnistyles: (Component: React.ComponentType) => Component,
@@ -107,7 +122,10 @@ vi.mock("./daemon-project-field", () => ({
     );
   },
 }));
-vi.mock("./managed-workspace-fields", () => ({ ManagedWorkspaceFields: () => null }));
+vi.mock("./managed-workspace-fields", () => ({
+  WORK_LOCATION_OPTIONS: [],
+  WorktreeTargetFields: () => null,
+}));
 vi.mock("./managed-agent-configuration-fields", () => ({
   ManagedAgentConfigurationFields: () => null,
   ManagedAgentFastModeSwitch: () => null,
@@ -166,15 +184,21 @@ vi.mock("@/components/ui/switch", () => ({
     onValueChange(value: boolean): void;
     accessibilityLabel: string;
     disabled?: boolean;
-  }) => (
-    <input
-      type="checkbox"
-      aria-label={accessibilityLabel}
-      checked={value}
-      disabled={disabled}
-      onChange={(event) => onValueChange(event.target.checked)}
-    />
-  ),
+  }) => {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => onValueChange(event.target.checked),
+      [onValueChange],
+    );
+    return (
+      <input
+        type="checkbox"
+        aria-label={accessibilityLabel}
+        checked={value}
+        disabled={disabled}
+        onChange={change}
+      />
+    );
+  },
 }));
 vi.mock("@/components/ui/form-field", () => ({
   Field: ({ label, children }: { label: string; children: ReactNode }) => (
@@ -191,13 +215,13 @@ vi.mock("@/components/ui/form-field", () => ({
     initialValue: string;
     onChangeText(value: string): void;
     editable?: boolean;
-  }) => (
-    <input
-      defaultValue={initialValue}
-      disabled={editable === false}
-      onChange={(event) => onChangeText(event.target.value)}
-    />
-  ),
+  }) => {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => onChangeText(event.target.value),
+      [onChangeText],
+    );
+    return <input defaultValue={initialValue} disabled={editable === false} onChange={change} />;
+  },
 }));
 vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) => (
@@ -212,7 +236,9 @@ function ChannelDraftAdapter() {
   return (
     <div>
       <input aria-label="Route draft" />
-      <button onClick={configure ?? undefined}>Configure reply output</button>
+      <button type="button" onClick={configure ?? undefined}>
+        Configure reply output
+      </button>
     </div>
   );
 }

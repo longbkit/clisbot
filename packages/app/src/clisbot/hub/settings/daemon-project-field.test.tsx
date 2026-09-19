@@ -3,6 +3,7 @@ import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ProjectSummary } from "@/utils/projects";
+import type { WorkspaceConfigurationValue } from "../workspace-configuration";
 import { DaemonProjectField } from "./daemon-project-field";
 
 const fixtures = vi.hoisted(() => ({
@@ -254,4 +255,52 @@ it("returns to the Project root when custom directory is turned off", async () =
   fireEvent.click(screen.getByLabelText("Use a custom working directory"));
   await waitFor(() => expect(changed).toHaveBeenLastCalledWith("/srv/brain"));
   expect(screen.queryByLabelText("Working directory")).toBeNull();
+});
+
+it("puts a folder inside the Project and a worktree behind one switch, as one choice", async () => {
+  const PROJECT_FOLDER: WorkspaceConfigurationValue = {
+    behavior: "project",
+    newBranch: "",
+    base: "",
+    branch: "",
+    pullRequestNumber: "",
+  };
+  function Harness() {
+    const [value, setValue] = React.useState(PROJECT_FOLDER);
+    const workspace = React.useMemo(() => ({ value, onChange: setValue }), [value]);
+    return (
+      <>
+        <DaemonProjectField
+          {...props}
+          onChange={vi.fn()}
+          onCwdChange={vi.fn()}
+          workspace={workspace}
+        />
+        <output aria-label="Behavior">{value.behavior}</output>
+      </>
+    );
+  }
+  render(<Harness />);
+  // Off by default: the Agent works in the Project folder, nothing else shows.
+  const toggle = screen.getByLabelText("Work outside the Project folder") as HTMLInputElement;
+  expect(toggle.checked).toBe(false);
+  expect(screen.queryByLabelText("Where the Agent works")).toBeNull();
+  fireEvent.click(toggle);
+  // On starts from a folder inside the Project.
+  expect((screen.getByLabelText("Where the Agent works") as HTMLSelectElement).value).toBe(
+    "folder",
+  );
+  expect(screen.getAllByLabelText("Working directory")).toHaveLength(1);
+  // A worktree replaces the folder: they exclude each other.
+  fireEvent.change(screen.getByLabelText("Where the Agent works"), {
+    target: { value: "branch-off" },
+  });
+  expect(screen.getByLabelText("Behavior").textContent).toBe("branch-off");
+  // The mock labels every text input alike: these two are New branch and Base branch.
+  expect(
+    screen.getAllByLabelText("Working directory").map((input) => (input as HTMLInputElement).value),
+  ).toEqual(["", ""]);
+  fireEvent.click(screen.getByLabelText("Work outside the Project folder"));
+  expect(screen.getByLabelText("Behavior").textContent).toBe("project");
+  expect(screen.queryByLabelText("Where the Agent works")).toBeNull();
 });

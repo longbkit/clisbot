@@ -241,7 +241,8 @@ vi.mock("./managed-agent-configuration-fields", () => ({
   ManagedAgentFastModeSwitch: () => null,
 }));
 vi.mock("./managed-workspace-fields", () => ({
-  ManagedWorkspaceFields: () => null,
+  WORK_LOCATION_OPTIONS: [],
+  WorktreeTargetFields: () => null,
 }));
 vi.mock("./automation-settings", () => ({
   SingleAgentAutomationForm: function TestAutomation(props: { save(yaml: string): Promise<void> }) {

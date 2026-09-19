@@ -78,7 +78,6 @@ import {
   ManagedAgentConfigurationFields,
   type ManagedAgentConfigurationValue,
 } from "./managed-agent-configuration-fields";
-import { ManagedWorkspaceFields } from "./managed-workspace-fields";
 import { AutomationActivity } from "./automation-run-details";
 
 export interface AutomationConnection {
@@ -988,6 +987,7 @@ export function SingleAgentAutomationForm({
   const [workspace, setWorkspace] = useState(() =>
     workspaceConfigurationFromTarget(initialValue?.worktree),
   );
+  const workspaceField = useMemo(() => ({ value: workspace, onChange: setWorkspace }), [workspace]);
   const [agentConfiguration, setAgentConfiguration] = useState<ManagedAgentConfigurationValue>({
     provider: initialValue?.provider ?? "",
     model: initialValue?.model ?? "",
@@ -1459,9 +1459,9 @@ export function SingleAgentAutomationForm({
           cwd={cwd}
           onChange={setProjectId}
           onCwdChange={setCwd}
+          workspace={workspaceField}
           disabled={pending}
         />
-        <ManagedWorkspaceFields value={workspace} onChange={setWorkspace} disabled={pending} />
         <ManagedAgentConfigurationFields
           serverId={selectedDaemonServerId}
           cwd={cwd}

@@ -42,7 +42,6 @@ import {
   FoldedRouteFormSection,
   FoldedRouteFormSubgroup,
   RouteFormSection,
-  RouteFormSubgroup,
   RoutePermissionFields,
   RouteReplyFields,
   RouteTriggerFields,
@@ -136,7 +135,6 @@ import {
   ManagedAgentFastModeSwitch,
   type ManagedAgentConfigurationValue,
 } from "./managed-agent-configuration-fields";
-import { ManagedWorkspaceFields } from "./managed-workspace-fields";
 import {
   isWorkspaceConfigurationValid,
   workspaceConfigurationFromTarget,
@@ -2876,18 +2874,17 @@ function ChannelAccountForm({
   // provider settings folded under Advanced.
   const renderRunSettings = () => (
     <>
-      <RouteFormSubgroup title="Permissions">
-        <RoutePermissionFields
-          approvalChoice={approvalChoice}
-          questions={behavior.questions ?? DEFAULT_ROUTE_QUESTIONS}
-          pending={pending}
-          changeApprovalChoice={changeApprovalChoice}
-          changeQuestions={changeQuestions}
-        />
-      </RouteFormSubgroup>
+      {/* Its two fields carry their own labels; a heading over them would repeat them. */}
+      <RoutePermissionFields
+        approvalChoice={approvalChoice}
+        questions={behavior.questions ?? DEFAULT_ROUTE_QUESTIONS}
+        pending={pending}
+        changeApprovalChoice={changeApprovalChoice}
+        changeQuestions={changeQuestions}
+      />
       {adminScoped || fixedAutomationName !== undefined || target !== "agent" ? null : (
         <FoldedRouteFormSubgroup
-          title="Advanced"
+          title="Advanced options"
           summary="Fast mode and provider options"
           inUse={
             initial.providerOptions.trim().length > 0 ||
@@ -3370,6 +3367,10 @@ function AgentTargetFields({
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
   pending: boolean;
 }) {
+  const workspaceField = useMemo(
+    () => ({ value: workspace, onChange: setWorkspace }),
+    [setWorkspace, workspace],
+  );
   return (
     <>
       <SelectField
@@ -3391,9 +3392,9 @@ function AgentTargetFields({
         cwd={cwd}
         onChange={setProjectId}
         onCwdChange={setCwd}
+        workspace={workspaceField}
         disabled={pending}
       />
-      <ManagedWorkspaceFields value={workspace} onChange={setWorkspace} disabled={pending} />
       <ManagedAgentConfigurationFields
         serverId={selectedDaemonServerId}
         cwd={cwd}

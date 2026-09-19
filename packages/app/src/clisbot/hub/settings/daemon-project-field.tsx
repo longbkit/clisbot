@@ -19,6 +19,12 @@ import {
   type ProjectSummary,
 } from "@/utils/projects";
 import { openProjectDirectoryForm } from "./project-directory-form";
+import {
+  WORK_LOCATION_OPTIONS,
+  WorktreeTargetFields,
+  type WorkLocation,
+} from "./managed-workspace-fields";
+import type { WorkspaceConfigurationValue } from "../workspace-configuration";
 
 type ProjectDirectoryForm = ReturnType<typeof openProjectDirectoryForm>;
 type ProjectDirectoryState = ReturnType<ProjectDirectoryForm["getState"]>;
@@ -30,6 +36,11 @@ interface DaemonProjectFieldProps {
   cwd: string;
   onChange(projectId: string): void;
   onCwdChange(cwd: string): void;
+  /** Offers isolated worktrees beside a folder inside the Project, as one choice. */
+  workspace?: {
+    value: WorkspaceConfigurationValue;
+    onChange(value: WorkspaceConfigurationValue): void;
+  };
   disabled: boolean;
 }
 
@@ -52,6 +63,7 @@ function ProjectDirectoryField({
   cwd,
   onChange,
   onCwdChange,
+  workspace,
   disabled,
 }: DaemonProjectFieldProps) {
   const hub = useHubAccount();
@@ -133,6 +145,7 @@ function ProjectDirectoryField({
           host={host}
           loadingRoot={loadingRoot}
           refreshProjects={localProjects.refetch}
+          workspace={workspace}
           disabled={disabled}
         />
       )}
@@ -140,13 +153,14 @@ function ProjectDirectoryField({
   );
 }
 
-/** The Project folder readout and the working directory override, once a Project is chosen. */
+/** The Project folder readout and where the Agent works, once a Project is chosen. */
 function ProjectDirectoryControls({
   directory,
   model,
   host,
   loadingRoot,
   refreshProjects,
+  workspace,
   disabled,
 }: {
   directory: ProjectDirectoryState;
@@ -154,9 +168,9 @@ function ProjectDirectoryControls({
   host: ReturnType<typeof useHostRuntimeSnapshot>;
   loadingRoot: boolean;
   refreshProjects(): void;
+  workspace: DaemonProjectFieldProps["workspace"];
   disabled: boolean;
 }) {
-  const customDirectory = directory.mode !== "project";
   return (
     <>
       {directory.rootPath === null ? (
@@ -177,34 +191,166 @@ function ProjectDirectoryControls({
           </Button>
         </View>
       ) : null}
-      <View style={settingsStyles.formRow}>
-        <Text style={[settingsStyles.rowTitle, settingsStyles.formRowContent]}>
-          Use a custom working directory
-        </Text>
-        <Switch
-          accessibilityLabel="Use a custom working directory"
-          value={customDirectory}
-          onValueChange={model.setCustomDirectory}
+      {workspace === undefined ? (
+        <CustomDirectoryFields directory={directory} model={model} disabled={disabled} />
+      ) : (
+        <WorkLocationFields
+          directory={directory}
+          model={model}
+          workspace={workspace}
           disabled={disabled}
         />
-      </View>
+      )}
+    </>
+  );
+}
+
+/** The working directory override alone, where worktrees are not offered. */
+function CustomDirectoryFields({
+  directory,
+  model,
+  disabled,
+}: {
+  directory: ProjectDirectoryState;
+  model: ProjectDirectoryForm;
+  disabled: boolean;
+}) {
+  const customDirectory = directory.mode !== "project";
+  return (
+    <>
+      <SwitchRowControl
+        label="Use a custom working directory"
+        value={customDirectory}
+        onChange={model.setCustomDirectory}
+        disabled={disabled}
+      />
       {customDirectory ? (
-        <Field
-          label="Working directory"
-          hint="Absolute path on this Host, within the selected Project."
-        >
-          <FormTextInput
-            key={directory.projectId}
-            initialValue={directory.cwd}
-            onChangeText={model.setCwd}
-            placeholder={directory.rootPath ?? "Absolute path within the Project"}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!disabled}
-          />
-        </Field>
+        <WorkingDirectoryField directory={directory} model={model} disabled={disabled} />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Where the Agent works. Off (the default), it works in the Project folder.
+ * On, one choice: a folder inside the Project, or an isolated worktree of its
+ * repository. They exclude each other: a worktree starts at its own root.
+ */
+function WorkLocationFields({
+  directory,
+  model,
+  workspace,
+  disabled,
+}: {
+  directory: ProjectDirectoryState;
+  model: ProjectDirectoryForm;
+  workspace: NonNullable<DaemonProjectFieldProps["workspace"]>;
+  disabled: boolean;
+}) {
+  const { value, onChange } = workspace;
+  const location = workLocation(value, directory);
+  const choose = useCallback(
+    (next: WorkLocation | null) => {
+      model.setCustomDirectory(next === "folder");
+      onChange({ ...value, behavior: next === null || next === "folder" ? "project" : next });
+    },
+    [model, onChange, value],
+  );
+  const toggle = useCallback((on: boolean) => choose(on ? "folder" : null), [choose]);
+  const selected = WORK_LOCATION_OPTIONS.find((option) => option.value === location);
+  const selectedDisplay = useMemo(
+    () => (selected ? { label: selected.label, description: selected.description } : null),
+    [selected],
+  );
+  return (
+    <>
+      <SwitchRowControl
+        label="Work outside the Project folder"
+        value={location !== null}
+        onChange={toggle}
+        disabled={disabled}
+      />
+      {location === null ? null : (
+        <>
+          <SelectField
+            label="Where the Agent works"
+            value={location}
+            selectedDisplay={selectedDisplay}
+            options={WORK_LOCATION_OPTIONS}
+            onChange={choose}
+            placeholder="Choose where the Agent works"
+            emptyText="No choices are available."
+            title="Where the Agent works"
+            disabled={disabled}
+          />
+          {location === "folder" ? (
+            <WorkingDirectoryField directory={directory} model={model} disabled={disabled} />
+          ) : (
+            <WorktreeTargetFields value={value} onChange={onChange} disabled={disabled} />
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/** The chosen place: a worktree kind, a folder inside the Project, or none. */
+function workLocation(
+  value: WorkspaceConfigurationValue,
+  directory: ProjectDirectoryState,
+): WorkLocation | null {
+  if (value.behavior !== "project") return value.behavior;
+  return directory.mode === "project" ? null : "folder";
+}
+
+function WorkingDirectoryField({
+  directory,
+  model,
+  disabled,
+}: {
+  directory: ProjectDirectoryState;
+  model: ProjectDirectoryForm;
+  disabled: boolean;
+}) {
+  return (
+    <Field
+      label="Working directory"
+      hint="Absolute path on this Host, within the selected Project."
+    >
+      <FormTextInput
+        key={directory.projectId}
+        initialValue={directory.cwd}
+        onChangeText={model.setCwd}
+        placeholder={directory.rootPath ?? "Absolute path within the Project"}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!disabled}
+      />
+    </Field>
+  );
+}
+
+function SwitchRowControl({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: boolean;
+  onChange(value: boolean): void;
+  disabled: boolean;
+}) {
+  return (
+    <View style={settingsStyles.formRow}>
+      <Text style={[settingsStyles.rowTitle, settingsStyles.formRowContent]}>{label}</Text>
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+      />
+    </View>
   );
 }
 

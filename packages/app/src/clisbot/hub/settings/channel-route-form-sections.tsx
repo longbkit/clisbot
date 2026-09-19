@@ -330,11 +330,10 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.spacing[4],
     gap: theme.spacing[3],
   },
+  // Spacing alone sets a subgroup off: it reads as more rows of the same card.
   subgroup: {
     gap: theme.spacing[3],
-    paddingTop: theme.spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing[1],
   },
   subgroupHeader: {
     alignItems: "center",
@@ -344,6 +343,5 @@ const styles = StyleSheet.create((theme) => ({
   subgroupTitle: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
   },
 }));

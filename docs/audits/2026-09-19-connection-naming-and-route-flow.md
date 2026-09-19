@@ -72,6 +72,16 @@ Auto-accept:
   provider options); Replies (thread, reply method, what is sent); Limits,
   folded. Folded parts open on their own when they hold a value. Section
   explanations are header info tips, per `docs/design.md`.
+- **Where the Agent works is one choice behind one switch** (Route form and
+  single-Agent Automation form, `DaemonProjectField` with `workspace`). Off,
+  the Agent works in the Project folder. On: a folder inside the Project, a
+  new isolated worktree, an existing branch, or a pull request. The earlier
+  "custom working directory" switch and "Workspace behavior" dropdown are
+  merged: a worktree is created from the repository and the Agent starts at
+  its root, so a folder inside the Project and a worktree exclude each other.
+  Permissions and Advanced options sit in What runs as ordinary rows: no rule
+  line, no bold heading; Permissions has no heading over its two labelled
+  fields.
 - **An audience rule reads as its sentence, then Who, then Where.** Rules
   fold like an accordion: one is open at a time, a lone rule starts open, and
   Add rule opens the new one and folds the rest to the same Who / Where lines.
