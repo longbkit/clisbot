@@ -68,8 +68,8 @@ export interface HubNavigationGrant {
 /**
  * Which Hub destinations a Member reaches without the organization's management role:
  * Channels when they administer a Connection, Automations when they may run or create one,
- * and People always (its Access tab shows their own effective access). Instance settings
- * are the Hub operator's alone.
+ * and People and Hosts always (their own access, and the Hosts they may use and open).
+ * Instance settings are the Hub operator's alone.
  */
 export function hubSettingsNavigationItems(input: {
   signedIn: boolean;
@@ -94,6 +94,7 @@ export function hubSettingsNavigationItems(input: {
       ? [AUTOMATIONS_ITEM]
       : []),
     PEOPLE_ITEM,
+    HOSTS_ITEM,
   ];
   return [ACCOUNT_ITEM, ...destinations, ...instance];
 }

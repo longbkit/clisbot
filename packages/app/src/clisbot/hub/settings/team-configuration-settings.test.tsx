@@ -65,7 +65,6 @@ vi.mock("expo-router", () => ({
 vi.mock("@/data/query", () => ({
   useFetchQuery: ({ queryKey }: { queryKey: string[] }) => fixtures.queries[queryKey.at(-1)!],
 }));
-vi.mock("./managed-host-row", () => ({ ManagedHostRow: () => null }));
 vi.mock("./connection-result", () => ({ HubConnectionResultNotice: () => null }));
 vi.mock("./connection-continuation", () => ({ HubConnectionContinuationNotice: () => null }));
 vi.mock("../use-connection-continuation", () => ({
@@ -121,7 +120,7 @@ vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings:
 vi.mock("./channel-identity-self-link", () => ({
   ChannelIdentitySelfLinkSettings: () => null,
 }));
-vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
+vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: vi.fn() }));
 vi.mock("@/components/ui/segmented-control", () => ({
   SegmentedControl: ({
@@ -1004,12 +1003,5 @@ describe("Integrations and Hosts", () => {
     expect(screen.getByText("Used by triage")).toBeTruthy();
     // The Channel bot a Route uses is a Connection under Channels, not an integration.
     expect(screen.queryByText("Slack · support-bot")).toBeNull();
-  });
-
-  it("lists enrolled Hosts on their own page", () => {
-    render(<HubSettingsContent section="hosts" />);
-    expect(screen.getByText("No Host is enrolled in this organization yet.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(fixtures.queries.daemons!.refetch).toHaveBeenCalledOnce();
   });
 });

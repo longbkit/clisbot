@@ -3,12 +3,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HubHostOnboardingSection } from "./host-onboarding-section";
-import { HubHostSynchronization } from "./host-synchronization";
+import { HostsSettings } from "./hosts-settings";
+import { HubHostSynchronization } from "../host-synchronization";
 
 const adapters = vi.hoisted(() => ({
   get: vi.fn(),
   put: vi.fn(),
+  delete: vi.fn(),
+  confirm: vi.fn(),
   canManageResources: true,
   role: "owner",
   copy: vi.fn(),
@@ -19,7 +21,7 @@ const adapters = vi.hoisted(() => ({
   hosts: [],
   statuses: new Map(),
 }));
-vi.mock("./account-provider", () => ({
+vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     enabled: true,
     origin: "https://hub.example.test",
@@ -29,7 +31,7 @@ vi.mock("./account-provider", () => ({
       capabilities: { manageResources: adapters.canManageResources },
       membership: { role: adapters.role },
     },
-    api: () => ({ get: adapters.get, put: adapters.put }),
+    api: () => ({ get: adapters.get, put: adapters.put, delete: adapters.delete }),
   }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
@@ -46,7 +48,28 @@ vi.mock("@/hooks/use-open-add-project", () => ({
   useOpenAddProject: () => adapters.openAddProject,
 }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: adapters.copy }));
-vi.mock("./settings/rename-host-dialog", () => ({
+vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: adapters.confirm }));
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+// The row's … menu renders its items inline, so a test presses Disconnect directly.
+vi.mock("./team/row-actions-menu", () => ({
+  RowActionsMenu: (props: {
+    actions: readonly { label: string; onSelect(): void; disabled?: boolean }[];
+  }) => (
+    <>
+      {props.actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          disabled={action.disabled}
+          onClick={action.onSelect}
+        >
+          {action.label}
+        </button>
+      ))}
+    </>
+  ),
+}));
+vi.mock("./rename-host-dialog", () => ({
   RenameHostDialog: ({
     name,
     onSave,
@@ -91,6 +114,8 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   adapters.get.mockReset();
   adapters.put.mockReset();
+  adapters.delete.mockReset();
+  adapters.confirm.mockReset();
   adapters.canManageResources = true;
   adapters.role = "owner";
   adapters.copy.mockReset();
@@ -107,7 +132,7 @@ afterEach(() => {
 function renderSection() {
   return render(
     <QueryClientProvider client={queryClient}>
-      <HubHostOnboardingSection />
+      <HostsSettings />
     </QueryClientProvider>,
   );
 }
@@ -124,7 +149,7 @@ describe("Host onboarding query recovery", () => {
       render(
         <QueryClientProvider client={queryClient}>
           <HubHostSynchronization />
-          <HubHostOnboardingSection />
+          <HostsSettings />
         </QueryClientProvider>,
       );
       await screen.findByText(label);
@@ -238,7 +263,7 @@ describe("Host binding recovery", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <HubHostSynchronization />
-        <HubHostOnboardingSection />
+        <HostsSettings />
       </QueryClientProvider>,
     );
     expect((await screen.findByText("Unable to save Host connection")).textContent).toBe(
@@ -252,9 +277,9 @@ describe("Host binding recovery", () => {
   });
 });
 
-describe("Account Hosts shared rename", () => {
+describe("Hosts shared rename", () => {
   it.each(["owner", "admin"])(
-    "offers %s shared rename in Account Hosts and refreshes its name",
+    "offers %s shared rename in Hosts and refreshes its name",
     async (role) => {
       adapters.role = role;
       const renamed = { ...registeredDaemon, slug: "renamed-workstation" };
@@ -284,5 +309,38 @@ describe("Account Hosts shared rename", () => {
     await screen.findByText("Workstation");
     expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
     expect(adapters.put).not.toHaveBeenCalled();
+  });
+});
+
+describe("Host administration", () => {
+  it("disconnects a Host only after confirming, and never twice", async () => {
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    adapters.confirm.mockResolvedValueOnce(false).mockResolvedValue(true);
+    adapters.delete.mockResolvedValue(undefined);
+    renderSection();
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    await waitFor(() => expect(adapters.confirm).toHaveBeenCalledTimes(1));
+    expect(adapters.delete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    const done = await screen.findByRole("button", { name: "Disconnected" });
+    fireEvent.click(done);
+    expect(adapters.delete).toHaveBeenCalledExactlyOnceWith("daemons/daemon-1");
+  });
+
+  it("keeps renaming, disconnecting, and adding Hosts to Organization Admins only", async () => {
+    adapters.canManageResources = false;
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    renderSection();
+    await screen.findByText("Workstation");
+    expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+    expect(screen.queryByText("Add a Host")).toBeNull();
+  });
+
+  it("always shows an Organization Admin how to add a Host", async () => {
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    renderSection();
+    await screen.findByText("Add a Host");
+    expect(screen.getByText("paseo hub login https://hub.example.test")).toBeTruthy();
   });
 });

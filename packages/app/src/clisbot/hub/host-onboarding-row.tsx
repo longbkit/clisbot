@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -19,6 +19,8 @@ import {
   useHubHostSynchronizationFailure,
 } from "./host-synchronization-status";
 import { ManagedHostRename } from "./settings/managed-host-rename";
+import { RowActionsMenu } from "./settings/team/row-actions-menu";
+import { useHostDisconnect } from "./settings/use-host-disconnect";
 
 interface SynchronizationFailure {
   message: string;
@@ -73,8 +75,33 @@ export function HubHostOnboardingRow({
         <HostPrimaryAction item={item} failure={failure} openAddProject={openAddProject} />
         <HostConnectionsAction item={item} failure={failure} />
         <ManagedHostRename daemonId={item.daemonId} name={item.daemonSlug} />
+        {item.canManage && hub.signedIn?.capabilities.manageResources ? (
+          <HostDisconnectMenu item={item} />
+        ) : null}
       </View>
     </View>
+  );
+}
+
+/** Disconnect sits behind the menu, away from the everyday actions beside it. */
+function HostDisconnectMenu({ item }: { item: HubHostOnboardingItem }) {
+  const host = useHostDisconnect(item.daemonId, item.daemonSlug);
+  const actions = useMemo(
+    () => [
+      {
+        label: host.done ? "Disconnected" : "Disconnect",
+        destructive: true,
+        disabled: host.pending || host.done,
+        onSelect: host.disconnect,
+      },
+    ],
+    [host.disconnect, host.done, host.pending],
+  );
+  return (
+    <>
+      <RowActionsMenu label={`Actions for ${item.label}`} actions={actions} disabled={false} />
+      {host.error ? <Text style={settingsStyles.rowError}>{host.error.message}</Text> : null}
+    </>
   );
 }
 

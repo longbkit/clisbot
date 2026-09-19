@@ -26,7 +26,7 @@ Với `off`, việc là Member hay chỉ được Connect trên Hub **không bi�
 4. App hiện **Turning on managed access…**: Host đóng mọi phiên không có vé Hub, kể cả phiên của thiết bị bạn. App tự xin vé từ Hub và kết nối lại, không cần làm gì.
 5. Khi thấy **Managed access is on** và badge **Managed access** là xong. Kiểm tra thêm bằng một Member chỉ được cấp một Project.
 
-Sau 30 giây vẫn chưa kết nối lại thì app báo lỗi: bấm **Reconnect** ở Account → Hosts, hoặc kiểm tra daemon bằng lệnh hiện trên card. Tab khác đang mở app từ trước cần reload để lấy vé.
+Sau 30 giây vẫn chưa kết nối lại thì app báo lỗi: bấm **Reconnect** ở **Settings → Hosts**, hoặc kiểm tra daemon bằng lệnh hiện trên card. Tab khác đang mở app từ trước cần reload để lấy vé.
 
 Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối ngoài không có vé bị đóng và phải kết nối lại qua Hub. Nếu vừa cập nhật mã nguồn/binary thì vẫn phải khởi động lại để nạp phiên bản mới; đó là việc khác với đổi mode.
 

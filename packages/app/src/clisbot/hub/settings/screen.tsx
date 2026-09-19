@@ -24,7 +24,6 @@ import { HostsSettings } from "./hosts-settings";
 import { InstanceSettings } from "./instance-settings";
 import { IntegrationsSettings } from "./integrations-settings";
 import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
-import { HubHostOnboardingSection } from "../host-onboarding-section";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
 import { capitalizeLabel as channelLabel } from "./labels";
 import { InfoRow } from "./resource-rows";
@@ -436,7 +435,6 @@ function ActiveHubAccount({
         {hub.error ? <Alert variant="error" title={hub.error} /> : null}
       </SettingsSection>
       <ChannelIdentitiesSection pending={pending} onManage={openIdentity} />
-      <HubHostOnboardingSection />
     </View>
   );
 }

@@ -147,7 +147,7 @@ Công tắc Managed Access trong app chỉ mở cho Organization Owner, dù quy�
 
 ## Đổi tên Host nhưng chỗ khác vẫn hiện tên cũ?
 
-Kiểm tra bạn đổi tên dùng chung trên **Account → Hosts** hay nhãn local trong **Appearance**. Nhãn local tùy chỉnh được giữ nguyên. Refresh danh sách và rà cấu hình tham chiếu slug cũ; daemon ID và hostname hệ điều hành không đổi theo thao tác Rename.
+Kiểm tra bạn đổi tên dùng chung trên **Settings → Hosts** hay nhãn local trong **Appearance**. Nhãn local tùy chỉnh được giữ nguyên. Refresh danh sách và rà cấu hình tham chiếu slug cũ; daemon ID và hostname hệ điều hành không đổi theo thao tác Rename.
 
 ## Logout có ngắt daemon khỏi Hub không?
 

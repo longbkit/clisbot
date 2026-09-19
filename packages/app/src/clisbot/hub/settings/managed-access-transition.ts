@@ -74,7 +74,7 @@ export function useManagedAccessTransition(input: {
       setTransition({
         status: "failed",
         message:
-          "This Host did not reconnect. Use Reconnect in Account → Hosts, or check its daemon.",
+          "This Host did not reconnect. Use Reconnect in Settings → Hosts, or check its daemon.",
       });
     }, RECONNECT_TIMEOUT_MS);
     return () => clearTimeout(timeout);

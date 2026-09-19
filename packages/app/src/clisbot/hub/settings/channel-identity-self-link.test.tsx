@@ -48,7 +48,7 @@ vi.mock("./automation-settings", () => ({ AutomationSettings: () => null }));
 vi.mock("./access-settings", () => ({ AccessSettings: () => null }));
 vi.mock("./api-key-settings", () => ({ ApiKeySettings: () => null }));
 vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings: () => null }));
-vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
+vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
 // People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
 vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
 // Account's own chat-account list has its browser test; here only its entry to the flow matters.

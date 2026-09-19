@@ -13,7 +13,7 @@ describe("Hub Settings navigation", () => {
     );
   });
 
-  it("keeps People visible to a signed-in Member, for their own access", () => {
+  it("keeps People and Hosts visible to a signed-in Member, for their own access", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({
         signedIn: true,
@@ -22,6 +22,7 @@ describe("Hub Settings navigation", () => {
       [
         { section: "account", label: "Account" },
         { section: "team", label: "People" },
+        { section: "hosts", label: "Hosts" },
       ],
     );
   });
@@ -33,11 +34,11 @@ describe("Hub Settings navigation", () => {
         canManage: false,
         grants: [{ resourceKind: "automation", privileges: ["automation.run"] }],
       }).map(({ section }) => section),
-      ["account", "automations", "team"],
+      ["account", "automations", "team", "hosts"],
     );
   });
 
-  it("opens Channels, Automations, and People to scoped Admins", () => {
+  it("opens Channels, Automations, People, and Hosts to scoped Admins", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({
         signedIn: true,
@@ -48,7 +49,7 @@ describe("Hub Settings navigation", () => {
           { resourceKind: "team", privileges: ["hub.access.manage"] },
         ],
       }).map(({ section }) => section),
-      ["account", "channels", "automations", "team"],
+      ["account", "channels", "automations", "team", "hosts"],
     );
   });
 

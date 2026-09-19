@@ -47,7 +47,7 @@ Each daemon has two identifiers: an immutable generated ID and a friendly slug. 
 
 You can rename the slug later without changing the daemon ID. Configuration referencing the slug must be updated after a rename; references using the immutable ID remain valid.
 
-In Paseo, open **Account → Hosts → Rename** with an organization Owner or Admin account.
+In Paseo, open **Settings → Hosts → Rename** with an organization Owner or Admin account.
 The dialog changes the shared Hub name and reports name conflicts inline. Daemon Administrator
 access alone does not grant organization configuration authority. Hosts following the shared name
 update without reconnecting; a local name chosen in Host Appearance stays personal to that app.

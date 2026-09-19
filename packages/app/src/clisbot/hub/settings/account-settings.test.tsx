@@ -51,7 +51,7 @@ vi.mock("./channel-identity-self-link", () => ({
     <div data-testid="identity-settings">{navigation.params.channelConnectionId}</div>
   ),
 }));
-vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
+vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
 // People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
 vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
 // Account's own chat-account list has its browser test; here only its entry to the flow matters.

@@ -4,7 +4,7 @@
 
 ## Enroll daemon vào Hub
 
-Trên máy chạy daemon, dùng lệnh app cung cấp tại **Account → Hosts**, hoặc:
+Trên máy chạy daemon, dùng lệnh ở mục **Add a Host** trong **Settings → Hosts**, hoặc:
 
 ```sh
 paseo hub login https://hub.example.com
@@ -29,7 +29,7 @@ Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `PASEO_H
 
 Hub báo **Host "…" already uses this daemon's identity** khi `PASEO_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `paseo daemon stop`, `paseo daemon reset-identity`, `paseo daemon start` rồi `paseo hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
 
-Host báo **Offline** ở Account → Hosts: bấm **Reconnect**. Vẫn offline thì kiểm tra Paseo đang chạy trên máy đó rồi mở **Connections**.
+Host báo **Offline** ở **Settings → Hosts**: bấm **Reconnect**. Vẫn offline thì kiểm tra Paseo đang chạy trên máy đó rồi mở **Connections**.
 
 Khi chạy không tương tác hoặc `--json`, `login` chỉ đăng nhập CLI: chạy `connect` rồi kiểm tra `status`.
 
@@ -37,7 +37,7 @@ Khi chạy không tương tác hoặc `--json`, `login` chỉ đăng nhập CLI:
 
 ## Đổi tên Host
 
-**Tên dùng chung trên Hub:** Account → **Hosts → [Host] → Rename**, nhập tên và lưu. Cũng có thao tác tương ứng trong **Configuration → Hosts**. Cần quyền quản lý tài nguyên tổ chức (Owner/Admin); Daemon Administrator đơn thuần chưa đủ quyền đổi tên bản ghi Hub.
+**Tên dùng chung trên Hub:** **Settings → Hosts → [Host] → Rename**, nhập tên và lưu. Ngắt Host khỏi Hub nằm ở menu **…** của Host đó (**Disconnect**). Cần quyền quản lý tài nguyên tổ chức (Owner/Admin); Daemon Administrator đơn thuần chưa đủ quyền đổi tên bản ghi Hub.
 
 Tên ban đầu lấy từ hostname máy, chuẩn hóa thành slug chữ thường, bỏ dấu và thay ký tự phân cách bằng dấu `-`. Nếu trống dùng `daemon-<đầu ID>`; khi trùng thêm phần ID. Tên mới cũng được chuẩn hóa và phải duy nhất trong tổ chức.
 
