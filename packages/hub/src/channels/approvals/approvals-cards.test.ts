@@ -395,17 +395,19 @@ describe("native card gating (inlineButtons)", () => {
     const { engine, postCalls } = makeEngine(store, new ManualClock(), questionRoute(), {
       inlineButtons: "all",
     });
-    await engine.handlePermissionRequest("agent-1", questionRequestOf());
+    // Its own id: the file shares one delivery ledger, and an id already
+    // recorded by an earlier test would replay instead of posting.
+    await engine.handlePermissionRequest("agent-1", questionRequestOf({ id: "req-qc" }));
     const actions = postCalls[0]?.blocks?.[1];
     const buttons = ((actions?.["elements"] ?? []) as Record<string, unknown>[]).map((b) => [
       String((b["text"] as Record<string, unknown>)?.["text"]),
       String(b["value"]),
     ]) as [string, string][];
     assert.deepEqual(buttons, [
-      ["Biome", "allow:req-q:Biome"],
-      ["Prettier", "allow:req-q:Prettier"],
-      ["Other…", "allow:req-q:Other"],
-      ["Dismiss", "deny:req-q"],
+      ["Biome", "allow:req-qc:Biome"],
+      ["Prettier", "allow:req-qc:Prettier"],
+      ["Other…", "allow:req-qc:Other"],
+      ["Dismiss", "deny:req-qc"],
     ]);
   });
 

@@ -67,7 +67,7 @@ export function makeRoute(): CompiledRoute {
 
 /** The route a question-kind request rides: `AskUserQuestion` classifies to
  * the `other` class, which the default route auto-denies via `*` — the E5
- * fixture prompts it instead (S10 holds: `other` stays approval-required). */
+ * fixture prompts it instead. */
 export function questionRoute(): CompiledRoute {
   const route = makeRoute();
   return {

@@ -29,12 +29,7 @@ import {
   selectRouteForSender,
   type InboundConversation,
 } from "./policy.js";
-import {
-  ApprovalEngine,
-  assertChannelPosture,
-  parseApprovalCommand,
-  type ApprovalCommand,
-} from "./approvals/index.js";
+import { ApprovalEngine, parseApprovalCommand, type ApprovalCommand } from "./approvals/index.js";
 import { parseCardValue } from "./approvals/card.js";
 import {
   parseChannelIdentityLinkCode,
@@ -166,10 +161,9 @@ export interface ChannelPlane {
    */
   onApprovalCallback(params: ApprovalCallbackParams): Promise<PlaneInboundResult>;
   /**
-   * Start the plane against a daemon + store: assert the S10 posture for every
-   * route, wait for the trusted session, recover orphan pending markers, and
-   * re-attach the streams of the markers that re-bound. Returns the recovery
-   * counts.
+   * Start the plane against a daemon + store: wait for the trusted session,
+   * recover orphan pending markers, and re-attach the streams of the markers
+   * that re-bound. Returns the recovery counts.
    */
   start(
     daemon: DaemonConnection,
@@ -697,9 +691,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         // resolution is unaffected).
         ...(deps.update !== undefined ? { update: deps.update } : {}),
       });
-      // The S10 posture invariant, asserted at load (not mid-conversation):
-      // every route keeps approval-required.
-      assertChannelPosture(deps.controlPlane.accounts);
       // Orphan recovery needs the daemon session: rebind a surviving agent
       // instead of re-creating it, then re-attach the streams of the markers
       // that re-bound so in-flight turns relay + prompt again.

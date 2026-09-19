@@ -6,7 +6,7 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
-import { openRouteWarnings } from "../configuration-warnings.js";
+import { openRouteWarnings, routeWarnings } from "../configuration-warnings.js";
 
 const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
 const ENVIRONMENTS = ["repo-app", "repo-infra", "personal-lab"];
@@ -285,7 +285,7 @@ routes:
       - { match: "*", mode: auto-deny }
 `,
       },
-      /allowed automatically/u,
+      /accepted automatically for anyone/u,
     );
     expectRouteWarning(
       {
@@ -815,6 +815,62 @@ routes:
       }),
     );
     assert.equal("workspace" in untouched.accounts[0]!.routes[0]!.defaults, false);
+  });
+
+  it("folds questions like every other default leaf, absent when unauthored", () => {
+    const account = (route: string, defaults = "") => `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+${defaults}
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+${route}
+`;
+    const compiled = (yaml: string) =>
+      compileChannelControlPlane(input({ [".paseo/channels/slack/main.yml"]: yaml })).accounts[0]!
+        .routes[0]!.defaults;
+    assert.equal(
+      compiled(account("", "defaults: { questions: recommended }")).questions,
+      "recommended",
+    );
+    assert.equal(
+      compiled(account("    questions: ask", "defaults: { questions: agent-decides }")).questions,
+      "ask",
+    );
+    assert.equal("questions" in compiled(account("")), false);
+    expectCompileError(
+      { [".paseo/channels/slack/main.yml"]: account("    questions: always") },
+      /questions/u,
+    );
+  });
+
+  it("warns once, on any Route, when every permission request is accepted", () => {
+    const account = (who: string) => `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience: [{ who: ${who}, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+    approval: [{ match: "*", mode: auto-allow }]
+`;
+    const route = (who: string) =>
+      compileChannelControlPlane(input({ [".paseo/channels/slack/main.yml"]: account(who) }))
+        .accounts[0]!.routes[0]!;
+    const every = "Every permission request is accepted automatically.";
+    assert.deepEqual(routeWarnings(route("{ roles: [member] }")), [every]);
+    const open = route("{ anyone: true }");
+    assert.deepEqual(routeWarnings(open), [every]);
+    assert.equal(
+      openRouteWarnings(open).some((warning) => /accepted automatically for anyone/u.test(warning)),
+      false,
+    );
   });
 
   it("carries a route-level outbound.template onto the tool path", () => {

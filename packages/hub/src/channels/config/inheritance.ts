@@ -6,7 +6,7 @@
 
 import { ORG_DEFAULTS, type ApprovalRule, type ChannelDefaults } from "./schema.js";
 import type { SyncProgress, SyncProgressGroup, SyncStreaming } from "./schema.js";
-import type { DmPolicy, GroupPolicy } from "./enums.js";
+import type { DmPolicy, GroupPolicy, QuestionsMode } from "./enums.js";
 import { issue } from "./compile-support.js";
 import type { AgentControls } from "./agent-controls.js";
 
@@ -49,6 +49,9 @@ export interface EffectiveDefaults {
    * model only means something beside the provider it was chosen under.
    * ABSENT when no layer authors it, so existing route fingerprints hold. */
   agentControls?: AgentControls | undefined;
+  /** How an agent's question is answered (`QuestionsModeSchema`). ABSENT when
+   * no layer authors it, so existing route fingerprints hold. */
+  questions?: QuestionsMode | undefined;
   sync: {
     finalAnswers: boolean;
     /** The "the bot is working" group: the relayed progress line, the
@@ -128,6 +131,10 @@ export function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): 
     ...optional(
       "agentControls",
       pick((layer) => layer?.agentControls),
+    ),
+    ...optional(
+      "questions",
+      pick((layer) => layer?.questions),
     ),
     sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
   };

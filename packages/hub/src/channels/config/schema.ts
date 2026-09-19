@@ -15,6 +15,7 @@ import {
   isApprovalMatchPattern,
   MessageReactionSchema,
   OutboundPathSchema,
+  QuestionsModeSchema,
   ReplyAnchorSchema,
   ReactionNotificationsSchema,
   SlackTransportModeSchema,
@@ -308,6 +309,7 @@ export const ChannelDefaultsSchema = z
     access: AccessDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
     agentControls: AgentControlsSchema.optional(),
+    questions: QuestionsModeSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
   })
   .strict();
@@ -406,7 +408,7 @@ export type ZaloTransport = z.infer<typeof ZaloTransportSchema>;
 // --- Vertical-owned account config (`account.config`) ---------------------------
 //
 // A credential key carries `.meta(SECRET)`; `account-secrets.ts` reads that mark
-// so a Channel Route Admin never sees or overwrites it.
+// so a Connection Admin never sees or overwrites it.
 const SECRET = { secret: true } as const;
 //
 // The account's `config` block is passed through to the vertical verbatim
@@ -661,6 +663,7 @@ export const RouteSchema = z
     sync: SyncDefaultsSchema.optional(),
     // Default Agent controls over the named `agent:` (`agent-controls.ts`).
     agentControls: AgentControlsSchema.optional(),
+    questions: QuestionsModeSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
     limits: ChannelLimitsSchema.optional(),
   })

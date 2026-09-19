@@ -181,6 +181,17 @@ export const ApprovalModeSchema = z.enum(["auto-allow", "auto-deny", "require"])
 export type ApprovalMode = z.infer<typeof ApprovalModeSchema>;
 
 /**
+ * `questions` — how an agent's question (AskUserQuestion, `kind: "question"`)
+ * is answered: `ask` posts it in the conversation, `recommended` picks each
+ * question's recommended option (else its first), `agent-decides` tells the
+ * agent to choose for itself. Unauthored, the key is ABSENT (the floor): the
+ * question follows the `other` approval rule, and is prompted instead of
+ * auto-allowed with no answer. Absence keeps existing route fingerprints.
+ */
+export const QuestionsModeSchema = z.enum(["ask", "recommended", "agent-decides"]);
+export type QuestionsMode = z.infer<typeof QuestionsModeSchema>;
+
+/**
  * The closed tool classes an approval `match` may name (§4.3.6/§4.3.7): the
  * `approval.*` privilege leaves without the `approval.` prefix, plus `*` as
  * the wildcard fallback (required whenever rules exist). The policy engine

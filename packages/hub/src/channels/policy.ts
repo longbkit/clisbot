@@ -477,10 +477,10 @@ export interface ApproverCheck {
  * inbound entry + approval exit"). The responder's channel identity may answer
  * when its effective privileges include `approval.<class>` AND the route's
  * merged rule list does not auto-deny the class; `initiatorOnly`, when set,
- * additionally requires the responder to be the thread's initiator (plan S10:
- * the session stays `approval-required` — routes relax per tool class, never
- * the posture). When the merged rule auto-allows the class there is no
- * prompt, so no responder is consulted (reported as "auto-allowed").
+ * additionally requires the responder to be the thread's initiator. When the
+ * merged rule auto-allows the class there is no prompt, so no responder is
+ * consulted (reported as "auto-allowed"). A question from the agent is not a
+ * permission and never reaches here (`answerFromChannel`).
  */
 export function mayApprove(
   responderIdentity: string,
@@ -513,49 +513,16 @@ export function mayApprove(
   return { allowed: true, reason: "ok" };
 }
 
-// --- The approval-required posture (invariant: plan S10 / §4.3.7) ---------------------------
+// --- Routes that accept every permission request ----------------------------
 //
-// "channel-originated sessions are `approval-required` (plan S10) — routes may
-// relax per tool, never lift the posture." The posture is not a configurable
-// value; it is the invariant every approval path obeys: an `auto-allow` rule
-// relaxes one tool class (and only via its explicit match), `mayApprove` stays
-// the single gate for everything else, and the check below makes the invariant
-// testable at the composition point.
+// A Route may auto-allow every tool class, so a channel conversation never
+// stalls on approval (2026-09-19 decision; it lifts the plan S10
+// "approval-required" invariant). The configuration warns about it
+// (`configuration-warnings.ts`); nothing refuses it.
 
-/** The channel session trust posture — a hard invariant, not a config value. */
-export const CHANNEL_SESSION_POSTURE = "approval-required" as const;
-
-/**
- * True when the route's merged rules do NOT auto-allow every tool class —
- * i.e. the approval-required posture still holds for at least one class.
- */
-export function postureIsApprovalRequired(route: CompiledRoute): boolean {
-  return CLASSIFIED_TOOL_CLASSES.some(
-    (toolClass) => approvalDecisionFor(toolClass, route).mode !== "auto-allow",
-  );
-}
-
-/**
- * Thrown when a route's merged approval rules auto-allow every tool class —
- * i.e. they lift the S10 `approval-required` posture. Named so composition
- * points can catch the invariant violation distinctly from a generic policy
- * error.
- */
-export class ApprovalPostureError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ApprovalPostureError";
-  }
-}
-
-/**
- * Asserts the S10 invariant for a route: no rule set may auto-allow every
- * tool class. Routes may relax per tool class, never the posture itself.
- */
-export function assertApprovalRequiredPosture(route: CompiledRoute): void {
-  if (postureIsApprovalRequired(route)) return;
-  throw new ApprovalPostureError(
-    "route lifts the approval-required posture: every tool class is auto-allowed; " +
-      "relax per tool class, never the posture (plan S10)",
+/** True when the Route's merged rules auto-allow every tool class. */
+export function autoAllowsEveryToolClass(route: CompiledRoute): boolean {
+  return CLASSIFIED_TOOL_CLASSES.every(
+    (toolClass) => approvalDecisionFor(toolClass, route).mode === "auto-allow",
   );
 }

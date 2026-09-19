@@ -7,9 +7,9 @@
 // `transport.inlineButtons` admits it — card.ts) and the responder's answer is
 // re-authorized at dispatch — the SECOND authority check (the first ran on the
 // inbound message as `mayTrigger`). An approver without the class privilege is
-// inert: zero side effect, the request stays open. The approval-required
-// posture (plan S10: routes may relax per class, never the posture) is
-// asserted at plane start for every route.
+// inert: zero side effect, the request stays open. A question
+// (AskUserQuestion) follows the Route's `questions:` default first
+// (`question-auto-answer.ts`).
 //
 // EXACTLY-ONCE (2026-08-27 card decision): a prompt resolves to exactly one
 // `agent_permission_response` no matter how many answer paths race — card
@@ -18,17 +18,18 @@
 // moment ANY path dispatches (or the wire reports a client resolution); every
 // later path finds the flag and is an inert no-op. The daemon's own
 // in-flight dedupe is the backstop, but the hub guarantees one frame.
-import type { ChannelControlPlane, CompiledChannelAccount } from "../config/compile.js";
+import type { ChannelControlPlane } from "../config/compile.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import type { ChannelStore } from "../../db/channels.js";
 import {
   approvalDecisionFor,
-  assertApprovalRequiredPosture,
   classifyToolClass,
   mayApprove,
+  type ApprovalDecision,
   type ApproverCheck,
 } from "../policy.js";
+import { questionHandling } from "./question-auto-answer.js";
 import { replyLocationFor } from "../relay/index.js";
 import type {
   OutboundPostResult,
@@ -146,8 +147,37 @@ export class ApprovalEngine {
       });
       return;
     }
-    const toolClass = classifyToolClass(request);
-    const decision = approvalDecisionFor(toolClass, context.route);
+    const question =
+      request.kind === "question"
+        ? questionHandling(request, context.route.defaults.questions)
+        : undefined;
+    if (question?.kind === "answer") {
+      await this.respond(agentId, request.id, question.response);
+      this.context.logger.info?.("question answered automatically by route default", {
+        agentId,
+        requestId: request.id,
+        answeredBy: question.answeredBy,
+      });
+      return;
+    }
+    if (question?.kind === "prompt") {
+      await this.postPrompt(context, request, false);
+      return;
+    }
+    await this.applyDecision(
+      context,
+      request,
+      approvalDecisionFor(classifyToolClass(request), context.route),
+    );
+  }
+
+  /** The route rule's decision for a request: auto-respond or prompt. */
+  private async applyDecision(
+    context: StreamContext,
+    request: AgentPermissionRequest,
+    decision: ApprovalDecision,
+  ): Promise<void> {
+    const { agentId } = context;
     if (decision.mode === "auto-allow") {
       await this.respond(agentId, request.id, { behavior: "allow" });
       this.context.logger.info?.("approval auto-allowed by route rule", {
@@ -222,14 +252,19 @@ export class ApprovalEngine {
       return { allowed: false, answered: false, reason: "ok", stale: true };
     }
     const { context, request } = prompt;
-    let check = mayApprove(
-      responderIdentity,
-      classifyToolClass(request),
-      context.initiator,
-      this.context.controlPlane,
-      context.account,
-      context.route,
-    );
+    // A question from the agent is not a permission: anyone the caller already
+    // admitted to this conversation (the Route's audience) may answer it.
+    let check: ApproverCheck =
+      request.kind === "question"
+        ? { allowed: true, reason: "ok" }
+        : mayApprove(
+            responderIdentity,
+            classifyToolClass(request),
+            context.initiator,
+            this.context.controlPlane,
+            context.account,
+            context.route,
+          );
     if (
       !check.allowed &&
       check.reason === "class-not-approved" &&
@@ -392,10 +427,13 @@ export class ApprovalEngine {
       // Replayed (posted earlier, Hub restarted): track it so the responder's
       // command can be re-authorized and dispatched. No card location survives
       // a restart (the native message id is gone with the in-memory post) —
-      // the prompt stays text+command-answerable.
+      // the prompt stays text+command-answerable. A question keeps its
+      // parsed shape so the answer still carries `updatedInput.answers`.
+      const questions = questionInfoFromRequest(request);
       this.openPrompts.set(this.promptKey(context.agentId, request.id), {
         context,
         request,
+        ...(questions !== undefined ? { questions } : {}),
         cardPosted: false,
         resolved: false,
       });
@@ -617,18 +655,3 @@ function approvalPrivilege(
  * facade maps it back to the daemon's request id through the open prompts
  * (one card id ↔ one request id per agent). */
 export { cardIdFor, parseCardValue };
-
-// --- Posture + prompt text ------------------------------------------------------
-
-/**
- * The S10 invariant at plane start: every route of every account keeps the
- * approval-required posture (no rule set auto-allows every tool class).
- * Propagates policy's `ApprovalPostureError` naming the offender.
- */
-export function assertChannelPosture(accounts: readonly CompiledChannelAccount[]): void {
-  for (const account of accounts) {
-    for (const route of account.routes) {
-      assertApprovalRequiredPosture(route);
-    }
-  }
-}

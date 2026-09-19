@@ -45,7 +45,6 @@ import {
 } from "../bindings/index.js";
 import { buttonValue, cardIdFor } from "../approvals/card.js";
 import { mintChannelCommandButton } from "../command-buttons.js";
-import { ApprovalPostureError } from "../policy.js";
 import { textCommandHelpText } from "../commands.js";
 import { createChannelPlane } from "../execution.js";
 
@@ -1803,14 +1802,10 @@ describe("start-time recovery + posture", () => {
     assert.ok(posted.includes("still here"), "the re-attached stream relays the final answer");
   });
 
-  it("asserts the S10 posture and rejects a posture-lifting route at start", async () => {
+  it("starts with a route that auto-allows every permission request", async () => {
     const lax = makeRoute({ approval: [{ match: "*", mode: "auto-allow" }] });
     const { plane, fake } = makeHarness({ account: makeAccount(lax) });
-    await assert.rejects(
-      async () => plane.start(fake.daemon, store),
-      (error: unknown) => error instanceof ApprovalPostureError,
-      "a `*` auto-allow lifts the posture",
-    );
+    await assert.doesNotReject(async () => plane.start(fake.daemon, store));
   });
 });
 

@@ -1,5 +1,6 @@
-// Warnings for wide open-audience Routes. The configurator may choose any of
-// these (docs/audits/2026-09-18-channel-chat-authority-and-limits.md): the
+// Warnings for wide Routes: any Route that accepts every permission request,
+// and open-audience Routes. The configurator may choose any of these
+// (docs/audits/2026-09-18-channel-chat-authority-and-limits.md): the
 // publish-time delegation check already decides what they may hand out, so
 // these are information for the person saving, never a refusal.
 
@@ -15,7 +16,7 @@ import { applyAgentControls } from "./config/agent-controls.js";
 import type { ChannelControlPlane, CompiledRoute, EffectiveDefaults } from "./config/compile.js";
 import type { ApprovalRule } from "./config/schema.js";
 import { privilegeCovers } from "./config/privileges.js";
-import { isOpenAudienceRoute } from "./policy.js";
+import { autoAllowsEveryToolClass, isOpenAudienceRoute } from "./policy.js";
 
 export interface ChannelConfigurationWarning {
   channel: string;
@@ -45,9 +46,12 @@ export async function channelConfigurationWarnings(input: {
   const warnings: ChannelConfigurationWarning[] = [];
   for (const account of input.controlPlane.accounts) {
     for (const [index, route] of account.routes.entries()) {
-      if (!isOpenAudienceRoute(route)) continue;
-      const agents = await routeAgents(input, input.triggers, route);
-      for (const message of [...openRouteWarnings(route), ...agents.flatMap(openAgentWarnings)]) {
+      const messages = routeWarnings(route);
+      if (isOpenAudienceRoute(route)) {
+        const agents = await routeAgents(input, input.triggers, route);
+        messages.push(...openRouteWarnings(route), ...agents.flatMap(openAgentWarnings));
+      }
+      for (const message of messages) {
         warnings.push({
           channel: account.channel,
           accountId: account.accountId,
@@ -60,7 +64,15 @@ export async function channelConfigurationWarnings(input: {
   return warnings;
 }
 
-/** What the Route itself lets anyone in the conversation do. */
+/** What any Route, whoever may use it, lets the Agent do unasked. */
+export function routeWarnings(route: CompiledRoute): string[] {
+  return autoAllowsEveryToolClass(route)
+    ? ["Every permission request is accepted automatically."]
+    : [];
+}
+
+/** What the Route itself lets anyone in the conversation do. The
+ * every-request case is `routeWarnings`' and is not repeated here. */
 export function openRouteWarnings(route: CompiledRoute): string[] {
   const warnings: string[] = [];
   const open = route.audienceRules.filter(({ who }) => who.anyone);
@@ -84,8 +96,10 @@ export function openRouteWarnings(route: CompiledRoute): string[] {
       `After a mention, the bot answers anyone here without one for ${String(route.defaults.followUp.ttlMinutes)} minutes.`,
     );
   }
-  if (autoAllowsApprovals(route.approval)) {
-    warnings.push("Tool approvals are allowed automatically for anyone in the conversation.");
+  if (autoAllowsApprovals(route.approval) && !autoAllowsEveryToolClass(route)) {
+    warnings.push(
+      "Some permission requests are accepted automatically for anyone in the conversation.",
+    );
   }
   if (!sendsFinalAnswerOnly(route.defaults)) {
     warnings.push("Progress, tool calls or streaming are posted, not only the final answer.");

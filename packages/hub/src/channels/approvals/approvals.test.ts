@@ -7,30 +7,20 @@
 // the tool class, auto-responds on the daemon for auto-allow / auto-deny, and
 // posts an in-thread prompt otherwise. A prompt's answer is re-authorized at the
 // approval exit (the SECOND authority check): an approver without the class
-// privilege is inert, `initiatorOnly` locks the answer to the thread's initiator,
-// and the S10 posture (no route auto-allows every class) is asserted at start.
+// privilege is inert, and `initiatorOnly` locks the answer to the thread's initiator.
 import assert from "node:assert/strict";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import type { ChannelStore } from "../../db/channels.js";
-import {
-  assertChannelPosture,
-  decidedPromptText,
-  parseApprovalCommand,
-  promptText,
-} from "./index.js";
-import { ApprovalPostureError } from "../policy.js";
+import { decidedPromptText, parseApprovalCommand, promptText } from "./index.js";
 import {
   APPROVER,
   BYSTANDER,
   INITIATOR,
-  makeAccount,
   makeEngine,
-  makeRoute,
   openStore,
   requestOf,
   type StoreHandle,
 } from "./harness.js";
-import type { CompiledRoute } from "../config/compile.js";
 
 // --- Store lifecycle ---------------------------------------------------------
 
@@ -213,27 +203,6 @@ describe("two-authority-check (approval exit)", () => {
       check.reason,
       "prompt-not-open",
       "not a privilege verdict — the prompt is not open",
-    );
-  });
-});
-
-// --- posture (S10) ---------------------------------------------------------
-
-describe("assertChannelPosture (S10)", () => {
-  it("passes a route that keeps at least one class approval-required", () => {
-    // The default route auto-allows only `file`; the posture holds.
-    assert.doesNotThrow(() => assertChannelPosture([makeAccount(makeRoute())]));
-  });
-
-  it("throws ApprovalPostureError when a route auto-allows every class", () => {
-    const lax: CompiledRoute = {
-      ...makeRoute(),
-      approval: [{ match: "*", mode: "auto-allow" }],
-    };
-    assert.throws(
-      () => assertChannelPosture([makeAccount(lax)]),
-      (error: unknown) => error instanceof ApprovalPostureError,
-      "a `*` auto-allow lifts the posture",
     );
   });
 });

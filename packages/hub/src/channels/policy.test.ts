@@ -10,9 +10,8 @@ import type {
 } from "./config/compile.js";
 import type { RoleAssignment } from "./config/schema.js";
 import {
-  CHANNEL_SESSION_POSTURE,
-  assertApprovalRequiredPosture,
   approvalDecisionFor,
+  autoAllowsEveryToolClass,
   classifyToolClass,
   effectivePrivileges,
   effectiveRoles,
@@ -21,7 +20,6 @@ import {
   mayApprove,
   mayTrigger,
   routeMatches,
-  postureIsApprovalRequired,
   resolvePrincipal,
   routeRoleScope,
   ruleMatchCoversToolClass,
@@ -759,37 +757,31 @@ describe("kill switches", () => {
   });
 });
 
-// --- Approval-required invariant ---------------------------------------------------
+// --- Routes that accept every permission request -------------------------------
 
-describe("approval-required posture (plan S10)", () => {
+describe("autoAllowsEveryToolClass", () => {
   const plane = makePlane();
   const account = makeAccount();
 
-  it("is a hard, non-configurable constant", () => {
-    assert.equal(CHANNEL_SESSION_POSTURE, "approval-required");
-  });
-
-  it("holds when at least one tool class is not auto-allowed", () => {
+  it("is false when at least one tool class is not auto-allowed", () => {
     const route = routeFor(plane, account); // file auto-allowed, the rest require
-    assert.equal(postureIsApprovalRequired(route), true);
-    assert.doesNotThrow(() => assertApprovalRequiredPosture(route));
+    assert.equal(autoAllowsEveryToolClass(route), false);
   });
 
-  it("is lifted (and asserted) when every tool class is auto-allowed", () => {
+  it("is true when every tool class is auto-allowed", () => {
     const route = routeFor(plane, account, {
       approval: [{ match: "*", mode: "auto-allow" }],
     });
-    assert.equal(postureIsApprovalRequired(route), false);
-    assert.throws(() => assertApprovalRequiredPosture(route), /approval-required posture/u);
+    assert.equal(autoAllowsEveryToolClass(route), true);
   });
 
-  it("still holds when only one class is auto-allowed", () => {
+  it("is false when only one class is auto-allowed", () => {
     const route = routeFor(plane, account, {
       approval: [
         { match: "file", mode: "auto-allow" },
         { match: "*", mode: "require" },
       ],
     });
-    assert.equal(postureIsApprovalRequired(route), true);
+    assert.equal(autoAllowsEveryToolClass(route), false);
   });
 });
