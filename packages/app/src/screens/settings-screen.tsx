@@ -53,7 +53,7 @@ import { HostStatusDot } from "@/components/host-status-dot";
 import { ScreenTitle } from "@/components/headers/screen-title";
 import { HeaderIconBadge } from "@/components/headers/header-icon-badge";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { HubSettingsDetailScrollProvider } from "@/clisbot/hub/settings/detail-scroll";
+import { SettingsDetailContent } from "@/clisbot/hub/settings/wide-content";
 import { AppearanceSection } from "@/screens/settings/appearance/appearance-section";
 import { LayoutSection } from "@/screens/settings/layout/layout-section";
 import {
@@ -1752,7 +1752,6 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     );
   }
 
-  const contentStyle = detailContentStyle(view);
   if (isCompactLayout) {
     return (
       <View style={styles.container}>
@@ -1766,11 +1765,13 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           style={styles.scrollView}
           contentContainerStyle={insetBottomStyle}
         >
-          <View style={contentStyle}>
-            <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
-              {content}
-            </HubSettingsDetailScrollProvider>
-          </View>
+          <SettingsDetailContent
+            style={styles.content}
+            wideStyle={styles.wideContent}
+            onNavigate={scrollDetailToTop}
+          >
+            {content}
+          </SettingsDetailContent>
         </ScrollView>
         {addHostModals}
       </View>
@@ -1808,11 +1809,13 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               style={styles.scrollView}
               contentContainerStyle={insetBottomStyle}
             >
-              <View style={contentStyle}>
-                <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
-                  {content}
-                </HubSettingsDetailScrollProvider>
-              </View>
+              <SettingsDetailContent
+                style={styles.content}
+                wideStyle={styles.wideContent}
+                onNavigate={scrollDetailToTop}
+              >
+                {content}
+              </SettingsDetailContent>
             </ScrollView>
           </View>
         </WindowChromeRegion>
@@ -1851,7 +1854,9 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: 720,
     alignSelf: "center",
   },
-  hubContent: {
+  // Clisbot fusion: the column a Hub table or master-detail asks for
+  // (`useWideContent`); everything else keeps 720.
+  wideContent: {
     maxWidth: 1120,
   },
   aboutValue: {
@@ -1912,13 +1917,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
   },
 }));
-// Clisbot fusion: Hub pages hold tables and master-detail views, so they get a
-// wider column. Upstream sections keep their 720.
-const hubContentStyle = [styles.content, styles.hubContent];
-function detailContentStyle(view: SettingsView) {
-  return view.kind === "hub" ? hubContentStyle : styles.content;
-}
-
 const desktopStyles = StyleSheet.create((theme) => ({
   row: {
     flex: 1,

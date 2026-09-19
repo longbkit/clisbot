@@ -15,6 +15,8 @@ import {
   memberDirectoryRows,
   type MemberFilter,
 } from "./member-directory";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { useWideContent } from "../wide-content";
 import { MemberRow, MemberTableHeader, type MemberRowHandlers } from "./member-row";
 import { canInvitePeople } from "./team-membership";
 import type { HubAccount, TeamResources } from "./types";
@@ -57,6 +59,8 @@ export function MembersTab({
     ],
   );
   const chips = useMemo(() => memberChips(rows), [rows]);
+  // The Members table needs the wide Settings column; on a phone rows are cards.
+  useWideContent(!useIsCompactFormFactor());
   const visible = useMemo(() => filterMemberRows(rows, query, filter), [filter, query, rows]);
   const shown = showAll ? visible : visible.slice(0, PAGE_SIZE);
   const expand = useCallback(() => setShowAll(true), []);

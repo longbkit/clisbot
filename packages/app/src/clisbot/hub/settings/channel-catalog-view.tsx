@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useWideContent } from "./wide-content";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr
 export function ChannelCatalogView() {
   const { rows, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
   const compact = useIsCompactFormFactor();
+  // Two columns need the wide Settings column; a phone shows one at a time.
+  useWideContent(!compact);
   const [chosenChannel, setSelectedChannel] = useState<string | null>(null);
   const selectedChannel = chosenChannel ?? (compact ? null : (rows[0]?.channel ?? null));
   const [connecting, setConnecting] = useState(false);
