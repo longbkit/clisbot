@@ -90,6 +90,8 @@ export function MultiSelectField({
         id: option.value,
         label: option.label,
         ...(option.description === undefined ? {} : { description: option.description }),
+        // Grouped options get the list's headings, as in `SelectField`.
+        ...(option.group === undefined ? {} : { group: option.group }),
       })),
     ],
     [allLabel, options],

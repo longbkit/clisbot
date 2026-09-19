@@ -165,7 +165,7 @@ vi.mock("./multi-select-field", () => ({
   MultiSelectField: function TestMultiSelectField(props: {
     label: string;
     disabled?: boolean;
-    options: { id: string; value: string; label: string }[];
+    options: { id: string; value: string; label: string; group?: string }[];
     value: "*" | readonly string[] | null;
     onChange(value: "*" | readonly string[]): void;
   }) {
@@ -183,7 +183,7 @@ vi.mock("./multi-select-field", () => ({
         onChange={change}
       >
         {props.options.map((option) => (
-          <option key={option.id} value={option.value}>
+          <option key={option.id} value={option.value} data-group={option.group}>
             {option.label}
           </option>
         ))}
@@ -543,9 +543,12 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit Rule 1" }));
     expect(screen.getByText("Anyone")).toBeTruthy();
     expect(screen.getByText("DMs")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Remove Rule 2" }));
+    // Remove sits behind the rule's menu, away from Edit.
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Rule 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(screen.queryByText("Anyone may talk in DMs")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Remove Rule 1" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions for Rule 1" })).toBeNull();
     expect(adapters.put).not.toHaveBeenCalled();
   });
 
@@ -566,6 +569,8 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     await openEditor();
     const people = screen.getByLabelText("Teams and Members") as HTMLSelectElement;
     expect(Array.from(people.options, ({ value }) => value)).toEqual(["team:team-qc"]);
+    // Teams and Members keep their own headings in the list, as in Access.
+    expect(people.options[0]!.dataset["group"]).toBe("Teams");
     people.options[0]!.selected = true;
     fireEvent.change(people);
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));

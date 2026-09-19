@@ -27,6 +27,7 @@ import {
   type AudienceNames,
   type AudienceRuleDraft,
 } from "./channel-route-audience";
+import { ChannelActionsMenu } from "./channel-actions-menu";
 import { ConversationSelectionFields, SenderSelectionFields } from "./conversation-picker-field";
 import {
   DisclosureRow,
@@ -213,15 +214,12 @@ function AudienceRuleRow({
             {open ? "Done" : "Edit"}
           </Button>
           {removable ? (
-            <Button
-              size="xs"
-              variant="ghost"
+            // Behind the menu, so a press meant for Edit never removes a rule.
+            <ChannelActionsMenu
+              label={`Actions for ${label}`}
               disabled={disabled}
-              onPress={removeRow}
-              accessibilityLabel={`Remove ${label}`}
-            >
-              Remove
-            </Button>
+              remove={removeRow}
+            />
           ) : null}
         </View>
       </View>
@@ -552,15 +550,16 @@ const styles = StyleSheet.create((theme) => ({
   },
   summary: { gap: theme.spacing[1] },
   summaryLine: { flexDirection: "row", gap: theme.spacing[3] },
+  // Base size, like the fields it folds: a summary is read, not skimmed past.
   summaryLabel: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    width: 56,
+    fontSize: theme.fontSize.base,
+    width: 64,
   },
   summaryValue: {
     color: theme.colors.foreground,
     flex: 1,
-    fontSize: theme.fontSize.sm,
+    fontSize: theme.fontSize.base,
   },
   nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
   ruleTitle: {
