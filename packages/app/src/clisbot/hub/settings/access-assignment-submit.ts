@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { mergeAccessConstraints } from "./access-assignment-edit";
-import { assignmentSubjectName } from "./access-assignment-list";
+import { assignmentSubjectName } from "./access-grant-rows";
 import { accessLevelLabel } from "./access-catalog";
 import { effectLines, summarizeAccess, type AccessSummary } from "./access-level-summary";
 import type {

@@ -1,12 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { ChevronDown, ChevronRight } from "lucide-react-native";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { HubAccessEventsSchema } from "../contracts";
-import { assignmentSubjectName } from "./access-assignment-list";
+import { assignmentSubjectName } from "./access-grant-rows";
 import { resourceKey, type AccessAssignment, type AccessResource } from "./access-catalog";
 import { canShareResource, type ViewerAuthority } from "./access-grantor";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
@@ -31,6 +30,9 @@ interface EventContext {
  * Automations the Hub paused. Collapsed by default: it is a review list, not
  * something to act on daily.
  */
+const EVENTS_INFO =
+  "Every Administrator grant on a Host, with who made it, and every Automation the Hub paused. Organization Admins are also notified.";
+
 export function AccessEventsSection({
   pending,
   remove,
@@ -39,22 +41,24 @@ export function AccessEventsSection({
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const events = useHubResource(EVENTS_RESOURCE, HubAccessEventsSchema, expanded);
+  const trailing = useMemo(
+    () => (
+      <Button size="sm" variant="ghost" onPress={toggle}>
+        {expanded ? "Hide" : "Show"}
+      </Button>
+    ),
+    [expanded, toggle],
+  );
   return (
-    <SettingsSection title="Access events">
+    <SettingsSection title="Access events" info={EVENTS_INFO} trailing={trailing}>
       <View style={settingsStyles.card}>
-        <View style={[settingsStyles.row, styles.row]}>
-          <Button
-            size="xs"
-            variant="ghost"
-            leftIcon={expanded ? ChevronDown : ChevronRight}
-            onPress={toggle}
-            accessibilityLabel={expanded ? "Hide access events" : "Show access events"}
-          />
-          <Text style={settingsStyles.rowHint}>
-            Every Administrator grant on a Host, with who made it, and every Automation the Hub
-            paused. Organization Admins are also notified.
-          </Text>
-        </View>
+        {expanded ? null : (
+          <View style={settingsStyles.row}>
+            <Text style={settingsStyles.rowHint}>
+              Administrator grants on a Host and paused Automations.
+            </Text>
+          </View>
+        )}
         {expanded ? <QueryFeedback queries={[events]} /> : null}
         {expanded && events.data?.events.length === 0 ? (
           <EmptyRow message="No access events yet." />

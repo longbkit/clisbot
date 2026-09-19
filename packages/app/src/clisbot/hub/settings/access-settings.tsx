@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import { SelectField } from "@/components/ui/select-field";
 import { useFetchQuery } from "@/data/query";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -23,31 +22,30 @@ import {
   HubMembersSchema,
   HubTeamsSchema,
 } from "../contracts";
-import {
-  assignmentsForResource,
-  assignmentsForSubject,
-  publicAccessRoutes,
-} from "./access-overview";
+import { publicAccessRoutes } from "./access-overview";
 import { useMountedAccessScope } from "./access-mounted-scope";
-import { ExplicitAssignments } from "./access-assignment-list";
+import { AccessGrantsTable } from "./access-grants-table";
+import {
+  aboveViewer,
+  grantRows,
+  grantedAccessLabel,
+  groupGrantRows,
+  type GrantGrouping,
+} from "./access-grant-rows";
+import { sharesAccess } from "./access-level-summary";
+import { SearchField } from "@/components/ui/search-field";
 import { GrantAccessContent } from "./access-assignment-form";
 import { MemberAccessSettings } from "./access-effective-section";
 import { AccessEventsSection } from "./access-events-section";
+import { holdsCanShareAnywhere, viewerAuthority, type ViewerAuthority } from "./access-grantor";
 import {
-  canShareResource,
-  holdsCanShareAnywhere,
-  viewerAuthority,
-  type ViewerAuthority,
-} from "./access-grantor";
-import {
-  assignmentResourceOptions,
   assignmentSubjectOptions,
   parseSubjectKey,
   resourceKey,
-  selectedOptionDisplay,
   subjectKey,
   type AccessAssignment,
   type AccessCatalog,
+  type AccessResource,
   type HubMember,
   type HubTeam,
   memberNamesByUserId,
@@ -334,42 +332,37 @@ function ManagedAccessContent({
   save(body: unknown, batch?: boolean): Promise<void>;
   remove(assignmentId: string): Promise<void>;
 }) {
-  const [subjectValue, setSubjectValue] = useState(initialSubject);
-  const [resourceValue, setResourceValue] = useState(initialResource);
-  const [viewBy, setViewBy] = useState(initialResource === null ? "subject" : "resource");
-  const changeSubject = useCallback((value: string) => setSubjectValue(value), []);
-  const grant = useCallback(() => edit(null), [edit]);
-  const changeViewBy = useCallback((value: string) => setViewBy(value), []);
+  // Everything shows by default; a link for one person or resource starts
+  // grouped that way and searched for it.
+  const [grouping, setGrouping] = useState<GrantGrouping>(
+    initialResource === null ? "subject" : "resource",
+  );
   const directory = useAccessDirectory(members, teams);
-  const rowContext = useMemo(
-    () => ({
-      accessLevels: catalog.accessLevels,
-      resources: catalog.resources,
-      resourceByKey: new Map(
-        catalog.resources.map((resource) => [resourceKey(resource), resource]),
-      ),
-      memberNameByUserId: directory.memberNameByUserId,
-      authority,
-    }),
-    [authority, catalog, directory.memberNameByUserId],
+  const [search, setSearch] = useState(() =>
+    initialSearch(initialSubject, initialResource, catalog.resources, members, teams),
   );
-  const { resourceByKey } = rowContext;
+  const grant = useCallback(() => edit(null), [edit]);
+  const changeGrouping = useCallback((value: string) => setGrouping(value as GrantGrouping), []);
+  const rows = useMemo(
+    () =>
+      grantRows({
+        assignments,
+        resources: catalog.resources,
+        members,
+        teams,
+        memberNameByUserId: directory.memberNameByUserId,
+        levelLabel: (assignment) => grantedAccessLabel(assignment, catalog.accessLevels),
+        sharesAccess: (assignment) => sharesAccess(assignment.resourceKind, assignment.privileges),
+        locked: (assignment) => aboveViewer(assignment, authority, catalog.resources),
+      }),
+    [assignments, authority, catalog, directory.memberNameByUserId, members, teams],
+  );
+  const groups = useMemo(
+    () => groupGrantRows(rows, grouping, search, { members, teams, resources: catalog.resources }),
+    [catalog.resources, grouping, members, rows, search, teams],
+  );
+  const grantActions = useMemo(() => ({ pending, edit, remove }), [edit, pending, remove]);
   const subjectOptions = assignmentSubjectOptions(members, teams);
-  const selectedSubject = subjectValue ?? subjectOptions[0]?.value ?? null;
-  const resourceOptions = assignmentResourceOptions(
-    catalog.resources.filter((resource) =>
-      canShareResource(authority, resource, catalog.resources),
-    ),
-    false,
-  );
-  const selectedResource = resourceValue ?? resourceOptions[0]?.value ?? null;
-  const visibleAssignments =
-    viewBy === "subject"
-      ? assignmentsForSubject(assignments, parseSubjectKey(selectedSubject), members, teams)
-      : assignmentsForResource(
-          assignments,
-          selectedResource === null ? undefined : resourceByKey.get(selectedResource),
-        );
   const grantButton = useMemo(
     () => (
       <Button size="sm" disabled={pending} onPress={grant}>
@@ -386,64 +379,37 @@ function ManagedAccessContent({
         trailing={grantButton}
       >
         <View style={styles.filters}>
+          <View style={styles.filterPicker}>
+            <SearchField
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search people, Teams, or resources"
+              clearAccessibilityLabel="Clear Access search"
+            />
+          </View>
           <SegmentedControl
             options={ACCESS_VIEWS}
-            value={viewBy}
-            onValueChange={changeViewBy}
+            value={grouping}
+            onValueChange={changeGrouping}
             size="sm"
           />
-          <View style={styles.filterPicker}>
-            {viewBy === "subject" ? (
-              <SelectField
-                field={false}
-                label="Team, Member or Guest"
-                title="Team, Member or Guest"
-                value={selectedSubject}
-                selectedDisplay={selectedOptionDisplay(subjectOptions, selectedSubject)}
-                options={subjectOptions}
-                onChange={changeSubject}
-                placeholder="Choose a Team, Member or Guest"
-                emptyText="Invite a Member or create a Team first."
-                disabled={pending}
-                searchable
-                searchPlaceholder="Search Teams, Members, Guest, or email"
-                maxOptionsPerGroup={50}
-              />
-            ) : (
-              <SelectField
-                field={false}
-                label="Resource"
-                title="Resource"
-                value={selectedResource}
-                selectedDisplay={selectedOptionDisplay(resourceOptions, selectedResource)}
-                options={resourceOptions}
-                onChange={setResourceValue}
-                placeholder="Choose a resource"
-                emptyText="No resources available."
-                disabled={pending}
-                searchable
-                searchPlaceholder="Search resources or parent Host"
-                maxOptionsPerGroup={50}
-              />
-            )}
-          </View>
         </View>
-        <ExplicitAssignments
-          assignments={visibleAssignments}
-          context={rowContext}
-          teamById={directory.teamById}
-          teamMembersById={directory.teamMembersById}
-          memberById={directory.memberById}
-          pending={pending}
-          remove={remove}
-          edit={edit}
+        <AccessGrantsTable
+          groups={groups}
+          grouping={grouping}
+          empty={
+            search.trim().length > 0
+              ? "No grant matches this search."
+              : "No one has been granted access yet. Owners always have full access."
+          }
+          actions={grantActions}
         />
       </SettingsSection>
       {formOpen ? (
         <GrantAccessContent
           key={editing?.id ?? "new"}
-          initialSubject={viewBy === "subject" ? selectedSubject : null}
-          initialResource={viewBy === "resource" ? selectedResource : null}
+          initialSubject={initialSubject}
+          initialResource={initialResource}
           editing={editing}
           cancelEdit={cancelEdit}
           assignableSubjects={subjectOptions.length}
@@ -480,6 +446,22 @@ const ACCESS_VIEWS: SegmentedControlOption<string>[] = [
   { value: "resource", label: "Resources" },
 ];
 
+/** A link for one person or resource opens searched for its name. */
+function initialSearch(
+  subject: string | null,
+  resource: string | null,
+  resources: readonly AccessResource[],
+  members: readonly HubMember[],
+  teams: readonly HubTeam[],
+): string {
+  if (resource !== null)
+    return resources.find((candidate) => resourceKey(candidate) === resource)?.name ?? "";
+  const parsed = parseSubjectKey(subject);
+  if (parsed?.kind === "team") return teams.find(({ id }) => id === parsed.id)?.name ?? "";
+  if (parsed?.kind === "member") return members.find(({ id }) => id === parsed.id)?.name ?? "";
+  return parsed?.kind === "guest" ? "Guest" : "";
+}
+
 /** The page's explanation, in its header's info tip rather than a box above the list. */
 function accessInfo(unrestricted: boolean): string {
   const who = unrestricted
@@ -509,6 +491,9 @@ function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
   );
 }
 
+const PUBLIC_ROUTES_INFO =
+  "Anyone in these conversations can chat with the Route's Agent without a grant. Chatting gives no Host or Project access. The audience is set on the Route in Channels.";
+
 function PublicRoutesAccessSection() {
   const hub = useHubAccount();
   const router = useRouter();
@@ -529,14 +514,21 @@ function PublicRoutesAccessSection() {
   });
   const openChannels = useCallback(() => router.push(buildHubSettingsRoute("channels")), [router]);
   const retry = useCallback(() => void configuration.refetch(), [configuration]);
+  const manageButton = useMemo(
+    () => (
+      <Button size="sm" variant="ghost" onPress={openChannels}>
+        Manage in Channels
+      </Button>
+    ),
+    [openChannels],
+  );
   const routes = publicAccessRoutes(configuration.data?.accounts ?? []);
   return (
-    <SettingsSection title="Routes open to anyone">
-      <Text style={settingsStyles.rowHint}>
-        Anyone in these matching conversations can chat with the Route&apos;s Agent without a Member
-        assignment. Chatting gives no Host or Project access. Manage the audience, limits, and
-        target in Channels.
-      </Text>
+    <SettingsSection
+      title="Routes open to anyone"
+      info={PUBLIC_ROUTES_INFO}
+      trailing={manageButton}
+    >
       <QueryFeedback queries={[configuration]} />
       {configuration.error ? (
         <Button size="sm" variant="outline" onPress={retry}>
@@ -565,9 +557,6 @@ function PublicRoutesAccessSection() {
           )}
         </View>
       ) : null}
-      <Button size="sm" variant="outline" onPress={openChannels}>
-        Manage in Channels
-      </Button>
     </SettingsSection>
   );
 }

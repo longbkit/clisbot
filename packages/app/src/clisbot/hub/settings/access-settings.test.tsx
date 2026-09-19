@@ -122,6 +122,26 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
       </div>
     ) : null,
 }));
+// The row's … menu renders its items inline, so a test presses Remove directly.
+vi.mock("./team/row-actions-menu", () => ({
+  RowActionsMenu: (props: {
+    actions: readonly { label: string; onSelect(): void; disabled?: boolean }[];
+    disabled: boolean;
+  }) => (
+    <>
+      {props.actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          disabled={props.disabled || action.disabled}
+          onClick={action.onSelect}
+        >
+          {action.label}
+        </button>
+      ))}
+    </>
+  ),
+}));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: function TestSelectField(props: {
     label: string;
@@ -488,8 +508,9 @@ describe("Access assignment editing", () => {
       return resources[resource];
     });
     renderAccess();
-    expect(await screen.findByText(/· by Member One$/)).toBeTruthy();
-    expect(screen.getByText(/· by Hub$/)).toBeTruthy();
+    // Granted by is its own column: the author's name, or Hub.
+    expect(await screen.findByText("Hub")).toBeTruthy();
+    expect(screen.getAllByText("Member One").length).toBeGreaterThan(0);
   });
 });
 
@@ -954,7 +975,13 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     expect([...level.options].map((option) => option.value)).toEqual(["", "office_worker"]);
     expect(screen.getByText("Above your own level, not offered: Developer")).toBeTruthy();
     // The Developer row on the same Project is above the viewer: no Edit, no Remove.
-    expect(screen.getAllByText("Locked · above your level")).toHaveLength(1);
+    expect(screen.getAllByText("Above your level")).toHaveLength(1);
+    // Opened for Member One: the Team grant shows under them, edited on the Team.
+    expect(screen.getByText("via Team QC")).toBeTruthy();
+    expect(screen.queryAllByRole("button", { name: "Edit" })).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Search people, Teams, or resources"), {
+      target: { value: "" },
+    });
     expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
   });
 
@@ -1000,7 +1027,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     view.unmount();
     mockHub({});
     renderAccess();
-    await screen.findByText("Access is managed by your organization");
+    await screen.findByText("No resource access has been granted to you yet.");
     expect(screen.queryByRole("button", { name: "Grant access…" })).toBeNull();
   });
 });
