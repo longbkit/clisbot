@@ -110,6 +110,18 @@ vi.mock("./conversation-picker-field", () => ({
   },
 }));
 // Adapt platform input controls; the Access form, buttons, state and queries remain real.
+vi.mock("@/components/adaptive-modal-sheet", () => ({
+  AdaptiveModalSheet: (props: {
+    visible: boolean;
+    header: { title: string };
+    children: React.ReactNode;
+  }) =>
+    props.visible ? (
+      <div role="dialog" aria-label={props.header.title}>
+        {props.children}
+      </div>
+    ) : null,
+}));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: function TestSelectField(props: {
     label: string;
@@ -213,6 +225,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** The grant form is a sheet the page's Grant access… button opens. */
+async function openGrant() {
+  fireEvent.click(await screen.findByRole("button", { name: "Grant access…" }));
+}
 function renderAccess() {
   return render(
     <QueryClientProvider client={queryClient}>
@@ -272,7 +288,9 @@ describe("Access assignment editing", () => {
 
   it("authors a Guest grant using the organization-scoped Guest identity", async () => {
     renderAccess();
-    const [subject] = await screen.findAllByLabelText("Team, Member or Guest");
+    await openGrant();
+    // The first is the page's filter; the sheet's own field comes after it.
+    const subject = (await screen.findAllByLabelText("Team, Member or Guest")).at(-1);
     fireEvent.change(subject!, { target: { value: "guest\0guest" } });
     fireEvent.change(screen.getByLabelText("Resource"), { target: { value: "daemon\0host" } });
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
@@ -547,6 +565,7 @@ describe("Access granted to more than one Resource at a time", () => {
       [existingOnB],
     );
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "project\u0000project-a" },
     });
@@ -619,6 +638,7 @@ describe("Access granted to more than one Resource at a time", () => {
     mockCatalog([], { daemon: { connect: ["daemon.connect"] } });
     adapters.confirm.mockResolvedValue(false);
     renderAccess();
+    await openGrant();
     // The view filter above the form has the same label; the grant form is last.
     const subjectFields = await screen.findAllByLabelText("Team, Member or Guest");
     fireEvent.change(subjectFields.at(-1)!, { target: { value: "guest\u0000guest" } });
@@ -644,6 +664,7 @@ describe("Access granted to more than one Resource at a time", () => {
     );
     adapters.confirm.mockResolvedValue(false);
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\u0000host" },
     });
@@ -695,6 +716,7 @@ describe("Access granted to more than one Resource at a time", () => {
       catalog,
     );
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\u0000host" },
     });
@@ -818,6 +840,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
   it("locks Can share on for Full access, hides it for Connect, and offers it for Developer", async () => {
     mockHub({});
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\0host" },
     });
@@ -839,6 +862,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
   it("writes Can share into a Developer grant when switched on", async () => {
     mockHub({});
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\0host" },
     });
@@ -857,6 +881,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     mockHub({});
     adapters.confirm.mockResolvedValue(false);
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\0host" },
     });
@@ -879,6 +904,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
   it("offers a Team only the Admin level and words it as Admin", async () => {
     mockHub({});
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), { target: { value: "team\0team" } });
     const level = screen.getByLabelText("Access level") as HTMLSelectElement;
     expect([...level.options].map((option) => option.textContent)).toEqual(["Choose", "Admin"]);
@@ -920,7 +946,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
       },
     });
     renderAccess();
-    await screen.findByText("You grant what you hold");
+    await openGrant();
     const resource = screen.getByLabelText("Resource") as HTMLSelectElement;
     expect([...resource.options].map((option) => option.value)).toEqual(["", "project\0project"]);
     fireEvent.change(resource, { target: { value: "project\0project" } });
@@ -943,6 +969,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
       ),
     );
     renderAccess();
+    await openGrant();
     fireEvent.change(await screen.findByLabelText("Resource"), {
       target: { value: "daemon\0host" },
     });
@@ -969,11 +996,11 @@ describe("Can share and grant-at-most-what-you-hold", () => {
       },
     });
     const view = renderAccess();
-    await screen.findByText("You grant what you hold");
+    await screen.findByRole("button", { name: "Grant access…" });
     view.unmount();
     mockHub({});
     renderAccess();
     await screen.findByText("Access is managed by your organization");
-    expect(screen.queryByText("You grant what you hold")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Grant access…" })).toBeNull();
   });
 });

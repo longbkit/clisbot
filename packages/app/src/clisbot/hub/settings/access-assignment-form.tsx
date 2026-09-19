@@ -1,11 +1,11 @@
 import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
+import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
 import { Switch } from "@/components/ui/switch";
-import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useAccessAssignmentDraft } from "./access-assignment-draft";
 import { useMountedAccessScope } from "./access-mounted-scope";
@@ -60,18 +60,25 @@ export function GrantAccessContent({
   assignableSubjects,
   ...props
 }: AccessAssignmentFormProps & { assignableSubjects: number }) {
-  if (assignableSubjects === 0) {
-    return (
-      <SettingsSection title="Grant access">
+  // A sheet over the Access list, as Invite people is over People: the form is
+  // there only while someone is granting or editing.
+  const header = useMemo(
+    () => ({ title: props.editing ? "Edit access" : "Grant access" }),
+    [props.editing],
+  );
+  return (
+    <AdaptiveModalSheet visible header={header} onClose={props.cancelEdit} desktopMaxWidth={560}>
+      {assignableSubjects === 0 ? (
         <Alert
           variant="info"
           title="No setup needed for one owner"
           description="Invite a Member or create a Team only when someone else needs access."
         />
-      </SettingsSection>
-    );
-  }
-  return <AccessAssignmentForm {...props} />;
+      ) : (
+        <AccessAssignmentForm {...props} />
+      )}
+    </AdaptiveModalSheet>
+  );
 }
 
 function AccessAssignmentForm({
@@ -134,88 +141,79 @@ function AccessAssignmentForm({
   );
 
   return (
-    <SettingsSection title={editing ? "Edit access" : "Grant access"}>
-      <View style={[settingsStyles.card, styles.form]}>
-        {!draft.constraintsValid ? (
-          <Alert
-            variant="error"
-            title="These constraints cannot be edited by this app version."
-            description="Use a compatible app to preserve this assignment safely."
-          />
-        ) : null}
-        <SelectField
-          label="Team, Member or Guest"
-          value={draft.subjectKeyValue}
-          selectedDisplay={selectedOptionDisplay(subjectOptions, draft.subjectKeyValue)}
-          options={subjectOptions}
-          onChange={draft.setSubjectKeyValue}
-          placeholder="Choose a Team, Member or Guest"
-          emptyText="Create a Team or invite a Member first."
-          searchable
-          searchPlaceholder="Search Teams, Members, Guest, or email"
-          maxOptionsPerGroup={50}
-          title="Team, Member or Guest"
-          disabled={identityDisabled}
+    <View style={styles.sheetForm}>
+      {!draft.constraintsValid ? (
+        <Alert
+          variant="error"
+          title="These constraints cannot be edited by this app version."
+          description="Use a compatible app to preserve this assignment safely."
         />
-        <SelectField
-          label="Resource"
-          value={draft.resourceKeyValue}
-          selectedDisplay={selectedOptionDisplay(resourceOptions, draft.resourceKeyValue)}
-          options={resourceOptions}
-          onChange={draft.changeResource}
-          placeholder="Choose a Host, Project, Team, Connection, or Automation"
-          emptyText="No resources you can share are available."
-          searchable
-          searchPlaceholder="Search resources or parent Host"
-          maxOptionsPerGroup={50}
-          title="Resource"
+      ) : null}
+      <SelectField
+        label="Team, Member or Guest"
+        value={draft.subjectKeyValue}
+        selectedDisplay={selectedOptionDisplay(subjectOptions, draft.subjectKeyValue)}
+        options={subjectOptions}
+        onChange={draft.setSubjectKeyValue}
+        placeholder="Choose a Team, Member or Guest"
+        emptyText="Create a Team or invite a Member first."
+        searchable
+        searchPlaceholder="Search Teams, Members, Guest, or email"
+        maxOptionsPerGroup={50}
+        title="Team, Member or Guest"
+        disabled={identityDisabled}
+      />
+      <SelectField
+        label="Resource"
+        value={draft.resourceKeyValue}
+        selectedDisplay={selectedOptionDisplay(resourceOptions, draft.resourceKeyValue)}
+        options={resourceOptions}
+        onChange={draft.changeResource}
+        placeholder="Choose a Host, Project, Team, Connection, or Automation"
+        emptyText="No resources you can share are available."
+        searchable
+        searchPlaceholder="Search resources or parent Host"
+        maxOptionsPerGroup={50}
+        title="Resource"
+        disabled={identityDisabled}
+      />
+      {siblingOptions.length > 0 ? (
+        <MultiSelectField
+          label="Also apply to"
+          hint="Projects on the same Host, each written as its own assignment. To cover every Project, including ones added later, grant the Host instead."
+          options={siblingOptions}
+          value={draft.alsoResourceKeys}
+          onChange={draft.changeAlsoResources}
           disabled={identityDisabled}
+          placeholder="Only the Resource above"
+          searchPlaceholder="Search Projects"
         />
-        {siblingOptions.length > 0 ? (
-          <MultiSelectField
-            label="Also apply to"
-            hint="Projects on the same Host, each written as its own assignment. To cover every Project, including ones added later, grant the Host instead."
-            options={siblingOptions}
-            value={draft.alsoResourceKeys}
-            onChange={draft.changeAlsoResources}
-            disabled={identityDisabled}
-            placeholder="Only the Resource above"
-            searchPlaceholder="Search Projects"
-          />
-        ) : null}
-        <AccessLevelFields
-          selection={selection}
-          draft={draft}
-          editing={editing}
+      ) : null}
+      <AccessLevelFields selection={selection} draft={draft} editing={editing} pending={pending} />
+      {selection.needsAgentConfiguration ? (
+        <AgentConfigurationSection
+          catalog={shareableAgentConfigurationCatalog(
+            selection.resource?.agentConfigurationCatalog,
+            selection.holdings,
+          )}
+          configurations={draft.agentConfigurations}
+          setConfigurations={draft.setAgentConfigurations}
+          addConfiguration={draft.addAgentConfiguration}
+          fastMode={draft.fastMode}
+          setFastMode={draft.setFastMode}
           pending={pending}
         />
-        {selection.needsAgentConfiguration ? (
-          <AgentConfigurationSection
-            catalog={shareableAgentConfigurationCatalog(
-              selection.resource?.agentConfigurationCatalog,
-              selection.holdings,
-            )}
-            configurations={draft.agentConfigurations}
-            setConfigurations={draft.setAgentConfigurations}
-            addConfiguration={draft.addAgentConfiguration}
-            fastMode={draft.fastMode}
-            setFastMode={draft.setFastMode}
-            pending={pending}
-          />
-        ) : null}
-        {grantorError !== null ? (
-          <Alert variant="error" title="Above what you can grant" description={grantorError} />
-        ) : null}
-        <Button disabled={pending || !selection.valid || !draft.constraintsValid} onPress={submit}>
-          {editing ? "Save access" : "Grant access"}
-        </Button>
-        {editing ? (
-          <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
-            Cancel
-          </Button>
-        ) : null}
-      </View>
-    </SettingsSection>
+      ) : null}
+      {grantorError !== null ? (
+        <Alert variant="error" title="Above what you can grant" description={grantorError} />
+      ) : null}
+      <Button disabled={pending || !selection.valid || !draft.constraintsValid} onPress={submit}>
+        {editing ? "Save access" : "Grant access"}
+      </Button>
+      <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
+        Cancel
+      </Button>
+    </View>
   );
 }
 

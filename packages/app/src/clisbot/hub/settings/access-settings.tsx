@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { SelectField } from "@/components/ui/select-field";
 import { useFetchQuery } from "@/data/query";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -189,7 +190,16 @@ function ManagedAccessSettings({
   const [pending, setPending] = useState(false);
   const [mutationError, setMutationError] = useState<MutationError | null>(null);
   const [editing, setEditing] = useState<AccessAssignment | null>(null);
-  const cancelEdit = useCallback(() => setEditing(null), []);
+  // The grant sheet is open while granting (editing null) or editing a row.
+  const [formOpen, setFormOpen] = useState(false);
+  const cancelEdit = useCallback(() => {
+    setEditing(null);
+    setFormOpen(false);
+  }, []);
+  const edit = useCallback((assignment: AccessAssignment | null) => {
+    setEditing(assignment);
+    setFormOpen(true);
+  }, []);
   const runMutation = useCallback(
     async (operation: () => Promise<void>) => {
       setPending(true);
@@ -198,6 +208,7 @@ function ManagedAccessSettings({
         await operation();
         await assignments.refetch();
         setEditing(null);
+        setFormOpen(false);
       } catch (error) {
         setMutationError(describeMutationError(error));
       } finally {
@@ -272,8 +283,9 @@ function ManagedAccessSettings({
           teams={teams.data.teams}
           pending={pending}
           editing={editing}
+          formOpen={formOpen}
           grantorError={grantorError}
-          edit={setEditing}
+          edit={edit}
           cancelEdit={cancelEdit}
           save={saveAssignment}
           remove={removeAssignment}
@@ -298,6 +310,7 @@ function ManagedAccessContent({
   teams,
   pending,
   editing,
+  formOpen,
   grantorError,
   edit,
   cancelEdit,
@@ -313,7 +326,9 @@ function ManagedAccessContent({
   teams: HubTeam[];
   pending: boolean;
   editing: AccessAssignment | null;
+  formOpen: boolean;
   grantorError: string | null;
+  /** Opens the grant sheet: on a row to edit it, or null to grant new access. */
   edit(assignment: AccessAssignment | null): void;
   cancelEdit(): void;
   save(body: unknown, batch?: boolean): Promise<void>;
@@ -322,13 +337,9 @@ function ManagedAccessContent({
   const [subjectValue, setSubjectValue] = useState(initialSubject);
   const [resourceValue, setResourceValue] = useState(initialResource);
   const [viewBy, setViewBy] = useState(initialResource === null ? "subject" : "resource");
-  const changeSubject = useCallback(
-    (value: string) => {
-      setSubjectValue(value);
-      edit(null);
-    },
-    [edit],
-  );
+  const changeSubject = useCallback((value: string) => setSubjectValue(value), []);
+  const grant = useCallback(() => edit(null), [edit]);
+  const changeViewBy = useCallback((value: string) => setViewBy(value), []);
   const directory = useAccessDirectory(members, teams);
   const rowContext = useMemo(
     () => ({
@@ -359,78 +370,63 @@ function ManagedAccessContent({
           assignments,
           selectedResource === null ? undefined : resourceByKey.get(selectedResource),
         );
-  const viewDisplay = useMemo(
-    () => ({
-      label: viewBy === "subject" ? "Team, Member or Guest" : "Resource · Who has access",
-    }),
-    [viewBy],
+  const grantButton = useMemo(
+    () => (
+      <Button size="sm" disabled={pending} onPress={grant}>
+        Grant access…
+      </Button>
+    ),
+    [grant, pending],
   );
   return (
     <View>
-      <SettingsSection title="Access">
-        <Alert
-          variant="info"
-          title={authority.unrestricted ? "Owner access is automatic" : "You grant what you hold"}
-          description={
-            authority.unrestricted
-              ? "The owner can use every current and future resource. Members and Guest start with no resource access. Guest grants apply to channel senders without a linked Member."
-              : "You can add, change, or remove people on the resources you can share, up to your own level. Grants above your level show locked."
-          }
-        />
-        <View style={[settingsStyles.card, styles.form]}>
-          <SelectField
-            label="View access by"
-            title="View access by"
+      <SettingsSection
+        title="Access"
+        info={accessInfo(authority.unrestricted)}
+        trailing={grantButton}
+      >
+        <View style={styles.filters}>
+          <SegmentedControl
+            options={ACCESS_VIEWS}
             value={viewBy}
-            selectedDisplay={viewDisplay}
-            options={[
-              { id: "subject", value: "subject", label: "Team, Member or Guest" },
-              {
-                id: "resource",
-                value: "resource",
-                label: "Resource · Who has access",
-              },
-            ]}
-            onChange={setViewBy}
-            placeholder="Choose a view"
-            emptyText="No views available."
-            disabled={pending}
+            onValueChange={changeViewBy}
+            size="sm"
           />
-          {viewBy === "subject" ? (
-            <SelectField
-              label="Team, Member or Guest"
-              title="Team, Member or Guest"
-              value={selectedSubject}
-              selectedDisplay={selectedOptionDisplay(subjectOptions, selectedSubject)}
-              options={subjectOptions}
-              onChange={changeSubject}
-              placeholder="Choose a Team, Member or Guest"
-              emptyText="Invite a Member or create a Team first."
-              disabled={pending}
-              searchable
-              searchPlaceholder="Search Teams, Members, Guest, or email"
-              maxOptionsPerGroup={50}
-            />
-          ) : (
-            <SelectField
-              label="Who has access to"
-              title="Resource"
-              value={selectedResource}
-              selectedDisplay={selectedOptionDisplay(resourceOptions, selectedResource)}
-              options={resourceOptions}
-              onChange={setResourceValue}
-              placeholder="Choose a resource"
-              emptyText="No resources available."
-              disabled={pending}
-              searchable
-              searchPlaceholder="Search resources or parent Host"
-              maxOptionsPerGroup={50}
-            />
-          )}
-          <Text style={settingsStyles.rowHint}>
-            Member access includes direct assignments and assignments inherited from their Teams.
-            Editing a Team assignment affects every Member in that Team.
-          </Text>
+          <View style={styles.filterPicker}>
+            {viewBy === "subject" ? (
+              <SelectField
+                field={false}
+                label="Team, Member or Guest"
+                title="Team, Member or Guest"
+                value={selectedSubject}
+                selectedDisplay={selectedOptionDisplay(subjectOptions, selectedSubject)}
+                options={subjectOptions}
+                onChange={changeSubject}
+                placeholder="Choose a Team, Member or Guest"
+                emptyText="Invite a Member or create a Team first."
+                disabled={pending}
+                searchable
+                searchPlaceholder="Search Teams, Members, Guest, or email"
+                maxOptionsPerGroup={50}
+              />
+            ) : (
+              <SelectField
+                field={false}
+                label="Resource"
+                title="Resource"
+                value={selectedResource}
+                selectedDisplay={selectedOptionDisplay(resourceOptions, selectedResource)}
+                options={resourceOptions}
+                onChange={setResourceValue}
+                placeholder="Choose a resource"
+                emptyText="No resources available."
+                disabled={pending}
+                searchable
+                searchPlaceholder="Search resources or parent Host"
+                maxOptionsPerGroup={50}
+              />
+            )}
+          </View>
         </View>
         <ExplicitAssignments
           assignments={visibleAssignments}
@@ -443,22 +439,24 @@ function ManagedAccessContent({
           edit={edit}
         />
       </SettingsSection>
-      <GrantAccessContent
-        key={editing?.id ?? `${viewBy}:${selectedSubject}:${selectedResource}`}
-        initialSubject={viewBy === "subject" ? selectedSubject : null}
-        initialResource={viewBy === "resource" ? selectedResource : null}
-        editing={editing}
-        cancelEdit={cancelEdit}
-        assignableSubjects={subjectOptions.length}
-        catalog={catalog}
-        assignments={assignments}
-        members={members}
-        teams={teams}
-        authority={authority}
-        grantorError={grantorError}
-        pending={pending}
-        save={save}
-      />
+      {formOpen ? (
+        <GrantAccessContent
+          key={editing?.id ?? "new"}
+          initialSubject={viewBy === "subject" ? selectedSubject : null}
+          initialResource={viewBy === "resource" ? selectedResource : null}
+          editing={editing}
+          cancelEdit={cancelEdit}
+          assignableSubjects={subjectOptions.length}
+          catalog={catalog}
+          assignments={assignments}
+          members={members}
+          teams={teams}
+          authority={authority}
+          grantorError={grantorError}
+          pending={pending}
+          save={save}
+        />
+      ) : null}
       {authority.unrestricted ? (
         <AccessEventsSection
           resources={catalog.resources}
@@ -474,6 +472,20 @@ function ManagedAccessContent({
       <PublicRoutesAccessSection />
     </View>
   );
+}
+
+/** Two ways to read the grants: by who holds them, or by what they are on. */
+const ACCESS_VIEWS: SegmentedControlOption<string>[] = [
+  { value: "subject", label: "People" },
+  { value: "resource", label: "Resources" },
+];
+
+/** The page's explanation, in its header's info tip rather than a box above the list. */
+function accessInfo(unrestricted: boolean): string {
+  const who = unrestricted
+    ? "The owner can use every current and future resource. Members and Guest start with no resource access; Guest grants apply to channel senders without a linked Member."
+    : "You can add, change, or remove people on the resources you can share, up to your own level. Grants above your level show locked.";
+  return `${who} A Member's access includes their own grants and their Teams'; editing a Team grant affects every Member in it.`;
 }
 
 /** Names for the ids that rows, events, and confirmations show. */

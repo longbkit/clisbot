@@ -10,6 +10,22 @@ export const accessSettingsStyles = StyleSheet.create((theme) => ({
     padding: theme.spacing[4],
     gap: theme.spacing[4],
   },
+  // The grant form sits in a sheet, which already pads its body.
+  sheetForm: {
+    gap: theme.spacing[4],
+  },
+  // View-by switch and its one picker on one line; the picker wraps under on a phone.
+  filters: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[3],
+  },
+  filterPicker: {
+    flexGrow: 1,
+    flexBasis: 280,
+    minWidth: 0,
+  },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
