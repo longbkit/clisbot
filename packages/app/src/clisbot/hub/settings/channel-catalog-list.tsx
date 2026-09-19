@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { settingsStyles } from "@/styles/settings";
+import { tableStyles } from "./table-styles";
 import { channelPrerequisiteSummary } from "../channel-catalog";
 import {
   CHANNEL_STATUS_LABELS,
@@ -57,7 +57,8 @@ function ChannelCatalogListRow({
       style={[
         settingsStyles.row,
         bordered ? settingsStyles.rowBorder : null,
-        selected ? styles.selected : null,
+        tableStyles.body,
+        selected ? tableStyles.selected : null,
       ]}
     >
       <View style={settingsStyles.rowContent}>
@@ -99,9 +100,3 @@ function worstSeverity(row: ChannelCatalogRow): ChannelIngressSeverity {
   if (row.accounts.some((account) => account.severity === "warning")) return "warning";
   return "ok";
 }
-
-const styles = StyleSheet.create((theme) => ({
-  selected: {
-    backgroundColor: theme.colors.surface2,
-  },
-}));

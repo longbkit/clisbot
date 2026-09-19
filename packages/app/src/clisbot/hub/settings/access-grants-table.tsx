@@ -1,6 +1,6 @@
-// The Access list: grants grouped by who holds them or by what they are on.
-// A header-row table on a wide screen, cards on a phone. Readable first: the
-// thing and its Level are foreground, context is muted at base size.
+// One subject's or one resource's grants: a header-row table on a wide screen,
+// cards on a phone. Readable first: the thing and its Level are foreground,
+// context is muted at base size; surfaces come from table-styles.
 // docs/features/access/access-screen.md
 
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import type { AccessAssignment } from "./access-catalog";
-import type { GrantGroup, GrantGrouping, GrantRow } from "./access-grant-rows";
+import type { GrantGrouping, GrantRow } from "./access-grant-rows";
+import { tableStyles } from "./table-styles";
 import { RowActionsMenu } from "./team/row-actions-menu";
 
 const SUBJECT_KIND_LABELS = { team: "Team", member: "Member", guest: "Guest" } as const;
@@ -22,33 +23,28 @@ export interface GrantActions {
 }
 
 export function AccessGrantsTable({
-  groups,
+  rows,
   grouping,
   empty,
   actions,
-  groupHeaders = true,
 }: {
-  groups: readonly GrantGroup[];
+  /** One subject's grants (grouping "subject") or one resource's ("resource"). */
+  rows: readonly GrantRow[];
   grouping: GrantGrouping;
   empty: string;
   /** Absent: the list is read-only (a Member's own access). */
   actions?: GrantActions;
-  /** Off where the page already names the one subject (a Team's or a Member's own access). */
-  groupHeaders?: boolean;
 }) {
   const compact = useIsCompactFormFactor();
   const withActions = actions !== undefined;
   const columns = useMemo<Columns>(
-    () => ({
-      grantedBy: groups.some((group) => group.rows.some((row) => row.grantedBy !== null)),
-      actions: withActions,
-    }),
-    [groups, withActions],
+    () => ({ grantedBy: rows.some((row) => row.grantedBy !== null), actions: withActions }),
+    [rows, withActions],
   );
-  if (groups.length === 0) {
+  if (rows.length === 0) {
     return (
       <View style={settingsStyles.card}>
-        <View style={settingsStyles.row}>
+        <View style={[settingsStyles.row, tableStyles.body]}>
           <Text style={styles.muted}>{empty}</Text>
         </View>
       </View>
@@ -57,25 +53,16 @@ export function AccessGrantsTable({
   return (
     <View style={settingsStyles.card}>
       {compact ? null : <HeaderRow grouping={grouping} columns={columns} />}
-      {groups.map((group) => (
-        <View key={group.key}>
-          {groupHeaders ? (
-            <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.group]}>
-              <Text style={styles.groupTitle}>{group.title}</Text>
-              <Text style={styles.muted}>{group.subtitle}</Text>
-            </View>
-          ) : null}
-          {group.rows.map((row) => (
-            <GrantRowView
-              key={row.key}
-              row={row}
-              grouping={grouping}
-              compact={compact}
-              columns={columns}
-              actions={actions}
-            />
-          ))}
-        </View>
+      {rows.map((row, index) => (
+        <GrantRowView
+          key={row.key}
+          row={row}
+          bordered={!compact || index > 0}
+          grouping={grouping}
+          compact={compact}
+          columns={columns}
+          actions={actions}
+        />
       ))}
     </View>
   );
@@ -89,14 +76,14 @@ interface Columns {
 
 function HeaderRow({ grouping, columns }: { grouping: GrantGrouping; columns: Columns }) {
   return (
-    <View style={[settingsStyles.row, styles.tableRow, styles.header]}>
-      <Text style={[styles.headerCell, styles.thing]}>
+    <View style={[settingsStyles.row, styles.tableRow, tableStyles.header]}>
+      <Text style={[tableStyles.headerCell, styles.thing]}>
         {grouping === "subject" ? "Resource" : "Who"}
       </Text>
-      <Text style={[styles.headerCell, styles.level]}>Level</Text>
-      <Text style={[styles.headerCell, styles.details]}>Details</Text>
+      <Text style={[tableStyles.headerCell, styles.level]}>Level</Text>
+      <Text style={[tableStyles.headerCell, styles.details]}>Details</Text>
       {columns.grantedBy ? (
-        <Text style={[styles.headerCell, styles.grantedBy]}>Granted by</Text>
+        <Text style={[tableStyles.headerCell, styles.grantedBy]}>Granted by</Text>
       ) : null}
       {columns.actions ? <View style={styles.actions} /> : null}
     </View>
@@ -105,12 +92,14 @@ function HeaderRow({ grouping, columns }: { grouping: GrantGrouping; columns: Co
 
 function GrantRowView({
   row,
+  bordered,
   grouping,
   compact,
   columns,
   actions,
 }: {
   row: GrantRow;
+  bordered: boolean;
   grouping: GrantGrouping;
   compact: boolean;
   columns: Columns;
@@ -124,7 +113,14 @@ function GrantRowView({
   const trailing = actions === undefined ? null : <GrantRowActions row={row} actions={actions} />;
   if (compact) {
     return (
-      <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.card]}>
+      <View
+        style={[
+          settingsStyles.row,
+          bordered ? settingsStyles.rowBorder : null,
+          tableStyles.body,
+          styles.card,
+        ]}
+      >
         <View style={styles.cardTop}>
           <Thing name={thing.name} context={thing.context} />
           {trailing}
@@ -146,7 +142,14 @@ function GrantRowView({
     );
   }
   return (
-    <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.tableRow]}>
+    <View
+      style={[
+        settingsStyles.row,
+        bordered ? settingsStyles.rowBorder : null,
+        tableStyles.body,
+        styles.tableRow,
+      ]}
+    >
       <View style={styles.thing}>
         <Thing name={thing.name} context={thing.context} />
       </View>
@@ -224,14 +227,6 @@ function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantAction
 
 const styles = StyleSheet.create((theme) => ({
   tableRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[4] },
-  header: { paddingVertical: theme.spacing[2] },
-  headerCell: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
-  group: { backgroundColor: theme.colors.surface1, gap: theme.spacing[0.5] },
-  groupTitle: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
-  },
   thing: { flex: 3, minWidth: 0 },
   thingText: { flexShrink: 1, minWidth: 0, gap: theme.spacing[0.5] },
   level: { flex: 2, minWidth: 0 },

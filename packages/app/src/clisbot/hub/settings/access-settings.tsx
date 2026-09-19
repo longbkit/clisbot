@@ -3,7 +3,6 @@ import { Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { useFetchQuery } from "@/data/query";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -24,33 +23,24 @@ import {
 } from "../contracts";
 import { publicAccessRoutes } from "./access-overview";
 import { useMountedAccessScope } from "./access-mounted-scope";
-import { AccessGrantsTable } from "./access-grants-table";
-import {
-  aboveViewer,
-  grantRows,
-  grantedAccessLabel,
-  groupGrantRows,
-  type GrantGrouping,
-} from "./access-grant-rows";
+import { AccessBrowser } from "./access-browser";
+import { aboveViewer, grantRows, grantedAccessLabel } from "./access-grant-rows";
+import { useAccessBrowser } from "./use-access-browser";
 import { sharesAccess } from "./access-level-summary";
-import { SearchField } from "@/components/ui/search-field";
 import { GrantAccessContent } from "./access-assignment-form";
 import { MemberAccessSettings } from "./access-effective-section";
 import { AccessEventsSection } from "./access-events-section";
 import { holdsCanShareAnywhere, viewerAuthority, type ViewerAuthority } from "./access-grantor";
 import {
   assignmentSubjectOptions,
-  parseSubjectKey,
   resourceKey,
   subjectKey,
   type AccessAssignment,
   type AccessCatalog,
-  type AccessResource,
   type HubMember,
   type HubTeam,
   memberNamesByUserId,
 } from "./access-catalog";
-import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
 
 /** A Hub refusal the form shows in place; anything else shows at the top of the page. */
@@ -334,17 +324,7 @@ function ManagedAccessContent({
   save(body: unknown, batch?: boolean): Promise<void>;
   remove(assignmentId: string): Promise<void>;
 }) {
-  // Everything shows by default; a link for one person or resource starts
-  // grouped that way and searched for it.
-  const [grouping, setGrouping] = useState<GrantGrouping>(
-    initialResource === null ? "subject" : "resource",
-  );
   const directory = useAccessDirectory(members, teams);
-  const [search, setSearch] = useState(() =>
-    initialSearch(initialSubject, initialResource, catalog.resources, members, teams),
-  );
-  const grant = useCallback(() => edit(null), [edit]);
-  const changeGrouping = useCallback((value: string) => setGrouping(value as GrantGrouping), []);
   const rows = useMemo(
     () =>
       grantRows({
@@ -359,59 +339,37 @@ function ManagedAccessContent({
       }),
     [assignments, authority, catalog, directory.memberNameByUserId, members, teams],
   );
-  const groups = useMemo(
-    () => groupGrantRows(rows, grouping, search, { members, teams, resources: catalog.resources }),
-    [catalog.resources, grouping, members, rows, search, teams],
+  const grantDirectory = useMemo(
+    () => ({ members, teams, resources: catalog.resources }),
+    [catalog.resources, members, teams],
   );
+  const browser = useAccessBrowser({
+    initialSubject,
+    initialResource,
+    rows,
+    directory: grantDirectory,
+    edit,
+  });
   const grantActions = useMemo(() => ({ pending, edit, remove }), [edit, pending, remove]);
   const subjectOptions = assignmentSubjectOptions(members, teams);
-  const grantButton = useMemo(
-    () => (
-      <Button size="sm" disabled={pending} onPress={grant}>
-        Grant access…
-      </Button>
-    ),
-    [grant, pending],
-  );
   return (
     <View>
-      <SettingsSection
-        title="Access"
-        info={accessInfo(authority.unrestricted)}
-        trailing={grantButton}
-      >
-        <View style={styles.filters}>
-          <View style={styles.filterPicker}>
-            <SearchField
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search people, Teams, or resources"
-              clearAccessibilityLabel="Clear Access search"
-            />
-          </View>
-          <SegmentedControl
-            options={ACCESS_VIEWS}
-            value={grouping}
-            onValueChange={changeGrouping}
-            size="sm"
-          />
-        </View>
-        <AccessGrantsTable
-          groups={groups}
-          grouping={grouping}
-          empty={
-            search.trim().length > 0
-              ? "No grant matches this search."
-              : "No one has been granted access yet. Owners always have full access."
-          }
+      <SettingsSection title="Access" info={accessInfo(authority.unrestricted)}>
+        <AccessBrowser
+          entries={browser.entries}
+          grouping={browser.grouping}
+          onGroupingChange={browser.changeGrouping}
+          selectedKey={browser.selectedKey}
+          onSelect={browser.setSelectedKey}
           actions={grantActions}
+          grantTo={browser.grantTo}
         />
       </SettingsSection>
       {formOpen ? (
         <GrantAccessContent
           key={editing?.id ?? "new"}
-          initialSubject={initialSubject}
-          initialResource={initialResource}
+          initialSubject={browser.prefill.subject}
+          initialResource={browser.prefill.resource}
           editing={editing}
           cancelEdit={cancelEdit}
           assignableSubjects={subjectOptions.length}
@@ -440,28 +398,6 @@ function ManagedAccessContent({
       <PublicRoutesAccessSection />
     </View>
   );
-}
-
-/** Two ways to read the grants: by who holds them, or by what they are on. */
-const ACCESS_VIEWS: SegmentedControlOption<string>[] = [
-  { value: "subject", label: "People" },
-  { value: "resource", label: "Resources" },
-];
-
-/** A link for one person or resource opens searched for its name. */
-function initialSearch(
-  subject: string | null,
-  resource: string | null,
-  resources: readonly AccessResource[],
-  members: readonly HubMember[],
-  teams: readonly HubTeam[],
-): string {
-  if (resource !== null)
-    return resources.find((candidate) => resourceKey(candidate) === resource)?.name ?? "";
-  const parsed = parseSubjectKey(subject);
-  if (parsed?.kind === "team") return teams.find(({ id }) => id === parsed.id)?.name ?? "";
-  if (parsed?.kind === "member") return members.find(({ id }) => id === parsed.id)?.name ?? "";
-  return parsed?.kind === "guest" ? "Guest" : "";
 }
 
 /** The page's explanation, in its header's info tip rather than a box above the list. */

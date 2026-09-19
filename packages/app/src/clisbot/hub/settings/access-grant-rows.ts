@@ -1,5 +1,5 @@
 // The Access list as data: one row per grant (Who × Resource × Level and its
-// modifiers), grouped by who holds it or by what it is on, narrowed by search.
+// modifiers), grouped by who holds it or by what it is on.
 // Pure functions, no React: docs/features/access/access-screen.md.
 
 import {
@@ -118,24 +118,23 @@ export interface GrantDirectory {
 }
 
 /**
- * Grouped by who holds the grants or by what they are on, narrowed by search.
- * Grouped by people, a Member's group also lists what their Teams give them.
+ * Grouped by who holds the grants or by what they are on. Grouped by people, a
+ * Member's group also lists what their Teams give them; grouped by resource, a
+ * Project lists the Host grants that reach it.
  */
 export function groupGrantRows(
   rows: readonly GrantRow[],
   grouping: GrantGrouping,
-  search: string,
   directory: GrantDirectory,
 ): GrantGroup[] {
-  const query = search.trim().toLowerCase();
-  return grouping === "subject"
-    ? subjectGroups(rows, query, directory)
-    : resourceGroups(rows, query, directory.resources);
+  const groups =
+    grouping === "subject" ? subjectGroups(rows, directory) : resourceGroups(rows, directory);
+  for (const group of groups) group.rows = sortGrantRows(group.rows, grouping);
+  return groups;
 }
 
 function subjectGroups(
   rows: readonly GrantRow[],
-  query: string,
   directory: { members: readonly HubMember[]; teams: readonly HubTeam[] },
 ): GrantGroup[] {
   const groups = new Map<string, GrantGroup>();
@@ -151,10 +150,7 @@ function subjectGroups(
     groups.set(key, group);
   }
   addTeamRowsToMembers(groups, rows, directory);
-  return [...groups.values()]
-    .map((group) => narrow(group, query))
-    .filter((group): group is GrantGroup => group !== null)
-    .sort(bySubjectOrder);
+  return [...groups.values()].sort(bySubjectOrder);
 }
 
 /**
@@ -207,19 +203,17 @@ function reached(row: GrantRow, key: string, via: string): GrantRow {
 
 /**
  * A Project is also used through a Host grant that carries Project use, so the
- * Project lists those too ("via Host …"), for any Project listed or searched for.
+ * Project lists those too ("via Host …"). A Project reached only that way still
+ * gets a group: it is not a Project without access.
  */
 function addHostRowsToProjects(
   groups: Map<string, GrantGroup>,
   rows: readonly GrantRow[],
   resources: readonly AccessResource[],
-  query: string,
 ): void {
   for (const project of resources) {
     if (project.kind !== "project" || project.parent?.kind !== "daemon") continue;
     const key = `project:${project.id}`;
-    const searched = query.length > 0 && project.name.toLowerCase().includes(query);
-    if (!groups.has(key) && !searched) continue;
     const hostId = project.parent.id;
     const reachedRows = rows
       .filter(
@@ -241,11 +235,8 @@ function addHostRowsToProjects(
   }
 }
 
-function resourceGroups(
-  rows: readonly GrantRow[],
-  query: string,
-  resources: readonly AccessResource[],
-): GrantGroup[] {
+function resourceGroups(rows: readonly GrantRow[], directory: GrantDirectory): GrantGroup[] {
+  const { resources } = directory;
   const groups = new Map<string, GrantGroup>();
   for (const row of rows) {
     const key = `${row.resource.kind}:${row.resource.id}`;
@@ -258,11 +249,8 @@ function resourceGroups(
     group.rows.push(row);
     groups.set(key, group);
   }
-  addHostRowsToProjects(groups, rows, resources, query);
-  return [...groups.values()]
-    .map((group) => narrow(group, query))
-    .filter((group): group is GrantGroup => group !== null)
-    .sort(byResourceOrder);
+  addHostRowsToProjects(groups, rows, resources);
+  return [...groups.values()].sort(byResourceOrder);
 }
 
 const RESOURCE_ORDER: Partial<Record<AccessResourceKind, number>> = {
@@ -280,17 +268,19 @@ function byResourceOrder(left: GrantGroup, right: GrantGroup): number {
   return kind(left) - kind(right) || left.title.localeCompare(right.title);
 }
 
-/** The whole group when its title matches; otherwise only its matching rows. */
-function narrow(group: GrantGroup, query: string): GrantGroup | null {
-  if (query.length === 0 || matches(query, group.title, group.subtitle)) return group;
-  const rows = group.rows.filter((row) =>
-    matches(query, row.subject.name, row.resource.name, row.resource.context, row.via ?? ""),
+/** A subject's grants by resource, a resource's by who holds them; direct and via stay adjacent. */
+export function sortGrantRows(rows: readonly GrantRow[], grouping: GrantGrouping): GrantRow[] {
+  const order = (row: GrantRow) =>
+    grouping === "subject"
+      ? (RESOURCE_ORDER[row.resource.kind] ?? 9)
+      : SUBJECT_ORDER[row.subject.kind];
+  const name = (row: GrantRow) => (grouping === "subject" ? row.resource.name : row.subject.name);
+  return [...rows].sort(
+    (left, right) =>
+      order(left) - order(right) ||
+      name(left).localeCompare(name(right)) ||
+      Number(left.via !== null) - Number(right.via !== null),
   );
-  return rows.length === 0 ? null : { ...group, rows };
-}
-
-function matches(query: string, ...values: string[]): boolean {
-  return values.some((value) => value.toLowerCase().includes(query));
 }
 
 export function assignmentSubjectName(
@@ -395,12 +385,12 @@ function effectiveLevel(
   return countLabel(privileges.length, "privilege");
 }
 
-/** One subject's group (a Team's grants, or a Member's own and their Teams'). */
-export function subjectGrantGroups(
+/** One subject's grants: a Team's, or a Member's own and their Teams'. */
+export function subjectGrantRows(
   rows: readonly GrantRow[],
   subject: { kind: SubjectKind; id: string },
   directory: GrantDirectory,
-): GrantGroup[] {
+): GrantRow[] {
   const key = `${subject.kind}:${subject.id}`;
-  return groupGrantRows(rows, "subject", "", directory).filter((group) => group.key === key);
+  return groupGrantRows(rows, "subject", directory).find((group) => group.key === key)?.rows ?? [];
 }

@@ -31,64 +31,74 @@ One grant is **Who × Resource × Level**, plus two modifiers: **Can share**, an
 
 ## Layout
 
-The standard layout for this kind of screen (cloud IAM consoles, GitHub
-organization roles, workspace sharing) is **one list of grants**, not a picker
-you must fill in before anything shows:
+An organization has hundreds of Members and dozens of Teams, so the screen
+never lists every grant at once. It is **master and detail**, the layout cloud
+IAM consoles and GitHub use for the same job: pick one person, Team, or
+resource, then read only its grants.
 
 ```
-Access ⓘ                                              [Grant access…]
-[ Search people, Teams, resources            ]  [ People | Resources ]
+Access ⓘ
+View access by  [ People and Teams | Resources ]
 
- Who / Resource            Level           Details               Granted by
- ─ QC (Team · 3 Members) ─────────────────────────────────────────────────
-   LongPro2Max.local       Developer       Can share             Hoa     Edit …
-   Host
-   brain                   Office worker   Claude only           Hoa     Edit …
-   Project · LongPro2Max.local
- ─ Ai Tran (Member) ──────────────────────────────────────────────────────
-   Support                 Admin                                 Owner   Edit …
-   Connection
-   brain                   Office worker   via Team QC
+[ Search people and Teams ]            Ai Tran                [Grant access…]
+(With access 38) (Teams 12) (Members   ai@vexere.com
+ 25) (Guest 1) (No access 140)
+┌──────────────────────────────┐       Resource          Level      Details        Granted by
+│ QC            Team · 9       │       LongPro2Max       Developer  Can share      Hoa    Edit …
+│ Ai Tran       ai@…   3 grants│ ◀     Host · vexere.com
+│ Bao           bao@…  1 grant │       brain             Office     via Team QC    Hoa
+│ …                            │       Project · LongPro2Max
+│ Show 50 more of 312          │
+└──────────────────────────────┘
 ```
 
-- **Everything shows by default**, grouped. _People_ groups by who holds the
-  grants; _Resources_ groups by what they are on. Search narrows both.
-- **Columns hold one fact each**: the thing (name, then its kind and parent
-  under it), the Level, its modifiers, who granted it. No sentence joined
-  with "·" that has to be parsed.
-- **A Member's group also lists what their Teams give them**, marked "via Team
-  …", with no actions: that grant is edited on the Team. A Member whose only
-  access comes through Teams still gets a group.
-- **On a phone** a grant is a card: the thing, then Level, Details and Granted
-  by as labelled lines, with its actions at the top right.
-- Below the list, folded: **Access events** (job 4) and **Routes open to
-  anyone** (who can chat without any grant; it belongs to Channels and is
-  listed here only as exposure to review).
+- **View access by** names what the list holds: _People and Teams_ (who holds
+  grants) or _Resources_ (what grants are on). The label is part of the
+  control, so the switch reads as a choice of axis, not as a filter.
+- **The list scales by narrowing, not scrolling**: search (name or email),
+  kind chips with counts, and _No access_ for everyone or everything without a
+  grant. It shows 50 entries, then _Show more_. Members show their email, so
+  two with the same name are told apart.
+- **The detail is one entry's grants**, one fact per column: the thing (name,
+  then its kind and parent), the Level, its modifiers, who granted it. A
+  custom grant reads _Custom · N privileges_; the list is in the grant sheet.
+- **A Member's grants include their Teams'**, marked "via Team …", with no
+  actions: that grant is edited on the Team. A Project lists the Host grants
+  that reach it, marked "via Host …". Either way the entry counts as having
+  access.
+- **Side by side only when both fit** (about 880px of Settings column);
+  narrower, and on a phone, the list is one screen and the entry another, with
+  a back link. On a phone a grant is a card with labelled lines.
+- Below, folded: **Access events** (job 4) and **Routes open to anyone** (who
+  can chat without any grant; it belongs to Channels and is listed here only
+  as exposure to review).
 
 ## Interaction
 
-- **Grant access…** in the header opens the grant sheet. It opens pre-filled
-  when the page was reached for one person or resource (a Member's _Manage
-  access_, a Connection's _Manage Admins_).
+- **Grant access…** is on the open entry and opens the grant sheet pre-filled
+  with it. A link for one person or resource (a Member's _Manage access_, a
+  Connection's _Manage Admins_) opens the screen on that entry.
 - **Edit** on a row opens the same sheet for that grant. **Remove** is in the
   row's **…** menu, with a confirmation, so it is never next to Edit.
 - A grant above the viewer's own level shows **Above your level** instead of
   actions: they can see it, not change it.
-- A Member who manages no one sees the same list, read-only, of their own
+- A Member who manages no one sees the same table, read-only, of their own
   access, with Levels named from the catalog the Hub sends with it. Who
   granted each is not part of that view, so the column is absent.
 - A Team's and a Member's detail pages show their grants in the same table
-  (`SubjectGrantsTable`), read-only, without the group header the page
-  already names. Change them with **Manage access**, which opens this screen
-  for them.
+  (`SubjectGrantsTable`), read-only. Change them with **Manage access**, which
+  opens this screen on them.
 
 ## Components and readability
 
-- The list is `settingsStyles.card` rows in a header-row table on wide screens
-  (the same pattern as People › Members), cards on a phone.
+- The master-detail shape is the one Channels › Channel Integrations uses;
+  the list chips are `FilterChips`, search is `SearchField`, the axis is a
+  labelled `SegmentedControl`, row actions are **Edit** plus
+  `RowActionsMenu`, explanations are the header's info tip.
+- Surfaces come from `table-styles.ts`, shared by every Hub table and
+  selectable list: a grey header row, white rows, and a selected row a full
+  step darker. A plain settings card (surface1) is too close to surface2 for a
+  header or a selection to read against it.
 - The thing's name and the Level are foreground text at base size; kinds,
   parents, modifiers and Granted by are muted at base size. Nothing a reader
   must act on is in the small size.
-- Search is `SearchField`; the grouping is `SegmentedControl`; row actions
-  are an **Edit** button plus `RowActionsMenu`; section explanations are the
-  header's info tip, never a paragraph above the list.

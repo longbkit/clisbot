@@ -68,7 +68,7 @@ describe("grantRows", () => {
 
 describe("groupGrantRows", () => {
   it("groups by people, Teams first, and lists a Member's Team grants under them, not editable", () => {
-    const groups = groupGrantRows(rows, "subject", "", directory);
+    const groups = groupGrantRows(rows, "subject", directory);
     expect(groups.map(({ title, subtitle }) => [title, subtitle])).toEqual([
       ["QC", "Team · 1 Member"],
       ["Ai Tran", "Member"],
@@ -81,17 +81,8 @@ describe("groupGrantRows", () => {
   });
 
   it("groups by resource, Hosts before Projects", () => {
-    const groups = groupGrantRows(rows, "resource", "", directory);
+    const groups = groupGrantRows(rows, "resource", directory);
     expect(groups.map(({ title }) => title)).toEqual(["LongPro2Max", "brain"]);
-  });
-
-  it("narrows to matching groups or rows, and finds a Member who only has Team grants", () => {
-    expect(groupGrantRows(rows, "resource", "brain", directory).map(({ title }) => title)).toEqual([
-      "brain",
-    ]);
-    const onlyTeam = groupGrantRows([rows[0]!], "subject", "tran", directory);
-    expect(onlyTeam.map(({ title }) => title)).toEqual(["Ai Tran"]);
-    expect(onlyTeam[0]!.rows[0]!.via).toBe("Team QC");
   });
 
   it("lists a Host grant that carries Project use under each Project, not editable there", () => {
@@ -114,7 +105,9 @@ describe("groupGrantRows", () => {
       sharesAccess: () => false,
       locked: () => false,
     });
-    const brain = groupGrantRows(hostGrant, "resource", "brain", directory);
+    const brain = groupGrantRows(hostGrant, "resource", directory).filter(
+      ({ key }) => key === "project:brain",
+    );
     expect(brain.map(({ title, subtitle }) => [title, subtitle])).toEqual([
       ["brain", "Project · LongPro2Max"],
     ]);
@@ -134,15 +127,15 @@ describe("groupGrantRows", () => {
       sharesAccess: () => false,
       locked: () => false,
     });
-    expect(groupGrantRows(guestRows, "subject", "", directory)[0]).toMatchObject({
+    expect(groupGrantRows(guestRows, "subject", directory)[0]).toMatchObject({
       title: "Guest",
       subtitle: "Channel senders without a linked Member",
     });
-    const left = groupGrantRows(rows, "subject", "tran", {
+    const left = groupGrantRows(rows, "subject", {
       ...directory,
       teams: [{ ...teams[0]!, userIds: [] }],
-    });
-    expect(left.flatMap((group) => group.rows).map((row) => row.via)).toEqual([null]);
+    }).find(({ key }) => key === "member:m-ai");
+    expect(left!.rows.map((row) => row.via)).toEqual([null]);
   });
 });
 
@@ -158,7 +151,7 @@ describe("Team-only access", () => {
       sharesAccess: () => false,
       locked: () => false,
     });
-    const groups = groupGrantRows(teamOnly, "subject", "", directory);
+    const groups = groupGrantRows(teamOnly, "subject", directory);
     expect(groups.map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
     expect(groups[1]!.rows[0]).toMatchObject({ via: "Team QC", assignment: null });
   });

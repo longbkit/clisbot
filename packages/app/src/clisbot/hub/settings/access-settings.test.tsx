@@ -463,7 +463,8 @@ describe("Access assignment editing", () => {
       return resources[resource];
     });
     renderAccess();
-    fireEvent.click((await screen.findAllByRole("button", { name: "Edit" }))[0]!);
+    // Rows read Host first, then its Project: edit the Project's.
+    fireEvent.click((await screen.findAllByRole("button", { name: "Edit" })).at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
     // The Host row is left alone: a Project sharer who cannot share the Host must not rewrite it.
@@ -976,12 +977,10 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     expect(screen.getByText("Above your own level, not offered: Developer")).toBeTruthy();
     // The Developer row on the same Project is above the viewer: no Edit, no Remove.
     expect(screen.getAllByText("Above your level")).toHaveLength(1);
-    // Opened for Member One: the Team grant shows under them, edited on the Team.
+    // Opened on Member One: the Team grant shows under them, edited on the Team.
     expect(screen.getByText("via Team QC")).toBeTruthy();
     expect(screen.queryAllByRole("button", { name: "Edit" })).toHaveLength(0);
-    fireEvent.change(screen.getByLabelText("Search people, Teams, or resources"), {
-      target: { value: "" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^QC/u }));
     expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
   });
 

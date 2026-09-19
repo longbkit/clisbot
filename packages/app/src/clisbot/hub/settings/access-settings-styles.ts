@@ -14,18 +14,6 @@ export const accessSettingsStyles = StyleSheet.create((theme) => ({
   sheetForm: {
     gap: theme.spacing[4],
   },
-  // View-by switch and its one picker on one line; the picker wraps under on a phone.
-  filters: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: theme.spacing[3],
-  },
-  filterPicker: {
-    flexGrow: 1,
-    flexBasis: 280,
-    minWidth: 0,
-  },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
+import { tableStyles } from "../table-styles";
 import { MemberChatCell } from "./member-chat-cell";
 import { memberTeamNames, type MemberDirectoryRow } from "./member-directory";
 import { MemberRoleSelect } from "./member-role-select";
@@ -95,7 +96,7 @@ export function MemberRow({
   // A phone has no room for columns: the row becomes a card, each value labelled.
   if (compact)
     return (
-      <View style={[settingsStyles.row, border, styles.stackedRow]}>
+      <View style={[settingsStyles.row, border, tableStyles.body, styles.stackedRow]}>
         <View>{identity}</View>
         <LabelledCell label="Teams">{teamsCell}</LabelledCell>
         {chatCell === null ? null : <LabelledCell label="Chat">{chatCell}</LabelledCell>}
@@ -103,7 +104,7 @@ export function MemberRow({
       </View>
     );
   return (
-    <View style={[settingsStyles.row, border, styles.tableRow]}>
+    <View style={[settingsStyles.row, border, tableStyles.body, styles.tableRow]}>
       <View style={styles.memberColumn}>{identity}</View>
       <View style={styles.teamsColumn}>{teamsCell}</View>
       {chat === undefined ? null : <View style={styles.chatColumn}>{chatCell}</View>}
@@ -119,12 +120,12 @@ export function MemberRow({
 export function MemberTableHeader({ chat, role }: { chat: boolean; role: boolean }) {
   if (useIsCompactFormFactor()) return null;
   return (
-    <View style={[settingsStyles.row, styles.tableRow, styles.header]}>
-      <Text style={[styles.cellLabel, styles.memberColumn]}>Member</Text>
-      <Text style={[styles.cellLabel, styles.teamsColumn]}>Teams</Text>
-      {chat ? <Text style={[styles.cellLabel, styles.chatColumn]}>Chat</Text> : null}
+    <View style={[settingsStyles.row, styles.tableRow, tableStyles.header]}>
+      <Text style={[tableStyles.headerCell, styles.memberColumn]}>Member</Text>
+      <Text style={[tableStyles.headerCell, styles.teamsColumn]}>Teams</Text>
+      {chat ? <Text style={[tableStyles.headerCell, styles.chatColumn]}>Chat</Text> : null}
       <View style={styles.trailing}>
-        {role ? <Text style={[styles.cellLabel, styles.roleHeading]}>Role</Text> : null}
+        {role ? <Text style={[tableStyles.headerCell, styles.roleHeading]}>Role</Text> : null}
         <View style={styles.menuSpace} />
       </View>
     </View>
@@ -142,7 +143,6 @@ function LabelledCell({ label, children }: { label: string; children: React.Reac
 
 const styles = StyleSheet.create((theme) => ({
   tableRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[4] },
-  header: { paddingVertical: theme.spacing[2] },
   memberColumn: { flex: 3, minWidth: 0 },
   teamsColumn: { flex: 2, minWidth: 0 },
   chatColumn: { flex: 3, minWidth: 0 },
