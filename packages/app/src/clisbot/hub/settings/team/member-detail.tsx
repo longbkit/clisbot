@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import { MemberTeamsSection } from "./member-teams-section";
 import { canManageTeamMembership } from "./team-membership";
 import type { HubAccount, HubMember, TeamResources } from "./types";
 import type { TeamActions } from "./use-team-actions";
+import { BackLink } from "../back-link";
 
 export function SelectedMemberDetail({
   hub,
@@ -45,12 +45,8 @@ export function SelectedMemberDetail({
   );
   return (
     <View>
+      <BackLink to="People" onPress={back} disabled={pending} />
       <SettingsSection title={member.name}>
-        <View style={styles.actions}>
-          <Button size="xs" variant="outline" disabled={pending} onPress={back}>
-            Back to People
-          </Button>
-        </View>
         {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
         {member.role === "owner" ? (
           <Alert
@@ -139,7 +135,3 @@ function MemberDangerZone({
     </SettingsSection>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
-}));

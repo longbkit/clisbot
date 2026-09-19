@@ -17,6 +17,7 @@ import { HubChannelActivitySchema, HubConnectionsSchema } from "../contracts";
 import { channelCatalogLabel, type ChannelCatalogEntry } from "../channel-catalog";
 import { hubResourceQueryKey } from "../query-keys";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
+import { BackLink } from "./back-link";
 
 type ActivityPage = z.infer<typeof HubChannelActivitySchema>;
 type ActivityEntry = ActivityPage["activity"][number];
@@ -497,12 +498,10 @@ function ChannelActivityDetails({
   const recovery = entry.outcome === "ignored" ? channelAccessRecovery(entry.outcomeDetail) : null;
   return (
     <View style={styles.results}>
+      <BackLink to="Activity" onPress={back} />
       <Text style={settingsStyles.rowHint}>
         Route positions describe the configuration when this event was recorded.
       </Text>
-      <Button size="sm" variant="ghost" onPress={back}>
-        Back to activity
-      </Button>
       <View style={settingsStyles.card}>
         <ActivityDetail
           label={`${routeLabel(entry)} · ${outcomeLabel(entry)}`}
@@ -619,7 +618,11 @@ function ChannelAccessRecovery({
     [connectionId, router],
   );
   const manageAccess = useCallback(
-    () => router.push({ pathname: "/settings/hub/[hubSection]", params: { hubSection: "access" } }),
+    () =>
+      router.push({
+        pathname: "/settings/hub/[hubSection]",
+        params: { hubSection: "team", view: "access" },
+      }),
     [router],
   );
   return (

@@ -18,7 +18,6 @@ import {
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
-import { ArrowLeft } from "lucide-react-native";
 import { ScreenTitle } from "@/components/headers/screen-title";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Alert } from "@/components/ui/alert";
@@ -79,6 +78,7 @@ import {
   type ManagedAgentConfigurationValue,
 } from "./managed-agent-configuration-fields";
 import { AutomationActivity } from "./automation-run-details";
+import { BackLink } from "./back-link";
 
 export interface AutomationConnection {
   id: string;
@@ -363,26 +363,20 @@ function AutomationDetailHeading({
   disabled?: boolean;
 }) {
   return (
-    <View style={styles.detailHeading}>
-      <Button
-        size="sm"
-        variant="ghost"
-        accessibilityLabel="Back to Automations"
-        disabled={disabled}
-        onPress={close}
-      >
-        <ArrowLeft style={styles.chevron} />
-      </Button>
-      <View style={styles.headingTitle}>
-        <ScreenTitle>{name}</ScreenTitle>
+    <>
+      <BackLink to="Automations" onPress={close} disabled={disabled} />
+      <View style={styles.detailHeading}>
+        <View style={styles.headingTitle}>
+          <ScreenTitle>{name}</ScreenTitle>
+        </View>
+        {enabled !== undefined ? (
+          <StatusBadge
+            label={enabled ? "Active" : "Disabled"}
+            variant={enabled ? "success" : "muted"}
+          />
+        ) : null}
       </View>
-      {enabled !== undefined ? (
-        <StatusBadge
-          label={enabled ? "Active" : "Disabled"}
-          variant={enabled ? "success" : "muted"}
-        />
-      ) : null}
-    </View>
+    </>
   );
 }
 
@@ -2134,11 +2128,6 @@ const styles = StyleSheet.create((theme) => ({
   hidden: { display: "none" },
   listRow: { minHeight: theme.spacing[12], borderRadius: theme.borderRadius.lg },
   highlight: { backgroundColor: theme.colors.interactionHighlight },
-  chevron: {
-    width: theme.iconSize.sm,
-    height: theme.iconSize.sm,
-    color: theme.colors.foregroundMuted,
-  },
   detailHeading: {
     flexDirection: "row",
     alignItems: "center",

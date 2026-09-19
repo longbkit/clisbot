@@ -206,7 +206,7 @@ they change where the conversation goes:
 
 Each route carries **audience rules**. A rule is one sentence, "[who] may talk
 in [where]", and a sender is admitted when any rule of the route matches.
-Rules are the only place that decides who may chat; the Access page grants
+Rules are the only place that decides who may chat; the People › Access tab grants
 only **Connection Admin**.
 
 - **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,

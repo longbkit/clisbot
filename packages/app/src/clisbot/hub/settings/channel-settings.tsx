@@ -35,7 +35,7 @@ import {
   type ReactElement,
   type SetStateAction,
 } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp } from "lucide-react-native";
+import { ArrowDown, ArrowUp } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
 import { ConnectionSettingRow, ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
@@ -142,6 +142,8 @@ import {
   worktreeTargetFromConfiguration,
 } from "../workspace-configuration";
 import { type AutomationConnection, SingleAgentAutomationForm } from "./automation-settings";
+import { BackLink } from "./back-link";
+import { useWideContent } from "./wide-content";
 
 type RecordValue = ChannelConfigurationRecord;
 type RouteTarget = "agent" | "automation";
@@ -200,6 +202,9 @@ export function ChannelSettings({
   automationName,
   embedded = false,
 }: Partial<AutomationChannelScope> & { embedded?: boolean } = {}) {
+  // One width for every Channels tab and page (Channel Integrations is two
+  // columns), so switching never resizes it. Not when embedded in an Automation.
+  useWideContent(!useIsCompactFormFactor() && automationName === undefined);
   const hub = useHubAccount();
   const router = useRouter();
   const adminScope = useChannelRouteAdminScope();
@@ -1065,7 +1070,7 @@ function AutomationChannelAccount({
 
 function ChannelRouteEditorHeader({
   title,
-  backLabel = "Back to Connections",
+  backTo = "Connections",
   pending,
   error,
   back,
@@ -1074,15 +1079,15 @@ function ChannelRouteEditorHeader({
   pending: boolean;
   error: string | null;
   back(): void;
-  backLabel?: string;
+  backTo?: string;
 }) {
   return (
-    <SettingsSection title={title}>
-      <Button size="sm" variant="outline" disabled={pending} onPress={back}>
-        {backLabel}
-      </Button>
-      {error ? <Alert variant="error" title={error} /> : null}
-    </SettingsSection>
+    <>
+      <BackLink to={backTo} onPress={back} disabled={pending} />
+      <SettingsSection title={title}>
+        {error ? <Alert variant="error" title={error} /> : null}
+      </SettingsSection>
+    </>
   );
 }
 
@@ -1158,17 +1163,7 @@ function ChannelAccountsSection({
         </View>
       ) : (
         // An open Connection is a page of its own: the way back leads it.
-        <View style={styles.backRow}>
-          <Button
-            size="sm"
-            variant="ghost"
-            leftIcon={ArrowLeft}
-            onPress={closeAccount}
-            accessibilityLabel="Back to Connections"
-          >
-            Connections
-          </Button>
-        </View>
+        <BackLink to="Connections" onPress={closeAccount} />
       )}
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
       {testResult ? <Alert variant="success" title={testResult} /> : null}
@@ -1282,7 +1277,7 @@ function ChannelManagementSection({
       <View>
         <ChannelRouteEditorHeader
           title={title}
-          backLabel={automationName ? "Back to Automation inputs" : undefined}
+          backTo={automationName ? "Automation inputs" : undefined}
           pending={pending}
           error={error}
           back={cancelRouteEdit}
@@ -1299,7 +1294,7 @@ function ChannelManagementSection({
     <>
       <ChannelRouteEditorHeader
         title={title}
-        backLabel={automationName ? "Back to Automation inputs" : undefined}
+        backTo={automationName ? "Automation inputs" : undefined}
         pending={pending || connectionPending}
         error={error}
         back={cancelRouteEdit}
@@ -1335,9 +1330,7 @@ function ChannelManagementSection({
             disabled={connectionPending}
             create={submitConnection}
           />
-          <Button variant="outline" disabled={connectionPending} onPress={closeConnection}>
-            Back to the Route
-          </Button>
+          <BackLink to="the Route" onPress={closeConnection} disabled={connectionPending} />
         </View>
       ) : null}
     </>
@@ -1796,13 +1789,12 @@ function ConnectionStatusRow({
   );
 }
 
-/** The provider account the Connection signs in as. Its credential is edited on the Connections page. */
+/**
+ * The provider account the Connection signs in as, shown in place. The Hub has
+ * no way to swap a stored credential yet: to use another token, connect a new
+ * Connection and point the Routes at it.
+ */
 function ConnectionCredentialRow({ connection }: { connection: HubConnection | undefined }) {
-  const router = useRouter();
-  const openConfiguration = useCallback(
-    () => router.push(buildHubSettingsRoute("configuration")),
-    [router],
-  );
   const status = connection?.status === "connected" ? "Connected" : "Not connected";
   return (
     <ConnectionSettingRow
@@ -1810,13 +1802,22 @@ function ConnectionCredentialRow({ connection }: { connection: HubConnection | u
       value={`${channelConnectionLabel(connection)} · ${status}`}
     >
       <View style={[settingsStyles.row, styles.statusPanel]}>
-        <Text style={settingsStyles.rowHint}>
-          The bot token or app credential this Connection signs in with. Replacing or disconnecting
-          it is done where credentials are managed.
-        </Text>
-        <Button size="sm" variant="outline" onPress={openConfiguration}>
-          Manage credential
-        </Button>
+        {connection === undefined ? (
+          <Text style={settingsStyles.rowHint}>
+            This Connection&apos;s credential is unavailable.
+          </Text>
+        ) : (
+          <>
+            <Text
+              style={settingsStyles.rowHint}
+            >{`Signs in as ${connection.externalName ?? connection.name}`}</Text>
+            <Text style={settingsStyles.rowHint}>{`Saved as ${connection.name} · ${status}`}</Text>
+            <Text style={settingsStyles.rowHint}>
+              To use another bot token, connect a new one from Add Route, then move this
+              Connection&apos;s Routes to it.
+            </Text>
+          </>
+        )}
       </View>
     </ConnectionSettingRow>
   );
@@ -1938,7 +1939,7 @@ function ChannelRouteAdmins({
     () =>
       router.push({
         pathname: "/settings/hub/[hubSection]",
-        params: { hubSection: "access", resourceKind: "channel_account", resourceId },
+        params: { hubSection: "team", view: "access", resourceKind: "channel_account", resourceId },
       }),
     [router, resourceId],
   );
@@ -4306,7 +4307,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.semibold,
   },
-  backRow: { alignItems: "flex-start" },
   statusPanel: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[2] },
   formActions: {
     gap: theme.spacing[2],

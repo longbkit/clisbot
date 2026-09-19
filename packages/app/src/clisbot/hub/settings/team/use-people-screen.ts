@@ -13,10 +13,9 @@ export function usePeopleSelection() {
   const back = useCallback(() => setSelection(undefined), []);
   const manageAccess = useCallback(() => {
     if (selection === undefined) return;
-    router.push({
-      pathname: "/settings/hub/[hubSection]",
-      params: { hubSection: "access", subjectKind: selection.kind, subjectId: selection.id },
-    });
+    // Access is People's own tab: switch to it with this Member or Team chosen.
+    router.setParams({ view: "access", subjectKind: selection.kind, subjectId: selection.id });
+    setSelection(undefined);
   }, [router, selection]);
   return { selection, setSelection, back, manageAccess };
 }

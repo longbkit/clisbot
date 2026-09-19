@@ -438,6 +438,13 @@ vi.mock("@/components/ui/alert", () => ({
     </div>
   ),
 }));
+vi.mock("./back-link", () => ({
+  BackLink: ({ to, onPress }: { to: string; onPress(): void }) => (
+    <button type="button" onClick={onPress}>
+      {`Back to ${to}`}
+    </button>
+  ),
+}));
 vi.mock("@/components/ui/button", () => ({
   Button: ({
     onPress,
@@ -825,22 +832,19 @@ describe("Teams", () => {
     expect(screen.getByText("1 Connection")).toBeTruthy();
     expect(screen.getByText("No access")).toBeTruthy();
   });
-  it("does not show access data or invitations to a Member who cannot manage them", () => {
+  it("shows a Member who manages no one only the Access tab, for their own access", () => {
     hub.signedIn = {
       account,
       organization: { id: "organization" },
       capabilities: { manageMembers: false, manageOwners: false, manageResources: false },
     };
-    const ui = render(<HubSettingsContent section="team" />);
-    expect(screen.queryByRole("button", { name: "Invite people" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "Invitations" })).toBeNull();
-    expect(screen.queryByLabelText("Role")).toBeNull();
-    ui.unmount();
     route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
-    expect(screen.queryByRole("button", { name: "New Team" })).toBeNull();
-    expect(screen.getByText("1 Member")).toBeTruthy();
-    expect(screen.queryByText("No access")).toBeNull();
+    expect(screen.getByRole("tab", { name: "Access" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Teams" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Invitations" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Invite people" })).toBeNull();
+    expect(screen.queryByLabelText("Role")).toBeNull();
   });
 });
 
@@ -884,18 +888,21 @@ describe("Team access navigation", () => {
     render(<HubSettingsContent section="team" />);
     openMember("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
-    expect(fixtures.push).toHaveBeenCalledWith({
-      pathname: "/settings/hub/[hubSection]",
-      params: { hubSection: "access", subjectKind: "member", subjectId: "membership-1" },
+    // Access is People's own tab: it opens there with this Member chosen.
+    expect(route.params).toMatchObject({
+      view: "access",
+      subjectKind: "member",
+      subjectId: "membership-1",
     });
   });
   it("preserves the Team context when managing access", () => {
     openTeam("Support");
     openTab("Access");
     fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
-    expect(fixtures.push).toHaveBeenCalledWith({
-      pathname: "/settings/hub/[hubSection]",
-      params: { hubSection: "access", subjectKind: "team", subjectId: "team-1" },
+    expect(route.params).toMatchObject({
+      view: "access",
+      subjectKind: "team",
+      subjectId: "team-1",
     });
   });
 });
@@ -967,25 +974,44 @@ describe("Team detail Members", () => {
   });
 });
 
-describe("Configuration Channel Connection entry", () => {
-  it("uses the shared catalog-driven form, retains failed drafts, and closes after saved", async () => {
-    fixtures.post.mockRejectedValueOnce(new Error("Token invalid"));
-    render(<HubSettingsContent section="configuration" />);
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Connection" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save Telegram" }));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Token invalid"));
-    expect(screen.getByRole("button", { name: "Save Telegram" })).toBeTruthy();
-    fixtures.post.mockResolvedValueOnce({});
-    fireEvent.click(screen.getByRole("button", { name: "Save Telegram" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Save Telegram" })).toBeNull());
-    expect(fixtures.post).toHaveBeenLastCalledWith(
-      "connections",
-      { provider: "telegram", accountId: "support", credentials: { botToken: "secret-token" } },
-      expect.anything(),
-    );
-    expect(fixtures.queries.connections!.refetch).toHaveBeenCalledOnce();
-    const hosts = screen.getByRole("heading", { name: "Managed Hosts" }).closest("section")!;
-    fireEvent.click(within(hosts).getByRole("button", { name: "Refresh" }));
+describe("Integrations and Hosts", () => {
+  it("lists connected apps, not the Channel bots Routes use, and locks Disconnect while in use", () => {
+    fixtures.queries.connections = query({
+      connections: [
+        {
+          id: "bot",
+          provider: "slack",
+          providerApplicationId: null,
+          name: "support-bot",
+          externalName: "VeXeRe",
+          status: "connected",
+          consumers: [
+            { resourceKind: "channel_account", resourceId: "slack/support", name: "support" },
+          ],
+        },
+        {
+          id: "gh",
+          provider: "github",
+          providerApplicationId: "app",
+          name: "acme",
+          externalName: "acme-org",
+          status: "connected",
+          consumers: [{ resourceKind: "automation", resourceId: "triage", name: "triage" }],
+        },
+      ],
+      providerApplications: [],
+    });
+    render(<HubSettingsContent section="integrations" />);
+    expect(screen.getByText("Github · acme")).toBeTruthy();
+    expect(screen.getByText("Used by triage")).toBeTruthy();
+    // The Channel bot a Route uses is a Connection under Channels, not an integration.
+    expect(screen.queryByText("Slack · support-bot")).toBeNull();
+  });
+
+  it("lists enrolled Hosts on their own page", () => {
+    render(<HubSettingsContent section="hosts" />);
+    expect(screen.getByText("No Host is enrolled in this organization yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(fixtures.queries.daemons!.refetch).toHaveBeenCalledOnce();
   });
 });

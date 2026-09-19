@@ -234,7 +234,7 @@ describe("Channel activity pages and detail recovery", () => {
     fireEvent.change(screen.getByLabelText("Connection"), {
       target: { value: "slack:support" },
     });
-    expect(screen.queryByRole("button", { name: "Back to activity" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back to Activity" })).toBeNull();
     await waitFor(() =>
       expect(fixture.get).toHaveBeenLastCalledWith(
         "channel-activity?limit=25&channel=slack&accountId=support",

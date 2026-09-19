@@ -106,6 +106,25 @@ Auto-accept:
   Permissions and Advanced options sit in What runs as ordinary rows: no rule
   line, no bold heading; Permissions has no heading over its two labelled
   fields.
+- **Hub settings, one destination per job** (option A, chosen 2026-09-19):
+  Account · Channels · Automations · People · Hosts · Integrations, plus
+  Instance settings for the Hub operator. Configuration was a drawer of four
+  unrelated jobs; it splits into **Hosts** (enrolled machines, formerly Managed
+  Hosts), **Integrations** (connected apps such as a GitHub App install, and API
+  keys; a Channel bot a Route uses is not listed, it is a Connection under
+  Channels, and the Channels "Add Channel Connection" duplicate is gone), and
+  **Instance settings** (Provider applications). **Access is a tab of People**:
+  managing people and what they may use is one job; a Member who manages no one
+  sees Access alone, their own access. The moved slugs `access` and
+  `configuration` redirect (`MOVED_HUB_SECTIONS`, `packages/app/src/clisbot/hub/navigation.ts`)
+  because the Hub still links to them. A Connection's Credential row shows the
+  provider account in place; there is no API to swap a stored credential yet.
+- **One page, one width.** A page with tabs or sub-pages keeps one column width
+  throughout, so switching never resizes it: People and Channels ask for the
+  wide column on wide screens (`useWideContent`); every other page keeps 720.
+- **The way back is a link, first on the page:** "← People", "← Connections",
+  "← Activity" (`BackLink`), not a boxed "Back to …" button among the page's
+  actions.
 - **An audience rule reads as its sentence, then Who, then Where.** Rules
   fold like an accordion: one is open at a time, a lone rule starts open, and
   Add rule opens the new one and folds the rest to the same Who / Where lines.

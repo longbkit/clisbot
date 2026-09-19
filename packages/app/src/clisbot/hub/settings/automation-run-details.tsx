@@ -10,6 +10,7 @@ import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
 import { HubAutomationRunDetailsSchema, type HubAutomationActivitySchema } from "../contracts";
 import { hubResourceQueryKey } from "../query-keys";
+import { BackLink } from "./back-link";
 
 type Activity = z.infer<typeof HubAutomationActivitySchema>;
 type RunDetails = z.infer<typeof HubAutomationRunDetailsSchema>;
@@ -139,22 +140,26 @@ export function AutomationRunDetails({
     [details.isFetching, refresh],
   );
   return (
-    <SettingsSection title="Run details" trailing={refreshAction}>
-      <Button size="sm" variant="outline" onPress={close}>
-        Back to Activity
-      </Button>
-      {details.isPending ? (
-        <Text style={settingsStyles.rowHint}>Loading run details...</Text>
-      ) : null}
-      {details.error ? (
-        <Alert variant="error" title="Run details unavailable" description={details.error.message}>
-          <Button size="sm" variant="outline" onPress={refresh}>
-            Retry
-          </Button>
-        </Alert>
-      ) : null}
-      {details.data ? <RunSummary details={details.data} /> : null}
-    </SettingsSection>
+    <>
+      <BackLink to="Activity" onPress={close} />
+      <SettingsSection title="Run details" trailing={refreshAction}>
+        {details.isPending ? (
+          <Text style={settingsStyles.rowHint}>Loading run details...</Text>
+        ) : null}
+        {details.error ? (
+          <Alert
+            variant="error"
+            title="Run details unavailable"
+            description={details.error.message}
+          >
+            <Button size="sm" variant="outline" onPress={refresh}>
+              Retry
+            </Button>
+          </Alert>
+        ) : null}
+        {details.data ? <RunSummary details={details.data} /> : null}
+      </SettingsSection>
+    </>
   );
 }
 

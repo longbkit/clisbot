@@ -1156,6 +1156,7 @@ function SettingsSidebar({
   const hubItems = hubSettingsNavigationItems({
     signedIn: hub.signedIn !== null,
     canManage: canManageHub,
+    isInstanceOperator: hub.state?.status === "active" && hub.state.isInstanceOperator,
     // Owners have `canManage`, so the effective read only ever runs for plain Members.
     grants: effectiveHubAccess.data?.grants.map(({ resource, privileges }) => ({
       resourceKind: resource.kind,

@@ -12,6 +12,7 @@ import { TeamSettingsTab } from "./team-settings-tab";
 import type { HubAccount, HubTeam, TeamResources } from "./types";
 import { useTeamAdminAction } from "./use-people-actions";
 import type { TeamActions } from "./use-team-actions";
+import { BackLink } from "../back-link";
 
 type TeamView = "members" | "access" | "settings";
 
@@ -60,11 +61,9 @@ export function SelectedTeamDetail({
   const invite = useCallback(() => addPeople(team), [addPeople, team]);
   return (
     <View>
+      <BackLink to="People" onPress={back} disabled={pending} />
       <SettingsSection title={team.name}>
         <View style={styles.actions}>
-          <Button size="xs" variant="outline" disabled={pending} onPress={back}>
-            Back to People
-          </Button>
           {canInvite ? (
             <Button size="xs" variant="outline" disabled={pending} onPress={invite}>
               Add people

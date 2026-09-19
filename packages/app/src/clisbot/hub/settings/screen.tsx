@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
@@ -17,34 +16,20 @@ import { OrganizationHeader } from "./organization-header";
 import { OrganizationSelection } from "./organization-selection";
 import { ChannelIdentitiesSection } from "./channel-identities-section";
 import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-entry-form";
-import {
-  HubConnectionContinuationSchema,
-  HubConnectionSchema,
-  HubConnectionsSchema,
-  HubDaemonsSchema,
-  invitationTeams,
-  type HubAccountState,
-} from "../contracts";
+import { invitationTeams, type HubAccountState } from "../contracts";
 import { type HubSectionSlug } from "../navigation";
-import { confirmDialog } from "@/utils/confirm-dialog";
 import { ChannelSettings } from "./channel-settings";
-import { AddChannelConnection } from "./channel-connection-add";
-import { ManagedHostRow } from "./managed-host-row";
 import { AutomationSettings } from "./automation-settings";
-import { AccessSettings } from "./access-settings";
-import { ApiKeySettings } from "./api-key-settings";
+import { HostsSettings } from "./hosts-settings";
+import { InstanceSettings } from "./instance-settings";
+import { IntegrationsSettings } from "./integrations-settings";
 import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
-import { ProviderApplicationSettings } from "./provider-application-settings";
 import { HubHostOnboardingSection } from "../host-onboarding-section";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
 import { capitalizeLabel as channelLabel } from "./labels";
-import { useHubResource } from "./hub-resource";
-import { EmptyRow, InfoRow, ResourceFeedback } from "./resource-rows";
+import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
-import type { HubConnection } from "./team/types";
-import { HubConnectionResultNotice } from "./connection-result";
-import { HubConnectionContinuationNotice } from "./connection-continuation";
-import { useHubConnectionContinuation } from "../use-connection-continuation";
+import { BackLink } from "./back-link";
 
 export function HubSettingsContent({ section }: { section: HubSectionSlug }) {
   const hub = useHubAccount();
@@ -67,7 +52,7 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
         <Alert
           variant="info"
           title="Sign in required"
-          description="Sign in before managing Channels, Automations, Team, or Access."
+          description="Sign in before managing Channels, Automations, or People."
         />
       </SettingsSection>
     );
@@ -80,10 +65,12 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
       return <AutomationSettings ChannelInputs={ChannelSettings} />;
     case "team":
       return <TeamSettings />;
-    case "access":
-      return <AccessSettings />;
-    case "configuration":
-      return <HubConfigurationSettings />;
+    case "hosts":
+      return <HostsSettings />;
+    case "integrations":
+      return <IntegrationsSettings />;
+    case "instance":
+      return <InstanceSettings />;
   }
 }
 
@@ -413,9 +400,7 @@ function ActiveHubAccount({
   if (identityVisible)
     return (
       <View>
-        <Button size="sm" variant="outline" onPress={backToAccount}>
-          Back to Account
-        </Button>
+        <BackLink to="Account" onPress={backToAccount} />
         <ChannelIdentitySelfLinkSettings />
       </View>
     );
@@ -772,277 +757,6 @@ function registrationMessage(state: Extract<HubAccountState, { status: "signedOu
     return "Accounts are created by invitation or with an allowed company email address.";
   }
   return "This Hub is not accepting new accounts.";
-}
-
-function HubConfigurationSettings() {
-  const hub = useHubAccount();
-  const continuation = useHubConnectionContinuation();
-  const openContinuation = continuation.open;
-  const clearContinuation = continuation.dismiss;
-  const connections = useHubResource("connections", HubConnectionsSchema);
-  const daemons = useHubResource("daemons", HubDaemonsSchema);
-  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
-  const [connectingApplicationId, setConnectingApplicationId] = useState<string | null>(null);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [addingConnection, setAddingConnection] = useState(false);
-  const openConnection = useCallback(() => setAddingConnection(true), []);
-  const closeConnection = useCallback(() => setAddingConnection(false), []);
-  const connectionSaved = useCallback(async () => {
-    setAddingConnection(false);
-    await connections.refetch();
-  }, [connections]);
-  const refreshHosts = useCallback(() => void daemons.refetch(), [daemons]);
-  const refreshHostsAction = useMemo(
-    () => (
-      <Button size="sm" variant="ghost" loading={daemons.isFetching} onPress={refreshHosts}>
-        Refresh
-      </Button>
-    ),
-    [daemons.isFetching, refreshHosts],
-  );
-  const canManage = hub.signedIn?.capabilities.manageResources === true;
-  const refreshConnections = useCallback(() => void connections.refetch(), [connections]);
-  const refreshConnectionsAction = useMemo(
-    () => (
-      <Button
-        size="sm"
-        variant="ghost"
-        loading={connections.isFetching}
-        onPress={refreshConnections}
-      >
-        Refresh
-      </Button>
-    ),
-    [connections.isFetching, refreshConnections],
-  );
-  const disconnect = useCallback(
-    async (connection: NonNullable<typeof connections.data>["connections"][number]) => {
-      if (connection.consumers.length > 0) return;
-      const confirmed = await confirmDialog({
-        title: `Disconnect ${connection.name}?`,
-        message: "The saved provider credential and its Channel identity mappings will be removed.",
-        confirmLabel: "Disconnect",
-        destructive: true,
-      });
-      if (!confirmed) return;
-      setConnectionError(null);
-      setDisconnectingId(connection.id);
-      try {
-        await hub.api().delete(`connections/${encodeURIComponent(connection.id)}`);
-        await connections.refetch();
-      } catch (error) {
-        setConnectionError(error instanceof Error ? error.message : "Hub request failed.");
-      } finally {
-        setDisconnectingId(null);
-      }
-    },
-    [connections, hub],
-  );
-  const connect = useCallback(
-    async (application: NonNullable<typeof connections.data>["providerApplications"][number]) => {
-      setConnectionError(null);
-      clearContinuation();
-      setConnectingApplicationId(application.id);
-      try {
-        const result = await hub.api().post(
-          "connections",
-          {
-            provider: application.provider,
-            providerApplicationId: application.id,
-          },
-          HubConnectionContinuationSchema,
-        );
-        await openContinuation(result.url);
-      } catch (error) {
-        setConnectionError(error instanceof Error ? error.message : "Hub request failed.");
-      } finally {
-        setConnectingApplicationId(null);
-      }
-    },
-    [clearContinuation, hub, openContinuation],
-  );
-  return (
-    <View>
-      <HubConnectionResultNotice />
-      <ProviderApplicationSettings />
-      <SettingsSection title="Connections" trailing={refreshConnectionsAction}>
-        <HubConnectionContinuationNotice continuation={continuation} />
-        {connectionError ? <Alert variant="error" title={connectionError} /> : null}
-        <ResourceFeedback query={connections} />
-        {connections.data !== undefined ? (
-          <View style={settingsStyles.card}>
-            {connections.data.connections.length === 0 ? (
-              <EmptyRow message="No provider Connections are configured." />
-            ) : (
-              connections.data.connections.map((connection, index) => (
-                <ConnectionRow
-                  key={connection.id}
-                  connection={connection}
-                  bordered={index > 0}
-                  canManage={canManage}
-                  disconnecting={disconnectingId === connection.id}
-                  disconnect={disconnect}
-                />
-              ))
-            )}
-          </View>
-        ) : null}
-        {canManage ? (
-          <Button size="sm" variant="outline" disabled={addingConnection} onPress={openConnection}>
-            Add Channel Connection
-          </Button>
-        ) : null}
-        {canManage && (connections.data?.providerApplications.length ?? 0) > 0 ? (
-          <View style={styles.connectionActions}>
-            <Text style={settingsStyles.rowHint}>Connect another provider account</Text>
-            <View style={styles.actions}>
-              {connections.data?.providerApplications.map((application) => (
-                <ConnectProviderApplicationButton
-                  key={`${application.provider}:${application.id}`}
-                  application={application}
-                  disabled={connectingApplicationId !== null || continuation.pending}
-                  loading={connectingApplicationId === application.id}
-                  connect={connect}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-      </SettingsSection>
-      {canManage && addingConnection ? (
-        <ChannelConnectionSetupSection close={closeConnection} saved={connectionSaved} />
-      ) : null}
-      {canManage ? <ApiKeySettings /> : null}
-      <SettingsSection title="Managed Hosts" trailing={refreshHostsAction}>
-        <ResourceFeedback query={daemons} />
-        {daemons.data !== undefined ? (
-          <View style={settingsStyles.card}>
-            {daemons.data.daemons.length === 0 ? (
-              <EmptyRow message="No Daemons are enrolled in this organization." />
-            ) : (
-              daemons.data.daemons.map((daemon, index) => (
-                <ManagedHostRow
-                  key={`${hub.signedIn?.account.id}:${daemon.id}`}
-                  daemon={daemon}
-                  bordered={index > 0}
-                />
-              ))
-            )}
-          </View>
-        ) : null}
-      </SettingsSection>
-    </View>
-  );
-}
-
-/**
- * Configuration settings adds a Connection with the same catalog-driven form the
- * Channels editor uses. Provider Applications are administered from their own
- * section here, so this one offers only the pasted-credential channels.
- */
-function ChannelConnectionSetupSection({
-  close,
-  saved,
-}: {
-  close(): void;
-  saved(): Promise<void>;
-}) {
-  const hub = useHubAccount();
-  const [pending, setPending] = useState(false);
-  const create = useCallback(
-    async (body: Record<string, unknown>) => {
-      setPending(true);
-      try {
-        await hub.api().post("connections", body, HubConnectionSchema);
-        await saved();
-      } finally {
-        setPending(false);
-      }
-    },
-    [hub, saved],
-  );
-  return (
-    <View>
-      <AddChannelConnection allowProviderApplications={false} disabled={pending} create={create} />
-      <Button variant="outline" disabled={pending} onPress={close}>
-        Cancel
-      </Button>
-    </View>
-  );
-}
-
-function ConnectionRow({
-  connection,
-  bordered,
-  canManage,
-  disconnecting,
-  disconnect,
-}: {
-  connection: HubConnection;
-  bordered: boolean;
-  canManage: boolean;
-  disconnecting: boolean;
-  disconnect(connection: HubConnection): Promise<void>;
-}) {
-  const handleDisconnect = useCallback(() => void disconnect(connection), [connection, disconnect]);
-  const consumers = connection.consumers.map((consumer) => consumer.name).join(", ");
-  return (
-    <View style={[styles.connection, bordered ? settingsStyles.rowBorder : null]}>
-      <View style={styles.connectionHeader}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>
-            {`${channelLabel(connection.provider)} · ${connection.name}`}
-          </Text>
-          <Text style={settingsStyles.rowHint}>
-            {`${connection.externalName ?? "Not connected"} · ${connection.status}`}
-          </Text>
-        </View>
-        {canManage ? (
-          <Button
-            size="xs"
-            variant="destructive"
-            disabled={connection.consumers.length > 0}
-            loading={disconnecting}
-            onPress={handleDisconnect}
-          >
-            Disconnect
-          </Button>
-        ) : null}
-      </View>
-      <Text style={settingsStyles.rowHint}>
-        {connection.consumers.length === 0
-          ? "Not used by any Route, Automation, or Project."
-          : `Used by ${consumers}. Move or remove these consumers before disconnecting.`}
-      </Text>
-    </View>
-  );
-}
-
-function ConnectProviderApplicationButton({
-  application,
-  disabled,
-  loading,
-  connect,
-}: {
-  application: z.infer<typeof HubConnectionsSchema>["providerApplications"][number];
-  disabled: boolean;
-  loading: boolean;
-  connect(
-    application: z.infer<typeof HubConnectionsSchema>["providerApplications"][number],
-  ): Promise<void>;
-}) {
-  const handleConnect = useCallback(() => void connect(application), [application, connect]);
-  return (
-    <Button
-      size="xs"
-      variant="outline"
-      disabled={disabled}
-      loading={loading}
-      onPress={handleConnect}
-    >
-      {`${channelLabel(application.provider)} · ${application.name}`}
-    </Button>
-  );
 }
 
 function StateMessage({ message }: { message: string }) {

@@ -122,6 +122,13 @@ vi.mock("@/components/ui/alert", () => ({
     </div>
   ),
 }));
+vi.mock("./back-link", () => ({
+  BackLink: ({ to, onPress }: { to: string; onPress(): void }) => (
+    <button type="button" onClick={onPress}>
+      {`Back to ${to}`}
+    </button>
+  ),
+}));
 vi.mock("@/components/ui/button", () => ({
   Button: ({
     onPress,

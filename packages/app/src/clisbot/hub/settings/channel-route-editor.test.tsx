@@ -805,13 +805,13 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("slack:support");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Details" }));
-    expect(screen.getByRole("button", { name: "Back to activity" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to Activity" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Connections" }));
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.queryByText("Channel activity")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
-    expect(screen.getByRole("button", { name: "Back to activity" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Back to activity" }));
+    expect(screen.getByRole("button", { name: "Back to Activity" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Activity" }));
     expect(screen.getByRole("button", { name: "Details" })).toBeTruthy();
     expect(adapters.put).not.toHaveBeenCalled();
     expect(adapters.post).not.toHaveBeenCalled();
@@ -1229,7 +1229,8 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       "#help",
     );
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByText("Connections")).toBeNull();
+    // The Connections list and its toolbar are gone; only the way back names it.
+    expect(screen.queryByRole("button", { name: "Refresh status" })).toBeNull();
     expect(screen.queryByText("Add Channel behavior")).toBeNull();
     expect(screen.queryByText("Advanced YAML")).toBeNull();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();

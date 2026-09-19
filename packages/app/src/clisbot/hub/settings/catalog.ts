@@ -1,10 +1,10 @@
 import type { ComponentType } from "react";
 import {
-  Cable,
+  Blocks,
   KeyRound,
   MessageSquare,
-  Settings2,
-  ShieldCheck,
+  Server,
+  ServerCog,
   UserRound,
   UsersRound,
   Workflow,
@@ -38,18 +38,25 @@ const PEOPLE_ITEM: HubSettingsNavigationItem = {
   label: "People",
   icon: UsersRound,
 };
-const ACCESS_ITEM: HubSettingsNavigationItem = {
-  section: "access",
-  label: "Access",
-  icon: ShieldCheck,
+const HOSTS_ITEM: HubSettingsNavigationItem = { section: "hosts", label: "Hosts", icon: Server };
+const INTEGRATIONS_ITEM: HubSettingsNavigationItem = {
+  section: "integrations",
+  label: "Integrations",
+  icon: Blocks,
+};
+const INSTANCE_ITEM: HubSettingsNavigationItem = {
+  section: "instance",
+  label: "Instance settings",
+  icon: ServerCog,
 };
 
+/** People holds Access as a tab: managing people and what they may use is one job. */
 const SIGNED_IN_ITEMS: readonly HubSettingsNavigationItem[] = [
   CHANNELS_ITEM,
   AUTOMATIONS_ITEM,
   PEOPLE_ITEM,
-  ACCESS_ITEM,
-  { section: "configuration", label: "Configuration", icon: Settings2 },
+  HOSTS_ITEM,
+  INTEGRATIONS_ITEM,
 ];
 
 /** One effective grant of the viewer, enough to decide which destinations they can use. */
@@ -61,17 +68,20 @@ export interface HubNavigationGrant {
 /**
  * Which Hub destinations a Member reaches without the organization's management role:
  * Channels when they administer a Connection, Automations when they may run or create one,
- * People when they administer a Team, and Access always (their own effective access).
+ * and People always (its Access tab shows their own effective access). Instance settings
+ * are the Hub operator's alone.
  */
 export function hubSettingsNavigationItems(input: {
   signedIn: boolean;
   canManage?: boolean;
+  isInstanceOperator?: boolean;
   grants?: readonly HubNavigationGrant[];
 }): readonly HubSettingsNavigationItem[] {
   if (!input.signedIn) {
     return [{ section: "account", label: "Sign in to Hub", icon: KeyRound }];
   }
-  if (input.canManage) return [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS];
+  const instance = input.isInstanceOperator ? [INSTANCE_ITEM] : [];
+  if (input.canManage) return [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, ...instance];
   const holds = (kind: string, privilege: string) =>
     input.grants?.some(
       (grant) => grant.resourceKind === kind && grant.privileges.includes(privilege),
@@ -83,15 +93,14 @@ export function hubSettingsNavigationItems(input: {
     holds("daemon", "project.use")
       ? [AUTOMATIONS_ITEM]
       : []),
-    ...(holds("team", "hub.access.manage") ? [PEOPLE_ITEM] : []),
-    ACCESS_ITEM,
+    PEOPLE_ITEM,
   ];
-  return [ACCOUNT_ITEM, ...destinations];
+  return [ACCOUNT_ITEM, ...destinations, ...instance];
 }
 
 export function hubSettingsSection(section: HubSectionSlug): HubSettingsNavigationItem {
-  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS].find(
+  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, INSTANCE_ITEM].find(
     (candidate) => candidate.section === section,
   );
-  return item ?? { section: "configuration", label: "Configuration", icon: Cable };
+  return item ?? ACCOUNT_ITEM;
 }

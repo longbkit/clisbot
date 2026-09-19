@@ -69,7 +69,7 @@ covers Team membership, invitations into that Team with role `member`, and
 appointing another Team Admin; never the Team's own grants. Granting
 Administrator writes an `access_events` row and, when email is configured, tells
 every Organization Owner and Admin who granted it, with a link to the grant on the
-Access page; the Access events list offers Revoke on it. The decision:
+People › Access tab; the Access events list offers Revoke on it. The decision:
 [Delegated access](features/access/scoped-admins.md).
 
 The `team` resource kind reaches an app only when it asks (`?include=team`), because

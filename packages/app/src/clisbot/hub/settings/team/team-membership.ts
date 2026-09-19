@@ -38,6 +38,15 @@ export function canManageTeamMembership(authority: PeopleAuthority, teamId: stri
 }
 
 /** Invite people into this Team, or into any Team the viewer may invite into when none is named. */
+/** Whether the viewer manages anyone here: the organization's people, or a Team they administer. */
+export function managesPeople(authority: PeopleAuthority): boolean {
+  return (
+    authority.capabilities?.manageMembers === true ||
+    authority.capabilities?.manageResources === true ||
+    authority.administeredTeamIds.size > 0
+  );
+}
+
 export function canInvitePeople(authority: PeopleAuthority, teamId?: string): boolean {
   if (canAddPeopleToTeams(authority.capabilities)) return true;
   return teamId === undefined

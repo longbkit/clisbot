@@ -1,8 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
-import { ArrowLeft } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useWideContent } from "./wide-content";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -20,6 +18,7 @@ import { useChannelCatalogQueries } from "./channel-catalog-queries";
 import { ChannelConnectionSetup } from "./channel-connection-setup";
 import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
+import { BackLink } from "./back-link";
 
 /**
  * Channels → Channel Integrations: every channel this Hub can run, as master and
@@ -29,8 +28,6 @@ import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr
 export function ChannelCatalogView() {
   const { rows, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
   const compact = useIsCompactFormFactor();
-  // Two columns need the wide Settings column; a phone shows one at a time.
-  useWideContent(!compact);
   const [chosenChannel, setSelectedChannel] = useState<string | null>(null);
   const selectedChannel = chosenChannel ?? (compact ? null : (rows[0]?.channel ?? null));
   const [connecting, setConnecting] = useState(false);
@@ -85,17 +82,7 @@ export function ChannelCatalogView() {
       list
     ) : (
       <View style={styles.view}>
-        <View style={styles.back}>
-          <Button
-            size="sm"
-            variant="ghost"
-            leftIcon={ArrowLeft}
-            onPress={back}
-            accessibilityLabel="Back to Channel Integrations"
-          >
-            Channel Integrations
-          </Button>
-        </View>
+        <BackLink to="Channel Integrations" onPress={back} />
         {detail}
       </View>
     );
@@ -182,7 +169,6 @@ const styles = StyleSheet.create((theme) => ({
   view: {
     gap: theme.spacing[2],
   },
-  back: { alignItems: "flex-start" },
   columns: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[6] },
   master: { flexBasis: 320, flexShrink: 0 },
   detail: { flex: 1, minWidth: 0, gap: theme.spacing[2] },

@@ -13,7 +13,7 @@ describe("Hub Settings navigation", () => {
     );
   });
 
-  it("keeps Effective access visible to a signed-in Member", () => {
+  it("keeps People visible to a signed-in Member, for their own access", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({
         signedIn: true,
@@ -21,7 +21,7 @@ describe("Hub Settings navigation", () => {
       }).map(({ section, label }) => ({ section, label })),
       [
         { section: "account", label: "Account" },
-        { section: "access", label: "Access" },
+        { section: "team", label: "People" },
       ],
     );
   });
@@ -33,7 +33,7 @@ describe("Hub Settings navigation", () => {
         canManage: false,
         grants: [{ resourceKind: "automation", privileges: ["automation.run"] }],
       }).map(({ section }) => section),
-      ["account", "automations", "access"],
+      ["account", "automations", "team"],
     );
   });
 
@@ -48,14 +48,25 @@ describe("Hub Settings navigation", () => {
           { resourceKind: "team", privileges: ["hub.access.manage"] },
         ],
       }).map(({ section }) => section),
-      ["account", "channels", "automations", "team", "access"],
+      ["account", "channels", "automations", "team"],
     );
   });
 
   it("shows every management destination to an owner or administrator", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({ signedIn: true, canManage: true }).map(({ section }) => section),
-      ["account", "channels", "automations", "team", "access", "configuration"],
+      ["account", "channels", "automations", "team", "hosts", "integrations"],
+    );
+  });
+
+  it("adds Instance settings for the Hub operator only", () => {
+    assert.deepEqual(
+      hubSettingsNavigationItems({
+        signedIn: true,
+        canManage: true,
+        isInstanceOperator: true,
+      }).map(({ section }) => section),
+      ["account", "channels", "automations", "team", "hosts", "integrations", "instance"],
     );
   });
 
