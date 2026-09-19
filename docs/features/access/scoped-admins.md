@@ -28,7 +28,7 @@ A QC lead needs to manage the people on their own Team and Host. Today the only 
 - **You change or remove only grants at or below your level.** Higher grants show locked.
 - **A Host grant reaches every Project on it**, so sharing a Host shares its Projects. Project grants follow the same rule inside one Project.
 - **Granting Administrator warns** that the person will control the daemon: restart, install plugins, use every Model, see every Project. Every Organization Admin is notified with the name of who granted it and a link to the grant; the Access events list has **Revoke** on it.
-- **Every grant shows who made it** ("by Hoa") and whether it can share, on the People › Access tab and in a person's or Team's access summary, so it can be revoked at once.
+- **Every grant shows who made it** ("by Hoa") and whether it can share, on the People & access › Access tab and in a person's or Team's access summary, so it can be revoked at once.
 - **Sharing a Project alone is enough to grant it.** The grantee also needs Connect on the Host; a Project sharer may write that one Connect-only Host row, and the Hub skips it when the grantee's Host row already connects.
 - Organization Owners and Admins are not limited by this rule.
 - Host name, daemon link, managed access mode, and removing the Host stay with Organization Admins: one Hub lists many Hosts, and a change by one team confuses everyone else who uses it.

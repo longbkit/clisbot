@@ -549,7 +549,7 @@ describe("People tabs", () => {
   it("opens on Members with filter chips and a search across name, email, and Team", () => {
     fixtures.queries.members = query({ members: [member, bao] });
     render(<HubSettingsContent section="team" />);
-    expect(screen.getByRole("heading", { name: "People" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "People & access" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Admins (1)" })).toBeTruthy();
     expect(screen.getAllByText("No chat bots yet")).toHaveLength(2);
     fireEvent.change(screen.getByLabelText("Search name, email, or Team"), {
@@ -771,7 +771,7 @@ describe("Member detail", () => {
     openMember("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Remove Member" }));
     await waitFor(() => expect(screen.getByText("Owner cannot be removed.")).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Back to People" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to People & access" })).toBeTruthy();
   });
   it("lists direct and Team access in the Access table, marking where each comes from", () => {
     fixtures.queries["access-assignments?include=team"] = query({

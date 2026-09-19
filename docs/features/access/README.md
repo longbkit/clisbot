@@ -3,7 +3,7 @@
 **What each level grants, on which resource, and what follows from granting it: [user guide — Quyền: cấp gì thì được gì](../../guides/user-guide/access/permissions.md).** How to grant: [Cấp Access](../../guides/user-guide/access/members-and-teams.md). The implementation rules live in [permissions](../../permissions.md#access-scopes).
 
 Who may manage people and grant access below the organization: [Delegated access](scoped-admins.md).
-The screen itself (People › Access): its jobs, layout and interaction are in [The Access screen](access-screen.md).
+The screen itself (People & access › Access): its jobs, layout and interaction are in [The Access screen](access-screen.md).
 
 This page keeps only what those do not say: why the model is shaped this way, the implementation facts the code cannot explain on its own, and what later phases need.
 

@@ -61,7 +61,7 @@ export function SelectedTeamDetail({
   const invite = useCallback(() => addPeople(team), [addPeople, team]);
   return (
     <View>
-      <BackLink to="People" onPress={back} disabled={pending} />
+      <BackLink to="People & access" onPress={back} disabled={pending} />
       <SettingsSection title={team.name}>
         <View style={styles.actions}>
           {canInvite ? (

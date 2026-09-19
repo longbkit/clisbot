@@ -45,7 +45,7 @@ export function SelectedMemberDetail({
   );
   return (
     <View>
-      <BackLink to="People" onPress={back} disabled={pending} />
+      <BackLink to="People & access" onPress={back} disabled={pending} />
       <SettingsSection title={member.name}>
         {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
         {member.role === "owner" ? (

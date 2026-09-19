@@ -1,7 +1,7 @@
 // Settings → Hosts: the machines in the organization that run Agents. Everyone
 // signed in sees the Hosts they may use and can open or reconnect them; an
 // Organization Admin also renames, disconnects, and adds Hosts. Who may use each
-// Host is set in People › Access.
+// Host is set in People & access › Access.
 
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -25,7 +25,7 @@ import { hubResourceQueryKey } from "../query-keys";
 const DEV_CLI_COMMAND = process.env.EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND?.trim() || undefined;
 
 const INFO =
-  "Machines in your organization that run Agents. Who may use each one is set in People › Access.";
+  "Machines in your organization that run Agents. Who may use each one is set in People & access › Access.";
 
 export function HostsSettings() {
   const hub = useHubAccount();
@@ -146,7 +146,7 @@ function AddHostSection({ command }: { command: string }) {
   return (
     <SettingsSection
       title="Add a Host"
-      info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People › Access."
+      info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People & access › Access."
       trailing={accessLink}
     >
       <CopyableCommand command={command} />

@@ -119,6 +119,15 @@ Auto-accept:
   `configuration` redirect (`MOVED_HUB_SECTIONS`, `packages/app/src/clisbot/hub/navigation.ts`)
   because the Hub still links to them. A Connection's Credential row shows the
   provider account in place; there is no API to swap a stored credential yet.
+- **People becomes "People & access"** (2026-09-20): the page holds Members,
+  Teams, Invitations and Access, so the name says both jobs. "People" alone hid
+  Access; "Users & permissions" and "Members & access" were set aside, the first
+  for leaving the product's Member/Access terms, the second for repeating the
+  Members tab. The slug stays `team`.
+- **Hosts are one page** (2026-09-20): Account no longer lists Hosts; Settings →
+  Hosts holds every Host action (open, Add project, Reconnect, Rename,
+  Disconnect behind the … menu, Add a Host) and is shown to every signed-in
+  Member, as Account's list was.
 - **One page, one width.** A page with tabs or sub-pages keeps one column width
   throughout, so switching never resizes it: People and Channels ask for the
   wide column on wide screens (`useWideContent`); every other page keeps 720.

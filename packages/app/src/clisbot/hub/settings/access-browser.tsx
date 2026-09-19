@@ -1,4 +1,4 @@
-// People › Access as master and detail: the list of people and Teams (or of
+// People & access › Access as master and detail: the list of people and Teams (or of
 // resources) on the left, one entry's grants on the right; on a phone the list,
 // then the entry on its own screen. docs/features/access/access-screen.md.
 

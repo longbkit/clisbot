@@ -21,7 +21,7 @@ describe("Hub Settings navigation", () => {
       }).map(({ section, label }) => ({ section, label })),
       [
         { section: "account", label: "Account" },
-        { section: "team", label: "People" },
+        { section: "team", label: "People & access" },
         { section: "hosts", label: "Hosts" },
       ],
     );

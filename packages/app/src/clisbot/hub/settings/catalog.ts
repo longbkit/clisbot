@@ -35,7 +35,7 @@ const AUTOMATIONS_ITEM: HubSettingsNavigationItem = {
 };
 const PEOPLE_ITEM: HubSettingsNavigationItem = {
   section: "team",
-  label: "People",
+  label: "People & access",
   icon: UsersRound,
 };
 const HOSTS_ITEM: HubSettingsNavigationItem = { section: "hosts", label: "Hosts", icon: Server };

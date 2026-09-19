@@ -1,4 +1,4 @@
-// One Team's or one Member's grants, read-only, in the same table as People ›
+// One Team's or one Member's grants, read-only, in the same table as People & access ›
 // Access: a Member's list also shows what their Teams give them.
 
 import { useMemo } from "react";

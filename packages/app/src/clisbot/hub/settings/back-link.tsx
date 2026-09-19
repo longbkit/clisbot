@@ -13,7 +13,7 @@ export function BackLink({
   onPress,
   disabled = false,
 }: {
-  /** The page it returns to, as its title reads ("People", "Connections"). */
+  /** The page it returns to, as its title reads ("People & access", "Connections"). */
   to: string;
   onPress(): void;
   disabled?: boolean;

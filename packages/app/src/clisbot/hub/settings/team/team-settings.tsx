@@ -99,7 +99,7 @@ export function TeamSettings() {
   }
   return (
     <View>
-      <SettingsSection title="People" trailing={inviteButton}>
+      <SettingsSection title="People & access" trailing={inviteButton}>
         <ViewTabs tabs={views} value={view} onChange={setView} />
         {people.notice === null ? null : <Alert variant="success" title={people.notice} />}
       </SettingsSection>

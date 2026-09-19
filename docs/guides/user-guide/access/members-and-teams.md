@@ -6,7 +6,7 @@ Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cầ
 
 ## Tạo Team và mời người
 
-Mở Settings → **People**. Trang có ba tab: **Members** (mọi người trong tổ chức, kèm vai trò, Team và tài khoản chat đã liên kết), **Teams**, và **Invitations** (lời mời đang chờ). Các ô đếm phía trên mỗi tab là bộ lọc: bấm **No Team** để xem ai chưa vào Team nào, **Expiring soon** để xem lời mời sắp hết hạn.
+Mở Settings → **People & access**. Trang có bốn tab: **Members** (mọi người trong tổ chức, kèm vai trò, Team và tài khoản chat đã liên kết), **Teams**, **Invitations** (lời mời đang chờ) và **Access** (ai được dùng gì). Các ô đếm phía trên mỗi tab là bộ lọc: bấm **No Team** để xem ai chưa vào Team nào, **Expiring soon** để xem lời mời sắp hết hạn.
 
 1. Ở tab **Teams**, bấm **New Team** và đặt tên theo nhóm làm việc, ví dụ `Product` hoặc `AI Team`.
 2. Bấm **Invite people** (có ở mọi tab; mở từ trong một Team thì Team đó được chọn sẵn). Ô **People** nhận cả tên Member đã có lẫn email mới, ngăn cách bằng dấu phẩy hoặc xuống dòng; dạng `Tên <email>` cũng được. Chọn **Teams**; với email mới chọn thêm vai trò **Member** cho người chỉ cần làm việc trên tài nguyên, **Admin** khi người đó cần quản lý tổ chức.

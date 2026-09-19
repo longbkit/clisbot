@@ -55,7 +55,7 @@ Authoritative terminology. UI label wins. Don't invent synonyms; use what's here
 - **Workflow step** — One ordered Agent execution inside an Automation, with its own Agent configuration, prompt, optional condition, output schema and output grants. A one-step Workflow is the same concept as a multi-step Workflow; `legacy_multistep` is only a historical storage discriminator, never a product lifecycle label.
 - **Automation input** — An event source or a Route on a Connection that can invoke an Automation. UI entry: **Add input**. Slack/Telegram inputs reuse canonical Routes; GitHub and other direct events remain event definitions.
 - **Parameters** — The Automation form's typed values supplied by callers. Serialized as the existing `inputs` schema; this UI name distinguishes values from input sources. It does not rename the Hub wire contract.
-- **Team** — One organization-scoped named group of Hub Members used as an access-assignment subject. A Member may belong to several Teams. BetterAuth owns Team identity and membership; Hub Access owns resource assignments. UI: Teams live on the **People** page (Members / Teams / Invitations tabs; URL section slug stays `team`). Forbidden: "Team" as the page title.
+- **Team** — One organization-scoped named group of Hub Members used as an access-assignment subject. A Member may belong to several Teams. BetterAuth owns Team identity and membership; Hub Access owns resource assignments. UI: Teams live on the **People & access** page (Members / Teams / Invitations / Access tabs; URL section slug stays `team`). Forbidden: "Team" as the page title.
 - **Admin** — Someone who manages one resource and who gets into it, within what they hold. Always name the scope: Organization Admin (the organization role), Team Admin, Connection Admin, Automation Admin. Hosts and Projects use **Can share** instead. Scoped Admins are access assignments, not organization roles. See [Delegated access](features/access/scoped-admins.md). Don't confuse with the Host level **Administrator** (`daemon.manage`), which controls the daemon and can share. Forbidden: "manager", "lead" as role names.
 - **Can share** — On a Host or Project grant: add, change, or remove people on that resource, up to your own level. Always on for Full access and Administrator, optional for Office worker and Developer. See [Delegated access](features/access/scoped-admins.md).
 - **Access assignment** — A Hub-owned grant from one Member or Team to one organization resource and semantic privilege set, with optional resource constraints. It does not replace organization roles or daemon Session namespace scopes.
@@ -109,7 +109,7 @@ It is separate from account passwords and the channel credential encryption key
   that sender's messages run with the Member's grants instead of the Guest
   group's. It resolves on every bot of its **Identity realm**. A Member links it
   with `/link <code>` from their own chat account; linking grants nothing by
-  itself. UI: **Chat accounts** (Account → Chat accounts for your own; People → Member → Chat accounts for an admin). Code: `channelIdentities`
+  itself. UI: **Chat accounts** (Account → Chat accounts for your own; People & access → Member → Chat accounts for an admin). Code: `channelIdentities`
   (`packages/hub/src/db/schema.ts`).
 - **Identity realm** — The bots across which one chat-platform sender id names
   one person, so one link covers all of them. Its scope is per Channel:

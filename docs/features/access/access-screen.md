@@ -1,6 +1,6 @@
 # The Access screen: problem, model, layout, interaction
 
-People › Access is where an organization decides who may use what. This doc
+People & access › Access is where an organization decides who may use what. This doc
 sets its shape from the job, so later fixes land inside one model instead of
 piling onto the page. Levels, Host scope and grant rules are in
 [Access](README.md) and [Delegated access](scoped-admins.md); this doc is only
