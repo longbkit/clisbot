@@ -594,7 +594,7 @@ it("runs an Automation through the shared dispatcher with current Member access"
   assert.equal(calls.length, 2);
 });
 
-it("keeps an Automation a Channel Route uses enabled, but lets its Mode widen", async () => {
+it("keeps an Automation a Route uses enabled, but lets its Mode widen", async () => {
   const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
   await bundle.runtime.drizzle().insert(schema.organizations).values({
     id: ORGANIZATION_ID,

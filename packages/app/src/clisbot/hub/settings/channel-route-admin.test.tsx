@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The Channels screen for a Member who administers one Channel Route through a
+// The Channels screen for a Member who administers one Connection through a
 // `channel.manage` grant and lacks the organization capability
 // (docs/features/access/scoped-admins.md): their accounts only, read and saved
 // through the per-account endpoints, the Connection and target left alone.
@@ -76,7 +76,13 @@ vi.mock("@/components/ui/form-field", () => ({
   },
 }));
 vi.mock("@/components/ui/select-field", () => ({
-  SelectField: (props: { label: string }) => <select aria-label={props.label} />,
+  SelectField: (props: { label: string; options?: { id: string; value: string }[] }) => (
+    <select aria-label={props.label}>
+      {(props.options ?? []).map((option) => (
+        <option key={option.id} value={option.value} />
+      ))}
+    </select>
+  ),
 }));
 vi.mock("@/components/ui/switch", () => ({
   Switch: function TestSwitch(props: {
@@ -218,12 +224,17 @@ function renderChannels() {
   );
 }
 
-describe("Channel Route Admin", { timeout: 20_000 }, () => {
+describe("Connection Admin", { timeout: 20_000 }, () => {
   it("lists only the administered account through its own endpoints, without token or Connection controls", async () => {
     renderChannels();
     expect(await screen.findByText("Slack · support")).toBeTruthy();
     expect(screen.getByText(/Managed by Organization Admins/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Add Channel Route" })).toBeNull();
+    // Add Route is theirs too, but its picker only offers their own Connections.
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
+    const picker = screen.getByLabelText("Connection") as HTMLSelectElement;
+    expect(Array.from(picker.options, ({ value }) => value)).toEqual(["account:slack:support"]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByText("Advanced YAML")).toBeNull();
     expect(screen.queryByRole("button", { name: /Actions for support/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Manage" }));

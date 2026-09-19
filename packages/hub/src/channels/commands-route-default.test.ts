@@ -185,7 +185,7 @@ describe("/promoteroutedefault", () => {
     assert.equal(vi.mocked(publisher.promote).mock.calls.length, 0);
   });
 
-  it("refuses a sender who does not manage the Channel Route", async () => {
+  it("refuses a sender who does not manage the Connection", async () => {
     const { deps, context, publisher } = harness({ conversation: OPUS, manager: false });
     const result = await promoteRouteDefault(deps, context, undefined);
     assert.match(

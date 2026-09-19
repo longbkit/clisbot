@@ -32,7 +32,7 @@ import { useChannelCatalog } from "./channel-catalog-queries";
 
 /**
  * Channels → Operations: queue depth, dead letters, resubmit and prune. A
- * Channel Route Admin (`adminAccounts`) sees their accounts' depth and dead
+ * Connection Admin (`adminAccounts`) sees their accounts' depth and dead
  * letters; resubmit and prune stay organization-wide.
  */
 export function ChannelOperationsView({

@@ -790,7 +790,7 @@ export type HubAudienceRule = z.infer<typeof HubAudienceRuleSchema>;
 
 /**
  * `GET|PUT channel-configuration/accounts/<channel>/<accountId>` — the one
- * account a Channel Route Admin may read and save. `account` is the stored
+ * account a Connection Admin may read and save. `account` is the stored
  * file in the audience-rules shape; `reconciliation` only follows a PUT.
  */
 export const HubChannelAccountConfigurationSchema = z

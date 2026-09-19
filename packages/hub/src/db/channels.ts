@@ -39,7 +39,7 @@ import type {
 type HubDatabase = DrizzleHandle;
 type HubTransaction = HubDatabase;
 
-/** Bounded, message-content-free evidence for one Channel Route decision. */
+/** Bounded, message-content-free evidence for one Route decision. */
 export interface RecordChannelInboundActivityInput {
   organizationId: string;
   channel: SupportedChannelName;

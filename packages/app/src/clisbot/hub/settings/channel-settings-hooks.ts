@@ -31,7 +31,7 @@ type HubResourceQueryScope = Parameters<typeof hubResourceQueryKey>[0] & { organ
 
 /**
  * Who the Channels screen serves: the organization capability sees and saves
- * the whole configuration; a Member who is Channel Route Admin of some
+ * the whole configuration; a Member who is Connection Admin of some
  * accounts (`channel.manage` on `channel_account`, direct or via a Team) sees
  * only those, through the per-account endpoints
  * (docs/features/access/scoped-admins.md).

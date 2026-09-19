@@ -179,7 +179,7 @@ describe("decideGrant", () => {
     expect(decideGrant(routeAdmin, outside, resources)).toMatchObject({ allowed: false });
   });
 
-  it("lets a Channel Route Admin appoint another Admin on that account only", () => {
+  it("lets a Connection Admin appoint another Admin on that account only", () => {
     const all = { conversation: { kind: "all" as const } };
     const routeAdmin: GrantActor = {
       role: "member",
@@ -214,7 +214,7 @@ describe("decideGrant", () => {
     expect(impliedPrivileges("daemon", [...RESOURCE_ACCESS_LEVELS.daemon.developer])).not.toContain(
       "hub.access.manage",
     );
-    // A Channel Route Admin row written before the level carried hub.access.manage reads as Admin.
+    // A Connection Admin row written before the level carried hub.access.manage reads as Admin.
     expect(impliedPrivileges("channel_account", ["channel.manage"])).toContain("hub.access.manage");
     const administrator: GrantActor = {
       role: "member",

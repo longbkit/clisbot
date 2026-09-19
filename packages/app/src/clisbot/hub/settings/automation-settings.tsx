@@ -270,11 +270,15 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   // COMPAT(automation-scope): an older Hub sends no `scope`; fall back to the viewer's own grants.
   const canRunSelectedAutomation =
     viewer.canRun || canRunAutomation(selectedAutomation, effectiveAccess.data);
-  const newAutomationButton = viewer.canCreate ? (
-    <Button size="sm" variant="outline" onPress={startCreate}>
-      New Automation
-    </Button>
-  ) : undefined;
+  const newAutomationButton = useMemo(
+    () =>
+      viewer.canCreate ? (
+        <Button size="sm" variant="outline" onPress={startCreate}>
+          New Automation
+        </Button>
+      ) : undefined,
+    [startCreate, viewer.canCreate],
+  );
 
   return (
     <View>
@@ -1185,6 +1189,13 @@ export function SingleAgentAutomationForm({
   );
 
   const activateAutomation = useCallback(() => submitAutomation(false), [submitAutomation]);
+  const addStep = useCallback(() => submitAutomation(true), [submitAutomation]);
+  const saveWorkflow = useCallback(
+    (...args: Parameters<typeof save>) => {
+      void save(...args);
+    },
+    [save],
+  );
   const replyFields = (
     <>
       {channelProvider !== "slack" || prioritizeReplies ? (
@@ -1220,9 +1231,7 @@ export function SingleAgentAutomationForm({
         initialDraft={channelDraft}
         daemons={daemons}
         pending={pending}
-        save={(source, draft) => {
-          void save(source, draft);
-        }}
+        save={saveWorkflow}
       />
     );
   return (
@@ -1462,7 +1471,7 @@ export function SingleAgentAutomationForm({
         />
         <SwitchRow
           title="Continue the same Agent"
-          hint="When a Channel Route invokes this Automation, reuse a compatible Agent for the same Channel conversation. Other event runs still create a new Agent."
+          hint="When a Route on a Connection invokes this Automation, reuse a compatible Agent for the same Channel conversation. Other event runs still create a new Agent."
           value={reuseBinding}
           onValueChange={setReuseBinding}
           disabled={pending}
@@ -1503,8 +1512,8 @@ export function SingleAgentAutomationForm({
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
         <Text style={styles.sectionTitle}>Limits and outputs</Text>
         <Text style={settingsStyles.rowHint}>
-          Channel replies apply when a Channel Route invokes this Automation. Direct event reply
-          settings remain above.
+          Channel replies apply when a Route on a Connection invokes this Automation. Direct event
+          reply settings remain above.
         </Text>
         {!prioritizeReplies ? replyFields : null}
 
@@ -1560,12 +1569,7 @@ export function SingleAgentAutomationForm({
         </Field>
       </View>
 
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={pending || !canSave}
-        onPress={() => submitAutomation(true)}
-      >
+      <Button size="sm" variant="outline" disabled={pending || !canSave} onPress={addStep}>
         Add step
       </Button>
 
@@ -1749,7 +1753,7 @@ function AutomationEventEditor({
       <Text style={settingsStyles.rowHint}>{definition.description}</Text>
       {definition.name === "slack.mention" ? (
         <Text style={settingsStyles.rowHint}>
-          Existing direct event. New Slack inputs use Channel Routes.
+          Existing direct event. New Slack inputs use Routes on a Connection.
         </Text>
       ) : null}
       {event !== undefined && definition.provider !== undefined ? (
@@ -2114,7 +2118,7 @@ function automationEventHint(event: AutomationEventValue): string {
 function eventLabel(eventName: string): string {
   return (
     AUTOMATION_EVENTS.find(({ name }) => name === eventName)?.label ??
-    (eventName === "channel.message" ? "Channel Routes" : eventName)
+    (eventName === "channel.message" ? "Routes" : eventName)
   );
 }
 

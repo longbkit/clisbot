@@ -623,7 +623,7 @@ describe("Invite people", () => {
     chooseTeam("Support");
     chooseTeam("Sales");
     expect(screen.getByText("1 invitation will be sent")).toBeTruthy();
-    expect(screen.getByText(/1 Channel Route/)).toBeTruthy();
+    expect(screen.getByText(/1 Connection/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     await waitFor(() =>
       expect(hub.inviteMember).toHaveBeenCalledWith({
@@ -822,7 +822,7 @@ describe("Teams", () => {
   it("lists each Team with its people and a one-line access summary", () => {
     route.params = { view: "teams" };
     render(<HubSettingsContent section="team" />);
-    expect(screen.getByText("1 Channel Route")).toBeTruthy();
+    expect(screen.getByText("1 Connection")).toBeTruthy();
     expect(screen.getByText("No access")).toBeTruthy();
   });
   it("does not show access data or invitations to a Member who cannot manage them", () => {

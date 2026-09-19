@@ -41,7 +41,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
   // Hub administration is derived from the organization role at the HTTP
   // boundary. It is never persisted as a Team/Member resource assignment.
   // `hub.access.manage` on a product resource is Can share (Host, Project) or
-  // scoped Admin (Team, Channel Route, Automation): docs/features/access/scoped-admins.md.
+  // scoped Admin (Team, Connection, Automation): docs/features/access/scoped-admins.md.
   organization: new Set(),
   daemon: new Set([
     "hub.access.manage",
@@ -1082,7 +1082,7 @@ export class AccessStore {
   }
 
   /**
-   * Whether a channel sender may change this Channel Route's configuration:
+   * Whether a channel sender may change this Connection's configuration:
    * an organization role that manages channels, or `channel.manage` assigned on
    * this account. Returns the linked Member so the change is published, and
    * delegation is checked, under that Member. A Guest never manages a Route.

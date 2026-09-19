@@ -60,7 +60,7 @@ export interface HubNavigationGrant {
 
 /**
  * Which Hub destinations a Member reaches without the organization's management role:
- * Channels when they administer a Channel Route, Automations when they may run or create one,
+ * Channels when they administer a Connection, Automations when they may run or create one,
  * People when they administer a Team, and Access always (their own effective access).
  */
 export function hubSettingsNavigationItems(input: {

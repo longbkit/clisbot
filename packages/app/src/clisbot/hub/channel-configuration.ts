@@ -8,7 +8,7 @@ export type ChannelRouteMatchKind = "dm" | "channel" | "thread" | "group" | "top
 export type ChannelRouteTarget =
   | { kind: "automation"; automationName: string }
   /** Keep the target the Route already has (`agent`/`environment`/`workflow`,
-   * `agentControls`): what a Channel Route Admin saves, since the shared
+   * `agentControls`): what a Connection Admin saves, since the shared
    * resource file that defines an Agent is not theirs to change. */
   | { kind: "existing"; route: ChannelConfigurationRecord }
   | {
@@ -70,7 +70,13 @@ export interface ChannelRouteBehavior {
   typingIndicator: boolean;
   toolCalls: boolean;
   approvalMode?: "auto-deny" | "require" | "auto-allow";
+  /** How a question from the Agent is answered (the Route's `questions:` leaf);
+   * absent leaves the Route's approval rules to decide. */
+  questions?: ChannelRouteQuestions;
 }
+
+/** Mirrors the Hub's `questions:` defaults leaf. */
+export type ChannelRouteQuestions = "ask" | "recommended" | "agent-decides";
 
 export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   requireMention: true,
@@ -343,6 +349,7 @@ function routeBehaviorSettings(
     ...(behavior.approvalMode === undefined
       ? {}
       : { approval: [{ match: "*", mode: behavior.approvalMode }] }),
+    ...(behavior.questions === undefined ? {} : { questions: behavior.questions }),
   };
 }
 
@@ -429,25 +436,33 @@ export function replaceChannelRouteCandidate(
   return { route, resource: nextResource };
 }
 
+/**
+ * The Route keys the form writes whole and may leave out on purpose: a cleared
+ * text filter, a limit set back to default, the target it switched away from.
+ * Every other key starts from the stored Route, so a key the form does not show
+ * (`agentControls`, `agents`, `workspace`, a key added to the schema later)
+ * survives a save.
+ */
+const FORM_CLEARABLE_ROUTE_KEYS = ["contains", "limits", "agent", "environment", "workflow"];
+/** Defaults a change of audience restarts from (`buildChannelRouteCandidate`). */
+const AUDIENCE_DEFAULT_ROUTE_KEYS = ["interaction", "sync", "approval"] as const;
+
 function preserveRouteSettings(
   current: ChannelConfigurationRecord,
   replacement: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord {
-  // `limits` is not preserved: the form shows every leaf, so what it sends is complete.
-  const preservedKeys = ["template", "policy", "binding", "reply", "outbound"];
-  const preserved = Object.fromEntries(
-    preservedKeys.flatMap((key) => (Object.hasOwn(current, key) ? [[key, current[key]]] : [])),
-  );
+  const merged: ChannelConfigurationRecord = { ...current, ...replacement };
+  for (const key of FORM_CLEARABLE_ROUTE_KEYS) {
+    if (!Object.hasOwn(replacement, key)) delete merged[key];
+  }
   // Changing who can use the Route starts from that audience's defaults;
   // keeping it keeps the settings the form does not show.
-  const sameAudience = isOpenAudienceRoute(current) === isOpenAudienceRoute(replacement);
-  if (sameAudience) {
-    for (const key of ["interaction", "sync", "approval"] as const) {
-      if (Object.hasOwn(current, key)) preserved[key] = current[key];
+  if (isOpenAudienceRoute(current) !== isOpenAudienceRoute(replacement)) {
+    for (const key of AUDIENCE_DEFAULT_ROUTE_KEYS) {
+      if (!Object.hasOwn(replacement, key)) delete merged[key];
     }
+    return merged;
   }
-  const merged = { ...preserved, ...replacement };
-  if (!sameAudience) return merged;
   for (const key of ["interaction", "reply", "outbound"] as const) {
     if (isRecord(current[key]) && isRecord(replacement[key])) {
       merged[key] = { ...current[key], ...replacement[key] };

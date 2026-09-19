@@ -84,7 +84,7 @@ export function AccessSettings() {
     typeof params.subjectId === "string"
       ? subjectKey(params.subjectKind, params.subjectId)
       : null;
-  // A resource page (e.g. a Channel Route's Access tab) opens the page on that resource.
+  // A resource page (e.g. a Connection's Access tab) opens the page on that resource.
   const initialResource =
     typeof params.resourceKind === "string" && typeof params.resourceId === "string"
       ? resourceKey({ kind: params.resourceKind, id: params.resourceId })

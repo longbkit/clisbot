@@ -31,7 +31,7 @@ export function assignmentResourceOptions(
     daemon: "Hosts",
     project: "Projects",
     team: "Teams",
-    channel_account: "Channel Routes",
+    channel_account: "Connections",
     automation: "Automations",
   };
   return resources
@@ -116,7 +116,7 @@ export function resourceKindLabel(kind: AccessResourceKind): string {
     daemon: "Host",
     project: "Project",
     team: "Team",
-    channel_account: "Channel Route",
+    channel_account: "Connection",
     automation: "Automation",
   }[kind];
 }
@@ -131,7 +131,7 @@ export function accessLevelLabel(value: string): string {
       developer: "Developer",
       full_access: "Full access",
       use: "Use",
-      // The wire key stays `manage`; the scope is always named (Channel Route Admin).
+      // The wire key stays `manage`; the scope is always named (Connection Admin).
       manage: "Admin",
       admin: "Admin",
       run: "Run",

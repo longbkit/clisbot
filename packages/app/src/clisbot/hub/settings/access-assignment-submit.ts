@@ -119,7 +119,7 @@ function createAccessAssignment(
 ): Record<string, unknown> {
   const { selection } = input;
   const constraints: Record<string, unknown> = {};
-  // Channel Route Admin covers every conversation on the account; who may
+  // Connection Admin covers every conversation on the account; who may
   // talk to the bot is the Route's audience rules, not a grant.
   if (resource.kind === "channel_account") constraints["conversation"] = { kind: "all" };
   if (selection.needsAgentConfiguration) {

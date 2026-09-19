@@ -88,7 +88,7 @@ it("checks only the changed Route when a change names one", async () => {
     "/finance",
     "/support",
   ]);
-  // A Channel Route manager changing `slack/support` is not asked about the
+  // A Connection manager changing `slack/support` is not asked about the
   // untouched `slack/finance` Route.
   const scoped = await delegatedExecutions([
     { channel: "slack", accountId: "support", position: 0 },

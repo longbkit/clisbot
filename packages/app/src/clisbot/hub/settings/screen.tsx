@@ -1011,7 +1011,7 @@ function ConnectionRow({
       </View>
       <Text style={settingsStyles.rowHint}>
         {connection.consumers.length === 0
-          ? "Not used by a Channel Route, Automation, or Project."
+          ? "Not used by any Route, Automation, or Project."
           : `Used by ${consumers}. Move or remove these consumers before disconnecting.`}
       </Text>
     </View>

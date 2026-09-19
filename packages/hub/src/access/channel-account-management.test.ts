@@ -20,7 +20,7 @@ const ACCOUNT = {
   accountId: "support",
 };
 
-it("lets channel-managing roles and account managers change a Channel Route, and nobody else", async () => {
+it("lets channel-managing roles and account managers change a Connection, and nobody else", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-channel-account-management-"));
   const { runtime } = await embeddedDatabaseRuntime(root);
   try {

@@ -1,7 +1,7 @@
 // The per-account directory reads behind the Route editor's pickers: the
 // conversations one bot has seen (plus the authored destinations, named when
 // the vertical can resolve them) and the senders outside the Hub who have
-// messaged it. Both are Channel Route Admin reads (`channel-admin.ts`).
+// messaged it. Both are Connection Admin reads (`channel-admin.ts`).
 
 import type { CompiledChannelAccount } from "../channels/config/compile.js";
 import type { SupportedChannelName } from "../channels/catalog.js";

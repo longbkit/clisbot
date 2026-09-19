@@ -35,7 +35,7 @@ const KIND_ORDER: AccessResourceKind[] = [
 const GROUP_LABELS: Record<AccessResourceKind, string> = {
   daemon: "Hosts",
   project: "Projects",
-  channel_account: "Channel Routes",
+  channel_account: "Connections",
   automation: "Automations",
   team: "Teams",
   organization: "Organization",

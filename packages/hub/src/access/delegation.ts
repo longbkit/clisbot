@@ -46,7 +46,7 @@ export interface DelegatedRouteRef {
  * A change to one Route (`/promoteroutedefault`) passes `routes`: the rest of
  * the candidate is byte-identical to the active revision, and was authorized
  * by whoever published it, so checking it against this principal would only
- * refuse a Channel Route manager for Routes they did not touch.
+ * refuse a Connection manager for Routes they did not touch.
  */
 export async function assertChannelConfigurationDelegation(input: {
   access: AccessStore;
@@ -128,7 +128,7 @@ export async function assertChannelConfigurationDelegation(input: {
 }
 
 /**
- * The Routes of a candidate account a Channel Route Admin save must re-check:
+ * The Routes of a candidate account a Connection Admin save must re-check:
  * those whose delegated parts (target, approvals, the tool reply path, Agent
  * controls) match no Route of the active account. Each active Route answers
  * for one candidate Route, so reordering or deleting Routes needs no check and

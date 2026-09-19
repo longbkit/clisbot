@@ -223,7 +223,7 @@ export const RESOURCE_ACCESS_LEVELS = {
     admin: ["hub.access.manage"],
   },
   channel_account: {
-    // Channel Route Admin (UI "Admin"): the Route's audience rules and
+    // Connection Admin (UI "Admin"): the Route's audience rules and
     // defaults, on the app and from a conversation, and appointing another
     // Admin. Covers every conversation on the account. Who may talk to the bot
     // is the Route's audience rules, never a grant
@@ -242,7 +242,7 @@ export const RESOURCE_ACCESS_LEVELS = {
 /**
  * The privileges a grant holds once its level's implications are applied: a
  * Host or Project grant that is Full access or Administrator also shares, and
- * a Channel Route Admin (`channel.manage`) always appoints other Admins. The
+ * a Connection Admin (`channel.manage`) always appoints other Admins. The
  * Hub applies this when it saves and when it reads, so a row written before
  * the level carried `hub.access.manage` reads the same as one written after.
  */

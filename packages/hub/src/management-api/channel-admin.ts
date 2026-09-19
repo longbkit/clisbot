@@ -1,4 +1,4 @@
-// Channel Route Admin: what a Member holding `channel.manage` on ONE Channel
+// Connection Admin: what a Member holding `channel.manage` on ONE Channel
 // account may do through the management API (docs/features/access/scoped-admins.md,
 // delegation-implementation.md row B). The organization capability keeps the
 // full `channel-configuration` / `channel-accounts` surface in `index.ts`; this

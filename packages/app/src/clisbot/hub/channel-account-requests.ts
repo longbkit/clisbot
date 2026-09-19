@@ -1,4 +1,4 @@
-// The per-account Channel requests a Channel Route Admin makes
+// The per-account Channel requests a Connection Admin makes
 // (docs/features/access/scoped-admins.md). Plain functions over the API client,
 // shared by the Channels screen and the Automation input save.
 import type { HubApiClient } from "./api-client";

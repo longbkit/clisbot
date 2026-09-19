@@ -21,7 +21,7 @@ export interface AutomationInputSaveProgress {
 }
 
 /**
- * Save the staged Routes. An author who is Channel Route Admin of some accounts
+ * Save the staged Routes. An author who is Connection Admin of some accounts
  * (not an Organization Admin) saves each changed account through its own
  * endpoint, which re-checks their delegation; the organization capability saves
  * the whole configuration. Returns the revision the save produced.

@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
@@ -84,3 +86,101 @@ export function RouteFollowUpFields({
     </>
   );
 }
+
+/** A small set of choices shown as buttons, beside the label (`row`) or under it. */
+export function ChoiceRow({
+  label,
+  values,
+  selected,
+  labels = {},
+  note,
+  layout = "stacked",
+  onChange,
+  disabled,
+}: {
+  label: string;
+  values: string[];
+  selected: string;
+  labels?: Record<string, string>;
+  note?: string;
+  /** `row` sits the choices beside the label, level with the switches above. */
+  layout?: "stacked" | "row";
+  onChange(value: string): void;
+  disabled: boolean;
+}) {
+  const choices = (
+    <>
+      {values.map((value) => (
+        <ChoiceButton
+          key={value}
+          value={value}
+          selected={selected === value}
+          label={labels[value] ?? capitalized(value)}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      ))}
+      {note === undefined ? null : <Text style={styles.choiceNote}>{note}</Text>}
+    </>
+  );
+  if (layout === "row") return <SettingRow label={label}>{choices}</SettingRow>;
+  return (
+    <View style={styles.choiceGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.choices}>{choices}</View>
+    </View>
+  );
+}
+
+function ChoiceButton({
+  value,
+  selected,
+  label,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  selected: boolean;
+  label: string;
+  onChange(value: string): void;
+  disabled: boolean;
+}) {
+  const select = useCallback(() => onChange(value), [onChange, value]);
+  return (
+    <Button
+      size="xs"
+      variant={selected ? "secondary" : "outline"}
+      disabled={disabled}
+      onPress={select}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function capitalized(value: string): string {
+  return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
+}
+
+const styles = StyleSheet.create((theme) => ({
+  choiceGroup: {
+    gap: theme.spacing[2],
+  },
+  choices: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  choiceNote: {
+    alignSelf: "center",
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  // A stacked choice group reads as a field whose control is a button row, so it
+  // uses the same label treatment as every Select and text field around it.
+  label: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.normal,
+  },
+}));

@@ -70,7 +70,7 @@ export function ChannelActivity({
 }: {
   accounts?: AccountRecord[];
   connections?: Connection[];
-  /** A Channel Route Admin reads each account's own activity; there is no "all". */
+  /** A Connection Admin reads each account's own activity; there is no "all". */
   accountScoped?: boolean;
   state: ChannelActivityState;
   onChange: ChangeActivity;
@@ -164,7 +164,7 @@ export function ChannelActivity({
       <View style={styles.filters}>
         <View style={styles.filter}>
           <SelectField
-            label="Channel Route"
+            label="Connection"
             value={state.accountKey}
             selectedDisplay={accountDisplay}
             options={accountOptions}
@@ -172,7 +172,7 @@ export function ChannelActivity({
             searchable
             size={size}
             placeholder="All accounts"
-            emptyText="No Channel Routes"
+            emptyText="No Connections"
           />
         </View>
         {state.accountKey !== ALL ? (
@@ -216,7 +216,7 @@ export function ChannelActivity({
 }
 
 /**
- * The organization-wide `channel-activity` list, or — for a Channel Route
+ * The organization-wide `channel-activity` list, or — for a Connection
  * Admin — the account's own `channel-activity/accounts/<channel>/<accountId>`,
  * the only one they may read.
  */
@@ -583,7 +583,7 @@ function channelAccessRecovery(reason: string | null | undefined): AccessRecover
       return {
         title: "Sender needs conversation access",
         description:
-          "The sender's Channel identity is verified. An owner or administrator must grant their Member or Team access to this Channel Route and conversation, then the sender can try again.",
+          "The sender's Channel identity is verified. An Organization or Connection Admin must add them to the audience of a Route on this Connection that covers this conversation, then the sender can try again.",
         identity: false,
         access: true,
       };

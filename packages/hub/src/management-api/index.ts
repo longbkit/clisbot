@@ -477,7 +477,7 @@ export class ManagementApi {
     if (resource === "connections") {
       return this.handleConnections(request, requestId, access, segments);
     }
-    // Channel Route Admin: one account's file, activity, ingress, status and
+    // Connection Admin: one account's file, activity, ingress, status and
     // QR relink for a Member holding `channel.manage` on that account
     // (`management-api/channel-admin.ts`). The organization capability keeps
     // the full handlers below.
@@ -536,7 +536,7 @@ export class ManagementApi {
     if (resource === "members") return this.listMembers(organizationId);
     // The channel catalog is the same for every organization; the guard is what
     // makes it organization-scoped (`management-api/channel-catalog.ts`). A
-    // Channel Route Admin reads it too: the Route editor asks it which channels
+    // Connection Admin reads it too: the Route editor asks it which channels
     // report a room's visibility.
     if (resource === "channel-catalog") {
       if (!access.capabilities.manageChannels) {

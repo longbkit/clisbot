@@ -65,7 +65,7 @@ describe("capability states", () => {
   it("asks for an account when the channel has none", () => {
     expect(rowFor(telegram, null, "text")).toMatchObject({
       state: "needsSetup",
-      nextAction: "Add a Telegram Channel Route.",
+      nextAction: "Add a Telegram Connection.",
     });
   });
 

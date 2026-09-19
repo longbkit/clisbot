@@ -1,7 +1,7 @@
 // The credential keys of an account's vertical-owned `config` block, and the
-// two operations the Channel Route Admin surface needs over them: hide them on
+// two operations the Connection Admin surface needs over them: hide them on
 // read, keep the stored values on save (docs/features/access/scoped-admins.md:
-// a Channel Route Admin never sees the bot token or a secret).
+// a Connection Admin never sees the bot token or a secret).
 //
 // A typed channel declares its credential keys in its schema with
 // `.meta(SECRET)` (`schema.ts`). The other channels pass `config` through

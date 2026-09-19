@@ -184,7 +184,7 @@ describe("/followup", () => {
   it("does not change the route without channel.manage or after it moved", async () => {
     const denied = await harness({ manager: false }).run("route mention-only");
     assert.deepEqual(denied, {
-      text: "/followup route needs permission to manage this Channel Route (channel.manage). Ask an admin, or send /me to see your access.",
+      text: "/followup route needs permission to manage this Connection (channel.manage). Ask an admin, or send /me to see your access.",
       published: false,
     });
     const moved = await harness({ outcome: { status: "route_changed" } }).run("route auto");

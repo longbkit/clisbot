@@ -1,4 +1,4 @@
-// Channel Route Admin through the management contract: a Member holding
+// Connection Admin through the management contract: a Member holding
 // `channel.manage` on one account may save that account's file (Connection,
 // transport and config frozen), read its activity and ingress, its status and
 // drive its QR relink — and nothing else: no policy file, no other account, no
@@ -193,7 +193,7 @@ function accessFor(input: {
 
 const accountPath = `/channel-configuration/accounts/zalouser/${ACCOUNT_ID}`;
 
-it("lets a Channel Route Admin manage exactly one account", async () => {
+it("lets a Connection Admin manage exactly one account", async () => {
   const access = new AccessStore(bundle.runtime);
   const channelSupervisor = supervisor();
   const common = {

@@ -36,7 +36,7 @@ const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) =>
   administrator: "Operate this Host with any model. Always can share.",
   use: "Talk to the bot in the chosen conversations.",
   manage:
-    "Edit this Channel Route's audience rules and defaults, on the app and in chat, and appoint another Admin. Who may talk to the bot is set on the Route.",
+    "Edit this Connection's audience rules and defaults, on the app and in chat, and appoint another Admin. Who may talk to the bot is set on the Route.",
   run: "Run this Automation.",
   admin: (kind) =>
     kind === "team"
@@ -112,7 +112,7 @@ function summarizeTeamAdmin(held: ReadonlySet<string>, summary: AccessSummary): 
 
 function summarizeRoutes(held: ReadonlySet<string>, summary: AccessSummary): void {
   if (held.has("channel.manage")) {
-    summary.allows.push("Edit this Channel Route's audience rules, Routes, and defaults");
+    summary.allows.push("Edit this Connection's audience rules, Routes, and defaults");
     summary.allows.push("Relink the account and read its activity");
     if (held.has(CAN_SHARE_PRIVILEGE)) summary.allows.push("Appoint another Admin on this Route");
     summary.withholds.push("Who may talk to the bot is set in the Route's audience rules");

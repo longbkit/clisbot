@@ -5,7 +5,7 @@ export interface AutomationChannelDraft {
   accounts: Record<string, unknown>[];
   resource: Record<string, unknown>;
   policy: Record<string, unknown>;
-  /** `accounts`: the author is Channel Route Admin of these accounts only, so
+  /** `accounts`: the author is Connection Admin of these accounts only, so
    * each changed account saves through its own endpoint. Absent = the
    * organization capability saves the whole configuration. */
   scope?: "organization" | "accounts";

@@ -1,5 +1,5 @@
 // The Channel-account Access grant the channel plane reads on its own: the
-// `channel.manage` check the Channel Route Admin API makes for a signed-in
+// `channel.manage` check the Connection Admin API makes for a signed-in
 // Member (`management-api/channel-admin.ts`).
 // Drizzle over the shared schema, kept out of `access/store.ts` so the
 // channel plane owns the reads it needs (delegation-implementation.md, row B).
@@ -48,7 +48,7 @@ export function holdsChannelAccountManagement(
   );
 }
 
-/** Whether a Member is Channel Route Admin of any account (the channel catalog
+/** Whether a Member is Connection Admin of any account (the channel catalog
  * and other account-neutral reads a Route Admin's screens need). */
 export function holdsAnyChannelAccountManagement(
   runtime: DatabaseRuntime,

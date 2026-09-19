@@ -308,7 +308,7 @@ describe("Access assignment editing", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save access" })).toBeNull());
   });
 
-  it("grants Channel Route Admin with no Conversations field and saves it for every conversation", async () => {
+  it("grants Connection Admin with no Conversations field and saves it for every conversation", async () => {
     const channelAssignment = {
       ...assignment,
       resourceKind: "channel_account",

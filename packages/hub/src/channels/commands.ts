@@ -270,8 +270,8 @@ export function channelCommandSpec(name: ChannelCommandName) {
 const PRIVILEGE_NEEDS: Readonly<Record<string, string>> = {
   "agent.interact": "Project access",
   "agent.create": "Project access",
-  "approval.config": "permission to manage this Channel Route's commands",
-  "channel.manage": "permission to manage this Channel Route",
+  "approval.config": "permission to manage this Connection's commands",
+  "channel.manage": "permission to manage this Connection",
 };
 
 /**

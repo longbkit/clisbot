@@ -37,11 +37,17 @@ import {
 } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
+import { ChoiceRow } from "./channel-route-behavior-rows";
 import {
-  RouteBehaviorSwitch,
-  RouteFollowUpFields,
-  SettingRow,
-} from "./channel-route-behavior-rows";
+  FoldedRouteFormSection,
+  RouteFormSection,
+  RoutePermissionFields,
+  RouteReplyFields,
+  approvalSummary,
+  DEFAULT_ROUTE_QUESTIONS,
+  QUESTION_VALUES,
+  type RouteApprovalChoice,
+} from "./channel-route-form-sections";
 import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -82,6 +88,7 @@ import {
   routeContainsText,
   type ChannelConfigurationRecord,
   type ChannelRouteBehavior,
+  type ChannelRouteQuestions,
   type ChannelRouteTarget,
 } from "../channel-configuration";
 import {
@@ -137,7 +144,6 @@ import { type AutomationConnection, SingleAgentAutomationForm } from "./automati
 type RecordValue = ChannelConfigurationRecord;
 type RouteTarget = "agent" | "automation";
 type RouteCondition = "all" | "contains";
-type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 const FOLLOW_UP_TTL_ERROR = "Use a positive whole number of minutes.";
 type ConfigurationKind = "account" | "route";
 type HubConnection = z.infer<typeof HubConnectionsSchema>["connections"][number];
@@ -156,7 +162,7 @@ type HubRevision = z.infer<typeof HubChannelRevisionsSchema>["revisions"][number
 type HubChannelConfiguration = z.infer<typeof HubChannelConfigurationSchema>;
 
 const EMPTY_RECORD: RecordValue = {};
-/** What a Channel Route Admin's editor gets for the organization-wide resources it never reads. */
+/** What a Connection Admin's editor gets for the organization-wide resources it never reads. */
 const EMPTY_CONNECTIONS: HubConnections = { connections: [], providerApplications: [] };
 const EMPTY_AUTOMATIONS: HubAutomations = { automations: [] };
 const EMPTY_DAEMONS: HubDaemons = { daemons: [] };
@@ -171,27 +177,17 @@ const ROUTE_TARGET_LABELS = {
   automation: "Run an Automation",
 };
 const EXPERIMENTAL_ROUTE_TARGET_NOTE = "Experimental";
-const OUTBOUND_PATH_VALUES = ["tool", "relay"];
-const OUTBOUND_PATH_LABELS = {
-  tool: "Use Channel tool",
-  relay: "Text forward",
-};
-const APPROVAL_VALUES = ["require", "auto-deny", "auto-allow"];
-const CUSTOM_APPROVAL_VALUES = ["custom", ...APPROVAL_VALUES];
-const APPROVAL_LABELS = {
-  custom: "Custom YAML",
-  require: "Ask authorized members",
-  "auto-deny": "Deny",
-  "auto-allow": "Allow automatically",
-};
 interface EditingRoute {
   accountKey: string;
   routeIndex: number;
 }
 
+/**
+ * One Add Route flow. `accountKey` preselects a Connection; `fixed` means the
+ * form was opened from inside that Connection, so it shows it instead of a picker.
+ */
 type ChannelEditor =
-  | { kind: "account" }
-  | { kind: "route"; accountKey: string }
+  | { kind: "add"; accountKey: string | null; fixed: boolean }
   | { kind: "edit"; route: EditingRoute };
 
 export interface AutomationChannelScope {
@@ -210,12 +206,12 @@ export function ChannelSettings({
   if (hub.loading || adminScope.status === "loading")
     return <Text style={settingsStyles.rowHint}>Loading Channels...</Text>;
   if (adminScope.status === "none" && automationInput)
-    // A Channel input is a Route on a bot, so adding one is Channel Route Admin work.
+    // A Channel input is a Route on a bot, so adding one is Connection Admin work.
     return (
       <Alert
         variant="info"
-        title="Channel inputs need Channel Route Admin"
-        description="A Channel input adds a Route to a Channel bot. Ask an Organization Admin to make you Channel Route Admin of that bot, or to add this input for you."
+        title="Channel inputs need Connection Admin"
+        description="A Channel input adds a Route to a Channel bot. Ask an Organization Admin to make you Connection Admin of that bot, or to add this input for you."
       />
     );
   if (adminScope.status === "none")
@@ -244,13 +240,13 @@ export function ChannelSettings({
   );
 }
 
-/** Channel Routes is the canonical Route editor; Channel Integrations is setup
+/** Connections is the canonical Route editor; Channel Integrations is setup
  * and capabilities, Operations is the durable ingress queue, Activity is inbound
  * admission. The `accounts`/`catalog` values stay as the stored view ids. */
 type ChannelView = "accounts" | "catalog" | "operations" | "activity";
 
 const CHANNEL_VIEWS: SegmentedControlOption<ChannelView>[] = [
-  { value: "accounts", label: "Channel Routes" },
+  { value: "accounts", label: "Connections" },
   { value: "catalog", label: "Channel Integrations" },
   { value: "operations", label: "Operations" },
   { value: "activity", label: "Activity" },
@@ -273,7 +269,7 @@ function ChannelSettingsContent({
   adminAccounts,
 }: Partial<AutomationChannelScope> & {
   embedded: boolean;
-  /** The accounts a Channel Route Admin administers; null for the organization capability. */
+  /** The accounts a Connection Admin administers; null for the organization capability. */
   adminAccounts: readonly ChannelAccountRef[] | null;
 }) {
   const [choosingInput, setChoosingInput] = useState(false);
@@ -370,7 +366,7 @@ function ChannelSettingsContent({
         return;
       }
       if (adminScoped) {
-        // A Channel Route Admin saves one account file at a time; the Hub
+        // A Connection Admin saves one account file at a time; the Hub
         // validates it and refuses a changed Connection.
         await saveChangedAccounts(
           hub.api(),
@@ -428,9 +424,9 @@ function ChannelSettingsContent({
         title: `Remove ${accountId}?`,
         message:
           remainingConsumers.length > 0
-            ? `This removes ${channel} behavior and its Routes. The provider Connection remains in use by ${remainingConsumers.map(({ name }) => name).join(", ")}.`
-            : `This removes ${channel} behavior and its Routes. You can also disconnect the unused provider Connection next.`,
-        confirmLabel: "Remove Channel Route",
+            ? `This removes all of its Routes, so nobody can talk to this bot. The Connection's credential stays, in use by ${remainingConsumers.map(({ name }) => name).join(", ")}.`
+            : `This removes all of its Routes, so nobody can talk to this bot. You can also disconnect its credential next.`,
+        confirmLabel: "Remove Routes",
         destructive: true,
       });
       if (!confirmed) return;
@@ -448,10 +444,10 @@ function ChannelSettingsContent({
         await connections.refetch();
         if (connectionId === null || remainingConsumers.length > 0) return;
         const disconnect = await confirmDialog({
-          title: "Disconnect unused provider account?",
+          title: "Disconnect its credential too?",
           message: "This removes its saved credentials and Channel identity mappings.",
           confirmLabel: "Disconnect",
-          cancelLabel: "Keep Connection",
+          cancelLabel: "Keep credential",
           destructive: true,
         });
         if (!disconnect) return;
@@ -606,10 +602,16 @@ function ChannelSettingsContent({
     (route: EditingRoute) => beginEdit({ kind: "edit", route }),
     [beginEdit],
   );
-  const addAccount = useCallback(() => beginEdit({ kind: "account" }), [beginEdit]);
-  const addRoute = useCallback(() => {
-    if (selectedAccountKey !== null) beginEdit({ kind: "route", accountKey: selectedAccountKey });
-  }, [selectedAccountKey, beginEdit]);
+  // Add Route from the list header picks the Connection; from inside a
+  // Connection it belongs to that Connection.
+  const addRoute = useCallback(
+    () => beginEdit({ kind: "add", accountKey: null, fixed: false }),
+    [beginEdit],
+  );
+  const addRouteTo = useCallback(
+    (accountKey: string) => beginEdit({ kind: "add", accountKey, fixed: true }),
+    [beginEdit],
+  );
   const createRouteAutomation = useCallback(
     async (yaml: string) => {
       const created = await createAutomation(hub.api(), yaml);
@@ -754,8 +756,8 @@ function ChannelSettingsContent({
         toggleChoosingInput={toggleChoosingInput}
         pending={pending}
         editRoute={editRoute}
-        beginEdit={beginEdit}
-        addAccount={addAccount}
+        addRoute={addRoute}
+        addRouteTo={addRouteTo}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
         testRoute={testRoute}
@@ -815,8 +817,8 @@ function ChannelSettingsContent({
         removeAccount={removeAccount}
         retryAccount={retryAccount}
         editRoute={editRoute}
-        addAccount={addAccount}
         addRoute={addRoute}
+        addRouteTo={addRouteTo}
         openActivity={openAccountActivity}
         testRoute={testRoute}
         moveRoute={moveRoute}
@@ -838,7 +840,7 @@ function ChannelSettingsContent({
 }
 
 /**
- * What the editor and the accounts list read, by viewer. A Channel Route Admin
+ * What the editor and the accounts list read, by viewer. A Connection Admin
  * never reads the organization-wide Connections, Automations, Hosts or
  * revisions: the form shows the target as managed elsewhere instead.
  */
@@ -880,7 +882,7 @@ interface SourceQuery<Data> {
   error: Error | null;
 }
 
-/** Revision history and Advanced YAML: organization-wide, so hidden from a Channel Route Admin. */
+/** Revision history and Advanced YAML: organization-wide, so hidden from a Connection Admin. */
 function ChannelConfigurationExtras({
   visible,
   showHistory,
@@ -920,7 +922,7 @@ function ChannelConfigurationExtras({
   );
 }
 
-/** The Channel Routes that feed one Automation, and the picker that adds one. */
+/** The Connections whose Routes feed one Automation, and the picker that adds one. */
 function AutomationChannelInputs({
   automationName,
   embedded,
@@ -933,8 +935,8 @@ function AutomationChannelInputs({
   toggleChoosingInput,
   pending,
   editRoute,
-  beginEdit,
-  addAccount,
+  addRoute,
+  addRouteTo,
   moveRoute,
   removeRoute,
   testRoute,
@@ -950,8 +952,8 @@ function AutomationChannelInputs({
   toggleChoosingInput(): void;
   pending: boolean;
   editRoute(route: EditingRoute): void;
-  beginEdit(editor: ChannelEditor): void;
-  addAccount(): void;
+  addRoute(): void;
+  addRouteTo(accountKey: string): void;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
@@ -990,7 +992,7 @@ function AutomationChannelInputs({
           automationName={automationName}
           pending={pending}
           editRoute={editRoute}
-          addRoute={beginEdit}
+          addRouteTo={addRouteTo}
           moveRoute={moveRoute}
           runtimes={inputDraft ? [] : runtimes}
           removeRoute={removeRoute}
@@ -1002,9 +1004,9 @@ function AutomationChannelInputs({
           size="sm"
           variant="outline"
           disabled={pending || accounts === undefined}
-          onPress={addAccount}
+          onPress={addRoute}
         >
-          Connect a new account
+          Use another Connection
         </Button>
       ) : null}
     </AutomationInputSection>
@@ -1024,7 +1026,7 @@ function AutomationChannelAccount({
   automationName,
   pending,
   editRoute,
-  addRoute,
+  addRouteTo,
   removeRoute,
   testRoute,
   moveRoute,
@@ -1037,14 +1039,11 @@ function AutomationChannelAccount({
   automationName: string;
   pending: boolean;
   editRoute(route: EditingRoute): void;
-  addRoute(editor: ChannelEditor): void;
+  addRouteTo(accountKey: string): void;
   removeRoute(account: RecordValue, index: number): Promise<void>;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
 }) {
-  const add = useCallback(
-    () => addRoute({ kind: "route", accountKey: channelAccountKey(account) }),
-    [account, addRoute],
-  );
+  const add = useCallback(() => addRouteTo(channelAccountKey(account)), [account, addRouteTo]);
   const routes = arrayField(account, "routes") as RecordValue[];
   return (
     <View style={settingsStyles.card}>
@@ -1052,7 +1051,7 @@ function AutomationChannelAccount({
         <Text style={settingsStyles.rowTitle}>{channelAccountLabel(account)}</Text>
         {choosing ? (
           <Button size="sm" variant="outline" disabled={pending} onPress={add}>
-            Use this connection
+            Add input here
           </Button>
         ) : null}
       </View>
@@ -1078,18 +1077,20 @@ function AutomationChannelAccount({
 }
 
 function ChannelRouteEditorHeader({
-  backLabel = "Back to Channels",
+  title,
+  backLabel = "Back to Connections",
   pending,
   error,
   back,
 }: {
+  title: string;
   pending: boolean;
   error: string | null;
   back(): void;
   backLabel?: string;
 }) {
   return (
-    <SettingsSection title="Route details">
+    <SettingsSection title={title}>
       <Button size="sm" variant="outline" disabled={pending} onPress={back}>
         {backLabel}
       </Button>
@@ -1117,8 +1118,8 @@ function ChannelAccountsSection({
   removeAccount,
   retryAccount,
   editRoute,
-  addAccount,
   addRoute,
+  addRouteTo,
   openActivity,
   testRoute,
   moveRoute,
@@ -1134,7 +1135,7 @@ function ChannelAccountsSection({
   mutationError: string | null;
   testResult: string | null;
   selectedAccountKey: string | null;
-  /** A Channel Route Admin: their accounts only, nothing organization-wide. */
+  /** A Connection Admin: their accounts only, nothing organization-wide. */
   adminScoped: boolean;
   pending: boolean;
   refreshStatus(): void;
@@ -1143,27 +1144,21 @@ function ChannelAccountsSection({
   removeAccount(account: RecordValue): Promise<void>;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
-  addAccount(): void;
   addRoute(): void;
+  addRouteTo(accountKey: string): void;
   openActivity(): void;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
   return (
-    <SettingsSection title="Channel Routes">
+    <SettingsSection title="Connections" info={CONNECTIONS_INFO}>
       <QueryFeedback queries={queries} />
       <View style={styles.actions}>
-        {/* Two fixed actions rather than one that changes meaning with the
-            selection: a new Channel Route always carries the Channel Account
-            picker, while Add Route only adds a rule to the open one. */}
-        {adminScoped ? null : (
-          <Button size="sm" disabled={pending} onPress={addAccount}>
-            Add Channel Route
-          </Button>
-        )}
-        {selectedAccountKey !== null ? (
-          <Button size="sm" variant="outline" disabled={pending} onPress={addRoute}>
+        {/* One Add Route: here its form picks the Connection or connects a new
+            one; inside an open Connection the card's own Add Route takes over. */}
+        {selectedAccountKey === null ? (
+          <Button size="sm" disabled={pending} onPress={addRoute}>
             Add Route
           </Button>
         ) : null}
@@ -1193,6 +1188,7 @@ function ChannelAccountsSection({
         removeAccount={removeAccount}
         retryAccount={retryAccount}
         editRoute={editRoute}
+        addRouteTo={addRouteTo}
         testRoute={testRoute}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
@@ -1200,6 +1196,9 @@ function ChannelAccountsSection({
     </SettingsSection>
   );
 }
+
+const CONNECTIONS_INFO =
+  "A Connection is one bot on one channel, such as a Slack workspace install or a Telegram bot. Its Routes decide who may talk to it, where, and which Agent or Automation answers; the first Route that matches a message wins.";
 
 function ChannelManagementSection({
   editor,
@@ -1265,7 +1264,10 @@ function ChannelManagementSection({
     [saveConnection],
   );
   const editing = editor.kind === "edit" ? editor.route : null;
-  const accountKey = editor.kind === "route" ? editor.accountKey : null;
+  const accountKey = editor.kind === "add" ? editor.accountKey : null;
+  const fixedAccount = editor.kind === "edit" || editor.fixed;
+  const title =
+    editor.kind === "edit" ? `Edit Route ${String(editor.route.routeIndex + 1)}` : "Add Route";
   if (
     channels === undefined ||
     connections === undefined ||
@@ -1276,6 +1278,7 @@ function ChannelManagementSection({
     return (
       <View>
         <ChannelRouteEditorHeader
+          title={title}
           backLabel={automationName ? "Back to Automation inputs" : undefined}
           pending={pending}
           error={error}
@@ -1292,6 +1295,7 @@ function ChannelManagementSection({
   return (
     <>
       <ChannelRouteEditorHeader
+        title={title}
         backLabel={automationName ? "Back to Automation inputs" : undefined}
         pending={pending || connectionPending}
         error={error}
@@ -1302,7 +1306,7 @@ function ChannelManagementSection({
         <ChannelAccountForm
           automationName={automationName}
           connections={channelConnections}
-          {...(editor.kind === "account" ? { connectChannelAccount: openConnection } : {})}
+          {...(fixedAccount || adminScoped ? {} : { connectChannelAccount: openConnection })}
           automationConnections={connections.connections}
           automations={automations.automations}
           daemons={daemons.daemons}
@@ -1311,6 +1315,7 @@ function ChannelManagementSection({
           existingAccounts={channels.accounts}
           editing={editing}
           initialAccountKey={accountKey}
+          fixedAccount={fixedAccount}
           createdConnectionId={createdConnectionId}
           pending={pending}
           adminScoped={adminScoped}
@@ -1328,7 +1333,7 @@ function ChannelManagementSection({
             create={submitConnection}
           />
           <Button variant="outline" disabled={connectionPending} onPress={closeConnection}>
-            Back to Channel Route
+            Back to the Route
           </Button>
         </View>
       ) : null}
@@ -1339,8 +1344,7 @@ function ChannelManagementSection({
 function channelFormKey(editor: ChannelEditor): string {
   if (editor.kind === "edit")
     return `${editor.route.accountKey}:${String(editor.route.routeIndex)}`;
-  if (editor.kind === "route") return `add-route:${editor.accountKey}`;
-  return "add-account";
+  return `add-route:${editor.accountKey ?? ""}:${String(editor.fixed)}`;
 }
 
 function ChannelAccountList({
@@ -1360,6 +1364,7 @@ function ChannelAccountList({
   removeAccount,
   retryAccount,
   editRoute,
+  addRouteTo,
   testRoute,
   moveRoute,
   removeRoute,
@@ -1380,6 +1385,7 @@ function ChannelAccountList({
   removeAccount(account: RecordValue): Promise<void>;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
+  addRouteTo(accountKey: string): void;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
@@ -1387,7 +1393,7 @@ function ChannelAccountList({
   if (accounts.length === 0) {
     return (
       <View style={settingsStyles.card}>
-        <EmptyRow message="No Channel Routes are configured." />
+        <EmptyRow message="No Connection has a Route yet. Add Route connects one." />
       </View>
     );
   }
@@ -1418,6 +1424,7 @@ function ChannelAccountList({
             removeAccount={removeAccount}
             retryAccount={retryAccount}
             editRoute={editRoute}
+            addRouteTo={addRouteTo}
             testRoute={testRoute}
             moveRoute={moveRoute}
             removeRoute={removeRoute}
@@ -1445,6 +1452,7 @@ function ChannelAccountRow({
   removeAccount,
   retryAccount,
   editRoute,
+  addRouteTo,
   testRoute,
   moveRoute,
   removeRoute,
@@ -1466,6 +1474,7 @@ function ChannelAccountRow({
   removeAccount(account: RecordValue): Promise<void>;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
+  addRouteTo(accountKey: string): void;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
@@ -1493,6 +1502,7 @@ function ChannelAccountRow({
   const remove = useCallback(() => {
     void removeAccount(account);
   }, [account, removeAccount]);
+  const addRoute = useCallback(() => addRouteTo(key), [addRouteTo, key]);
 
   return (
     <View style={index > 0 ? settingsStyles.rowBorder : null}>
@@ -1519,7 +1529,7 @@ function ChannelAccountRow({
             disabled={pending}
             onPress={toggleSelected}
           >
-            {selected ? "Back to Channel Routes" : "Manage"}
+            {selected ? "Back to Connections" : "Manage"}
           </Button>
           <Switch
             value={enabled}
@@ -1553,6 +1563,7 @@ function ChannelAccountRow({
         retryAccount={retryAccount}
         updateAccount={updateAccount}
       />
+      {selected ? <RoutesHeaderRow pending={pending} addRoute={addRoute} /> : null}
       <ChannelAccountRouteList
         visible={selected}
         account={account}
@@ -1568,6 +1579,21 @@ function ChannelAccountRow({
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
+    </View>
+  );
+}
+
+/** The Connection's Routes start here, with the one way to add another. */
+function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): void }) {
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.row]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={styles.formHeading}>Routes</Text>
+        <Text style={settingsStyles.rowHint}>First match wins, top to bottom.</Text>
+      </View>
+      <Button size="xs" variant="outline" disabled={pending} onPress={addRoute}>
+        Add Route
+      </Button>
     </View>
   );
 }
@@ -1786,7 +1812,7 @@ function ChannelAccountQrLinking({ channel, accountId }: { channel: string; acco
 }
 
 /**
- * The Channel Route's Access tab: who administers it. Who may talk is decided
+ * The Connection's Access tab: who administers it. Who may talk is decided
  * by each Route's audience rules, so no Use grant is offered here
  * (docs/features/access/scoped-admins.md).
  */
@@ -1853,10 +1879,10 @@ function ChannelRouteAdmins({
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Channel Route Admins</Text>
+        <Text style={settingsStyles.rowTitle}>Connection Admins</Text>
         <Text style={settingsStyles.rowHint}>
-          Admins edit this Channel Route’s Routes, audience rules, status and relink. Who may talk
-          to the bot is set on each Route.
+          Admins edit this Connection’s Routes, audience rules, status and relink. Who may talk to
+          the bot is set on each Route.
         </Text>
         {adminLines(assignments === undefined, admins).map((line, index) => (
           <Text key={admins[index]?.id ?? line} style={settingsStyles.rowHint}>
@@ -1973,7 +1999,7 @@ function ChannelAccountRouteList({
   if (routes.length === 0) {
     return (
       <>
-        <EmptyRow message="No Routes are configured for this Channel Route." />
+        <EmptyRow message="No Routes yet: nobody can talk to this bot." />
         {refusal}
       </>
     );
@@ -2241,6 +2267,7 @@ function ChannelAccountForm({
   existingAccounts,
   editing,
   initialAccountKey,
+  fixedAccount,
   createdConnectionId,
   pending,
   adminScoped,
@@ -2265,14 +2292,16 @@ function ChannelAccountForm({
   existingAccounts: RecordValue[];
   editing: EditingRoute | null;
   initialAccountKey: string | null;
+  /** The Connection is shown, not picked: an edit, or Add Route inside a Connection. */
+  fixedAccount: boolean;
   createdConnectionId: string | null;
   pending: boolean;
-  /** A Channel Route Admin: the target is shown, not edited, and saved as it is. */
+  /** A Connection Admin: the target is shown, not edited, and saved as it is. */
   adminScoped: boolean;
   /** The last save's refusal, so rule-level Hub errors land on their rows. */
   saveError: string | null;
   cancelEdit(): void;
-  /** Absent when the form edits an account that already has its Channel Account. */
+  /** Offered beside the Connection picker; absent when the Connection is fixed. */
   connectChannelAccount?: () => void;
   createRouteAutomation(yaml: string): Promise<string>;
   save(accounts: RecordValue[], resource: RecordValue, createdAccountKey?: string): void;
@@ -2290,13 +2319,28 @@ function ChannelAccountForm({
   }, []);
   const initial = channelFormInitialState(existingAccounts, editing, resource);
   const { editedAccount, editedRoute, editedWorkflow, isEditing } = initial;
-  const configurationKind = channelConfigurationKind(isEditing, initialAccountKey);
-  const existingAccountKey = initial.accountKey ?? initialAccountKey;
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  // The picked Connection: one that already has Routes (its account), or one
+  // with none yet, which this Route gives its first.
+  const [destination, setDestinationState] = useState<RouteDestination | null>(() =>
+    initialAccountKey === null ? null : { kind: "account", key: initialAccountKey },
+  );
+  const [accountIdDraft, setAccountId] = useState<string | null>(null);
+  const setDestination = useCallback((next: RouteDestination | null) => {
+    setDestinationState(next);
+    setAccountId(null);
+  }, []);
   useEffect(() => {
-    if (createdConnectionId !== null) setConnectionId(createdConnectionId);
-  }, [createdConnectionId]);
-  const [accountId, setAccountId] = useState("");
+    if (createdConnectionId !== null)
+      setDestination({ kind: "connection", id: createdConnectionId });
+  }, [createdConnectionId, setDestination]);
+  const { configurationKind, existingAccountKey, connectionId, destinationValue } =
+    routeDestinationState(isEditing, initial.accountKey, destination);
+  const accountId =
+    accountIdDraft ??
+    suggestedChannelAccountId(
+      existingAccounts,
+      connections.find(({ id }) => id === connectionId),
+    );
   const [audienceRules, setAudienceRulesState] = useState<AudienceRuleDraft[]>(
     initial.audienceRules,
   );
@@ -2379,15 +2423,9 @@ function ChannelAccountForm({
   } = selection;
   const parsedProviderOptions = parseOptionalObject(providerOptions);
   const parsedRouteLimits = parseChannelLimitsDraft(routeLimits);
-  const connectionOptions = useMemo<SelectFieldOption<string>[]>(
-    () =>
-      connections.map((connection) => ({
-        id: connection.id,
-        value: connection.id,
-        label: `${channelLabel(connection.provider)} · ${connection.name}`,
-        description: connection.externalName ?? undefined,
-      })),
-    [connections],
+  const destinationOptions = useMemo(
+    () => routeDestinationOptions(existingAccounts, connections, adminScoped, inputDraft?.provider),
+    [adminScoped, connections, existingAccounts, inputDraft?.provider],
   );
   const daemonOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
@@ -2413,7 +2451,7 @@ function ChannelAccountForm({
     behavior,
     draft: followUpTtlDraft,
   });
-  // A Channel Route Admin keeps the Route's target; a new Route of theirs
+  // A Connection Admin keeps the Route's target; a new Route of theirs
   // copies the target of one the account already has.
   const [existingTargetIndex, setExistingTargetIndex] = useState<string | null>(null);
   const existingTarget = adminExistingTarget(
@@ -2446,9 +2484,13 @@ function ChannelAccountForm({
     configurationKind === "account" &&
     isDuplicateChannelAccount(existingAccounts, selectedConnection, accountId);
 
-  const connectionDisplay = useMemo(
-    () => selectedOptionDisplay(connectionOptions, connectionId),
-    [connectionId, connectionOptions],
+  const destinationDisplay = useMemo(
+    () => selectedOptionDisplay(destinationOptions, destinationValue),
+    [destinationOptions, destinationValue],
+  );
+  const changeDestination = useCallback(
+    (value: string | null) => setDestination(parseRouteDestination(value)),
+    [setDestination],
   );
   const automationDisplay = useMemo(
     () => selectedOptionDisplay(automationOptions, automationName),
@@ -2523,10 +2565,15 @@ function ChannelAccountForm({
     (value: string) => setApprovalChoice(value as RouteApprovalChoice),
     [],
   );
+  const changeQuestions = useCallback(
+    (value: string) =>
+      setBehavior((current) => ({ ...current, questions: value as ChannelRouteQuestions })),
+    [],
+  );
   const changeTarget = useCallback((value: string) => setTarget(value as RouteTarget), []);
   const showAutomationForm = useCallback(() => {
     if (selectedConnection === undefined) {
-      setAutomationCreateError("Choose a Channel Connection before creating its Automation.");
+      setAutomationCreateError("Choose a Connection before creating its Automation.");
       return;
     }
     setAutomationCreateError(null);
@@ -2652,90 +2699,74 @@ function ChannelAccountForm({
     previewWarnings,
   ]);
 
-  const renderAccountSelection = () => (
-    <>
-      {isEditing ? (
-        <Alert
-          variant="info"
-          title={channelAccountLabel(editedAccount)}
-          description="Saving validates and activates one complete Channel configuration revision."
-        />
-      ) : null}
-      {!isEditing && configurationKind === "account" ? (
-        <>
-          {/* The heading names the group and the trigger names itself, so the two
-              controls carry no captions; `Or` joins them and wraps with the button
-              rather than being stranded at the end of the first line. */}
-          <View style={styles.accountPicker}>
-            <Text style={styles.formHeading}>Channel Account</Text>
-            <View style={styles.accountRow}>
-              <View style={styles.accountSelect}>
-                <SelectField
-                  label="Channel Account"
-                  field={false}
-                  value={connectionId}
-                  selectedDisplay={connectionDisplay}
-                  options={connectionOptions}
-                  onChange={setConnectionId}
-                  placeholder="Choose a channel account"
-                  emptyText="No Channel Account is connected yet."
-                  searchable={connectionOptions.length > 6}
-                  title="Channel Account"
-                  disabled={pending}
-                />
-              </View>
-              {connectChannelAccount === undefined ? null : (
-                <View style={styles.accountConnect}>
-                  <Text style={styles.accountOr}>Or</Text>
-                  <Button
-                    size="sm"
-                    variant={connectionOptions.length === 0 ? "secondary" : "outline"}
-                    disabled={pending}
-                    onPress={connectChannelAccount}
-                  >
-                    Connect a Channel Integration
-                  </Button>
-                </View>
-              )}
-            </View>
-            {connectionOptions.length === 0 ? (
-              <Text style={settingsStyles.rowHint}>Nothing is connected yet.</Text>
-            ) : null}
-          </View>
-          <Field
-            label="Account name"
-            hint="A short name for this behavior configuration; credentials stay on the Connection."
-            error={duplicateAccount ? "This account name is already used for the provider." : null}
-          >
-            <FormTextInput
-              initialValue=""
-              onChangeText={setAccountId}
-              placeholder="customer-support"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!pending}
+  const renderConnection = () => (
+    <RouteFormSection title="Connection">
+      {fixedAccount ? (
+        <View style={styles.channelTitle}>
+          <ChannelIcon
+            channel={
+              stringField(isEditing ? editedAccount : selectedAccount, "channel") ?? undefined
+            }
+            size={14}
+          />
+          <Text style={settingsStyles.rowTitle}>
+            {channelAccountLabel(isEditing ? editedAccount : selectedAccount)}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.accountRow}>
+          <View style={styles.accountSelect}>
+            <SelectField
+              label="Connection"
+              field={false}
+              value={destinationValue}
+              selectedDisplay={destinationDisplay}
+              options={destinationOptions}
+              onChange={changeDestination}
+              placeholder="Choose a Connection"
+              emptyText="Nothing is connected yet."
+              searchable={destinationOptions.length > 6}
+              title="Connection"
+              disabled={pending}
             />
-          </Field>
-        </>
-      ) : null}
-      {!isEditing && configurationKind === "route" ? (
-        // A Route belongs to the Channel Route it was opened from, so the account
-        // is shown rather than picked; the hint names the path to a different one.
-        <Field
-          label="Channel Account"
-          hint="Fixed by the Channel Route you opened. Use Add Channel Route for a different account."
-        >
-          <View style={styles.channelTitle}>
-            <ChannelIcon channel={stringField(selectedAccount, "channel") ?? undefined} size={14} />
-            <Text style={settingsStyles.rowTitle}>{channelAccountLabel(selectedAccount)}</Text>
           </View>
+          {connectChannelAccount === undefined ? null : (
+            <View style={styles.accountConnect}>
+              <Text style={styles.accountOr}>Or</Text>
+              <Button
+                size="sm"
+                variant={destinationOptions.length === 0 ? "secondary" : "outline"}
+                disabled={pending}
+                onPress={connectChannelAccount}
+              >
+                Connect a new one
+              </Button>
+            </View>
+          )}
+        </View>
+      )}
+      {configurationKind === "account" ? (
+        // A Connection's first Route also names the bot in Paseo; the name
+        // defaults from the Connection and is what the list shows.
+        <Field
+          label="Name"
+          error={duplicateAccount ? "Another Connection on this channel uses this name." : null}
+        >
+          <FormTextInput
+            key={connectionId ?? ""}
+            initialValue={accountId}
+            onChangeText={setAccountId}
+            placeholder="customer-support"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+          />
         </Field>
       ) : null}
-    </>
+    </RouteFormSection>
   );
   const renderAudience = () => (
-    <>
-      <Text style={styles.formHeading}>Who may talk, where</Text>
+    <RouteFormSection title="Who can talk, and where" info={AUDIENCE_INFO}>
       <AudienceRulesEditor
         rules={audienceRules}
         setRules={setAudienceRules}
@@ -2771,37 +2802,37 @@ function ChannelAccountForm({
           />
         </Field>
       ) : null}
-    </>
+    </RouteFormSection>
   );
-  const renderLimits = () => {
-    return (
-      <>
-        <Text style={styles.formHeading}>Limits</Text>
-        <Text style={settingsStyles.rowHint}>
-          Counted across every conversation this Route matches. Messages over a rate or run limit
-          wait their turn; a message longer than the input limit is refused. The bot&apos;s own
-          limits are under Manage → Limits.
-        </Text>
-        <ChannelLimitsFields
-          draft={routeLimits}
-          setDraft={setRouteLimits}
-          defaults={open ? DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS : NO_DEFAULTS}
-          error={parsedRouteLimits.valid ? null : parsedRouteLimits.error}
-          disabled={pending}
-        />
-      </>
-    );
-  };
-  const renderBehavior = () => {
-    return (
-      <RouteBehaviorFields
+  const renderLimits = () => (
+    <FoldedRouteFormSection
+      title="Limits"
+      info={LIMITS_INFO}
+      summary={
+        parsedRouteLimits.valid
+          ? channelLimitsSummary(parsedRouteLimits.value)
+          : parsedRouteLimits.error
+      }
+      inUse={initial.routeLimitsAuthored}
+    >
+      <ChannelLimitsFields
+        draft={routeLimits}
+        setDraft={setRouteLimits}
+        defaults={open ? DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS : NO_DEFAULTS}
+        error={parsedRouteLimits.valid ? null : parsedRouteLimits.error}
+        disabled={pending}
+      />
+    </FoldedRouteFormSection>
+  );
+  const renderReplies = () => (
+    <RouteFormSection title="Replies">
+      <RouteReplyFields
         dmOnly={dmOnly}
         behavior={behavior}
-        approvalChoice={approvalChoice}
         pending={pending}
-        changeRequireMention={changeRequireMention}
         followUpTtlDraft={followUpTtlDraft}
         followUpTtlError={followUpTtlValid ? null : FOLLOW_UP_TTL_ERROR}
+        changeRequireMention={changeRequireMention}
         changeFollowUpAuto={changeFollowUpAuto}
         changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
         changeReplyThread={changeReplyThread}
@@ -2810,50 +2841,91 @@ function ChannelAccountForm({
         changeProgressMessage={changeProgressMessage}
         changeTypingIndicator={changeTypingIndicator}
         changeToolCalls={changeToolCalls}
-        changeApprovalChoice={changeApprovalChoice}
       />
-    );
-  };
+    </RouteFormSection>
+  );
+  const renderPermissions = () => (
+    <RouteFormSection title="Permissions" info={PERMISSIONS_INFO}>
+      <RoutePermissionFields
+        approvalChoice={approvalChoice}
+        questions={behavior.questions ?? DEFAULT_ROUTE_QUESTIONS}
+        pending={pending}
+        changeApprovalChoice={changeApprovalChoice}
+        changeQuestions={changeQuestions}
+      />
+    </RouteFormSection>
+  );
   const renderTarget = () => {
+    if (fixedAutomationName !== undefined)
+      return (
+        <RouteFormSection title="What runs">
+          <Text style={settingsStyles.rowTitle}>{`Automation · ${fixedAutomationName}`}</Text>
+        </RouteFormSection>
+      );
     if (adminScoped)
       return (
-        <ChannelRouteAdminTarget
-          editedRoute={editedRoute}
-          routes={arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[]}
-          selectedIndex={existingTargetIndex}
-          onChange={setExistingTargetIndex}
-          disabled={pending}
-        />
+        <RouteFormSection title="What runs">
+          <ChannelRouteAdminTarget
+            editedRoute={editedRoute}
+            routes={arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[]}
+            selectedIndex={existingTargetIndex}
+            onChange={setExistingTargetIndex}
+            disabled={pending}
+          />
+        </RouteFormSection>
       );
     return (
-      <RouteTargetFields
-        target={target}
-        changeTarget={changeTarget}
-        automationName={automationName}
-        automationDisplay={automationDisplay}
-        automationOptions={automationOptions}
-        setAutomationName={setAutomationName}
-        automationCreatePending={automationCreatePending}
-        showAutomationCreator={showAutomationCreator}
-        showAutomationForm={showAutomationForm}
-        automationCreateError={automationCreateError}
-        daemonId={daemonId}
-        daemonDisplay={daemonDisplay}
-        daemonOptions={daemonOptions}
-        changeDaemon={changeDaemon}
-        projectId={projectId}
-        setProjectId={setProjectId}
-        cwd={cwd}
-        setCwd={setCwd}
-        workspace={workspace}
-        setWorkspace={setWorkspace}
-        selectedDaemonServerId={selectedDaemonServerId}
-        agentConfiguration={agentConfiguration}
-        setAgentConfiguration={setAgentConfiguration}
-        parsedProviderOptions={parsedProviderOptions}
-        setProviderOptions={setProviderOptions}
-        pending={pending}
-      />
+      <RouteFormSection title="What runs">
+        <RouteTargetFields
+          target={target}
+          changeTarget={changeTarget}
+          automationName={automationName}
+          automationDisplay={automationDisplay}
+          automationOptions={automationOptions}
+          setAutomationName={setAutomationName}
+          automationCreatePending={automationCreatePending}
+          showAutomationCreator={showAutomationCreator}
+          showAutomationForm={showAutomationForm}
+          automationCreateError={automationCreateError}
+          daemonId={daemonId}
+          daemonDisplay={daemonDisplay}
+          daemonOptions={daemonOptions}
+          changeDaemon={changeDaemon}
+          projectId={projectId}
+          setProjectId={setProjectId}
+          cwd={cwd}
+          setCwd={setCwd}
+          workspace={workspace}
+          setWorkspace={setWorkspace}
+          selectedDaemonServerId={selectedDaemonServerId}
+          agentConfiguration={agentConfiguration}
+          setAgentConfiguration={setAgentConfiguration}
+          pending={pending}
+        />
+      </RouteFormSection>
+    );
+  };
+  const renderAdvanced = () => {
+    if (adminScoped || fixedAutomationName !== undefined || target !== "agent") return null;
+    return (
+      <FoldedRouteFormSection
+        title="Advanced"
+        summary="Fast mode and provider options"
+        inUse={
+          initial.providerOptions.trim().length > 0 ||
+          initial.agentConfiguration.featureValues["fast_mode"] === true
+        }
+      >
+        <AgentAdvancedFields
+          selectedDaemonServerId={selectedDaemonServerId}
+          agentConfiguration={agentConfiguration}
+          setAgentConfiguration={setAgentConfiguration}
+          providerOptions={providerOptions}
+          parsedProviderOptions={parsedProviderOptions}
+          setProviderOptions={setProviderOptions}
+          pending={pending}
+        />
+      </FoldedRouteFormSection>
     );
   };
   const renderAutomationCreator = () => {
@@ -2874,41 +2946,43 @@ function ChannelAccountForm({
       />
     );
   };
-  const formTitle = channelFormTitle(isEditing, editing, configurationKind);
   return (
     <View>
-      <SettingsSection title={formTitle}>
-        <View style={[settingsStyles.card, styles.form]}>
-          {renderAccountSelection()}
-          {renderAudience()}
-          {fixedAutomationName === undefined ? (
-            renderTarget()
-          ) : (
-            <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
-          )}
-          {renderBehavior()}
-          {renderLimits()}
-          {target === "automation" && automationName !== null && !adminScoped ? (
-            <AutomationReplyAuthority
-              automation={automations.find((item) => item.name === automationName)}
-              channel={selectedConnection?.provider}
-            />
-          ) : null}
-          <Button disabled={pending || !canSave || duplicateAccount} onPress={submit}>
-            {inputDraft ? "Use input" : channelFormSubmitLabel(isEditing)}
-          </Button>
-          <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
-            Cancel
-          </Button>
-        </View>
-      </SettingsSection>
+      {renderConnection()}
+      {renderAudience()}
+      {renderTarget()}
+      {renderReplies()}
+      {renderPermissions()}
+      {renderLimits()}
+      {renderAdvanced()}
+      {target === "automation" && automationName !== null && !adminScoped ? (
+        <AutomationReplyAuthority
+          automation={automations.find((item) => item.name === automationName)}
+          channel={selectedConnection?.provider}
+        />
+      ) : null}
+      <View style={styles.formActions}>
+        <Button disabled={pending || !canSave || duplicateAccount} onPress={submit}>
+          {inputDraft ? "Use input" : channelFormSubmitLabel(isEditing)}
+        </Button>
+        <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
+          Cancel
+        </Button>
+      </View>
       {renderAutomationCreator()}
     </View>
   );
 }
 
+const AUDIENCE_INFO =
+  "A sender is admitted when any row matches both who they are and where they write. Anyone no Route admits is refused.";
+const LIMITS_INFO =
+  "Counted across every conversation this Route matches. Messages over a rate or run limit wait their turn; a message longer than the input limit is refused. The bot's own limits are on the Connection, under Limits.";
+const PERMISSIONS_INFO =
+  "What happens when the Agent's provider asks before it runs a tool. Accept automatically answers every request with Allow: use it when the provider has no mode that runs unattended, or when its own auto mode still asks for review.";
+
 /**
- * The accounts and resource a save writes: the edited Route replaced in place, a new Channel Route appended, or a Route inserted into
+ * The accounts and resource a save writes: the edited Route replaced in place, a Connection's first Route (a new account) appended, or a Route inserted into
  * the selected account. Null when the form has nothing to write to.
  */
 function nextConfiguration(input: {
@@ -2973,14 +3047,7 @@ function nextConfiguration(input: {
   return { nextAccounts, nextResource: candidate.resource, nextRoute: candidate.route };
 }
 
-function channelConfigurationKind(
-  isEditing: boolean,
-  initialAccountKey: string | null,
-): ConfigurationKind {
-  return isEditing || initialAccountKey !== null ? "route" : "account";
-}
-
-/** The Route whose target a Channel Route Admin's save keeps; null when the form builds one. */
+/** The Route whose target a Connection Admin's save keeps; null when the form builds one. */
 function adminExistingTarget(
   adminScoped: boolean,
   editedRoute: RecordValue | undefined,
@@ -2995,7 +3062,7 @@ function adminExistingTarget(
 }
 
 /**
- * What a Channel Route Admin sees for the target: the Route keeps the Agent or
+ * What a Connection Admin sees for the target: the Route keeps the Agent or
  * Automation it has, since the shared resource file that defines it is the
  * organization's. A new Route of theirs copies the target of one the account
  * already runs.
@@ -3048,7 +3115,7 @@ function daemonServerId(daemons: HubDaemon[], daemonId: string | null): string |
   return daemons.find((daemon) => daemon.id === daemonId)?.connectionOffer?.serverId ?? null;
 }
 
-/** True when the provider already has a Channel Account with this name. */
+/** True when the provider already has a Connection with this name. */
 function isDuplicateChannelAccount(
   existingAccounts: RecordValue[],
   connection: { provider: string } | undefined,
@@ -3099,159 +3166,6 @@ function AutomationReplyAuthority({
   );
 }
 
-function RouteBehaviorFields({
-  dmOnly,
-  behavior,
-  approvalChoice,
-  pending,
-  changeRequireMention,
-  followUpTtlDraft,
-  followUpTtlError,
-  changeFollowUpAuto,
-  changeFollowUpTtlMinutes,
-  changeReplyThread,
-  changeOutboundPath,
-  changeFinalAnswers,
-  changeProgressMessage,
-  changeTypingIndicator,
-  changeToolCalls,
-  changeApprovalChoice,
-}: {
-  /** Every rule covers DMs only: mention and thread settings do not apply. */
-  dmOnly: boolean;
-  behavior: ChannelRouteBehavior;
-  approvalChoice: RouteApprovalChoice;
-  pending: boolean;
-  changeRequireMention(value: boolean): void;
-  followUpTtlDraft: string;
-  followUpTtlError: string | null;
-  changeFollowUpAuto(value: boolean): void;
-  changeFollowUpTtlMinutes(value: string): void;
-  changeReplyThread(value: boolean): void;
-  changeOutboundPath(value: string): void;
-  changeFinalAnswers(value: boolean): void;
-  changeProgressMessage(value: boolean): void;
-  changeTypingIndicator(value: boolean): void;
-  changeToolCalls(value: boolean): void;
-  changeApprovalChoice(value: string): void;
-}) {
-  const approvalValues = approvalChoice === "custom" ? CUSTOM_APPROVAL_VALUES : APPROVAL_VALUES;
-  return (
-    <>
-      <Text style={styles.formHeading}>Replies and approvals</Text>
-      {dmOnly ? null : (
-        <RouteBehaviorSwitch
-          label="Require a mention"
-          value={behavior.requireMention}
-          onChange={changeRequireMention}
-          disabled={pending}
-        />
-      )}
-      {!dmOnly && behavior.requireMention ? (
-        <RouteFollowUpFields
-          behavior={behavior}
-          followUpTtlDraft={followUpTtlDraft}
-          followUpTtlError={followUpTtlError}
-          pending={pending}
-          changeFollowUpAuto={changeFollowUpAuto}
-          changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
-        />
-      ) : null}
-      {dmOnly ? null : (
-        <RouteBehaviorSwitch
-          label="Reply in a thread"
-          value={behavior.replyAnchor === "thread"}
-          onChange={changeReplyThread}
-          disabled={pending}
-        />
-      )}
-      <ChoiceRow
-        label="Reply method"
-        values={OUTBOUND_PATH_VALUES}
-        selected={behavior.outboundPath}
-        labels={OUTBOUND_PATH_LABELS}
-        layout="row"
-        onChange={changeOutboundPath}
-        disabled={pending}
-      />
-      <RelayBehaviorFields
-        visible={behavior.outboundPath === "relay"}
-        behavior={behavior}
-        pending={pending}
-        changeFinalAnswers={changeFinalAnswers}
-        changeProgressMessage={changeProgressMessage}
-        changeTypingIndicator={changeTypingIndicator}
-        changeToolCalls={changeToolCalls}
-      />
-      <ChoiceRow
-        label="Tool requests"
-        values={approvalValues}
-        selected={approvalChoice}
-        labels={APPROVAL_LABELS}
-        layout="row"
-        onChange={changeApprovalChoice}
-        disabled={pending}
-      />
-    </>
-  );
-}
-
-function RelayBehaviorFields({
-  visible,
-  behavior,
-  pending,
-  changeFinalAnswers,
-  changeProgressMessage,
-  changeTypingIndicator,
-  changeToolCalls,
-}: {
-  visible: boolean;
-  behavior: ChannelRouteBehavior;
-  pending: boolean;
-  changeFinalAnswers(value: boolean): void;
-  changeProgressMessage(value: boolean): void;
-  changeTypingIndicator(value: boolean): void;
-  changeToolCalls(value: boolean): void;
-}) {
-  if (!visible) {
-    return (
-      <Alert
-        variant="info"
-        title="The Agent controls replies"
-        description="The Agent can send text and files from the selected Project to this conversation without a separate approval. File sending requires the Hub to access the Project folder. Text forward is disabled to avoid duplicate replies."
-      />
-    );
-  }
-  return (
-    <>
-      <RouteBehaviorSwitch
-        label="Send final answers"
-        value={behavior.finalAnswers}
-        onChange={changeFinalAnswers}
-        disabled={pending}
-      />
-      <RouteBehaviorSwitch
-        label="Send progress messages"
-        value={behavior.progressMessage}
-        onChange={changeProgressMessage}
-        disabled={pending}
-      />
-      <RouteBehaviorSwitch
-        label="Show typing indicator"
-        value={behavior.typingIndicator}
-        onChange={changeTypingIndicator}
-        disabled={pending}
-      />
-      <RouteBehaviorSwitch
-        label="Show tool activity"
-        value={behavior.toolCalls}
-        onChange={changeToolCalls}
-        disabled={pending}
-      />
-    </>
-  );
-}
-
 function RouteTargetFields({
   target,
   changeTarget,
@@ -3276,8 +3190,6 @@ function RouteTargetFields({
   selectedDaemonServerId,
   agentConfiguration,
   setAgentConfiguration,
-  parsedProviderOptions,
-  setProviderOptions,
   pending,
 }: {
   target: RouteTarget;
@@ -3303,8 +3215,6 @@ function RouteTargetFields({
   selectedDaemonServerId: string | null;
   agentConfiguration: ManagedAgentConfigurationValue;
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
-  parsedProviderOptions: ReturnType<typeof parseOptionalObject>;
-  setProviderOptions(value: string): void;
   pending: boolean;
 }) {
   return (
@@ -3345,8 +3255,6 @@ function RouteTargetFields({
           selectedDaemonServerId={selectedDaemonServerId}
           agentConfiguration={agentConfiguration}
           setAgentConfiguration={setAgentConfiguration}
-          parsedProviderOptions={parsedProviderOptions}
-          setProviderOptions={setProviderOptions}
           pending={pending}
         />
       )}
@@ -3419,8 +3327,6 @@ function AgentTargetFields({
   selectedDaemonServerId,
   agentConfiguration,
   setAgentConfiguration,
-  parsedProviderOptions,
-  setProviderOptions,
   pending,
 }: {
   daemonId: string | null;
@@ -3436,13 +3342,8 @@ function AgentTargetFields({
   selectedDaemonServerId: string | null;
   agentConfiguration: ManagedAgentConfigurationValue;
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
-  parsedProviderOptions: ReturnType<typeof parseOptionalObject>;
-  setProviderOptions(value: string): void;
   pending: boolean;
 }) {
-  const providerOptionsError = parsedProviderOptions.valid
-    ? null
-    : 'Enter a JSON object, for example {"setting": true}.';
   return (
     <>
       <SelectField
@@ -3475,101 +3376,55 @@ function AgentTargetFields({
         showFastMode={false}
         disabled={pending}
       />
-      <View style={styles.inlineFields}>
-        <Text style={styles.formHeading}>Advanced Provider Options</Text>
-        <ManagedAgentFastModeSwitch
-          serverId={selectedDaemonServerId}
-          value={agentConfiguration}
-          onChange={setAgentConfiguration}
-          disabled={pending}
-        />
-        <Field
-          label="Provider options"
-          hint="Optional JSON object for provider-specific settings."
-          error={providerOptionsError}
-        >
-          <FormTextInput
-            initialValue=""
-            onChangeText={setProviderOptions}
-            placeholder='{"setting": true}'
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline
-            editable={!pending}
-          />
-        </Field>
-      </View>
     </>
   );
 }
 
-function ChoiceRow({
-  label,
-  values,
-  selected,
-  labels = {},
-  note,
-  layout = "stacked",
-  onChange,
-  disabled,
+/** Provider-specific settings, folded under Advanced on a direct Agent Route. */
+function AgentAdvancedFields({
+  selectedDaemonServerId,
+  agentConfiguration,
+  setAgentConfiguration,
+  providerOptions,
+  parsedProviderOptions,
+  setProviderOptions,
+  pending,
 }: {
-  label: string;
-  values: string[];
-  selected: string;
-  labels?: Record<string, string>;
-  note?: string;
-  /** `row` sits the choices beside the label, level with the switches above. */
-  layout?: "stacked" | "row";
-  onChange(value: string): void;
-  disabled: boolean;
+  selectedDaemonServerId: string | null;
+  agentConfiguration: ManagedAgentConfigurationValue;
+  setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
+  providerOptions: string;
+  parsedProviderOptions: ReturnType<typeof parseOptionalObject>;
+  setProviderOptions(value: string): void;
+  pending: boolean;
 }) {
-  const choices = (
+  const providerOptionsError = parsedProviderOptions.valid
+    ? null
+    : 'Enter a JSON object, for example {"setting": true}.';
+  return (
     <>
-      {values.map((value) => (
-        <ChoiceButton
-          key={value}
-          value={value}
-          selected={selected === value}
-          label={labels[value] ?? channelLabel(value)}
-          onChange={onChange}
-          disabled={disabled}
+      <ManagedAgentFastModeSwitch
+        serverId={selectedDaemonServerId}
+        value={agentConfiguration}
+        onChange={setAgentConfiguration}
+        disabled={pending}
+      />
+      <Field
+        label="Provider options"
+        hint="Optional JSON object for provider-specific settings."
+        error={providerOptionsError}
+      >
+        <FormTextInput
+          initialValue={providerOptions}
+          onChangeText={setProviderOptions}
+          placeholder='{"setting": true}'
+          autoCapitalize="none"
+          autoCorrect={false}
+          multiline
+          editable={!pending}
         />
-      ))}
-      {note === undefined ? null : <Text style={styles.choiceNote}>{note}</Text>}
+      </Field>
     </>
-  );
-  if (layout === "row") return <SettingRow label={label}>{choices}</SettingRow>;
-  return (
-    <View style={styles.choiceGroup}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.actions}>{choices}</View>
-    </View>
-  );
-}
-
-function ChoiceButton({
-  value,
-  selected,
-  label,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  selected: boolean;
-  label: string;
-  onChange(value: string): void;
-  disabled: boolean;
-}) {
-  const select = useCallback(() => onChange(value), [onChange, value]);
-  return (
-    <Button
-      size="xs"
-      variant={selected ? "secondary" : "outline"}
-      disabled={disabled}
-      onPress={select}
-    >
-      {label}
-    </Button>
   );
 }
 
@@ -3617,11 +3472,11 @@ function channelAccountKey(account: RecordValue): string {
 }
 
 function channelAccountLabel(account: RecordValue | undefined): string {
-  if (account === undefined) return "Channel Route unavailable";
+  if (account === undefined) return "Connection unavailable";
   return `${channelLabel(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
 }
 
-/** What a Channel Route Admin sees where the Connection would be named. */
+/** What a Connection Admin sees where the Connection would be named. */
 const MANAGED_BY_ORGANIZATION = "Managed by Organization Admins";
 
 function channelConnectionLabel(connection: HubConnection | undefined): string {
@@ -3700,6 +3555,7 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
       ),
       toolCalls: booleanValue(sync["toolCalls"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.toolCalls),
       ...(approvalChoice === "custom" ? {} : { approvalMode: approvalChoice }),
+      ...routeQuestions(route),
     },
     approvalChoice,
   };
@@ -3732,6 +3588,13 @@ function routeProgressMessage(progress: RecordValue | null, sync: RecordValue): 
   return booleanValue(sync["progress"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.progressMessage);
 }
 
+/** The Route's `questions:` leaf as loaded; absent when it authors none. */
+function routeQuestions(route: RecordValue | undefined): { questions?: ChannelRouteQuestions } {
+  const questions = QUESTION_VALUES.find((value) => value === stringField(route, "questions"));
+  return questions === undefined ? {} : { questions };
+}
+
+/** The behavior a save writes: Custom YAML keeps the Route's own approval rules. */
 function behaviorWithApprovalChoice(
   behavior: ChannelRouteBehavior,
   approvalChoice: RouteApprovalChoice,
@@ -3747,18 +3610,12 @@ function routeReplySummary(route: RecordValue): string {
 }
 
 function routeToolRequestSummary(route: RecordValue): string {
-  return approvalSummary(routeBehaviorDraft(route).approvalChoice);
+  const { behavior, approvalChoice } = routeBehaviorDraft(route);
+  return approvalSummary(approvalChoice, behavior.questions);
 }
 
 function routeBehaviorSummary(route: RecordValue): string {
   return `${routeReplySummary(route)} · ${routeToolRequestSummary(route)}`;
-}
-
-function approvalSummary(approvalChoice: RouteApprovalChoice): string {
-  if (approvalChoice === "require") return "Ask for approval";
-  if (approvalChoice === "auto-deny") return "Requests denied";
-  if (approvalChoice === "auto-allow") return "Requests auto-approved";
-  return "Custom approvals";
 }
 
 interface RouteReviewInput {
@@ -3799,7 +3656,7 @@ function routeReviewFacts(input: RouteReviewInput): { label: string; value: stri
       : [{ label: "Only messages containing", value: routeContainsText(input.route)! }]),
     { label: "Target", value: input.target },
     { label: "Reply method", value: routeReplySummary(input.route) },
-    { label: "Tool requests", value: routeToolRequestSummary(input.route) },
+    { label: "Permission requests", value: routeToolRequestSummary(input.route) },
     ...(input.warnings.length === 0
       ? []
       : [{ label: "Warnings", value: input.warnings.join("\n") }]),
@@ -3950,6 +3807,7 @@ function channelFormInitialState(
     behavior: routeBehaviorDraft(editedRoute),
     contains,
     routeLimits: channelLimitsDraft(editedLimits),
+    routeLimitsAuthored: Object.keys(editedLimits).length > 0,
     ...environment,
     agentConfiguration: managedAgentConfiguration(editedAgent),
     providerOptions: formatOptionalObject(objectField(editedAgent ?? EMPTY_RECORD, "options")),
@@ -3998,6 +3856,111 @@ function managedAgentConfiguration(agent: RecordValue | null): ManagedAgentConfi
   };
 }
 
+/** What the Route form's Connection picker points at. */
+type RouteDestination = { kind: "account"; key: string } | { kind: "connection"; id: string };
+
+const ACCOUNT_DESTINATION = "account:";
+const CONNECTION_DESTINATION = "connection:";
+
+function routeDestinationValue(destination: RouteDestination): string {
+  return destination.kind === "account"
+    ? `${ACCOUNT_DESTINATION}${destination.key}`
+    : `${CONNECTION_DESTINATION}${destination.id}`;
+}
+
+/** What the picked Connection means for the save: a new account, or a Route on one. */
+function routeDestinationState(
+  isEditing: boolean,
+  editedAccountKey: string | null,
+  destination: RouteDestination | null,
+): {
+  configurationKind: ConfigurationKind;
+  existingAccountKey: string | null;
+  connectionId: string | null;
+  destinationValue: string | null;
+} {
+  const newConnection = !isEditing && destination?.kind === "connection";
+  return {
+    configurationKind: newConnection ? "account" : "route",
+    existingAccountKey:
+      editedAccountKey ?? (destination?.kind === "account" ? destination.key : null),
+    connectionId: destination?.kind === "connection" ? destination.id : null,
+    destinationValue: destination === null ? null : routeDestinationValue(destination),
+  };
+}
+
+function parseRouteDestination(value: string | null): RouteDestination | null {
+  if (value?.startsWith(ACCOUNT_DESTINATION))
+    return { kind: "account", key: value.slice(ACCOUNT_DESTINATION.length) };
+  if (value?.startsWith(CONNECTION_DESTINATION))
+    return { kind: "connection", id: value.slice(CONNECTION_DESTINATION.length) };
+  return null;
+}
+
+/**
+ * Every Connection a Route can go on: the ones that already have Routes, then
+ * (for an Organization Admin) the channel Connections with none yet. A
+ * Connection Admin only ever sees their own.
+ */
+function routeDestinationOptions(
+  accounts: readonly RecordValue[],
+  connections: readonly { id: string; provider: string; name: string }[],
+  adminScoped: boolean,
+  /** An Automation input draft is for one channel; only its Connections are offered. */
+  provider?: string,
+): SelectFieldOption<string>[] {
+  const onChannel = (channel: string | null) => provider === undefined || channel === provider;
+  const used = new Set(accounts.map((account) => stringField(account, "connectionId")));
+  const existing = accounts
+    .filter((account) => onChannel(stringField(account, "channel")))
+    .map((account) => {
+      const connection = connections.find(({ id }) => id === stringField(account, "connectionId"));
+      const count = arrayField(account, "routes").length;
+      const routes = `${String(count)} Route${count === 1 ? "" : "s"}`;
+      const value = routeDestinationValue({ kind: "account", key: channelAccountKey(account) });
+      return {
+        id: value,
+        value,
+        label: channelAccountLabel(account),
+        description: connection === undefined ? routes : `${connection.name} · ${routes}`,
+      };
+    });
+  if (adminScoped) return existing;
+  const unused = connections
+    .filter(({ id, provider: channel }) => !used.has(id) && onChannel(channel))
+    .map((connection) => {
+      const value = routeDestinationValue({ kind: "connection", id: connection.id });
+      return {
+        id: value,
+        value,
+        label: `${channelLabel(connection.provider)} · ${connection.name}`,
+        description: "No Routes yet",
+      };
+    });
+  return [...existing, ...unused];
+}
+
+/** A first Route's default name: the Connection's name as an id, unique on its channel. */
+function suggestedChannelAccountId(
+  accounts: readonly RecordValue[],
+  connection: { provider: string; name: string } | undefined,
+): string {
+  if (connection === undefined) return "";
+  const base =
+    connection.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gu, "-")
+      .replace(/^-+|-+$/gu, "") || connection.provider;
+  const taken = new Set(
+    accounts
+      .filter((account) => stringField(account, "channel") === connection.provider)
+      .map((account) => stringField(account, "accountId")),
+  );
+  let candidate = base;
+  for (let suffix = 2; taken.has(candidate); suffix += 1) candidate = `${base}-${String(suffix)}`;
+  return candidate;
+}
+
 function channelFormSelection(input: {
   existingAccounts: RecordValue[];
   existingAccountKey: string | null;
@@ -4027,15 +3990,6 @@ function channelFormSelection(input: {
   };
 }
 
-function channelFormTitle(
-  isEditing: boolean,
-  editing: EditingRoute | null,
-  kind: ConfigurationKind,
-): string {
-  if (!isEditing) return kind === "account" ? "Add Channel Route" : "Add Route";
-  return `Edit Route ${String(Number(editing?.routeIndex ?? 0) + 1)}`;
-}
-
 /** The minutes field only blocks saving while it is shown. */
 function isFollowUpTtlDraftValid(input: {
   dmOnly: boolean;
@@ -4057,7 +4011,7 @@ function canSaveChannelRoute(input: {
   contains: string;
   audienceComplete: boolean;
   parsedRouteLimits: ReturnType<typeof parseChannelLimitsDraft>;
-  /** The target the Route keeps (a Channel Route Admin's edit), or null when the form builds one. */
+  /** The target the Route keeps (a Connection Admin's edit), or null when the form builds one. */
   existingTarget: RecordValue | null;
   target: RouteTarget;
   automationName: string | null;
@@ -4138,7 +4092,7 @@ function routeConfirmationTitle(
   isEditing: boolean,
 ): string {
   if (open) return "Open this Route to anyone in the matching conversations?";
-  if (approvalChoice === "auto-allow") return "Activate automatic tool access?";
+  if (approvalChoice === "auto-allow") return "Accept every permission request automatically?";
   return isEditing ? "Save Route?" : "Activate Route?";
 }
 
@@ -4206,20 +4160,10 @@ const styles = StyleSheet.create((theme) => ({
   routeContent: {
     flexBasis: 256,
   },
-  detailRow: {
-    paddingLeft: theme.spacing[4],
-  },
-  form: {
-    padding: theme.spacing[4],
-    gap: theme.spacing[3],
-  },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[2],
-  },
-  accountPicker: {
-    gap: theme.spacing[3],
   },
   accountRow: {
     alignItems: "center",
@@ -4258,14 +4202,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     gap: theme.spacing[2],
   },
-  choiceGroup: {
-    gap: theme.spacing[2],
-  },
-  choiceNote: {
-    alignSelf: "center",
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
   reviewList: {
     gap: theme.spacing[3],
   },
@@ -4281,20 +4217,13 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.medium,
   },
-  // A stacked choice group reads as a field whose control is a button row, so it
-  // uses the same label treatment as every Select and text field around it.
-  label: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.normal,
-  },
   formHeading: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.semibold,
   },
-  inlineFields: {
-    gap: theme.spacing[3],
+  formActions: {
+    gap: theme.spacing[2],
   },
   errorText: {
     color: theme.colors.destructive,

@@ -231,7 +231,7 @@ describe("Channel activity pages and detail recovery", () => {
     expect(screen.queryByText("Slack · first-0")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Details" })).toHaveLength(1);
     await openDetails();
-    fireEvent.change(screen.getByLabelText("Channel Route"), {
+    fireEvent.change(screen.getByLabelText("Connection"), {
       target: { value: "slack:support" },
     });
     expect(screen.queryByRole("button", { name: "Back to activity" })).toBeNull();
@@ -267,7 +267,7 @@ describe("Channel activity pages and detail recovery", () => {
     });
     render(view());
     await screen.findByText("Route 1 · Ignored");
-    fireEvent.change(screen.getByLabelText("Channel Route"), {
+    fireEvent.change(screen.getByLabelText("Connection"), {
       target: { value: "slack:support" },
     });
     await screen.findByText("Channel activity is unavailable");

@@ -42,7 +42,7 @@ describe("per-account Channel saves", () => {
     expect(last).toBe("revision-2");
   });
 
-  it("routes a Channel Route Admin's Automation inputs through the account endpoint", async () => {
+  it("routes a Connection Admin's Automation inputs through the account endpoint", async () => {
     const { put, client } = api();
     const changed = { ...support, routes: [{ workflow: "support" }] };
     await saveAutomationWithInputs(

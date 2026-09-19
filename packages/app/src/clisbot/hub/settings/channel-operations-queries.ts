@@ -27,7 +27,7 @@ export interface ChannelIngressQueries {
 
 /**
  * Queue depth and the first page of dead letters. Organization-wide by
- * default; a Channel Route Admin passes their accounts and both come from the
+ * default; a Connection Admin passes their accounts and both come from the
  * per-account endpoints (queue depth rides on `channel-accounts/<c>/<a>/status`).
  */
 export function useChannelIngressQueries(

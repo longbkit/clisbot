@@ -341,7 +341,7 @@ async function openEditor() {
   expect(adapters.scrollToTop).toHaveBeenCalledTimes(1);
 }
 
-describe("Channel Route focused editing", { timeout: 20_000 }, () => {
+describe("Connection focused editing", { timeout: 20_000 }, () => {
   it("retains dirty YAML across local views and resets it for a different principal", async () => {
     const ui = renderChannels();
     await screen.findByRole("button", { name: "Manage" });
@@ -350,7 +350,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     const draft = `${yaml.value}\n# draft retained locally`;
     fireEvent.change(yaml, { target: { value: draft } });
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
-    fireEvent.click(screen.getByRole("button", { name: "Channel Routes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connections" }));
     fireEvent.click(screen.getByRole("button", { name: "Advanced YAML" }));
     expect((screen.getByLabelText("Configuration YAML") as HTMLTextAreaElement).value).toBe(draft);
     fireEvent.click(screen.getByRole("button", { name: "Manage" }));
@@ -413,10 +413,10 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Up")).toBeNull();
     expect(screen.queryByText("Down")).toBeNull();
     expect(screen.queryByText("Connection and access")).toBeNull();
-    expect(screen.queryByText(/Channel Route Admins/)).toBeNull();
+    expect(screen.queryByText(/Connection Admins/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Access" }));
     // The Access tab lists Admins only: no Use grant is offered anywhere.
-    expect(screen.getByText("Channel Route Admins")).toBeTruthy();
+    expect(screen.getByText("Connection Admins")).toBeTruthy();
     expect(screen.getByText("Only Organization Admins so far.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Manage Admins in Access" })).toBeTruthy();
     expect(screen.queryByText(/channel\.use/)).toBeNull();
@@ -705,13 +705,11 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Channel activity")).toBeNull();
     expect(adapters.get.mock.calls.some(([resource]) => resource.includes("activity"))).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "View activity" }));
-    expect((screen.getByLabelText("Channel Route") as HTMLSelectElement).value).toBe(
-      "slack:support",
-    );
+    expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("slack:support");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Details" }));
     expect(screen.getByRole("button", { name: "Back to activity" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Channel Routes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connections" }));
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.queryByText("Channel activity")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
@@ -753,20 +751,18 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Revision 5")).toBeNull();
   });
 
-  it("adds a Route within the selected account with thread replies enabled by default", async () => {
+  it("adds a Route inside an open Connection with thread replies enabled by default", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    // Opening an account adds Add Route beside Add Channel Route; neither action
-    // takes the other's meaning, so a new account stays reachable from here.
-    expect(screen.getByRole("button", { name: "Add Channel Route" })).toBeTruthy();
+    // Inside a Connection, its own Add Route is the only one: the Route belongs
+    // to it, so the form names the Connection instead of offering a picker.
     fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
-    expect(screen.queryByLabelText("Account name")).toBeNull();
-    // A Route inherits its account, so the picker and Connect belong to Add Channel
-    // Route; the account it will use is still named here.
-    expect(screen.queryByRole("button", { name: "Connect a Channel Integration" })).toBeNull();
+    expect(screen.queryByLabelText("Connection")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
+    expect(screen.queryByLabelText("Name")).toBeNull();
     expect(screen.getByText("Slack · support")).toBeTruthy();
     // A new Route starts as Members everywhere: one rule, DM and Group chat on.
-    expect(screen.getByText("Who may talk, where")).toBeTruthy();
+    expect(screen.getByText("Who can talk, and where")).toBeTruthy();
     expect(screen.getByText("Members may talk in DMs and every group chat")).toBeTruthy();
     expect((screen.getByLabelText("DM") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
@@ -784,10 +780,28 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     // Use Channel tool is the default, so the Agent owns replies without extra relay switches.
     expect(screen.getByText("The Agent controls replies")).toBeTruthy();
     expect(screen.queryByLabelText("Send final answers")).toBeNull();
+    // Limits and Advanced hold nothing yet, so they start folded to a summary.
+    expect(screen.getByText("Default limits")).toBeTruthy();
+    expect(screen.getByText("Fast mode and provider options")).toBeTruthy();
+    expect(screen.queryByLabelText("Provider options")).toBeNull();
     expect(screen.getByRole("button", { name: "Activate Route" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
+  });
+
+  it("accepts every permission request and saves how questions are answered", async () => {
+    await openEditor();
+    // A question is not a permission, so its choice is offered whatever the
+    // permission choice is, and switching that choice keeps it.
+    fireEvent.click(screen.getByRole("button", { name: "Pick the recommended answer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask authorized members" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept automatically" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const saved = adapters.put.mock.calls[0]![1].accounts[0].routes[0];
+    expect(saved.approval).toEqual([{ match: "*", mode: "auto-allow" }]);
+    expect(saved.questions).toBe("recommended");
   });
 
   it("preserves the new-account draft through Connection creation then closes after Route activation", async () => {
@@ -823,21 +837,21 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     });
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
-    // The heading names the group; `Or` is the only word between the two controls.
-    expect(screen.getByText("Channel Account")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    // The picker offers the Connection that already has Routes; `Or` joins it to Connect.
     expect(screen.getByText("Or")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Channel Account"), {
-      target: { value: "connection" },
-    });
-    fireEvent.change(screen.getByLabelText("Account name"), {
-      target: { value: "new-account" },
-    });
+    expect(
+      (screen.getByLabelText("Connection") as HTMLSelectElement).querySelector(
+        'option[value="account:slack:support"]',
+      ),
+    ).toBeTruthy();
+    // No Connection picked yet, so there is nothing to name.
+    expect(screen.queryByLabelText("Name")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
     fireEvent.change(screen.getByLabelText("Automation"), {
       target: { value: "support" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a new one" }));
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
     // The Add-connection form is catalog-driven, so it mounts once the Hub's
     // catalog read lands and the first connectable channel is chosen.
@@ -851,29 +865,31 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull(),
     );
-    expect((screen.getByLabelText("Account name") as HTMLInputElement).value).toBe("new-account");
-    expect((screen.getByLabelText("Channel Account") as HTMLSelectElement).value).toBe(
-      "new-connection",
+    // The new Connection is picked, and its first Route names it after the Connection.
+    expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
+      "connection:new-connection",
     );
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("new-bot");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "new-account" } });
     expect((screen.getByLabelText("Automation") as HTMLSelectElement).value).toBe("support");
     fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull(),
     );
-    expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
     expect(screen.getByText("Telegram · new-account")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Back to Channel Routes" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
-    expect((screen.getByLabelText("Account name") as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Back to Connections" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("");
+    expect(screen.queryByLabelText("Name")).toBeNull();
   });
 
   it("offers every channel this Hub can connect and swaps the credential form", async () => {
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a new one" }));
     expect(await screen.findByText("Connect Telegram")).toBeTruthy();
     // Slack Socket Mode is created from a Provider Application; this Member is
     // not an instance operator, so it is not on offer.
@@ -926,12 +942,12 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     });
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
     await screen.findByText("Automations unavailable");
-    expect(screen.queryByLabelText("Account name")).toBeNull();
+    expect(screen.queryByLabelText("Connection")).toBeNull();
     unavailable = false;
     fireEvent.click(screen.getByRole("button", { name: "Retry Channel setup" }));
-    expect(await screen.findByLabelText("Account name")).toBeTruthy();
+    expect(await screen.findByLabelText("Connection")).toBeTruthy();
   });
 
   it("keeps both navigation exits disabled while a Connection is being verified", async () => {
@@ -944,8 +960,8 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     );
     renderChannels();
     await screen.findByRole("button", { name: "Manage" });
-    fireEvent.click(screen.getByRole("button", { name: "Add Channel Route" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect a Channel Integration" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a new one" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
       target: { value: "bot" },
     });
@@ -956,14 +972,14 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Back to Channels",
+          name: "Back to Connections",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(
       (
         screen.getByRole("button", {
-          name: "Back to Channel Route",
+          name: "Back to the Route",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -992,6 +1008,35 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(adapters.get.mock.calls.map(([resource]) => resource)).toEqual([
       "access-assignments/effective?include=team",
     ]);
+  });
+
+  it("saves an unchanged Route without dropping any key the form does not show", async () => {
+    // Every Route key the schema allows. A save from the form must never lose
+    // one: a new schema key would otherwise vanish on the next edit in the app.
+    const fullRoute = {
+      ...route,
+      template: "support-template",
+      policy: { defaultRoles: ["member"] },
+      workspace: { organize: false },
+      access: { dmPolicy: "open" },
+      agentControls: { model: "gpt-5" },
+      agents: ["triage"],
+      models: ["gpt-5"],
+      questions: "recommended",
+      interaction: { requireMention: true, followUp: { mode: "auto", ttlMinutes: 30 } },
+      reply: { anchor: "default" },
+      outbound: { path: "relay", template: "support-reply" },
+      limits: { messagesPerMinute: 5 },
+    };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration"
+        ? { ...configuration, accounts: [{ ...account, routes: [fullRoute] }] }
+        : data[resource],
+    );
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0]).toMatchObject(fullRoute);
   });
 
   it("keeps a Route that stored Text forward on the relay path the owner chose", async () => {
@@ -1087,7 +1132,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
       "#help",
     );
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByText("Channel Routes")).toBeNull();
+    expect(screen.queryByText("Connections")).toBeNull();
     expect(screen.queryByText("Add Channel behavior")).toBeNull();
     expect(screen.queryByText("Advanced YAML")).toBeNull();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
@@ -1158,7 +1203,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     );
     await openEditor();
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
-    fireEvent.click(screen.getByRole("button", { name: "Back to Channels" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Connections" }));
     await act(async () => confirm(true));
     // Only the read-only preview ran; nothing was activated.
     for (const [path] of adapters.post.mock.calls)
@@ -1184,7 +1229,7 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     renderChannels("support");
     fireEvent.click(await screen.findByRole("button", { name: "Edit input and replies" }));
     expect(screen.queryByRole("button", { name: "Start or continue an Agent" })).toBeNull();
-    expect(screen.getByText("Run Automation: support").textContent).toBe("Run Automation: support");
+    expect(screen.getByText("Automation · support")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Only messages containing"), {
       target: { value: "#triage" },
     });
@@ -1267,6 +1312,44 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     );
   });
 
+  it("offers only the draft channel's Connections when an input picks another one", async () => {
+    const telegram = {
+      id: "telegram-connection",
+      provider: "telegram",
+      name: "Ops bot",
+      externalName: null,
+      status: "connected",
+      consumers: [],
+    };
+    const slack = { ...telegram, id: "slack-spare", provider: "slack", name: "Spare" };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "connections"
+        ? {
+            connections: [
+              ...(data.connections as { connections: unknown[] }).connections,
+              telegram,
+              slack,
+            ],
+            providerApplications: [],
+          }
+        : data[resource],
+    );
+    const draftContext = slackInputDraftContext(vi.fn());
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AutomationInputDraftContext.Provider value={draftContext}>
+          <ChannelSettings automationName="support" />
+        </AutomationInputDraftContext.Provider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Use another Connection" }));
+    const picker = (await screen.findByLabelText("Connection")) as HTMLSelectElement;
+    expect(Array.from(picker.options, ({ value }) => value).filter(Boolean)).toEqual([
+      "account:slack:support",
+      "connection:slack-spare",
+    ]);
+  });
+
   it("stages an Automation input with the shared editor without publishing a Route", async () => {
     const stage = vi.fn();
     const draftContext = slackInputDraftContext(stage);
@@ -1303,8 +1386,8 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
   it("adds an input on an existing account without asking for another target", async () => {
     renderChannels("support");
     fireEvent.click(await screen.findByRole("button", { name: "Add input" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Use this connection" }));
-    expect(screen.getByText("Run Automation: support").textContent).toBe("Run Automation: support");
+    fireEvent.click(await screen.findByRole("button", { name: "Add input here" }));
+    expect(screen.getByText("Automation · support")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create Automation" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(adapters.put).not.toHaveBeenCalled();

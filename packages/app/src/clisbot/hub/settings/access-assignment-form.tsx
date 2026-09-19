@@ -163,7 +163,7 @@ function AccessAssignmentForm({
           selectedDisplay={selectedOptionDisplay(resourceOptions, draft.resourceKeyValue)}
           options={resourceOptions}
           onChange={draft.changeResource}
-          placeholder="Choose a Host, Project, Team, Channel Route, or Automation"
+          placeholder="Choose a Host, Project, Team, Connection, or Automation"
           emptyText="No resources you can share are available."
           searchable
           searchPlaceholder="Search resources or parent Host"

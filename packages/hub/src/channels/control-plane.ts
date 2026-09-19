@@ -177,7 +177,7 @@ async function compileControlPlaneSnapshot(
   };
 }
 
-/** A Channel Route names its Automation; renaming or disabling it would leave the Route without a target. */
+/** A Route names its Automation; renaming or disabling it would leave the Route without a target. */
 export async function assertAutomationRouteTargetKept(input: {
   database: Database;
   organizationId: string;
@@ -203,7 +203,7 @@ export async function assertAutomationRouteTargetKept(input: {
   throw new TriggerDocumentError([
     {
       path: [input.candidate.authored.name !== current.name ? "name" : "enabled"],
-      message: "must remain active while a Channel Route uses it",
+      message: "must remain active while a Route uses it",
     },
   ]);
 }
