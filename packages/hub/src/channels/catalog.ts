@@ -143,9 +143,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
       "visibility",
     ],
     extraTools: ["slack.emoji-list"],
-    notes: [
-      "Runtime vertical is in packages/channels/slack; status does not imply every OpenClaw action is complete.",
-    ],
+    notes: [],
   },
   {
     id: "telegram",
@@ -208,9 +206,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
       "visibility",
     ],
     extraTools: ["telegram.sticker-search", "telegram.emoji-list"],
-    notes: [
-      "Runtime vertical is in packages/channels/telegram; durable ingress queue/drain remains a separate Hub workstream.",
-    ],
+    notes: [],
   },
   {
     id: "discord",
@@ -262,7 +258,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     ],
     extraTools: ["discord.emoji-list"],
     notes: [
-      "Runtime vertical is in packages/channels/discord; inbound covers DM, guild text channels and threads (MESSAGE_CREATE). Slash commands, interaction callbacks, inbound reactions and voice are not wired yet.",
+      "Answers in DMs, server text channels and threads. Slash commands, button clicks, reactions from users and voice are not supported yet.",
     ],
   },
   {
@@ -314,8 +310,8 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     ],
     extraTools: [],
     notes: [
-      "Runtime vertical is in packages/channels/googlechat. Message actions: send, edit, delete. Inbound: message, command, callback, member. No attachment upload (user OAuth only), no inbound media download, no native approval card.",
-      "Google posts to a public HTTPS URL; the Hub publishes no endpoint, so a reverse proxy in front of the account's webhook listener is required. Workspace admin approval and the Chat app manifest are required before live E2E.",
+      "Google Chat sends messages to a public HTTPS address, so this Hub needs a reverse proxy in front of the Connection's webhook. A Google Workspace admin must approve the Chat app first.",
+      "Replies can be sent, edited and deleted. Files and images are not sent or read, and approval prompts are typed commands rather than cards.",
     ],
   },
   {
@@ -405,8 +401,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
       "feishu_wiki",
     ],
     notes: [
-      "Runtime vertical is in packages/channels/feishu; use @larksuiteoapi/node-sdk directly, never an OpenClaw runtime package.",
-      "Message actions: send, thread-reply, read, edit, pin, unpin, list-pins, member-info, channel-info, plus react/reactions when `actions.reactions` is on. Inbound: message, callback (card click), member. No sticker, no upload-file, no inbound media download yet.",
+      "Replies, thread replies, edits and pins are supported; reactions when turned on for the Connection. Stickers and files are not sent, and images people send are not read yet.",
     ],
   },
   {
@@ -445,8 +440,8 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     capabilities: ["text", "mention", "format", "chunk", "media", "file", "reaction", "voice"],
     extraTools: ["zalouser"],
     notes: [
-      "Runtime vertical is in packages/channels/zalouser. Message actions: react only. Inbound: message, command. No threads, no inbound media download, no edits/deletes/pins/polls.",
-      "Linking requires a human QR scan through the channel-accounts QR operations; relink is expected, not exceptional. Personal-account automation has provider risk and identity constraints; requires an explicit live-test checklist.",
+      "Links a personal Zalo account by scanning a QR code in the Zalo app. Zalo ends these sessions from time to time, so expect to scan again.",
+      "Automating a personal account can break Zalo's terms; use an account made for this. No threads, and images people send are not read.",
     ],
   },
   {
@@ -496,8 +491,8 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     capabilities: ["text", "mention", "format", "chunk", "media"],
     extraTools: [],
     notes: [
-      "Runtime vertical is in packages/channels/zalo. Message actions: send (text, or an image by HTTPS URL). Inbound: message, command. Stickers and unsupported events are ignored. No upload API - local files are refused with a notice.",
-      "Webhook acceptance persists the raw event before acknowledging Zalo, then drains through the shared ingress runtime; polling needs no public URL and is the mode to run first.",
+      "Polling needs no public address; start with it. A webhook needs a public HTTPS address.",
+      "Replies are text, or an image by HTTPS link: Zalo has no file upload, so files are refused with a notice.",
     ],
   },
 ] as const;

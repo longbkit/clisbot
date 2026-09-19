@@ -72,6 +72,18 @@ Auto-accept:
   open in place: Admins, Bot limits, Status (revision, integrity, retry, QR
   relink), Credential (a link to where credentials are managed). They replace
   the Access / Limits / Status details / Manage Connection buttons.
+- **Channel Integrations is master and detail.** Two columns on a wide screen
+  (the list, and the chosen channel, the first open by default); on a phone
+  the list, then the channel on its own screen with a "← Channel Integrations"
+  way back. A channel reads: its Connections and Connect, How it connects
+  (credential labels, not config keys), Before you connect (the catalog's notes,
+  rewritten for people who connect a bot: no package paths or OpenClaw), and
+  What it supports.
+- **What it supports replaces the capability matrix.** The matrix showed each
+  claimed capability as "Not verified" on every Hub, because the Hub keeps no
+  per-capability evidence, so the state could never change. It now shows the
+  Channel's supported capabilities, the ones with a limit, and one "Not
+  supported" line. It describes the Channel; a Connection's state is its Status.
 - **A test message tests the Connection, not a Route.** It starts from the
   Connection's menu with a Send to picker (conversations the bot has seen and
   the ones Routes name, starting on the first a Route names), then the same

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import type { ChannelCatalogEntry } from "../channel-catalog";
 import {
   channelSeverityVariant,
   type ChannelAccountHealth,
@@ -38,34 +39,6 @@ export function ChannelCatalogDetail({
           description={`${row.label} has no runtime on this Hub yet, so it cannot be connected.`}
         />
       ) : null}
-      {row.entry?.notes.map((note) => (
-        <Text key={note} style={settingsStyles.rowHint}>
-          {note}
-        </Text>
-      ))}
-      {row.entry === undefined ? null : (
-        <View style={settingsStyles.card}>
-          {row.entry.transports.map((transport, index) => (
-            <View
-              key={transport.id}
-              style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
-            >
-              <View style={settingsStyles.rowContent}>
-                <Text style={settingsStyles.rowTitle}>{transport.label}</Text>
-                <Text style={settingsStyles.rowHint}>{transport.setup}</Text>
-                <Text style={settingsStyles.rowHint}>
-                  {`Requires ${transport.requiredConfig.join(", ")}`}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-      {row.entry !== undefined && row.entry.extraTools.length > 0 ? (
-        <Text style={settingsStyles.rowHint}>
-          {`Channel tools: ${row.entry.extraTools.join(", ")}`}
-        </Text>
-      ) : null}
       <ChannelAccountHealthCard accounts={row.accounts} />
       {onConnect === undefined || !row.connectable ? null : (
         <View style={styles.actions}>
@@ -74,7 +47,44 @@ export function ChannelCatalogDetail({
           </Button>
         </View>
       )}
+      {row.entry === undefined ? null : <ChannelConnectGuide entry={row.entry} />}
     </SettingsSection>
+  );
+}
+
+/** How a Connection of this channel is made, and what to know first. */
+function ChannelConnectGuide({ entry }: { entry: ChannelCatalogEntry }) {
+  const labels = new Map(entry.credentials.map(({ key, label }) => [key, label]));
+  return (
+    <>
+      <Text style={styles.heading}>How it connects</Text>
+      <View style={settingsStyles.card}>
+        {entry.transports.map((transport, index) => (
+          <View
+            key={transport.id}
+            style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
+          >
+            <View style={settingsStyles.rowContent}>
+              <Text style={settingsStyles.rowTitle}>{transport.label}</Text>
+              <Text style={settingsStyles.rowHint}>{transport.setup}</Text>
+              <Text style={settingsStyles.rowHint}>
+                {`Needs: ${transport.requiredConfig.map((key) => labels.get(key) ?? key).join(", ")}`}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      {entry.notes.length === 0 ? null : (
+        <>
+          <Text style={styles.heading}>Before you connect</Text>
+          {entry.notes.map((note) => (
+            <Text key={note} style={settingsStyles.rowHint}>
+              {note}
+            </Text>
+          ))}
+        </>
+      )}
+    </>
   );
 }
 
@@ -83,7 +93,7 @@ function ChannelAccountHealthCard({ accounts }: { accounts: readonly ChannelAcco
     return (
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>No accounts are configured for this channel.</Text>
+          <Text style={settingsStyles.rowHint}>No Connection uses this channel yet.</Text>
         </View>
       </View>
     );
@@ -143,5 +153,10 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     flexDirection: "row",
     gap: theme.spacing[2],
+  },
+  heading: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    marginTop: theme.spacing[2],
   },
 }));

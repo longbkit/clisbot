@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
+import { ArrowLeft } from "lucide-react-native";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,7 @@ import type { ChannelConnectionProblem } from "../channel-connection-form";
 import type { ChannelCatalogRow } from "../channel-account-health";
 import type { ChannelCatalogEntry } from "../channel-catalog";
 import { useChannelConnectionSave } from "./channel-connection-add";
-import { ChannelCapabilityMatrix } from "./channel-capability-matrix";
+import { ChannelSupportSection } from "./channel-support-section";
 import { ChannelCatalogDetail } from "./channel-catalog-detail";
 import { ChannelCatalogList } from "./channel-catalog-list";
 import { useChannelCatalogQueries } from "./channel-catalog-queries";
@@ -19,13 +21,15 @@ import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 
 /**
- * Channels → Catalog: every channel this build knows, its prerequisites, the
- * health of its accounts, its capability matrix, and the setup flow for the ones
- * this Hub can connect.
+ * Channels → Channel Integrations: every channel this Hub can run, as master and
+ * detail. Two columns on a wide screen, the first channel open; on a phone the
+ * list, then the chosen channel on its own screen with a way back.
  */
 export function ChannelCatalogView() {
   const { rows, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
-  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const compact = useIsCompactFormFactor();
+  const [chosenChannel, setSelectedChannel] = useState<string | null>(null);
+  const selectedChannel = chosenChannel ?? (compact ? null : (rows[0]?.channel ?? null));
   const [connecting, setConnecting] = useState(false);
   const selected = rows.find((row) => row.channel === selectedChannel) ?? null;
   const select = useCallback((channel: string) => {
@@ -33,6 +37,7 @@ export function ChannelCatalogView() {
     setSelectedChannel(channel);
   }, []);
   const cancel = useCallback(() => setConnecting(false), []);
+  const back = useCallback(() => setSelectedChannel(null), []);
   const connect = useCallback(() => setConnecting(true), []);
   const save = useSaveConnection(selected?.entry, refresh, cancel);
   const refreshAction = useMemo(
@@ -43,34 +48,58 @@ export function ChannelCatalogView() {
     ),
     [fetching, refresh],
   );
-  return (
-    <View style={styles.view}>
-      <SettingsSection title="Channel catalog" trailing={refreshAction}>
-        {catalog.availability === "available" || catalog.message === null ? null : (
-          <Alert
-            variant={catalog.availability === "loading" ? "info" : "warning"}
-            title={CATALOG_STATE_TITLES[catalog.availability]}
-            description={catalog.message}
-          />
-        )}
-        {statusError === null ? null : (
-          <Alert
-            variant="warning"
-            title="Channel runtime status is unavailable"
-            description={statusError.message}
-          />
-        )}
-        <ChannelCatalogList rows={rows} selected={selectedChannel} onSelect={select} />
-      </SettingsSection>
-      {selected === null ? null : (
-        <ChannelSelection
-          row={selected}
-          connecting={connecting}
-          onConnect={connect}
-          onCancel={cancel}
-          save={save}
+  const list = (
+    <SettingsSection title="Channels" trailing={refreshAction}>
+      {catalog.availability === "available" || catalog.message === null ? null : (
+        <Alert
+          variant={catalog.availability === "loading" ? "info" : "warning"}
+          title={CATALOG_STATE_TITLES[catalog.availability]}
+          description={catalog.message}
         />
       )}
+      {statusError === null ? null : (
+        <Alert
+          variant="warning"
+          title="Channel runtime status is unavailable"
+          description={statusError.message}
+        />
+      )}
+      <ChannelCatalogList rows={rows} selected={selectedChannel} onSelect={select} />
+    </SettingsSection>
+  );
+  const detail =
+    selected === null ? null : (
+      <ChannelSelection
+        row={selected}
+        connecting={connecting}
+        onConnect={connect}
+        onCancel={cancel}
+        save={save}
+      />
+    );
+  if (compact)
+    return selected === null ? (
+      list
+    ) : (
+      <View style={styles.view}>
+        <View style={styles.back}>
+          <Button
+            size="sm"
+            variant="ghost"
+            leftIcon={ArrowLeft}
+            onPress={back}
+            accessibilityLabel="Back to Channel Integrations"
+          >
+            Channel Integrations
+          </Button>
+        </View>
+        {detail}
+      </View>
+    );
+  return (
+    <View style={styles.columns}>
+      <View style={styles.master}>{list}</View>
+      <View style={styles.detail}>{detail}</View>
     </View>
   );
 }
@@ -96,17 +125,6 @@ function ChannelSelection({
 }) {
   const account = row.accounts[0] ?? null;
   const entry = row.entry;
-  const capabilityAccount = useMemo(
-    () =>
-      account === null
-        ? null
-        : {
-            transport: account.transport,
-            enabled: account.enabled,
-            detail: account.detail ?? undefined,
-          },
-    [account],
-  );
   return (
     <View style={styles.view}>
       <ChannelCatalogDetail row={row} onConnect={connecting ? undefined : onConnect} />
@@ -116,9 +134,7 @@ function ChannelSelection({
       {entry?.auth === "qr" ? (
         <ChannelQrPanel channel={row.channel} accountId={account?.accountId ?? row.channel} />
       ) : null}
-      {entry === undefined ? null : (
-        <ChannelCapabilityMatrix entry={entry} account={capabilityAccount} />
-      )}
+      {entry === undefined ? null : <ChannelSupportSection entry={entry} />}
     </View>
   );
 }
@@ -163,4 +179,8 @@ const styles = StyleSheet.create((theme) => ({
   view: {
     gap: theme.spacing[2],
   },
+  back: { alignItems: "flex-start" },
+  columns: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[6] },
+  master: { flexBasis: 320, flexShrink: 0 },
+  detail: { flex: 1, minWidth: 0, gap: theme.spacing[2] },
 }));
