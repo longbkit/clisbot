@@ -55,7 +55,7 @@ later. Use a Host assignment when the answer is "all of them".
 
 `hub.access.manage` on a Host or Project is **Can share**; on a Team, Channel
 account, or Automation it is that resource's **Admin**. It sits in the same grant
-row as the level. Full access, Administrator, and Channel Route Admin always carry
+row as the level. Full access, Administrator, and Connection Admin always carry
 it: the Hub adds it when it saves those levels and when it reads rows written before
 the level carried it (`impliedPrivileges` in `contract.ts`). A holder grants at most what they
 hold on that resource, privileges and constraints alike, and may change or remove
@@ -100,7 +100,7 @@ the [user guide](guides/user-guide/access/permissions.md).
 
 A Channel account assignment carries channel authority, not Project authority.
 The only level is **Admin** (`channel.manage` + `hub.access.manage`, wire key
-`manage`): edit that Channel Route's audience rules and Route defaults, on the app
+`manage`): edit that Connection's audience rules and Route defaults, on the app
 and from a conversation, and appoint another Admin on it. It requires the All conversations constraint; an organization
 owner or admin holds it without an assignment. Who may talk to the bot is the
 Route's audience rules, never a grant: `channel.use` is no longer grantable, and

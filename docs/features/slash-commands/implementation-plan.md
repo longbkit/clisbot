@@ -131,12 +131,12 @@ Decisions, with the options that lost:
   It now reads like a conversation selection; a block without a provider still
   merges.
 - **Delegation scoped to the changed Route.** The first cut checked every Route
-  in the organization, which refused a Channel Route manager whenever another
+  in the organization, which refused a Connection manager whenever another
   account used a Project they lacked. Promote and undo now pass the one Route;
   a Hub UI save still checks all of them.
 - **Undo from history.** No undo store: the previous value is read from revision
   history, bounded by the Route's own identity.
-- **`channel.manage` per Channel Route.** A `manage` access level on
+- **`channel.manage` per Connection.** A `manage` access level on
   `channel_account`, requiring the All conversations constraint, beside the
   owner/admin role capability.
 
@@ -165,7 +165,7 @@ Limits:
 - **One live pass.** The Telegram and cross-account refresh paths were not
   exercised live; `refreshInPlace` has no unit test beyond the signature.
 - **The Hub UI still gates channel configuration on the organization role.** A
-  Member with Manage on one Channel Route can change its default from chat but
+  Member with Manage on one Connection can change its default from chat but
   not from Settings. Scoping the management API by account is open.
 
 The audit below records the **2026-09-07 baseline**, before this implementation.

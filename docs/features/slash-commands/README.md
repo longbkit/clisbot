@@ -44,7 +44,7 @@ group:
 | `agent.create`    | bring a session from elsewhere                             | `/resume`                                                                                                                                                            |
 | `approval.config` | manage dynamic commands                                    | `/command add`, `/command remove`                                                                                                                                    |
 | `approval.*`      | answer or suppress prompts                                 | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
-| `channel.manage`  | change a Channel Route's Route defaults³                   | `/promoteroutedefault`                                                                                                                                               |
+| `channel.manage`  | change a Connection's Route defaults³                      | `/promoteroutedefault`                                                                                                                                               |
 
 The per-command **Requires** columns below repeat this at the row level.
 
@@ -72,7 +72,7 @@ live configuration, session creation and `/resume`; ordinary configuration or
 creation privileges do not imply Fast mode access.
 ³ `channel.manage` is checked by `authorizeChannelAccountManagement`, not
 `authorizeChannelPrivilege`: an organization owner or admin holds it, and so does
-a Member or Team assigned the **Manage** level on that Channel Route. The Manage
+a Member or Team assigned the **Manage** level on that Connection. The Manage
 level requires the All conversations constraint, because a Route can match
 conversations outside a narrower list. A Guest never holds it. See
 [Route defaults](#route-defaults).
@@ -213,7 +213,7 @@ Names are the contract users learn; these are chosen against
   `/permission` sets `modeId`; `/mode` is the glossary-aligned alias. Distinct
   from `/approve`/`/deny`, which answer an open permission _prompt_.
 - **`/routedefault` / `/promoteroutedefault`** — "route" is the glossary's
-  **Route**, the ordered rule inside a Channel Route. The write is one long word on
+  **Route**, the ordered rule inside a Connection. The write is one long word on
   purpose: it reaches conversations other than the caller's, so it should be
   typed deliberately, and `promote` says the direction — from this conversation
   up to its Route.
@@ -401,7 +401,7 @@ served this message. That Route is the one changed, and `/routedefault` shows it
   Route that changed since the running plane compiled it, ignoring an earlier
   default change (`routeIdentity`). Delegation is scoped because every other Route
   in the revision is unchanged and was authorized by whoever published it;
-  checking all of them would refuse a Channel Route manager whose own Route is
+  checking all of them would refuse a Connection manager whose own Route is
   within their grants whenever another account uses a Project they lack. A Hub UI
   save still checks every Route.
 - **What happens to the conversation.** Its own selection is cleared, since the

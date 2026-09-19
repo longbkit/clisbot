@@ -32,7 +32,7 @@ paseo channels add discord --account main --secret-file /tmp/discord-token
 rm /tmp/discord-token
 ```
 
-Hub probes the token against `GET /users/@me` before storing it. In the app, use **Channels → Channel Routes → Add Channel Route**.
+Hub probes the token against `GET /users/@me` before storing it. In the app, use **Channels → Connections → Add Route**, then **Connect a new one**.
 
 ## Conversations it handles
 

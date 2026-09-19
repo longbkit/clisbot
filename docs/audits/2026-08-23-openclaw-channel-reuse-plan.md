@@ -243,6 +243,8 @@ An unbound thread that creates a workspace carries the route's optional template
 
 ### S10. Trust posture: channel-originated sessions are `approval-required` by default (P15)
 
+> Superseded 2026-09-19: a Route may accept every permission request (warned, not refused), and a `questions:` leaf answers the Agent's questions. See [2026-09-19 Connection naming and Accept automatically](2026-09-19-connection-naming-and-route-flow.md).
+
 External text is data, not instructions, and a channel-driven session never auto-executes sensitive tools (T3Claw fixes `runtimeMode: "approval-required"` as a hard invariant of channel-originated threads — set literally on `thread.create`/`thread.turn.start` in its coordinator, not a configurable default). The route can relax to per-tool pre-approval via policy as trust is earned. Hub stays out of scope for injection defense, as upstream documents it.
 
 ## 5. Coverage map

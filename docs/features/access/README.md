@@ -43,7 +43,7 @@ This page keeps only what those two do not say: why the model is shaped this way
 
 | Phase                             | What it needs                                                                                                                                                                          |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Scoped Admins**                 | Decided in [Delegated access](scoped-admins.md): Can share on Hosts and Projects; Team, Channel Route, and Automation Admins; grant at most what you hold                              |
+| **Scoped Admins**                 | Decided in [Delegated access](scoped-admins.md): Can share on Hosts and Projects; Team, Connection, and Automation Admins; grant at most what you hold                                 |
 | **Read versus write per Project** | "Read-only" is only real without agents, terminal, and command approvals. A worktree writes into the main repository's `.git`, so a read-only Project cannot offer worktrees           |
 | **Folder limits**                 | Where a Project or worktree may be created, beyond "inside a parent Project"                                                                                                           |
 | **Project-level creation**        | A Project-level Full access holder can create nested Projects but not use them. Decide whether that level should create at all, or grant the creator the new Project                   |

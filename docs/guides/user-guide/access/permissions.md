@@ -8,20 +8,20 @@ Mọi thứ dưới đây chỉ có hiệu lực khi daemon bật [Managed Acces
 
 ## 1. Ba điều cần nắm trước
 
-1. **Quyền luôn cấp trên một tài nguyên**: Host, Project, Channel Route hoặc Automation. Workspace và worktree không cấp riêng, mà theo quyền của Project chứa chúng.
+1. **Quyền luôn cấp trên một tài nguyên**: Host, Project, Connection hoặc Automation. Workspace và worktree không cấp riêng, mà theo quyền của Project chứa chúng.
 2. **Quyền chỉ cộng dồn, không trừ.** Người dùng nhận tổng các grant trực tiếp và grant từ mọi Team của họ, cả trên Host lẫn trên Project. Một grant nhỏ hơn không làm giảm một grant lớn hơn.
 3. **Đây không phải sandbox.** Ai có terminal hoặc được duyệt lệnh shell thì chạy được mọi thứ mà tài khoản chạy daemon chạy được, kể cả vượt giới hạn Project hay model. Nếu cần cách ly thật, dùng user hệ điều hành hoặc container riêng.
 
 ## 2. Tài nguyên và phạm vi
 
-| Tài nguyên                             | Cấp ở đây thì áp cho                                    | Mức quyền có thể chọn                                         |
-| -------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| **Tổ chức**                            | Toàn tổ chức; không cấp bằng assignment mà theo vai trò | Owner, Admin, Member                                          |
-| **Host** (một daemon)                  | **Mọi Project** trên Host đó, kể cả Project thêm sau    | Connect, Office worker, Developer, Full access, Administrator |
-| **Project**                            | Chỉ Project đó, và mọi workspace/worktree bên trong     | Office worker, Developer, Full access                         |
-| **Workspace, worktree**                | Không cấp riêng; theo quyền của Project chứa nó         | —                                                             |
-| **Channel Route** (Slack, Telegram...) | Mọi conversation của Channel Route đó                   | Admin                                                         |
-| **Automation**                         | Một Automation của Hub                                  | Run                                                           |
+| Tài nguyên                          | Cấp ở đây thì áp cho                                    | Mức quyền có thể chọn                                         |
+| ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
+| **Tổ chức**                         | Toàn tổ chức; không cấp bằng assignment mà theo vai trò | Owner, Admin, Member                                          |
+| **Host** (một daemon)               | **Mọi Project** trên Host đó, kể cả Project thêm sau    | Connect, Office worker, Developer, Full access, Administrator |
+| **Project**                         | Chỉ Project đó, và mọi workspace/worktree bên trong     | Office worker, Developer, Full access                         |
+| **Workspace, worktree**             | Không cấp riêng; theo quyền của Project chứa nó         | —                                                             |
+| **Connection** (Slack, Telegram...) | Mọi conversation của Connection đó                      | Admin                                                         |
+| **Automation**                      | Một Automation của Hub                                  | Run                                                           |
 
 Vai trò tổ chức:
 
@@ -66,12 +66,12 @@ Tóm tắt từng mức:
 - **Full access**: Developer, cộng thêm tạo và quản lý Project, workspace, worktree.
 - **Administrator**: vận hành cả daemon và **không bị giới hạn provider/model**. Xem [Daemon Administrator](daemon-administrator.md).
 
-Channel Route và Automation:
+Connection và Automation:
 
-| Mức                       | Làm được gì                                                                                                                                                             |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Channel Route → **Admin** | Sửa audience rules, Route và Route default của Channel Route đó, trên app và trong chat. Ai được nói chuyện với bot thì đặt ở audience rules của Route, không cấp ở đây |
-| Automation → **Run**      | Chạy Automation đó                                                                                                                                                      |
+| Mức                    | Làm được gì                                                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connection → **Admin** | Sửa audience rules, Route và Route default của Connection đó, trên app và trong chat. Ai được nói chuyện với bot thì đặt ở audience rules của Route, không cấp ở đây |
+| Automation → **Run**   | Chạy Automation đó                                                                                                                                                   |
 
 ## 4. Hệ quả cần biết trước khi cấp
 

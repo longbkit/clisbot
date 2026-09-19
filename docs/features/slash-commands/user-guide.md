@@ -150,7 +150,7 @@ the new default. Your own conversation keeps working exactly as before.
 
 Changing a route affects other people, so it needs `channel.manage`: an
 organization owner or admin has it, and so does anyone given **Manage** on that
-Channel Route in Access. If someone changed the route since your session started,
+Connection in Access. If someone changed the route since your session started,
 the bot asks you to check `/routedefault` first.
 
 ## One-off questions and forking

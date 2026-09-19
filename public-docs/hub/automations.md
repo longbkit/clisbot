@@ -42,10 +42,10 @@ Choose **New Automation**, name the work, then choose **Add input**:
   offered by this editor.
 - **Manual / API:** callers provide the declared Parameters and prompt.
 - **Discord / Linear:** retain their existing direct-event configuration. Discord currently
-  supports mentions; it does not yet use the Slack/Telegram Channel Route editor.
+  supports mentions; it does not yet use the Slack/Telegram Route editor.
 
-Existing Slack direct-mention inputs remain editable and removable. New Slack inputs use
-Channel Routes; “when mentioned” is configured as a Route condition. Adding a Channel input
+Existing Slack direct-mention inputs remain editable and removable. New Slack inputs use Routes on a
+Connection; “when mentioned” is configured as a Route condition. Adding a Channel input
 does not automatically remove or convert an existing direct event.
 
 **Parameters** declares typed values supplied by a caller; it is separate from input sources.
@@ -54,7 +54,7 @@ Mode uses the Provider default when omitted; Pi exposes no selectable Modes.
 
 ## Saving and retrying
 
-Channel Route changes made inside the Automation form stay local until the Automation is saved.
+Route changes made inside the Automation form stay local until the Automation is saved.
 Connections created during account onboarding are shared resources and are saved separately.
 Hub requires Routes to target active Automations, so saving first writes the Automation, then
 validates and writes the shared Channel configuration, then applies any Team access assignments.

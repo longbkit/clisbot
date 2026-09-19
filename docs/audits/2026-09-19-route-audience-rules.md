@@ -4,6 +4,8 @@ Decision record. Status: decided and built 2026-09-19 (hub: `channels/config/aud
 sources in [2026-09-18](2026-09-18-channel-chat-authority-and-limits.md#chat-authority-is-separate-from-hostproject-access)
 (`channel.use` **or** the Route's audience/`access:` admission). The rest of
 that record (execution vouched by the publisher, warnings, limits) stands.
+The UI name **Channel Route** used below is now **Connection**
+([2026-09-19 naming decision](2026-09-19-connection-naming-and-route-flow.md)).
 
 ## Context
 

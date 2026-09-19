@@ -97,6 +97,37 @@ The same verbs work on every channel, with or without a leading `/`, and with or
 
 Approve and deny also arrive as button presses where the platform has buttons.
 
+### Permission requests
+
+Each route decides what happens when the agent's provider asks before running a
+tool. In the app this is **Permissions** on the route: **Ask authorized
+members**, **Deny**, or **Accept automatically**. Accept automatically answers
+every request with Allow, for providers whose own modes still stop for approval
+(OpenCode's `build` mode, Claude's auto mode review). The Hub saves it with a
+warning.
+
+A question from the agent (Claude's AskUserQuestion) is not a permission: the
+permission choice never decides it, and anyone the route lets talk in the
+conversation may answer it. The route's `questions:` setting, under
+**Permissions** in the app, decides how it is answered:
+
+| `questions:`    | In the app                  | What happens                                                               |
+| --------------- | --------------------------- | -------------------------------------------------------------------------- |
+| `ask` (default) | Ask in the conversation     | The question is posted; anyone the route admits answers it.                |
+| `recommended`   | Pick the recommended answer | Each question gets the option labelled recommended, else the first option. |
+| `agent-decides` | Let the Agent decide        | The agent is told nobody can answer and picks the option it recommends.    |
+
+```yaml
+routes:
+  - audience: [...]
+    agent: worker
+    approval: [{ match: "*", mode: auto-allow }]
+    questions: recommended
+```
+
+`questions:` is also a `defaults:` leaf, inherited organization → account →
+route.
+
 `/agent` and `/model` only offer what the route lists:
 
 ```yaml
@@ -136,7 +167,7 @@ Without a `provider`, the block overrides only the fields you set.
 `/promoteroutedefault` writes this leaf from a conversation: it publishes a new
 Channel revision that makes the conversation's current setup the default of the
 route that served it. It needs `channel.manage` — an organization owner or admin,
-or **Manage** on that Channel Route in Access — and the new default must be
+or **Manage** on that Connection in Access — and the new default must be
 something the sender could start themselves. Only the route being changed is
 checked against the sender's access; the organization's other routes are not. Running sessions keep their setup; the next
 session on the route uses the new default, and no account restarts.
@@ -176,7 +207,7 @@ they change where the conversation goes:
 Each route carries **audience rules**. A rule is one sentence, "[who] may talk
 in [where]", and a sender is admitted when any rule of the route matches.
 Rules are the only place that decides who may chat; the Access page grants
-only **Channel Route Admin**.
+only **Connection Admin**.
 
 - **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,
   Anyone (unlinked senders included), or senders outside the Hub, picked from
@@ -225,12 +256,12 @@ answering an approval needs an `approval.*` privilege.
 
 The person who publishes a route vouches for what it runs: saving checks that
 they may hand out its Host, Project, Agent configuration and automatic
-approvals. A Channel Route Admin edits the routes of one account through the
+approvals. A Connection Admin edits the routes of one account through the
 app and keeps its Connection as it is. Only a route whose target, approvals,
 reply path or Agent controls changed is checked against their access, so a
-Channel Route Admin can change who may talk to a route they could not publish.
+Connection Admin can change who may talk to a route they could not publish.
 The bot token and every credential in the account's settings are never shown
-to a Channel Route Admin and survive their saves unchanged.
+to a Connection Admin and survive their saves unchanged.
 
 Commands never need a mention. `requireMention` decides when a plain message
 wakes the agent.
@@ -240,7 +271,7 @@ wakes the agent.
 A rule with `anyone: true` works like any other. The Hub saves it and lists a
 warning on the route for each wide choice: no named conversations, no mention
 needed, a follow-up window that lets anyone talk without a mention, output
-beyond the final answer, tool approvals allowed automatically, Fast mode, or a
+beyond the final answer, permission requests accepted automatically, Fast mode, or a
 mode that runs tools without asking. The app lists them before you confirm a
 save. New routes start from the safe side: a mention in groups, final answers
 only, tool requests denied.
