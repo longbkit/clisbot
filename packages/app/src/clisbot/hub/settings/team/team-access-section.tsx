@@ -1,12 +1,24 @@
+import { useMemo } from "react";
 import { Text } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
-import { memberNamesByUserId } from "../access-catalog";
-import { AccessSummary, EMPTY_ACCESS_LEVELS, subjectAssignments } from "../access-summary";
+import { SubjectGrantsTable } from "../subject-grants-table";
 import { ResourceFeedbackGroup } from "../resource-rows";
-import type { HubTeam, TeamResources } from "./types";
+import type {
+  HubAccessLevels,
+  HubAccessResource,
+  HubAssignment,
+  HubMember,
+  HubTeam,
+  TeamResources,
+} from "./types";
 import { useTeamAccess } from "./use-people-resources";
+
+const NO_MEMBERS: HubMember[] = [];
+const NO_ASSIGNMENTS: HubAssignment[] = [];
+const NO_RESOURCES: HubAccessResource[] = [];
+const NO_LEVELS: HubAccessLevels = {};
 
 /**
  * A Team's grants. Organization Admins read them from the organization's assignments and can
@@ -23,23 +35,22 @@ export function TeamAccessSection({
   pending: boolean;
   manageAccess(): void;
 }) {
-  const memberNameByUserId = memberNamesByUserId(resources.members.data?.members ?? []);
+  const members = resources.members.data?.members ?? NO_MEMBERS;
+  const teams = useMemo(() => [team], [team]);
   if (!resources.canManageResources) {
-    return <TeamAdminAccess team={team} memberNameByUserId={memberNameByUserId} />;
+    return <TeamAdminAccess team={team} teams={teams} members={members} />;
   }
-  const assignments = subjectAssignments(
-    resources.assignments.data?.assignments ?? [],
-    "team",
-    team.id,
-  );
   return (
     <SettingsSection title="Access">
-      <AccessSummary
-        entries={assignments.map((assignment) => ({ assignment, source: team.name }))}
-        resources={resources.catalog.data?.resources ?? []}
-        accessLevels={resources.catalog.data?.accessLevels ?? EMPTY_ACCESS_LEVELS}
-        emptyMessage="No resource access granted"
-        memberNameByUserId={memberNameByUserId}
+      <SubjectGrantsTable
+        subjectKind="team"
+        subjectId={team.id}
+        assignments={resources.assignments.data?.assignments ?? NO_ASSIGNMENTS}
+        resources={resources.catalog.data?.resources ?? NO_RESOURCES}
+        accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
+        members={members}
+        teams={teams}
+        empty="No resource access granted"
       />
       <Button variant="outline" disabled={pending} onPress={manageAccess}>
         Manage access
@@ -50,25 +61,27 @@ export function TeamAccessSection({
 
 function TeamAdminAccess({
   team,
-  memberNameByUserId,
+  teams,
+  members,
 }: {
   team: HubTeam;
-  memberNameByUserId: ReadonlyMap<string, string>;
+  teams: readonly HubTeam[];
+  members: readonly HubMember[];
 }) {
   const access = useTeamAccess(team.id);
   return (
     <SettingsSection title="Access">
       <ResourceFeedbackGroup queries={[access]} />
       {access.data === undefined ? null : (
-        <AccessSummary
-          entries={access.data.assignments.map((assignment) => ({
-            assignment,
-            source: team.name,
-          }))}
+        <SubjectGrantsTable
+          subjectKind="team"
+          subjectId={team.id}
+          assignments={access.data.assignments}
           resources={access.data.resources}
           accessLevels={access.data.accessLevels}
-          emptyMessage="No resource access granted"
-          memberNameByUserId={memberNameByUserId}
+          members={members}
+          teams={teams}
+          empty="No resource access granted"
         />
       )}
       <Text style={settingsStyles.rowHint}>

@@ -57,7 +57,8 @@ Access ⓘ                                              [Grant access…]
   under it), the Level, its modifiers, who granted it. No sentence joined
   with "·" that has to be parsed.
 - **A Member's group also lists what their Teams give them**, marked "via Team
-  …", with no actions: that grant is edited on the Team.
+  …", with no actions: that grant is edited on the Team. A Member whose only
+  access comes through Teams still gets a group.
 - **On a phone** a grant is a card: the thing, then Level, Details and Granted
   by as labelled lines, with its actions at the top right.
 - Below the list, folded: **Access events** (job 4) and **Routes open to
@@ -74,7 +75,12 @@ Access ⓘ                                              [Grant access…]
 - A grant above the viewer's own level shows **Above your level** instead of
   actions: they can see it, not change it.
 - A Member who manages no one sees the same list, read-only, of their own
-  access.
+  access, with Levels named from the catalog the Hub sends with it. Who
+  granted each is not part of that view, so the column is absent.
+- A Team's and a Member's detail pages show their grants in the same table
+  (`SubjectGrantsTable`), read-only, without the group header the page
+  already names. Change them with **Manage access**, which opens this screen
+  for them.
 
 ## Components and readability
 

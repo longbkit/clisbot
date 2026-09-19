@@ -774,7 +774,7 @@ describe("Member detail", () => {
     await waitFor(() => expect(screen.getByText("Owner cannot be removed.")).toBeTruthy());
     expect(screen.getByRole("button", { name: "Back to People" })).toBeTruthy();
   });
-  it("groups access by resource kind with its source, and keeps raw privileges behind Details", () => {
+  it("lists direct and Team access in the Access table, marking where each comes from", () => {
     fixtures.queries["access-assignments?include=team"] = query({
       assignments: [
         teamGrant,
@@ -800,16 +800,14 @@ describe("Member detail", () => {
     render(<HubSettingsContent section="team" />);
     openMember("Alice");
     const access = screen.getByRole("heading", { name: "Access" }).closest("section")!;
-    expect(within(access).getByText("Hosts").nextSibling?.textContent).toContain("sandbox");
-    expect(within(access).getByText("Office worker · Direct · by Alice")).toBeTruthy();
-    expect(
-      within(access).getByText("Every Project on this Host, including Projects added later"),
-    ).toBeTruthy();
-    expect(within(access).getByText("2 privileges · Via Support · by Hub")).toBeTruthy();
-    expect(within(access).queryByText("channel read, channel reply")).toBeNull();
-    const chatRow = within(access).getByText("Customer chat").parentElement!.parentElement!;
-    fireEvent.click(within(chatRow).getByRole("button", { name: "Details" }));
-    expect(within(access).getByText("channel read, channel reply")).toBeTruthy();
+    // One fact per cell: the resource, its Level, where it comes from, who granted it.
+    expect(within(access).getByText("sandbox")).toBeTruthy();
+    expect(within(access).getByText("Office worker")).toBeTruthy();
+    expect(within(access).getAllByText("Alice").length).toBeGreaterThan(0);
+    expect(within(access).getByText("Customer chat")).toBeTruthy();
+    expect(within(access).getByText("via Team Support")).toBeTruthy();
+    // A grant matching no Level names its privileges.
+    expect(within(access).getByText(/^Custom: /u)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Chat accounts" })).toBeTruthy();
   });
 });

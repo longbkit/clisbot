@@ -33,6 +33,7 @@ const catalogSchema = z.object({
 });
 const effectiveSchema = z.object({
   owner: z.boolean(),
+  accessLevels: z.record(z.string(), z.unknown()),
   grants: z.array(
     z.object({ resource: z.object({ kind: z.string() }), privileges: z.array(z.string()) }),
   ),

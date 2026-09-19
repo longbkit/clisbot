@@ -1,6 +1,5 @@
 import { invitationTeams } from "../../contracts";
-import { resourceKindLabel } from "../access-catalog";
-import { subjectAssignments } from "../access-summary";
+import { resourceKindLabel, subjectAssignments } from "../access-catalog";
 import { countLabel } from "../labels";
 import { matchesSearch } from "../search-text";
 import type { HubAssignment, HubManagedInvitation, HubTeam } from "./types";

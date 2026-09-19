@@ -21,6 +21,7 @@ export function MemberAccessSettings({ access }: { access: EffectiveAccess | und
             effectiveGrantRows(
               access.grants,
               access.grants.map(({ resource }) => resource),
+              access.accessLevels,
             ),
             "subject",
             "",
@@ -44,6 +45,7 @@ export function MemberAccessSettings({ access }: { access: EffectiveAccess | und
           <AccessGrantsTable
             groups={groups}
             grouping="subject"
+            groupHeaders={false}
             empty="No resource access has been granted to you yet."
           />
         )}

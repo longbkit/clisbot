@@ -26,14 +26,25 @@ export function AccessGrantsTable({
   grouping,
   empty,
   actions,
+  groupHeaders = true,
 }: {
   groups: readonly GrantGroup[];
   grouping: GrantGrouping;
   empty: string;
   /** Absent: the list is read-only (a Member's own access). */
   actions?: GrantActions;
+  /** Off where the page already names the one subject (a Team's or a Member's own access). */
+  groupHeaders?: boolean;
 }) {
   const compact = useIsCompactFormFactor();
+  const withActions = actions !== undefined;
+  const columns = useMemo<Columns>(
+    () => ({
+      grantedBy: groups.some((group) => group.rows.some((row) => row.grantedBy !== null)),
+      actions: withActions,
+    }),
+    [groups, withActions],
+  );
   if (groups.length === 0) {
     return (
       <View style={settingsStyles.card}>
@@ -45,19 +56,22 @@ export function AccessGrantsTable({
   }
   return (
     <View style={settingsStyles.card}>
-      {compact ? null : <HeaderRow grouping={grouping} withActions={actions !== undefined} />}
+      {compact ? null : <HeaderRow grouping={grouping} columns={columns} />}
       {groups.map((group) => (
         <View key={group.key}>
-          <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.group]}>
-            <Text style={styles.groupTitle}>{group.title}</Text>
-            <Text style={styles.muted}>{group.subtitle}</Text>
-          </View>
+          {groupHeaders ? (
+            <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.group]}>
+              <Text style={styles.groupTitle}>{group.title}</Text>
+              <Text style={styles.muted}>{group.subtitle}</Text>
+            </View>
+          ) : null}
           {group.rows.map((row) => (
             <GrantRowView
               key={row.key}
               row={row}
               grouping={grouping}
               compact={compact}
+              columns={columns}
               actions={actions}
             />
           ))}
@@ -67,7 +81,13 @@ export function AccessGrantsTable({
   );
 }
 
-function HeaderRow({ grouping, withActions }: { grouping: GrantGrouping; withActions: boolean }) {
+/** Columns every row shares: Granted by only when some row knows it. */
+interface Columns {
+  grantedBy: boolean;
+  actions: boolean;
+}
+
+function HeaderRow({ grouping, columns }: { grouping: GrantGrouping; columns: Columns }) {
   return (
     <View style={[settingsStyles.row, styles.tableRow, styles.header]}>
       <Text style={[styles.headerCell, styles.thing]}>
@@ -75,8 +95,10 @@ function HeaderRow({ grouping, withActions }: { grouping: GrantGrouping; withAct
       </Text>
       <Text style={[styles.headerCell, styles.level]}>Level</Text>
       <Text style={[styles.headerCell, styles.details]}>Details</Text>
-      <Text style={[styles.headerCell, styles.grantedBy]}>Granted by</Text>
-      {withActions ? <View style={styles.actions} /> : null}
+      {columns.grantedBy ? (
+        <Text style={[styles.headerCell, styles.grantedBy]}>Granted by</Text>
+      ) : null}
+      {columns.actions ? <View style={styles.actions} /> : null}
     </View>
   );
 }
@@ -85,11 +107,13 @@ function GrantRowView({
   row,
   grouping,
   compact,
+  columns,
   actions,
 }: {
   row: GrantRow;
   grouping: GrantGrouping;
   compact: boolean;
+  columns: Columns;
   actions: GrantActions | undefined;
 }) {
   const thing =
@@ -113,9 +137,11 @@ function GrantRowView({
             <Text style={styles.muted}>{details.join(", ")}</Text>
           </Labelled>
         )}
-        <Labelled label="Granted by">
-          <Text style={styles.muted}>{row.grantedBy}</Text>
-        </Labelled>
+        {row.grantedBy === null ? null : (
+          <Labelled label="Granted by">
+            <Text style={styles.muted}>{row.grantedBy}</Text>
+          </Labelled>
+        )}
       </View>
     );
   }
@@ -126,7 +152,9 @@ function GrantRowView({
       </View>
       <Text style={[styles.value, styles.level]}>{row.level}</Text>
       <Text style={[styles.muted, styles.details]}>{details.join(", ") || "—"}</Text>
-      <Text style={[styles.muted, styles.grantedBy]}>{row.grantedBy}</Text>
+      {columns.grantedBy ? (
+        <Text style={[styles.muted, styles.grantedBy]}>{row.grantedBy ?? "—"}</Text>
+      ) : null}
       {trailing}
     </View>
   );

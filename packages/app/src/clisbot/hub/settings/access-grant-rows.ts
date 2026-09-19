@@ -5,7 +5,7 @@
 import {
   accessLevelLabel,
   constraintSummary,
-  grantedByLabel,
+  grantorName,
   privilegeLabel,
   resourceKey,
   resourceKindLabel,
@@ -30,7 +30,8 @@ export interface GrantRow {
   level: string;
   /** Can share, Agent limits: the modifiers, one fact each. */
   details: string[];
-  grantedBy: string;
+  /** Who made the grant; null where that is not known (a Member's own view). */
+  grantedBy: string | null;
   /** What this grant reaches the group through ("Team QC", "Host LongPro2Max");
    * such a row is edited where it is granted. */
   via: string | null;
@@ -74,7 +75,7 @@ export function grantRows(input: GrantRowInput): GrantRow[] {
     resource: resourceCell(assignment, resourceByKey),
     level: input.levelLabel(assignment),
     details: grantDetails(assignment, input.sharesAccess(assignment)),
-    grantedBy: grantedByLabel(assignment, input.memberNameByUserId).replace(/^by /u, ""),
+    grantedBy: grantorName(assignment, input.memberNameByUserId),
     via: null,
     assignment,
     locked: input.locked(assignment),
@@ -110,16 +111,16 @@ function resourceCell(
   };
 }
 
-/**
- * Grouped by who holds the grants or by what they are on, narrowed by search.
- * Grouped by people, a Member's group also lists what their Teams give them.
- */
 export interface GrantDirectory {
   members: readonly HubMember[];
   teams: readonly HubTeam[];
   resources: readonly AccessResource[];
 }
 
+/**
+ * Grouped by who holds the grants or by what they are on, narrowed by search.
+ * Grouped by people, a Member's group also lists what their Teams give them.
+ */
 export function groupGrantRows(
   rows: readonly GrantRow[],
   grouping: GrantGrouping,
@@ -149,24 +150,24 @@ function subjectGroups(
     group.rows.push(row);
     groups.set(key, group);
   }
-  addTeamRowsToMembers(groups, rows, directory, query);
+  addTeamRowsToMembers(groups, rows, directory);
   return [...groups.values()]
     .map((group) => narrow(group, query))
     .filter((group): group is GrantGroup => group !== null)
     .sort(bySubjectOrder);
 }
 
-/** A Member's Team grants, under the Member, for any Member already listed or searched for. */
+/**
+ * A Member's Team grants, under the Member. A Member whose only access comes
+ * through Teams still gets a group: "what can this person use" has an answer.
+ */
 function addTeamRowsToMembers(
   groups: Map<string, GrantGroup>,
   rows: readonly GrantRow[],
   directory: { members: readonly HubMember[]; teams: readonly HubTeam[] },
-  query: string,
 ): void {
   for (const member of directory.members) {
     const key = `member:${member.id}`;
-    const searched = query.length > 0 && member.name.toLowerCase().includes(query);
-    if (!groups.has(key) && !searched) continue;
     const teams = directory.teams.filter((team) => team.userIds.includes(member.userId));
     const inherited = teams.flatMap((team) =>
       rows
@@ -305,7 +306,7 @@ export function assignmentSubjectName(
 
 /** The Level's name when the grant still equals one; the privilege list only for custom grants. */
 export function grantedAccessLabel(
-  assignment: AccessAssignment,
+  assignment: Pick<AccessAssignment, "resourceKind" | "privileges">,
   accessLevels: AccessCatalog["accessLevels"],
 ): string {
   const level = matchingAccessLevel(accessLevels, assignment.resourceKind, assignment.privileges);
@@ -327,15 +328,14 @@ export function aboveViewer(
       candidate.kind === assignment.resourceKind && candidate.id === assignment.resourceId,
   ) ?? { kind: assignment.resourceKind, id: assignment.resourceId, parent: null };
   return !privilegesWithinHoldings(
-    viewerHoldings(authority, resource as AccessResource, [...resources]),
+    viewerHoldings(authority, resource, resources),
     assignment.privileges,
   );
 }
 
 /**
  * A Member's own effective access as rows (read-only): direct grants and the
- * ones their Teams give them. The Level reads as the privileges held, since the
- * Member's view carries no Level catalog.
+ * ones their Teams give them. Who made each grant is not part of this view.
  */
 export function effectiveGrantRows(
   grants: readonly {
@@ -346,6 +346,7 @@ export function effectiveGrantRows(
     source: { kind: "direct" } | { kind: "team"; teamName: string };
   }[],
   resources: readonly AccessResource[],
+  accessLevels: AccessCatalog["accessLevels"] | undefined,
 ): GrantRow[] {
   return grants.map((grant) => {
     const parent = grant.resource.parent
@@ -369,15 +370,34 @@ export function effectiveGrantRows(
           ...(grant.resource.available ? [] : ["Unavailable"]),
         ].join(" · "),
       },
-      level:
-        grant.privileges.length === 0
-          ? "No privileges"
-          : grant.privileges.map(privilegeLabel).join(", "),
+      level: effectiveLevel(grant.resource.kind, grant.privileges, accessLevels),
       details: limits === null ? [] : [limits],
-      grantedBy: grant.source.kind === "team" ? `Team ${grant.source.teamName}` : "Direct",
+      grantedBy: null,
       via: grant.source.kind === "team" ? `Team ${grant.source.teamName}` : null,
       assignment: null,
       locked: false,
     };
   });
+}
+
+function effectiveLevel(
+  resourceKind: AccessResourceKind,
+  privileges: readonly string[],
+  accessLevels: AccessCatalog["accessLevels"] | undefined,
+): string {
+  if (accessLevels !== undefined)
+    return grantedAccessLabel({ resourceKind, privileges: [...privileges] }, accessLevels);
+  // COMPAT(effective-access-levels): added 2026-09-19, remove after 2027-03-19.
+  // A Hub without the Level catalog on effective access: name the privileges.
+  return privileges.length === 0 ? "No privileges" : privileges.map(privilegeLabel).join(", ");
+}
+
+/** One subject's group (a Team's grants, or a Member's own and their Teams'). */
+export function subjectGrantGroups(
+  rows: readonly GrantRow[],
+  subject: { kind: SubjectKind; id: string },
+  directory: GrantDirectory,
+): GrantGroup[] {
+  const key = `${subject.kind}:${subject.id}`;
+  return groupGrantRows(rows, "subject", "", directory).filter((group) => group.key === key);
 }

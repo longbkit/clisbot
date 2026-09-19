@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccessAssignment, AccessResource, HubMember, HubTeam } from "./access-catalog";
-import { grantRows, groupGrantRows } from "./access-grant-rows";
+import { effectiveGrantRows, grantRows, groupGrantRows } from "./access-grant-rows";
 
 const host = { kind: "daemon", id: "host", name: "LongPro2Max", parent: null } as AccessResource;
 const project = {
@@ -143,5 +143,45 @@ describe("groupGrantRows", () => {
       teams: [{ ...teams[0]!, userIds: [] }],
     });
     expect(left.flatMap((group) => group.rows).map((row) => row.via)).toEqual([null]);
+  });
+});
+
+describe("Team-only access", () => {
+  it("gives a Member whose only access is through a Team their own group", () => {
+    const teamOnly = grantRows({
+      assignments: [grant({ id: "team-project" })],
+      resources: [host, project],
+      members,
+      teams,
+      memberNameByUserId: new Map(),
+      levelLabel: () => "Office worker",
+      sharesAccess: () => false,
+      locked: () => false,
+    });
+    const groups = groupGrantRows(teamOnly, "subject", "", directory);
+    expect(groups.map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
+    expect(groups[1]!.rows[0]).toMatchObject({ via: "Team QC", assignment: null });
+  });
+});
+
+describe("effectiveGrantRows", () => {
+  const own = [
+    {
+      assignmentId: "a",
+      resource: { ...host, available: true } as AccessResource,
+      privileges: ["daemon.connect", "project.use"],
+      constraints: {},
+      source: { kind: "team" as const, teamName: "QC" },
+    },
+  ];
+  it("names the Level from the Hub's catalog and leaves the author unknown", () => {
+    const [row] = effectiveGrantRows(own, [host], {
+      daemon: { office_worker: ["daemon.connect", "project.use"] },
+    });
+    expect(row).toMatchObject({ level: "Office worker", via: "Team QC", grantedBy: null });
+  });
+  it("names the privileges when an older Hub sends no catalog", () => {
+    const [row] = effectiveGrantRows(own, [host], undefined);
+    expect(row!.level).not.toBe("Office worker");
   });
 });

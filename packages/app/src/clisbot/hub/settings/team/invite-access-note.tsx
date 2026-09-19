@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { subjectAssignments } from "../access-summary";
+import { subjectAssignments } from "../access-catalog";
 import { teamAccessLine } from "./team-directory";
 import type { TeamResources } from "./types";
 

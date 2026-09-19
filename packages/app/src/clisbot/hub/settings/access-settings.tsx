@@ -272,6 +272,8 @@ function ManagedAccessSettings({
       ) : null}
       {assignments.data && catalog.data && members.data && teams.data ? (
         <ManagedAccessContent
+          // A link for another person or resource starts the list over.
+          key={`${initialSubject ?? ""}|${initialResource ?? ""}`}
           initialSubject={initialSubject}
           initialResource={initialResource}
           authority={authority}
@@ -475,15 +477,6 @@ function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
   return useMemo(
     () => ({
       teamById: new Map(teams.map((team) => [team.id, team.name])),
-      teamMembersById: new Map(
-        teams.map((team) => [
-          team.id,
-          members
-            .filter((member) => team.userIds.includes(member.userId))
-            .map((member) => `${member.name} · ${member.email}`)
-            .join(", ") || "No Members in this Team",
-        ]),
-      ),
       memberById: new Map(members.map((member) => [member.id, `${member.name} · ${member.email}`])),
       memberNameByUserId: memberNamesByUserId(members),
     }),

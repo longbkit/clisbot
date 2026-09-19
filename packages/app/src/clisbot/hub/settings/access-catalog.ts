@@ -189,11 +189,23 @@ export function memberNamesByUserId(
   return new Map(members.map((member) => [member.userId, member.name]));
 }
 
-export function grantedByLabel(
+/** Who made a grant: a Member's name, or Hub for one the Hub wrote itself. */
+export function grantorName(
   assignment: Pick<AccessAssignment, "createdByUserId">,
   memberNameByUserId: ReadonlyMap<string, string>,
 ): string {
   const userId = assignment.createdByUserId ?? null;
-  if (userId === null) return "by Hub";
-  return `by ${memberNameByUserId.get(userId) ?? "a former Member"}`;
+  if (userId === null) return "Hub";
+  return memberNameByUserId.get(userId) ?? "Former Member";
+}
+
+/** Assignments held by one subject, e.g. every grant to a Team. */
+export function subjectAssignments<T extends Pick<AccessAssignment, "subjectKind" | "subjectId">>(
+  assignments: readonly T[],
+  subjectKind: SubjectKind,
+  subjectId: string,
+): T[] {
+  return assignments.filter(
+    (assignment) => assignment.subjectKind === subjectKind && assignment.subjectId === subjectId,
+  );
 }

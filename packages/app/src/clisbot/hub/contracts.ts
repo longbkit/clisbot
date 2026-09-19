@@ -690,6 +690,8 @@ export const HubEffectiveAccessSchema = z.object({
       ]),
     }),
   ),
+  /** The Level catalog, so a Member reads their grants as Levels. Absent from older Hubs. */
+  accessLevels: z.record(z.string(), z.record(z.string(), z.array(z.string()))).optional(),
 });
 
 /** One Administrator grant on a Host, recorded so Organization Admins can review who granted it. */

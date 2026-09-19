@@ -162,7 +162,8 @@ export class AccessDelegationApi {
       ? effective.grants
       : // COMPAT(team-resource-kind): added 2026-09-19, remove after 2027-03-19.
         effective.grants.filter(({ resource }) => resource.kind !== "team");
-    return Response.json({ owner: effective.owner, grants });
+    // The Level catalog lets a Member read their own grants as Levels, not privilege lists.
+    return Response.json({ owner: effective.owner, grants, accessLevels: RESOURCE_ACCESS_LEVELS });
   }
 
   private async listAssignments(

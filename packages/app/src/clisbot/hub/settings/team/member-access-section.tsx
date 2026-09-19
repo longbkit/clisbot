@@ -2,30 +2,25 @@ import { Text } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
-import { memberNamesByUserId } from "../access-catalog";
-import { AccessSummary, EMPTY_ACCESS_LEVELS, type AccessSummaryEntry } from "../access-summary";
+import { subjectAssignments } from "../access-catalog";
 import { countLabel } from "../labels";
 import { InfoRow } from "../resource-rows";
-import type { HubAssignment, HubMember, HubTeam, TeamResources } from "./types";
+import { SubjectGrantsTable } from "../subject-grants-table";
+import type {
+  HubAccessLevels,
+  HubAccessResource,
+  HubAssignment,
+  HubMember,
+  HubTeam,
+  TeamResources,
+} from "./types";
 
-/** A Member's grants: direct ones, then every grant of a Team they are in, each with its source. */
-export function memberAccessEntries(
-  member: HubMember,
-  teams: readonly HubTeam[],
-  assignments: readonly HubAssignment[],
-): AccessSummaryEntry[] {
-  return assignments.flatMap<AccessSummaryEntry>((assignment) => {
-    if (assignment.subjectKind === "member" && assignment.subjectId === member.id) {
-      return [{ assignment, source: "Direct" }];
-    }
-    const team = teams.find(({ id }) => id === assignment.subjectId);
-    if (assignment.subjectKind === "team" && team?.userIds.includes(member.userId)) {
-      return [{ assignment, source: `Via ${team.name}` }];
-    }
-    return [];
-  });
-}
+const NO_MEMBERS: HubMember[] = [];
+const NO_ASSIGNMENTS: HubAssignment[] = [];
+const NO_RESOURCES: HubAccessResource[] = [];
+const NO_LEVELS: HubAccessLevels = {};
 
+/** A Member's grants: direct ones, then every grant of a Team they are in, marked via that Team. */
 export function MemberAccessSection({
   member,
   teams,
@@ -39,23 +34,26 @@ export function MemberAccessSection({
   pending: boolean;
   manageAccess(): void;
 }) {
-  const entries = memberAccessEntries(member, teams, resources.assignments.data?.assignments ?? []);
-  const directCount = entries.filter(({ source }) => source === "Direct").length;
+  const assignments = resources.assignments.data?.assignments ?? NO_ASSIGNMENTS;
+  const directCount = subjectAssignments(assignments, "member", member.id).length;
   return (
     <SettingsSection title="Access">
       {member.role === "owner" ? (
         <InfoRow title="Full organization access" hint="Owner · No setup required" />
       ) : (
         <>
-          <AccessSummary
-            entries={entries}
-            resources={resources.catalog.data?.resources ?? []}
-            accessLevels={resources.catalog.data?.accessLevels ?? EMPTY_ACCESS_LEVELS}
-            emptyMessage="No resource access granted"
-            memberNameByUserId={memberNamesByUserId(resources.members.data?.members ?? [])}
+          <SubjectGrantsTable
+            subjectKind="member"
+            subjectId={member.id}
+            assignments={assignments}
+            resources={resources.catalog.data?.resources ?? NO_RESOURCES}
+            accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
+            members={resources.members.data?.members ?? NO_MEMBERS}
+            teams={teams}
+            empty="No resource access granted"
           />
           <Text style={settingsStyles.rowHint}>
-            {`${countLabel(directCount, "direct assignment")}; Team access is listed with its source.`}
+            {`${countLabel(directCount, "direct assignment")}; Team access is marked with its Team.`}
           </Text>
         </>
       )}
