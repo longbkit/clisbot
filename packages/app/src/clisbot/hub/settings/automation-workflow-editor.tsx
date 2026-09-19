@@ -7,6 +7,7 @@ import { AutomationInputDraftContext, type AutomationChannelDraft } from "./auto
 import type { AutomationConnection } from "./automation-settings";
 import { StyleSheet } from "react-native-unistyles";
 import { useState, useSyncExternalStore, type ComponentType } from "react";
+import { audienceRuleSentence, routeAudienceDraft } from "./channel-route-audience";
 import { Text, View } from "react-native";
 import { stringify, parse } from "yaml";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function AutomationWorkflowEditor({
   save,
   daemons,
   connections = [],
+  allowConnectionInputs = true,
   ChannelInputs,
   initialDraft = null,
   creating = false,
@@ -39,6 +41,11 @@ export function AutomationWorkflowEditor({
   save(source: string, draft?: AutomationChannelDraft | null): void;
   initialDraft?: AutomationChannelDraft | null;
   connections?: AutomationConnection[];
+  /**
+   * False for a Member: Connection-sourced inputs (GitHub, Slack, Discord,
+   * Linear) stay with Organization Admins, so Add input offers manual only.
+   */
+  allowConnectionInputs?: boolean;
   ChannelInputs?: ComponentType<{ automationName: string; embedded?: boolean }>;
   daemons: { id: string; slug: string; connectionOffer: { serverId: string } | null }[];
 }) {
@@ -115,9 +122,7 @@ export function AutomationWorkflowEditor({
                   <Text style={settingsStyles.rowTitle}>
                     {inputLabel(String(account.channel))} · {String(account.accountId)}
                   </Text>
-                  <Text style={settingsStyles.rowHint}>
-                    {routeSummary(record(record(route).match))}
-                  </Text>
+                  <Text style={settingsStyles.rowHint}>{routeSummary(record(route))}</Text>
                 </View>
                 <Button
                   size="sm"
@@ -162,6 +167,12 @@ export function AutomationWorkflowEditor({
               </Button>
             }
           >
+            {addingInput && !allowConnectionInputs ? (
+              <Text style={settingsStyles.rowHint}>
+                Inputs from a Connection (GitHub, Slack, Discord, Linear) need an Organization
+                Admin. You can add manual runs.
+              </Text>
+            ) : null}
             {addingInput ? (
               <SelectField
                 label="Input source"
@@ -169,20 +180,11 @@ export function AutomationWorkflowEditor({
                 selectedDisplay={null}
                 placeholder="Choose source"
                 emptyText="No sources"
-                options={[
-                  ...(ChannelInputs ? ["slack", "telegram"] : []),
-                  "manual.run",
-                  "github.issue_comment",
-                  "discord.mention",
-                  "linear.issue_created",
-                ]
-                  .filter(
-                    (value) =>
-                      value === "slack" ||
-                      value === "telegram" ||
-                      !(value in record(state.value.on)),
-                  )
-                  .map((value) => ({ id: value, value, label: inputLabel(value) }))}
+                options={inputSourceOptions(
+                  allowConnectionInputs,
+                  ChannelInputs !== undefined,
+                  record(state.value.on),
+                )}
                 onChange={(value) => {
                   if (value === "slack" || value === "telegram") setChannelProvider(value);
                   else {
@@ -929,6 +931,26 @@ function WorkflowEnvironment({
   );
 }
 
+/** Input sources still available to add: Connection-backed ones only for Organization Admins. */
+function inputSourceOptions(
+  allowConnectionInputs: boolean,
+  hasChannelInputs: boolean,
+  configured: Record<string, unknown>,
+): { id: string; value: string; label: string }[] {
+  const sources = allowConnectionInputs
+    ? [
+        ...(hasChannelInputs ? ["slack", "telegram"] : []),
+        "manual.run",
+        "github.issue_comment",
+        "discord.mention",
+        "linear.issue_created",
+      ]
+    : ["manual.run"];
+  return sources
+    .filter((value) => value === "slack" || value === "telegram" || !(value in configured))
+    .map((value) => ({ id: value, value, label: inputLabel(value) }));
+}
+
 function inputLabel(source: string): string {
   return (
     (
@@ -952,13 +974,17 @@ function stepTitle(step: Record<string, unknown>, index: number): string {
   return text && !text.startsWith("${{") ? text.slice(0, 72) : `Agent step ${index + 1}`;
 }
 
-function routeSummary(match: Record<string, unknown>): string {
-  const parts: string[] = [];
-  if (match.kind) parts.push(String(match.kind));
-  if (Array.isArray(match.ids)) parts.push(match.ids.join(", "));
-  if (match.mention === true || match.mention === "required") parts.push("Mentions only");
-  if (match.contains) parts.push(`Contains: ${String(match.contains)}`);
+/** Who this Route admits and where, in the Route's own words; ids stand in for names here. */
+function routeSummary(route: Record<string, unknown>): string {
+  const { rules, contains } = routeAudienceDraft(route);
+  const names = { teamName: same, memberName: same, conversationLabel: same };
+  const parts = rules.map((rule) => audienceRuleSentence(rule, names));
+  if (contains.length > 0) parts.push(`Contains: ${contains}`);
   return parts.join(" · ") || "Configured conversation filter";
+}
+
+function same(id: string): string {
+  return id;
 }
 
 function WorkflowParameters({ model, pending }: { model: Model; pending: boolean }) {

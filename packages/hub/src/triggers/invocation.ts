@@ -25,7 +25,9 @@ export type InvocationRejection =
   | { code: "duplicate_input"; inputName: string }
   | { code: "missing_required"; inputName: string }
   | { code: "invalid_default_type"; inputName: string; expectedType: InvocationInputType }
-  | { code: "invalid_default_choice"; inputName: string };
+  | { code: "invalid_default_choice"; inputName: string }
+  /** The Automation's author can no longer delegate its runs; the Hub paused it. */
+  | { code: "author_access_lost"; reason: string };
 
 const JsonPrimitiveSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
 
@@ -56,6 +58,7 @@ export const InvocationRejectionSchema = z.discriminatedUnion("code", [
     })
     .strict(),
   z.object({ code: z.literal("invalid_default_choice"), inputName: z.string() }).strict(),
+  z.object({ code: z.literal("author_access_lost"), reason: z.string() }).strict(),
 ]);
 
 export function parseInvocationRejection(value: unknown): InvocationRejection {
@@ -83,6 +86,8 @@ export function formatInvocationRejection(rejection: InvocationRejection): strin
       return `input ${rejection.inputName} default does not match type ${rejection.expectedType}`;
     case "invalid_default_choice":
       return `input ${rejection.inputName} default is not one of the declared choices`;
+    case "author_access_lost":
+      return `Automation paused: ${rejection.reason}`;
   }
   throw new Error("unknown invocation rejection");
 }

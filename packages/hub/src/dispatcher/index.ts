@@ -17,6 +17,7 @@ export interface DispatcherOptions {
   providers?: readonly TriggerProvider[];
   dispatchLaunchMachineIntent?: (intent: LaunchMachineIntent) => Promise<unknown>;
   validateLaunchMachineIntent?: DurableWorkflowEngineOptions["validateLaunchMachineIntent"];
+  authorizeWorkflowRun?: DurableWorkflowEngineOptions["authorizeWorkflowRun"];
   configurationRevisionId?: string;
   leaseMs?: number;
   workerIntervalMs?: number;
@@ -47,6 +48,9 @@ export function createDispatcherWithEngine(options: DispatcherOptions): {
     ...(options.validateLaunchMachineIntent === undefined
       ? {}
       : { validateLaunchMachineIntent: options.validateLaunchMachineIntent }),
+    ...(options.authorizeWorkflowRun === undefined
+      ? {}
+      : { authorizeWorkflowRun: options.authorizeWorkflowRun }),
     ...(options.configurationRevisionId === undefined
       ? {}
       : { configurationRevisionId: options.configurationRevisionId }),

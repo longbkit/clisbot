@@ -13,6 +13,11 @@ import { AutomationSettings, SingleAgentAutomationForm } from "./automation-sett
 
 const page = vi.hoisted(() => ({
   enabled: false,
+  signedIn: null as null | {
+    organization: { id: string };
+    account: { id: string };
+    capabilities: { manageResources: boolean };
+  },
   resources: {} as Record<string, unknown>,
 }));
 vi.mock("@/components/adaptive-modal-sheet", () => ({
@@ -62,11 +67,11 @@ vi.mock("../account-provider", () => ({
     enabled: page.enabled,
     origin: "https://hub.example.test",
     signedIn: page.enabled
-      ? {
+      ? (page.signedIn ?? {
           organization: { id: "org" },
           account: { id: "owner" },
           capabilities: { manageResources: true },
-        }
+        })
       : null,
   }),
 }));
@@ -214,6 +219,7 @@ function ChannelDraftAdapter() {
 beforeEach(() => {
   vi.stubGlobal("React", React);
   page.enabled = false;
+  page.signedIn = null;
   page.resources = {};
 });
 afterEach(() => {
@@ -464,6 +470,120 @@ describe("Channel Automation form", () => {
   });
 });
 
+describe("Automations for Members", () => {
+  const member = {
+    organization: { id: "org" },
+    account: { id: "lead" },
+    capabilities: { manageResources: false },
+  };
+  const shared = (id: string, scope: "admin" | "run", extra: Record<string, unknown> = {}) => ({
+    id,
+    name: id,
+    enabled: true,
+    format: "single_run",
+    activeRevisionId: `${id}-revision`,
+    yaml: buildSingleAgentAutomationYaml({
+      name: id,
+      daemonId: "daemon",
+      cwd: "/workspace",
+      provider: "codex",
+      events: [{ name: "manual.run" }],
+      instruction: "Do it",
+    }),
+    createdAt: "2026-09-19T00:00:00.000Z",
+    updatedAt: "2026-09-19T00:00:00.000Z",
+    scope,
+    pausedReason: null,
+    author: {
+      userId: scope === "admin" ? "lead" : "hoa",
+      name: scope === "admin" ? "Lead" : "Hoa",
+    },
+    target: { daemonName: "Workstation", projectName: "Project A" },
+    ...extra,
+  });
+
+  it("offers New Automation to a Member with Project access, and filters Mine / Shared with me", () => {
+    page.enabled = true;
+    page.signedIn = member;
+    page.resources = {
+      automations: {
+        automations: [
+          shared("triage", "admin"),
+          shared("release", "run", { pausedReason: "its author lost access to the Project" }),
+        ],
+      },
+      daemons: { daemons },
+      effective: {
+        owner: false,
+        grants: [
+          {
+            assignmentId: "grant",
+            resource: {
+              kind: "project",
+              id: "project",
+              name: "Project A",
+              parent: { kind: "daemon", id: "daemon" },
+              available: true,
+            },
+            privileges: ["project.use", "agent.create"],
+            constraints: {},
+            source: { kind: "direct" },
+          },
+        ],
+      },
+    };
+    render(<AutomationSettings />);
+    expect(screen.getByRole("button", { name: "New Automation" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "All (2)" })).toBeNull();
+    expect(screen.getByText("Active · Admin").textContent).toBe("Active · Admin");
+    fireEvent.click(screen.getByRole("tab", { name: "Shared with me (1)" }));
+    expect(screen.getByText("Paused · Run").textContent).toBe("Paused · Run");
+    expect(screen.getByText("Paused: its author lost access to the Project")).toBeTruthy();
+    // Run scope cannot enable it again; only an Admin of the Automation sees the action.
+    expect(screen.queryByRole("button", { name: "Review and enable" })).toBeNull();
+  });
+
+  it("hides New Automation without Project access", () => {
+    page.enabled = true;
+    page.signedIn = member;
+    page.resources = {
+      automations: { automations: [] },
+      daemons: { daemons },
+      effective: { owner: false, grants: [] },
+    };
+    render(<AutomationSettings />);
+    expect(screen.queryByRole("button", { name: "New Automation" })).toBeNull();
+    expect(screen.getByText("No Automations are shared with you.")).toBeTruthy();
+  });
+
+  it("shows the Run warning and Review and enable to an Automation Admin", () => {
+    page.enabled = true;
+    page.signedIn = member;
+    page.resources = {
+      automations: {
+        automations: [
+          shared("triage", "admin", { pausedReason: "its author lost access to the Project" }),
+        ],
+      },
+      daemons: { daemons },
+      effective: { owner: false, grants: [] },
+      "automation-access": { assignments: [] },
+      members: { members: [] },
+      revisions: { revisions: [] },
+      activity: { activity: [] },
+    };
+    render(<AutomationSettings />);
+    fireEvent.click(screen.getByRole("button", { name: "Review and enable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+    expect(
+      screen.getByText(
+        "Runs with Lead's access on Project A. The runner sees results but gets no Project access in the app.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Paused: its author lost access to the Project")).toBeTruthy();
+  });
+});
+
 describe("Automation workspace navigation", () => {
   it("opens an overview and retains the configuration draft across tabs", () => {
     page.enabled = true;
@@ -485,6 +605,8 @@ describe("Automation workspace navigation", () => {
             format: "single_agent",
             activeRevisionId: "revision",
             yaml,
+            createdAt: "2026-09-19T00:00:00.000Z",
+            updatedAt: "2026-09-19T00:00:00.000Z",
           },
         ],
       },

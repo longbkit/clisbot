@@ -1778,6 +1778,42 @@ describe("durable multi-step workflow engine", () => {
   });
 });
 
+describe("author access re-check", () => {
+  it("rejects the run with author_access_lost when the authorizer refuses, and dispatches nothing", async () => {
+    const fixture = await workflowFixture();
+    const checked: string[] = [];
+    const dispatches: string[] = [];
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [providerMatch(fixture.configuration, fixture.revisionId)],
+      authorizeWorkflowRun: async (input) => {
+        checked.push(`${input.workflowId}:${input.configurationRevisionId}`);
+        return { allowed: false, reason: "its author lost access" };
+      },
+      dispatchLaunchMachineIntent: async (intent) => {
+        dispatches.push(dispatchLabel(intent));
+        return {};
+      },
+    });
+
+    await handler(fixture.trigger("run repo=paseo"));
+    await engine.processAvailable();
+
+    assert.deepEqual(checked, [`${fixture.workflowId}:${fixture.revisionId}`]);
+    assert.deepEqual(dispatches, []);
+    const [run] = await fixture.database.findTriggerRunsByProviderEventReceiptId(
+      fixture.providerEventReceiptId,
+    );
+    assert.equal(run?.outcome, "rejected");
+    if (run?.outcome !== "rejected") return;
+    assert.deepEqual(run.rejection, {
+      code: "author_access_lost",
+      reason: "its author lost access",
+    });
+  });
+});
+
 interface Fixture {
   database: Database;
   entitlements: EntitlementsService;

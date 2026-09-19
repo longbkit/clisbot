@@ -1,4 +1,3 @@
-import { editableAutomationYaml } from "../triggers/configuration/workflow-document.js";
 import { configuredChannelDestinations } from "../channels/configured-destinations.js";
 import { ChannelAccessStore, type ChannelPairingRecord } from "../db/channel-access.js";
 import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
@@ -15,6 +14,7 @@ import {
 import { channelIngressAccountKey } from "../channels/ingress/health.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
 import { channelCatalogView } from "./channel-catalog.js";
+import { channelAdminHandles, handleChannelAccountAdmin } from "./channel-admin.js";
 import { channelConfigurationRevisionList, channelControlPlaneView } from "./channel-plane-gate.js";
 import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 import {
@@ -22,21 +22,17 @@ import {
   channelActivityView,
   parseChannelActivityQuery,
 } from "./channel-activity.js";
-import { automationRunView } from "./automation-run.js";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { dump, load } from "js-yaml";
 import { z } from "zod";
-import {
-  ACCESS_PRIVILEGES,
-  AccessAssignmentBatchInputSchema,
-  AccessAssignmentInputSchema,
-  RESOURCE_ACCESS_LEVELS,
-} from "../access/contract.js";
-import {
-  assertAutomationConfigurationDelegation,
-  assertChannelConfigurationDelegation,
-} from "../access/delegation.js";
+import { AccessEventStore } from "../access/events.js";
+import { AccessDelegationApi } from "./access-delegation.js";
+import { TeamsApi } from "./teams.js";
+import { AutomationsApi } from "./automations.js";
+import { parseBody, problem } from "./request.js";
+import type { NotificationMailer } from "../invitations/index.js";
+import { assertChannelConfigurationDelegation, delegationPrincipal } from "../access/delegation.js";
 import {
   deleteUnreachableChannelIdentities,
   channelBotIdentityRealm,
@@ -50,10 +46,7 @@ import { listObservedChannelConversations } from "../channels/conversation-catal
 import type { CompiledChannelAccount } from "../channels/config/compile.js";
 import { AccountFileSchema, OrgPolicySchema } from "../channels/config/schema.js";
 import { channelConfigurationWarnings } from "../channels/configuration-warnings.js";
-import {
-  assertAutomationRouteTargetKept,
-  loadChannelControlPlane,
-} from "../channels/control-plane.js";
+import { loadChannelControlPlane } from "../channels/control-plane.js";
 import {
   ControlPlaneHttpError,
   deployRevision,
@@ -71,7 +64,6 @@ import {
   HUB_RESOURCE_PATH,
   type HubBundleFile,
 } from "../config/bundle-contract.js";
-import { parseCompiledHubConfig } from "../config/compiler.js";
 import {
   ChannelConfigurationConflictError,
   OrganizationTriggerConflictError,
@@ -88,8 +80,6 @@ import type {
   ChannelConfigurationRevisionRecord,
   ChannelConnectionChannel,
   Database,
-  OrganizationTriggerRecord,
-  OrganizationTriggerRevisionRecord,
 } from "../db/types.js";
 import { configureDiscordConnection } from "../channels/connections/discord.js";
 import { configureFeishuConnection } from "../channels/connections/feishu.js";
@@ -105,8 +95,6 @@ import { AccessLeaseRevocation } from "../managed-access/revocation.js";
 import { AccessTicketError, AccessTicketService } from "../managed-access/tickets.js";
 import { OrganizationTeamDirectory } from "../auth/team-directory.js";
 import { TriggerDocumentError } from "../triggers/configuration/index.js";
-import { OrganizationTriggerStore } from "../triggers/store.js";
-import { ManualInvocationInputSchema } from "../triggers/manual/provider.js";
 import type { PublicOperations } from "../public-operations/index.js";
 import {
   ProviderApplicationError,
@@ -160,12 +148,6 @@ const channelAccountTestRequestSchema = channelAccountTestTargetSchema.extend({
   expectedPreviewId: z.string().optional(),
   expectedRevisionId: z.string().uuid().nullable().optional(),
 });
-const automationCandidateSchema = z.object({ yaml: z.string().min(1) }).strict();
-const automationRequestSchema = automationCandidateSchema.extend({
-  expectedRevisionId: z.string().uuid().nullable(),
-});
-const teamRequestSchema = z.object({ name: z.string().trim().min(1).max(100) }).strict();
-const teamMemberRequestSchema = z.object({ userId: z.string().min(1) }).strict();
 const providerApplicationRequestSchema = z.discriminatedUnion("provider", [
   z
     .object({
@@ -366,7 +348,9 @@ type ManagementConnectionSummary = Omit<ManagementConnectionView, "consumers">;
 /** Browser/app management contract; each operation delegates to an existing Hub domain owner. */
 export class ManagementApi {
   private readonly accessLeaseRevocation: AccessLeaseRevocation;
-  private readonly teams: OrganizationTeamDirectory;
+  private readonly teams: TeamsApi;
+  private readonly automations: AutomationsApi;
+  private readonly accessDelegation: AccessDelegationApi;
   private readonly cliAccessTickets: CliAccessTickets;
 
   constructor(
@@ -392,11 +376,31 @@ export class ManagementApi {
       renameDaemon?: (request: Request, daemonId: string) => Promise<Response>;
       /** Bearer credentials, so a logged-in CLI can request daemon access tickets. */
       credentials?: OperationAuthenticator;
+      /** Delivers access notices (Administrator granted) when the Hub can send email. */
+      notificationMailer?: NotificationMailer;
     },
   ) {
     this.accessLeaseRevocation =
       options.accessLeaseRevocation ?? new AccessLeaseRevocation(options.tickets);
-    this.teams = new OrganizationTeamDirectory(options.runtime);
+    const shared = {
+      runtime: options.runtime,
+      access: options.access,
+      requireMutation: (request: Request) => this.requireMutation(request),
+      revokeOrganizationAccessLeases: (organizationId: string) =>
+        this.revokeOrganizationAccessLeases(organizationId),
+    };
+    this.teams = new TeamsApi({ ...shared, teams: new OrganizationTeamDirectory(options.runtime) });
+    this.automations = new AutomationsApi({
+      ...shared,
+      database: options.database,
+      channelSupervisor: options.channelSupervisor,
+      manualRuns: options.manualRuns,
+    });
+    this.accessDelegation = new AccessDelegationApi({
+      ...shared,
+      events: new AccessEventStore(options.runtime),
+      notificationMailer: options.notificationMailer,
+    });
     this.cliAccessTickets = new CliAccessTickets(
       options.runtime,
       options.credentials,
@@ -413,7 +417,7 @@ export class ManagementApi {
       if (error instanceof ProductRequestError) return error.response();
       if (error instanceof AccessPolicyError) {
         let status = 404;
-        if (error.code === "access_denied") status = 403;
+        if (error.code === "access_denied" || error.code === "access_exceeds_grantor") status = 403;
         else if (error.code === "invalid_assignment") status = 400;
         return problem(requestId, status, error.code, error.message);
       }
@@ -458,17 +462,36 @@ export class ManagementApi {
     const resource = segments[2];
 
     if (method === "GET" && segments.length === 3) {
-      const collection = await this.organizationCollection(resource, organizationId, access);
+      const collection = await this.organizationCollection(request, resource, access);
       if (collection !== undefined) return collection;
     }
     if (resource === "teams") {
-      return this.handleTeams(request, requestId, access, segments);
+      return this.teams.handle(request, requestId, access, segments);
+    }
+    if (isMemberEffectiveAccessRoute(method, segments)) {
+      return this.accessDelegation.memberEffectiveAccess(request, requestId, access, segments[3]!);
     }
     if (resource === "provider-applications") {
       return this.handleProviderApplications(request, requestId, access, segments);
     }
     if (resource === "connections") {
       return this.handleConnections(request, requestId, access, segments);
+    }
+    // Channel Route Admin: one account's file, activity, ingress, status and
+    // QR relink for a Member holding `channel.manage` on that account
+    // (`management-api/channel-admin.ts`). The organization capability keeps
+    // the full handlers below.
+    if (channelAdminHandles(resource, segments, access)) {
+      return handleChannelAccountAdmin(
+        {
+          database: this.options.database,
+          runtime: this.options.runtime,
+          access: this.options.access,
+          channelSupervisor: this.options.channelSupervisor,
+          requireMutation: (mutation) => this.requireMutation(mutation),
+        },
+        { request, requestId, access, segments },
+      );
     }
     if (resource === "channel-configuration") {
       return this.handleChannelConfiguration(request, requestId, access, segments);
@@ -483,10 +506,10 @@ export class ManagementApi {
       return this.handleChannelAccounts(request, requestId, access, segments);
     }
     if (resource === "automations") {
-      return this.handleAutomations(request, requestId, access, segments);
+      return this.automations.handle(request, requestId, access, segments);
     }
     if (resource === "access-assignments") {
-      return this.handleAccessAssignments(request, requestId, access, segments);
+      return this.accessDelegation.handleAssignments(request, requestId, access, segments);
     }
     if (resource === "channel-identities") {
       return this.handleChannelIdentities(request, requestId, access, segments);
@@ -503,18 +526,13 @@ export class ManagementApi {
    * caller falls through to the per-resource handlers.
    */
   private async organizationCollection(
+    request: Request,
     resource: string | undefined,
-    organizationId: string,
     access: OrganizationAccessValue,
   ): Promise<Response | undefined> {
-    if (resource === "access-catalog") {
-      this.requireHubAction(access, "hub.access.manage");
-      return Response.json({
-        privileges: ACCESS_PRIVILEGES,
-        accessLevels: RESOURCE_ACCESS_LEVELS,
-        resources: await this.options.access.listResources(organizationId),
-      });
-    }
+    const organizationId = access.organization.id;
+    if (resource === "access-catalog") return this.accessDelegation.accessCatalog(request, access);
+    if (resource === "access-events") return this.accessDelegation.accessEvents(request, access);
     if (resource === "members") return this.listMembers(organizationId);
     // The channel catalog is the same for every organization; the guard is what
     // makes it organization-scoped (`management-api/channel-catalog.ts`).
@@ -523,198 +541,6 @@ export class ManagementApi {
       return Response.json({ channels: channelCatalogView() });
     }
     return undefined;
-  }
-
-  private async handleTeams(
-    request: Request,
-    requestId: string,
-    access: OrganizationAccessValue,
-    segments: readonly string[],
-  ): Promise<Response> {
-    if (request.method === "GET" && segments.length === 3) {
-      return this.listTeams(access.organization.id);
-    }
-    this.requireHubAction(access, "hub.access.manage");
-    this.requireMutation(request);
-    if (request.method === "POST" && segments.length === 3) {
-      return this.createTeam(request, access.organization.id);
-    }
-    const teamId = segments[3];
-    if (teamId === undefined) {
-      return problem(requestId, 404, "not_found", "No management resource matches this path.");
-    }
-    if (request.method === "PUT" && segments.length === 4) {
-      return this.renameTeam(request, requestId, access.organization.id, teamId);
-    }
-    if (request.method === "DELETE" && segments.length === 4) {
-      return this.removeTeam(requestId, access.organization.id, teamId);
-    }
-    if (segments[4] === "members" && segments.length === 5 && request.method === "POST") {
-      return this.addTeamMember(request, requestId, access.organization.id, teamId);
-    }
-    const userId = segments[5];
-    if (
-      segments[4] === "members" &&
-      userId !== undefined &&
-      segments.length === 6 &&
-      request.method === "DELETE"
-    ) {
-      return this.removeTeamMember(requestId, access.organization.id, teamId, userId);
-    }
-    return problem(requestId, 404, "not_found", "No management resource matches this path.");
-  }
-
-  private async createTeam(request: Request, organizationId: string): Promise<Response> {
-    const input = await parseBody(request, teamRequestSchema);
-    const team = await this.teams.create(organizationId, input.name);
-    await this.revokeOrganizationAccessLeases(organizationId);
-    return Response.json(serializeTeam(team, []), { status: 201 });
-  }
-
-  private async renameTeam(
-    request: Request,
-    requestId: string,
-    organizationId: string,
-    teamId: string,
-  ): Promise<Response> {
-    const input = await parseBody(request, teamRequestSchema);
-    const team = await this.teams.rename(organizationId, teamId, input.name);
-    if (team === undefined) {
-      return problem(requestId, 404, "team_unavailable", "Team is unavailable.");
-    }
-    await this.revokeOrganizationAccessLeases(organizationId);
-    const current = await this.listTeamUserIds(organizationId, teamId);
-    return Response.json(serializeTeam(team, current));
-  }
-
-  private async removeTeam(
-    requestId: string,
-    organizationId: string,
-    teamId: string,
-  ): Promise<Response> {
-    const deleted = await this.teams.remove(organizationId, teamId);
-    if (!deleted) {
-      return problem(requestId, 404, "team_unavailable", "Team is unavailable.");
-    }
-    await this.revokeOrganizationAccessLeases(organizationId);
-    return new Response(null, { status: 204 });
-  }
-
-  private async addTeamMember(
-    request: Request,
-    requestId: string,
-    organizationId: string,
-    teamId: string,
-  ): Promise<Response> {
-    const input = await parseBody(request, teamMemberRequestSchema);
-    const membership = await this.teams.addMember(organizationId, teamId, input.userId);
-    if (membership === undefined) {
-      return problem(
-        requestId,
-        404,
-        "team_or_member_unavailable",
-        "Team or Member is unavailable.",
-      );
-    }
-    await this.revokeOrganizationAccessLeases(organizationId);
-    return Response.json(
-      {
-        id: membership.id,
-        teamId: membership.teamId,
-        userId: membership.userId,
-        createdAt: membership.createdAt.toISOString(),
-      },
-      { status: 201 },
-    );
-  }
-
-  private async removeTeamMember(
-    requestId: string,
-    organizationId: string,
-    teamId: string,
-    userId: string,
-  ): Promise<Response> {
-    const removed = await this.teams.removeMember(organizationId, teamId, userId);
-    if (!removed) {
-      return problem(
-        requestId,
-        404,
-        "team_membership_unavailable",
-        "Team membership is unavailable.",
-      );
-    }
-    await this.revokeOrganizationAccessLeases(organizationId);
-    return new Response(null, { status: 204 });
-  }
-
-  private async handleAccessAssignments(
-    request: Request,
-    requestId: string,
-    access: OrganizationAccessValue,
-    segments: readonly string[],
-  ): Promise<Response> {
-    if (request.method === "GET" && segments.length === 4 && segments[3] === "effective") {
-      const effective = await this.options.access.listEffectiveAccess({
-        organizationId: access.organization.id,
-        userId: access.account.id,
-        membershipId: access.membership.id,
-      });
-      return effective === undefined
-        ? problem(
-            requestId,
-            404,
-            "membership_unavailable",
-            "Organization membership is unavailable.",
-          )
-        : Response.json(effective);
-    }
-    this.requireHubAction(access, "hub.access.manage");
-    if (request.method === "GET" && segments.length === 3) {
-      return Response.json({
-        assignments: serializeAssignments(
-          await this.options.access.listAssignments(access.organization.id),
-        ),
-      });
-    }
-    if (request.method === "POST" && segments.length === 3) {
-      this.requireMutation(request);
-      const input = await parseBody(request, AccessAssignmentInputSchema);
-      const assignment = await this.options.access.saveAssignment(
-        access.organization.id,
-        input,
-        access.account.id,
-      );
-      await this.revokeOrganizationAccessLeases(access.organization.id);
-      return Response.json(serializeAssignment(assignment), { status: 201 });
-    }
-    if (request.method === "POST" && segments.length === 4 && segments[3] === "batch") {
-      this.requireMutation(request);
-      const input = await parseBody(request, AccessAssignmentBatchInputSchema);
-      const assignments = await this.options.access.saveAssignments(
-        access.organization.id,
-        input.assignments,
-        access.account.id,
-      );
-      await this.revokeOrganizationAccessLeases(access.organization.id);
-      return Response.json({ assignments: serializeAssignments(assignments) }, { status: 201 });
-    }
-    if (request.method === "DELETE" && segments.length === 4) {
-      this.requireMutation(request);
-      const deleted = await this.options.access.deleteAssignment(
-        access.organization.id,
-        segments[3]!,
-      );
-      if (deleted) await this.revokeOrganizationAccessLeases(access.organization.id);
-      return deleted
-        ? new Response(null, { status: 204 })
-        : problem(
-            requestId,
-            404,
-            "access_assignment_unavailable",
-            "Access assignment is unavailable.",
-          );
-    }
-    return problem(requestId, 404, "not_found", "No management resource matches this path.");
   }
 
   private async revokeOrganizationAccessLeases(organizationId: string): Promise<void> {
@@ -1530,20 +1356,10 @@ export class ManagementApi {
     account: CompiledChannelAccount,
     input: { conversationId: string; threadId?: string | undefined },
   ): Promise<boolean> {
-    if (
-      account.routes.some(
-        ({ match }) =>
-          match.kind !== "thread" &&
-          match.kind !== "topic" &&
-          match.ids.includes(input.conversationId),
-      )
-    )
+    if (account.routes.some(({ where }) => where.conversations.includes(input.conversationId)))
       return true;
     const nested = account.routes.filter(
-      ({ match }) =>
-        (match.kind === "thread" || match.kind === "topic") &&
-        input.threadId !== undefined &&
-        match.ids.includes(input.threadId),
+      ({ where }) => input.threadId !== undefined && where.conversations.includes(input.threadId),
     );
     if (nested.length === 0) return false;
     const observed = await listObservedChannelConversations(this.options.runtime, {
@@ -1553,9 +1369,7 @@ export class ManagementApi {
     });
     return observed.some(
       (item) =>
-        item.rootConversationId === input.conversationId &&
-        item.threadId === input.threadId &&
-        nested.some(({ match }) => match.kind === item.kind),
+        item.rootConversationId === input.conversationId && item.threadId === input.threadId,
     );
   }
 
@@ -1765,239 +1579,6 @@ export class ManagementApi {
       ok: true,
       externalMessageId: result.externalMessageId ?? null,
     });
-  }
-
-  private async handleAutomations(
-    request: Request,
-    requestId: string,
-    access: OrganizationAccessValue,
-    segments: readonly string[],
-  ): Promise<Response> {
-    const store = new OrganizationTriggerStore(this.options.database, access.organization.id);
-    const isRunnableList =
-      request.method === "GET" && segments.length === 4 && segments[3] === "runnable";
-    const isValidation =
-      request.method === "POST" && segments.length === 4 && segments[3] === "validate";
-    const isRun = request.method === "POST" && segments.length === 5 && segments[4] === "runs";
-    if (isRunnableList) {
-      return this.listRunnableAutomations(requestId, access, store);
-    }
-    if (isRun) {
-      return this.runAutomation(request, requestId, access, segments[3], store);
-    }
-    this.requireHubAction(access, "hub.configure");
-    if (request.method === "GET") {
-      return this.readAutomations(requestId, access, segments, store);
-    }
-    if (!["POST", "PUT"].includes(request.method)) {
-      return problem(
-        requestId,
-        405,
-        "method_not_allowed",
-        "Use GET, POST, PUT, or POST to the validate resource for Automations.",
-      );
-    }
-    if (isValidation) {
-      return validateAutomation(request, store);
-    }
-    this.requireMutation(request);
-    const isCreate = request.method === "POST" && segments.length === 3;
-    const isUpdate = request.method === "PUT" && segments.length === 4;
-    if (!isCreate && !isUpdate) {
-      return problem(requestId, 404, "not_found", "No management resource matches this path.");
-    }
-    return this.saveAutomation(request, access, segments[3], isUpdate, store);
-  }
-
-  private async listRunnableAutomations(
-    requestId: string,
-    access: OrganizationAccessValue,
-    store: OrganizationTriggerStore,
-  ): Promise<Response> {
-    const effective = await this.options.access.listEffectiveAccess({
-      organizationId: access.organization.id,
-      userId: access.account.id,
-      membershipId: access.membership.id,
-    });
-    if (effective === undefined) {
-      return problem(requestId, 404, "membership_unavailable", "Membership is unavailable.");
-    }
-    const runnableIds = new Set(
-      effective.grants.flatMap(({ resource, privileges }) =>
-        resource.kind === "automation" &&
-        resource.available &&
-        privileges.includes("automation.run")
-          ? [resource.id]
-          : [],
-      ),
-    );
-    const projections = await Promise.all(
-      (await store.list())
-        .filter(({ id, enabled }) => enabled && (effective.owner || runnableIds.has(id)))
-        .map(async (automation) =>
-          runnableAutomationView(await store.activeRevision(automation), automation),
-        ),
-    );
-    return Response.json({ automations: projections.filter(isPresent) });
-  }
-
-  private async runAutomation(
-    request: Request,
-    requestId: string,
-    access: OrganizationAccessValue,
-    automationId: string | undefined,
-    store: OrganizationTriggerStore,
-  ): Promise<Response> {
-    this.requireMutation(request);
-    const automation = (await store.list()).find(({ id }) => id === automationId);
-    if (automation === undefined || !(await this.canRunAutomation(access, automation.id))) {
-      return problem(requestId, 404, "automation_unavailable", "Automation is unavailable.");
-    }
-    if (this.options.manualRuns === null || this.options.manualRuns === undefined) {
-      return problem(
-        requestId,
-        503,
-        "automation_runtime_unavailable",
-        "Automation runtime is unavailable.",
-      );
-    }
-    const input = await parseBody(request, ManualInvocationInputSchema);
-    const result = await this.options.manualRuns.dispatchManualRun(
-      {
-        kind: "member",
-        membershipId: access.membership.id,
-        organizationId: access.organization.id,
-      },
-      {
-        expectedVersionId: automation.activeRevisionId,
-        trigger: automation.name,
-        actor: access.account.id,
-        deliveryKey: randomUUID(),
-        input,
-      },
-    );
-    return Response.json(result);
-  }
-
-  private async readAutomations(
-    requestId: string,
-    access: OrganizationAccessValue,
-    segments: readonly string[],
-    store: OrganizationTriggerStore,
-  ): Promise<Response> {
-    if (segments.length === 3) {
-      const automations = await Promise.all(
-        (await store.list()).map((automation) => automationView(store, automation)),
-      );
-      return Response.json({ automations });
-    }
-    const automation = (await store.list()).find(({ id }) => id === segments[3]);
-    if (automation === undefined) {
-      return problem(requestId, 404, "automation_unavailable", "Automation is unavailable.");
-    }
-    if (segments.length === 4) return Response.json(await automationView(store, automation));
-    if (segments.length === 5 && segments[4] === "revisions") {
-      const revisions = await this.options.database.listOrganizationTriggerRevisions(
-        access.organization.id,
-        automation.id,
-        50,
-      );
-      return Response.json({
-        revisions: revisions.map((revision) => automationRevisionView(revision)),
-      });
-    }
-    if (segments.length === 6 && segments[4] === "runs") {
-      const runId = segments[5];
-      if (runId === undefined || !z.string().uuid().safeParse(runId).success) {
-        return problem(requestId, 404, "run_unavailable", "Run is unavailable.");
-      }
-      const run = await automationRunView(
-        this.options.database,
-        access.organization.id,
-        automation.id,
-        runId,
-      );
-      return run === undefined
-        ? problem(requestId, 404, "run_unavailable", "Run is unavailable.")
-        : Response.json(run);
-    }
-    if (segments.length === 5 && segments[4] === "activity") {
-      const activity = await this.options.database.listWorkflowActivityRuns(automation.id, 100);
-      return Response.json({
-        activity: activity.map(({ run, receipt }) => ({
-          id: run.id,
-          outcome: run.outcome,
-          status: run.status,
-          revisionId: run.configurationRevisionId,
-          provider: receipt.provider,
-          source: receipt.source,
-          createdAt: run.createdAt.toISOString(),
-          completedAt: run.completedAt?.toISOString() ?? null,
-          error: run.outcome === "accepted" ? run.failureReason : run.rejection.code,
-        })),
-      });
-    }
-    return problem(requestId, 404, "not_found", "No management resource matches this path.");
-  }
-
-  private async saveAutomation(
-    request: Request,
-    access: OrganizationAccessValue,
-    automationId: string | undefined,
-    isUpdate: boolean,
-    store: OrganizationTriggerStore,
-  ): Promise<Response> {
-    const input = await parseBody(request, automationRequestSchema);
-    const automation = await store.save(
-      {
-        ...(automationId === undefined ? {} : { triggerId: automationId }),
-        yaml: input.yaml,
-        userId: access.account.id,
-        expectedActiveRevisionId: input.expectedRevisionId,
-      },
-      {
-        authorize: async ({ compiled, resolved }) => {
-          await assertAutomationConfigurationDelegation({
-            access: this.options.access,
-            principal: delegationPrincipal(access),
-            configuration: resolved.configuration,
-          });
-          if (isUpdate && automationId !== undefined) {
-            await assertAutomationRouteTargetKept({
-              database: this.options.database,
-              organizationId: access.organization.id,
-              automationId,
-              candidate: compiled,
-            });
-          }
-        },
-      },
-    );
-    await this.options.channelSupervisor?.reconcile();
-    return Response.json(await automationView(store, automation), {
-      status: isUpdate ? 200 : 201,
-    });
-  }
-
-  private async canRunAutomation(
-    access: OrganizationAccessValue,
-    automationId: string,
-  ): Promise<boolean> {
-    const effective = await this.options.access.listEffectiveAccess({
-      organizationId: access.organization.id,
-      userId: access.account.id,
-      membershipId: access.membership.id,
-    });
-    return (
-      effective?.owner === true ||
-      effective?.grants.some(
-        ({ resource, privileges }) =>
-          resource.kind === "automation" &&
-          resource.id === automationId &&
-          resource.available &&
-          privileges.includes("automation.run"),
-      ) === true
-    );
   }
 
   private async handleChannelIdentities(
@@ -2300,51 +1881,22 @@ export class ManagementApi {
       .orderBy(asc(schema.users.name), asc(schema.users.email));
     return Response.json({ members: rows });
   }
-
-  private async listTeams(organizationId: string): Promise<Response> {
-    const database = this.options.runtime.drizzle();
-    const [teams, memberships] = await Promise.all([
-      database
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.organizationId, organizationId))
-        .orderBy(asc(schema.teams.name)),
-      database
-        .select({
-          teamId: schema.teamMembers.teamId,
-          userId: schema.teamMembers.userId,
-        })
-        .from(schema.teamMembers)
-        .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-        .where(eq(schema.teams.organizationId, organizationId)),
-    ]);
-    return Response.json({
-      teams: teams.map((team) => ({
-        id: team.id,
-        name: team.name,
-        userIds: memberships.filter(({ teamId }) => teamId === team.id).map(({ userId }) => userId),
-        createdAt: team.createdAt.toISOString(),
-        updatedAt: team.updatedAt?.toISOString() ?? null,
-      })),
-    });
-  }
-
-  private async listTeamUserIds(organizationId: string, teamId: string): Promise<string[]> {
-    return (
-      await this.options.runtime
-        .drizzle()
-        .select({ userId: schema.teamMembers.userId })
-        .from(schema.teamMembers)
-        .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-        .where(and(eq(schema.teams.organizationId, organizationId), eq(schema.teams.id, teamId)))
-    ).map(({ userId }) => userId);
-  }
 }
 
 class ManagementResponse extends Error {
   constructor(readonly response: Response) {
     super("management response");
   }
+}
+
+/** `GET /organizations/:id/members/:membershipId/effective` (`access-delegation.ts`). */
+function isMemberEffectiveAccessRoute(method: string, segments: readonly string[]): boolean {
+  return (
+    method === "GET" &&
+    segments.length === 5 &&
+    segments[2] === "members" &&
+    segments[4] === "effective"
+  );
 }
 
 function managementSegments(request: Request): string[] {
@@ -2356,28 +1908,6 @@ function managementSegments(request: Request): string[] {
   } catch {
     return [];
   }
-}
-
-async function parseBody<Schema extends z.ZodType>(
-  request: Request,
-  bodySchema: Schema,
-): Promise<z.infer<Schema>> {
-  const value = await (request.json() as Promise<unknown>).catch(() => undefined);
-  const parsed = bodySchema.safeParse(value);
-  if (!parsed.success) throw new ProductRequestError(400, "invalid_request");
-  return parsed.data;
-}
-
-function serializeAssignments(assignments: Awaited<ReturnType<AccessStore["listAssignments"]>>) {
-  return assignments.map(serializeAssignment);
-}
-
-function serializeAssignment(assignment: Awaited<ReturnType<AccessStore["saveAssignment"]>>) {
-  return {
-    ...assignment,
-    createdAt: assignment.createdAt.toISOString(),
-    updatedAt: assignment.updatedAt.toISOString(),
-  };
 }
 
 function serializeIdentity(identity: Awaited<ReturnType<AccessStore["bindChannelIdentity"]>>) {
@@ -2396,16 +1926,6 @@ function serializeDaemonProject(
     metadata: project.metadata,
     available: project.available,
     observedAt: project.observedAt.toISOString(),
-  };
-}
-
-function serializeTeam(team: typeof schema.teams.$inferSelect, userIds: readonly string[]) {
-  return {
-    id: team.id,
-    name: team.name,
-    userIds,
-    createdAt: team.createdAt.toISOString(),
-    updatedAt: team.updatedAt?.toISOString() ?? null,
   };
 }
 
@@ -2489,76 +2009,6 @@ function writeChannelConfiguration(
   ];
 }
 
-async function automationView(
-  store: OrganizationTriggerStore,
-  automation: OrganizationTriggerRecord,
-) {
-  const revision = await store.activeRevision(automation);
-  return {
-    id: automation.id,
-    name: automation.name,
-    enabled: automation.enabled,
-    format: automation.format,
-    activeRevisionId: automation.activeRevisionId,
-    definition: load(editableAutomationYaml(revision.yaml, automation.enabled)),
-    yaml: editableAutomationYaml(revision.yaml, automation.enabled),
-    createdAt: automation.createdAt.toISOString(),
-    updatedAt: automation.updatedAt.toISOString(),
-  };
-}
-
-async function validateAutomation(
-  request: Request,
-  store: OrganizationTriggerStore,
-): Promise<Response> {
-  const input = await parseBody(request, automationCandidateSchema);
-  const prepared = await store.validate(input.yaml);
-  return Response.json({
-    valid: true,
-    name: prepared.compiled.authored.name,
-    definition: prepared.compiled.authored,
-  });
-}
-
-function runnableAutomationView(
-  revision: OrganizationTriggerRevisionRecord,
-  automation: OrganizationTriggerRecord,
-) {
-  const manual = parseCompiledHubConfig(revision.normalizedConfiguration).triggers.find(
-    ({ on }) => on === "manual.run",
-  );
-  if (manual === undefined) return null;
-  const definition: unknown = load(revision.yaml);
-  let description: string | null = null;
-  if (typeof definition === "object" && definition !== null && !Array.isArray(definition)) {
-    const candidate: unknown = Reflect.get(definition, "description");
-    if (typeof candidate === "string") description = candidate;
-  }
-  return {
-    id: automation.id,
-    name: automation.name,
-    description,
-    inputs: manual.inputs,
-  };
-}
-
-function isPresent<Value>(value: Value | null): value is Value {
-  return value !== null;
-}
-
-function automationRevisionView(revision: OrganizationTriggerRevisionRecord) {
-  return {
-    id: revision.id,
-    version: revision.version,
-    yaml: revision.yaml,
-    definition: load(revision.yaml),
-    contentHash: revision.contentHash,
-    sourceKind: revision.sourceKind,
-    createdByUserId: revision.createdByUserId,
-    createdAt: revision.createdAt.toISOString(),
-  };
-}
-
 function externalIdentityLabel(value: unknown): string | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   for (const key of ["username", "name", "id"] as const) {
@@ -2566,10 +2016,6 @@ function externalIdentityLabel(value: unknown): string | null {
     if (typeof candidate === "string" && candidate.length > 0) return candidate;
   }
   return null;
-}
-
-function problem(requestId: string, status: number, error: string, message: string): Response {
-  return Response.json({ error, message, requestId }, { status });
 }
 
 /** Every per-account operation the management contract routes. `qr:*` is the
@@ -2636,14 +2082,6 @@ function channelAccountSubOperation(
   return login === undefined ? undefined : `qr:${login}`;
 }
 
-function delegationPrincipal(access: OrganizationAccessValue) {
-  return {
-    organizationId: access.organization.id,
-    userId: access.account.id,
-    membershipId: access.membership.id,
-  };
-}
-
 function connectionInUseProblem(
   requestId: string,
   consumers: readonly ConnectionConsumer[],
@@ -2694,8 +2132,8 @@ function configuredChannelTestTarget(
   account: CompiledChannelAccount,
   input: { conversationId: string; threadId?: string | undefined },
 ): boolean {
-  return account.routes.some(({ match }) =>
-    match.ids.some(
+  return account.routes.some(({ where }) =>
+    where.conversations.some(
       (id) =>
         id === input.conversationId || (input.threadId !== undefined && id === input.threadId),
     ),

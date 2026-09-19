@@ -15,10 +15,10 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
-import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 import { ScreenTitle } from "@/components/headers/screen-title";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Alert } from "@/components/ui/alert";
@@ -55,15 +55,19 @@ import {
   HubAutomationRevisionsSchema,
   HubAutomationSchema,
   HubAutomationValidationSchema,
-  HubAutomationsSchema,
   HubChannelConfigurationSchema,
   HubConnectionsSchema,
   HubDaemonsSchema,
   HubEffectiveAccessSchema,
   type HubAutomationRunResult,
-  HubRunnableAutomationsSchema,
-  type HubRunnableAutomation,
 } from "../contracts";
+import {
+  automationViewerAccess,
+  HubScopedAutomationsSchema,
+  type HubScopedAutomation,
+} from "./automation-access";
+import { AutomationAccessSection } from "./automation-access-section";
+import { AutomationList } from "./automation-list";
 import {
   isWorkspaceConfigurationValid,
   workspaceConfigurationFromTarget,
@@ -85,7 +89,7 @@ export interface AutomationConnection {
   status: string;
 }
 
-type ManagedAutomation = z.infer<typeof HubAutomationsSchema>["automations"][number];
+type ManagedAutomation = HubScopedAutomation;
 type EffectiveAccess = z.infer<typeof HubEffectiveAccessSchema>;
 type AutomationInputDraft = AutomationInputValue & { editorId: string };
 let automationInputEditorSequence = 0;
@@ -139,31 +143,24 @@ const INPUT_TYPE_OPTIONS: SelectFieldOption<AutomationInputValue["type"]>[] = [
   { id: "number", value: "number", label: "Number" },
   { id: "boolean", value: "boolean", label: "On or off" },
 ];
-const NOOP_ASYNC = async () => undefined;
 
-// eslint-disable-next-line complexity -- one settings coordinator owns the query/load/detail states.
 export interface AutomationSettingsProps {
   ChannelInputs?: ComponentType<{ automationName: string; embedded?: boolean }>;
 }
 
+// eslint-disable-next-line complexity -- one settings coordinator owns the query/load/detail states.
 export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = {}) {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
   const queryScope = { origin: hub.origin, organizationId, accountId };
   const canManage = hub.signedIn?.capabilities.manageResources === true;
+  // The Hub scopes the list itself: Organization Admins get every Automation,
+  // a Member the ones they hold Admin or Run on.
   const automations = useFetchQuery({
     queryKey: hubResourceQueryKey(queryScope, "automations"),
-    queryFn: () => hub.api().get("automations", HubAutomationsSchema),
-    enabled: organizationId.length > 0 && canManage,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
-  const runnableAutomations = useFetchQuery({
-    queryKey: [...hubResourceQueryKey(queryScope, "automations"), "runnable"],
-    queryFn: () => hub.api().get("automations/runnable", HubRunnableAutomationsSchema),
-    enabled: organizationId.length > 0 && !canManage,
+    queryFn: () => hub.api().get("automations", HubScopedAutomationsSchema),
+    enabled: organizationId.length > 0,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,
@@ -171,7 +168,7 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   const daemons = useFetchQuery({
     queryKey: hubResourceQueryKey(queryScope, "daemons"),
     queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
-    enabled: organizationId.length > 0 && canManage,
+    enabled: organizationId.length > 0,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,
@@ -195,7 +192,7 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   const effectiveAccess = useFetchQuery({
     queryKey: [...hubResourceQueryKey(queryScope, "access-assignments"), "effective"],
     queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
-    enabled: organizationId.length > 0 && canManage,
+    enabled: organizationId.length > 0,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,
@@ -210,6 +207,7 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   }, []);
   const cancelCreate = useCallback(() => setCreating(false), []);
   const [selectedAutomationId, setSelectedAutomationId] = useState<string | null>(null);
+  const [detailView, setDetailView] = useState<AutomationDetailView>("overview");
 
   const create = useCallback(
     async (yaml: string, draft?: AutomationChannelDraft | null) => {
@@ -231,6 +229,11 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
     [automations, hub],
   );
   const openAutomation = useCallback((automationId: string) => {
+    setDetailView("overview");
+    setSelectedAutomationId(automationId);
+  }, []);
+  const reviewAutomation = useCallback((automationId: string) => {
+    setDetailView("configuration");
     setSelectedAutomationId(automationId);
   }, []);
   const closeAutomation = useCallback(() => {
@@ -258,44 +261,42 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
           ),
     [channelConfiguration.data?.accounts, selectedAutomation],
   );
-  const canRunSelectedAutomation = canRunAutomation(selectedAutomation, effectiveAccess.data);
-
-  if (!canManage) {
-    return (
-      <RunnableAutomationSettings
-        automations={runnableAutomations.data?.automations ?? []}
-        pending={runnableAutomations.isPending}
-        error={runnableAutomations.error}
-      />
-    );
-  }
+  const viewer = automationViewerAccess({
+    canManage,
+    selected: selectedAutomation,
+    access: effectiveAccess.data,
+    daemons: daemons.data?.daemons ?? [],
+  });
+  // COMPAT(automation-scope): an older Hub sends no `scope`; fall back to the viewer's own grants.
+  const canRunSelectedAutomation =
+    viewer.canRun || canRunAutomation(selectedAutomation, effectiveAccess.data);
+  const newAutomationButton = viewer.canCreate ? (
+    <Button size="sm" variant="outline" onPress={startCreate}>
+      New Automation
+    </Button>
+  ) : undefined;
 
   return (
     <View>
       {!selectedAutomationId && !creating ? (
-        <SettingsSection
-          title="Automations"
-          trailing={
-            <Button size="sm" variant="outline" onPress={startCreate}>
-              New Automation
-            </Button>
-          }
-        >
+        <SettingsSection title="Automations" trailing={newAutomationButton}>
           <QueryFeedback pending={automations.isPending} error={automations.error} />
           {error ? <Alert variant="error" title={error} /> : null}
-          <View>
-            {automations.data?.automations.length === 0 ? (
-              <EmptyRow message="No Automations are configured." />
-            ) : (
-              automations.data?.automations.map((automation) => (
-                <ManagedAutomationRow
-                  key={automation.id}
-                  automation={automation}
-                  open={openAutomation}
-                />
-              ))
-            )}
-          </View>
+          {automations.data?.automations.length === 0 ? (
+            <EmptyRow
+              message={
+                canManage ? "No Automations are configured." : "No Automations are shared with you."
+              }
+            />
+          ) : (
+            <AutomationList
+              automations={automations.data?.automations ?? []}
+              viewerUserId={accountId}
+              canManage={canManage}
+              open={openAutomation}
+              review={reviewAutomation}
+            />
+          )}
         </SettingsSection>
       ) : null}
       {selectedAutomationId ? (
@@ -303,16 +304,18 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
           key={selectedAutomationId}
           automation={selectedAutomation}
           ChannelInputs={ChannelInputs}
-          daemons={daemons.data?.daemons ?? []}
+          daemons={viewer.visibleDaemons}
           connections={connections.data?.connections ?? []}
           backlinks={backlinks}
-          canManage={canManage}
+          canManage={viewer.canEdit}
+          allowConnectionInputs={canManage}
           canRun={canRunSelectedAutomation}
+          initialView={detailView}
           close={closeAutomation}
           saved={refreshAutomation}
         />
       ) : null}
-      {canManage && creating ? (
+      {viewer.canCreate && creating ? (
         <View>
           {error ? <Alert variant="error" title={error} /> : null}
           <QueryFeedback
@@ -330,52 +333,17 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
               instruction: "",
             })}
             ChannelInputs={ChannelInputs}
-            daemons={daemons.data?.daemons ?? []}
+            daemons={viewer.visibleDaemons}
             connections={connections.data?.connections ?? []}
-            pending={pending || daemons.data === undefined || connections.data === undefined}
+            allowConnectionInputs={canManage}
+            pending={
+              pending || daemons.data === undefined || (canManage && connections.data === undefined)
+            }
             cancel={cancelCreate}
             save={createFromYaml}
           />
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function AutomationListRow({
-  name,
-  description,
-  open,
-}: {
-  name: string;
-  description?: string;
-  open(): void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const enter = useCallback(() => setHovered(true), []);
-  const leave = useCallback(() => setHovered(false), []);
-  const rowStyle = useCallback(
-    ({ pressed }: { pressed: boolean }) => [
-      settingsStyles.row,
-      styles.listRow,
-      (hovered || pressed) && styles.highlight,
-    ],
-    [hovered],
-  );
-  return (
-    <View onPointerEnter={enter} onPointerLeave={leave}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${name}`}
-        onPress={open}
-        style={rowStyle}
-      >
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{name}</Text>
-          {description ? <Text style={settingsStyles.rowHint}>{description}</Text> : null}
-        </View>
-        <ChevronRight style={styles.chevron} />
-      </Pressable>
     </View>
   );
 }
@@ -415,26 +383,6 @@ function AutomationDetailHeading({
   );
 }
 
-function ManagedAutomationRow({
-  automation,
-  open,
-}: {
-  automation: ManagedAutomation;
-  open(automationId: string): void;
-}) {
-  const openAutomation = useCallback(() => open(automation.id), [automation.id, open]);
-  const value = parseSingleAgentAutomationYaml(automation.yaml);
-  return (
-    <AutomationListRow
-      name={automation.name}
-      description={[automation.enabled ? "Active" : "Disabled", value?.description]
-        .filter(Boolean)
-        .join(" · ")}
-      open={openAutomation}
-    />
-  );
-}
-
 function canRunAutomation(
   automation: ManagedAutomation | null,
   access: EffectiveAccess | undefined,
@@ -450,94 +398,6 @@ function canRunAutomation(
         privileges.includes("automation.run"),
     ) === true
   );
-}
-
-function RunnableAutomationSettings({
-  automations,
-  pending,
-  error,
-}: {
-  automations: readonly HubRunnableAutomation[];
-  pending: boolean;
-  error: Error | null;
-}) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = automations.find(({ id }) => id === selectedId) ?? null;
-  const selectAutomation = useCallback((automationId: string) => {
-    setSelectedId(automationId);
-  }, []);
-  const closeAutomation = useCallback(() => {
-    setSelectedId(null);
-  }, []);
-  if (selected !== null) {
-    return (
-      <View>
-        <AutomationDetailHeading name={selected.name} close={closeAutomation} />
-        <SettingsSection title="Workflow">
-          <View style={settingsStyles.card}>
-            {selected.description ? (
-              <SummaryRow title="Description" hint={selected.description} />
-            ) : (
-              <SummaryRow title="Access" hint="Run this Automation" />
-            )}
-          </View>
-        </SettingsSection>
-        <AutomationRunForm
-          automationId={selected.id}
-          inputs={runnableAutomationInputs(selected)}
-          completed={NOOP_ASYNC}
-        />
-      </View>
-    );
-  }
-  return (
-    <SettingsSection title="Automations">
-      <QueryFeedback pending={pending} error={error} />
-      <View>
-        {automations.length === 0 ? (
-          <EmptyRow message="No Automations are assigned to you." />
-        ) : (
-          automations.map((automation) => (
-            <RunnableAutomationRow
-              key={automation.id}
-              automation={automation}
-              select={selectAutomation}
-            />
-          ))
-        )}
-      </View>
-    </SettingsSection>
-  );
-}
-
-function RunnableAutomationRow({
-  automation,
-  select,
-}: {
-  automation: HubRunnableAutomation;
-  select(automationId: string): void;
-}) {
-  const open = useCallback(() => select(automation.id), [automation.id, select]);
-  return (
-    <AutomationListRow
-      name={automation.name}
-      description={automation.description ?? undefined}
-      open={open}
-    />
-  );
-}
-
-function runnableAutomationInputs(automation: HubRunnableAutomation): AutomationInputValue[] {
-  return Object.entries(automation.inputs).map(([name, definition]) => {
-    const input: AutomationInputValue = {
-      name,
-      type: definition.type,
-      required: definition.required ?? false,
-    };
-    if (definition.default !== undefined) input.default = definition.default;
-    if (definition.choices !== undefined) input.choices = definition.choices;
-    return input;
-  });
 }
 
 type AutomationDetailView = "overview" | "channels" | "configuration" | "runs" | "revisions";
@@ -556,19 +416,14 @@ function AutomationDetail({
   connections,
   backlinks,
   canManage,
+  allowConnectionInputs,
   canRun,
+  initialView,
   close,
   saved,
 }: {
   ChannelInputs?: AutomationSettingsProps["ChannelInputs"];
-  automation: {
-    id: string;
-    name: string;
-    enabled: boolean;
-    format: string;
-    activeRevisionId: string;
-    yaml: string;
-  } | null;
+  automation: ManagedAutomation | null;
   daemons: {
     id: string;
     slug: string;
@@ -576,8 +431,11 @@ function AutomationDetail({
   }[];
   connections: AutomationConnection[];
   backlinks: readonly AutomationRouteBacklink[];
+  /** Admin of this Automation (or an Organization Admin): may edit, enable, and grant. */
   canManage: boolean;
+  allowConnectionInputs: boolean;
   canRun: boolean;
+  initialView: AutomationDetailView;
   close(): void;
   saved(): Promise<unknown>;
 }) {
@@ -595,7 +453,7 @@ function AutomationDetail({
           `automations/${encodeURIComponent(automationId)}/revisions`,
           HubAutomationRevisionsSchema,
         ),
-    enabled: automationId.length > 0,
+    enabled: automationId.length > 0 && canManage,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,
@@ -614,7 +472,10 @@ function AutomationDetail({
     dataShape: "value",
     staleTimeMs: 15_000,
   });
-  const [view, setView] = useState<AutomationDetailView>("overview");
+  const [view, setView] = useState<AutomationDetailView>(initialView);
+  const detailViews = canManage
+    ? AUTOMATION_DETAIL_VIEWS
+    : AUTOMATION_DETAIL_VIEWS.filter(({ value }) => value === "overview" || value === "runs");
   const configurationVisited = useLatchedBoolean(view === "configuration");
   const [yaml, setYaml] = useState(() => {
     const source = automation?.yaml ?? "";
@@ -709,13 +570,15 @@ function AutomationDetail({
         disabled={pending !== null}
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailTabs}>
-        <SegmentedControl
-          options={AUTOMATION_DETAIL_VIEWS}
-          value={view}
-          onValueChange={setView}
-          size="sm"
-        />
+        <SegmentedControl options={detailViews} value={view} onValueChange={setView} size="sm" />
       </ScrollView>
+      {typeof automation.pausedReason === "string" ? (
+        <Alert variant="warning" title={`Paused: ${automation.pausedReason}`}>
+          {canManage
+            ? "Review the Automation and enable it again under Configuration."
+            : "An Admin of this Automation can enable it again."}
+        </Alert>
+      ) : null}
       {view === "configuration" && result ? (
         <Alert variant={result.tone} title={result.message} />
       ) : null}
@@ -808,6 +671,9 @@ function AutomationDetail({
           </View>
         </SettingsSection>
       ) : null}
+      {view === "overview" && canManage ? (
+        <AutomationAccessSection automation={automation} />
+      ) : null}
       {configurationVisited && canManage ? (
         <View style={view === "configuration" ? undefined : styles.hidden}>
           <AutomationWorkflowEditor
@@ -815,6 +681,7 @@ function AutomationDetail({
             ChannelInputs={ChannelInputs}
             daemons={daemons}
             connections={connections}
+            allowConnectionInputs={allowConnectionInputs}
             pending={pending !== null}
             save={saveStructured}
           />

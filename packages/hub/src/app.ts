@@ -42,6 +42,8 @@ import {
   handleManualTriggerRequest,
 } from "./triggers/manual/source.js";
 import { createManualRunProvider } from "./triggers/manual/provider.js";
+import { composeAutomationAuthorAccessCheck } from "./triggers/author-access.js";
+import { composeNotificationMailer } from "./invitations/index.js";
 import { createWorkflowConfigurationResolver } from "./triggers/configuration.js";
 import {
   createChannelWorkflowProvider,
@@ -244,10 +246,20 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       ? undefined
       : (intent: Parameters<DaemonModule["lifecycle"]["handoffLaunchMachineIntent"]>[0]) =>
           daemonModule.lifecycle.handoffLaunchMachineIntent(intent);
+  const authorizeWorkflowRun =
+    options.database === null || options.databaseRuntime === undefined || accessStore === null
+      ? undefined
+      : composeAutomationAuthorAccessCheck({
+          database: options.database,
+          runtime: options.databaseRuntime,
+          access: accessStore,
+          mailer: composeNotificationMailer(),
+        });
   const dispatcherOptions = {
     database: options.database,
     entitlements: options.entitlements,
     providers,
+    ...(authorizeWorkflowRun === undefined ? {} : { authorizeWorkflowRun }),
     ...(options.configurationRevisionId === undefined
       ? {}
       : { configurationRevisionId: options.configurationRevisionId }),

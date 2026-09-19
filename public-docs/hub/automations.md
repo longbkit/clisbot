@@ -8,8 +8,25 @@ category: Hub
 # Automations in the Paseo app
 
 In a Clisbot Hub-enabled Paseo build, sign in and open **Automations**. Select a row to
-open its detail; use the back arrow beside its name to return. Owners and administrators
-configure Automations; members can run assigned Automations.
+open its detail; use the back arrow beside its name to return.
+
+## Who can do what
+
+Organization Owners and Admins see and configure every Automation. Any member with work
+access to a Project can create an Automation that runs there, using only the Hosts, Projects,
+and Agent configurations they hold; the creator becomes that Automation's **Admin**. An
+Automation Admin edits, enables, and grants access to that one Automation. **Run** access lets
+a member start it and see its runs. The list filters by **Mine**, **Shared with me**, and (for
+Organization Admins) **All**, and each row shows Admin or Run.
+
+An Automation runs with its author's access. Granting Run warns about this: the runner sees
+results from a Project they may not otherwise reach, and gets no Project access in the app.
+Every run re-checks the author's access; when the author loses access to the Host, Project, or
+Agent configuration, the Automation is paused, the run is recorded as rejected, and every
+Admin of the Automation is notified. An Admin reviews it and saves it again to enable it.
+
+Members author manual and Channel inputs only. Inputs from a Connection (GitHub, Slack,
+Discord, Linear), environment variables, and GitHub authority stay with Organization Admins.
 
 ## Create and configure inputs
 

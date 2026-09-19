@@ -39,6 +39,7 @@ import type {
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
 import { logProviderEventRouting } from "../triggers/audit.js";
 import { asTriggerContextValue, isAcceptedTriggerProviderMatch } from "../triggers/index.js";
+import type { AuthorizeWorkflowRun } from "../triggers/author-access.js";
 import {
   ExpressionEvaluationError,
   evaluateExpression,
@@ -76,6 +77,12 @@ export interface DurableWorkflowEngineOptions {
   providers?: readonly TriggerProvider[];
   dispatchLaunchMachineIntent?: (intent: LaunchMachineIntent) => Promise<unknown>;
   validateLaunchMachineIntent?: (intent: LaunchMachineIntent) => void;
+  /**
+   * Re-checks the Automation author's access before a run is accepted
+   * (`triggers/author-access.ts`). A refusal becomes a rejected run with
+   * `author_access_lost`; absent means every run is accepted.
+   */
+  authorizeWorkflowRun?: AuthorizeWorkflowRun;
   configurationRevisionId?: string;
   leaseMs?: number;
   workerIntervalMs?: number;
@@ -184,6 +191,27 @@ export class DurableWorkflowEngine {
         );
         if (compiledTrigger === undefined)
           throw new Error(`compiled trigger not found: ${acceptedMatch.triggerName}`);
+        const authorization = (await this.options.authorizeWorkflowRun?.({
+          organizationId: trigger.organizationId,
+          workflowId: trigger.workflowId,
+          configurationRevisionId,
+        })) ?? { allowed: true };
+        if (!authorization.allowed) {
+          await this.options.database!.createRejectedTriggerRun({
+            organizationId: trigger.organizationId,
+            workflowId: trigger.workflowId,
+            configurationRevisionId,
+            providerEventReceiptId: trigger.providerEventReceiptId,
+            configuredTriggerName: acceptedMatch.triggerName,
+            prompt: acceptedMatch.invocation.prompt,
+            inputs: acceptedMatch.invocation.inputs,
+            triggerContext: acceptedMatch.triggerContext,
+            outputContext: acceptedMatch.outputContext,
+            rejection: { code: "author_access_lost", reason: authorization.reason },
+            createdAt,
+          });
+          return;
+        }
         const runDeadline = new Date(createdAt.getTime() + compiledTrigger.maxRuntimeMs);
         // Accepting a trigger reserves nothing: a trigger can skip every step, and multi-step
         // workflows create several executions. Metering happens per execution, at creation time
