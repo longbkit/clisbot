@@ -46,32 +46,49 @@ vi.mock("./channel-actions-menu", () => ({
   ChannelActionsMenu: function MenuAdapter({
     label,
     disabled,
+    actions = [],
     remove,
   }: {
     label: string;
     disabled: boolean;
-    remove(): void;
+    actions?: { label: string; onSelect(): void }[];
+    remove?: () => void;
   }) {
     const [open, setOpen] = React.useState(false);
     const toggle = React.useCallback(() => setOpen((value) => !value), []);
-    const select = React.useCallback(() => {
-      setOpen(false);
-      remove();
-    }, [remove]);
+    const items = [
+      ...actions,
+      ...(remove === undefined ? [] : [{ label: "Remove", onSelect: remove }]),
+    ];
     return (
       <div>
         <button type="button" aria-label={label} disabled={disabled} onClick={toggle}>
           …
         </button>
-        {open ? (
-          <button type="button" disabled={disabled} onClick={select}>
-            Remove
-          </button>
-        ) : null}
+        {open
+          ? items.map((item) => (
+              <MenuItemAdapter key={item.label} item={item} disabled={disabled} close={toggle} />
+            ))
+          : null}
       </div>
     );
   },
 }));
+function MenuItemAdapter(props: {
+  item: { label: string; onSelect(): void };
+  disabled: boolean;
+  close(): void;
+}) {
+  const select = React.useCallback(() => {
+    props.close();
+    props.item.onSelect();
+  }, [props]);
+  return (
+    <button type="button" disabled={props.disabled} onClick={select}>
+      {props.item.label}
+    </button>
+  );
+}
 // Adapt native inputs while exercising the actual route form, configuration builders and queries.
 vi.mock("@/components/ui/form-field", () => ({
   Field: ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -355,6 +372,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** A test message starts from the Connection's menu and goes where the form points. */
+function startTestMessage() {
+  fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
+  fireEvent.click(screen.getByRole("button", { name: "Preview and send" }));
+}
 function renderChannels(automationName?: string) {
   return render(
     <QueryClientProvider client={queryClient}>
@@ -446,8 +469,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Down")).toBeNull();
     expect(screen.queryByText("Connection and access")).toBeNull();
     expect(screen.queryByText(/Connection Admins/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Access" }));
-    // The Access tab lists Admins only: no Use grant is offered anywhere.
+    // Connection settings show their values; Admins opens in place.
+    expect(screen.getByText("Only Organization Admins")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show Admins" }));
+    // Admins only: no Use grant is offered anywhere.
     expect(screen.getByText("Connection Admins")).toBeTruthy();
     expect(screen.getByText("Only Organization Admins so far.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Manage Admins in Access" })).toBeTruthy();
@@ -619,7 +644,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       adapters.confirm.mockResolvedValue(confirmed);
       renderChannels();
       fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-      fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
+      startTestMessage();
       await waitFor(() =>
         expect(adapters.confirm).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -662,7 +687,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     });
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
+    startTestMessage();
     await screen.findByText(/This Hub cannot preview test messages/);
     expect(adapters.confirm).not.toHaveBeenCalled();
     expect(adapters.post).not.toHaveBeenCalled();
@@ -710,7 +735,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     );
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
+    startTestMessage();
     await screen.findByText(/test destination changed/);
     expect(screen.queryByText(/Test message sent to/)).toBeNull();
     expect(adapters.post).toHaveBeenCalledTimes(1);
@@ -775,6 +800,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.queryByText("Channel activity")).toBeNull();
     expect(adapters.get.mock.calls.some(([resource]) => resource.includes("activity"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
     fireEvent.click(screen.getByRole("button", { name: "View activity" }));
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("slack:support");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
@@ -1209,7 +1235,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
     adapters.scrollToTop.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await screen.findByRole("button", { name: "Refresh status" });
+    await screen.findByRole("button", { name: "Back to Connections" });
     expect(adapters.scrollToTop).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(adapters.post).not.toHaveBeenCalled();
@@ -1245,7 +1271,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
         ],
       }),
     ]);
-    await screen.findByRole("button", { name: "Refresh status" });
+    await screen.findByRole("button", { name: "Back to Connections" });
   });
 
   it("preserves the Route draft when creating its Automation inline", async () => {

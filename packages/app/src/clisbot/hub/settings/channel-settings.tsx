@@ -35,8 +35,9 @@ import {
   type ReactElement,
   type SetStateAction,
 } from "react";
-import { ArrowUp, ArrowDown } from "lucide-react-native";
+import { ArrowDown, ArrowLeft, ArrowUp } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
+import { ConnectionSettingRow, ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
 import {
   FoldedRouteFormSection,
@@ -516,12 +517,14 @@ function ChannelSettingsContent({
     [channels.data?.accounts, mutate, replaceConfiguration],
   );
 
-  const testRoute = useCallback(
-    async (account: RecordValue, route: RecordValue) => {
+  // A test message checks the Connection itself: it is sent where the user
+  // picks, not tied to a Route.
+  const sendTestMessage = useCallback(
+    async (account: RecordValue, conversationId: string) => {
       const channel = stringField(account, "channel");
       const accountId = stringField(account, "accountId");
-      const target = routeTestTarget(route);
-      if (channel === null || accountId === null || target === null) return;
+      if (channel === null || accountId === null) return;
+      const target = { conversationId };
       setTestResult(null);
       await mutate(async () => {
         const resource = `channel-accounts/${encodeURIComponent(channel)}/${encodeURIComponent(accountId)}`;
@@ -750,7 +753,6 @@ function ChannelSettingsContent({
         embedded={embedded}
         accounts={channels.data?.accounts}
         queries={[channels, connections, automations]}
-        runtimes={runtimeStatus.data?.accounts}
         mutationError={mutationError}
         testResult={testResult}
         choosingInput={choosingInput}
@@ -761,7 +763,6 @@ function ChannelSettingsContent({
         addRouteTo={addRouteTo}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
-        testRoute={testRoute}
       />
     );
   }
@@ -821,7 +822,7 @@ function ChannelSettingsContent({
         addRoute={addRoute}
         addRouteTo={addRouteTo}
         openActivity={openAccountActivity}
-        testRoute={testRoute}
+        sendTestMessage={sendTestMessage}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
@@ -929,7 +930,6 @@ function AutomationChannelInputs({
   embedded,
   accounts,
   queries,
-  runtimes = [],
   mutationError,
   testResult,
   choosingInput,
@@ -940,13 +940,11 @@ function AutomationChannelInputs({
   addRouteTo,
   moveRoute,
   removeRoute,
-  testRoute,
 }: {
   automationName: string;
   embedded: boolean;
   accounts: RecordValue[] | undefined;
   queries: Array<{ isPending: boolean; error: Error | null }>;
-  runtimes: HubRuntimeAccount[] | undefined;
   mutationError: string | null;
   testResult: string | null;
   choosingInput: boolean;
@@ -957,7 +955,6 @@ function AutomationChannelInputs({
   addRouteTo(accountKey: string): void;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
 }) {
   const inputDraft = useContext(AutomationInputDraftContext);
   const choosing = Boolean(inputDraft) || choosingInput;
@@ -995,9 +992,7 @@ function AutomationChannelInputs({
           editRoute={editRoute}
           addRouteTo={addRouteTo}
           moveRoute={moveRoute}
-          runtimes={inputDraft ? [] : runtimes}
           removeRoute={removeRoute}
-          testRoute={testRoute}
         />
       ))}
       {choosing ? (
@@ -1029,12 +1024,9 @@ function AutomationChannelAccount({
   editRoute,
   addRouteTo,
   removeRoute,
-  testRoute,
   moveRoute,
-  runtimes,
 }: {
   choosing: boolean;
-  runtimes: HubRuntimeAccount[];
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   account: RecordValue;
   automationName: string;
@@ -1042,7 +1034,6 @@ function AutomationChannelAccount({
   editRoute(route: EditingRoute): void;
   addRouteTo(accountKey: string): void;
   removeRoute(account: RecordValue, index: number): Promise<void>;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
 }) {
   const add = useCallback(() => addRouteTo(channelAccountKey(account)), [account, addRouteTo]);
   const routes = arrayField(account, "routes") as RecordValue[];
@@ -1061,14 +1052,9 @@ function AutomationChannelAccount({
         account={account}
         accountKey={channelAccountKey(account)}
         routes={routes}
-        enabled={account.enabled !== false}
-        runtime={runtimes.find(
-          (runtime) => runtime.channel === account.channel && runtime.account === account.accountId,
-        )}
         canManage
         pending={pending}
         editRoute={editRoute}
-        testRoute={testRoute}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
         automationName={automationName}
@@ -1122,7 +1108,7 @@ function ChannelAccountsSection({
   addRoute,
   addRouteTo,
   openActivity,
-  testRoute,
+  sendTestMessage,
   moveRoute,
   removeRoute,
 }: {
@@ -1148,28 +1134,42 @@ function ChannelAccountsSection({
   addRoute(): void;
   addRouteTo(accountKey: string): void;
   openActivity(): void;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
+  sendTestMessage(account: RecordValue, conversationId: string): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
+  const closeAccount = useCallback(() => selectAccount(null), [selectAccount]);
   return (
     <SettingsSection title="Connections" info={CONNECTIONS_INFO}>
       <QueryFeedback queries={queries} />
-      <View style={styles.actions}>
-        {/* One Add Route: here its form picks the Connection or connects a new
-            one; inside an open Connection the card's own Add Route takes over. */}
-        {selectedAccountKey === null ? (
+      {selectedAccountKey === null ? (
+        <View style={styles.actions}>
+          {/* One Add Route: here its form picks the Connection or connects a new
+              one; inside an open Connection the page's own Add Route takes over. */}
           <Button size="sm" disabled={pending} onPress={addRoute}>
             Add Route
           </Button>
-        ) : null}
-        <Button size="xs" variant="outline" disabled={refreshing} onPress={refreshStatus}>
-          Refresh status
-        </Button>
-        <Button size="sm" variant="ghost" onPress={openActivity}>
-          View activity
-        </Button>
-      </View>
+          <Button size="xs" variant="outline" disabled={refreshing} onPress={refreshStatus}>
+            Refresh status
+          </Button>
+          <Button size="sm" variant="ghost" onPress={openActivity}>
+            View activity
+          </Button>
+        </View>
+      ) : (
+        // An open Connection is a page of its own: the way back leads it.
+        <View style={styles.backRow}>
+          <Button
+            size="sm"
+            variant="ghost"
+            leftIcon={ArrowLeft}
+            onPress={closeAccount}
+            accessibilityLabel="Back to Connections"
+          >
+            Connections
+          </Button>
+        </View>
+      )}
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
       {testResult ? <Alert variant="success" title={testResult} /> : null}
       <ChannelAccountList
@@ -1185,12 +1185,14 @@ function ChannelAccountsSection({
         adminScoped={adminScoped}
         pending={pending}
         selectAccount={selectAccount}
+        refreshStatus={refreshStatus}
+        openActivity={openActivity}
         updateAccount={updateAccount}
         removeAccount={removeAccount}
         retryAccount={retryAccount}
         editRoute={editRoute}
         addRouteTo={addRouteTo}
-        testRoute={testRoute}
+        sendTestMessage={sendTestMessage}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
@@ -1361,12 +1363,14 @@ function ChannelAccountList({
   adminScoped,
   pending,
   selectAccount,
+  refreshStatus,
+  openActivity,
   updateAccount,
   removeAccount,
   retryAccount,
   editRoute,
   addRouteTo,
-  testRoute,
+  sendTestMessage,
   moveRoute,
   removeRoute,
 }: {
@@ -1382,12 +1386,14 @@ function ChannelAccountList({
   adminScoped: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
+  refreshStatus(): void;
+  openActivity(): void;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
   addRouteTo(accountKey: string): void;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
+  sendTestMessage(account: RecordValue, conversationId: string): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
@@ -1421,12 +1427,14 @@ function ChannelAccountList({
             adminScoped={adminScoped}
             pending={pending}
             selectAccount={selectAccount}
+            refreshStatus={refreshStatus}
+            openActivity={openActivity}
             updateAccount={updateAccount}
             removeAccount={removeAccount}
             retryAccount={retryAccount}
             editRoute={editRoute}
             addRouteTo={addRouteTo}
-            testRoute={testRoute}
+            sendTestMessage={sendTestMessage}
             moveRoute={moveRoute}
             removeRoute={removeRoute}
           />
@@ -1449,12 +1457,14 @@ function ChannelAccountRow({
   adminScoped,
   pending,
   selectAccount,
+  refreshStatus,
+  openActivity,
   updateAccount,
   removeAccount,
   retryAccount,
   editRoute,
   addRouteTo,
-  testRoute,
+  sendTestMessage,
   moveRoute,
   removeRoute,
 }: {
@@ -1471,12 +1481,14 @@ function ChannelAccountRow({
   adminScoped: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
+  refreshStatus(): void;
+  openActivity(): void;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
   addRouteTo(accountKey: string): void;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
+  sendTestMessage(account: RecordValue, conversationId: string): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
@@ -1491,9 +1503,24 @@ function ChannelAccountRow({
   const runtime = runtimes.find(
     (candidate) => candidate.channel === channel && candidate.account === accountId,
   );
-  const toggleSelected = useCallback(() => {
-    selectAccount(selected ? null : key);
-  }, [key, selectAccount, selected]);
+  const openAccount = useCallback(() => selectAccount(key), [key, selectAccount]);
+  const [testing, setTesting] = useState(false);
+  const pageActions = useMemo(
+    () => [
+      { label: "Send test message", onSelect: () => setTesting(true) },
+      { label: "Refresh status", onSelect: refreshStatus },
+      { label: "View activity", onSelect: openActivity },
+    ],
+    [openActivity, refreshStatus],
+  );
+  const closeTest = useCallback(() => setTesting(false), []);
+  const sendTest = useCallback(
+    (conversationId: string) => {
+      setTesting(false);
+      void sendTestMessage(account, conversationId);
+    },
+    [account, sendTestMessage],
+  );
   const toggleEnabled = useCallback(
     (value: boolean) => {
       void updateAccount(account, { enabled: value });
@@ -1524,29 +1551,54 @@ function ChannelAccountRow({
           </Text>
         </View>
         <View style={styles.actions}>
-          <Button
-            size="xs"
-            variant={selected ? "secondary" : "outline"}
-            disabled={pending}
-            onPress={toggleSelected}
-          >
-            {selected ? "Back to Connections" : "Manage"}
-          </Button>
+          {selected ? null : (
+            <Button size="xs" variant="outline" disabled={pending} onPress={openAccount}>
+              Manage
+            </Button>
+          )}
           <Switch
             value={enabled}
             onValueChange={toggleEnabled}
             disabled={pending}
             accessibilityLabel={`${enabled ? "Disable" : "Enable"} ${accountId}`}
           />
-          {adminScoped ? null : (
+          {selected || !adminScoped ? (
             <ChannelActionsMenu
               label={`Actions for ${accountId}`}
               disabled={pending}
-              remove={remove}
+              actions={selected ? pageActions : []}
+              {...(adminScoped ? {} : { remove })}
             />
-          )}
+          ) : null}
         </View>
       </View>
+
+      {selected && runtime?.detail ? (
+        <View style={settingsStyles.row}>
+          <Text style={styles.errorText}>{runtime.detail}</Text>
+        </View>
+      ) : null}
+      {selected && testing ? (
+        <ConnectionTestMessage
+          account={account}
+          pending={pending}
+          send={sendTest}
+          close={closeTest}
+        />
+      ) : null}
+      {selected ? <RoutesHeaderRow pending={pending} addRoute={addRoute} /> : null}
+      <ChannelAccountRouteList
+        visible={selected}
+        account={account}
+        accountKey={key}
+        routes={routes}
+        warnings={warnings}
+        canManage
+        pending={pending}
+        editRoute={editRoute}
+        moveRoute={moveRoute}
+        removeRoute={removeRoute}
+      />
       <ChannelAccountDetails
         visible={selected}
         account={account}
@@ -1563,22 +1615,6 @@ function ChannelAccountRow({
         pending={pending}
         retryAccount={retryAccount}
         updateAccount={updateAccount}
-      />
-      {selected ? <RoutesHeaderRow pending={pending} addRoute={addRoute} /> : null}
-      <ChannelAccountRouteList
-        visible={selected}
-        account={account}
-        accountKey={key}
-        routes={routes}
-        warnings={warnings}
-        enabled={enabled}
-        runtime={runtime}
-        canManage
-        pending={pending}
-        editRoute={editRoute}
-        testRoute={testRoute}
-        moveRoute={moveRoute}
-        removeRoute={removeRoute}
       />
     </View>
   );
@@ -1599,6 +1635,10 @@ function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): 
   );
 }
 
+/**
+ * The Connection's settings, under its Routes: who administers it, the bot's
+ * limits, its runtime status, and its credential, each showing its value.
+ */
 function ChannelAccountDetails({
   visible,
   account,
@@ -1632,55 +1672,24 @@ function ChannelAccountDetails({
   retryAccount(account: RecordValue): Promise<void>;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
 }) {
-  const [showRuntimeDetails, setShowRuntimeDetails] = useState(false);
-  const [showLimits, setShowLimits] = useState(false);
-  const toggleLimits = useCallback(() => setShowLimits((value) => !value), []);
-  const toggleRuntimeDetails = useCallback(() => setShowRuntimeDetails((value) => !value), []);
-  const [showAccess, setShowAccess] = useState(false);
-  const toggleAccess = useCallback(() => setShowAccess((value) => !value), []);
-  const [showLinking, setShowLinking] = useState(false);
-  const toggleLinking = useCallback(() => setShowLinking((value) => !value), []);
-  const router = useRouter();
-  const openConfiguration = useCallback(
-    () => router.push(buildHubSettingsRoute("configuration")),
-    [router],
-  );
   if (!visible) return null;
+  const adminCount = connectionAdminCount(
+    assignments,
+    channelAccountResourceId(channel, accountId),
+  );
   return (
     <View style={settingsStyles.rowBorder}>
-      <ChannelAccountActions
-        account={account}
-        connection={connection}
-        runtime={runtime}
-        runtimeAvailable={runtimeAvailable}
-        enabled={enabled}
-        adminScoped={adminScoped}
-        pending={pending}
-        showingAccess={showAccess}
-        showingRuntimeDetails={showRuntimeDetails}
-        showingLinking={showLinking}
-        showingLimits={showLimits}
-        toggleLimits={toggleLimits}
-        toggleAccess={toggleAccess}
-        toggleRuntimeDetails={toggleRuntimeDetails}
-        toggleLinking={toggleLinking}
-        openConfiguration={openConfiguration}
-        retryAccount={retryAccount}
-      />
-      {runtime?.detail ? (
-        <View style={settingsStyles.row}>
-          <Text style={styles.errorText}>{runtime.detail}</Text>
-        </View>
-      ) : null}
-      {showLinking ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
-      {showLimits ? (
-        <ChannelAccountLimitsSection
-          account={account}
-          pending={pending}
-          updateAccount={updateAccount}
-        />
-      ) : null}
-      {showAccess ? (
+      <View style={settingsStyles.row}>
+        <Text style={styles.formHeading}>Connection settings</Text>
+      </View>
+      <ConnectionSettingRow
+        title="Admins"
+        value={
+          adminCount === 0
+            ? "Only Organization Admins"
+            : `${String(adminCount)} Admin${adminCount === 1 ? "" : "s"}`
+        }
+      >
         <ChannelRouteAdmins
           channel={channel}
           accountId={accountId}
@@ -1690,15 +1699,174 @@ function ChannelAccountDetails({
           adminScoped={adminScoped}
           pending={pending}
         />
-      ) : null}
-      {showRuntimeDetails ? (
-        <View style={settingsStyles.row}>
-          <Text
-            style={settingsStyles.rowHint}
-          >{`Configuration revision ${revisionVersion ?? "—"} · Integrity ${runtime?.integrity ?? "not checked"} · Load ${runtime?.loadTrace ?? "not loaded"}`}</Text>
-        </View>
-      ) : null}
+      </ConnectionSettingRow>
+      <ConnectionSettingRow
+        title="Bot limits"
+        value={channelLimitsSummary(account["limits"])}
+        actionLabel="Change"
+      >
+        <ChannelAccountLimitsSection
+          account={account}
+          pending={pending}
+          updateAccount={updateAccount}
+        />
+      </ConnectionSettingRow>
+      <ConnectionStatusRow
+        account={account}
+        channel={channel}
+        accountId={accountId}
+        connection={connection}
+        runtime={runtime}
+        runtimeAvailable={runtimeAvailable}
+        revisionVersion={revisionVersion}
+        enabled={enabled}
+        pending={pending}
+        retryAccount={retryAccount}
+      />
+      {adminScoped ? null : <ConnectionCredentialRow connection={connection} />}
     </View>
+  );
+}
+
+/** How many Members or Teams administer the Connection (Organization Admins aside). */
+function connectionAdminCount(
+  assignments: readonly HubAssignment[] | undefined,
+  resourceId: string,
+): number {
+  return (assignments ?? []).filter(
+    (assignment) =>
+      assignment.resourceKind === "channel_account" &&
+      assignment.resourceId === resourceId &&
+      assignment.privileges.includes("channel.manage"),
+  ).length;
+}
+
+/** The runtime, as the Hub reports it, with the actions that report offers. */
+function ConnectionStatusRow({
+  account,
+  channel,
+  accountId,
+  connection,
+  runtime,
+  runtimeAvailable,
+  revisionVersion,
+  enabled,
+  pending,
+  retryAccount,
+}: {
+  account: RecordValue;
+  channel: string;
+  accountId: string;
+  connection: HubConnection | undefined;
+  runtime: HubRuntimeAccount | undefined;
+  runtimeAvailable: boolean | undefined;
+  revisionVersion: number | undefined;
+  enabled: boolean;
+  pending: boolean;
+  retryAccount(account: RecordValue): Promise<void>;
+}) {
+  const retry = useCallback(() => {
+    void retryAccount(account);
+  }, [account, retryAccount]);
+  // The Hub reports `needs-login` for a QR-auth account whose profile has no live
+  // session. That is the whole signal: nothing else says an account is linkable.
+  const needsLinking = runtime?.transport === "needs-login";
+  const canRetry =
+    connection?.status === "connected" && enabled && runtime?.transport !== "started";
+  const label = enabled ? channelRuntimeLabel(runtimeAvailable, runtime) : "Disabled";
+  return (
+    <ConnectionSettingRow title="Status" value={needsLinking ? `${label} · needs linking` : label}>
+      <View style={[settingsStyles.row, styles.statusPanel]}>
+        <Text
+          style={settingsStyles.rowHint}
+        >{`Configuration revision ${revisionVersion ?? "—"} · Integrity ${runtime?.integrity ?? "not checked"} · Load ${runtime?.loadTrace ?? "not loaded"}`}</Text>
+        {canRetry ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending || runtimeAvailable === false}
+            onPress={retry}
+          >
+            Retry runtime
+          </Button>
+        ) : null}
+      </View>
+      {needsLinking ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
+    </ConnectionSettingRow>
+  );
+}
+
+/** The provider account the Connection signs in as. Its credential is edited on the Connections page. */
+function ConnectionCredentialRow({ connection }: { connection: HubConnection | undefined }) {
+  const router = useRouter();
+  const openConfiguration = useCallback(
+    () => router.push(buildHubSettingsRoute("configuration")),
+    [router],
+  );
+  const status = connection?.status === "connected" ? "Connected" : "Not connected";
+  return (
+    <ConnectionSettingRow
+      title="Credential"
+      value={`${channelConnectionLabel(connection)} · ${status}`}
+    >
+      <View style={[settingsStyles.row, styles.statusPanel]}>
+        <Text style={settingsStyles.rowHint}>
+          The bot token or app credential this Connection signs in with. Replacing or disconnecting
+          it is done where credentials are managed.
+        </Text>
+        <Button size="sm" variant="outline" onPress={openConfiguration}>
+          Manage credential
+        </Button>
+      </View>
+    </ConnectionSettingRow>
+  );
+}
+
+/**
+ * Where a test message can go: every conversation the bot has seen, plus the
+ * ones a Route names. It starts on the first a Route names.
+ */
+function ConnectionTestMessage({
+  account,
+  pending,
+  send,
+  close,
+}: {
+  account: RecordValue;
+  pending: boolean;
+  send(conversationId: string): void;
+  close(): void;
+}) {
+  const channel = stringField(account, "channel");
+  const accountId = stringField(account, "accountId");
+  const observed = useObservedConversations(channel, accountId, true);
+  const routes = arrayField(account, "routes") as RecordValue[];
+  const destinations = useMemo<SelectFieldOption<string>[]>(() => {
+    const named = routes.flatMap((route) =>
+      routeAudienceDraft(route).rules.flatMap((rule) =>
+        splitConversationIds(rule.where.conversations),
+      ),
+    );
+    const seen = [
+      ...(observed.data?.destinations ?? []),
+      ...(observed.data?.conversations ?? []),
+    ].map((item) => item.id);
+    return [...new Set([...named, ...seen])].map((id) => ({
+      id,
+      value: id,
+      label: channelDestinationLabel(id, observed.data),
+    }));
+  }, [observed.data, routes]);
+  const initial = routes.map(routeTestTarget).find((target) => target !== null);
+  return (
+    <ConnectionTestMessagePanel
+      key={observed.data === undefined ? "loading" : "loaded"}
+      destinations={destinations}
+      initialDestination={initial?.conversationId ?? destinations[0]?.value ?? null}
+      pending={pending}
+      send={send}
+      close={close}
+    />
   );
 }
 
@@ -1716,89 +1884,6 @@ function ChannelAccountLimitsSection({
     [account, updateAccount],
   );
   return <ChannelAccountLimitsPanel limits={account["limits"]} pending={pending} save={save} />;
-}
-
-/** The account's row of runtime actions. What is on offer is entirely the Hub's
- * report: an unconnected Connection, an account waiting to be linked, or a
- * transport that is not running. */
-function ChannelAccountActions({
-  account,
-  connection,
-  runtime,
-  runtimeAvailable,
-  enabled,
-  adminScoped,
-  pending,
-  showingAccess,
-  showingRuntimeDetails,
-  showingLinking,
-  showingLimits,
-  toggleAccess,
-  toggleRuntimeDetails,
-  toggleLinking,
-  toggleLimits,
-  openConfiguration,
-  retryAccount,
-}: {
-  account: RecordValue;
-  connection: HubConnection | undefined;
-  runtime: HubRuntimeAccount | undefined;
-  runtimeAvailable: boolean | undefined;
-  adminScoped: boolean;
-  enabled: boolean;
-  pending: boolean;
-  showingAccess: boolean;
-  showingRuntimeDetails: boolean;
-  showingLinking: boolean;
-  showingLimits: boolean;
-  toggleAccess(): void;
-  toggleRuntimeDetails(): void;
-  toggleLinking(): void;
-  toggleLimits(): void;
-  openConfiguration(): void;
-  retryAccount(account: RecordValue): Promise<void>;
-}) {
-  const retry = useCallback(() => {
-    void retryAccount(account);
-  }, [account, retryAccount]);
-  const connected = connection?.status === "connected";
-  // The Hub reports `needs-login` for a QR-auth account whose profile has no live
-  // session. That is the whole signal: nothing else says an account is linkable.
-  const needsLinking = runtime?.transport === "needs-login";
-  const canRetry = connected && enabled && runtime?.transport !== "started";
-  return (
-    <View style={[settingsStyles.row, styles.actions]}>
-      <Button size="sm" variant="ghost" onPress={toggleAccess}>
-        {showingAccess ? "Hide access" : "Access"}
-      </Button>
-      <Button size="sm" variant="ghost" onPress={toggleLimits}>
-        {showingLimits ? "Hide limits" : "Limits"}
-      </Button>
-      <Button size="sm" variant="ghost" onPress={toggleRuntimeDetails}>
-        {showingRuntimeDetails ? "Hide status details" : "Status details"}
-      </Button>
-      {needsLinking ? (
-        <Button size="sm" variant="secondary" disabled={pending} onPress={toggleLinking}>
-          {showingLinking ? "Hide linking" : "Link with QR"}
-        </Button>
-      ) : null}
-      {connected || needsLinking || adminScoped ? null : (
-        <Button size="sm" variant="outline" disabled={pending} onPress={openConfiguration}>
-          Manage Connection
-        </Button>
-      )}
-      {canRetry ? (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending || runtimeAvailable === false}
-          onPress={retry}
-        >
-          Retry runtime
-        </Button>
-      ) : null}
-    </View>
-  );
 }
 
 function ChannelAccountQrLinking({ channel, accountId }: { channel: string; accountId: string }) {
@@ -1977,12 +2062,9 @@ function ChannelAccountRouteList({
   accountKey,
   routes,
   warnings,
-  enabled,
-  runtime,
   canManage,
   pending,
   editRoute,
-  testRoute,
   moveRoute,
   removeRoute,
 }: {
@@ -1992,12 +2074,9 @@ function ChannelAccountRouteList({
   accountKey: string;
   routes: RecordValue[];
   warnings?: HubChannelConfiguration["warnings"];
-  enabled: boolean;
-  runtime: HubRuntimeAccount | undefined;
   canManage: boolean;
   pending: boolean;
   editRoute(route: EditingRoute): void;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
@@ -2028,12 +2107,9 @@ function ChannelAccountRouteList({
         warnings={warnings}
         routeIndex={routeIndex}
         routeCount={routes.length}
-        enabled={enabled}
-        runtime={runtime}
         canManage={canManage}
         pending={pending}
         editRoute={editRoute}
-        testRoute={testRoute}
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
@@ -2081,12 +2157,9 @@ function ChannelRouteRow({
   warnings: accountWarnings,
   routeIndex,
   routeCount,
-  enabled,
-  runtime,
   canManage,
   pending,
   editRoute,
-  testRoute,
   moveRoute,
   removeRoute,
 }: {
@@ -2098,20 +2171,14 @@ function ChannelRouteRow({
   warnings: HubChannelConfiguration["warnings"];
   routeIndex: number;
   routeCount: number;
-  enabled: boolean;
-  runtime: HubRuntimeAccount | undefined;
   canManage: boolean;
   pending: boolean;
   editRoute(route: EditingRoute): void;
-  testRoute(account: RecordValue, route: RecordValue): Promise<void>;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
   const compact = useIsCompactFormFactor();
   const names = useAudienceNames(metadata);
-  const runTest = useCallback(() => {
-    void testRoute(account, route);
-  }, [account, route, testRoute]);
   const edit = useCallback(() => {
     editRoute({ accountKey, routeIndex });
   }, [accountKey, editRoute, routeIndex]);
@@ -2156,16 +2223,6 @@ function ChannelRouteRow({
       </View>
       {canManage ? (
         <View style={styles.actions}>
-          {routeTestTarget(route) !== null ? (
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={pending || !enabled || runtime?.transport !== "started"}
-              onPress={runTest}
-            >
-              Send test message
-            </Button>
-          ) : null}
           <Button size="xs" variant="outline" disabled={pending} onPress={edit}>
             {automationScoped ? "Edit input and replies" : "Edit"}
           </Button>
@@ -4249,6 +4306,8 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.semibold,
   },
+  backRow: { alignItems: "flex-start" },
+  statusPanel: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[2] },
   formActions: {
     gap: theme.spacing[2],
   },

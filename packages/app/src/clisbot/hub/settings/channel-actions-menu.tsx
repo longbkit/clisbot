@@ -18,14 +18,22 @@ function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
 }
 
 /** Infrequent actions share Paseo's menu presentation and confirmation handoff. */
+export interface ChannelMenuAction {
+  label: string;
+  onSelect(): void;
+}
+
 export function ChannelActionsMenu({
   label,
   disabled,
+  actions = [],
   remove,
 }: {
   label: string;
   disabled: boolean;
-  remove(): void;
+  /** Listed first; Remove, when offered, stays last and apart. */
+  actions?: readonly ChannelMenuAction[];
+  remove?: () => void;
 }) {
   const compact = useIsCompactFormFactor();
   return (
@@ -39,9 +47,16 @@ export function ChannelActionsMenu({
         <ThemedMoreHorizontal size={buttonIconSize[compact ? "md" : "sm"]} uniProps={mutedColor} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sheetTitle={label}>
-        <DropdownMenuItem disabled={disabled} onSelect={remove}>
-          Remove
-        </DropdownMenuItem>
+        {actions.map((action) => (
+          <DropdownMenuItem key={action.label} disabled={disabled} onSelect={action.onSelect}>
+            {action.label}
+          </DropdownMenuItem>
+        ))}
+        {remove === undefined ? null : (
+          <DropdownMenuItem disabled={disabled} onSelect={remove}>
+            Remove
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

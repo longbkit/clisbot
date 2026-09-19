@@ -273,7 +273,7 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: /Actions for support/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Manage" }));
     expect(screen.queryByRole("button", { name: "Manage Connection" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show Admins" }));
     expect(screen.getByText("Team QC · by Owner")).toBeTruthy();
     const read = adapters.get.mock.calls.map(([resource]) => resource as string);
     expect(read).toContain("channel-configuration/accounts/slack/support");

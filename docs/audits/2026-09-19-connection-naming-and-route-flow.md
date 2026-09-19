@@ -64,6 +64,18 @@ Auto-accept:
   Route also names it; the name defaults from the Connection's name. Inside an
   open Connection, the card's own **Add Route** fixes the Connection and the
   list header's Add Route is hidden.
+- **An open Connection is a page.** A "← Connections" back link leads it
+  (list → detail), instead of a Manage / Back to Connections toggle inside the
+  card. Its header keeps the name, status, the enable switch and a … menu
+  (Send test message, Refresh status, View activity, Remove). Routes come
+  first; under them, Connection settings are rows that show their value and
+  open in place: Admins, Bot limits, Status (revision, integrity, retry, QR
+  relink), Credential (a link to where credentials are managed). They replace
+  the Access / Limits / Status details / Manage Connection buttons.
+- **A test message tests the Connection, not a Route.** It starts from the
+  Connection's menu with a Send to picker (conversations the bot has seen and
+  the ones Routes name, starting on the first a Route names), then the same
+  exact-text preview and confirm. Route rows no longer carry the button.
 - **The Route form follows the Route's own model, a rule: conditions, then
   what happens.** One card per section: Connection; Who can talk, and where;
   When it answers (mention, follow-up, message text: conditions on the message,
