@@ -64,13 +64,22 @@ Auto-accept:
   Route also names it; the name defaults from the Connection's name. Inside an
   open Connection, the card's own **Add Route** fixes the Connection and the
   list header's Add Route is hidden.
-- **The Route form is sections, one card each**, in the order an operator
-  answers them: Connection, Who can talk and where, What runs, Replies, then
-  Limits. How the Agent runs stays with what runs: What runs holds the target,
-  then a Permissions subgroup and an Advanced subgroup (fast mode, provider
-  options). Limits and Advanced start folded to a one-line summary and open on
-  their own when they hold a value. Section explanations are header info tips,
-  per `docs/design.md`.
+- **The Route form follows the Route's own model, a rule: conditions, then
+  what happens.** One card per section: Connection; Who can talk, and where;
+  When it answers (mention, follow-up, message text: conditions on the message,
+  moved out of Replies and out of the audience); What runs, which holds how the
+  Agent runs (a Permissions subgroup and a folded Advanced subgroup: fast mode,
+  provider options); Replies (thread, reply method, what is sent); Limits,
+  folded. Folded parts open on their own when they hold a value. Section
+  explanations are header info tips, per `docs/design.md`.
+- **An audience rule reads as its sentence, then Who, then Where.** Who is one
+  choice first: people you choose (rows for Roles, Teams, Specific Members,
+  Senders outside the Hub) or Anyone in the conversation, which covers everyone
+  and so hides the people rows and saves alone. Where is three places of one
+  kind: Direct messages, Group chats (public/private filter), Specific
+  conversations. The combined by-place summary under the rules is gone: it
+  restated the rule sentences, and it showed raw conversation ids because the
+  form never loaded their names (it does now).
 - **Accept automatically** (was "Allow automatically") answers every permission
   request with Allow. The plane no longer refuses it; the configuration warns
   "Every permission request is accepted automatically." on any Route.

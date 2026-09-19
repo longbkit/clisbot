@@ -2,7 +2,7 @@
 // [where]" rows above what the bot does (docs/audits/2026-09-19-route-audience-rules.md).
 // Every row edits one `AudienceRuleDraft`; the pure module owns the shape.
 
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import React, { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -11,13 +11,13 @@ import { settingsStyles } from "@/styles/settings";
 import { channelCatalogEntry, channelCatalogLabel } from "../channel-catalog";
 import { HUB_AUDIENCE_ROLES, type HubAudienceRole } from "../contracts";
 import { useChannelCatalog } from "./channel-catalog-queries";
-import { RouteBehaviorSwitch } from "./channel-route-behavior-rows";
+import { ChoiceRow, RouteBehaviorSwitch } from "./channel-route-behavior-rows";
+import { splitConversationIds } from "../conversation-picker";
 import {
   AUDIENCE_ROLE_LABELS,
   audienceRuleSentence,
   channelReportsVisibility,
   emptyAudienceRule,
-  routeAudienceSummary,
   visibilityFilterMatchesNothing,
   type AudienceGroups,
   type AudienceNames,
@@ -78,7 +78,6 @@ export function AudienceRulesEditor({
     (index: number) => setRules((current) => current.filter((_, at) => at !== index)),
     [setRules],
   );
-  const summary = useMemo(() => routeAudienceSummary(rules, names), [rules, names]);
   const catalog = useChannelCatalog();
   const place = useMemo<AudiencePlace>(
     () => ({
@@ -116,7 +115,6 @@ export function AudienceRulesEditor({
           Add rule
         </Button>
       </View>
-      <RouteAudienceSummary summary={summary} />
     </View>
   );
 }
@@ -130,6 +128,10 @@ interface AudiencePlace {
   accountId: string | null;
 }
 
+/**
+ * One rule reads as its sentence ("Members may talk in DMs"), then the two
+ * halves that make it: Who, then Where.
+ */
 function AudienceRuleRow({
   index,
   rule,
@@ -170,7 +172,10 @@ function AudienceRuleRow({
   return (
     <View style={styles.rule} accessibilityLabel={label}>
       <View style={styles.ruleHeader}>
-        <Text style={styles.ruleTitle}>{label}</Text>
+        <View style={styles.ruleHeading}>
+          <Text style={styles.ruleTitle}>{label}</Text>
+          <Text style={settingsStyles.rowHint}>{audienceRuleSentence(rule, names)}</Text>
+        </View>
         {removable ? (
           <Button
             size="xs"
@@ -197,12 +202,22 @@ function AudienceRuleRow({
         disabled={disabled}
         setWhere={setWhere}
       />
-      <Text style={settingsStyles.rowHint}>{audienceRuleSentence(rule, names)}</Text>
       {error === null ? null : <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
 
+type WhoScope = "hub" | "anyone";
+const WHO_SCOPE_VALUES: WhoScope[] = ["hub", "anyone"];
+const WHO_SCOPE_LABELS: Record<WhoScope, string> = {
+  hub: "People you choose",
+  anyone: "Anyone in the conversation",
+};
+
+/**
+ * Who, as one choice first: people you choose, or anyone in the conversation.
+ * Anyone covers everyone, so the people rows only show for the first.
+ */
 function AudienceWhoFields({
   who,
   teams,
@@ -218,17 +233,60 @@ function AudienceWhoFields({
   disabled: boolean;
   setWho(patch: Partial<AudienceRuleDraft["who"]>): void;
 }) {
-  const [showTeams, setShowTeams] = useState(who.teams.length > 0);
-  const [showMembers, setShowMembers] = useState(who.members.length > 0);
-  const [showAdvanced, setShowAdvanced] = useState(who.identities.length > 0);
-  const toggleTeams = useCallback(() => setShowTeams((value) => !value), []);
-  const toggleMembers = useCallback(() => setShowMembers((value) => !value), []);
-  const toggleAdvanced = useCallback(() => setShowAdvanced((value) => !value), []);
+  const changeScope = useCallback(
+    (value: string) => setWho({ anyone: value === "anyone" }),
+    [setWho],
+  );
+  return (
+    <View style={styles.part}>
+      <ChoiceRow
+        label="Who"
+        values={WHO_SCOPE_VALUES}
+        selected={who.anyone ? "anyone" : "hub"}
+        labels={WHO_SCOPE_LABELS}
+        onChange={changeScope}
+        disabled={disabled}
+      />
+      {who.anyone ? (
+        <Alert
+          variant="warning"
+          title={OPEN_AUDIENCE_WARNING.title}
+          description={OPEN_AUDIENCE_WARNING.description}
+        />
+      ) : (
+        <AudiencePeopleFields
+          who={who}
+          teams={teams}
+          members={members}
+          place={place}
+          disabled={disabled}
+          setWho={setWho}
+        />
+      )}
+    </View>
+  );
+}
+
+/** The people a rule names: by role, Team, Member, or a sender outside the Hub. */
+function AudiencePeopleFields({
+  who,
+  teams,
+  members,
+  place,
+  disabled,
+  setWho,
+}: {
+  who: AudienceRuleDraft["who"];
+  teams: readonly AudienceOption[];
+  members: readonly AudienceOption[];
+  place: AudiencePlace;
+  disabled: boolean;
+  setWho(patch: Partial<AudienceRuleDraft["who"]>): void;
+}) {
   const toggleRole = useCallback(
     (role: string) => setWho({ roles: toggled(who.roles, role as HubAudienceRole) }),
     [setWho, who.roles],
   );
-  const toggleAnyone = useCallback(() => setWho({ anyone: !who.anyone }), [setWho, who.anyone]);
   const toggleTeam = useCallback(
     (id: string) => setWho({ teams: toggled(who.teams, id) }),
     [setWho, who.teams],
@@ -238,54 +296,33 @@ function AudienceWhoFields({
     [setWho, who.members],
   );
   const changeIdentities = useCallback((identities: string) => setWho({ identities }), [setWho]);
+  const roleOptions = useMemo(
+    () => HUB_AUDIENCE_ROLES.map((role) => ({ id: role, name: AUDIENCE_ROLE_LABELS[role] })),
+    [],
+  );
   return (
-    <View style={styles.part}>
-      <Text style={styles.label}>Who</Text>
-      <View style={styles.chips}>
-        {HUB_AUDIENCE_ROLES.map((role) => (
-          <ToggleChip
-            key={role}
-            value={role}
-            label={AUDIENCE_ROLE_LABELS[role]}
-            selected={who.roles.includes(role)}
-            disabled={disabled}
-            onToggle={toggleRole}
-          />
-        ))}
-        {teams.length === 0 ? null : (
-          <DisclosureChip
-            label="Teams…"
-            open={showTeams}
-            count={who.teams.length}
-            disabled={disabled}
-            onPress={toggleTeams}
-          />
-        )}
-        <DisclosureChip
-          label="Members…"
-          open={showMembers}
-          count={who.members.length}
-          disabled={disabled}
-          onPress={toggleMembers}
-        />
-        <ToggleChip
-          value="anyone"
-          label="Anyone"
-          selected={who.anyone}
-          disabled={disabled}
-          onToggle={toggleAnyone}
-        />
-      </View>
-      {showTeams ? (
+    <View style={styles.nested}>
+      <PickerRow label="Roles">
         <OptionChips
-          options={teams}
-          selected={who.teams}
+          options={roleOptions}
+          selected={who.roles}
           disabled={disabled}
-          onToggle={toggleTeam}
-          empty="No Teams yet."
+          onToggle={toggleRole}
+          empty=""
         />
-      ) : null}
-      {showMembers ? (
+      </PickerRow>
+      {teams.length === 0 ? null : (
+        <DisclosureRow label="Teams" count={who.teams.length} disabled={disabled}>
+          <OptionChips
+            options={teams}
+            selected={who.teams}
+            disabled={disabled}
+            onToggle={toggleTeam}
+            empty="No Teams yet."
+          />
+        </DisclosureRow>
+      )}
+      <DisclosureRow label="Specific Members" count={who.members.length} disabled={disabled}>
         <OptionChips
           options={members}
           selected={who.members}
@@ -293,18 +330,12 @@ function AudienceWhoFields({
           onToggle={toggleMember}
           empty="No Members yet."
         />
-      ) : null}
-      {who.anyone ? (
-        <Alert
-          variant="warning"
-          title={OPEN_AUDIENCE_WARNING.title}
-          description={OPEN_AUDIENCE_WARNING.description}
-        />
-      ) : null}
-      <Button size="xs" variant="ghost" disabled={disabled} onPress={toggleAdvanced}>
-        {showAdvanced ? "Hide senders outside the Hub" : "Advanced: senders outside the Hub"}
-      </Button>
-      {showAdvanced ? (
+      </DisclosureRow>
+      <DisclosureRow
+        label="Senders outside the Hub"
+        count={splitConversationIds(who.identities).length}
+        disabled={disabled}
+      >
         <SenderSelectionFields
           channel={place.observedChannel}
           accountId={place.accountId}
@@ -312,7 +343,7 @@ function AudienceWhoFields({
           onChange={changeIdentities}
           disabled={disabled}
         />
-      ) : null}
+      </DisclosureRow>
     </View>
   );
 }
@@ -324,6 +355,7 @@ const GROUP_FILTER_LABELS: Record<Exclude<AudienceGroups, "off">, string> = {
   private: "Private only",
 };
 
+/** Where, as three places of the same kind: DMs, group chats, named conversations. */
 function AudienceWhereFields({
   where,
   place,
@@ -335,8 +367,6 @@ function AudienceWhereFields({
   disabled: boolean;
   setWhere(patch: Partial<AudienceRuleDraft["where"]>): void;
 }) {
-  const [showSpecific, setShowSpecific] = useState(where.conversations.length > 0);
-  const toggleSpecific = useCallback(() => setShowSpecific((value) => !value), []);
   const changeDm = useCallback((dm: boolean) => setWhere({ dm }), [setWhere]);
   const changeGroups = useCallback(
     (on: boolean) => setWhere({ groups: on ? "all" : "off" }),
@@ -355,62 +385,101 @@ function AudienceWhereFields({
   return (
     <View style={styles.part}>
       <Text style={styles.label}>Where</Text>
-      <RouteBehaviorSwitch label="DM" value={where.dm} onChange={changeDm} disabled={disabled} />
-      <RouteBehaviorSwitch
-        label="Group chat"
-        value={where.groups !== "off"}
-        onChange={changeGroups}
-        disabled={disabled}
-      />
-      {where.groups !== "off" && (place.reportsVisibility || filtered) ? (
-        <View style={styles.chips}>
-          {GROUP_FILTER_VALUES.map((value) => (
-            <ToggleChip
-              key={value}
-              value={value}
-              label={GROUP_FILTER_LABELS[value]}
-              selected={where.groups === value}
-              disabled={disabled}
-              onToggle={changeFilter}
-            />
-          ))}
-        </View>
-      ) : null}
-      {visibilityFilterMatchesNothing(where, place.reportsVisibility) ? (
-        <Alert
-          variant="warning"
-          title={`${place.channelName} does not report whether a group chat is public or private`}
-          description="This filter matches no group chat here. Choose All, or name the conversations under Specific conversations."
-        />
-      ) : null}
-      <Button size="xs" variant="ghost" disabled={disabled} onPress={toggleSpecific}>
-        {showSpecific ? "Hide specific conversations" : "Specific conversations…"}
-      </Button>
-      {showSpecific ? (
-        <ConversationSelectionFields
-          channel={place.observedChannel}
-          accountId={place.accountId}
-          value={where.conversations}
-          onChange={changeConversations}
+      <View style={styles.nested}>
+        <RouteBehaviorSwitch
+          label="Direct messages"
+          value={where.dm}
+          onChange={changeDm}
           disabled={disabled}
-          hint="Named rooms, groups, threads or topics, whatever their visibility. A thread or topic narrows to it."
-          placeholder="C0123, C0456"
         />
-      ) : null}
+        <RouteBehaviorSwitch
+          label="Group chats"
+          value={where.groups !== "off"}
+          onChange={changeGroups}
+          disabled={disabled}
+        />
+        {where.groups !== "off" && (place.reportsVisibility || filtered) ? (
+          <View style={styles.chips}>
+            {GROUP_FILTER_VALUES.map((value) => (
+              <ToggleChip
+                key={value}
+                value={value}
+                label={GROUP_FILTER_LABELS[value]}
+                selected={where.groups === value}
+                disabled={disabled}
+                onToggle={changeFilter}
+              />
+            ))}
+          </View>
+        ) : null}
+        {visibilityFilterMatchesNothing(where, place.reportsVisibility) ? (
+          <Alert
+            variant="warning"
+            title={`${place.channelName} does not report whether a group chat is public or private`}
+            description="This filter matches no group chat here. Choose All, or name the conversations under Specific conversations."
+          />
+        ) : null}
+        <DisclosureRow
+          label="Specific conversations"
+          count={splitConversationIds(where.conversations).length}
+          disabled={disabled}
+        >
+          <ConversationSelectionFields
+            channel={place.observedChannel}
+            accountId={place.accountId}
+            value={where.conversations}
+            onChange={changeConversations}
+            disabled={disabled}
+            hint="Named rooms, groups, threads or topics, whatever their visibility. A thread or topic narrows to it."
+            placeholder="C0123, C0456"
+          />
+        </DisclosureRow>
+      </View>
     </View>
   );
 }
 
-function RouteAudienceSummary({ summary }: { summary: { place: string; who: string }[] }) {
-  if (summary.length === 0) return null;
+/** A labelled row whose control sits under the label. */
+function PickerRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <View style={styles.summary}>
-      {summary.map(({ place, who }) => (
-        <View key={place} style={styles.summaryLine}>
-          <Text style={styles.summaryPlace}>{place}</Text>
-          <Text style={styles.summaryWho}>{who}</Text>
-        </View>
-      ))}
+    <View style={styles.part}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+/** A labelled row folded to its count; it opens on its own when it holds a value. */
+function DisclosureRow({
+  label,
+  count,
+  disabled,
+  children,
+}: {
+  label: string;
+  count: number;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(count > 0);
+  const toggle = useCallback(() => setOpen((value) => !value), []);
+  const state = useMemo(() => ({ expanded: open }), [open]);
+  return (
+    <View style={styles.part}>
+      <View style={styles.disclosureHeader}>
+        <Text style={styles.rowLabel}>{count > 0 ? `${label} (${String(count)})` : label}</Text>
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={disabled}
+          onPress={toggle}
+          accessibilityState={state}
+          accessibilityLabel={`${open ? "Hide" : "Choose"} ${label}`}
+        >
+          {open ? "Hide" : "Choose"}
+        </Button>
+      </View>
+      {open ? children : null}
     </View>
   );
 }
@@ -473,33 +542,6 @@ function ToggleChip({
   );
 }
 
-function DisclosureChip({
-  label,
-  open,
-  count,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  open: boolean;
-  count: number;
-  disabled: boolean;
-  onPress(): void;
-}) {
-  const state = useMemo(() => ({ expanded: open }), [open]);
-  return (
-    <Button
-      size="xs"
-      variant={count > 0 ? "secondary" : "outline"}
-      disabled={disabled}
-      onPress={onPress}
-      accessibilityState={state}
-    >
-      {count > 0 ? `${label} (${String(count)})` : label}
-    </Button>
-  );
-}
-
 function toggled<T>(list: readonly T[], value: T): T[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
@@ -514,9 +556,20 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
   },
   ruleHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  ruleHeading: { flex: 1, gap: theme.spacing[1] },
+  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
+  disclosureHeader: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  rowLabel: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
   },
   ruleTitle: {
     color: theme.colors.foreground,
@@ -538,22 +591,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[2],
-  },
-  summary: { gap: theme.spacing[1] },
-  summaryLine: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[2],
-  },
-  summaryPlace: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-  },
-  summaryWho: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
   },
   errorText: {
     color: theme.colors.destructive,

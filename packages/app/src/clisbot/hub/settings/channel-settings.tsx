@@ -45,6 +45,7 @@ import {
   RouteFormSubgroup,
   RoutePermissionFields,
   RouteReplyFields,
+  RouteTriggerFields,
   approvalSummary,
   DEFAULT_ROUTE_QUESTIONS,
   QUESTION_VALUES,
@@ -1919,6 +1920,41 @@ function adminLines(
   return admins.map(({ subject, by }) => (by === null ? subject : `${subject} · by ${by}`));
 }
 
+/** The conversations the bot has seen on one account, for naming stored ids. */
+function useObservedConversations(
+  channel: string | null,
+  accountId: string | null,
+  enabled: boolean,
+) {
+  const hub = useHubAccount();
+  const organizationId = hub.signedIn?.organization.id ?? "";
+  return useFetchQuery({
+    queryKey: [
+      ...hubResourceQueryKey(
+        {
+          origin: hub.origin,
+          organizationId,
+          accountId: hub.signedIn?.account.id ?? null,
+        },
+        "channel-conversations",
+      ),
+      channel,
+      accountId,
+    ],
+    queryFn: () =>
+      hub
+        .api()
+        .get(
+          `channel-accounts/${encodeURIComponent(channel!)}/${encodeURIComponent(accountId!)}/conversations`,
+          HubObservedChannelConversationsSchema,
+        ),
+    enabled: enabled && organizationId.length > 0 && channel !== null && accountId !== null,
+    retry: false,
+    dataShape: "value",
+    staleTimeMs: 15_000,
+  });
+}
+
 /** Names for the ids audience rules store: Teams, Members and observed conversations. */
 function useAudienceNames(
   metadata: z.infer<typeof HubObservedChannelConversationsSchema> | undefined,
@@ -1967,35 +2003,11 @@ function ChannelAccountRouteList({
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
-  const hub = useHubAccount();
-  const channel = stringField(account, "channel");
-  const accountId = stringField(account, "accountId");
-  const organizationId = hub.signedIn?.organization.id ?? "";
-  const metadata = useFetchQuery({
-    queryKey: [
-      ...hubResourceQueryKey(
-        {
-          origin: hub.origin,
-          organizationId,
-          accountId: hub.signedIn?.account.id ?? null,
-        },
-        "channel-conversations",
-      ),
-      channel,
-      accountId,
-    ],
-    queryFn: () =>
-      hub
-        .api()
-        .get(
-          `channel-accounts/${encodeURIComponent(channel!)}/${encodeURIComponent(accountId!)}/conversations`,
-          HubObservedChannelConversationsSchema,
-        ),
-    enabled: visible && organizationId.length > 0 && channel !== null && accountId !== null,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
+  const metadata = useObservedConversations(
+    stringField(account, "channel"),
+    stringField(account, "accountId"),
+    visible,
+  );
   if (!visible) return null;
   const refusal = automationName === undefined ? <RouteRefusalRow /> : null;
   if (routes.length === 0) {
@@ -2380,7 +2392,6 @@ function ChannelAccountForm({
     }),
     [hub.signedIn?.team?.members, teams],
   );
-  const audienceNames = useAudienceNames(undefined, teams);
   const audienceErrors = useMemo(
     () =>
       saveError === null
@@ -2423,6 +2434,12 @@ function ChannelAccountForm({
     observedAccountChannel,
     observedAccountId,
   } = selection;
+  const observedConversations = useObservedConversations(
+    observedAccountChannel,
+    observedAccountId,
+    true,
+  );
+  const audienceNames = useAudienceNames(observedConversations.data, teams);
   const parsedProviderOptions = parseOptionalObject(providerOptions);
   const parsedRouteLimits = parseChannelLimitsDraft(routeLimits);
   const destinationOptions = useMemo(
@@ -2781,8 +2798,22 @@ function ChannelAccountForm({
         errors={audienceErrors}
         disabled={pending}
       />
+    </RouteFormSection>
+  );
+  const renderTrigger = () => (
+    <RouteFormSection title="When it answers">
+      <RouteTriggerFields
+        dmOnly={dmOnly}
+        behavior={behavior}
+        pending={pending}
+        followUpTtlDraft={followUpTtlDraft}
+        followUpTtlError={followUpTtlValid ? null : FOLLOW_UP_TTL_ERROR}
+        changeRequireMention={changeRequireMention}
+        changeFollowUpAuto={changeFollowUpAuto}
+        changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
+      />
       <ChoiceRow
-        label="When"
+        label="Messages"
         values={ROUTE_CONDITION_VALUES}
         selected={routeCondition}
         labels={ROUTE_CONDITION_LABELS}
@@ -2832,11 +2863,6 @@ function ChannelAccountForm({
         dmOnly={dmOnly}
         behavior={behavior}
         pending={pending}
-        followUpTtlDraft={followUpTtlDraft}
-        followUpTtlError={followUpTtlValid ? null : FOLLOW_UP_TTL_ERROR}
-        changeRequireMention={changeRequireMention}
-        changeFollowUpAuto={changeFollowUpAuto}
-        changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
         changeReplyThread={changeReplyThread}
         changeOutboundPath={changeOutboundPath}
         changeFinalAnswers={changeFinalAnswers}
@@ -2951,6 +2977,7 @@ function ChannelAccountForm({
     <View>
       {renderConnection()}
       {renderAudience()}
+      {renderTrigger()}
       {renderTarget()}
       {renderReplies()}
       {renderLimits()}

@@ -162,6 +162,7 @@ vi.mock("@/components/ui/switch", () => ({
   },
 }));
 vi.mock("./conversation-picker-field", () => ({
+  SenderSelectionFields: () => null,
   ConversationSelectionFields: function TestConversations(props: {
     value: string;
     disabled: boolean;
@@ -439,7 +440,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       true,
     );
     expect(adapters.put).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("Group chat"));
+    fireEvent.click(screen.getByLabelText("Group chats"));
     expect(screen.getByText("Members may talk in every group chat")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalled());
@@ -468,7 +469,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.queryByLabelText("Conversation IDs")).toBeNull();
-    expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Group chats") as HTMLInputElement).checked).toBe(true);
     // The catalog says Slack reports visibility, so the filter is offered once
     // it loads; the sentence follows it.
     fireEvent.click(await screen.findByRole("button", { name: "Public only" }));
@@ -476,14 +477,14 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
-    fireEvent.click(screen.getByLabelText("Group chat"));
+    fireEvent.click(screen.getByLabelText("Group chats"));
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
     expect(adapters.put).not.toHaveBeenCalled();
   });
 
-  it("adds and removes rules, warns on Anyone, and summarizes the Route by place", async () => {
+  it("adds and removes rules, and Anyone replaces the people rows with a warning", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -493,18 +494,18 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "Anyone" })[1]!);
+    expect(screen.getAllByText("Roles")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Anyone in the conversation" })[1]!);
     expect(
       screen.getByText("Anyone in the matching conversations can use this Route"),
     ).toBeTruthy();
-    fireEvent.click(screen.getAllByLabelText("DM")[1]!);
+    // Anyone covers everyone, so that rule no longer offers people to pick.
+    expect(screen.getAllByText("Roles")).toHaveLength(1);
+    fireEvent.click(screen.getAllByLabelText("Direct messages")[1]!);
     expect(screen.getByText("Anyone may talk in DMs")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
-    // The per-Route summary groups who may talk by place.
-    expect(screen.getByText("C1")).toBeTruthy();
-    expect(screen.getAllByText("Members").length).toBeGreaterThan(1);
     fireEvent.click(screen.getByRole("button", { name: "Remove Rule 2" }));
     expect(screen.queryByText("Anyone may talk in DMs")).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove Rule 1" })).toBeNull();
@@ -764,8 +765,8 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     // A new Route starts as Members everywhere: one rule, DM and Group chat on.
     expect(screen.getByText("Who can talk, and where")).toBeTruthy();
     expect(screen.getByText("Members may talk in DMs and every group chat")).toBeTruthy();
-    expect((screen.getByLabelText("DM") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Direct messages") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Group chats") as HTMLInputElement).checked).toBe(true);
     // A new Route starts an Agent; Automation is still experimental and says so.
     expect(screen.queryByLabelText("Automation")).toBeNull();
     expect(screen.queryByText("Experimental")).toBeNull();

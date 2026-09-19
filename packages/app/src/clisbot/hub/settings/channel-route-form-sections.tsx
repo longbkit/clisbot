@@ -8,11 +8,10 @@ import { settingsStyles } from "@/styles/settings";
 import type { ChannelRouteBehavior, ChannelRouteQuestions } from "../channel-configuration";
 import { ChoiceRow, RouteBehaviorSwitch, RouteFollowUpFields } from "./channel-route-behavior-rows";
 
-// The Route form is a stack of sections, each one card: Connection, Who and
-// where, What runs, Replies, then Limits, folded until opened or until it holds
-// a value. What runs also holds how the Agent runs: its Permissions and, folded,
-// its Advanced provider settings. The order follows the questions an operator
-// answers: which bot, who may talk, what answers and how it runs, how it replies.
+// The Route form follows the Route's own model, a rule: conditions, then what
+// happens. Conditions: the Connection, who may talk and where, when the bot
+// answers (mention, follow-up, message text). Then what runs and how it runs
+// (Permissions, folded Advanced), how it replies, and folded Limits.
 
 export type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 
@@ -143,8 +142,18 @@ export function FoldedRouteFormSubgroup({
   );
 }
 
-export interface RouteReplyFieldsProps {
-  /** Every rule covers DMs only: mention and thread settings do not apply. */
+/** When the bot answers in a group: a mention, then a follow-up window. DMs always answer. */
+export function RouteTriggerFields({
+  dmOnly,
+  behavior,
+  pending,
+  followUpTtlDraft,
+  followUpTtlError,
+  changeRequireMention,
+  changeFollowUpAuto,
+  changeFollowUpTtlMinutes,
+}: {
+  /** Every rule covers DMs only: mention settings do not apply. */
   dmOnly: boolean;
   behavior: ChannelRouteBehavior;
   pending: boolean;
@@ -153,6 +162,35 @@ export interface RouteReplyFieldsProps {
   changeRequireMention(value: boolean): void;
   changeFollowUpAuto(value: boolean): void;
   changeFollowUpTtlMinutes(value: string): void;
+}) {
+  if (dmOnly) return null;
+  return (
+    <>
+      <RouteBehaviorSwitch
+        label="Require a mention"
+        value={behavior.requireMention}
+        onChange={changeRequireMention}
+        disabled={pending}
+      />
+      {behavior.requireMention ? (
+        <RouteFollowUpFields
+          behavior={behavior}
+          followUpTtlDraft={followUpTtlDraft}
+          followUpTtlError={followUpTtlError}
+          pending={pending}
+          changeFollowUpAuto={changeFollowUpAuto}
+          changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export interface RouteReplyFieldsProps {
+  /** Every rule covers DMs only: thread settings do not apply. */
+  dmOnly: boolean;
+  behavior: ChannelRouteBehavior;
+  pending: boolean;
   changeReplyThread(value: boolean): void;
   changeOutboundPath(value: string): void;
   changeFinalAnswers(value: boolean): void;
@@ -161,29 +199,11 @@ export interface RouteReplyFieldsProps {
   changeToolCalls(value: boolean): void;
 }
 
-/** When the bot answers and how its replies reach the conversation. */
+/** How replies reach the conversation. */
 export function RouteReplyFields(props: RouteReplyFieldsProps) {
   const { dmOnly, behavior, pending } = props;
   return (
     <>
-      {dmOnly ? null : (
-        <RouteBehaviorSwitch
-          label="Require a mention"
-          value={behavior.requireMention}
-          onChange={props.changeRequireMention}
-          disabled={pending}
-        />
-      )}
-      {!dmOnly && behavior.requireMention ? (
-        <RouteFollowUpFields
-          behavior={behavior}
-          followUpTtlDraft={props.followUpTtlDraft}
-          followUpTtlError={props.followUpTtlError}
-          pending={pending}
-          changeFollowUpAuto={props.changeFollowUpAuto}
-          changeFollowUpTtlMinutes={props.changeFollowUpTtlMinutes}
-        />
-      ) : null}
       {dmOnly ? null : (
         <RouteBehaviorSwitch
           label="Reply in a thread"

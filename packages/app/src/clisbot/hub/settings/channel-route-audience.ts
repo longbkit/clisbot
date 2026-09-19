@@ -79,14 +79,18 @@ export function audienceRuleDraft(rule: HubAudienceRule): AudienceRuleDraft {
 }
 
 export function audienceRuleFromDraft(draft: AudienceRuleDraft): HubAudienceRule {
+  // Anyone covers every sender, so a rule saved as Anyone carries nothing else.
+  const who: HubAudienceRule["who"] = draft.who.anyone
+    ? { roles: [], teams: [], members: [], anyone: true, identities: [] }
+    : {
+        roles: draft.who.roles,
+        teams: draft.who.teams,
+        members: draft.who.members,
+        anyone: draft.who.anyone,
+        identities: splitConversationIds(draft.who.identities),
+      };
   return {
-    who: {
-      roles: draft.who.roles,
-      teams: draft.who.teams,
-      members: draft.who.members,
-      anyone: draft.who.anyone,
-      identities: splitConversationIds(draft.who.identities),
-    },
+    who,
     where: {
       dm: draft.where.dm,
       groups: draft.where.groups,
@@ -250,35 +254,6 @@ export function audienceWhereLabel(
 export function audienceRuleSentence(rule: AudienceRuleDraft, names: AudienceNames): string {
   return `${audienceWhoLabel(rule.who, names)} may talk in ${audienceWhereLabel(rule.where, names)}`;
 }
-
-/** The Route's audience grouped by conversation kind: who may talk in each place. */
-export function routeAudienceSummary(
-  rules: readonly AudienceRuleDraft[],
-  names: AudienceNames,
-): { place: string; who: string }[] {
-  const places = new Map<string, string[]>();
-  const add = (place: string, who: string) => {
-    const current = places.get(place) ?? [];
-    if (!current.includes(who)) current.push(who);
-    places.set(place, current);
-  };
-  for (const rule of rules) {
-    const who = audienceWhoLabel(rule.who, names);
-    if (rule.where.dm) add("DM", who);
-    if (rule.where.groups !== "off")
-      add(`Group chat · ${GROUP_FILTER_LABELS[rule.where.groups]}`, who);
-    for (const id of splitConversationIds(rule.where.conversations)) {
-      add(names.conversationLabel(id), who);
-    }
-  }
-  return [...places].map(([place, who]) => ({ place, who: who.join(" · ") }));
-}
-
-const GROUP_FILTER_LABELS: Record<Exclude<AudienceGroups, "off">, string> = {
-  all: "all",
-  public: "public only",
-  private: "private only",
-};
 
 function joinNatural(parts: readonly string[]): string {
   if (parts.length <= 1) return parts.join("");

@@ -105,6 +105,7 @@ vi.mock("@/components/ui/switch", () => ({
   },
 }));
 vi.mock("./conversation-picker-field", () => ({
+  SenderSelectionFields: () => null,
   ConversationSelectionFields: function TestConversations(props: {
     value: string;
     onChange(value: string): void;
@@ -258,7 +259,7 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
     expect(screen.getByText("Agent · worker")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start or continue an Agent" })).toBeNull();
     expect(screen.getByText("Team QC may talk in C1")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("DM"));
+    fireEvent.click(screen.getByLabelText("Direct messages"));
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     const [resource, body] = adapters.put.mock.calls[0]!;

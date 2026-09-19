@@ -7,7 +7,6 @@ import {
   channelReportsVisibility,
   membersEverywhereRule,
   routeAudienceDraft,
-  routeAudienceSummary,
   visibilityFilterMatchesNothing,
   type AudienceNames,
 } from "./channel-route-audience";
@@ -109,13 +108,11 @@ describe("summaries", () => {
     expect(audienceRuleSentence(rules[1]!, names)).toBe(
       "Team QC may talk in every public group chat and 🔒 #qc-private",
     );
-    expect(routeAudienceSummary(rules, names)).toEqual([
-      { place: "DM", who: "Owner and Admins · aitran" },
-      { place: "Group chat · all", who: "Owner and Admins" },
-      { place: "Group chat · public only", who: "Team QC" },
-      { place: "🔒 #qc-private", who: "Team QC" },
-      { place: "#help", who: "Anyone" },
-    ]);
+    expect(audienceRuleSentence(rules[3]!, names)).toBe("Anyone may talk in #help");
+    // Anyone covers every sender, so a rule saved as Anyone names nobody else.
+    expect(
+      audienceRuleFromDraft({ ...rules[3]!, who: { ...rules[0]!.who, anyone: true } }).who,
+    ).toEqual({ roles: [], teams: [], members: [], anyone: true, identities: [] });
   });
 });
 
