@@ -806,8 +806,8 @@ describe("Member detail", () => {
     expect(within(access).getAllByText("Alice").length).toBeGreaterThan(0);
     expect(within(access).getByText("Customer chat")).toBeTruthy();
     expect(within(access).getByText("via Team Support")).toBeTruthy();
-    // A grant matching no Level names its privileges.
-    expect(within(access).getByText(/^Custom: /u)).toBeTruthy();
+    // A grant matching no Level is counted, not listed.
+    expect(within(access).getByText("Custom · 2 privileges")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Chat accounts" })).toBeTruthy();
   });
 });

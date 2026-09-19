@@ -6,7 +6,6 @@ import {
   accessLevelLabel,
   constraintSummary,
   grantorName,
-  privilegeLabel,
   resourceKey,
   resourceKindLabel,
   type AccessAssignment,
@@ -19,6 +18,7 @@ import {
 } from "./access-catalog";
 import { privilegesWithinHoldings, viewerHoldings, type ViewerAuthority } from "./access-grantor";
 import { matchingAccessLevel } from "./access-level-summary";
+import { countLabel } from "./labels";
 
 export type GrantGrouping = "subject" | "resource";
 
@@ -26,7 +26,7 @@ export interface GrantRow {
   key: string;
   subject: { kind: SubjectKind; id: string; name: string };
   resource: { kind: AccessResourceKind; id: string; name: string; context: string };
-  /** The Level's name, or "Custom: …" for a grant that matches none. */
+  /** The Level's name, or "Custom · N privileges" for a grant that matches none. */
   level: string;
   /** Can share, Agent limits: the modifiers, one fact each. */
   details: string[];
@@ -304,14 +304,17 @@ export function assignmentSubjectName(
     : (memberById.get(subject.id) ?? "Member");
 }
 
-/** The Level's name when the grant still equals one; the privilege list only for custom grants. */
+/**
+ * The Level's name when the grant still equals one. A custom grant is counted,
+ * not listed: its privileges are read in the grant sheet, not in a table cell.
+ */
 export function grantedAccessLabel(
   assignment: Pick<AccessAssignment, "resourceKind" | "privileges">,
   accessLevels: AccessCatalog["accessLevels"],
 ): string {
   const level = matchingAccessLevel(accessLevels, assignment.resourceKind, assignment.privileges);
   if (level === undefined) {
-    return `Custom: ${assignment.privileges.map(privilegeLabel).join(", ")}`;
+    return `Custom · ${countLabel(assignment.privileges.length, "privilege")}`;
   }
   const fastMode = assignment.privileges.includes("agent.fast.use") ? " + Fast mode" : "";
   return `${accessLevelLabel(level)}${fastMode}`;
@@ -389,7 +392,7 @@ function effectiveLevel(
     return grantedAccessLabel({ resourceKind, privileges: [...privileges] }, accessLevels);
   // COMPAT(effective-access-levels): added 2026-09-19, remove after 2027-03-19.
   // A Hub without the Level catalog on effective access: name the privileges.
-  return privileges.length === 0 ? "No privileges" : privileges.map(privilegeLabel).join(", ");
+  return countLabel(privileges.length, "privilege");
 }
 
 /** One subject's group (a Team's grants, or a Member's own and their Teams'). */

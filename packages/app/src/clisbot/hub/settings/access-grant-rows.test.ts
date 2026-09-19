@@ -180,8 +180,8 @@ describe("effectiveGrantRows", () => {
     });
     expect(row).toMatchObject({ level: "Office worker", via: "Team QC", grantedBy: null });
   });
-  it("names the privileges when an older Hub sends no catalog", () => {
+  it("counts the privileges when an older Hub sends no catalog", () => {
     const [row] = effectiveGrantRows(own, [host], undefined);
-    expect(row!.level).not.toBe("Office worker");
+    expect(row!.level).toBe("2 privileges");
   });
 });
