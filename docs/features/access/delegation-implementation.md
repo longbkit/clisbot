@@ -1,6 +1,6 @@
 # Delegated access, People, and Route audience: implementation plan
 
-Status: all six workstreams shipped 2026-09-19 (one uncommitted change set). Coordinator follow-ups so far: `contracts.ts` (team kind, `createdByUserId`, `HUB_ACCESS_INCLUDE`, access events, invitation `createdAt`), Hub navigation items from effective grants (`settings/catalog.ts`), a Connect-only Host row allowed for a Project sharer (`grantor.ts`), Access page opening on `?resourceKind=&resourceId=`, the workflow editor's Route summary reading audience rules. Decisions this plan implements:
+Status: all six workstreams shipped 2026-09-19 in commits `2cf04acf2` (access, People), `afdf0d51d` (Route audience rules), `39f55dddc` (Automations), with fixes in `ca4e311b1` (Channel Route grants only Admin) and `c4bbc5c10` (catch-all removed). Coordinator follow-ups so far: `contracts.ts` (team kind, `createdByUserId`, `HUB_ACCESS_INCLUDE`, access events, invitation `createdAt`), Hub navigation items from effective grants (`settings/catalog.ts`), a Connect-only Host row allowed for a Project sharer (`grantor.ts`), Access page opening on `?resourceKind=&resourceId=`, the workflow editor's Route summary reading audience rules. Decisions this plan implements:
 [Delegated access](scoped-admins.md), [Route audience rules](../../audits/2026-09-19-route-audience-rules.md),
 and the People page redesign recorded below (its decision lives only here).
 

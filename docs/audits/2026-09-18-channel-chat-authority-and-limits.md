@@ -55,6 +55,8 @@ only open-audience Routes showed them in the UI.
 
 ### Chat authority is separate from Host/Project access
 
+> **Superseded (2026-09-19):** who may talk to a Route is decided only by its audience rules; `channel.use` is no longer granted. See [Route audience rules](2026-09-19-route-audience-rules.md). The separation from Host/Project access below still holds.
+
 Option C.
 
 - **Chat authority** is `channel.use` on the channel account (or the Route's
