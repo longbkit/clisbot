@@ -11,6 +11,7 @@ import {
   type HubScopedAutomation,
 } from "./automation-access";
 import { FilterChips, type FilterChip } from "./filter-chips";
+import { tableStyles } from "./table-styles";
 
 /**
  * The Automations directory: Mine / Shared with me / All (Organization Admins)
@@ -51,28 +52,35 @@ export function AutomationList({
   return (
     <View style={styles.list}>
       <FilterChips<AutomationListFilter> chips={chips} value={filter} onChange={setFilter} />
-      {visible.length === 0 ? (
-        <Text style={settingsStyles.rowHint}>No Automations match this filter.</Text>
-      ) : (
-        visible.map((automation) => (
-          <ScopedAutomationRow
-            key={automation.id}
-            automation={automation}
-            open={open}
-            review={review}
-          />
-        ))
-      )}
+      <View style={settingsStyles.card}>
+        {visible.length === 0 ? (
+          <View style={[settingsStyles.row, tableStyles.body]}>
+            <Text style={settingsStyles.rowHint}>No Automations match this filter.</Text>
+          </View>
+        ) : (
+          visible.map((automation, index) => (
+            <ScopedAutomationRow
+              key={automation.id}
+              automation={automation}
+              bordered={index > 0}
+              open={open}
+              review={review}
+            />
+          ))
+        )}
+      </View>
     </View>
   );
 }
 
 function ScopedAutomationRow({
   automation,
+  bordered,
   open,
   review,
 }: {
   automation: HubScopedAutomation;
+  bordered: boolean;
   open(automationId: string): void;
   review(automationId: string): void;
 }) {
@@ -81,7 +89,7 @@ function ScopedAutomationRow({
   const paused = typeof automation.pausedReason === "string";
   const state = automationStateLabel(automation);
   return (
-    <View>
+    <View style={[tableStyles.body, bordered ? settingsStyles.rowBorder : null]}>
       <AutomationListRow
         name={automation.name}
         description={`${state} · ${automationScopeLabel(automation.scope)}`}
@@ -122,7 +130,7 @@ export function AutomationListRow({
     ({ pressed }: { pressed: boolean }) => [
       settingsStyles.row,
       styles.listRow,
-      (hovered || pressed) && styles.highlight,
+      (hovered || pressed) && tableStyles.hovered,
     ],
     [hovered],
   );
@@ -146,8 +154,7 @@ export function AutomationListRow({
 
 const styles = StyleSheet.create((theme) => ({
   list: { gap: theme.spacing[3] },
-  listRow: { minHeight: theme.spacing[12], borderRadius: theme.borderRadius.lg },
-  highlight: { backgroundColor: theme.colors.interactionHighlight },
+  listRow: { minHeight: theme.spacing[12] },
   chevron: {
     width: theme.iconSize.sm,
     height: theme.iconSize.sm,
@@ -158,7 +165,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[3],
-    paddingHorizontal: theme.spacing[3],
-    paddingBottom: theme.spacing[2],
+    paddingHorizontal: theme.spacing[4],
+    paddingBottom: theme.spacing[3],
   },
 }));

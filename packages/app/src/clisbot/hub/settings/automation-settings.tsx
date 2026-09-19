@@ -79,6 +79,11 @@ import {
 import { AutomationActivity } from "./automation-run-details";
 import { BackLink } from "./back-link";
 import { ViewTabs, type ViewTab } from "./view-tabs";
+import { HubEmptyState } from "./empty-state";
+import { Plus, Workflow } from "lucide-react-native";
+
+const AUTOMATIONS_INFO =
+  "An Automation runs an Agent on a Project when something happens: on a schedule, a GitHub event, or a chat message, or when someone runs it.";
 
 export interface AutomationConnection {
   id: string;
@@ -272,7 +277,7 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   const newAutomationButton = useMemo(
     () =>
       viewer.canCreate ? (
-        <Button size="sm" variant="outline" onPress={startCreate}>
+        <Button size="sm" variant="outline" leftIcon={Plus} onPress={startCreate}>
           New Automation
         </Button>
       ) : undefined,
@@ -282,14 +287,20 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   return (
     <View>
       {!selectedAutomationId && !creating ? (
-        <SettingsSection title="Automations" trailing={newAutomationButton}>
+        <SettingsSection
+          title="Automations"
+          info={AUTOMATIONS_INFO}
+          // Empty, the button is the empty state's own action, so it is not shown twice.
+          trailing={automations.data?.automations.length === 0 ? undefined : newAutomationButton}
+        >
           <QueryFeedback pending={automations.isPending} error={automations.error} />
           {error ? <Alert variant="error" title={error} /> : null}
           {automations.data?.automations.length === 0 ? (
-            <EmptyRow
-              message={
-                canManage ? "No Automations are configured." : "No Automations are shared with you."
-              }
+            <HubEmptyState
+              icon={Workflow}
+              title={viewer.canCreate ? "No Automations yet" : "No Automations are shared with you"}
+              description={AUTOMATIONS_INFO}
+              action={newAutomationButton}
             />
           ) : (
             <AutomationList

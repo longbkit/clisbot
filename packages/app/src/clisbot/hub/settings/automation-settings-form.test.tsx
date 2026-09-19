@@ -579,7 +579,7 @@ describe("Automations for Members", () => {
     };
     render(<AutomationSettings />);
     expect(screen.queryByRole("button", { name: "New Automation" })).toBeNull();
-    expect(screen.getByText("No Automations are shared with you.")).toBeTruthy();
+    expect(screen.getByText("No Automations are shared with you")).toBeTruthy();
   });
 
   it("shows the Run warning and Review and enable to an Automation Admin", () => {
