@@ -1,13 +1,18 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react-native";
+import { StyleSheet } from "react-native-unistyles";
 import {
   Pressable,
+  Text,
   View,
   type NativeSyntheticEvent,
   type PressableStateCallbackType,
   type TargetedEvent,
 } from "react-native";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
+import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/form-field";
+import { settingsStyles } from "@/styles/settings";
 import { SelectFieldTrigger, type SelectFieldOption } from "@/components/ui/select-field";
 
 /**
@@ -112,8 +117,13 @@ export function MultiSelectField({
     ),
     [value],
   );
-  const summary = selectionLabel(value, options, allLabel);
+  // The chosen values are listed under the trigger, so the trigger only counts them.
+  const summary = triggerLabel(value, allLabel);
   const display = useMemo(() => (summary === null ? null : { label: summary }), [summary]);
+  const removeOne = useCallback(
+    (optionId: string) => onChange(toggleSelection(value, optionId)),
+    [onChange, value],
+  );
   return (
     <Field label={label} {...(hint === undefined ? {} : { hint })}>
       <View ref={anchorRef} collapsable={false}>
@@ -151,6 +161,64 @@ export function MultiSelectField({
         anchorRef={anchorRef}
         renderOption={renderOption}
       />
+      {Array.isArray(value) && value.length > 0 ? (
+        <View style={styles.selected}>
+          {value.map((id) => (
+            <SelectedOptionRow
+              key={id}
+              id={id}
+              option={options.find((option) => option.value === id)}
+              disabled={disabled}
+              remove={removeOne}
+            />
+          ))}
+        </View>
+      ) : null}
     </Field>
   );
 }
+
+function triggerLabel(value: MultiSelection | null, allLabel: string | undefined): string | null {
+  if (value === null) return null;
+  if (value === "*") return allLabel ?? null;
+  return value.length === 0 ? null : `${String(value.length)} selected`;
+}
+
+/** One chosen value, readable at a glance, with its group and a way to drop it. */
+function SelectedOptionRow({
+  id,
+  option,
+  disabled,
+  remove,
+}: {
+  id: string;
+  option: SelectFieldOption<string> | undefined;
+  disabled: boolean;
+  remove(id: string): void;
+}) {
+  const press = useCallback(() => remove(id), [id, remove]);
+  const label = option?.label ?? id;
+  const meta = option?.description ?? option?.group;
+  return (
+    <View style={styles.selectedRow}>
+      <View style={styles.selectedText}>
+        <Text style={settingsStyles.rowTitle}>{label}</Text>
+        {meta === undefined ? null : <Text style={settingsStyles.rowHint}>{meta}</Text>}
+      </View>
+      <Button
+        size="sm"
+        variant="ghost"
+        leftIcon={X}
+        accessibilityLabel={`Remove ${label}`}
+        disabled={disabled}
+        onPress={press}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  selected: { gap: theme.spacing[1], marginTop: theme.spacing[1] },
+  selectedRow: { alignItems: "center", flexDirection: "row", gap: theme.spacing[2] },
+  selectedText: { flex: 1, minWidth: 0 },
+}));

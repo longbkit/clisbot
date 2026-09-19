@@ -73,7 +73,7 @@ function Card() {
 }
 
 // Guards the picker against its first shape: no Done band or buttons beside the
-// trigger, the list stays open while choosing, and the trigger names the selection.
+// trigger, the list stays open while choosing, and each choice is listed under it.
 it("chooses several Models from one trigger that stays open while choosing", async () => {
   await page.viewport(1200, 800);
   render(
@@ -88,8 +88,10 @@ it("chooses several Models from one trigger that stays open while choosing", asy
   await userEvent.click(page.getByText("Fable 5.1"));
   await expect.element(page.getByText("Sonnet 5")).toBeVisible();
   await expect
-    .element(page.getByRole("button", { name: "Models (Opus 5, +1)" }))
+    .element(page.getByRole("button", { name: "Models (2 selected)" }))
     .toBeInTheDocument();
+  // Each chosen Model is listed by name under the trigger, removable in place.
+  await expect.element(page.getByRole("button", { name: "Remove Fable 5.1" })).toBeVisible();
   await userEvent.click(page.getByText("All available Models"));
   await expect
     .element(page.getByRole("button", { name: "Models (All available Models)" }))
