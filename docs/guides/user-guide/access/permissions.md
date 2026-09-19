@@ -20,7 +20,7 @@ Mọi thứ dưới đây chỉ có hiệu lực khi daemon bật [Managed Acces
 | **Host** (một daemon)                  | **Mọi Project** trên Host đó, kể cả Project thêm sau    | Connect, Office worker, Developer, Full access, Administrator |
 | **Project**                            | Chỉ Project đó, và mọi workspace/worktree bên trong     | Office worker, Developer, Full access                         |
 | **Workspace, worktree**                | Không cấp riêng; theo quyền của Project chứa nó         | —                                                             |
-| **Channel Route** (Slack, Telegram...) | Các conversation được chọn trên Channel Route đó        | Use, Manage                                                   |
+| **Channel Route** (Slack, Telegram...) | Mọi conversation của Channel Route đó                   | Admin                                                         |
 | **Automation**                         | Một Automation của Hub                                  | Run                                                           |
 
 Vai trò tổ chức:
@@ -68,11 +68,10 @@ Tóm tắt từng mức:
 
 Channel Route và Automation:
 
-| Mức                        | Làm được gì                                                                                                |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Channel Route → **Use**    | Nói chuyện với bot trong các conversation được chọn. Muốn điều khiển agent thì còn cần quyền trên Project  |
-| Channel Route → **Manage** | Thêm quyền đổi Route default từ conversation (`/promoteroutedefault`). Bắt buộc chọn **All conversations** |
-| Automation → **Run**       | Chạy Automation đó                                                                                         |
+| Mức                       | Làm được gì                                                                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Channel Route → **Admin** | Sửa audience rules, Route và Route default của Channel Route đó, trên app và trong chat. Ai được nói chuyện với bot thì đặt ở audience rules của Route, không cấp ở đây |
+| Automation → **Run**      | Chạy Automation đó                                                                                                                                                      |
 
 ## 4. Hệ quả cần biết trước khi cấp
 
@@ -89,14 +88,14 @@ Channel Route và Automation:
 
 ## 5. Chọn nhanh
 
-| Nhu cầu                                                        | Cấp                                                                                                                           |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Chỉ làm việc với agent trong workspace đã chuẩn bị             | **Office worker** trên Project                                                                                                |
-| Lập trình, terminal, tự tạo worktree trong vài Project cố định | **Developer** trên từng Project                                                                                               |
-| Làm trên mọi Project của một Host, chỉ với model được chọn     | **Developer** trên Host                                                                                                       |
-| Như trên, và tự thêm Project mới                               | **Full access** trên Host                                                                                                     |
-| Vận hành máy daemon, cần mọi provider/model                    | **Administrator** trên Host, chỉ cho người tin cậy                                                                            |
-| Chỉ chat qua Slack/Telegram hoặc chạy một Automation           | **Use** trên Channel Route, **Run** trên Automation; xem [Channels và Automations](../automation/channels-and-automations.md) |
+| Nhu cầu                                                        | Cấp                                                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Chỉ làm việc với agent trong workspace đã chuẩn bị             | **Office worker** trên Project                                                                                                       |
+| Lập trình, terminal, tự tạo worktree trong vài Project cố định | **Developer** trên từng Project                                                                                                      |
+| Làm trên mọi Project của một Host, chỉ với model được chọn     | **Developer** trên Host                                                                                                              |
+| Như trên, và tự thêm Project mới                               | **Full access** trên Host                                                                                                            |
+| Vận hành máy daemon, cần mọi provider/model                    | **Administrator** trên Host, chỉ cho người tin cậy                                                                                   |
+| Chỉ chat qua Slack/Telegram hoặc chạy một Automation           | Thêm vào audience rules của Route; **Run** trên Automation; xem [Channels và Automations](../automation/channels-and-automations.md) |
 
 ## 6. Sau khi cập nhật phiên bản
 

@@ -11,6 +11,7 @@ import { load } from "js-yaml";
 import { afterAll, beforeAll, it } from "vitest";
 import { formatChannelAccountResourceId } from "../access/contract.js";
 import { AccessStore } from "../access/store.js";
+import { createChannelUseGrantSource } from "../channels/access-grants.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
 import type { ChannelSupervisor } from "../channels/supervisor/types.js";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
@@ -322,4 +323,39 @@ it("lets a Channel Route Admin manage exactly one account", async () => {
   // The organization capability keeps the full surface, the scoped one included.
   assert.equal((await owner.handle(apiRequest("/channel-configuration", "GET"))).status, 200);
   assert.equal((await owner.handle(apiRequest(accountPath, "GET"))).status, 200);
+});
+
+it("retiring channel.use deletes Use-only grants and keeps Channel Route Admin grants", async () => {
+  const db = bundle.runtime.drizzle();
+  const resourceId = formatChannelAccountResourceId("zalouser", OTHER_ACCOUNT_ID);
+  const [useOnly, admin] = await db
+    .insert(schema.accessAssignments)
+    .values([
+      {
+        organizationId: ORGANIZATION_ID,
+        subjectKind: "member",
+        subjectId: OWNER_MEMBERSHIP,
+        resourceKind: "channel_account",
+        resourceId,
+        privileges: ["channel.use"],
+        constraints: { conversation: { kind: "direct_messages" } },
+      },
+      {
+        organizationId: ORGANIZATION_ID,
+        subjectKind: "member",
+        subjectId: ADMIN_MEMBERSHIP,
+        resourceKind: "channel_account",
+        resourceId,
+        privileges: ["channel.use", "channel.manage"],
+        constraints: { conversation: { kind: "all" } },
+      },
+    ])
+    .returning();
+  await createChannelUseGrantSource(bundle.runtime).retireChannelUse([useOnly!.id, admin!.id]);
+  const rows = await db.select().from(schema.accessAssignments);
+  assert.equal(
+    rows.some((row) => row.id === useOnly!.id),
+    false,
+  );
+  assert.deepEqual(rows.find((row) => row.id === admin!.id)?.privileges, ["channel.manage"]);
 });

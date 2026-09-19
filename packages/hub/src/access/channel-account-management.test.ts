@@ -96,7 +96,7 @@ it("lets channel-managing roles and account managers change a Channel Route, and
             subjectId: "member-membership",
             resourceKind: "channel_account",
             resourceId: formatChannelAccountResourceId("slack", "support"),
-            privileges: ["channel.use", "channel.manage"],
+            privileges: ["channel.manage"],
             constraints: { conversation: { kind: "specific", conversationIds: ["C1"] } },
           },
         ],

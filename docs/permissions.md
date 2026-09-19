@@ -94,10 +94,14 @@ Project grant creates only inside its own root. The level-by-level effect is in
 the [user guide](guides/user-guide/access/permissions.md).
 
 A Channel account assignment carries channel authority, not Project authority.
-**Use** (`channel.use`) lets a sender talk in the conversations its constraint
-names. **Manage** (`channel.manage`) also lets them change that Channel Route's
-Route defaults from a conversation, and requires the All conversations constraint;
-an organization owner or admin holds it without an assignment. What the changed
+The only level is **Admin** (`channel.manage`, wire key `manage`): edit that
+Channel Route's audience rules and Route defaults, on the app and from a
+conversation. It requires the All conversations constraint; an organization
+owner or admin holds it without an assignment. Who may talk to the bot is the
+Route's audience rules, never a grant: `channel.use` is no longer grantable, and
+the Hub folds stored `channel.use` rows into audience rules at start
+([2026-09-19](audits/2026-09-19-route-audience-rules.md)). Once a sender is
+admitted, chat commands and approvals check only the sender's Project grants. What the changed
 Route may start is still bounded by the sender's own Project grants, through
 delegation scoped to that Route. See
 [Route defaults](features/slash-commands/README.md#route-defaults).
@@ -163,12 +167,12 @@ link grants nothing: the linked sender gets the Member's grants, which may be no
 Linking does replace the Guest group — a linked sender stops receiving Guest
 grants — so a Member with fewer grants than Guest can lose access by linking.
 
-The route's `channel.use` / `mayTrigger` admission remains the baseline. The old channel role projection and
+The Route's audience rules (and `mayTrigger`) are the admission baseline. The old channel role projection and
 session initiator do not grant command authority.
 
 Chat is separate from Host and Project access
 ([decision](audits/2026-09-18-channel-chat-authority-and-limits.md)). A sender
-with chat authority (`channel.use`, or admission by an open-audience Route) talks
+admitted by the Route's audience rules talks
 to the Route's Agent, starts sessions with the Route's configuration, and uses the
 commands that stay inside it: status, stop, new, fork/side/quick, steer/queue,
 skills and dynamic commands. Nobody re-checks the sender's Project grants for

@@ -1,4 +1,4 @@
-import { parseChannelAccountResourceId, splitConversationIds } from "../conversation-picker";
+import { parseChannelAccountResourceId } from "../conversation-picker";
 import { accessLevelLabel, parseSubjectKey, resourceKey } from "./access-catalog";
 import type {
   AccessAssignment,
@@ -38,8 +38,6 @@ export interface AssignmentSelection {
   canShare: CanShareState;
   privileges: string[];
   needsAgentConfiguration: boolean;
-  conversation: string;
-  specificConversationIds: string[];
   valid: boolean;
 }
 
@@ -52,8 +50,6 @@ export function resolveAssignmentSelection(input: {
   alsoResourceKeys: readonly string[];
   accessLevel: string | null;
   canShare: boolean;
-  conversation: string;
-  conversationIds: string;
   agentConfigurations: AgentConfigurationDraft[];
 }): AssignmentSelection {
   const subject = parseSubjectKey(input.subjectKeyValue);
@@ -100,16 +96,12 @@ export function resolveAssignmentSelection(input: {
   const needsAgentConfiguration =
     (resource?.kind === "project" || resource?.kind === "daemon") &&
     privileges.includes("agent.create");
-  const specificConversationIds = splitConversationIds(input.conversationIds);
   const valid =
     subject !== null &&
     resource !== undefined &&
     privileges.length > 0 &&
     privilegesWithinHoldings(holdings, privileges) &&
     constraintsAreComplete({
-      resourceKind: resource.kind,
-      conversation: input.conversation,
-      specificConversationIds,
       needsAgentConfiguration,
       agentConfigurations: input.agentConfigurations,
     });
@@ -126,8 +118,6 @@ export function resolveAssignmentSelection(input: {
       ? privileges.filter((privilege) => privilege !== "agent.fast.use")
       : privileges,
     needsAgentConfiguration,
-    conversation: input.conversation,
-    specificConversationIds,
     valid,
   };
 }
@@ -143,19 +133,9 @@ function selectedAccessLevelPrivileges(
 
 /** Whether the constraints this Resource needs are all filled in. */
 function constraintsAreComplete(input: {
-  resourceKind: AccessResource["kind"];
-  conversation: string;
-  specificConversationIds: readonly string[];
   needsAgentConfiguration: boolean;
   agentConfigurations: AgentConfigurationDraft[];
 }): boolean {
-  if (
-    input.resourceKind === "channel_account" &&
-    input.conversation === "specific" &&
-    input.specificConversationIds.length === 0
-  ) {
-    return false;
-  }
   if (!input.needsAgentConfiguration) return true;
   return (
     input.agentConfigurations.length > 0 &&

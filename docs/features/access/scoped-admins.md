@@ -52,7 +52,7 @@ Built 2026-09-19 ([`management-api/automations.ts`](../../../packages/hub/src/ma
 - Anyone with work access to a Project (`project.use` on a Host or Project) can create an Automation. The same delegation check as before (`assertAutomationConfigurationDelegation`, [`delegation.ts`](../../../packages/hub/src/access/delegation.ts)) keeps its targets and Agent configurations inside the creator's own grants; a target they do not hold is `access_denied`.
 - The creator becomes Admin of that Automation: an ordinary `automation` assignment with `["automation.run", "hub.access.manage"]`, written by the creator. Organization Owners and Admins get no row; their role already covers it.
 - Admin reads, edits, enables, and grants on that one Automation. Run (`automation.run`) reads it and its runs and starts it. The list answers with each Automation's `scope` (`admin` or `run`), its `author`, and its `target` (Host and Project names); Organization Admins see every Automation.
-- **Run works like Channel Route Use.** The Automation's Access section and the grant form warn: "Runs with <author>'s access on <project>. The runner sees results but gets no Project access in the app." Nothing else is special server-side.
+- **Run is shared as a tool.** The Automation's Access section and the grant form warn: "Runs with <author>'s access on <project>. The runner sees results but gets no Project access in the app." Nothing else is special server-side.
 - Every accepted run re-checks the author's access with the save-time check, keyed by the revision's `createdByUserId`. When it fails, the Hub disables the Automation with a `pausedReason`, records the run as rejected (`author_access_lost`), writes an `automation_paused` access event, and emails every Admin of the Automation. Any Admin lifts the pause by saving the Automation again, which runs the check again. Revisions without an author (imported from GitHub, or older than the field) are not re-checked.
 - Members author manual and Channel inputs only. A Connection-sourced input (GitHub, Slack, Discord, Linear) is `automation_input_requires_admin`; `env` and GitHub authority are `automation_secret_requires_admin`. There is no admin-provided secret reference yet, so a Member's Automation carries no secrets at all. Deleting an Automation is not offered to anyone yet.
 
@@ -72,7 +72,7 @@ Built 2026-09-19 ([`management-api/automations.ts`](../../../packages/hub/src/ma
 | A separate "Host Admin" flag beside the levels (Azure)   | Replaced by Can share: same flexibility, and no second "Admin" next to the Administrator level                  |
 | Per-resource sharing switch (Google Drive)               | Not needed: sharing follows the level, and Can share covers the exceptions per person                           |
 | Administrator cannot grant Administrator                 | Rejected: an exception users must remember. Replaced by the warning, the notification, and the optional policy  |
-| Runner without Project access cannot run an Automation   | Rejected: an Automation is shared as a tool, like Channel Route Use; the warning makes the trade visible        |
+| Runner without Project access cannot run an Automation   | Rejected: an Automation is shared as a tool; the warning makes the trade visible                                |
 
 ## Build order
 

@@ -15,7 +15,7 @@ import {
 } from "../test-utils/channel-identity.js";
 import { AccessStore, type ChannelPrivilegeRequest } from "./store.js";
 
-it("Guest grants are explicit, conversation-scoped and separate from linked Member grants", async () => {
+it("Guest grants are explicit and separate from linked Member grants", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-guest-access-"));
   const bundle = await embeddedDatabaseRuntime(root);
   try {
@@ -118,15 +118,17 @@ it("Guest grants are explicit, conversation-scoped and separate from linked Memb
       unrestricted: false,
       agentConfigurations: configurations,
     });
-    const hidden = {
+    // Reaching a conversation is the Route's audience rules, not a grant: the
+    // Project grant alone decides agent control once the sender is admitted.
+    const otherConversation = {
       ...input,
       privilege: "agent.interact" as const,
       conversation: { kind: "channel" as const, id: "C2", rootConversationId: "C2" },
     };
-    expect((await access.authorizeChannelPrivilege(hidden)).allowed).toBe(false);
-    expect(await access.resolveChannelAgentConfigurations(hidden)).toEqual({
+    expect((await access.authorizeChannelPrivilege(otherConversation)).allowed).toBe(true);
+    expect(await access.resolveChannelAgentConfigurations(otherConversation)).toEqual({
       unrestricted: false,
-      agentConfigurations: [],
+      agentConfigurations: configurations,
     });
     expect(
       await access.allowsChannelApproval({

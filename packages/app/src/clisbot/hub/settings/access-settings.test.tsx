@@ -308,15 +308,13 @@ describe("Access assignment editing", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save access" })).toBeNull());
   });
 
-  it("keeps specific conversation access after clearing selection and parses multiple IDs before saving", async () => {
+  it("grants Channel Route Admin with no Conversations field and saves it for every conversation", async () => {
     const channelAssignment = {
       ...assignment,
       resourceKind: "channel_account",
       resourceId: "slack/support",
-      privileges: ["channel.message.send"],
-      constraints: {
-        conversation: { kind: "specific", conversationIds: ["C1"] },
-      },
+      privileges: ["channel.manage"],
+      constraints: { conversation: { kind: "all" } },
     };
     adapters.get.mockImplementation(async (path: string) => {
       const resource = resourceOf(path);
@@ -324,9 +322,7 @@ describe("Access assignment editing", () => {
       if (resource === "access-catalog")
         return {
           privileges: channelAssignment.privileges,
-          accessLevels: {
-            channel_account: { use: channelAssignment.privileges },
-          },
+          accessLevels: { channel_account: { manage: ["channel.manage"] } },
           resources: [
             {
               kind: "channel_account",
@@ -341,24 +337,15 @@ describe("Access assignment editing", () => {
     });
     renderAccess();
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByLabelText("Conversation IDs"), {
-      target: { value: "" },
-    });
-    expect((screen.getByLabelText("Conversations") as HTMLSelectElement).value).toBe("specific");
-    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
-    expect(adapters.confirm).not.toHaveBeenCalled();
-    expect(adapters.post).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Conversation IDs"), {
-      target: { value: " C1, C2\nC3\nC2 " },
-    });
+    // Who may talk to the bot is the Route's audience rules, never a grant.
+    expect(screen.queryByLabelText("Conversations")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
     expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
       resourceKind: "channel_account",
       resourceId: "slack/support",
-      constraints: {
-        conversation: { kind: "specific", conversationIds: ["C1", "C2", "C3"] },
-      },
+      privileges: ["channel.manage"],
+      constraints: { conversation: { kind: "all" } },
     });
   });
 

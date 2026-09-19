@@ -35,7 +35,8 @@ const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) =>
       : "Developer, plus rename, remove, and archive this Project and its workspaces.",
   administrator: "Operate this Host with any model. Always can share.",
   use: "Talk to the bot in the chosen conversations.",
-  manage: "Use, plus change this Channel Route's defaults. Needs All conversations.",
+  manage:
+    "Edit this Channel Route's audience rules and defaults, on the app and in chat. Who may talk to the bot is set on the Route.",
   run: "Run this Automation.",
   admin: (kind) =>
     kind === "team"
@@ -110,16 +111,15 @@ function summarizeTeamAdmin(held: ReadonlySet<string>, summary: AccessSummary): 
 }
 
 function summarizeRoutes(held: ReadonlySet<string>, summary: AccessSummary): void {
-  if (held.has("channel.use")) summary.allows.push("Talk to the bot in the chosen conversations");
   if (held.has("channel.manage")) {
-    summary.allows.push("Change this Channel Route's defaults from a conversation");
+    summary.allows.push("Edit this Channel Route's audience rules, Routes, and defaults");
+    summary.allows.push("Relink the account and read its activity");
+    summary.withholds.push("Who may talk to the bot is set in the Route's audience rules");
+    summary.withholds.push("The bot token stays with Organization Admins");
   }
   if (held.has("automation.run")) summary.allows.push("Run this Automation");
   if (held.has("automation.run") && held.has(CAN_SHARE_PRIVILEGE)) {
     summary.allows.push("Edit, enable, or delete this Automation, and grant Run or Admin on it");
-  }
-  if (held.has("channel.use")) {
-    summary.withholds.push("Controlling an agent still needs access to its Project");
   }
 }
 

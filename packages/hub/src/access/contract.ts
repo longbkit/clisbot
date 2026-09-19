@@ -223,10 +223,11 @@ export const RESOURCE_ACCESS_LEVELS = {
     admin: ["hub.access.manage"],
   },
   channel_account: {
-    use: ["channel.use"],
-    // Change this Channel Route's Route defaults from a conversation
-    // (`/promoteroutedefault`). Covers every conversation on the account.
-    manage: ["channel.use", "channel.manage"],
+    // Channel Route Admin (UI "Admin"): the Route's audience rules and
+    // defaults, on the app and from a conversation. Covers every conversation
+    // on the account. Who may talk to the bot is the Route's audience rules,
+    // never a grant (docs/audits/2026-09-19-route-audience-rules.md).
+    manage: ["channel.manage"],
   },
   automation: {
     run: ["automation.run"],

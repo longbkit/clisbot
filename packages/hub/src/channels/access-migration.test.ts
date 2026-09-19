@@ -35,7 +35,7 @@ function grantSource(
     rows,
     listChannelUseGrants: async (organizationId) =>
       rows.filter((row) => row.organizationId === organizationId),
-    deleteGrants: async (ids) => {
+    retireChannelUse: async (ids) => {
       for (const id of ids) {
         const index = rows.findIndex((row) => row.id === id);
         if (index >= 0) rows.splice(index, 1);

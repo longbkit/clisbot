@@ -45,8 +45,6 @@ export function useAccessAssignmentDraft(
   const [alsoResourceKeys, setAlsoResourceKeys] = useState<readonly string[]>([]);
   const [accessLevel, setAccessLevel] = useState(initial.accessLevel);
   const [canShare, setCanShare] = useState(initial.canShare);
-  const [conversation, setConversation] = useState<string>(initial.constraints.conversation);
-  const [conversationIds, setConversationIds] = useState(initial.constraints.conversationIds);
   const [agentConfigurations, setAgentConfigurations] = useState<AgentConfigurationDraft[]>(
     initial.agentConfigurations,
   );
@@ -56,8 +54,6 @@ export function useAccessAssignmentDraft(
     setAlsoResourceKeys([]);
     setAccessLevel(null);
     setCanShare(false);
-    setConversation("specific");
-    setConversationIds("");
     setFastMode(false);
     setAgentConfigurations([createAgentConfigurationDraft()]);
   }, []);
@@ -91,10 +87,6 @@ export function useAccessAssignmentDraft(
     changeLevel,
     canShare,
     setCanShare,
-    conversation,
-    setConversation,
-    conversationIds,
-    setConversationIds,
     agentConfigurations,
     setAgentConfigurations,
     addAgentConfiguration,

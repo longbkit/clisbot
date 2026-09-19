@@ -104,7 +104,7 @@ export async function channelIdentityText(
 ): Promise<string> {
   const request = commandAccessRequest(deps, message, account, route, "channel.use");
   const member = await deps.commandAccess?.resolveChannelMember(request);
-  const privileges = ["channel.use", "agent.interact", "agent.create", "approval.config"] as const;
+  const privileges = ["agent.interact", "agent.create", "approval.config"] as const;
   const decisions = await Promise.all(
     privileges.map(async (privilege) =>
       (await deps.commandAccess?.authorizeChannelPrivilege({ ...request, privilege }))?.allowed

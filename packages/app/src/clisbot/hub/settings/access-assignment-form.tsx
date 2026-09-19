@@ -7,7 +7,6 @@ import { SelectField, type SelectFieldOption } from "@/components/ui/select-fiel
 import { Switch } from "@/components/ui/switch";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
-import { ConversationSelectionFields } from "./conversation-picker-field";
 import { useAccessAssignmentDraft } from "./access-assignment-draft";
 import { useMountedAccessScope } from "./access-mounted-scope";
 import {
@@ -29,7 +28,6 @@ import { AccessLevelSummary } from "./access-level-summary-view";
 import {
   assignmentResourceOptions,
   assignmentSubjectOptions,
-  conversationLabel,
   resourceKey,
   selectedOptionDisplay,
   type AccessAssignment,
@@ -44,17 +42,6 @@ import {
   AgentConfigurationGrantEditor,
   type AgentConfigurationDraft,
 } from "./agent-configuration-grant-fields";
-
-const CONVERSATION_OPTIONS: SelectFieldOption<string>[] = [
-  { id: "specific", value: "specific", label: "Specific conversations" },
-  { id: "direct_messages", value: "direct_messages", label: "Direct messages" },
-  {
-    id: "public_channels",
-    value: "public_channels",
-    label: "Public conversations",
-  },
-  { id: "all", value: "all", label: "All conversations" },
-];
 
 interface AccessAssignmentFormProps {
   initialSubject: string | null;
@@ -128,8 +115,6 @@ function AccessAssignmentForm({
     alsoResourceKeys: draft.alsoResourceKeys,
     accessLevel: draft.accessLevel,
     canShare: draft.canShare,
-    conversation: draft.conversation,
-    conversationIds: draft.conversationIds,
     agentConfigurations: draft.agentConfigurations,
   });
   const siblingOptions = useSiblingProjectOptions(catalog, selection.resource, editing);
@@ -212,16 +197,6 @@ function AccessAssignmentForm({
           editing={editing}
           pending={pending}
         />
-        {selection.resource?.kind === "channel_account" ? (
-          <ConversationFields
-            channelAccount={selection.channelAccount}
-            conversation={draft.conversation}
-            setConversation={draft.setConversation}
-            conversationIds={draft.conversationIds}
-            setConversationIds={draft.setConversationIds}
-            pending={pending}
-          />
-        ) : null}
         {selection.needsAgentConfiguration ? (
           <AgentConfigurationSection
             catalog={shareableAgentConfigurationCatalog(
@@ -309,54 +284,6 @@ function AccessLevelFields({
           savedPrivileges={editing?.privileges}
           resourceKind={selection.resource.kind}
           subjectKind={selection.subject?.kind}
-        />
-      ) : null}
-    </>
-  );
-}
-
-/** Which conversations on a Channel Route a grant covers. */
-function ConversationFields({
-  channelAccount,
-  conversation,
-  setConversation,
-  conversationIds,
-  setConversationIds,
-  pending,
-}: {
-  channelAccount: AssignmentSelection["channelAccount"];
-  conversation: string;
-  setConversation(value: string): void;
-  conversationIds: string;
-  setConversationIds(value: string): void;
-  pending: boolean;
-}) {
-  const conversationDisplay = useMemo(
-    () => ({ label: conversationLabel(conversation) }),
-    [conversation],
-  );
-  return (
-    <>
-      <SelectField
-        label="Conversations"
-        value={conversation}
-        selectedDisplay={conversationDisplay}
-        options={CONVERSATION_OPTIONS}
-        onChange={setConversation}
-        placeholder="Choose conversation access"
-        emptyText="No conversation scopes are available."
-        title="Conversations"
-        disabled={pending}
-      />
-      {conversation === "specific" ? (
-        <ConversationSelectionFields
-          channel={channelAccount?.channel ?? null}
-          accountId={channelAccount?.accountId ?? null}
-          value={conversationIds}
-          onChange={setConversationIds}
-          disabled={pending}
-          hint="Threads inherit their root Conversation unless selected explicitly."
-          placeholder="C0123, C0456"
         />
       ) : null}
     </>

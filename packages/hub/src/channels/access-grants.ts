@@ -30,7 +30,9 @@ export interface ChannelUseGrant {
  * implementation is below, tests use a memory one. */
 export interface ChannelUseGrantSource {
   listChannelUseGrants(organizationId: string): Promise<ChannelUseGrant[]>;
-  deleteGrants(ids: readonly string[]): Promise<void>;
+  /** Removes `channel.use` from the folded rows: a Use-only row is deleted,
+   * a Channel Route Admin row (`channel.manage`) keeps its Admin privilege. */
+  retireChannelUse(ids: readonly string[]): Promise<void>;
 }
 
 /** `<channel>/<accountId>` as `formatChannelAccountResourceId` writes it. */
@@ -75,11 +77,25 @@ export function createChannelUseGrantSource(runtime: DatabaseRuntime): ChannelUs
       }
       return grants;
     },
-    async deleteGrants(ids) {
+    async retireChannelUse(ids) {
       if (ids.length === 0) return;
-      await database
-        .delete(schema.accessAssignments)
+      const rows = await database
+        .select()
+        .from(schema.accessAssignments)
         .where(inArray(schema.accessAssignments.id, [...ids]));
+      for (const row of rows) {
+        const kept = row.privileges.filter((privilege) => privilege !== "channel.use");
+        if (kept.length === 0) {
+          await database
+            .delete(schema.accessAssignments)
+            .where(eq(schema.accessAssignments.id, row.id));
+          continue;
+        }
+        await database
+          .update(schema.accessAssignments)
+          .set({ privileges: kept })
+          .where(eq(schema.accessAssignments.id, row.id));
+      }
     },
   };
 }

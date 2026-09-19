@@ -78,7 +78,9 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.other",
   ]),
   team: new Set(["hub.access.manage"]),
-  channel_account: new Set(["hub.access.manage", "channel.use", "channel.manage"]),
+  // `channel.use` is no longer grantable: audience rules decide who talks to a
+  // Route. Stored rows are folded by channels/access-migration.ts.
+  channel_account: new Set(["hub.access.manage", "channel.manage"]),
   automation: new Set(["hub.access.manage", "automation.run"]),
 };
 
@@ -895,11 +897,8 @@ export class AccessStore {
     input: ChannelPrivilegeRequest,
   ): Promise<ChannelPrivilegeDecision> {
     if (input.privilege !== "channel.use") {
-      const channelAccess = await this.authorizeChannelPrivilege({
-        ...input,
-        privilege: "channel.use",
-      });
-      if (!channelAccess.allowed) return channelAccess;
+      // Reaching the bot is the Route's audience rules, checked before any
+      // command or approval runs; here only the Project grant decides.
       const authority = await this.resolveChannelAgentAccess(input);
       return authority.unrestricted || authority.privileges.includes(input.privilege)
         ? { allowed: true }
@@ -930,9 +929,7 @@ export class AccessStore {
     unrestricted: boolean;
     agentConfigurations: AgentConfigurationGrant[];
   }> {
-    if (!(await this.authorizeChannelPrivilege({ ...input, privilege: "channel.use" })).allowed) {
-      return { unrestricted: false, agentConfigurations: [] };
-    }
+    // The Route's audience rules already admitted the sender; Project grants decide the rest.
     const { unrestricted, agentConfigurations } = await this.resolveChannelAgentAccess(input);
     return { unrestricted, agentConfigurations };
   }
@@ -1582,16 +1579,6 @@ function validatePrivilegeScope(
 }
 
 function validateConstraints(assignment: AccessAssignmentInput): void {
-  if (
-    assignment.resourceKind === "channel_account" &&
-    assignment.privileges.includes("channel.use") &&
-    assignment.constraints.conversation === undefined
-  ) {
-    throw new AccessPolicyError(
-      "invalid_assignment",
-      "channel.use requires a Conversation constraint",
-    );
-  }
   if (
     assignment.resourceKind === "channel_account" &&
     assignment.privileges.includes("channel.manage") &&

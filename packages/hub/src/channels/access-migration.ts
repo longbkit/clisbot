@@ -5,7 +5,8 @@
 // per organization at Hub start (docs/audits/2026-09-19-route-audience-rules.md#migration-automatic).
 // Idempotent: an organization with no old-shape route and no `channel.use`
 // grant is skipped. What it writes is one new configuration revision per
-// organization, then the folded grant rows are deleted — so a crash between
+// organization, then `channel.use` is removed from the folded rows (a
+// Channel Route Admin row keeps `channel.manage`) — so a crash between
 // the two leaves the grants in place and the next start folds them again
 // (appending a duplicate rule, never losing one).
 
@@ -35,7 +36,7 @@ export interface ChannelAudienceMigrationResult {
   accounts: number;
   /** Routes (fallbacks included) that received at least one grant rule. */
   routes: number;
-  /** Grant rows folded and deleted. */
+  /** Grant rows folded; Use-only rows deleted, Admin rows keep Admin. */
   grants: number;
   revisionId: string | null;
 }
@@ -93,7 +94,7 @@ export async function migrateOrganizationAudiences(
     createdByUserId: null,
     expectedRevisionId: active.id,
   });
-  await input.grants.deleteGrants(rewritten.foldedGrantIds);
+  await input.grants.retireChannelUse(rewritten.foldedGrantIds);
   const result = {
     organizationId,
     accounts: rewritten.changed.length,

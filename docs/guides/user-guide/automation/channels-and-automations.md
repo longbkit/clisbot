@@ -2,12 +2,12 @@
 
 [User guide](../README.md) · [Cấp Access](../access/members-and-teams.md) · [Q&A](../help/faq.md)
 
-|                  | Channel                                                | Automation                                                |
-| ---------------- | ------------------------------------------------------ | --------------------------------------------------------- |
-| Mục đích         | Nhận/gửi hội thoại qua Slack, Telegram…                | Thực hiện một công việc hoặc Workflow nhiều bước          |
-| Cấu hình chính   | Connection, conversation, route và nơi trả lời         | Các bước, Host/Project, cấu hình Agent, inputs và kết quả |
-| Cách dùng        | Gửi tin nhắn vào conversation được cấu hình            | Chạy trực tiếp, nhận event hoặc nhận tin nhắn qua Channel |
-| Quyền người dùng | `channel.use` và phạm vi conversation/audience phù hợp | `automation.run` khi chạy trực tiếp                       |
+|                  | Channel                                        | Automation                                                |
+| ---------------- | ---------------------------------------------- | --------------------------------------------------------- |
+| Mục đích         | Nhận/gửi hội thoại qua Slack, Telegram…        | Thực hiện một công việc hoặc Workflow nhiều bước          |
+| Cấu hình chính   | Connection, conversation, route và nơi trả lời | Các bước, Host/Project, cấu hình Agent, inputs và kết quả |
+| Cách dùng        | Gửi tin nhắn vào conversation được cấu hình    | Chạy trực tiếp, nhận event hoặc nhận tin nhắn qua Channel |
+| Quyền người dùng | Khớp một audience rule của Route (Who + Where) | `automation.run` khi chạy trực tiếp                       |
 
 Channel có thể chuyển vào một Automation hoặc **Start or continue an Agent** trực tiếp. Vì vậy không phải mọi tin nhắn Channel đều tạo Workflow run. Trong Automation, chọn tiếp tục cùng Agent vẫn tạo một Automation run mới cho mỗi yêu cầu.
 

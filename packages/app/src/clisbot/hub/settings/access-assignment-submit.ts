@@ -122,12 +122,9 @@ function createAccessAssignment(
 ): Record<string, unknown> {
   const { selection } = input;
   const constraints: Record<string, unknown> = {};
-  if (resource.kind === "channel_account") {
-    constraints["conversation"] = channelConversationConstraint(
-      selection.conversation,
-      selection.specificConversationIds,
-    );
-  }
+  // Channel Route Admin covers every conversation on the account; who may
+  // talk to the bot is the Route's audience rules, not a grant.
+  if (resource.kind === "channel_account") constraints["conversation"] = { kind: "all" };
   if (selection.needsAgentConfiguration) {
     constraints["agentConfigurations"] = uniqueAgentConfigurationGrants(input.agentConfigurations);
   }
@@ -149,15 +146,6 @@ export function grantedPrivileges(selection: AssignmentSelection, fastMode: bool
   if (!selection.needsAgentConfiguration) return selection.privileges;
   const privileges = selection.privileges.filter((privilege) => privilege !== "agent.fast.use");
   return fastMode ? [...privileges, "agent.fast.use"] : privileges;
-}
-
-function channelConversationConstraint(
-  conversation: string,
-  conversationIds: string[],
-): Record<string, unknown> {
-  return conversation === "specific"
-    ? { kind: "specific", conversationIds }
-    : { kind: conversation };
 }
 
 function parentDaemonId(resource: AccessResource): string | null {
