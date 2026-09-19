@@ -405,36 +405,29 @@ function ActiveHubAccount({
     );
   return (
     <View>
-      <SettingsSection title="Account">
-        <OrganizationHeader
-          hub={hub}
-          organizationName={state.organization.name}
-          organizationSlug={state.organization.slug}
-          roleLabel={role}
-          isOwner={state.membership.role === "owner"}
-          pending={pending}
-          run={run}
-        />
-        {state.membership.role === "owner" ? (
-          <Alert
-            variant="success"
-            title="Full organization access"
-            description="Owners automatically have access to every current and future Host, Project, Channel, and Automation. No assignment is required."
-          />
-        ) : null}
-        <View style={settingsStyles.card}>
-          <InfoRow title={state.account.name} hint={state.account.email} />
-          {state.isInstanceOperator ? (
-            <InfoRow title="Hub instance" hint="Instance role: Operator" bordered />
-          ) : null}
-        </View>
-        <ProfileSettings hub={hub} account={state.account} pending={pending} run={run} />
-        <Button variant="outline" disabled={pending} onPress={signOut}>
+      <ProfileSettings
+        hub={hub}
+        account={state.account}
+        isInstanceOperator={state.isInstanceOperator === true}
+        pending={pending}
+        run={run}
+      />
+      <OrganizationHeader
+        hub={hub}
+        organizationName={state.organization.name}
+        organizationSlug={state.organization.slug}
+        roleLabel={role}
+        isOwner={state.membership.role === "owner"}
+        pending={pending}
+        run={run}
+      />
+      <ChannelIdentitiesSection pending={pending} onManage={openIdentity} />
+      <View style={styles.signOut}>
+        {hub.error ? <Alert variant="error" title={hub.error} /> : null}
+        <Button size="sm" variant="outline" disabled={pending} onPress={signOut}>
           Sign out
         </Button>
-        {hub.error ? <Alert variant="error" title={hub.error} /> : null}
-      </SettingsSection>
-      <ChannelIdentitiesSection pending={pending} onManage={openIdentity} />
+      </View>
     </View>
   );
 }
@@ -790,5 +783,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   connectionActions: {
     gap: theme.spacing[2],
+  },
+  // Sign out ends the page, apart from what it describes, and never full width.
+  signOut: {
+    alignItems: "flex-start",
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[2],
   },
 }));

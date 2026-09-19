@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -11,9 +12,13 @@ import { DetailRow, OrganizationTitle } from "../organization-identity";
 type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
 
+/** What an Owner's role means, next to the role rather than in a box of its own. */
+const OWNER_HINT =
+  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
+
 /**
- * The organization every Hub action applies to, shown first and largest on Account. Owners
- * rename it in place; the slug that CLI and daemon flows use does not change.
+ * The organization every Hub action applies to, and your role in it. Owners rename it in
+ * place; the slug that CLI and daemon flows use does not change.
  */
 export function OrganizationHeader({
   hub,
@@ -36,27 +41,29 @@ export function OrganizationHeader({
   const startRenaming = useCallback(() => setRenaming(true), []);
   const stopRenaming = useCallback(() => setRenaming(false), []);
   return (
-    <View style={[settingsStyles.card, styles.card]}>
-      <View style={styles.titleRow}>
-        <OrganizationTitle name={organizationName} />
-        {isOwner && !renaming ? (
-          <Button size="sm" variant="outline" disabled={pending} onPress={startRenaming}>
-            Rename
-          </Button>
+    <SettingsSection title="Organization">
+      <View style={[settingsStyles.card, styles.card]}>
+        <View style={styles.titleRow}>
+          <OrganizationTitle name={organizationName} />
+          {isOwner && !renaming ? (
+            <Button size="sm" variant="outline" disabled={pending} onPress={startRenaming}>
+              Rename
+            </Button>
+          ) : null}
+        </View>
+        <DetailRow label="Organization ID" value={organizationSlug} />
+        <DetailRow label="Your role" value={roleLabel} hint={isOwner ? OWNER_HINT : undefined} />
+        {renaming ? (
+          <RenameOrganization
+            hub={hub}
+            currentName={organizationName}
+            pending={pending}
+            run={run}
+            onDone={stopRenaming}
+          />
         ) : null}
       </View>
-      <DetailRow label="Organization ID" value={organizationSlug} />
-      <DetailRow label="Your role" value={roleLabel} />
-      {renaming ? (
-        <RenameOrganization
-          hub={hub}
-          currentName={organizationName}
-          pending={pending}
-          run={run}
-          onDone={stopRenaming}
-        />
-      ) : null}
-    </View>
+    </SettingsSection>
   );
 }
 

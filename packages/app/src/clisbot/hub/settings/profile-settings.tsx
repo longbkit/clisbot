@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { Image, View } from "react-native";
+import { Image, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -11,18 +12,22 @@ type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
 
 /**
- * Display name and profile image, saved through Better Auth's `update-user`. The image is a link:
- * Hub stores no image files yet and accepts only https links on hosts the operator trusts.
- * `update-user` needs the browser session cookie, so only clients on the Hub origin can edit.
+ * You on this Hub: name, email, and the instance role when you run the Hub. Edit opens the form
+ * in the same card. Display name and image save through Better Auth's `update-user`; the image
+ * is a link, since Hub stores no image files yet and accepts only https links on hosts the
+ * operator trusts. `update-user` needs the browser session cookie, so only clients on the Hub
+ * origin can edit.
  */
 export function ProfileSettings({
   hub,
   account,
+  isInstanceOperator,
   pending,
   run,
 }: {
   hub: HubAccount;
-  account: { name: string; image?: string | null | undefined };
+  account: { name: string; email: string; image?: string | null | undefined };
+  isInstanceOperator: boolean;
   pending: boolean;
   run: HubRun;
 }) {
@@ -45,48 +50,66 @@ export function ProfileSettings({
       }),
     [hub, image, name, run],
   );
-  if (hub.signInKind !== "password") return null;
+  const editable = hub.signInKind === "password";
   if (!editing) {
     return (
-      <Button variant="outline" disabled={pending} onPress={startEditing}>
-        Edit profile
-      </Button>
+      <SettingsSection title="Profile">
+        <View style={settingsStyles.card}>
+          <View style={settingsStyles.row}>
+            {account.image ? <ProfileImage uri={account.image} /> : null}
+            <View style={[settingsStyles.rowContent, account.image ? styles.identity : null]}>
+              <Text style={settingsStyles.rowTitle}>{account.name}</Text>
+              <Text style={settingsStyles.rowHint}>{account.email}</Text>
+              {isInstanceOperator ? (
+                <Text style={settingsStyles.rowHint}>Operator of this Hub instance</Text>
+              ) : null}
+            </View>
+            {editable ? (
+              <Button size="sm" variant="outline" disabled={pending} onPress={startEditing}>
+                Edit
+              </Button>
+            ) : null}
+          </View>
+        </View>
+      </SettingsSection>
     );
   }
   return (
-    <View style={[settingsStyles.card, styles.form]}>
-      {account.image ? <ProfileImage uri={account.image} /> : null}
-      <Field label="Display name">
-        <FormTextInput
-          size={fieldSize}
-          initialValue={name}
-          onChangeText={setName}
-          editable={!pending}
-        />
-      </Field>
-      <Field
-        label="Profile image link"
-        hint="An https link, for example your Google or Gravatar photo. Leave empty to remove it."
-      >
-        <FormTextInput
-          size={fieldSize}
-          initialValue={image}
-          onChangeText={setImage}
-          placeholder="https://"
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!pending}
-        />
-      </Field>
-      <View style={styles.actions}>
-        <Button disabled={pending || name.trim().length === 0} loading={pending} onPress={save}>
-          Save profile
-        </Button>
-        <Button variant="ghost" disabled={pending} onPress={cancel}>
-          Cancel
-        </Button>
+    <SettingsSection title="Profile">
+      <View style={[settingsStyles.card, styles.form]}>
+        {account.image ? <ProfileImage uri={account.image} /> : null}
+        <Field label="Display name">
+          <FormTextInput
+            size={fieldSize}
+            initialValue={name}
+            onChangeText={setName}
+            editable={!pending}
+          />
+        </Field>
+        <Field
+          label="Profile image link"
+          hint="An https link, for example your Google or Gravatar photo. Leave empty to remove it."
+        >
+          <FormTextInput
+            size={fieldSize}
+            initialValue={image}
+            onChangeText={setImage}
+            placeholder="https://"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+          />
+        </Field>
+        <View style={styles.actions}>
+          <Button disabled={pending || name.trim().length === 0} loading={pending} onPress={save}>
+            Save profile
+          </Button>
+          <Button variant="ghost" disabled={pending} onPress={cancel}>
+            Cancel
+          </Button>
+        </View>
       </View>
-    </View>
+    </SettingsSection>
   );
 }
 
@@ -104,6 +127,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[2],
+  },
+  identity: {
+    marginLeft: theme.spacing[3],
   },
   avatar: {
     width: 48,

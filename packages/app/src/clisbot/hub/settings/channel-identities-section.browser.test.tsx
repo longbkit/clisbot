@@ -77,11 +77,11 @@ it("lists the Member's own linked chat accounts on Account without opening Manag
       <ChannelIdentitiesSection pending={false} onManage={vi.fn()} />
     </QueryClientProvider>,
   );
-  expect(await screen.findByText("U8ZTVGJJF")).toBeTruthy();
+  expect(await screen.findByText("Account U8ZTVGJJF")).toBeTruthy();
   // One row for the workspace, naming every bot that recognizes the identity, never the realm id.
   expect(screen.getByText("Slack · VeXeRe · works with dai-clisbot, oai-clisbot")).toBeTruthy();
   // An administrator's read includes other Members; Account shows only your own.
-  expect(screen.queryByText("USAM")).toBeNull();
+  expect(screen.queryByText("Account USAM")).toBeNull();
   expect(screen.getByRole("button", { name: "Manage chat accounts" })).toBeTruthy();
   await page.screenshot({ path: "/tmp/account-channel-identities.png" });
 });

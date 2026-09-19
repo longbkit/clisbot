@@ -197,7 +197,7 @@ describe("Account entry lifecycle and recovery", () => {
       isInstanceOperator: true,
     };
     render(view());
-    expect(screen.getByText(/Full organization access/)).toBeTruthy();
+    expect(screen.getByText(/^Full access to every current and future Host/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
     expect(screen.queryByTestId("identity-settings")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Manage chat accounts" }));

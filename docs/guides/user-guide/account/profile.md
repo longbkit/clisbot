@@ -5,7 +5,7 @@
 ## Đổi tên và ảnh
 
 1. Mở Paseo web app, vào **Settings → Account**.
-2. Bấm **Edit profile**.
+2. Ở mục **Profile**, bấm **Edit**.
 3. Sửa **Display name** (1–100 ký tự).
 4. Dán **Profile image link**, hoặc để trống để bỏ ảnh.
 5. Bấm **Save profile**.
