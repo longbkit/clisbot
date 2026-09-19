@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from "react";
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { SelectField } from "@/components/ui/select-field";
+import { settingsStyles } from "@/styles/settings";
 import { capitalizeLabel } from "../labels";
 import { memberRoleLockReason, memberRoleOptions, type OrganizationRole } from "./member-role";
 import type { HubCapabilities, HubMember } from "./types";
@@ -30,19 +33,29 @@ export function MemberRoleSelect({
     },
     [member, setRole],
   );
+  // A fixed-width column: every row's dropdown starts on the same rail, and a
+  // lock reason wraps under it instead of widening the column. The column is
+  // obviously Role, so each row does not repeat the label.
   return (
-    <SelectField
-      size="sm"
-      label="Role"
-      value={member.role}
-      selectedDisplay={display}
-      options={options}
-      onChange={change}
-      placeholder="Role"
-      emptyText="No roles are available."
-      title={`Role of ${member.name}`}
-      disabled={pending || lockReason !== null}
-      hint={lockReason ?? undefined}
-    />
+    <View style={styles.column}>
+      <SelectField
+        size="sm"
+        field={false}
+        label="Role"
+        value={member.role}
+        selectedDisplay={display}
+        options={options}
+        onChange={change}
+        placeholder="Role"
+        emptyText="No roles are available."
+        title={`Role of ${member.name}`}
+        disabled={pending || lockReason !== null}
+      />
+      {lockReason === null ? null : <Text style={settingsStyles.rowHint}>{lockReason}</Text>}
+    </View>
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  column: { width: 180, gap: theme.spacing[1] },
+}));

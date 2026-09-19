@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
+import { buttonControlHeight } from "@/components/ui/control-geometry";
 import { settingsStyles } from "@/styles/settings";
 import type { RealmLink } from "./member-directory";
 
@@ -48,5 +49,11 @@ export function MemberChatCell({
 
 const styles = StyleSheet.create((theme) => ({
   list: { gap: theme.spacing[0.5] },
-  line: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  // A button tall, like the Teams column's lines, so the two read level.
+  line: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minHeight: buttonControlHeight.xs,
+  },
 }));

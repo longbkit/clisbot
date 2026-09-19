@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
+import { buttonControlHeight } from "@/components/ui/control-geometry";
 import { settingsStyles } from "@/styles/settings";
 import { MemberChatCell } from "./member-chat-cell";
 import { memberTeamNames, type MemberDirectoryRow } from "./member-directory";
@@ -102,8 +103,16 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[4],
     marginTop: theme.spacing[1],
   },
-  cell: { gap: theme.spacing[0.5], minWidth: 160 },
-  cellLine: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  // Fixed widths keep the Teams and Chat columns on the same rails in every row.
+  cell: { gap: theme.spacing[0.5], width: 240 },
+  // Every line is a button tall, with or without its button, so text sits level
+  // across the columns.
+  cellLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minHeight: buttonControlHeight.xs,
+  },
   cellLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
-  trailing: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  trailing: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[2] },
 }));
