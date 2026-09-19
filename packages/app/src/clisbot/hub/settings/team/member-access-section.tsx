@@ -2,6 +2,7 @@ import { Text } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
+import { memberNamesByUserId } from "../access-catalog";
 import { AccessSummary, EMPTY_ACCESS_LEVELS, type AccessSummaryEntry } from "../access-summary";
 import { countLabel } from "../labels";
 import { InfoRow } from "../resource-rows";
@@ -51,6 +52,7 @@ export function MemberAccessSection({
             resources={resources.catalog.data?.resources ?? []}
             accessLevels={resources.catalog.data?.accessLevels ?? EMPTY_ACCESS_LEVELS}
             emptyMessage="No resource access granted"
+            memberNameByUserId={memberNamesByUserId(resources.members.data?.members ?? [])}
           />
           <Text style={settingsStyles.rowHint}>
             {`${countLabel(directCount, "direct assignment")}; Team access is listed with its source.`}

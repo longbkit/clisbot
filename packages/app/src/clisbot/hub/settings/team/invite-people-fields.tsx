@@ -18,12 +18,16 @@ export function InvitePeopleFields({
   plan,
   unknown,
   teams,
+  roleLocked,
   disabled,
 }: {
   draftState: InviteDraftState;
   plan: TeamAdditionPlan;
   unknown: readonly string[];
+  /** The Teams the viewer may invite into. */
   teams: readonly HubTeam[];
+  /** A Team Admin invites only as Member. */
+  roleLocked: boolean;
   disabled: boolean;
 }) {
   const { draft, update } = draftState;
@@ -81,7 +85,8 @@ export function InvitePeopleFields({
           placeholder="Choose a role"
           emptyText="No organization roles are available."
           title="Organization role"
-          disabled={disabled}
+          disabled={disabled || roleLocked}
+          hint={roleLocked ? "Team Admins invite people as Members." : undefined}
         />
       ) : null}
     </>

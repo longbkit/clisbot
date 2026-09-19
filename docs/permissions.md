@@ -55,16 +55,21 @@ later. Use a Host assignment when the answer is "all of them".
 
 `hub.access.manage` on a Host or Project is **Can share**; on a Team, Channel
 account, or Automation it is that resource's **Admin**. It sits in the same grant
-row as the level. Full access and Administrator always carry it: the Hub adds it
-when it saves those levels and when it reads rows written before the privilege
-existed (`impliedPrivileges` in `contract.ts`). A holder grants at most what they
+row as the level. Full access, Administrator, and Channel Route Admin always carry
+it: the Hub adds it when it saves those levels and when it reads rows written before
+the level carried it (`impliedPrivileges` in `contract.ts`). A holder grants at most what they
 hold on that resource, privileges and constraints alike, and may change or remove
 only grants inside that bound (`access/grantor.ts`, error `access_exceeds_grantor`);
 Organization Owners and Admins are not bound. A Host grant's Can share reaches its
-Projects. Team Admin covers Team membership, invitations into that Team with role
-`member`, and appointing another Team Admin; never the Team's own grants. Granting
+Projects. A Project grant needs Connect on its Host, so someone who shares only the
+Project may write one Connect-only Host row for the grantee; the app sends it with
+every such grant, because the Host row is hidden from them, and the Hub drops it
+when the grantee's Host row already connects rather than replace it. Team Admin
+covers Team membership, invitations into that Team with role `member`, and
+appointing another Team Admin; never the Team's own grants. Granting
 Administrator writes an `access_events` row and, when email is configured, tells
-every Organization Owner and Admin who granted it. The decision:
+every Organization Owner and Admin who granted it, with a link to the grant on the
+Access page; the Access events list offers Revoke on it. The decision:
 [Delegated access](features/access/scoped-admins.md).
 
 The `team` resource kind reaches an app only when it asks (`?include=team`), because
@@ -94,9 +99,9 @@ Project grant creates only inside its own root. The level-by-level effect is in
 the [user guide](guides/user-guide/access/permissions.md).
 
 A Channel account assignment carries channel authority, not Project authority.
-The only level is **Admin** (`channel.manage`, wire key `manage`): edit that
-Channel Route's audience rules and Route defaults, on the app and from a
-conversation. It requires the All conversations constraint; an organization
+The only level is **Admin** (`channel.manage` + `hub.access.manage`, wire key
+`manage`): edit that Channel Route's audience rules and Route defaults, on the app
+and from a conversation, and appoint another Admin on it. It requires the All conversations constraint; an organization
 owner or admin holds it without an assignment. Who may talk to the bot is the
 Route's audience rules, never a grant: `channel.use` is no longer grantable, and
 the Hub folds stored `channel.use` rows into audience rules at start

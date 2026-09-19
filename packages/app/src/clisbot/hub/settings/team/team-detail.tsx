@@ -1,23 +1,30 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import { AccessSummary, EMPTY_ACCESS_LEVELS, subjectAssignments } from "../access-summary";
+import { TeamAccessSection } from "./team-access-section";
 import { TeamMemberRows } from "./team-member-rows";
+import { canInvitePeople, canManageTeamMembership } from "./team-membership";
 import { TeamSettingsTab } from "./team-settings-tab";
 import type { HubAccount, HubTeam, TeamResources } from "./types";
 import { useTeamAdminAction } from "./use-people-actions";
 import type { TeamActions } from "./use-team-actions";
 
 type TeamView = "members" | "access" | "settings";
-const TEAM_VIEWS: SegmentedControlOption<TeamView>[] = [
-  { value: "members", label: "Members" },
-  { value: "access", label: "Access" },
-  { value: "settings", label: "Settings" },
-];
+
+/**
+ * Members for everyone; Access for Organization Admins and this Team's Team Admins (read-only
+ * for the latter); Settings (rename, delete) for Organization Admins only.
+ */
+function teamViews(canManage: boolean, organizationAdmin: boolean) {
+  const views: SegmentedControlOption<TeamView>[] = [{ value: "members", label: "Members" }];
+  if (canManage) views.push({ value: "access", label: "Access" });
+  if (organizationAdmin) views.push({ value: "settings", label: "Settings" });
+  return views;
+}
 
 export function SelectedTeamDetail({
   hub,
@@ -27,7 +34,6 @@ export function SelectedTeamDetail({
   back,
   manageAccess,
   addPeople,
-  canInvite,
 }: {
   hub: HubAccount;
   team: HubTeam;
@@ -36,23 +42,22 @@ export function SelectedTeamDetail({
   back(): void;
   manageAccess(): void;
   addPeople(team: HubTeam): void;
-  /** Invitations need both Team management and Member management. */
-  canInvite: boolean;
 }) {
   const [view, setView] = useState<TeamView>("members");
   const { pending, mutationError } = actions;
-  const canManage = resources.canManageResources;
+  const organizationAdmin = resources.canManageResources;
+  const canManage = canManageTeamMembership(resources.authority, team.id);
+  const canInvite = canInvitePeople(resources.authority, team.id);
+  const views = useMemo(
+    () => teamViews(canManage, organizationAdmin),
+    [canManage, organizationAdmin],
+  );
   const teamAdmin = useTeamAdminAction(hub, resources, actions.run);
   const removeMember = useCallback(
     (userId: string) => actions.removeTeamMember(team.id, userId),
     [actions, team.id],
   );
   const invite = useCallback(() => addPeople(team), [addPeople, team]);
-  const assignments = subjectAssignments(
-    resources.assignments.data?.assignments ?? [],
-    "team",
-    team.id,
-  );
   return (
     <View>
       <SettingsSection title={team.name}>
@@ -67,8 +72,8 @@ export function SelectedTeamDetail({
           ) : null}
         </View>
         {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-        {canManage ? (
-          <SegmentedControl options={TEAM_VIEWS} value={view} onValueChange={setView} size="sm" />
+        {views.length > 1 ? (
+          <SegmentedControl options={views} value={view} onValueChange={setView} size="sm" />
         ) : null}
       </SettingsSection>
       {view === "members" ? (
@@ -84,19 +89,14 @@ export function SelectedTeamDetail({
         </SettingsSection>
       ) : null}
       {view === "access" && canManage ? (
-        <SettingsSection title="Access">
-          <AccessSummary
-            entries={assignments.map((assignment) => ({ assignment, source: team.name }))}
-            resources={resources.catalog.data?.resources ?? []}
-            accessLevels={resources.catalog.data?.accessLevels ?? EMPTY_ACCESS_LEVELS}
-            emptyMessage="No resource access granted"
-          />
-          <Button variant="outline" disabled={pending} onPress={manageAccess}>
-            Manage access
-          </Button>
-        </SettingsSection>
+        <TeamAccessSection
+          team={team}
+          resources={resources}
+          pending={pending}
+          manageAccess={manageAccess}
+        />
       ) : null}
-      {view === "settings" && canManage ? (
+      {view === "settings" && organizationAdmin ? (
         <TeamSettingsTab team={team} actions={actions} onDeleted={back} />
       ) : null}
     </View>

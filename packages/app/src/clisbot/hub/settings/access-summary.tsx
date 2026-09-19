@@ -6,10 +6,11 @@ import { settingsStyles } from "@/styles/settings";
 import {
   accessLevelLabel,
   constraintSummary,
+  grantedByLabel,
   privilegeLabel,
   type AccessResourceKind,
 } from "./access-catalog";
-import { accessLevelDescription, matchingAccessLevel } from "./access-level-summary";
+import { accessLevelDescription, matchingAccessLevel, sharesAccess } from "./access-level-summary";
 import { plural } from "./labels";
 import { EmptyRow } from "./resource-rows";
 import type { HubAccessLevels, HubAccessResource, HubAssignment } from "./team/types";
@@ -54,16 +55,22 @@ export function groupAccessEntries(entries: readonly AccessSummaryEntry[]): Acce
   });
 }
 
-/** Read-only access assignments grouped by resource kind, each with its level and source. */
+/**
+ * Read-only access assignments grouped by resource kind, each with its level,
+ * Can share, source, and who granted it.
+ */
 export function AccessSummary({
   entries,
   resources,
   accessLevels,
+  memberNameByUserId,
   emptyMessage,
 }: {
   entries: readonly AccessSummaryEntry[];
   resources: readonly HubAccessResource[];
   accessLevels: HubAccessLevels;
+  /** Names the grantor ("by Ana"); without it the row omits who granted it. */
+  memberNameByUserId?: ReadonlyMap<string, string>;
   emptyMessage: string;
 }) {
   const groups = groupAccessEntries(entries);
@@ -87,6 +94,7 @@ export function AccessSummary({
                 entry={entry}
                 resource={resourceByKey.get(resourceKey(entry.assignment))}
                 accessLevels={accessLevels}
+                memberNameByUserId={memberNameByUserId}
                 bordered={index > 0}
               />
             ))}
@@ -101,11 +109,13 @@ function AccessRow({
   entry: { assignment, source },
   resource,
   accessLevels,
+  memberNameByUserId,
   bordered,
 }: {
   entry: AccessSummaryEntry;
   resource: HubAccessResource | undefined;
   accessLevels: HubAccessLevels;
+  memberNameByUserId: ReadonlyMap<string, string> | undefined;
   bordered: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -116,7 +126,9 @@ function AccessRow({
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{resource?.name ?? "Unavailable resource"}</Text>
-        <Text style={settingsStyles.rowHint}>{`${level.label} · ${source}`}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {accessRowFacts({ assignment, source }, level.label, memberNameByUserId)}
+        </Text>
         {level.description === undefined ? null : (
           <Text style={settingsStyles.rowHint}>{level.description}</Text>
         )}
@@ -144,6 +156,20 @@ function AccessRow({
       </Button>
     </View>
   );
+}
+
+/** Level, Can share, source, and grantor, the same facts the Access page rows show. */
+export function accessRowFacts(
+  { assignment, source }: AccessSummaryEntry,
+  levelLabel: string,
+  memberNameByUserId: ReadonlyMap<string, string> | undefined,
+): string {
+  return [
+    levelLabel,
+    ...(sharesAccess(assignment.resourceKind, assignment.privileges) ? ["Can share"] : []),
+    source,
+    ...(memberNameByUserId === undefined ? [] : [grantedByLabel(assignment, memberNameByUserId)]),
+  ].join(" · ");
 }
 
 /** Assignments held by one subject, e.g. every grant to a Team. */

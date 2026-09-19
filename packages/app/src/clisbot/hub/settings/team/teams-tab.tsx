@@ -9,6 +9,7 @@ import { settingsStyles } from "@/styles/settings";
 import { HubTeamSchema } from "../../contracts";
 import { EmptyRow, ResourceFeedbackGroup } from "../resource-rows";
 import { teamDirectoryRows } from "./team-directory";
+import { canSeeInvitations } from "./team-membership";
 import { TeamRow } from "./team-row";
 import type {
   HubAccount,
@@ -41,10 +42,9 @@ export function TeamsTab({
   const closeCreate = useCallback(() => setCreating(false), []);
   const createTeam = useCreateTeam(hub, resources);
   const canManage = resources.canManageResources;
-  const invitations =
-    hub.signedIn?.capabilities.manageMembers === true
-      ? (hub.signedIn.team?.invitations ?? NO_INVITATIONS)
-      : NO_INVITATIONS;
+  const invitations = canSeeInvitations(resources.authority)
+    ? (hub.signedIn?.team?.invitations ?? NO_INVITATIONS)
+    : NO_INVITATIONS;
   const teams = resources.teams.data?.teams ?? NO_TEAMS;
   const rows = useMemo(
     () =>

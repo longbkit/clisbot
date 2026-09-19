@@ -32,6 +32,23 @@ export function memberRoleLockReason(
   return owners <= 1 ? "The last Owner cannot step down." : null;
 }
 
+/**
+ * Why the viewer cannot remove this Member, or null when they can. Mirrors the Hub
+ * (`canRemoveMember` and `protectLastOwner`): an Admin cannot remove an Owner, and the last
+ * Owner cannot be removed.
+ */
+export function memberRemoveLockReason(
+  member: HubMember,
+  members: readonly HubMember[],
+  capabilities: HubCapabilities | undefined,
+): string | null {
+  if (capabilities?.manageMembers !== true) return "Only Owners and Admins remove Members.";
+  if (member.role !== "owner") return null;
+  if (capabilities.manageOwners !== true) return "Only an Owner removes an Owner.";
+  const owners = members.filter(({ role }) => role === "owner").length;
+  return owners <= 1 ? "The last Owner cannot be removed." : null;
+}
+
 /** The Owner change needs a confirmation; every other role change is immediate. */
 export function roleChangeConfirmation(
   member: HubMember,

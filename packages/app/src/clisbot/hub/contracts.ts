@@ -713,6 +713,17 @@ export const HubAccessCatalogSchema = z.object({
   resources: z.array(HubAccessResourceSchema),
 });
 
+/**
+ * `GET teams/:teamId/access` — one Team's grants, read-only, with the resources they name so a
+ * Team Admin who cannot read the access catalog still sees names and levels. A Hub without the
+ * route answers 404.
+ */
+export const HubTeamAccessSchema = z.object({
+  assignments: z.array(HubAccessAssignmentSchema),
+  resources: z.array(HubAccessResourceSchema),
+  accessLevels: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+});
+
 export const HubChannelIdentitySchema = z
   .object({
     id: z.string(),
@@ -870,6 +881,25 @@ export const HubObservedChannelConversationsSchema = z.object({
 });
 
 export type HubObservedChannelConversation = z.infer<typeof HubObservedChannelConversationSchema>;
+
+/**
+ * `GET channel-accounts/<channel>/<account>/senders` — people who messaged the
+ * bot and are not linked to a Member, newest first. `identity` is the value a
+ * Route's `who.identities` stores. A Hub older than this read answers 404.
+ */
+export const HubObservedChannelSenderSchema = z.object({
+  id: z.string().min(1),
+  identity: z.string().min(1),
+  name: z.string().nullable(),
+  username: z.string().nullable(),
+  lastSeenAt: z.string(),
+});
+
+export const HubObservedChannelSendersSchema = z.object({
+  senders: z.array(HubObservedChannelSenderSchema),
+});
+
+export type HubObservedChannelSender = z.infer<typeof HubObservedChannelSenderSchema>;
 
 /**
  * A channel name as the Hub reports it. Open on purpose: the Hub owns the

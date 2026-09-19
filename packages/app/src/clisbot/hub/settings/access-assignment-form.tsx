@@ -13,11 +13,7 @@ import {
   resolveAssignmentSelection,
   type AssignmentSelection,
 } from "./access-assignment-selection";
-import {
-  grantedPrivileges,
-  submitAccessAssignment,
-  unshareableHostConnect,
-} from "./access-assignment-submit";
+import { grantedPrivileges, submitAccessAssignment } from "./access-assignment-submit";
 import { CanShareField } from "./access-can-share-field";
 import {
   canShareResource,
@@ -118,12 +114,6 @@ function AccessAssignmentForm({
     agentConfigurations: draft.agentConfigurations,
   });
   const siblingOptions = useSiblingProjectOptions(catalog, selection.resource, editing);
-  const unshareableHost = unshareableHostConnect({
-    selection,
-    assignments,
-    authority,
-    resources: catalog.resources,
-  });
   const submit = useCallback(
     () =>
       void submitAccessAssignment({
@@ -136,9 +126,11 @@ function AccessAssignmentForm({
         agentConfigurations: draft.agentConfigurations,
         fastMode: draft.fastMode,
         accessLevel: draft.accessLevel,
+        authority,
+        catalogResources: catalog.resources,
         save,
       }),
-    [assignments, draft, editing, isCurrent, members, save, selection, teams],
+    [assignments, authority, catalog, draft, editing, isCurrent, members, save, selection, teams],
   );
 
   return (
@@ -211,22 +203,10 @@ function AccessAssignmentForm({
             pending={pending}
           />
         ) : null}
-        {unshareableHost !== null ? (
-          <Alert
-            variant="warning"
-            title={`Needs Connect on ${unshareableHost} first`}
-            description={`This person cannot reach the Project without Connect on its Host, and you cannot share ${unshareableHost}. Ask someone who can share that Host to grant Connect first.`}
-          />
-        ) : null}
         {grantorError !== null ? (
           <Alert variant="error" title="Above what you can grant" description={grantorError} />
         ) : null}
-        <Button
-          disabled={
-            pending || !selection.valid || !draft.constraintsValid || unshareableHost !== null
-          }
-          onPress={submit}
-        >
+        <Button disabled={pending || !selection.valid || !draft.constraintsValid} onPress={submit}>
           {editing ? "Save access" : "Grant access"}
         </Button>
         {editing ? (

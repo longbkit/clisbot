@@ -20,11 +20,11 @@ Mở Settings → **People**. Trang có ba tab: **Members** (mọi người tron
 | Chưa có tài khoản, tự nhập email và mật khẩu               | Có. Mật khẩu gõ tay chưa chứng minh sở hữu email, nên chỉ form mở từ link mời mới tạo được tài khoản kèm lời mời. |
 | Đã có tài khoản trên Hub (kể cả đang ở tổ chức khác)       | Có. Lời mời không tự áp dụng cho tài khoản sẵn có; mở link mời khi đang đăng nhập rồi bấm **Accept invitation**.  |
 
-Lời mời hết hạn sau **48 giờ**, gửi lại không gia hạn lời mời còn hạn. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Hết hạn thì gửi lại để tạo lời mời mới; muốn gia hạn sớm thì **Cancel** rồi gửi lại.
+Lời mời hết hạn sau **48 giờ**; gửi lại (Resend) tính lại 48 giờ từ lúc gửi. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Lời mời đã hết hạn không còn hiện trong tab **Invitations**; mời lại email đó bằng **Invite people**.
 
-Thêm Member đã có vào Team: mở Team → **Add people** rồi gõ tên hoặc email, hoặc bấm **Add to a Team** ngay trên dòng Member chưa có Team. Tab **Members** của Team liệt kê người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team. Vai trò **Admin** trong Team (Team Admin) cho phép người đó thêm, bớt và mời người vào Team này, không cho sửa quyền của Team.
+Thêm Member đã có vào Team: mở Team → **Add people** rồi gõ tên hoặc email, hoặc bấm **Add to a Team** ngay trên dòng Member chưa có Team. Tab **Members** của Team liệt kê người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team. Vai trò **Admin** trong Team (Team Admin) cho phép người đó thêm, bớt và mời người vào Team này, và đặt người khác làm Team Admin. Team Admin mở People thấy các Team mình thuộc về hoặc quản lý; trong Team mình quản lý có **Add people**, **Remove**, ô vai trò Team, và tab **Access** chỉ xem (sửa quyền của Team vẫn là việc của Owner/Admin tổ chức). Khi Team Admin mời, ô Teams chỉ có Team họ quản lý và vai trò luôn là **Member**; tab **Invitations** của họ chỉ liệt kê lời mời loại đó, và họ gửi lại hoặc hủy được chính các lời mời này.
 
-Đổi vai trò tổ chức ngay trên dòng Member (Member / Admin, Owner chỉ hiện với Owner và cần xác nhận). Owner cuối cùng không thể tự hạ vai trò; Admin không đổi được vai trò của Owner. Xóa Member nằm trong **Danger zone** của trang chi tiết Member. Tab **Invitations**: **Resend** gửi lại (lời mời tính lại 48 giờ), **Renew** cho lời mời đã hết hạn, **Cancel invitation** trong menu của dòng.
+Đổi vai trò tổ chức ngay trên dòng Member (Member / Admin, Owner chỉ hiện với Owner và cần xác nhận). Owner cuối cùng không thể tự hạ vai trò; Admin không đổi được vai trò của Owner. Xóa Member nằm trong **Danger zone** của trang chi tiết Member; nút bị khóa kèm lý do khi Hub sẽ từ chối (Admin không xóa được Owner, không ai xóa được Owner cuối cùng). Tab **Invitations**: **Resend** gửi lại (lời mời tính lại 48 giờ), **Cancel invitation** trong menu của dòng.
 
 Member mới không tự có quyền dùng tài nguyên. Nếu vào Team đã được cấp Access, người đó nhận các quyền của Team.
 
@@ -74,11 +74,11 @@ Trên Host hoặc Project, dưới ô mức quyền có công tắc **Can share*
 | Administrator | Luôn bật               |
 
 - Người có Can share ở mức Office worker chỉ cấp được Office worker; ở Host thì cấp được mọi Project trên Host đó. Trong **Access** họ chỉ thấy tài nguyên mình chia sẻ được; mức cao hơn mức của họ không hiện trong ô chọn (có dòng "Above your own level"); grant cao hơn hiện **Locked**, không sửa hay xóa được.
-- Với Project, người nhận vẫn cần **Connect** trên Host. Nếu bạn không chia sẻ được Host đó, form báo "Needs Connect on … first": nhờ người chia sẻ được Host cấp Connect trước.
-- Mỗi grant hiện **by \<tên>** (ai đã cấp; **by Hub** khi Hub tự ghi) để thu hồi nhanh khi cần.
-- Với Team, Channel Route, hoặc Automation, mức tương ứng gọi là **Admin**: quản lý đúng tài nguyên đó và ai được vào (Team Admin chỉ quản lý thành viên, không đổi grant của Team). Owner/Admin tổ chức không bị giới hạn bởi quy tắc này.
+- Với Project, người nhận vẫn cần **Connect** trên Host. Dù bạn không chia sẻ được Host đó, form vẫn cấp kèm Connect (và chỉ Connect) trên Host; nếu người nhận đã vào được Host thì Hub giữ nguyên grant Host của họ.
+- Mỗi grant hiện **by \<tên>** (ai đã cấp; **by Hub** khi Hub tự ghi) và **Can share** nếu có, cả trong trang Access lẫn phần Access của một người hoặc Team, để thu hồi nhanh khi cần.
+- Với Team, Channel Route, hoặc Automation, mức tương ứng gọi là **Admin**: quản lý đúng tài nguyên đó và ai được vào (Channel Route Admin cũng bổ nhiệm được Admin khác cho Route đó) (Team Admin chỉ quản lý thành viên, không đổi grant của Team). Owner/Admin tổ chức không bị giới hạn bởi quy tắc này.
 
-**Cảnh báo khi chọn Administrator.** Chọn mức này mở hộp xác nhận trước khi form nhận mức: người đó điều khiển daemon (restart, cài plugin, dùng mọi Model, thấy mọi Project). Mọi Admin tổ chức được thông báo kèm tên người cấp; Owner/Admin xem lại trong mục **Administrator grants** ở cuối trang Access.
+**Cảnh báo khi chọn Administrator.** Chọn mức này mở hộp xác nhận trước khi form nhận mức: người đó điều khiển daemon (restart, cài plugin, dùng mọi Model, thấy mọi Project). Mọi Admin tổ chức được thông báo kèm tên người cấp và link mở đúng grant trong trang Access; Owner/Admin xem lại trong mục **Access events** ở cuối trang Access và bấm **Revoke** để thu hồi ngay. Mục này cũng liệt kê Automation mà Hub tạm dừng vì tác giả mất quyền.
 
 ## Cấp cho Guest
 

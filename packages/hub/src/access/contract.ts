@@ -224,14 +224,15 @@ export const RESOURCE_ACCESS_LEVELS = {
   },
   channel_account: {
     // Channel Route Admin (UI "Admin"): the Route's audience rules and
-    // defaults, on the app and from a conversation. Covers every conversation
-    // on the account. Who may talk to the bot is the Route's audience rules,
-    // never a grant (docs/audits/2026-09-19-route-audience-rules.md).
-    manage: ["channel.manage"],
+    // defaults, on the app and from a conversation, and appointing another
+    // Admin. Covers every conversation on the account. Who may talk to the bot
+    // is the Route's audience rules, never a grant
+    // (docs/audits/2026-09-19-route-audience-rules.md).
+    manage: ["channel.manage", "hub.access.manage"],
   },
   automation: {
     run: ["automation.run"],
-    // Automation Admin: edit, enable, delete, and grant Run or Admin on this one.
+    // Automation Admin: edit, enable, and grant Run or Admin on this one (no delete yet).
     admin: ["automation.run", "hub.access.manage"],
   },
 } as const satisfies Partial<
@@ -240,17 +241,19 @@ export const RESOURCE_ACCESS_LEVELS = {
 
 /**
  * The privileges a grant holds once its level's implications are applied: a
- * Host or Project grant that is Full access or Administrator also shares. The
+ * Host or Project grant that is Full access or Administrator also shares, and
+ * a Channel Route Admin (`channel.manage`) always appoints other Admins. The
  * Hub applies this when it saves and when it reads, so a row written before
- * Can share existed reads the same as one written after.
+ * the level carried `hub.access.manage` reads the same as one written after.
  */
 export function impliedPrivileges(
   resourceKind: AccessResourceKind,
   privileges: readonly AccessPrivilege[],
 ): AccessPrivilege[] {
   const implies =
-    (resourceKind === "daemon" || resourceKind === "project") &&
-    CAN_SHARE_IMPLYING_PRIVILEGES.some((privilege) => privileges.includes(privilege));
+    ((resourceKind === "daemon" || resourceKind === "project") &&
+      CAN_SHARE_IMPLYING_PRIVILEGES.some((privilege) => privileges.includes(privilege))) ||
+    (resourceKind === "channel_account" && privileges.includes("channel.manage"));
   if (!implies || privileges.includes("hub.access.manage")) return [...privileges];
   return [...privileges, "hub.access.manage"];
 }

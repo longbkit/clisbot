@@ -111,13 +111,13 @@ export class AccessDelegationApi {
     if (request.method === "POST" && segments.length === 3) {
       this.deps.requireMutation(request);
       const input = await parseBody(request, AccessAssignmentInputSchema);
-      const [assignment] = await this.save(access, [input]);
+      const [assignment] = await this.save(request, access, [input]);
       return Response.json(serializeAssignment(assignment!), { status: 201 });
     }
     if (request.method === "POST" && segments.length === 4 && segments[3] === "batch") {
       this.deps.requireMutation(request);
       const input = await parseBody(request, AccessAssignmentBatchInputSchema);
-      const assignments = await this.save(access, input.assignments);
+      const assignments = await this.save(request, access, input.assignments);
       return Response.json({ assignments: assignments.map(serializeAssignment) }, { status: 201 });
     }
     if (request.method === "DELETE" && segments.length === 4) {
@@ -191,13 +191,19 @@ export class AccessDelegationApi {
   }
 
   private async save(
+    request: Request,
     access: OrganizationAccessValue,
     inputs: readonly AccessAssignmentInput[],
   ): Promise<AccessAssignmentRecord[]> {
     const organizationId = access.organization.id;
     const previous = await this.deps.access.listAssignments(organizationId);
-    await this.requireWithinGrantor(access, inputs, previous);
-    const saved = await this.deps.access.saveAssignments(organizationId, inputs, access.account.id);
+    const candidates = await this.withoutHeldHostConnect(access, inputs, previous);
+    await this.requireWithinGrantor(access, candidates, previous);
+    const saved = await this.deps.access.saveAssignments(
+      organizationId,
+      candidates,
+      access.account.id,
+    );
     await this.deps.revokeOrganizationAccessLeases(organizationId);
     const promoted = newlyAdministrator(previous, saved);
     if (promoted.length > 0) {
@@ -208,6 +214,8 @@ export class AccessDelegationApi {
           mailer: this.deps.notificationMailer,
           organizationId,
           actor: { userId: access.account.id, name: access.account.name },
+          // The Hub serves the app, so the grant request's origin opens its Access page.
+          appOrigin: new URL(request.url).origin,
           resources: await this.deps.access.listResources(organizationId),
         },
         promoted,
@@ -237,6 +245,37 @@ export class AccessDelegationApi {
     await this.deps.access.deleteAssignment(organizationId, assignmentId);
     await this.deps.revokeOrganizationAccessLeases(organizationId);
     return new Response(null, { status: 204 });
+  }
+
+  /**
+   * A Project sharer who cannot share the Host never sees the grantee's Host
+   * row, so the app sends a Connect-only Host row with every Project grant
+   * (`isConnectForSharedProject` in `access/grantor.ts`). When the grantee's
+   * own Host row already connects, writing it would replace that row, so it is
+   * dropped instead.
+   */
+  private async withoutHeldHostConnect(
+    access: OrganizationAccessValue,
+    inputs: readonly AccessAssignmentInput[],
+    previous: readonly AccessAssignmentRecord[],
+  ): Promise<AccessAssignmentInput[]> {
+    if (inputs.length < 2) return [...inputs];
+    const viewer = await this.viewer(access);
+    if (bypassesGrantorRule(viewer.role)) return [...inputs];
+    const resources = await this.deps.access.listResources(access.organization.id);
+    return inputs.filter((input) => {
+      if (!isConnectOnlyHostRow(input)) return true;
+      const host = resources.find(({ kind, id }) => kind === "daemon" && id === input.resourceId);
+      if (host === undefined || canShareResource(viewer, host, resources)) return true;
+      return !previous.some(
+        (row) =>
+          row.subjectKind === input.subjectKind &&
+          row.subjectId === input.subjectId &&
+          row.resourceKind === "daemon" &&
+          row.resourceId === input.resourceId &&
+          row.privileges.includes("daemon.connect"),
+      );
+    });
   }
 
   /**
@@ -280,6 +319,15 @@ export class AccessDelegationApi {
       }),
     };
   }
+}
+
+function isConnectOnlyHostRow(input: AccessAssignmentInput): boolean {
+  return (
+    input.resourceKind === "daemon" &&
+    input.privileges.length === 1 &&
+    input.privileges[0] === "daemon.connect" &&
+    Object.keys(input.constraints).length === 0
+  );
 }
 
 function shareableResources(

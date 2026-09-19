@@ -180,3 +180,20 @@ export function constraintSummary(constraints: Record<string, unknown>): string 
   }
   return values.length === 0 ? null : values.join(" · ");
 }
+
+/** Who made the grant, so it can be revoked at once. Null means the Hub itself wrote it. */
+/** Member display names keyed by user id, for "by <grantor>" labels. */
+export function memberNamesByUserId(
+  members: readonly { userId: string; name: string }[],
+): Map<string, string> {
+  return new Map(members.map((member) => [member.userId, member.name]));
+}
+
+export function grantedByLabel(
+  assignment: Pick<AccessAssignment, "createdByUserId">,
+  memberNameByUserId: ReadonlyMap<string, string>,
+): string {
+  const userId = assignment.createdByUserId ?? null;
+  if (userId === null) return "by Hub";
+  return `by ${memberNameByUserId.get(userId) ?? "a former Member"}`;
+}

@@ -498,6 +498,8 @@ beforeEach(() => {
     }),
     "channel-identities": query({ identities: [] }),
     "access-assignments?include=team": query({ assignments: [teamGrant] }),
+    // The viewer's own grants: which Teams they are Team Admin of.
+    "access-assignments/effective?include=team": query({ owner: false, grants: [] }),
     "access-catalog?include=team": query({
       resources: [{ kind: "channel_account", id: "channel-1", name: "Customer chat" }],
       accessLevels: {},
@@ -777,6 +779,7 @@ describe("Member detail", () => {
           resourceId: "host-1",
           privileges: ["daemon.connect", "project.use"],
           constraints: {},
+          createdByUserId: member.userId,
         },
       ],
     });
@@ -791,11 +794,11 @@ describe("Member detail", () => {
     openMember("Alice");
     const access = screen.getByRole("heading", { name: "Access" }).closest("section")!;
     expect(within(access).getByText("Hosts").nextSibling?.textContent).toContain("sandbox");
-    expect(within(access).getByText("Office worker · Direct")).toBeTruthy();
+    expect(within(access).getByText("Office worker · Direct · by Alice")).toBeTruthy();
     expect(
       within(access).getByText("Every Project on this Host, including Projects added later"),
     ).toBeTruthy();
-    expect(within(access).getByText("2 privileges · Via Support")).toBeTruthy();
+    expect(within(access).getByText("2 privileges · Via Support · by Hub")).toBeTruthy();
     expect(within(access).queryByText("channel read, channel reply")).toBeNull();
     const chatRow = within(access).getByText("Customer chat").parentElement!.parentElement!;
     fireEvent.click(within(chatRow).getByRole("button", { name: "Details" }));
@@ -862,9 +865,7 @@ describe("Invitations", () => {
     expect(screen.getByText("Admin · Support")).toBeTruthy();
     expect(screen.getByText(/Expiring soon · 59 min/)).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Expiring soon (1)" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "Expired (0)" }));
-    expect(screen.getByText("No invitations match.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "Invitations (1)" }));
+    expect(screen.queryByRole("tab", { name: /Expired/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Resend" }));
     await waitFor(() =>
       expect(hub.inviteMember).toHaveBeenCalledWith({

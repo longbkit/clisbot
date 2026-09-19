@@ -27,6 +27,9 @@ export async function submitAccessAssignment(input: {
   agentConfigurations: AgentConfigurationDraft[];
   fastMode: boolean;
   accessLevel: string | null;
+  authority: ViewerAuthority;
+  /** The catalog's resources; a Host the viewer cannot share is absent from it. */
+  catalogResources: AccessResource[];
   save(body: unknown, batch?: boolean): Promise<void>;
 }): Promise<void> {
   const { selection } = input;
@@ -35,11 +38,12 @@ export async function submitAccessAssignment(input: {
   const resources = [selection.resource, ...selection.alsoResources];
   const written = resources.map((resource) => createAccessAssignment(input, resource));
   const daemonId = parentDaemonId(selection.resource);
-  const existingDaemon = findSubjectDaemonAssignment(
-    input.assignments,
-    selection.subject,
-    daemonId,
-  );
+  const hostShareable = canShareHost(input.authority, input.catalogResources, daemonId);
+  // The Hub hides Host rows from a viewer who cannot share the Host, so an
+  // absent row there means "unknown", not "none".
+  const existingDaemon = hostShareable
+    ? findSubjectDaemonAssignment(input.assignments, selection.subject, daemonId)
+    : undefined;
   const replaced = input.editing
     ? []
     : resources.filter((resource) =>
@@ -68,6 +72,7 @@ export async function submitAccessAssignment(input: {
       }),
       configurationCount: selection.needsAgentConfiguration ? input.agentConfigurations.length : 0,
       addsHostConnect,
+      hostConnectKnown: hostShareable,
       replacedNames: replaced.map(({ name }) => name),
       guestScope: guestScope(selection.subject.kind, selection.resource.kind),
       assignmentCount: written.length + (addsHostConnect ? 1 : 0),
@@ -85,26 +90,18 @@ export async function submitAccessAssignment(input: {
 }
 
 /**
- * The Host whose Connect this Project grant needs and the viewer cannot write:
- * a Project sharer who cannot share the Host has to ask a Host sharer first.
- * Null when no Host row is needed or the viewer may write it.
+ * Whether the viewer may write the Project's Host row as a whole. When not, the
+ * save sends the one Connect-only Host row the Hub lets a Project sharer write
+ * (`isConnectForSharedProject` in the Hub's `access/grantor.ts`), and the Hub
+ * drops it when the grantee's Host row already connects.
  */
-export function unshareableHostConnect(input: {
-  selection: AssignmentSelection;
-  assignments: AccessAssignment[];
-  authority: ViewerAuthority;
-  resources: AccessResource[];
-}): string | null {
-  const { subject, resource } = input.selection;
-  if (subject === null || resource === undefined) return null;
-  const daemonId = parentDaemonId(resource);
-  if (daemonId === null) return null;
-  if (holdsHostConnect(findSubjectDaemonAssignment(input.assignments, subject, daemonId))) {
-    return null;
-  }
-  const host = input.resources.find(({ kind, id }) => kind === "daemon" && id === daemonId);
-  if (host === undefined || canShareResource(input.authority, host, input.resources)) return null;
-  return host.name;
+function canShareHost(
+  authority: ViewerAuthority,
+  resources: AccessResource[],
+  daemonId: string | null,
+): boolean {
+  const host = resources.find(({ kind, id }) => kind === "daemon" && id === daemonId);
+  return host !== undefined && canShareResource(authority, host, resources);
 }
 
 function holdsHostConnect(existingDaemon: AccessAssignment | undefined): boolean {
@@ -223,6 +220,8 @@ function grantReviewMessage(input: {
   summary: AccessSummary;
   configurationCount: number;
   addsHostConnect: boolean;
+  /** False when the viewer cannot see the grantee's Host row. */
+  hostConnectKnown: boolean;
   replacedNames: readonly string[];
   guestScope: string | null;
   assignmentCount: number;
@@ -237,7 +236,7 @@ function grantReviewMessage(input: {
     effectLines("Allows", input.summary.allows),
     effectLines("Not included", input.summary.withholds),
     effectLines("Before you grant", input.summary.cautions),
-    input.addsHostConnect ? "Also grants: Connect to the parent Host" : null,
+    hostConnectLine(input.addsHostConnect, input.hostConnectKnown),
     input.replacedNames.length > 0
       ? `Replaces existing access, including its Agent choices, on: ${input.replacedNames.join(", ")}`
       : null,
@@ -250,4 +249,11 @@ function grantReviewMessage(input: {
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
+}
+
+function hostConnectLine(addsHostConnect: boolean, known: boolean): string | null {
+  if (!addsHostConnect) return null;
+  return known
+    ? "Also grants: Connect to the parent Host"
+    : "Also grants: Connect to the parent Host, unless they already reach it";
 }

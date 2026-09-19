@@ -2,11 +2,13 @@
  * Team management for the organization-scoped management contract (`teams`).
  * Creating, renaming, and deleting a Team stays with Organization Admins. Who is
  * in a Team is also open to its Team Admins: Members holding
- * `hub.access.manage` on `team:<id>` (docs/features/access/scoped-admins.md).
+ * `hub.access.manage` on `team:<id>` (docs/features/access/scoped-admins.md),
+ * who also read the Team's grants (`GET teams/:id/access`) without changing them.
  */
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { AccessStore } from "../access/store.js";
+import { RESOURCE_ACCESS_LEVELS } from "../access/contract.js";
+import type { AccessResourceRecord, AccessStore } from "../access/store.js";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import type { OrganizationTeamDirectory } from "../auth/team-directory.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
@@ -36,6 +38,11 @@ export class TeamsApi {
     const organizationId = access.organization.id;
     if (request.method === "GET" && segments.length === 3) {
       return this.listTeams(organizationId);
+    }
+    if (request.method === "GET" && segments.length === 5 && segments[4] === "access") {
+      const teamId = segments[3]!;
+      await this.requireTeamMembershipAuthority(access, teamId);
+      return this.teamAccess(requestId, organizationId, teamId);
     }
     this.deps.requireMutation(request);
     if (request.method === "POST" && segments.length === 3) {
@@ -161,6 +168,41 @@ export class TeamsApi {
     return new Response(null, { status: 204 });
   }
 
+  /**
+   * The Team's grants, read-only, with the resources they name (and their parents) so a
+   * Team Admin who cannot read the access catalog still sees names and levels.
+   */
+  private async teamAccess(
+    requestId: string,
+    organizationId: string,
+    teamId: string,
+  ): Promise<Response> {
+    const [team] = await this.deps.runtime
+      .drizzle()
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(and(eq(schema.teams.organizationId, organizationId), eq(schema.teams.id, teamId)));
+    if (team === undefined) {
+      return problem(requestId, 404, "team_unavailable", "Team is unavailable.");
+    }
+    const [assignments, resources] = await Promise.all([
+      this.deps.access.listAssignments(organizationId),
+      this.deps.access.listResources(organizationId),
+    ]);
+    const granted = assignments.filter(
+      ({ subjectKind, subjectId }) => subjectKind === "team" && subjectId === teamId,
+    );
+    return Response.json({
+      assignments: granted.map((assignment) => ({
+        ...assignment,
+        createdAt: assignment.createdAt.toISOString(),
+        updatedAt: assignment.updatedAt.toISOString(),
+      })),
+      resources: namedResources(granted, resources),
+      accessLevels: RESOURCE_ACCESS_LEVELS,
+    });
+  }
+
   private async listTeams(organizationId: string): Promise<Response> {
     const database = this.deps.runtime.drizzle();
     const [teams, memberships] = await Promise.all([
@@ -202,6 +244,26 @@ export class TeamsApi {
 
 function requireOrganizationAdmin(access: OrganizationAccessValue): void {
   if (!access.capabilities.manageResources) throw new ProductRequestError(403, "forbidden");
+}
+
+/** The resources the grants name, plus their parents, without the Agent catalog. */
+function namedResources(
+  granted: readonly { resourceKind: string; resourceId: string }[],
+  resources: readonly AccessResourceRecord[],
+) {
+  const named = resources.filter(({ kind, id }) =>
+    granted.some(({ resourceKind, resourceId }) => resourceKind === kind && resourceId === id),
+  );
+  const parents = resources.filter(({ kind, id }) =>
+    named.some(({ parent }) => parent?.kind === kind && parent.id === id),
+  );
+  return [...new Set([...named, ...parents])].map(({ kind, id, name, parent, available }) => ({
+    kind,
+    id,
+    name,
+    parent,
+    available,
+  }));
 }
 
 function notFound(requestId: string): Response {

@@ -6,7 +6,7 @@ import { settingsStyles } from "@/styles/settings";
 import { MemberChatCell } from "./member-chat-cell";
 import { memberTeamNames, type MemberDirectoryRow } from "./member-directory";
 import { MemberRoleSelect } from "./member-role-select";
-import type { OrganizationRole } from "./member-role";
+import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
 import { RowActionsMenu } from "./row-actions-menu";
 import { needsTeam } from "./team-membership";
 import type { HubCapabilities, HubMember, TeamSelection } from "./types";
@@ -45,17 +45,13 @@ export function MemberRow({
   );
   const remove = useCallback(() => handlers.remove(member), [handlers, member]);
   const addToTeam = useCallback(() => handlers.addToTeam(member), [handlers, member]);
+  const removeLocked = memberRemoveLockReason(member, members, capabilities) !== null;
   const actions = useMemo(
     () => [
       { label: "View", onSelect: view },
-      {
-        label: "Remove",
-        onSelect: remove,
-        destructive: true,
-        disabled: capabilities?.manageMembers !== true,
-      },
+      { label: "Remove", onSelect: remove, destructive: true, disabled: removeLocked },
     ],
-    [capabilities?.manageMembers, remove, view],
+    [remove, removeLocked, view],
   );
   const canManageMembers = capabilities?.manageMembers === true;
   return (

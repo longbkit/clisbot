@@ -5,62 +5,31 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useHubAccount } from "../../account-provider";
-import {
-  HUB_ACCESS_INCLUDE,
-  HubAccessAssignmentsSchema,
-  HubAccessCatalogSchema,
-  HubChannelIdentitiesSchema,
-  HubConnectionsSchema,
-  HubMembersSchema,
-  HubTeamsSchema,
-} from "../../contracts";
-import { useHubResource } from "../hub-resource";
 import { InvitationsTab } from "./invitations-tab";
 import { InvitePeopleModal } from "./invite-people-modal";
 import { SelectedMemberDetail } from "./member-detail";
 import { MembersTab } from "./members-tab";
 import { peopleViews, usePeopleView } from "./people-views";
 import { SelectedTeamDetail } from "./team-detail";
-import { canAddPeopleToTeams } from "./team-membership";
+import { canInvitePeople, canSeeInvitations } from "./team-membership";
 import { TeamsTab } from "./teams-tab";
-import type { TeamResources } from "./types";
 import { useMemberRoleAction } from "./use-people-actions";
+import { usePeopleResources } from "./use-people-resources";
 import { useInvitePeople, usePeopleSelection } from "./use-people-screen";
 import { useTeamActions } from "./use-team-actions";
-
-function useTeamResources(canManageResources: boolean): TeamResources {
-  return {
-    canManageResources,
-    members: useHubResource("members", HubMembersSchema),
-    teams: useHubResource("teams", HubTeamsSchema),
-    identities: useHubResource("channel-identities", HubChannelIdentitiesSchema),
-    connections: useHubResource("connections", HubConnectionsSchema, canManageResources),
-    // Team rows (Team Admin) come only when asked for; older Hubs ignore the query string.
-    assignments: useHubResource(
-      `access-assignments${HUB_ACCESS_INCLUDE}`,
-      HubAccessAssignmentsSchema,
-      canManageResources,
-    ),
-    catalog: useHubResource(
-      `access-catalog${HUB_ACCESS_INCLUDE}`,
-      HubAccessCatalogSchema,
-      canManageResources,
-    ),
-  };
-}
 
 /** Settings → People: Members, Teams, and Invitations, with one Invite people modal for all three. */
 export function TeamSettings() {
   const hub = useHubAccount();
-  const capabilities = hub.signedIn?.capabilities;
-  const resources = useTeamResources(capabilities?.manageResources === true);
+  const resources = usePeopleResources(hub);
+  const { authority } = resources;
   const actions = useTeamActions(hub, resources);
   const setRole = useMemberRoleAction(hub, resources, actions.run);
   const { selection, setSelection, back, manageAccess } = usePeopleSelection();
   const people = useInvitePeople(actions, setRole, setSelection);
-  const views = useMemo(() => peopleViews(capabilities?.manageMembers === true), [capabilities]);
+  const views = useMemo(() => peopleViews(canSeeInvitations(authority)), [authority]);
   const [view, setView] = usePeopleView(views);
-  const canInvite = canAddPeopleToTeams(capabilities);
+  const canInvite = canInvitePeople(authority);
   const inviteButton = useMemo(
     () =>
       canInvite ? (
@@ -114,7 +83,6 @@ export function TeamSettings() {
           back={back}
           manageAccess={manageAccess}
           addPeople={people.addPeopleToTeam}
-          canInvite={canInvite}
         />
         {modal}
       </>

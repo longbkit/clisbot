@@ -27,8 +27,9 @@ A QC lead needs to manage the people on their own Team and Host. Today the only 
 - **Can share passes on** within your level, as a Drive editor can invite another editor.
 - **You change or remove only grants at or below your level.** Higher grants show locked.
 - **A Host grant reaches every Project on it**, so sharing a Host shares its Projects. Project grants follow the same rule inside one Project.
-- **Granting Administrator warns** that the person will control the daemon: restart, install plugins, use every Model, see every Project. Every Organization Admin is notified with the name of who granted it.
-- **Every grant shows who made it** ("by Hoa"), so it can be revoked at once.
+- **Granting Administrator warns** that the person will control the daemon: restart, install plugins, use every Model, see every Project. Every Organization Admin is notified with the name of who granted it and a link to the grant; the Access events list has **Revoke** on it.
+- **Every grant shows who made it** ("by Hoa") and whether it can share, on the Access page and in a person's or Team's access summary, so it can be revoked at once.
+- **Sharing a Project alone is enough to grant it.** The grantee also needs Connect on the Host; a Project sharer may write that one Connect-only Host row, and the Hub skips it when the grantee's Host row already connects.
 - Organization Owners and Admins are not limited by this rule.
 - Host name, daemon link, managed access mode, and removing the Host stay with Organization Admins: one Hub lists many Hosts, and a change by one team confuses everyone else who uses it.
 - Later, if an organization needs it: a policy "Only Organization Admins grant Administrator", off by default and invisible otherwise.
@@ -37,13 +38,17 @@ The Host level keeps the name **Administrator**. Because it can share, it now ma
 
 ## Team, Channel Route, Automation: Admin
 
-| Scope         | Admin manages                                                                                                             | Excluded                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Team          | Who is in the Team: add, remove, invite into it, appoint another Team Admin                                               | The Team's access grants                                                   |
-| Channel Route | Its Routes and Route defaults, status, relink, its own activity, its audience rules, granting Admin — in the app and chat | The bot token, creating or deleting the Connection, the shared policy file |
-| Automation    | One Automation: edit, enable, delete, grant Run or Admin                                                                  | Every other Automation                                                     |
+| Scope         | Admin manages                                                                                                             | Excluded                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Team          | Who is in the Team: add, remove, invite into it, appoint another Team Admin; reads the Team's grants                      | Changing the Team's access grants                                                                                         |
+| Channel Route | Its Routes and Route defaults, status, relink, its own activity, its audience rules, granting Admin — in the app and chat | The bot token and every credential in the account's settings, creating or deleting the Connection, the shared policy file |
+| Automation    | One Automation: edit, enable, grant Run or Admin (deleting is not offered yet)                                            | Every other Automation                                                                                                    |
 
 Who may talk to the bot is decided only in the Route's audience rules ([2026-09-19](../../audits/2026-09-19-route-audience-rules.md)), which a Channel Route Admin edits. The Channel Route's Access tab keeps only Admin; Use is no longer granted there. Channel Route **Manage** is renamed **Admin**; the wire key `manage` stays. Only an Organization Admin deletes a Team or Channel Route.
+
+A Channel Route Admin save (`management-api/channel-admin.ts`) re-checks delegation only for Routes whose target, approvals, tool reply path or Agent controls match no Route of the active revision (`routesNeedingDelegation` in [`delegation.ts`](../../../packages/hub/src/access/delegation.ts)). Editing who may talk to a Route they could not publish saves; copying that Route does not. Credentials in the account's `config` are hidden on read and kept on save ([`account-secrets.ts`](../../../packages/hub/src/channels/config/account-secrets.ts)): a key the channel's schema marks `.meta(SECRET)`, or any key named like a credential on channels whose `config` is passed through untyped.
+
+A Team Admin's invitations follow one rule for sending, listing, resending, and cancelling: role Member, and every Team named is one they administer (`auth/team-admin-invitations.ts`). An invitation that names another Team or the Admin role stays with Organization Admins, even when it names the Team Admin's Team too. In People a Team Admin sees the Teams they belong to or administer; the Hub's Team list stays complete because the Access form and Route audience rules name any Team.
 
 ## Automations
 
@@ -54,14 +59,15 @@ Built 2026-09-19 ([`management-api/automations.ts`](../../../packages/hub/src/ma
 - Admin reads, edits, enables, and grants on that one Automation. Run (`automation.run`) reads it and its runs and starts it. The list answers with each Automation's `scope` (`admin` or `run`), its `author`, and its `target` (Host and Project names); Organization Admins see every Automation.
 - **Run is shared as a tool.** The Automation's Access section and the grant form warn: "Runs with <author>'s access on <project>. The runner sees results but gets no Project access in the app." Nothing else is special server-side.
 - Every accepted run re-checks the author's access with the save-time check, keyed by the revision's `createdByUserId`. When it fails, the Hub disables the Automation with a `pausedReason`, records the run as rejected (`author_access_lost`), writes an `automation_paused` access event, and emails every Admin of the Automation. Any Admin lifts the pause by saving the Automation again, which runs the check again. Revisions without an author (imported from GitHub, or older than the field) are not re-checked.
+- A Channel input is a Route on a bot, so its author must be Channel Route Admin of that bot or an Organization Admin. The app saves a Route Admin's input through the per-account endpoint, which runs the Route delegation check above; a Member who administers no bot is told to ask an Organization Admin.
 - Members author manual and Channel inputs only. A Connection-sourced input (GitHub, Slack, Discord, Linear) is `automation_input_requires_admin`; `env` and GitHub authority are `automation_secret_requires_admin`. There is no admin-provided secret reference yet, so a Member's Automation carries no secrets at all. Deleting an Automation is not offered to anyone yet.
 
 ## Storage
 
-- Can share and scoped Admin are `hub.access.manage` in the same grant as the level. Hosts keep one grant per subject. Today that privilege is derived from the organization role and no resource accepts it ([`store.ts`](../../../packages/hub/src/access/store.ts) `PRIVILEGES_BY_RESOURCE`). Channel Route Admin keeps `channel.manage`.
+- Can share and scoped Admin are `hub.access.manage` in the same grant as the level. Hosts keep one grant per subject. Channel Route Admin is `["channel.manage", "hub.access.manage"]`; a row holding only `channel.manage` reads as Admin (`impliedPrivileges` in [`contract.ts`](../../../packages/hub/src/access/contract.ts)).
 - Team Admin needs a new resource kind `team`. The app parses `resourceKind` with a closed enum (`packages/app/src/clisbot/hub/contracts.ts`), so an older app would reject a catalog containing it. Gate it per [protocol compatibility](../../protocol-compatibility.md).
 - Assignments already store `createdByUserId` (`AccessAssignmentRecord` in [`store.ts`](../../../packages/hub/src/access/store.ts)).
-- Channel Route Admin in the app needs a per-account save of the channel configuration (it is one organization-wide file set today) and account-filtered activity and ingress. The per-Route delegation check already exists for `/promoteroutedefault`.
+- Channel Route Admin in the app saves one account file at a time and reads that account's activity, ingress, seen conversations and senders under `channel-configuration/accounts/…`, `channel-activity/accounts/…`, `channel-ingress/accounts/…` and `channel-accounts/<channel>/<account>/…`. It also reads the channel catalog, which carries no secrets.
 
 ## Options considered
 

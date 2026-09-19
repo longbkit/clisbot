@@ -8,7 +8,8 @@ import { settingsStyles } from "@/styles/settings";
 import { InviteAccessNote } from "./invite-access-note";
 import { InvitePeopleFields } from "./invite-people-fields";
 import { invitePreview, pendingInvitationNotes, type TeamAdditionPlan } from "./team-additions";
-import type { HubAccount, TeamResources } from "./types";
+import { invitableTeams, inviteRoleLocked } from "./team-membership";
+import type { HubAccount, HubTeam, TeamResources } from "./types";
 import {
   useInviteDraft,
   useInvitePlan,
@@ -18,6 +19,7 @@ import {
 import type { TeamActions } from "./use-team-actions";
 
 const HEADER: SheetHeader = { title: "Invite people" };
+const NO_TEAMS: HubTeam[] = [];
 
 /**
  * One modal for everyone who should be somewhere: existing Members join the chosen Teams now,
@@ -54,7 +56,11 @@ export function InvitePeopleModal({
     [close, onDone],
   );
   const submit = useSubmitInvite({ hub, resources, actions, draftState, plan, onDone: done });
-  const teams = resources.teams.data?.teams ?? [];
+  const teams = resources.teams.data?.teams ?? NO_TEAMS;
+  const offeredTeams = useMemo(
+    () => invitableTeams(resources.authority, teams),
+    [resources.authority, teams],
+  );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
@@ -83,7 +89,8 @@ export function InvitePeopleModal({
           draftState={draftState}
           plan={plan}
           unknown={unknown}
-          teams={teams}
+          teams={offeredTeams}
+          roleLocked={inviteRoleLocked(resources.authority)}
           disabled={actions.pending}
         />
         {preview.length === 0 ? null : <Alert variant="info" title={preview} />}

@@ -41,7 +41,11 @@ import { EntitlementDenied } from "../entitlements/catalog.js";
 import { entitlementDenialResponse } from "../entitlements/denial.js";
 import type { EntitlementsService } from "../entitlements/service.js";
 import type { InvitationMailer } from "../invitations/index.js";
-import { AccessStore } from "../access/store.js";
+import {
+  pendingInvitationScope,
+  teamAdminCoversInvitation,
+  teamsAdministeredBy,
+} from "./team-admin-invitations.js";
 
 const INVITATION_LIFETIME_HOURS = 48;
 
@@ -566,6 +570,10 @@ export class OrganizationAccess {
       );
       const pendingReinvite = alreadyPending.rows[0];
       if (pendingReinvite !== undefined) {
+        if (!capabilitiesFor(actorRole).manageMembers) {
+          // A Team Admin replaces only an invitation they could have sent themselves.
+          await this.requireTeamAdminOverInvitation(client, access, pendingReinvite.id);
+        }
         // The latest invite wins: it replaces the role and the Team set, and renews the expiry,
         // so resending is how an admin keeps an invitation open.
         await client.query(
@@ -631,7 +639,7 @@ export class OrganizationAccess {
   /**
    * A Team Admin (`hub.access.manage` on the Team, docs/features/access/scoped-admins.md)
    * invites Members into their own Teams only: the role stays `member` and every
-   * Team named must be one they administer.
+   * Team named must be one they administer (`teamAdminCoversInvitation`).
    */
   private async requireTeamAdminInvitation(
     client: TransactionHandle,
@@ -639,15 +647,22 @@ export class OrganizationAccess {
     role: InvitationRole,
     teamIds: readonly string[],
   ): Promise<void> {
-    if (role !== "member" || teamIds.length === 0) {
+    const administered = await teamsAdministeredBy(this.options.pool, access, client.drizzle());
+    if (!teamAdminCoversInvitation(role, teamIds, administered)) {
       throw new ProductRequestError(403, "forbidden");
     }
-    const administered = await new AccessStore(this.options.pool).listTeamsAdministeredBy(
-      access.organization.id,
-      { membershipId: access.membership.id, userId: access.account.id },
-      client.drizzle(),
-    );
-    if (teamIds.some((teamId) => !administered.includes(teamId))) {
+  }
+
+  /** The same rule for an invitation already pending: resending or cancelling it. */
+  private async requireTeamAdminOverInvitation(
+    client: TransactionHandle,
+    access: OrganizationAccessValue,
+    invitationId: string,
+  ): Promise<void> {
+    const scope = await pendingInvitationScope(client, access.organization.id, invitationId);
+    if (scope === undefined) throw new ProductRequestError(404, "invitation_unavailable");
+    const administered = await teamsAdministeredBy(this.options.pool, access, client.drizzle());
+    if (!teamAdminCoversInvitation(scope.role, scope.teamIds, administered)) {
       throw new ProductRequestError(403, "forbidden");
     }
   }
@@ -666,7 +681,7 @@ export class OrganizationAccess {
       await lockOrganizationMembers(client, access.organization.id);
       const actorRole = await currentActorRole(client, access);
       if (!capabilitiesFor(actorRole).manageMembers) {
-        throw new ProductRequestError(403, "forbidden");
+        await this.requireTeamAdminOverInvitation(client, access, input.invitationId);
       }
       const result = await client.query(
         `update invitation set status = 'canceled'
@@ -905,7 +920,10 @@ export class OrganizationAccess {
             },
           ];
     });
-    if (!access.capabilities.manageMembers) return { members: memberSummaries };
+    const administered = access.capabilities.manageMembers
+      ? undefined
+      : await teamsAdministeredBy(this.options.pool, access);
+    if (administered?.length === 0) return { members: memberSummaries };
     const invitations = await this.options.pool.query<InvitationRow>(
       `select invitation.id, invitation.organization_id,
               organization.name as organization_name, "user".name as inviter_name,
@@ -921,9 +939,18 @@ export class OrganizationAccess {
     );
     return {
       members: memberSummaries,
-      invitations: invitations.rows.map((invitation) =>
-        managerInvitationSummary(invitation, this.options.baseURL),
-      ),
+      // A Team Admin lists only the invitations they could send: `member` into their Teams.
+      invitations: invitations.rows
+        .filter(
+          (invitation) =>
+            administered === undefined ||
+            teamAdminCoversInvitation(
+              invitation.role,
+              invitation.teams.map(({ id }) => id),
+              administered,
+            ),
+        )
+        .map((invitation) => managerInvitationSummary(invitation, this.options.baseURL)),
     };
   }
 

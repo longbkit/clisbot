@@ -179,6 +179,31 @@ describe("decideGrant", () => {
     expect(decideGrant(routeAdmin, outside, resources)).toMatchObject({ allowed: false });
   });
 
+  it("lets a Channel Route Admin appoint another Admin on that account only", () => {
+    const all = { conversation: { kind: "all" as const } };
+    const routeAdmin: GrantActor = {
+      role: "member",
+      assignments: [
+        grant(
+          "channel_account",
+          "slack/support",
+          impliedPrivileges("channel_account", ["channel.manage"]),
+          all,
+        ),
+      ],
+    };
+    const appoint = {
+      resourceKind: "channel_account" as const,
+      resourceId: "slack/support",
+      privileges: [...RESOURCE_ACCESS_LEVELS.channel_account.manage],
+      constraints: all,
+    };
+    expect(decideGrant(routeAdmin, appoint, resources)).toEqual({ allowed: true });
+    expect(
+      decideGrant(routeAdmin, { ...appoint, resourceId: "slack/other" }, resources),
+    ).toMatchObject({ allowed: false });
+  });
+
   it("treats Full access and Administrator as sharing, and Team Admin as scoped to the Team", () => {
     expect(impliedPrivileges("daemon", ["daemon.connect", "daemon.manage"])).toContain(
       "hub.access.manage",
@@ -189,9 +214,8 @@ describe("decideGrant", () => {
     expect(impliedPrivileges("daemon", [...RESOURCE_ACCESS_LEVELS.daemon.developer])).not.toContain(
       "hub.access.manage",
     );
-    expect(impliedPrivileges("channel_account", ["channel.manage"])).not.toContain(
-      "hub.access.manage",
-    );
+    // A Channel Route Admin row written before the level carried hub.access.manage reads as Admin.
+    expect(impliedPrivileges("channel_account", ["channel.manage"])).toContain("hub.access.manage");
     const administrator: GrantActor = {
       role: "member",
       assignments: [

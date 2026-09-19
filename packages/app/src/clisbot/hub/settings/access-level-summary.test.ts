@@ -31,6 +31,7 @@ const LEVELS = {
   },
   project: { office_worker: OFFICE_WORKER, developer: DEVELOPER },
   team: { admin: ["hub.access.manage"] },
+  channel_account: { manage: ["channel.manage", "hub.access.manage"] },
   automation: { run: ["automation.run"], admin: ["automation.run", "hub.access.manage"] },
 };
 
@@ -122,6 +123,15 @@ describe("level names", () => {
     );
     expect(matchingAccessLevel(LEVELS, "project", ["project.use"])).toBeUndefined();
     expect(matchingAccessLevel(LEVELS, "channel_account", ["channel.use"])).toBeUndefined();
+    expect(
+      matchingAccessLevel(LEVELS, "channel_account", ["channel.manage", "hub.access.manage"]),
+    ).toBe("manage");
+    expect(
+      summarizeAccess({
+        privileges: ["channel.manage", "hub.access.manage"],
+        resourceKind: "channel_account",
+      }).allows,
+    ).toContain("Appoint another Admin on this Route");
   });
 
   it("matches a Host or Project level with or without Can share, and keeps Admin whole", () => {

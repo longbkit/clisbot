@@ -6,6 +6,7 @@ import { settingsStyles } from "@/styles/settings";
 import {
   accessLevelLabel,
   constraintSummary,
+  grantedByLabel,
   privilegeLabel,
   resourceKindLabel,
   type AccessAssignment,
@@ -215,16 +216,6 @@ function assignmentDetail(assignment: AccessAssignment, context: AssignmentRowCo
     ...(summary ? [summary] : []),
     grantedByLabel(assignment, context.memberNameByUserId),
   ].join(" · ");
-}
-
-/** Who made the grant, so it can be revoked at once. Null means the Hub itself wrote it. */
-function grantedByLabel(
-  assignment: AccessAssignment,
-  memberNameByUserId: Map<string, string>,
-): string {
-  const userId = assignment.createdByUserId ?? null;
-  if (userId === null) return "by Hub";
-  return `by ${memberNameByUserId.get(userId) ?? "a former Member"}`;
 }
 
 /** A row above the viewer's own level shows locked: no Edit, no Remove. */

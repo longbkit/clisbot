@@ -4,12 +4,12 @@ import type { SegmentedControlOption } from "@/components/ui/segmented-control";
 
 export type PeopleView = "members" | "teams" | "invitations";
 
-/** The People tabs; Invitations only for roles that manage Members, who alone can read them. */
-export function peopleViews(canManageMembers: boolean): SegmentedControlOption<PeopleView>[] {
+/** The People tabs; Invitations only for viewers who can read them (`canSeeInvitations`). */
+export function peopleViews(showInvitations: boolean): SegmentedControlOption<PeopleView>[] {
   return [
     { value: "members", label: "Members" },
     { value: "teams", label: "Teams" },
-    ...(canManageMembers ? [{ value: "invitations" as const, label: "Invitations" }] : []),
+    ...(showInvitations ? [{ value: "invitations" as const, label: "Invitations" }] : []),
   ];
 }
 

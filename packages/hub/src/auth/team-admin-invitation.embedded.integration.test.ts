@@ -67,6 +67,43 @@ it("lets a Team Admin invite Members into their own Teams only", async () => {
       403,
     );
     assert.equal(await pendingInvitationCount(runtime), 1);
+
+    // The owner's invitations stay out of reach: an admin into QC, a Member into Design.
+    const ownerInvite = async (body: unknown) =>
+      z
+        .object({ id: z.string() })
+        .parse(
+          await (await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, body)).json(),
+        ).id;
+    const adminInvitation = await ownerInvite({
+      email: "e@example.test",
+      role: "admin",
+      teamIds: [qcTeam],
+    });
+    const designInvitation = await ownerInvite({
+      email: "f@example.test",
+      role: "member",
+      teamIds: [designTeam],
+    });
+    const leadState = await state(auth, leadCookie);
+    if (leadState.status !== "active") throw new Error("lead state is not active");
+    assert.deepEqual(
+      leadState.team.invitations?.map(({ email }) => email),
+      ["a@example.test"],
+    );
+    // Resending over an invitation they could not send is refused too.
+    assert.equal(
+      (await invite({ email: "e@example.test", role: "member", teamIds: [qcTeam] })).status,
+      403,
+    );
+    const cancel = (invitationId: string) =>
+      post(auth, "/api/auth/paseo/cancel-invitation", leadCookie, { invitationId });
+    assert.equal((await cancel(adminInvitation)).status, 403);
+    assert.equal((await cancel(designInvitation)).status, 403);
+    const own = leadState.team.invitations?.[0]?.id;
+    assert.ok(own !== undefined);
+    assert.equal((await cancel(own)).status, 200);
+    assert.equal(await pendingInvitationCount(runtime), 2);
   } finally {
     await auth.close();
     await entitlements.close();

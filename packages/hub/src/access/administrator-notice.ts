@@ -19,6 +19,8 @@ export interface AdministratorGrantNotice {
   organizationId: string;
   actor: { userId: string; name: string };
   resources: readonly AccessResourceRecord[];
+  /** Where the app is served; the email links to the grant on its Access page to revoke it. */
+  appOrigin: string;
 }
 
 /** Rows that hold `daemon.manage` now and did not before this write. */
@@ -68,7 +70,10 @@ export async function recordAdministratorGranted(
         id: event.id,
         to: recipients,
         subject: `${subject} is now Administrator of ${host}`,
-        text: `${notice.actor.name} granted ${subject} Administrator on Host ${host}. An Administrator controls the daemon: restart, plugins, every Model, every Project.`,
+        text: [
+          `${notice.actor.name} granted ${subject} Administrator on Host ${host}. An Administrator controls the daemon: restart, plugins, every Model, every Project.`,
+          `Review or revoke it: ${administratorGrantLink(notice.appOrigin, row)}`,
+        ].join("\n\n"),
       })
       .catch((error: unknown) => {
         reportFailure(error, {
@@ -78,6 +83,19 @@ export async function recordAdministratorGranted(
         });
       });
   }
+}
+
+/** The app's Access page opened on this grant (`AccessSettings` reads these params). */
+export function administratorGrantLink(
+  appOrigin: string,
+  row: Pick<AccessAssignmentRecord, "resourceKind" | "resourceId" | "subjectKind" | "subjectId">,
+): string {
+  const url = new URL("/settings/hub/access", appOrigin);
+  url.searchParams.set("resourceKind", row.resourceKind);
+  url.searchParams.set("resourceId", row.resourceId);
+  url.searchParams.set("subjectKind", row.subjectKind);
+  url.searchParams.set("subjectId", row.subjectId);
+  return url.toString();
 }
 
 async function administratorEmails(

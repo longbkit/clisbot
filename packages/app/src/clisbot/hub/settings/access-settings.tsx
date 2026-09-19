@@ -49,6 +49,7 @@ import {
   type AccessCatalog,
   type HubMember,
   type HubTeam,
+  memberNamesByUserId,
 } from "./access-catalog";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
@@ -461,6 +462,10 @@ function ManagedAccessContent({
       {authority.unrestricted ? (
         <AccessEventsSection
           resources={catalog.resources}
+          assignments={assignments}
+          authority={authority}
+          pending={pending}
+          remove={remove}
           memberNameByUserId={directory.memberNameByUserId}
           teamById={directory.teamById}
           memberById={directory.memberById}
@@ -486,7 +491,7 @@ function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
         ]),
       ),
       memberById: new Map(members.map((member) => [member.id, `${member.name} · ${member.email}`])),
-      memberNameByUserId: new Map(members.map((member) => [member.userId, member.name])),
+      memberNameByUserId: memberNamesByUserId(members),
     }),
     [members, teams],
   );

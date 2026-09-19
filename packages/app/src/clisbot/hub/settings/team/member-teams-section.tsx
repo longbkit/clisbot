@@ -7,7 +7,10 @@ import { EmptyRow } from "../resource-rows";
 import type { HubMember, HubTeam } from "./types";
 import type { TeamActions } from "./use-team-actions";
 
-/** Every Team, with whether this Member is in it; managers toggle membership row by row. */
+/**
+ * Every Team People shows, with whether this Member is in it; whoever manages a Team's
+ * membership (Organization Admins, its Team Admins) toggles it row by row.
+ */
 export function MemberTeamsSection({
   member,
   teams,
@@ -17,7 +20,7 @@ export function MemberTeamsSection({
   member: HubMember;
   teams: readonly HubTeam[];
   actions: TeamActions;
-  canManage: boolean;
+  canManage(teamId: string): boolean;
 }) {
   return (
     <SettingsSection title="Teams">
@@ -31,7 +34,7 @@ export function MemberTeamsSection({
               team={team}
               userId={member.userId}
               bordered={index > 0}
-              canManage={canManage}
+              canManage={canManage(team.id)}
               actions={actions}
             />
           ))

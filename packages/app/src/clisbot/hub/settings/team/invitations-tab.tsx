@@ -18,12 +18,12 @@ const INVITATION_SEARCH_THRESHOLD = 6;
 function invitationChips(
   invitations: readonly HubManagedInvitation[],
 ): FilterChip<InvitationFilter>[] {
-  const count = (state: "expiringSoon" | "expired") =>
+  // No Expired chip: the Hub lists only invitations that have not expired yet.
+  const count = (state: "expiringSoon") =>
     invitations.filter(({ expiresAt }) => invitationState(expiresAt) === state).length;
   return [
     { value: "all", label: "Invitations", count: invitations.length },
     { value: "expiringSoon", label: "Expiring soon", count: count("expiringSoon") },
-    { value: "expired", label: "Expired", count: count("expired") },
   ];
 }
 

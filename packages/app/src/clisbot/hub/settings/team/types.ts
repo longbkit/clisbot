@@ -27,13 +27,22 @@ export type HubManagedInvitation = NonNullable<
 >[number];
 export type InvitationRole = "admin" | "member";
 
+/** What the viewer may do on People: their organization role, and the Teams they are Team Admin of. */
+export interface PeopleAuthority {
+  capabilities: HubCapabilities | undefined;
+  administeredTeamIds: ReadonlySet<string>;
+}
+
 /**
  * The Team settings resources, loaded once by the Team settings screen and shared by its tabs.
- * `connections`, `assignments`, and `catalog` load only for roles that manage resources; check
- * `canManageResources` before reading or showing their state.
+ * `connections` and `catalog` load only for roles that manage resources; check
+ * `canManageResources` before reading or showing their state. `assignments` also loads for a
+ * Team Admin, holding only the Team Admin rows of their Teams. `teams` holds the Teams People
+ * shows (`visibleTeams`).
  */
 export interface TeamResources {
   canManageResources: boolean;
+  authority: PeopleAuthority;
   members: UseQueryResult<z.infer<typeof HubMembersSchema>, Error>;
   teams: UseQueryResult<z.infer<typeof HubTeamsSchema>, Error>;
   identities: UseQueryResult<z.infer<typeof HubChannelIdentitiesSchema>, Error>;

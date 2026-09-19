@@ -276,6 +276,11 @@ it("lets Can share grant up to its own level on a Host, and tells Admins about A
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0]?.to, ["owner@example.test"]);
   assert.match(sent[0]?.text ?? "", /owner granted other Administrator/);
+  assert.ok(
+    sent[0]?.text.includes(
+      `https://hub.example.test/settings/hub/access?resourceKind=daemon&resourceId=${TEST_DAEMON_ID}&subjectKind=member&subjectId=${OTHER.membershipId}`,
+    ),
+  );
   // The lead cannot remove a grant above their level; it shows locked.
   const locked = listSchema.parse(
     await (await owner.handle(request("/access-assignments", "GET"))).json(),
@@ -308,6 +313,89 @@ it("lets Can share grant up to its own level on a Host, and tells Admins about A
     200,
   );
 });
+
+it("lets a Project sharer write the Connect row a Project grant needs, never replacing a wider Host row", async () => {
+  const catalog = catalogSchema.parse(
+    await (await owner.handle(request("/access-catalog", "GET"))).json(),
+  );
+  const projectId = catalog.resources.find(({ kind }) => kind === "project")?.id;
+  assert.ok(projectId !== undefined);
+  const projectGrant = (subjectId: string, privileges: readonly string[]) => ({
+    subjectKind: "member",
+    subjectId,
+    resourceKind: "project",
+    resourceId: projectId,
+    privileges: [...privileges],
+    constraints: { agentConfigurations: [codex] },
+  });
+  const connect = {
+    subjectKind: "member",
+    subjectId: OTHER.membershipId,
+    resourceKind: "daemon",
+    resourceId: TEST_DAEMON_ID,
+    privileges: ["daemon.connect"],
+    constraints: {},
+  };
+  assert.equal(
+    (
+      await owner.handle(
+        request(
+          "/access-assignments",
+          "POST",
+          projectGrant(LEAD.membershipId, [
+            ...RESOURCE_ACCESS_LEVELS.project.developer,
+            "hub.access.manage",
+          ]),
+        ),
+      )
+    ).status,
+    201,
+  );
+  const office = projectGrant(OTHER.membershipId, RESOURCE_ACCESS_LEVELS.project.office_worker);
+  const first = await lead.handle(
+    request("/access-assignments/batch", "POST", { assignments: [connect, office] }),
+  );
+  assert.equal(first.status, 201);
+  assert.deepEqual(await hostPrivileges(OTHER.membershipId), ["daemon.connect"]);
+
+  // Once an Owner widens the Host row, the same Project grant leaves it alone.
+  await owner.handle(
+    request(
+      "/access-assignments",
+      "POST",
+      hostGrant(OTHER.membershipId, RESOURCE_ACCESS_LEVELS.daemon.developer),
+    ),
+  );
+  const again = await lead.handle(
+    request("/access-assignments/batch", "POST", { assignments: [connect, office] }),
+  );
+  assert.equal(again.status, 201);
+  assert.deepEqual(await hostPrivileges(OTHER.membershipId), [
+    ...RESOURCE_ACCESS_LEVELS.daemon.developer,
+  ]);
+  // Sent alone it is no Project grant's companion: replacing the wider row is refused.
+  const alone = await lead.handle(
+    request("/access-assignments", "POST", hostGrant(OTHER.membershipId, ["daemon.connect"])),
+  );
+  assert.equal(alone.status, 403);
+});
+
+async function hostPrivileges(subjectId: string): Promise<string[] | undefined> {
+  const listed = z
+    .object({
+      assignments: z.array(
+        z.object({
+          resourceKind: z.string(),
+          subjectId: z.string(),
+          privileges: z.array(z.string()),
+        }),
+      ),
+    })
+    .parse(await (await owner.handle(request("/access-assignments", "GET"))).json());
+  return listed.assignments.find(
+    (row) => row.resourceKind === "daemon" && row.subjectId === subjectId,
+  )?.privileges;
+}
 
 async function problemCode(response: Response): Promise<string> {
   return z.object({ error: z.string() }).parse(await response.json()).error;
