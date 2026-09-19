@@ -18,7 +18,7 @@ export interface ChannelReplyOutputBudget {
 export interface ChannelReplyCapability {
   organizationId: string;
   channelRevisionId: string | null;
-  routePosition: number | "fallback";
+  routePosition: number;
   routeFingerprint: string;
   ref: ChannelReplyBindingRef;
   projectRoot?: string | undefined;
@@ -74,7 +74,7 @@ export interface ChannelReplyCapability {
 export interface ChannelReplyCapabilityInput {
   organizationId: string;
   channelRevisionId: string | null;
-  routePosition: number | "fallback";
+  routePosition: number;
   routeFingerprint: string;
   ref: ChannelReplyBindingRef;
   projectRoot?: string | undefined;
@@ -492,16 +492,19 @@ function toRow(hash: string, capability: PendingChannelReplyCapability): Channel
 }
 
 /** A stored row as a live capability; `undefined` for a channel this build
- * no longer supports, so one stale row cannot fail the whole rehydration. */
+ * no longer supports or a Route position that is not an index, so one stale
+ * row cannot fail the whole rehydration. */
 function fromRow(
   row: ChannelReplyCapabilityRow,
   turnOutputMax: number,
 ): PendingChannelReplyCapability | undefined {
   if (!isSupportedChannel(row.channel)) return undefined;
+  const routePosition = Number(row.routePosition);
+  if (!Number.isInteger(routePosition) || routePosition < 0) return undefined;
   return {
     organizationId: row.organizationId,
     channelRevisionId: row.channelRevisionId,
-    routePosition: row.routePosition === "fallback" ? "fallback" : Number(row.routePosition),
+    routePosition,
     routeFingerprint: row.routeFingerprint,
     ref: {
       channel: row.channel,

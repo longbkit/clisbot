@@ -99,7 +99,6 @@ function context(
     defaults: route.defaults,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
   return {
     agentId: overrides.agentId ?? AGENT_ID,

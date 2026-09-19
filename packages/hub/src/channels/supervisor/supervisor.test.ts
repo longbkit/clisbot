@@ -52,12 +52,9 @@ connectionId: slack:${accountId}
 transport:
   mode: socket
 ${enabled ? "" : "enabled: false\n"}routes:
-  - match:
-      kind: dm
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: codex-safe
     environment: work
-fallback:
-  deny: true
 `;
 }
 
@@ -256,12 +253,9 @@ connectionId: discord:guild
 transport:
   mode: gateway
 routes:
-  - match:
-      kind: channel
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: codex-safe
     environment: work
-fallback:
-  deny: true
 `,
           },
         ],

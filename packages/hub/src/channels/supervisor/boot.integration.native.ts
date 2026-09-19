@@ -393,20 +393,11 @@ connectionId: ${connectionId}
 transport:
   mode: socket
 routes:
-  - match:
-      kind: channel
-      ids: [C-WORKFLOW-E2E]
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C-WORKFLOW-E2E] } }]
     workflow: boot-strap
-  - match:
-      kind: thread
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: codex-e2e
     environment: work
-  - match:
-      kind: channel
-    agent: codex-e2e
-    environment: work
-fallback:
-  deny: true
 `;
 }
 
@@ -418,16 +409,9 @@ connectionId: ${connectionId}
 transport:
   mode: polling
 routes:
-  - match:
-      kind: group
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: codex-e2e
     environment: work
-  - match:
-      kind: topic
-    agent: codex-e2e
-    environment: work
-fallback:
-  deny: true
 `;
 }
 
@@ -439,13 +423,9 @@ connectionId: ${connectionId}
 transport:
   mode: gateway
 routes:
-  - match:
-      kind: channel
-      ids: [${DISCORD_TEST_CHANNEL_ID ?? ""}]
+  - audience: [{ who: { roles: [member] }, where: { conversations: [${DISCORD_TEST_CHANNEL_ID ?? ""}] } }]
     agent: codex-e2e
     environment: work
-fallback:
-  deny: true
 `;
 }
 

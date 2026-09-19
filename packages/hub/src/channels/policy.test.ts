@@ -17,11 +17,10 @@ import {
   effectivePrivileges,
   effectiveRoles,
   isOpenAudienceRoute,
-  fallbackRoleScope,
   isEnabled,
   mayApprove,
   mayTrigger,
-  matchRoute,
+  routeMatches,
   postureIsApprovalRequired,
   resolvePrincipal,
   routeRoleScope,
@@ -117,7 +116,6 @@ interface AccountOverrides {
   defaultRoles?: string[];
   assignments?: readonly RoleAssignment[];
   routes?: readonly CompiledRoute[];
-  fallback?: CompiledChannelAccount["fallback"];
 }
 
 function makeAccount(overrides: AccountOverrides = {}): CompiledChannelAccount {
@@ -134,7 +132,6 @@ function makeAccount(overrides: AccountOverrides = {}): CompiledChannelAccount {
     defaults: DEFAULTS,
     approval: [],
     routes: overrides.routes ?? [],
-    fallback: overrides.fallback ?? { deny: true },
   };
 }
 
@@ -194,6 +191,16 @@ function toolRequest(name: string, input?: Record<string, unknown>): AgentPermis
 }
 
 // --- Tool-class mapping ----------------------------------------------------------
+
+/** Conversation-only coverage, sender not consulted: the first Route whose
+ * Where (and `contains`) apply. */
+function firstCoveringRoute(
+  conversation: Parameters<typeof routeMatches>[1],
+  account: CompiledChannelAccount,
+  text?: string,
+): CompiledRoute | null {
+  return account.routes.find((route) => routeMatches(route, conversation, text)) ?? null;
+}
 
 describe("classifyToolClass", () => {
   it("maps shell tools to command", () => {
@@ -441,8 +448,8 @@ describe("route matching (first match wins)", () => {
         }),
       ],
     });
-    const result = matchRoute({ kind: "channel", id: "C0APP" }, account);
-    assert.equal(result.route, account.routes[0], "the kind-level route declared first wins");
+    const result = firstCoveringRoute({ kind: "channel", id: "C0APP" }, account);
+    assert.equal(result, account.routes[0], "the kind-level route declared first wins");
   });
 
   it("matches a specific channel id", () => {
@@ -455,11 +462,11 @@ describe("route matching (first match wins)", () => {
         }),
       ],
     });
-    assert.ok(matchRoute({ kind: "channel", id: "C0APP" }, account).route !== null);
-    assert.ok(matchRoute({ kind: "channel", id: "C0OTHER" }, account).route === null);
+    assert.ok(firstCoveringRoute({ kind: "channel", id: "C0APP" }, account) !== null);
+    assert.ok(firstCoveringRoute({ kind: "channel", id: "C0OTHER" }, account) === null);
   });
 
-  it("uses a case-sensitive literal text condition before a catch-all route", () => {
+  it("uses a case-sensitive literal text condition before a route without one", () => {
     const plane = makePlane();
     const account = makeAccount({
       routes: [
@@ -476,14 +483,14 @@ describe("route matching (first match wins)", () => {
       ],
     });
     assert.equal(
-      matchRoute({ kind: "channel", id: "C0APP" }, account, "please #triage this").route,
+      firstCoveringRoute({ kind: "channel", id: "C0APP" }, account, "please #triage this"),
       account.routes[0],
     );
     assert.equal(
-      matchRoute({ kind: "channel", id: "C0APP" }, account, "please #TRIAGE this").route,
+      firstCoveringRoute({ kind: "channel", id: "C0APP" }, account, "please #TRIAGE this"),
       account.routes[1],
     );
-    assert.equal(matchRoute({ kind: "channel", id: "C0APP" }, account).route, account.routes[1]);
+    assert.equal(firstCoveringRoute({ kind: "channel", id: "C0APP" }, account), account.routes[1]);
   });
 
   it("matches kind-level routes with empty ids (incl. DMs)", () => {
@@ -496,11 +503,11 @@ describe("route matching (first match wins)", () => {
         }),
       ],
     });
-    assert.ok(matchRoute({ kind: "dm", id: "D1" }, account).route !== null);
-    assert.ok(matchRoute({ kind: "channel", id: "C1" }, account).route === null);
+    assert.ok(firstCoveringRoute({ kind: "dm", id: "D1" }, account) !== null);
+    assert.ok(firstCoveringRoute({ kind: "channel", id: "C1" }, account) === null);
   });
 
-  it("falls back to the deny fallback when no route matches", () => {
+  it("matches no route when none covers the conversation: there is no catch-all", () => {
     const plane = makePlane();
     const account = makeAccount({
       routes: [
@@ -509,35 +516,8 @@ describe("route matching (first match wins)", () => {
           where: { dm: false, groups: [], conversations: ["C0APP"] },
         }),
       ],
-      fallback: { deny: true },
     });
-    const result = matchRoute({ kind: "group", id: "G1" }, account);
-    assert.equal(result.route, null);
-    assert.equal(result.target, null);
-    assert.equal(result.fallback.deny, true);
-  });
-
-  it("falls back to the catch-all route when fallback is not deny", () => {
-    const catchAllTarget: CompiledRoute["target"] = {
-      kind: "agent",
-      agent: "assistant",
-      environment: "lab",
-      template: null,
-    };
-    const account = makeAccount({
-      routes: [],
-      fallback: {
-        deny: false,
-        target: catchAllTarget,
-        defaultRoles: ["user"],
-        assignments: [],
-        approval: [],
-      },
-    });
-    const result = matchRoute({ kind: "dm", id: "D9" }, account);
-    assert.equal(result.route, null);
-    assert.equal(result.target, catchAllTarget);
-    assert.equal(result.fallback.deny, false);
+    assert.equal(firstCoveringRoute({ kind: "group", id: "G1" }, account), null);
   });
 
   // A bare account the route fixtures can reference without recursion.
@@ -555,7 +535,6 @@ describe("route matching (first match wins)", () => {
       defaults: DEFAULTS,
       approval: [],
       routes: [],
-      fallback: { deny: true },
     };
   }
 });
@@ -812,27 +791,5 @@ describe("approval-required posture (plan S10)", () => {
       ],
     });
     assert.equal(postureIsApprovalRequired(route), true);
-  });
-});
-
-// --- Fallback role scope -----------------------------------------------------------
-
-describe("fallbackRoleScope", () => {
-  it("concatenates org, account, and fallback assignments additively", () => {
-    const plane = makePlane({
-      assignments: [{ identities: ["user:long.luong"], roles: ["user"] }],
-    });
-    const account = makeAccount({
-      assignments: [{ identities: ["slack:U0ALICE"], roles: ["approver"] }],
-      fallback: {
-        deny: false,
-        target: { kind: "agent", agent: "a", environment: "e", template: null },
-        defaultRoles: ["operator"],
-        assignments: [{ identities: ["slack:U0ALICE"], roles: ["admin"] }],
-        approval: [],
-      },
-    });
-    const roles = effectiveRoles("long.luong", [fallbackRoleScope(plane, account)], plane);
-    assert.deepEqual([...roles].sort(), ["admin", "approver", "operator", "user"]);
   });
 });

@@ -4,7 +4,6 @@ import {
   audienceRuleFromDraft,
   audienceRuleSentence,
   audienceRulesComplete,
-  fallbackAudienceDraft,
   membersEverywhereRule,
   routeAudienceDraft,
   routeAudienceSummary,
@@ -44,63 +43,8 @@ describe("routeAudienceDraft", () => {
     ]);
   });
 
-  it.each([
-    [
-      "a channel match with ids narrows to those conversations",
-      {
-        match: { kind: "channel", ids: ["C1", "C2"], contains: "#help" },
-        audience: { kind: "members" },
-      },
-      { roles: ["member"], anyone: false },
-      { dm: false, groups: "off", conversations: "C1, C2" },
-      "#help",
-    ],
-    [
-      "an id-less thread match covers every group chat",
-      { match: { kind: "thread" }, audience: { kind: "conversationParticipants" } },
-      { roles: [], anyone: true },
-      { dm: false, groups: "all", conversations: "" },
-      "",
-    ],
-    [
-      "a DM match is the DM Where",
-      { match: { kind: "dm" } },
-      { roles: ["member"], anyone: false },
-      { dm: true, groups: "off", conversations: "" },
-      "",
-    ],
-    [
-      "no match at all means Members everywhere",
-      { agent: "worker" },
-      { roles: ["member"], anyone: false },
-      { dm: true, groups: "all", conversations: "" },
-      "",
-    ],
-  ])("normalizes the old shape: %s", (_name, route, who, where, contains) => {
-    const draft = routeAudienceDraft(route);
-    expect(draft.contains).toBe(contains);
-    expect(draft.rules).toHaveLength(1);
-    expect(draft.rules[0]!.who).toMatchObject(who);
-    expect(draft.rules[0]!.where).toEqual(where);
-  });
-});
-
-describe("fallbackAudienceDraft", () => {
-  it("keeps deny and seeds Members everywhere for when it is switched on", () => {
-    const denied = fallbackAudienceDraft({ deny: true });
-    expect(denied.deny).toBe(true);
-    expect(withoutIds(denied.rules)).toEqual(withoutIds([membersEverywhereRule()]));
-    expect(fallbackAudienceDraft(undefined).deny).toBe(true);
-  });
-
-  it("reads an open catch-all as Anyone everywhere", () => {
-    const draft = fallbackAudienceDraft({
-      audience: { kind: "conversationParticipants" },
-      agent: "worker",
-    });
-    expect(draft.deny).toBe(false);
-    expect(draft.rules[0]!.who.anyone).toBe(true);
-    expect(draft.rules[0]!.where).toEqual({ dm: true, groups: "all", conversations: "" });
+  it("gives a Route without audience rules no rules", () => {
+    expect(routeAudienceDraft({ agent: "worker" })).toEqual({ rules: [], contains: "" });
   });
 });
 
@@ -178,13 +122,14 @@ describe("audienceRuleErrors", () => {
     const message = [
       "channels/slack/support.yml.routes.0.audience.1.who: an audience rule needs at least one Who part",
       "channels/slack/support.yml.routes.2.audience.0: unrelated route",
-      "channels/slack/support.yml.fallback.audience.0.where: an audience rule needs at least one Where part",
+      "channels/slack/support.yml.routes.2.audience.3.where: an audience rule needs at least one Where part",
     ].join("\n");
     expect([...audienceRuleErrors(message, 0)]).toEqual([
       [1, "an audience rule needs at least one Who part"],
     ]);
-    expect([...audienceRuleErrors(message, "fallback")]).toEqual([
-      [0, "an audience rule needs at least one Where part"],
+    expect([...audienceRuleErrors(message, 2)]).toEqual([
+      [0, "unrelated route"],
+      [3, "an audience rule needs at least one Where part"],
     ]);
     expect(audienceRuleErrors("something else", 0).size).toBe(0);
   });

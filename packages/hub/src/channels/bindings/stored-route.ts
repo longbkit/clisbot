@@ -13,7 +13,6 @@
 import { createHash } from "node:crypto";
 import type {
   CompiledChannelAccount,
-  CompiledFallback,
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
@@ -45,7 +44,7 @@ export interface StoredRouteSummary {
    * reading rows back; no routing decision reads it. */
   selection?: {
     revisionId: string | null;
-    position: number | "fallback";
+    position: number;
     fingerprint: string;
   };
 }
@@ -53,7 +52,7 @@ export interface StoredRouteSummary {
 export function bindingSummary(
   route: CompiledRoute,
   conversation: InboundConversationDetail,
-  selection?: { revisionId: string | null; position: number | "fallback" },
+  selection?: { revisionId: string | null; position: number },
   conversationLabel?: string,
 ): StoredRouteSummary {
   const match = {
@@ -82,12 +81,10 @@ export function bindingSummary(
 }
 
 /** Internal position of a compiled route inside one immutable account revision. */
-export function routePosition(
-  account: CompiledChannelAccount,
-  route: CompiledRoute,
-): number | "fallback" {
+export function routePosition(account: CompiledChannelAccount, route: CompiledRoute): number {
   const position = account.routes.indexOf(route);
-  return position < 0 ? "fallback" : position;
+  if (position < 0) throw new Error("route is not one of this account's routes");
+  return position;
 }
 
 /** Content hash of a compiled route: provenance on a binding row, and the
@@ -107,15 +104,11 @@ export function parseStoredRouteSelection(
   const position = (selection as { position?: unknown }).position;
   const fingerprint = (selection as { fingerprint?: unknown }).fingerprint;
   if (revisionId !== null && typeof revisionId !== "string") return undefined;
-  if (position !== "fallback" && (!Number.isInteger(position) || Number(position) < 0)) {
+  if (typeof position !== "number" || !Number.isInteger(position) || position < 0) {
     return undefined;
   }
   if (typeof fingerprint !== "string" || fingerprint.length === 0) return undefined;
-  return {
-    revisionId: revisionId as string | null,
-    position: position as number | "fallback",
-    fingerprint,
-  };
+  return { revisionId: revisionId as string | null, position, fingerprint };
 }
 
 /**
@@ -172,26 +165,39 @@ export function parseStoredRouteSummary(stored: unknown): InboundConversation | 
  * among the Routes whose Where still covers the recorded conversation, the one
  * the binding recorded — by content hash while it is unchanged, by position
  * after an edit — and otherwise the first that covers it. No Route covering
- * it → the catch-all when there is one, else undefined (unserved).
+ * it → undefined (unserved).
  */
 export function storedRouteOwner(
   account: CompiledChannelAccount,
   binding: Pick<ThreadBindingRecord, "route" | "externalConversationId">,
   live?: InboundConversation,
-): CompiledRoute | CompiledFallback | undefined {
+): CompiledRoute | undefined {
   const conversation = live ??
     parseStoredRouteSummary(binding.route) ?? {
       kind: "channel" as const,
       id: binding.externalConversationId,
     };
+  return recordedRoute(account, conversation, parseStoredRouteSelection(binding.route));
+}
+
+/**
+ * The Route a recorded selection still points at: among the Routes whose Where
+ * covers the conversation, the recorded one by content hash, then by position,
+ * then the first that covers it. Shared by bound conversations and Workflow
+ * output so both answer "which Route owns this" the same way.
+ */
+export function recordedRoute(
+  account: CompiledChannelAccount,
+  conversation: InboundConversation,
+  selection:
+    | Pick<NonNullable<StoredRouteSummary["selection"]>, "position" | "fingerprint">
+    | undefined,
+): CompiledRoute | undefined {
   const covering = account.routes.filter((route) => routeConversationMatches(route, conversation));
-  if (covering.length === 0) return account.fallback.deny ? undefined : account.fallback;
-  const selection = parseStoredRouteSelection(binding.route);
   if (selection === undefined) return covering[0];
   const byFingerprint = covering.find((route) => routeFingerprint(route) === selection.fingerprint);
   if (byFingerprint !== undefined) return byFingerprint;
-  const byPosition =
-    selection.position === "fallback" ? undefined : account.routes[selection.position];
+  const byPosition = account.routes[selection.position];
   return byPosition !== undefined && covering.includes(byPosition) ? byPosition : covering[0];
 }
 

@@ -115,7 +115,6 @@ export function ChannelActivity({
         value: String(index),
         label: `Route ${index + 1}`,
       })),
-      { id: "fallback", value: "fallback", label: "Fallback" },
     ],
     [selectedAccount?.routes],
   );
@@ -535,7 +534,7 @@ function ActivityDetail({ label, value }: { label: string; value: string }) {
   );
 }
 function routeLabel(entry: ActivityEntry): string {
-  return entry.routePosition === "fallback" ? "Fallback" : `Route ${entry.routePosition + 1}`;
+  return `Route ${entry.routePosition + 1}`;
 }
 function outcomeLabel(entry: ActivityEntry): string {
   return entry.limitDecision === "denied" ? "Blocked by Route limits" : OUTCOMES[entry.outcome];

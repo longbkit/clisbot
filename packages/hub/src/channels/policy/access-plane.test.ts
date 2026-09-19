@@ -1,3 +1,4 @@
+import { compileAudienceRule } from "../config/audience.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 // The access plane on the production path: `createChannelPlane` over the real
 // ChannelStore (embedded PGlite) and a fake daemon. Proves the four things a
@@ -55,9 +56,10 @@ function makeRoute(options: {
   access?: EffectiveAccess;
   selectable?: CompiledRoute["selectable"];
   where?: CompiledRoute["where"];
+  audienceRules?: CompiledRoute["audienceRules"];
 }): CompiledRoute {
   return {
-    audienceRules: [],
+    audienceRules: options.audienceRules ?? [],
     where: options.where ?? { dm: true, groups: [], conversations: [] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
@@ -85,7 +87,6 @@ function makeAccount(accountId: string, route: CompiledRoute): CompiledChannelAc
     defaults: route.defaults,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
 }
 
@@ -144,7 +145,6 @@ function makeHarness(options: {
   accountId?: string;
   route: CompiledRoute;
   commandAccess?: ChannelPlaneDeps["commandAccess"];
-  authorizeChannelUse?: ChannelPlaneDeps["authorizeChannelUse"];
 }): Harness {
   const accountId = options.accountId ?? "work";
   const account = makeAccount(accountId, options.route);
@@ -217,9 +217,6 @@ function makeHarness(options: {
     normalizeInbound: () => next.message,
     envFlag: true,
     controlPlane: makeControlPlane(account),
-    ...(options.authorizeChannelUse === undefined
-      ? {}
-      : { authorizeChannelUse: options.authorizeChannelUse }),
     commandAccess: options.commandAccess ?? {
       authorizeChannelPrivilege: async () => ({ allowed: true }),
       resolveChannelAgentConfigurations: async () => ({
@@ -342,6 +339,34 @@ describe("allowlist enforcement", () => {
     assert.equal(harness.posted.length, 1);
     assert.match(harness.posted[0] ?? "", /can't use this bot here yet/u);
     assert.equal(harness.created.length, 0);
+    await harness.plane.stop();
+  });
+
+  it("tells a refused sender in a thread another sender bound where to go, once", async () => {
+    const harness = makeHarness({
+      route: makeRoute({ where: { dm: false, groups: ["all"], conversations: [] } }),
+    });
+    await harness.plane.start(harness.daemon, store);
+    const topic = {
+      kind: "topic" as const,
+      id: "7",
+      rootConversationId: "-100200",
+      threadId: "7",
+    };
+    // ALICE holds `bot.interact`: her message binds the topic to Route 1.
+    const bound = await deliver(harness, dm({ senderIdentity: ALICE, conversation: topic }));
+    assert.equal(bound.outcome?.kind, "bound");
+
+    // STRANGER is refused by that Route and is told, in the topic, to start their own.
+    const refused = await deliver(harness, dm({ senderIdentity: STRANGER, conversation: topic }));
+    assert.equal(refused.dispatched, false);
+    await deliver(
+      harness,
+      dm({ senderIdentity: STRANGER, conversation: topic, text: "hello again" }),
+    );
+    const notices = harness.posted.filter((text) => text.includes("belongs to Route 1"));
+    assert.equal(notices.length, 1);
+    assert.match(notices[0] ?? "", /Send a new message outside this thread/u);
     await harness.plane.stop();
   });
 
@@ -503,9 +528,11 @@ describe("org Access command authority and live configuration", () => {
   ) {
     const harness = makeHarness({
       accountId,
-      // Everyone may use this shared conversation; command privileges remain independently gated.
-      authorizeChannelUse: async () => ({ allowed: true }),
       route: makeRoute({
+        // Everyone may use this shared conversation; command privileges remain independently gated.
+        audienceRules: [
+          compileAudienceRule({ who: { anyone: true }, where: { conversations: ["-200"] } }),
+        ],
         where: { dm: false, groups: [], conversations: ["-200"] },
         selectable: { models: ["legacy-route-model"], agents: [] },
       }),

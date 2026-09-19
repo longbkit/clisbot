@@ -8,17 +8,15 @@
 // closures) → privilege check → decision.
 //
 // Inheritance note: the compiler already folds `defaultRoles` (policy <
-// account < route, first-set layer wins) into `account.defaultRoles`,
-// `route.defaultRoles`, and `fallback.defaultRoles`, and concatenates the
+// account < route, first-set layer wins) into `account.defaultRoles` and
+// `route.defaultRoles`, and concatenates the
 // org ⊕ account ⊕ route `assignments` into `CompiledRoute.assignments`. This
 // engine reads those resolved values — it does not re-derive inheritance.
 
 import type {
   ChannelControlPlane,
   CompiledChannelAccount,
-  CompiledFallback,
   CompiledRoute,
-  RouteTarget,
 } from "./config/compile.js";
 import type { RoleAssignment } from "./config/schema.js";
 import { privilegeCovers, roleGrants, type CompiledRole } from "./config/privileges.js";
@@ -292,16 +290,6 @@ export function isEnabled(
 /** An inbound conversation descriptor for route matching. */
 export type InboundConversation = AudienceConversation;
 
-/** The outcome of matching an inbound conversation against an account. */
-export interface RouteMatchResult {
-  /** The first matching route, or null when the fallback applies. */
-  route: CompiledRoute | null;
-  /** The account fallback (deny marker or catch-all route). */
-  fallback: CompiledFallback;
-  /** The target to drive — the matched route's, or the catch-all's. */
-  target: RouteTarget | null;
-}
-
 /** Does the Route's Where cover this conversation? */
 export function routeConversationMatches(
   route: Pick<CompiledRoute, "where">,
@@ -320,32 +308,9 @@ export function routeMatches(
   return route.contains === undefined || (text !== undefined && text.includes(route.contains));
 }
 
-/**
- * Routes in declaration order, first Route whose Where covers the
- * conversation (and whose `contains` matches) wins. No route matched → the
- * fallback: the deny marker, or the catch-all route when `fallback.deny` is
- * false (§4.3.6). Conversation-only: the sender is not consulted, which is what
- * a bound conversation needs (it stays with its Route and never falls through).
- */
-export function matchRoute(
-  conversation: InboundConversation,
-  account: CompiledChannelAccount,
-  text?: string,
-): RouteMatchResult {
-  const route =
-    account.routes.find((candidate) => routeMatches(candidate, conversation, text)) ?? null;
-  if (route !== null) return { route, fallback: account.fallback, target: route.target };
-  const fallback = account.fallback;
-  return {
-    route: null,
-    fallback,
-    target: fallback.deny ? null : (fallback.target ?? null),
-  };
-}
-
 /** What ordered selection found for an unbound conversation. */
 export interface RouteSelection {
-  /** The Route that applies, or null when the fallback denies. */
+  /** The Route that applies, or null when no Route covers the conversation. */
   route: CompiledRoute | null;
   /** Whether `route` admits the sender. False = every applicable Route
    * refused them; `route` is then the first one, so the refusal can be worded
@@ -356,19 +321,17 @@ export interface RouteSelection {
 /**
  * Ordered selection for a NEW conversation: the first Route whose Where and
  * `contains` apply AND that admits the sender. A Route that applies but
- * refuses the sender is skipped — the next Route is tried, then the catch-all
- * fallback — so tiers by audience work (Owner on a strong Agent first, Anyone
- * in public rooms on a limited one after it).
+ * refuses the sender is skipped for the next one, so tiers by audience work
+ * (Owner on a strong Agent first, Anyone in public rooms on a limited one after
+ * it). There is no catch-all: a sender no Route admits is refused.
  */
 export async function selectRouteForSender(
   conversation: InboundConversation,
   account: CompiledChannelAccount,
   text: string | undefined,
   admits: (route: CompiledRoute) => Promise<boolean>,
-  catchAll: (fallback: CompiledFallback) => CompiledRoute,
 ): Promise<RouteSelection> {
   const candidates = account.routes.filter((route) => routeMatches(route, conversation, text));
-  if (!account.fallback.deny) candidates.push(catchAll(account.fallback));
   for (const route of candidates) {
     if (await admits(route)) return { route, admitted: true };
   }
@@ -381,27 +344,11 @@ export async function selectRouteForSender(
 // compiler has already folded `defaultRoles` (policy < account < route) and
 // concatenated the org ⊕ account ⊕ route assignments, so the scope carries
 // everything a decision at that level needs. Pass the single scope for the
-// level being decided (a matched route, or the account fallback).
+// level being decided (a matched route, or the account).
 
 /** The complete role scope for a matched route (org ⊕ account ⊕ route). */
 export function routeRoleScope(route: CompiledRoute): RoleScope {
   return { defaultRoles: route.defaultRoles, assignments: route.assignments };
-}
-
-/** The complete role scope for the account fallback (org ⊕ account ⊕ fallback). */
-export function fallbackRoleScope(
-  controlPlane: ChannelControlPlane,
-  account: CompiledChannelAccount,
-): RoleScope {
-  const fallback = account.fallback;
-  return {
-    defaultRoles: fallback.defaultRoles ?? [],
-    assignments: [
-      ...controlPlane.assignments,
-      ...account.assignments,
-      ...(fallback.assignments ?? []),
-    ],
-  };
 }
 
 /** The complete role scope at the account level (org ⊕ account). */

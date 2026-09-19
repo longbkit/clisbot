@@ -101,7 +101,6 @@ export function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     defaults: DEFAULTS,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
 }
 

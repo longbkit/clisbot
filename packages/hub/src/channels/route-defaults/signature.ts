@@ -30,15 +30,10 @@ function withoutAgentControls(controlPlane: ChannelControlPlane): ChannelControl
 }
 
 function accountWithoutAgentControls(account: CompiledChannelAccount): CompiledChannelAccount {
-  const fallback = account.fallback;
   return {
     ...account,
     defaults: stripped(account.defaults),
     routes: account.routes.map((route) => ({ ...route, defaults: stripped(route.defaults) })),
-    fallback:
-      fallback.defaults === undefined
-        ? fallback
-        : { ...fallback, defaults: stripped(fallback.defaults) },
   };
 }
 

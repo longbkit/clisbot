@@ -232,30 +232,33 @@ What to grep for, by question:
 
 A silent `hub.log` around an inbound message that never got an answer means the event did not reach the plane at all — check the transport and the queue depth before reading anything else.
 
-## The audience migration on start
+## The one-time Route migration
 
-`COMPAT(route-audience-rules)`: once per organization, before any account
-starts, the Hub rewrites account files that still use `match` / the one-value
-`audience` into audience rules and folds every `channel.use` Access grant on a
-Channel account into a rule on each of that account's Routes and its catch-all
-(`packages/hub/src/channels/access-migration.ts`, table in the
-[decision](../../audits/2026-09-19-route-audience-rules.md#migration-automatic)).
-It writes one new revision, then deletes the folded grant rows; the rewritten
-file starts with a `# Rewritten by the Hub on start` comment. Grep `hub.log` for:
+Audience rules replaced `match`, the one-value `audience`, `channel.use` grants
+and the account catch-all
+([decision](../../audits/2026-09-19-route-audience-rules.md#migration-one-time-then-deleted)).
+The Hub reads only the rules shape, so a Hub with older data must run
+`packages/hub/src/channels/one-time/migrate-channel-routes-once.ts` once before
+it starts on this code. Stop the Hub first: an embedded database has one owner.
 
-- `channel audience migration applied` — carries `accounts`, `routes`, `grants`
-  and the new `revisionId`.
-- `channel audience migration skipped` (debug) — nothing old-shaped, no grants.
-- `channel audience migration left grants without a configuration` — the
-  organization has grants but no active channel revision; the rows stay until
-  a revision exists.
-- `channel audience migration failed` — that organization is left as it was and
-  the next start retries. A crash between the revision write and the grant
-  delete replays the fold on the next start, appending the same rule again;
-  remove the duplicate rule in the Route editor.
+```bash
+cd packages/hub
+node --import tsx src/channels/one-time/migrate-channel-routes-once.ts --data-dir <hub data dir>  # dry run
+node --import tsx src/channels/one-time/migrate-channel-routes-once.ts --data-dir <hub data dir> --apply
+# or DATABASE_URL=postgres://… instead of --data-dir
+```
 
-A grant on an account the active revision does not configure is left in place
-and reported in the next start's counts once the account exists.
+The dry run prints, per organization, how many catch-alls become a last Route,
+how many grants fold and how many old revisions go, plus the current
+`leftovers`. `--apply` dumps every row it may touch to
+`/tmp/channel-routes-once-<ms>.json` first, rewrites the active revision in
+place, deletes the other revisions, repoints stored `"fallback"` positions
+(bindings, Workflow runs, reply capabilities, activity) at the new last Route,
+and retires the folded grants. It exits 1 when any `leftovers` count is not
+zero. The Hub fails to load an old-shape account file, so run it before the
+first start, not after.
+
+Delete the `one-time/` folder once it has run on every Hub that holds data.
 
 ## Following upstream
 

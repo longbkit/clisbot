@@ -60,8 +60,6 @@ import {
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
 } from "./channels/control-plane.js";
-import { createChannelUseGrantSource } from "./channels/access-grants.js";
-import { migrateChannelAudiences } from "./channels/access-migration.js";
 import { createChannelSenderResolver } from "./channels/policy/sender-facts.js";
 import type { ChannelSupervisor } from "./channels/supervisor/types.js";
 
@@ -196,16 +194,6 @@ async function createOwnedApplicationRuntime(
     await channelSupervisor?.stopAll();
   });
   await application.hub.start(registrations.flatMap((registration) => registration.sources));
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-  // Fold `channel.use` grants and old-shape routes into audience rules before
-  // any account starts, so the first inbound already reads the new revision.
-  if (channelSupervisor !== null && options.database !== null && options.databaseRuntime) {
-    await migrateChannelAudiences({
-      database: options.database,
-      grants: createChannelUseGrantSource(options.databaseRuntime),
-      logger: channelLogger,
-    });
-  }
   // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
   // channel account. Isolated per account (failures never abort the boot);
   // the supervisor is null whenever the kill-switch is off.
@@ -690,17 +678,6 @@ async function createChannelSupervisorAtComposition(
       ...(access === null
         ? {}
         : {
-            // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-            authorizeChannelUse: ({ organizationId, account, message }) =>
-              access.authorizeChannelPrivilege({
-                organizationId,
-                connectionId: account.connectionId,
-                channel: account.channel,
-                accountId: account.accountId,
-                senderIdentity: message.senderIdentity,
-                conversation: message.conversation,
-                privilege: "channel.use",
-              }),
             authorizeChannelApproval: ({
               organizationId,
               account,

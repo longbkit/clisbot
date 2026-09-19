@@ -113,7 +113,6 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     defaults: DEFAULTS,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
 }
 
@@ -276,7 +275,7 @@ function makeHarness(
     daemonOptions?: Parameters<typeof makeFakeDaemon>[1];
     daemonAgents?: AgentSnapshot[];
     processingTtlMs?: number;
-    authorizeChannelUse?: ChannelPlaneDeps["authorizeChannelUse"];
+    resolveChannelSender?: ChannelPlaneDeps["resolveChannelSender"];
     authorizeChannelApproval?: ChannelPlaneDeps["authorizeChannelApproval"];
     consumeChannelIdentityChallenge?: ChannelPlaneDeps["consumeChannelIdentityChallenge"];
     channelRevisionId?: string;
@@ -344,9 +343,9 @@ function makeHarness(
       await fake.daemon.cancelAgent("workflow-agent");
       return 1;
     },
-    ...(opts.authorizeChannelUse === undefined
+    ...(opts.resolveChannelSender === undefined
       ? {}
-      : { authorizeChannelUse: opts.authorizeChannelUse }),
+      : { resolveChannelSender: opts.resolveChannelSender }),
     ...(opts.authorizeChannelApproval === undefined
       ? {}
       : { authorizeChannelApproval: opts.authorizeChannelApproval }),
@@ -414,7 +413,7 @@ function workflowExecution(input: {
   conversationId: string;
   route: CompiledRoute;
   /** Set to exercise the captured-route branch (a run started by this Hub). */
-  captured?: { position: number | "fallback" };
+  captured?: { position: number };
   threadId?: string;
 }): AgentExecutionRecord {
   const bindingKey = JSON.stringify(["slack", ACCOUNT_ID, input.conversationId, null]);
@@ -774,8 +773,8 @@ describe("workflow route", () => {
       "bound",
     );
 
-    // The route is narrowed to another Conversation and the fallback denies:
-    // this conversation is no longer served at all.
+    // The route is narrowed to another Conversation: this conversation is no
+    // longer served at all.
     const narrowed: CompiledRoute = {
       ...makeRoute(),
       audienceRules: [],
@@ -877,20 +876,23 @@ describe("workflow route", () => {
     assert.equal(harness.workflowDispatches.length, 0);
   });
 
-  it("admits a Hub-authorized Member when legacy Channel roles do not", async () => {
+  it("admits a Member through an audience rule when legacy Channel roles do not", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
+      audienceRules: [
+        compileAudienceRule({ who: { roles: ["member"] }, where: { groups: "all" } }),
+      ],
       target: { kind: "workflow", workflow: "engineering-assistant" },
       defaultRoles: [],
     };
     const account = makeAccount(route);
-    const requests: Parameters<NonNullable<ChannelPlaneDeps["authorizeChannelUse"]>>[0][] = [];
+    const requests: Parameters<NonNullable<ChannelPlaneDeps["resolveChannelSender"]>>[0][] = [];
     const harness = makeHarness({
       account,
       controlPlane: makeControlPlane(account),
-      authorizeChannelUse: async (input) => {
+      resolveChannelSender: async (input) => {
         requests.push(input);
-        return { allowed: true };
+        return { membershipId: "membership-1", role: "member", teamIds: [] };
       },
     });
     await harness.plane.start(harness.fake.daemon, store);
@@ -905,7 +907,7 @@ describe("workflow route", () => {
     assert.equal(admitted.outcome?.kind, "workflow");
     assert.equal(harness.workflowDispatches.length, 1);
     assert.equal(requests[0]?.account.connectionId, account.connectionId);
-    assert.equal(requests[0]?.message.senderIdentity, "slack:U0MEMBER");
+    assert.equal(requests[0]?.senderIdentity, "slack:U0MEMBER");
     assert.equal(harness.activity.length, 1);
     assert.equal(harness.activity[0]?.outcome, "workflow");
     assert.equal(harness.activity[0]?.senderIdentity, "slack:U0MEMBER");
@@ -913,12 +915,9 @@ describe("workflow route", () => {
   });
 
   it.each(["agent", "workflow"] as const)(
-    "records precise denied %s admission without executing",
+    "records a denied %s admission without executing",
     async (targetKind) => {
-      for (const reason of [
-        "sender identity is not linked to a Hub Member on this Connection",
-        "linked Hub Member does not have access to this conversation",
-      ]) {
+      for (const reason of ["sender may not trigger this route"]) {
         const base = makeRoute();
         const route: CompiledRoute = {
           ...base,
@@ -933,7 +932,7 @@ describe("workflow route", () => {
         const harness = makeHarness({
           account,
           controlPlane: makeControlPlane(account),
-          authorizeChannelUse: async () => ({ allowed: false, reason }),
+          resolveChannelSender: async () => null,
         });
         await harness.plane.start(harness.fake.daemon, store);
         harness.next.message = message({ senderIdentity: "slack:U0UNLINKED" });
@@ -2168,6 +2167,39 @@ describe("channel session commands", () => {
     await harness.plane.stop();
   });
 
+  // Tiers: Route 1 (a direct Agent for a narrower audience) also covers the
+  // conversation. A run started on Route 2 stays with Route 2, the same way a
+  // bound conversation keeps the Route its binding recorded.
+  it("keeps a workflow run on its recorded Route when an earlier Route also covers it", async () => {
+    const earlier = makeRoute();
+    const workflowRoute: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+    };
+    const account = { ...makeAccount(earlier), routes: [earlier, workflowRoute] };
+    const harness = makeHarness({ account });
+    await harness.plane.start(harness.fake.daemon, store);
+    const execution = workflowExecution({
+      id: "3c9e8f0a-6b1d-4e2f-9a7c-5d4b3a2f1e0d",
+      conversationId: "C0WFTIER",
+      route: workflowRoute,
+      captured: { position: 1 },
+    });
+
+    await harness.plane.onWorkflowStreamEvent({
+      execution,
+      agentId: "workflow-tier-agent",
+      event: {
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "ok" },
+      },
+    });
+
+    assert.deepEqual(harness.fake.cancelled, [], "the run stays on Route 2");
+    await harness.plane.stop();
+  });
+
   it("uses captured Workflow context for approval callbacks and /stop", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
@@ -2293,7 +2325,10 @@ describe("channel session commands", () => {
         turnId: "stale-turn",
       },
     });
-    assert.deepEqual(harness.fake.cancelled, ["workflow-agent", "stale-workflow-agent"]);
+    // The Route was edited (new fingerprint) but still owns the conversation at
+    // the recorded position and still names this Workflow, so the run keeps its
+    // output. Its `contains` marker selects new runs only; it never gates output.
+    assert.deepEqual(harness.fake.cancelled, ["workflow-agent"]);
   });
 });
 

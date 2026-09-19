@@ -14,7 +14,7 @@
 //   member  a linked identity or an assignment covers them, and `bot.interact`
 //           holds: they can chat, and control their OWN session.
 //   guest   admitted only because the route opened its audience
-//           (`audience: conversationParticipants`) or by the access allowlist,
+//           (an audience rule whose Who is Anyone) or by the access allowlist,
 //           with no Hub identity behind them. Chat only.
 //
 // The ordering is total, so a check is a comparison rather than a set of

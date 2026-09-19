@@ -76,8 +76,8 @@ describe("buildChannelAccountCandidate", () => {
           environment: "channel-customer-support",
         },
       ],
-      fallback: { deny: true },
     });
+    expect(result.account).not.toHaveProperty("fallback");
     expect(result.resource).toMatchObject({
       name: "organization",
       agents: {
@@ -129,7 +129,6 @@ describe("buildChannelAccountCandidate", () => {
           workflow: "customer-handoff",
         },
       ],
-      fallback: { deny: true },
     });
     expect(JSON.stringify(result.account)).not.toContain("routeId");
   });
@@ -235,7 +234,7 @@ describe("buildChannelAccountCandidate", () => {
     });
   });
 
-  it("adds a specific Route before a catch-all and keeps direct resources unique", () => {
+  it("adds a Route with a contains filter before unfiltered Routes and keeps direct resources unique", () => {
     const audience = [{ who: { roles: ["member" as const] }, where: { conversations: ["C1"] } }];
     const first = buildChannelRouteCandidate({
       accountId: "support",
@@ -280,8 +279,7 @@ describe("buildChannelAccountCandidate", () => {
 
   it("edits an exclusively owned direct Agent resource in place", () => {
     const route = {
-      match: { kind: "channel", ids: ["C1"] },
-      audience: { kind: "members" },
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1"] } }],
       agent: "support-agent",
       environment: "support-agent",
       binding: { key: "thread" },
@@ -369,12 +367,12 @@ describe("buildChannelAccountCandidate", () => {
 
   it("uses copy-on-write for a shared Agent and removes an orphan when switching to Automation", () => {
     const sharedRoute = {
-      match: { kind: "channel" },
+      audience: [{ who: { roles: ["member"] }, where: { groups: "all" } }],
       agent: "shared",
       environment: "shared",
     };
     const siblingRoute = {
-      match: { kind: "dm" },
+      audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
       agent: "shared",
       environment: "shared",
     };
@@ -420,7 +418,7 @@ describe("buildChannelAccountCandidate", () => {
         },
       },
       currentRoute: {
-        match: { kind: "dm" },
+        audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
         agent: "solo",
         environment: "solo",
       },
@@ -428,7 +426,7 @@ describe("buildChannelAccountCandidate", () => {
         {
           routes: [
             {
-              match: { kind: "dm" },
+              audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
               agent: "solo",
               environment: "solo",
             },

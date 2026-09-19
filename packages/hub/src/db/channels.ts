@@ -44,7 +44,7 @@ export interface RecordChannelInboundActivityInput {
   organizationId: string;
   channel: SupportedChannelName;
   accountId: string;
-  routePosition: number | "fallback";
+  routePosition: number;
   routeFingerprint: string;
   externalConversationId: string;
   externalThreadId: string | null;

@@ -13,7 +13,6 @@ import { assertChannelConfigurationDelegation } from "../access/delegation.js";
 import type { AccessStore } from "../access/store.js";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import { holdsChannelAccountManagement } from "../channels/access-grants.js";
-import { fallbackInNewShape, routeInNewShape } from "../channels/config/audience-migration.js";
 import type { CompiledChannelAccount } from "../channels/config/compile.js";
 import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 import { AccountFileSchema, type AccountFile } from "../channels/config/schema.js";
@@ -188,19 +187,13 @@ function accountPath(account: { channel: string; accountId: string }): string {
   return `${CHANNELS_DIRECTORY}/${account.channel}/${account.accountId}.yml`;
 }
 
-/** The stored file, in the new audience shape whichever shape it was saved in. */
+/** The stored account file. */
 function storedAccountFile(
   snapshot: ChannelControlPlaneSnapshot,
   account: CompiledChannelAccount,
 ): AccountFile | undefined {
   const file = snapshot.files.find(({ path }) => path === accountPath(account));
-  if (file === undefined) return undefined;
-  const parsed = AccountFileSchema.parse(load(file.content));
-  return {
-    ...parsed,
-    ...(parsed.routes === undefined ? {} : { routes: parsed.routes.map(routeInNewShape) }),
-    ...(parsed.fallback === undefined ? {} : { fallback: fallbackInNewShape(parsed.fallback) }),
-  };
+  return file === undefined ? undefined : AccountFileSchema.parse(load(file.content));
 }
 
 async function accountWarnings(
@@ -298,16 +291,16 @@ async function saveAccountFile(
   });
 }
 
-/** Every Route of this account, and its fallback: what the save re-checks. */
+/** Every Route of this account: what the save re-checks. */
 function delegatedRoutes(
   account: { channel: string; accountId: string },
   next: AccountFile,
-): { channel: string; accountId: string; position: number | "fallback" }[] {
-  const refs: { channel: string; accountId: string; position: number | "fallback" }[] = (
-    next.routes ?? []
-  ).map((_, position) => ({ channel: account.channel, accountId: account.accountId, position }));
-  refs.push({ channel: account.channel, accountId: account.accountId, position: "fallback" });
-  return refs;
+): { channel: string; accountId: string; position: number }[] {
+  return (next.routes ?? []).map((_, position) => ({
+    channel: account.channel,
+    accountId: account.accountId,
+    position,
+  }));
 }
 
 /** The parts of an account file only the organization may change. */

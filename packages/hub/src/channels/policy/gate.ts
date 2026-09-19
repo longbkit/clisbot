@@ -14,7 +14,6 @@ import type {
 import type { ChannelAccessStore } from "../../db/channel-access.js";
 import type {
   ChannelSenderResolver,
-  ChannelUseAuthorizer,
   InboundMessage,
   SupportedChannelName,
 } from "../plane/types.js";
@@ -141,9 +140,8 @@ export async function audienceSenderFor(input: {
  * Advanced paths — the sender's roles grant `bot.interact`, or the route
  * authored an `access:` block and it admits them (this is what makes pairing
  * mean something — an operator-approved stranger has no Hub identity and no
- * role, and approval is the grant); and, until the start-time migration has
- * run everywhere, a `channel.use` Access grant. A sender the access gate
- * REFUSES never gets here: `admitChannelAccess` settles the message first.
+ * role, and approval is the grant). A sender the access gate REFUSES never
+ * gets here: `admitChannelAccess` settles the message first.
  */
 export async function mayUseChannelRoute(input: {
   store?: ChannelAccessStore | undefined;
@@ -153,7 +151,6 @@ export async function mayUseChannelRoute(input: {
   route: CompiledRoute;
   message: InboundMessage;
   resolveChannelSender?: ChannelSenderResolver | undefined;
-  authorizeChannelUse?: ChannelUseAuthorizer | undefined;
 }): Promise<ChannelPrivilegeDecision> {
   const { account, controlPlane, message, route } = input;
   const sender = await audienceSenderFor(input);
@@ -172,12 +169,5 @@ export async function mayUseChannelRoute(input: {
     });
     if (decision.decision === "allow") return { allowed: true };
   }
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-  return (
-    (await input.authorizeChannelUse?.({
-      organizationId: input.organizationId,
-      account,
-      message,
-    })) ?? { allowed: false, reason: "sender may not trigger this route" }
-  );
+  return { allowed: false, reason: "sender may not trigger this route" };
 }

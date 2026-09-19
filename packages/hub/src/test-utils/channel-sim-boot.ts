@@ -39,6 +39,9 @@ export const SIM_SLACK_CHANNEL = "C_SIM_MAIN";
 export const SIM_SLACK_SENDER = "U_SIM_HUMAN";
 export const SIM_TELEGRAM_CHAT = -1_001_777_000;
 export const SIM_TELEGRAM_SENDER = 900_001;
+/** The conversations the streaming Routes are narrowed to. */
+export const SIM_STREAM_SLACK_CHANNEL = "C_SIM_STREAM";
+export const SIM_STREAM_TELEGRAM_CHAT = -1_001_777_555;
 
 const SLACK_CONNECTION_ID = "00000000-0000-4000-8000-0000000000b1";
 const TELEGRAM_CONNECTION_ID = "00000000-0000-4000-8000-0000000000b2";
@@ -126,10 +129,12 @@ defaults:
   outbound:
     path: ${options.outboundPath ?? "tool"}${indent(options.slackDefaultsYaml, 2)}
 routes:
-  # The streaming route (D-W4-03): a threaded mention relays its own answer and
-  # streams it as a progress card, so the account's tool path never applies.
-  - match:
-      kind: thread
+  # The streaming route (D-W4-03): a mention in the streaming channel relays its
+  # own answer and streams it as a progress card, so the account's tool path
+  # never applies there.
+  - audience:
+      - who: { roles: [member] }
+        where: { conversations: ["${SIM_STREAM_SLACK_CHANNEL}"] }
     agent: sim-agent
     environment: work
     outbound:
@@ -137,12 +142,11 @@ routes:
     sync:
       streaming:
         mode: progress
-  - match:
-      kind: channel
+  - audience:
+      - who: { roles: [member] }
+        where: { groups: all }
     agent: sim-agent
     environment: work
-fallback:
-  deny: true
 `;
 }
 
@@ -159,14 +163,12 @@ defaults:
   outbound:
     path: ${options.outboundPath ?? "tool"}${indent(options.telegramDefaultsYaml, 2)}
 routes:
-  - match:
-      kind: group
-    agent: sim-agent
-    environment: work
-  # The streaming route (D-W4-03): a topic message relays its own answer and
-  # drafts it in place (block mode), so the account's tool path never applies.
-  - match:
-      kind: topic
+  # The streaming route (D-W4-03): a message in the streaming chat relays its
+  # own answer and drafts it in place (block mode), so the account's tool path
+  # never applies there.
+  - audience:
+      - who: { roles: [member] }
+        where: { conversations: ["${SIM_STREAM_TELEGRAM_CHAT}"] }
     agent: sim-agent
     environment: work
     outbound:
@@ -174,8 +176,11 @@ routes:
     sync:
       streaming:
         mode: block
-fallback:
-  deny: true
+  - audience:
+      - who: { roles: [member] }
+        where: { groups: all }
+    agent: sim-agent
+    environment: work
 `;
 }
 

@@ -1,5 +1,4 @@
 import type { ApprovalPrivilege } from "../../access/contract.js";
-import type { ChannelPrivilegeDecision } from "../../access/store.js";
 // Shared vocabulary for the channel execution plane (plan §4-S2/§4-S5/§4-S6).
 // One place for the shapes that the bindings, relay, and approval engines all
 // read, so no engine re-derives an inbound message, a post, or an outcome. The
@@ -377,15 +376,6 @@ export type ChannelSenderResolver = (input: {
   senderIdentity: string;
 }) => Promise<{ membershipId: string; role: string; teamIds: readonly string[] } | null>;
 
-/** COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
- * The `channel.use` Access-grant way in, until the start-time migration has
- * folded every grant into audience rules. */
-export type ChannelUseAuthorizer = (input: {
-  organizationId: string;
-  account: CompiledChannelAccount;
-  message: InboundMessage;
-}) => Promise<ChannelPrivilegeDecision>;
-
 export interface ChannelAgentAccessTarget {
   daemonReference: string;
   projectId?: string;
@@ -446,7 +436,6 @@ export interface ChannelPlaneDeps {
     bindingKey: string;
     workflowName: string;
   }) => Promise<import("../../workflows/channel-status.js").ChannelWorkflowRunSummary[]>;
-  authorizeChannelUse?: ChannelUseAuthorizer | undefined;
   /** Resolves a sender to their Member facts for audience rules; absent = only
    * `anyone` and `identities` rules can admit. */
   resolveChannelSender?: ChannelSenderResolver | undefined;
@@ -558,7 +547,7 @@ export interface StreamContext {
   initiator: string;
   /** The account the thread's binding belongs to (role scopes for approval). */
   account: CompiledChannelAccount;
-  /** The effective route (matched route, or the synthesized catch-all fallback). */
+  /** The Route that owns the conversation. */
   route: CompiledRoute;
   /** Fixed daemon/Project ceiling used to authorize Channel approval responders. */
   accessTarget?: ChannelAgentAccessTarget;

@@ -95,7 +95,6 @@ function context(params: {
     defaults: route.defaults,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
   return {
     agentId: AGENT_ID,

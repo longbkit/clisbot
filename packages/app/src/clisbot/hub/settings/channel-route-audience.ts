@@ -42,7 +42,7 @@ function nextRuleId(): string {
   return `rule-${String(ruleSequence)}`;
 }
 
-/** Every Member, everywhere — what a new Route, a bare fallback and `audience: members` mean. */
+/** Every Member, everywhere: the one rule a new Route starts with. */
 export function membersEverywhereRule(): AudienceRuleDraft {
   return {
     id: nextRuleId(),
@@ -120,48 +120,21 @@ export function isOpenAudienceDraft(rules: readonly AudienceRuleDraft[]): boolea
   return rules.some((rule) => rule.who.anyone);
 }
 
-// --- Stored shape → rules (the Hub's `config/audience-migration.ts` table) -----
+// --- Stored shape → rules --------------------------------------------------------
 
-/** What a stored Route authored, in rules whichever shape it used. */
+/** What a stored Route authored: its audience rules and its `contains` filter. */
 export function routeAudienceDraft(route: ChannelConfigurationRecord): {
   rules: AudienceRuleDraft[];
   contains: string;
 } {
-  const contains = routeContainsText(route) ?? "";
-  const rules = storedAudienceRules(route["audience"]);
-  if (rules !== null) return { rules, contains };
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-  const match = recordValue(route["match"]);
-  const where = match === null ? membersEverywhereRule().where : whereFromMatch(match);
-  return { rules: [{ id: nextRuleId(), who: legacyWho(route["audience"]), where }], contains };
-}
-
-/** A catch-all covers everything; only its Who was ever authored. */
-export function fallbackAudienceDraft(fallback: unknown): {
-  deny: boolean;
-  rules: AudienceRuleDraft[];
-} {
-  const record = recordValue(fallback);
-  if (record === null || record["deny"] === true) {
-    return { deny: true, rules: [membersEverywhereRule()] };
-  }
-  const rules = storedAudienceRules(record["audience"]);
-  if (rules !== null) return { deny: false, rules };
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
   return {
-    deny: false,
-    rules: [
-      {
-        id: nextRuleId(),
-        who: legacyWho(record["audience"]),
-        where: membersEverywhereRule().where,
-      },
-    ],
+    rules: storedAudienceRules(route["audience"]),
+    contains: routeContainsText(route) ?? "",
   };
 }
 
-function storedAudienceRules(audience: unknown): AudienceRuleDraft[] | null {
-  if (!Array.isArray(audience)) return null;
+function storedAudienceRules(audience: unknown): AudienceRuleDraft[] {
+  if (!Array.isArray(audience)) return [];
   return audience.flatMap((rule) => {
     const record = recordValue(rule);
     if (record === null) return [];
@@ -184,27 +157,6 @@ function storedAudienceRules(audience: unknown): AudienceRuleDraft[] | null {
       }),
     ];
   });
-}
-
-/** `match.kind` + `ids` → a Where. Threads and topics belong to their room, so an
- * id-less thread/topic route covers every group chat and a listed id narrows to it. */
-function whereFromMatch(match: ChannelConfigurationRecord): AudienceRuleDraft["where"] {
-  const ids = stringList(match["ids"]);
-  if (match["kind"] === "dm") return { dm: true, groups: "off", conversations: "" };
-  return ids.length === 0
-    ? { dm: false, groups: "all", conversations: "" }
-    : { dm: false, groups: "off", conversations: ids.join(", ") };
-}
-
-function legacyWho(audience: unknown): AudienceRuleDraft["who"] {
-  const open = recordValue(audience)?.["kind"] === "conversationParticipants";
-  return {
-    roles: open ? [] : ["member"],
-    teams: [],
-    members: [],
-    anyone: open,
-    identities: "",
-  };
 }
 
 function isAudienceRole(value: string): value is HubAudienceRole {
@@ -325,15 +277,12 @@ function joinNatural(parts: readonly string[]): string {
 
 /**
  * The rule each Hub validation line names, for the Route being edited. The
- * Hub renders issues as `<file>.routes.<i>.audience.<j>[.part]: <message>`
- * (`fallback.audience.<j>` for the catch-all); other lines stay with the form.
+ * Hub renders issues as `<file>.routes.<i>.audience.<j>[.part]: <message>`;
+ * other lines stay with the form.
  */
-export function audienceRuleErrors(
-  message: string,
-  position: number | "fallback",
-): Map<number, string> {
+export function audienceRuleErrors(message: string, position: number): Map<number, string> {
   const errors = new Map<number, string>();
-  const prefix = position === "fallback" ? "fallback" : `routes\\.${String(position)}`;
+  const prefix = `routes\\.${String(position)}`;
   const pattern = new RegExp(`(?:^|\\.)${prefix}\\.audience\\.(\\d+)(?:\\.[^:]*)?: (.+)$`, "u");
   for (const line of message.split("\n")) {
     const found = pattern.exec(line.trim());

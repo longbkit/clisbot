@@ -177,15 +177,16 @@ it("validates bounded query filters before touching history", () => {
   expect(parseChannelActivityQuery(new URLSearchParams())).toEqual({ limit: 25 });
   expect(
     parseChannelActivityQuery(
-      new URLSearchParams("channel=slack&accountId=a&routePosition=fallback&limit=100"),
+      new URLSearchParams("channel=slack&accountId=a&routePosition=2&limit=100"),
     ),
-  ).toEqual({ channel: "slack", accountId: "a", routePosition: "fallback", limit: 100 });
+  ).toEqual({ channel: "slack", accountId: "a", routePosition: 2, limit: 100 });
   for (const query of [
     "limit=0",
     "limit=101",
     "limit=1.5",
     "accountId=a",
     "routePosition=0",
+    "channel=slack&accountId=a&routePosition=fallback",
     "outcome=other",
     "channel=irc",
     "unknown=1",

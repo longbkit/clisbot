@@ -67,7 +67,6 @@ const account: CompiledChannelAccount = {
   defaults,
   approval: [],
   routes: [route],
-  fallback: { deny: true },
 };
 let fixtureId = 0;
 function snapshot(id: string, workspaceId?: string): AgentSnapshot {
@@ -445,12 +444,14 @@ describe("channel lifecycle commands", () => {
     const revokeCapability = vi.fn();
     const f = fixture({ issueCapability, bindCapability, revokeCapability });
     await f.seed();
+    const toolRoute = {
+      ...route,
+      defaults: { ...defaults, outbound: { path: "tool" as const, template: null } },
+    };
     const toolContext = {
       ...f.context,
-      route: {
-        ...route,
-        defaults: { ...defaults, outbound: { path: "tool" as const, template: null } },
-      },
+      account: { ...f.context.account, routes: [toolRoute] },
+      route: toolRoute,
     };
     await f.lifecycle.handle({ name: "fork", value: "continue" }, toolContext);
     expect(issueCapability).toHaveBeenCalledWith(toolContext);
@@ -464,12 +465,14 @@ describe("channel lifecycle commands", () => {
   it("resume on a tool route persists a relay override without changing captured route policy", async () => {
     const f = fixture();
     await f.seed();
+    const toolRoute = {
+      ...route,
+      defaults: { ...defaults, outbound: { path: "tool" as const, template: null } },
+    };
     const toolContext = {
       ...f.context,
-      route: {
-        ...route,
-        defaults: { ...defaults, outbound: { path: "tool" as const, template: null } },
-      },
+      account: { ...f.context.account, routes: [toolRoute] },
+      route: toolRoute,
     };
     await f.lifecycle.handle({ name: "resume", value: f.target.id }, toolContext);
     expect((await f.bound())?.route).toMatchObject({

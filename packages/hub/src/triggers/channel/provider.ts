@@ -25,15 +25,13 @@ export const ChannelWorkflowRequestPayloadSchema = z.object({
     trigger_message_id: z.string().optional(),
     // Additive so executions created before route capture remain readable.
     revision_id: z.string().uuid().nullable().optional(),
-    route_position: z.union([z.number().int().nonnegative(), z.literal("fallback")]).optional(),
+    route_position: z.number().int().nonnegative().optional(),
     route_fingerprint: z.string().min(1).optional(),
-    route:
-      z.custom<
-        Pick<
-          CompiledRoute,
-          "audienceRules" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
-        >
-      >(),
+    // `audienceRules` is absent on executions created before route capture.
+    route: z.custom<
+      Pick<CompiledRoute, "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"> &
+        Partial<Pick<CompiledRoute, "audienceRules">>
+    >(),
   }),
 });
 

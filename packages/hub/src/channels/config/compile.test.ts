@@ -68,7 +68,8 @@ defaults:
   approval:
     - { match: command.destructive, mode: require, initiatorOnly: true }
 routes:
-  - match: { kind: channel, ids: [C0APP], contains: "#triage" }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    contains: "#triage"
     agent: worker-app
     environment: repo-app
     template: team
@@ -76,18 +77,17 @@ routes:
       assignments:
         - identities: [slack:U0CAROL]
           roles: [approver]
-  - match: { kind: channel, ids: [C0INFRA] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0INFRA] } }]
     agent: worker-infra
     environment: repo-infra
     binding: { key: channel }
     reply: { anchor: default }
-  - match: { kind: thread, ids: [C0THREAD] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0THREAD] } }]
     workflow: infra-runbook
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: assistant-personal
     environment: personal-lab
     template: personal
-fallback: { deny: true }
 `;
 
 const POLICY = `
@@ -167,10 +167,9 @@ describe("compileChannelControlPlane", () => {
     assert.equal(account.approval[0]!.match, "command.destructive");
     assert.equal(account.routes.length, 4);
     assert.equal(account.routes[0]!.contains, "#triage");
-    // COMPAT(route-audience-rules): the old `match` reads as one rule.
     assert.deepEqual(account.routes[0]!.where, { dm: false, groups: [], conversations: ["C0APP"] });
     assert.deepEqual(account.routes[0]!.audienceRules[0]?.who.roles, ["member"]);
-    assert.equal(account.fallback.deny, true);
+    assert.equal("fallback" in account, false);
   });
 
   it("passes the vertical-owned account config block through verbatim", () => {
@@ -205,8 +204,7 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: worker-app
     environment: repo-app
     sync:
@@ -238,8 +236,7 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { groups: all } }]
     agent: worker-app
     environment: repo-app
     sync:
@@ -264,8 +261,7 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: worker-app
     environment: repo-app
     interaction: { requireMention: false }
@@ -281,8 +277,7 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: worker-app
     environment: repo-app
     approval:
@@ -300,8 +295,7 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: worker-app
     environment: repo-app
     approval: [{ match: "*", mode: auto-deny }]
@@ -324,12 +318,11 @@ limits:
   messagesSentPerMinute: 120
   perConversation: { messagesPerMinute: 20, maxRuntimeSeconds: off }
 routes:
-  - match: { kind: channel, ids: [C_OPEN] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_OPEN] } }]
     agent: worker-app
     environment: repo-app
     limits: { maxConcurrentRuns: 25, maxInputCharacters: off }
-  - match: { kind: channel, ids: [C_MEMBERS] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C_MEMBERS] } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -520,7 +513,7 @@ accountId: work
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
     workflow: infra-runbook
@@ -539,7 +532,7 @@ accountId: work
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: not-an-agent
     environment: repo-app
 `,
@@ -629,7 +622,7 @@ transport: { mode: socket }
 defaults:
   sync: { subagents: { finalAnswers: true } }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
     sync: { subagents: { toolCalls: true } }
@@ -687,11 +680,11 @@ transport: { mode: socket }
 defaults:
   sync: { progress: { messageReaction: hourglass_flowing_sand } }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
     sync: { progress: { progressMessage: false } }
-  - match: { kind: channel, ids: [C0QUIET] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0QUIET] } }]
     agent: worker-app
     environment: repo-app
     sync: { progress: { messageReaction: off } }
@@ -743,10 +736,10 @@ defaults:
   outbound: { path: tool }
   sync: { threadLink: full, finalAnswers: true }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
-  - match: { kind: channel, ids: [C0RELAY] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0RELAY] } }]
     agent: worker-app
     environment: repo-app
     outbound: { path: relay }
@@ -789,10 +782,10 @@ transport: { mode: socket }
 defaults:
   workspace: { organize: false }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
-  - match: { kind: channel, ids: [C0ORGANIZED] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0ORGANIZED] } }]
     agent: worker-app
     environment: repo-app
     workspace: { organize: true }
@@ -815,7 +808,7 @@ accountId: main
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -833,7 +826,7 @@ accountId: main
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
     environment: repo-app
     outbound: { path: tool, template: "Reply only via the message tool." }
@@ -876,7 +869,7 @@ config:
   textChunkMode: newline
   dangerouslyAllowNameMatching: false
 routes:
-  - match: { kind: group }
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -889,26 +882,26 @@ routes:
     assert.equal(account.config["textChunkMode"], "newline");
   });
 
-  it("reads a legacy id-less thread route as every group chat", () => {
-    const plane = compileChannelControlPlane(
-      input({
-        [".paseo/channels/zalouser/main.yml"]: `
+  it("rejects an account file that still carries a catch-all fallback", () => {
+    assert.throws(
+      () =>
+        compileChannelControlPlane(
+          input({
+            [".paseo/channels/zalouser/main.yml"]: `
 channel: zalouser
 accountId: main
 connectionId: connection-id
 transport: { mode: qr }
 routes:
-  - match: { kind: thread }
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: worker-app
     environment: repo-app
+fallback: { deny: true }
 `,
-      }),
+          }),
+        ),
+      ChannelCompilationError,
     );
-    assert.deepEqual(plane.accounts[0]?.routes[0]?.where, {
-      dm: false,
-      groups: ["all"],
-      conversations: [],
-    });
   });
 
   it("rejects a wrong-typed Zalo Personal config knob at deploy", () => {
@@ -950,13 +943,13 @@ accountId: main
 connectionId: connection-id
 transport: { mode: gateway }
 routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: worker-app
     environment: repo-app
-  - match: { kind: channel, ids: ["123456789012345678"] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: ["123456789012345678"] } }]
     agent: worker-app
     environment: repo-app
-  - match: { kind: thread }
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -1036,7 +1029,7 @@ config:
   allowBots: false
   mediaMaxMb: 20
 routes:
-  - match: { kind: channel, ids: [spaces/AAAA] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [spaces/AAAA] } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -1069,7 +1062,7 @@ config:
   tools: { doc: true, chat: true, perm: false, bitable: true }
   httpTimeoutMs: 20000
 routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: assistant-personal
     environment: personal-lab
 `,
@@ -1098,7 +1091,7 @@ config:
   mediaMaxMb: 5
   botNames: [fusion, "trợ lý"]
 routes:
-  - match: { kind: group, ids: ["4000"] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: ["4000"] } }]
     agent: worker-app
     environment: repo-app
 `,
@@ -1201,10 +1194,9 @@ ${body}
     const plane = compileChannelControlPlane(
       input({
         [".paseo/channels/telegram/butler.yml"]: account(`routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
-    environment: personal-lab
-fallback: { deny: true }`),
+    environment: personal-lab`),
       }),
     );
     assert.equal(plane.accounts[0]?.routes[0]?.defaults.access, undefined);
@@ -1226,11 +1218,10 @@ defaults:
     groupAllowFrom: [222, "tg:333"]
     deniedReply: "Not allowed."
 routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab
-    access: { dmPolicy: allowlist }
-fallback: { deny: true }`),
+    access: { dmPolicy: allowlist }`),
       }),
     );
     const route = plane.accounts[0]?.routes[0];
@@ -1249,10 +1240,9 @@ fallback: { deny: true }`),
         [".paseo/channels/telegram/butler.yml"]: account(`defaults:
   access: { dmPolicy: everyone }
 routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
-    environment: personal-lab
-fallback: { deny: true }`),
+    environment: personal-lab`),
       },
       /Invalid option|expected/,
     );
@@ -1272,12 +1262,11 @@ ${body}
     const plane = compileChannelControlPlane(
       input({
         [".paseo/channels/telegram/butler.yml"]: account(`routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab
     agents: [worker-app]
-    models: [gpt-5.6-luna]
-fallback: { deny: true }`),
+    models: [gpt-5.6-luna]`),
       }),
     );
     assert.deepEqual(plane.accounts[0]?.routes[0]?.selectable, {
@@ -1290,11 +1279,10 @@ fallback: { deny: true }`),
     expectCompileError(
       {
         [".paseo/channels/telegram/butler.yml"]: account(`routes:
-  - match: { kind: dm }
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab
-    agents: [ghost]
-fallback: { deny: true }`),
+    agents: [ghost]`),
       },
       /agent ghost is not defined in hub\.yml/,
     );

@@ -11,8 +11,8 @@ import type { CompiledRoute } from "../config/compile.js";
 import type { RouteFollowUpChange } from "../commands-follow-up-arguments.js";
 import { AccountFileSchema, type AccountFile, type Route } from "../config/schema.js";
 
-/** A Route's place in its account file: an index into `routes`, or the fallback. */
-export type RoutePosition = number | "fallback";
+/** A Route's place in its account file: an index into `routes`. */
+export type RoutePosition = number;
 
 /** Where one account's authored file lives in a revision. */
 export function accountFilePath(channel: string, accountId: string): string {
@@ -37,12 +37,7 @@ export function authoredRoute(
   position: RoutePosition,
 ): Route | undefined {
   const account = authoredAccount(files, channel, accountId);
-  if (account === undefined) return undefined;
-  if (position === "fallback") {
-    const fallback = account.fallback;
-    return fallback === undefined || "deny" in fallback ? undefined : (fallback as Route);
-  }
-  return account.routes?.[position];
+  return account?.routes?.[position];
 }
 
 /** Replace the account file with one whose Route at `position` has `controls`. */
@@ -90,10 +85,8 @@ function writeRoute(
   const account = authoredAccount(files, channel, accountId);
   if (account === undefined) throw new Error(`account file ${path} is not in the revision`);
   const next = structuredClone(account);
-  const route =
-    position === "fallback" ? (next.fallback as Route | undefined) : next.routes?.[position];
-  if (route === undefined || "deny" in route)
-    throw new Error(`route ${position} is not in ${path}`);
+  const route = next.routes?.[position];
+  if (route === undefined) throw new Error(`route ${position} is not in ${path}`);
   edit(route);
   const content = dump(next, { lineWidth: -1 });
   return files.map((file) => (file.path === path ? { path, content } : file));

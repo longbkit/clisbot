@@ -3,7 +3,7 @@
 // (docs/audits/2026-09-19-route-audience-rules.md).
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { storedRouteOwner } from "../bindings/stored-route.js";
+import { routeFingerprint, storedRouteOwner } from "../bindings/stored-route.js";
 import { compileAudienceRule, deriveRouteWhere } from "../config/audience.js";
 import type {
   ChannelControlPlane,
@@ -60,7 +60,6 @@ function account(routes: CompiledRoute[]): CompiledChannelAccount {
     defaults: DEFAULTS,
     approval: [],
     routes,
-    fallback: { deny: true },
   };
 }
 
@@ -189,7 +188,6 @@ describe("ordered routes", () => {
   const tiers = account([strong, limited]);
   const admits = (inbound: InboundMessage) => (candidate: CompiledRoute) =>
     admitted(candidate, inbound);
-  const catchAll = () => strong;
 
   it("falls through to the next Route when the sender matches no rule", async () => {
     const help = { id: "C0HELP", rootConversationId: "C0HELP" };
@@ -198,7 +196,6 @@ describe("ordered routes", () => {
       tiers,
       "hi",
       admits(message(OWNER, help)),
-      catchAll,
     );
     assert.deepEqual([asOwner.route, asOwner.admitted], [strong, true]);
     const asStranger = await selectRouteForSender(
@@ -206,7 +203,6 @@ describe("ordered routes", () => {
       tiers,
       "hi",
       admits(message(STRANGER, help)),
-      catchAll,
     );
     assert.deepEqual([asStranger.route, asStranger.admitted], [limited, true]);
   });
@@ -218,9 +214,30 @@ describe("ordered routes", () => {
       tiers,
       "hi",
       admits(inbound),
-      catchAll,
     );
     assert.deepEqual([selection.route, selection.admitted], [strong, false]);
+  });
+
+  it("refuses a sender that no tiered Route admits: there is no catch-all", async () => {
+    const members = route([{ who: { roles: ["member"] }, where: { groups: "all" } }], "members");
+    const tiered = account([strong, members]);
+    const inbound = message(STRANGER);
+    const selection = await selectRouteForSender(
+      inbound.conversation,
+      tiered,
+      "hi",
+      admits(inbound),
+    );
+    assert.deepEqual([selection.route, selection.admitted], [strong, false]);
+    const decision = await mayUseChannelRoute({
+      organizationId: "org",
+      controlPlane: { ...plane, accounts: [tiered] },
+      account: tiered,
+      route: members,
+      message: inbound,
+      resolveChannelSender: async () => null,
+    });
+    assert.deepEqual(decision, { allowed: false, reason: "sender may not trigger this route" });
   });
 
   it("keeps a bound conversation with the Route the binding recorded", () => {
@@ -241,6 +258,17 @@ describe("ordered routes", () => {
       ),
       limited,
     );
+    // Unchanged since the bind: the recorded fingerprint finds it.
+    const recorded = {
+      ...binding,
+      route: {
+        ...binding.route,
+        selection: { revisionId: null, position: 1, fingerprint: routeFingerprint(limited) },
+      },
+    };
+    assert.equal(storedRouteOwner(tiers, recorded), limited);
+    // Reordered since the bind: the fingerprint still wins over the position.
+    assert.equal(storedRouteOwner(account([limited, strong]), recorded), limited);
     // No recorded selection at all: the first covering Route owns it.
     assert.equal(
       storedRouteOwner(tiers, { ...binding, route: { match: binding.route.match } }),

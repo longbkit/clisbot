@@ -657,11 +657,7 @@ function AutomationDetail({
               <SummaryRow
                 key={`${backlink.channel}:${backlink.accountId}:${String(backlink.routePosition)}`}
                 title={`${capitalize(backlink.channel)} · ${backlink.accountId}`}
-                hint={
-                  backlink.routePosition === "fallback"
-                    ? "Fallback Route"
-                    : `Route ${String(backlink.routePosition + 1)}`
-                }
+                hint={`Route ${String(backlink.routePosition + 1)}`}
                 border={(structuredValue?.events.length ?? 0) + index > 0}
               />
             ))}

@@ -2,7 +2,7 @@
 // execution limiter and the outbound pacer so both count the same thing.
 // docs/audits/2026-09-18-channel-chat-authority-and-limits.md#limits
 
-import { routeFingerprint, routePosition } from "../bindings/index.js";
+import { routeFingerprint } from "../bindings/index.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import type { ResolvedLimits } from "../config/limits.js";
 
@@ -47,7 +47,9 @@ function routeScopeKey(account: CompiledChannelAccount, route: CompiledRoute): s
     "route",
     account.channel,
     account.accountId,
-    routePosition(account, route),
+    // -1 for a Workflow run's recorded Route that is no longer in the account;
+    // the fingerprint keeps its scope apart.
+    account.routes.indexOf(route),
     routeFingerprint(route),
   ]);
 }

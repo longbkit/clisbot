@@ -182,7 +182,6 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
       transport:
         input.connection.provider === "telegram" ? { mode: "polling" } : { mode: "socket" },
       routes: [candidate.route],
-      fallback: { deny: true },
     },
     resource: candidate.resource,
   };
@@ -263,14 +262,13 @@ export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean 
   );
 }
 
-/** Whether a stored Route admits everyone somewhere, whichever audience shape it uses. */
+/** Whether a stored Route admits everyone somewhere. */
 export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean {
   const audience = route["audience"];
-  if (Array.isArray(audience)) {
-    return audience.some((rule) => isRecord(rule) && recordField(rule, "who")["anyone"] === true);
-  }
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-  return recordField(route, "audience")["kind"] === "conversationParticipants";
+  return (
+    Array.isArray(audience) &&
+    audience.some((rule) => isRecord(rule) && recordField(rule, "who")["anyone"] === true)
+  );
 }
 
 /** What names a Route's target, kept verbatim when the target is not rebuilt. */
@@ -530,17 +528,7 @@ function countTargetReferences(
   let count = 0;
   for (const account of accounts) {
     const routes = Array.isArray(account["routes"]) ? (account["routes"] as unknown[]) : [];
-    const fallback = account["fallback"];
-    for (const candidate of [...routes, fallback]) {
-      if (
-        typeof candidate === "object" &&
-        candidate !== null &&
-        !Array.isArray(candidate) &&
-        (candidate as ChannelConfigurationRecord)[key] === name
-      ) {
-        count += 1;
-      }
-    }
+    count += routes.filter((route) => isRecord(route) && route[key] === name).length;
   }
   return count;
 }
@@ -553,22 +541,21 @@ function isRecord(value: unknown): value is ChannelConfigurationRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Specific text Routes must stay ahead of catch-all Routes. */
+/** Routes with a `contains` filter stay ahead of Routes without one. */
 export function insertChannelRoute(
   routes: readonly ChannelConfigurationRecord[],
   route: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord[] {
   if (routeContainsText(route) === null) return [...routes, route];
-  const catchAll = routes.findIndex((candidate) => routeContainsText(candidate) === null);
-  return catchAll < 0
+  const firstUnfiltered = routes.findIndex((candidate) => routeContainsText(candidate) === null);
+  return firstUnfiltered < 0
     ? [...routes, route]
-    : [...routes.slice(0, catchAll), route, ...routes.slice(catchAll)];
+    : [...routes.slice(0, firstUnfiltered), route, ...routes.slice(firstUnfiltered)];
 }
 
-/** Route-level `contains`; a stored pre-rules Route still carries it under `match`. */
+/** The Route-level `contains` text filter, when set. */
 export function routeContainsText(route: ChannelConfigurationRecord): string | null {
-  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-  const contains = route["contains"] ?? recordField(route, "match")["contains"];
+  const contains = route["contains"];
   return typeof contains === "string" && contains.length > 0 ? contains : null;
 }
 

@@ -13,7 +13,7 @@
 //
 // `compile-support.ts` owns the error type + the mechanical leaf compilers
 // (yaml parse, roles, users, transport, assignment checks); this file is the
-// orchestration — snapshot shape, account/route/fallback composition, the
+// orchestration — snapshot shape, account/route composition, the
 // inheritance fold, and the approval merge.
 
 import type { z } from "zod";
@@ -27,7 +27,6 @@ import {
   OrgPolicySchema,
   type ApprovalRule,
   type ChannelDefaults,
-  type Fallback,
   type RoleAssignment,
   type Route,
 } from "./schema.js";
@@ -40,7 +39,6 @@ import {
   type CompiledAudienceRule,
   type RouteWhere,
 } from "./audience.js";
-import { migrateFallbackAudience, migrateRouteAudience } from "./audience-migration.js";
 import { foldDefaults, mergeApproval, requireStarFallback } from "./inheritance.js";
 import {
   compileAccountLimits,
@@ -119,20 +117,6 @@ export interface RouteSelectable {
   models: readonly string[];
 }
 
-export interface CompiledFallback {
-  deny: boolean;
-  /** Catch-all route when `deny` is false; inherits the account layers. */
-  target?: RouteTarget;
-  /** Who the catch-all admits; its Where is every conversation. */
-  audienceRules?: readonly CompiledAudienceRule[];
-  defaultRoles?: string[];
-  assignments?: readonly RoleAssignment[];
-  defaults?: EffectiveDefaults;
-  approval?: readonly ApprovalRule[];
-  limits?: ResolvedLimits;
-  selectable?: RouteSelectable;
-}
-
 export interface CompiledChannelAccount {
   channel: string;
   accountId: string;
@@ -149,8 +133,8 @@ export interface CompiledChannelAccount {
   defaults: EffectiveDefaults;
   /** Merged, most-specific-first (account → org). */
   approval: readonly ApprovalRule[];
+  /** In authored order. A sender no Route admits is refused. */
   routes: readonly CompiledRoute[];
-  fallback: CompiledFallback;
   /** The Bot and per-Conversation scopes; absent = none apply. */
   limits?: CompiledAccountLimits;
 }
@@ -271,8 +255,8 @@ interface AccountPolicyLayers {
 }
 
 /** The account-level policy layers (org ⊕ account), with the account's own
- * assignment layer validated even when the account has no routes or catch-all
- * fallback (they would otherwise never reach `validateAssignments`). */
+ * assignment layer validated even when the account has no routes (they would
+ * otherwise never reach `validateAssignments`). */
 function accountPolicyLayers(
   file: HubBundleFile,
   org: OrgPolicy,
@@ -326,16 +310,6 @@ function compileAccount(
     defaults: foldDefaults(layers.layers),
     approval: layers.approval,
     routes,
-    fallback: compileFallback(account.fallback, {
-      file,
-      input,
-      users,
-      orgAssignments: layers.orgAssignments,
-      accountAssignments: layers.accountAssignments,
-      accountLayers: layers.layers,
-      accountApproval: layers.approval,
-      accountDefaultRoles: layers.defaultRoles,
-    }),
     ...compileAccountLimits(account.limits),
   };
 }
@@ -357,18 +331,17 @@ function compileRoute(
 ): CompiledRoute {
   validateAssignments(context.assignments, context.users, context.file.path);
   requireStarFallback([context.file.path, "routes", context.index], context.approval);
-  const migrated = migrateRouteAudience(route);
-  if (migrated.rules.length === 0) {
+  if (route.audience.length === 0) {
     issue(
       [context.file.path, "routes", context.index, "audience"],
       "a route needs at least one audience rule",
     );
   }
-  const audienceRules = migrated.rules.map(compileAudienceRule);
+  const audienceRules = route.audience.map(compileAudienceRule);
   return {
     audienceRules,
     where: deriveRouteWhere(audienceRules),
-    ...(migrated.contains === undefined ? {} : { contains: migrated.contains }),
+    ...(route.contains === undefined ? {} : { contains: route.contains }),
     target: compileRouteTarget(route, context),
     defaultRoles: context.defaultRoles,
     assignments: context.assignments,
@@ -401,15 +374,8 @@ function compileRouteSelectable(
   return { selectable: { agents: [...(route.agents ?? [])], models: [...(route.models ?? [])] } };
 }
 
-interface RouteTargetRef {
-  agent?: string | undefined;
-  environment?: string | undefined;
-  workflow?: string | undefined;
-  template?: string | undefined;
-}
-
 function compileRouteTarget(
-  route: RouteTargetRef,
+  route: Route,
   context: { file: HubBundleFile; index: number; input: ChannelCompileInput },
 ): RouteTarget {
   const path = [context.file.path, "routes", context.index];
@@ -450,51 +416,4 @@ function compileRouteTarget(
     issue([...path, "workflow"], `workflow ${workflow} has no matching organization Trigger`);
   }
   return { kind: "workflow", workflow };
-}
-
-function compileFallback(
-  fallback: Fallback | undefined,
-  context: {
-    file: HubBundleFile;
-    input: ChannelCompileInput;
-    users: Record<string, CompiledUser>;
-    orgAssignments: readonly RoleAssignment[];
-    accountAssignments: readonly RoleAssignment[];
-    accountLayers: readonly (ChannelDefaults | undefined)[];
-    accountApproval: readonly ApprovalRule[];
-    accountDefaultRoles: string[];
-  },
-): CompiledFallback {
-  if (fallback === undefined || "deny" in fallback) {
-    return { deny: true };
-  }
-  // The catch-all is a route: it inherits every layer above it (§4.3.7).
-  const assignments = [
-    ...context.orgAssignments,
-    ...context.accountAssignments,
-    ...(fallback.policy?.assignments ?? []),
-  ];
-  validateAssignments(assignments, context.users, context.file.path);
-  const approval = mergeApproval(context.accountApproval, fallback.approval);
-  requireStarFallback([context.file.path, "fallback"], approval);
-  const audienceRules = migrateFallbackAudience(fallback).rules.map(compileAudienceRule);
-  return {
-    deny: false,
-    target: compileRouteTarget(fallback, {
-      file: context.file,
-      index: -1,
-      input: context.input,
-    }),
-    audienceRules,
-    defaultRoles: fallback.policy?.defaultRoles ?? context.accountDefaultRoles,
-    assignments,
-    defaults: foldDefaults([...context.accountLayers, fallback]),
-    approval,
-    ...compileRouteLimits(fallback.limits, isOpenAudience(audienceRules)),
-    ...compileRouteSelectable(fallback as Route, {
-      file: context.file,
-      index: -1,
-      input: context.input,
-    }),
-  };
 }

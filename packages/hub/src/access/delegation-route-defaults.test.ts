@@ -29,11 +29,10 @@ accountId: ${accountId}
 connectionId: slack-${accountId}
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - match: { kind: channel, ids: [C1] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
     agent: assistant
     environment: ${environment}
 ${controls}
-fallback: { deny: true }
 `;
 }
 

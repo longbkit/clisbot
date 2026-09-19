@@ -367,7 +367,6 @@ it("rejects unattended Automation and auto-accept Channel delegation for a proje
             defaults: { outbound: { path: "relay", template: null } },
           },
         ],
-        fallback: { deny: true },
       },
     ],
   } as unknown as ChannelControlPlane;

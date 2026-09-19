@@ -88,7 +88,18 @@ Rule 4  Who: Anyone (warned)   Where: Specific [qc-public-help]
   Admins on a strong Agent, Anyone in public rooms on a limited one.
 - **A bound conversation does not fall through.** The Route the binding recorded
   owns it, and a sender must match that Route's rules. Otherwise two people in
-  one thread would reach different Routes and sessions.
+  one thread would reach different Routes and sessions. When that Route's Who
+  refuses the sender, the bot replies in the thread instead of staying silent:
+  the conversation belongs to Route <name>, and a new message outside the
+  thread starts the sender's own conversation. That new message goes through
+  ordinary selection, so it may land on a later Route with its own session.
+  Keying sessions by (thread, Route) was rejected as too invasive.
+- **No catch-all.** A sender no Route admits is refused. To answer "everyone
+  else", add a last Route whose rule covers them. The account `fallback`
+  (the "Everyone else (catch-all)" screen) is removed: once Where lives in the
+  rules and senders fall through, a catch-all is a Route with no Where of its
+  own appended last, so it added a second concept and a second binding state
+  (`"fallback"`) without adding behavior.
 
 ### Access page
 
@@ -96,7 +107,7 @@ The Channel Route's Access tab keeps only **Channel Route Admin** (see
 [Delegated access](../features/access/scoped-admins.md)). `channel.use` with a
 conversation scope is no longer created from the UI.
 
-### Migration (automatic)
+### Migration (one-time, then deleted)
 
 | Old                                  | Becomes a rule on every Route of that account      |
 | ------------------------------------ | -------------------------------------------------- |
@@ -107,11 +118,40 @@ conversation scope is no longer created from the UI.
 | `audience: conversationParticipants` | Who = Anyone, Where = the Route's old `match`      |
 | `audience: members`                  | Who = Members, Where = the Route's old `match`     |
 | `match.kind` + `ids`                 | The Where of the Route's rules                     |
+| `fallback` without `deny`            | A last Route with the same rules, target, behavior |
+| `fallback: { deny: true }`           | Removed (refusing is the default)                  |
+| A binding that recorded `"fallback"` | Points at that last Route                          |
+
+A folded grant only widens Who. Its rule's Where is the **intersection** of the
+grant's scope and that Route's old `match`, and a Route where the intersection
+is empty gets no rule. A Route's Where is the union of its rules' Where, so
+adding the grant's own scope would let an "all conversations" grant make Route 1
+cover everywhere and take conversations that belong to later Routes. Example:
+Routes `#eng` and `#support` plus one "all" grant give Route 1 {grantee, `#eng`}
+and Route 2 {grantee, `#support`}.
 
 Channel-policy roles (`bot.interact`) and `access:`/pairing stay under an
-**Advanced** section and are not migrated yet. The read path for old grants
-carries a `COMPAT(route-audience-rules)` tag until the migration has run
-everywhere.
+**Advanced** section and are not migrated yet.
+
+The old shapes leave the stored data entirely, history included, so nobody
+reading the database later meets a format the code no longer knows. A one-time
+script, per Hub and in one transaction after dumping both tables:
+
+- rewrites the **active** `channel_configuration_revisions` row of each
+  organization in place into the new shape (`content_hash` recomputed);
+- **deletes every other revision** of that organization. The only foreign key
+  into the table is `organization_channel_configurations.active_revision_id`,
+  so nothing else points at them;
+- rewrites every thread binding's stored route selection to the active
+  revision id and the new Route position.
+
+Dropping history is a decision for this migration only. Revisions stay
+append-only everywhere else. The Hub and app code then know
+only the new shape: no `fallback`, no `match`/one-value `audience` reader, no
+`COMPAT(route-audience-rules)` tag. This is acceptable because both Hubs that
+hold data (dev and ai-cowork) are ours; an old app still sending `fallback`
+gets a validation error and a reload fixes it. The script is deleted once it
+has run on both.
 
 ## Options considered
 
@@ -123,6 +163,9 @@ everywhere.
 | Where split by public/private for specific rooms                        | Rejected: the configurator would have to know each room's visibility |
 | "DM with" as a Where part                                               | Rejected: in a DM the sender is the other person, so it is a Who     |
 | Route chosen by conversation only; rules only refuse                    | Rejected: no tiers by audience                                       |
+| Keep the catch-all, relabel it "Last Route"                             | Rejected: still a second concept with no behavior of its own         |
+| Read old shapes at compile time behind a COMPAT tag                     | Rejected: old revisions keep the old shape forever                   |
+| Rewrite every revision in place, keep history                           | Rejected: old revisions would claim content nobody saved             |
 
 ## Storage sketch
 
@@ -133,5 +176,4 @@ audience:
 ```
 
 This extends `RouteAudienceSchema` (`packages/hub/src/channels/config/schema.ts`)
-and replaces `match.kind`/`ids` as the conversation selector. The account file
-format changes, so the compiler reads the old shape through the migration.
+and replaces `match.kind`/`ids` as the conversation selector.

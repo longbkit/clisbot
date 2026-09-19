@@ -127,7 +127,6 @@ export interface ChannelSupervisorOptions {
   /** The process environment the channel gate + policy read; default `process.env`. */
   env?: NodeJS.ProcessEnv;
   dispatchWorkflow?: import("../plane/types.js").ChannelPlaneDeps["dispatchWorkflow"];
-  authorizeChannelUse?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelUse"];
   resolveChannelSender?: import("../plane/types.js").ChannelPlaneDeps["resolveChannelSender"];
   authorizeChannelApproval?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelApproval"];
   consumeChannelIdentityChallenge?: import("../plane/types.js").ChannelPlaneDeps["consumeChannelIdentityChallenge"];

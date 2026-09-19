@@ -24,7 +24,6 @@ const initial = [
       connectionId: "connection-1",
       enabled: true,
       transport: { mode: "socket" },
-      fallback: { deny: true },
     }),
   },
 ];

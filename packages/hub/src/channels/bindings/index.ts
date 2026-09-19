@@ -46,7 +46,6 @@ import type {
   InboundMessage,
   InboundOutcome,
   ChannelSenderResolver,
-  ChannelUseAuthorizer,
   SupportedChannelName,
   PlaneClock,
 } from "../plane/types.js";
@@ -61,6 +60,7 @@ export {
   parseStoredRouteTarget,
   routeFingerprint,
   routePosition,
+  recordedRoute,
   storedRouteOwner,
   type StoredRouteSummary,
   type ThreadKey,
@@ -111,7 +111,6 @@ interface BindingEngineContext extends SessionCreateContext {
   controlPlane: ChannelControlPlane;
   clock: PlaneClock;
   store: ChannelStore;
-  authorizeChannelUse?: ChannelUseAuthorizer | undefined;
   resolveChannelSender?: ChannelSenderResolver | undefined;
   /** Release a session the plane no longer streams — the conversation moved to
    * another target. Absent = the engine only cancels and unbinds it. */
@@ -628,7 +627,7 @@ export class BindingEngine {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-  ): ReturnType<ChannelUseAuthorizer> {
+  ): ReturnType<typeof mayUseChannelRoute> {
     return await mayUseChannelRoute({
       store: this.context.store.access,
       organizationId: this.context.organizationId,
@@ -639,9 +638,6 @@ export class BindingEngine {
       ...(this.context.resolveChannelSender === undefined
         ? {}
         : { resolveChannelSender: this.context.resolveChannelSender }),
-      ...(this.context.authorizeChannelUse === undefined
-        ? {}
-        : { authorizeChannelUse: this.context.authorizeChannelUse }),
     });
   }
 

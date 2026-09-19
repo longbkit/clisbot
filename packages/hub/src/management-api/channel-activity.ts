@@ -12,9 +12,8 @@ import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 // code in `outcomeDetail`. It is distinct from `ignored`, which means the plane
 // had nothing to do with the event.
 const outcomeSchema = z.enum(["bound", "steered", "workflow", "ignored", "denied", "error"]);
-const routeSchema = z.union([z.number().int().nonnegative(), z.literal("fallback")]);
 const activityEvidence = z.object({
-  routePosition: routeSchema,
+  routePosition: z.number().int().nonnegative(),
   conversationId: z.string(),
   threadId: z.string().nullable(),
   providerSenderId: z.string(),
@@ -28,10 +27,10 @@ const querySchema = z
     channel: SupportedChannelNameSchema.optional(),
     accountId: z.string().min(1).max(512).optional(),
     routePosition: z
-      .union([
-        z.literal("fallback"),
-        z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe()),
-      ])
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .pipe(z.number().int().nonnegative().safe())
       .optional(),
     outcome: outcomeSchema.optional(),
     cursor: z.string().min(1).max(4096).optional(),

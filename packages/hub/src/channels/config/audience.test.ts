@@ -9,15 +9,7 @@ import {
   whoMatches,
   type AudienceSender,
 } from "./audience.js";
-import {
-  fallbackInNewShape,
-  migrateRouteAudience,
-  routeInNewShape,
-  whereFromChannelUseConstraint,
-  whereFromMatch,
-  whoFromChannelUseSubject,
-} from "./audience-migration.js";
-import { AudienceRuleSchema, RouteSchema } from "./schema.js";
+import { AccountFileSchema, AudienceRuleSchema, RouteSchema } from "./schema.js";
 
 const owner: AudienceSender = {
   identity: "slack:U0OWNER",
@@ -138,76 +130,29 @@ describe("who", () => {
   });
 });
 
-describe("migration table", () => {
-  it("turns match.kind + ids into the Where of one rule", () => {
-    assert.deepEqual(whereFromMatch({ kind: "dm" }), { dm: true });
-    assert.deepEqual(whereFromMatch({ kind: "channel" }), { groups: "all" });
-    assert.deepEqual(whereFromMatch({ kind: "thread", ids: [] }), { groups: "all" });
-    assert.deepEqual(whereFromMatch({ kind: "topic", ids: [42] }), { conversations: ["42"] });
-  });
-
-  it("maps the one-value audience to Members or Anyone, and keeps contains at route level", () => {
-    const members = migrateRouteAudience(
-      RouteSchema.parse({
-        match: { kind: "channel", ids: ["C1"], contains: "#x" },
-        agent: "a",
-        environment: "e",
-      }),
+describe("route shape", () => {
+  it("knows only audience rules: no match, no one-value audience, no fallback", () => {
+    const target = { agent: "a", environment: "e" };
+    assert.equal(RouteSchema.safeParse({ ...target }).success, false);
+    assert.equal(
+      RouteSchema.safeParse({ ...target, audience: [], match: { kind: "channel" } }).success,
+      false,
     );
-    assert.deepEqual(members.rules, [
-      { who: { roles: ["member"] }, where: { conversations: ["C1"] } },
-    ]);
-    assert.equal(members.contains, "#x");
-    assert.equal(members.legacy, true);
-    const open = migrateRouteAudience(
-      RouteSchema.parse({
-        match: { kind: "dm" },
-        audience: { kind: "conversationParticipants" },
-        agent: "a",
-        environment: "e",
-      }),
+    assert.equal(
+      RouteSchema.safeParse({ ...target, audience: { kind: "conversationParticipants" } }).success,
+      false,
     );
-    assert.deepEqual(open.rules, [{ who: { anyone: true }, where: { dm: true } }]);
-    const rules = migrateRouteAudience(
-      RouteSchema.parse({
-        audience: [{ who: { teams: ["qc"] }, where: { groups: "public" } }],
-        contains: "deploy",
-        agent: "a",
-        environment: "e",
-      }),
+    const account = {
+      channel: "slack",
+      accountId: "work",
+      connectionId: "c",
+      transport: { mode: "socket" },
+      routes: [{ ...target, audience: [{ who: { anyone: true }, where: { dm: true } }] }],
+    };
+    assert.equal(AccountFileSchema.safeParse(account).success, true);
+    assert.equal(
+      AccountFileSchema.safeParse({ ...account, fallback: { deny: true } }).success,
+      false,
     );
-    assert.equal(rules.legacy, false);
-    assert.equal(rules.contains, "deploy");
-  });
-
-  it("rewrites a route and a fallback to the new shape", () => {
-    const route = routeInNewShape(
-      RouteSchema.parse({ match: { kind: "group", contains: "x" }, agent: "a", environment: "e" }),
-    );
-    assert.equal("match" in route, false);
-    assert.deepEqual(route.audience, [{ who: { roles: ["member"] }, where: { groups: "all" } }]);
-    assert.equal(route.contains, "x");
-    const fallback = fallbackInNewShape({
-      audience: { kind: "conversationParticipants" },
-      workflow: "w",
-    });
-    assert.deepEqual("deny" in fallback ? undefined : fallback.audience, [
-      { who: { anyone: true }, where: { dm: true, groups: "all" } },
-    ]);
-  });
-
-  it("maps a channel.use grant to a rule", () => {
-    assert.deepEqual(whereFromChannelUseConstraint({ kind: "all" }), { dm: true, groups: "all" });
-    assert.deepEqual(whereFromChannelUseConstraint({ kind: "direct_messages" }), { dm: true });
-    assert.deepEqual(whereFromChannelUseConstraint({ kind: "public_channels" }), {
-      groups: "public",
-    });
-    assert.deepEqual(whereFromChannelUseConstraint({ kind: "specific", conversationIds: ["C1"] }), {
-      conversations: ["C1"],
-    });
-    assert.equal(whereFromChannelUseConstraint(undefined), undefined);
-    assert.deepEqual(whoFromChannelUseSubject("member", "m1"), { members: ["m1"] });
-    assert.deepEqual(whoFromChannelUseSubject("team", "t1"), { teams: ["t1"] });
-    assert.deepEqual(whoFromChannelUseSubject("guest", "guest"), { anyone: true });
   });
 });

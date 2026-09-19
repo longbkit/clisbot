@@ -770,7 +770,6 @@ function upsertAccountFile(
       enabled: true,
       connectionId,
       transport: retained["transport"] ?? { mode: DEFAULT_TRANSPORT_MODE[channel] },
-      fallback: retained["fallback"] ?? { deny: true },
     },
     { lineWidth: -1 },
   );

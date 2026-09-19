@@ -594,9 +594,8 @@ function accountDaemonReference(
   account: CompiledChannelAccount,
   resolveTarget: ChannelControlPlaneSnapshot["resolveAgentAccessTarget"],
 ): string | undefined {
-  const targets = [...account.routes.map((route) => route.target), account.fallback.target];
-  for (const target of targets) {
-    if (target?.kind !== "agent") continue;
+  for (const target of account.routes.map((route) => route.target)) {
+    if (target.kind !== "agent") continue;
     try {
       return resolveTarget(target).daemonReference;
     } catch {
@@ -1347,7 +1346,6 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       controlPlane: snapshot.controlPlane,
       ...commandPlaneOptions(this.options, this.routeDefaults),
       ...pickDefined(this.options, [
-        "authorizeChannelUse",
         "resolveChannelSender",
         "authorizeChannelApproval",
         "consumeChannelIdentityChallenge",

@@ -18,12 +18,7 @@
 // moment ANY path dispatches (or the wire reports a client resolution); every
 // later path finds the flag and is an inert no-op. The daemon's own
 // in-flight dedupe is the backstop, but the hub guarantees one frame.
-import type {
-  ChannelControlPlane,
-  CompiledChannelAccount,
-  CompiledFallback,
-  CompiledRoute,
-} from "../config/compile.js";
+import type { ChannelControlPlane, CompiledChannelAccount } from "../config/compile.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import type { ChannelStore } from "../../db/channels.js";
@@ -627,63 +622,13 @@ export { cardIdFor, parseCardValue };
 
 /**
  * The S10 invariant at plane start: every route of every account keeps the
- * approval-required posture (no rule set auto-allows every tool class). A
- * catch-all fallback that targets an agent is a route too and is checked the
- * same way. Propagates policy's `ApprovalPostureError` naming the offender.
+ * approval-required posture (no rule set auto-allows every tool class).
+ * Propagates policy's `ApprovalPostureError` naming the offender.
  */
 export function assertChannelPosture(accounts: readonly CompiledChannelAccount[]): void {
   for (const account of accounts) {
     for (const route of account.routes) {
       assertApprovalRequiredPosture(route);
     }
-    const fallback = account.fallback;
-    if (
-      fallback.deny === false &&
-      fallback.target !== undefined &&
-      fallback.defaults !== undefined
-    ) {
-      assertApprovalRequiredPosture(catchAllRoute(fallback));
-    }
   }
-}
-
-/** The catch-all fallback rendered as the route the posture check decides on. */
-export function catchAllRoute(fallback: CompiledFallback): CompiledRoute {
-  const target = fallback.target;
-  return {
-    audienceRules: fallback.audienceRules ?? [],
-    // The catch-all covers every conversation no earlier Route claimed.
-    where: { dm: true, groups: ["all"], conversations: [] },
-    target: target ?? { kind: "workflow", workflow: "none" },
-    defaultRoles: fallback.defaultRoles ?? [],
-    assignments: fallback.assignments ?? [],
-    defaults: fallback.defaults ?? accountlessDefaults(),
-    approval: fallback.approval ?? [],
-    ...(fallback.limits === undefined ? {} : { limits: fallback.limits }),
-    ...(fallback.selectable === undefined ? {} : { selectable: fallback.selectable }),
-  };
-}
-
-// The catch-all fallback synthesized without an account still needs a
-// well-formed defaults block for the posture check.
-function accountlessDefaults() {
-  return {
-    requireMention: true,
-    followUp: { mode: "auto" as const, ttlMinutes: 60 },
-    bindingKey: "thread" as const,
-    replyAnchor: "thread" as const,
-    outbound: { path: "relay" as const, template: null },
-    inbound: { reactionNotifications: "off" as const, editNotifications: "off" as const },
-    sync: {
-      finalAnswers: true,
-      progress: {
-        progressMessage: false,
-        typingIndicator: false,
-        messageReaction: "off",
-      },
-      toolCalls: false,
-      threadLink: "final-only" as const,
-      subagents: { finalAnswers: false, progress: false, toolCalls: false },
-    },
-  };
 }

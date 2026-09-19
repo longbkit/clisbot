@@ -2247,8 +2247,9 @@ function workflowChannelTool(
   const routeFingerprint = Reflect.get(channel, "route_fingerprint");
   if (
     (revisionId !== null && typeof revisionId !== "string") ||
-    (routePosition !== "fallback" &&
-      (!Number.isInteger(routePosition) || Number(routePosition) < 0)) ||
+    typeof routePosition !== "number" ||
+    !Number.isInteger(routePosition) ||
+    routePosition < 0 ||
     typeof routeFingerprint !== "string" ||
     routeFingerprint === ""
   ) {
@@ -2258,7 +2259,7 @@ function workflowChannelTool(
   const capabilityToken = capabilities.issue({
     organizationId: intent.organizationId,
     channelRevisionId: revisionId as string | null,
-    routePosition: routePosition as number | "fallback",
+    routePosition,
     routeFingerprint,
     ref: {
       channel: name,

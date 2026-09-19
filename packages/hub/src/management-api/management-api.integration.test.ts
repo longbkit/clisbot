@@ -628,8 +628,7 @@ accountId: public
 connectionId: slack:public
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     workflow: public-handoff
     sync:
       finalAnswers: true
@@ -840,14 +839,20 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
         connectionId: channelConnection.connectionId,
         transport: { mode: "polling" },
         routes: [
-          { match: { kind: "dm" }, agent: "coding", environment: "work" },
           {
-            match: { kind: "group", ids: ["-100123"] },
+            audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
+            agent: "coding",
+            environment: "work",
+          },
+          {
+            audience: [{ who: { roles: ["member"] }, where: { conversations: ["-100123"] } }],
             workflow: "handoff",
           },
-          { match: { kind: "topic", ids: ["42"] }, workflow: "handoff" },
+          {
+            audience: [{ who: { roles: ["member"] }, where: { conversations: ["42"] } }],
+            workflow: "handoff",
+          },
         ],
-        fallback: { deny: true },
       },
     ],
   };
@@ -869,8 +874,7 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
           ...candidate.accounts[0],
           routes: [
             {
-              match: { kind: "dm" },
-              audience: { kind: "conversationParticipants" },
+              audience: [{ who: { anyone: true }, where: { dm: true } }],
               agent: "coding",
               environment: "work",
             },
@@ -885,7 +889,10 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     message: string;
   }[];
   assert.ok(
-    openWarnings.some(({ route, message }) => route === 0 && /Anyone in any dm/u.test(message)),
+    openWarnings.some(
+      ({ route, message }) =>
+        route === 0 && /Anyone who can message the bot directly/u.test(message),
+    ),
     JSON.stringify(openWarnings),
   );
   assert.equal((await database.findActiveChannelConfiguration(ORGANIZATION_ID))?.id, initial.id);
@@ -896,7 +903,13 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
       accounts: [
         {
           ...candidate.accounts[0],
-          routes: [{ match: { kind: "dm" }, agent: "missing", environment: "work" }],
+          routes: [
+            {
+              audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
+              agent: "missing",
+              environment: "work",
+            },
+          ],
         },
       ],
     }),
@@ -1203,10 +1216,8 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
       subjectId: MEMBERSHIP_ID,
       resourceKind: "channel_account",
       resourceId: "telegram/support",
-      privileges: ["channel.use"],
-      constraints: {
-        conversation: { kind: "specific", conversationIds: ["C-CUSTOMER"] },
-      },
+      privileges: ["channel.manage"],
+      constraints: { conversation: { kind: "all" } },
     }),
   );
   assert.equal(assignment.status, 201);
@@ -1217,10 +1228,8 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
       subjectId: MEMBERSHIP_ID,
       resourceKind: "channel_account",
       resourceId: "slack/unknown",
-      privileges: ["channel.use"],
-      constraints: {
-        conversation: { kind: "specific", conversationIds: ["C-CUSTOMER"] },
-      },
+      privileges: ["channel.manage"],
+      constraints: { conversation: { kind: "all" } },
     }),
   );
   assert.equal(guessed.status, 404);
@@ -1372,53 +1381,6 @@ it("stores provider credentials in the Connection owner and never returns them",
     }),
     { botToken: "telegram-secret-rotated" },
   );
-  await access.saveAssignment(
-    ORGANIZATION_ID,
-    {
-      subjectKind: "member",
-      subjectId: "member-membership",
-      resourceKind: "channel_account",
-      resourceId: "telegram/support",
-      privileges: ["channel.use"],
-      constraints: {
-        conversation: { kind: "specific", conversationIds: ["customer-1"] },
-      },
-    },
-    USER_ID,
-  );
-  assert.equal(
-    await access.allowsChannelPrivilege({
-      organizationId: ORGANIZATION_ID,
-      connectionId: connection.id,
-      channel: "telegram",
-      accountId: "support",
-      senderIdentity: "telegram:10001",
-      conversation: {
-        kind: "group",
-        id: "customer-1",
-        rootConversationId: "customer-1",
-      },
-      privilege: "channel.use",
-    }),
-    true,
-  );
-  assert.equal(
-    await access.allowsChannelPrivilege({
-      organizationId: ORGANIZATION_ID,
-      connectionId: connection.id,
-      channel: "telegram",
-      accountId: "support",
-      senderIdentity: "telegram:10001",
-      conversation: {
-        kind: "group",
-        id: "customer-2",
-        rootConversationId: "customer-2",
-      },
-      privilege: "channel.use",
-    }),
-    false,
-  );
-
   await enrollTestDaemon(database, ORGANIZATION_ID);
   const [managedProject] = await access.replaceDaemonProjects(ORGANIZATION_ID, TEST_DAEMON_ID, [
     { projectId: "project-support", name: "Support" },
@@ -1579,12 +1541,15 @@ it("stores provider credentials in the Connection owner and never returns them",
     "/channel-configuration/revisions",
     "/channel-accounts/status",
     "/channel-accounts/telegram/support/conversations",
-    "/automations",
     "/provider-applications",
   ]) {
     const forbidden = await memberApi.handle(request(path, "GET"));
     assert.equal(forbidden.status, 403, `${path} must require resource management`);
   }
+  // Automations are author-owned: a Member lists the ones they hold, here none.
+  const memberAutomations = await memberApi.handle(request("/automations", "GET"));
+  assert.equal(memberAutomations.status, 200);
+  assert.deepEqual((await memberAutomations.json()).automations, []);
 
   const inUse = await api.handle(request(`/connections/${connection.id}`, "DELETE"));
   assert.equal(inUse.status, 409);

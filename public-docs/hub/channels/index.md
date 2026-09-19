@@ -23,7 +23,7 @@ Three resources make that work, and they are separate on purpose:
 
 - A **Connection** owns the credential — one Slack workspace installation, one bot token, one linked Zalo account. Hub encrypts it and never shows it again.
 - A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization.
-- A **Route** picks what a matching conversation runs — a direct agent, or an Automation. First match wins.
+- A **Route** picks what a matching conversation runs — a direct agent, or an Automation. The first Route whose audience rules admit the sender wins; a sender no Route admits is refused.
 
 [How Hub works](/docs/hub/concepts) covers the resource model. This section covers the platforms.
 
@@ -202,8 +202,11 @@ routes:
 Routes stay ordered. A route applies when a rule's Where covers the
 conversation (and `contains`, if set, matches); if the sender matches none of
 that route's rules, the next route is tried. A bound conversation does not fall
-through: the route that started the session owns it. The catch-all (`fallback`)
-takes the same rules, or `deny: true`.
+through: the route that started the session owns it, and a sender that route
+refuses is told in the thread to start their own conversation with a new
+message outside it. There is no catch-all: a
+sender no route admits is refused. To answer everyone else, add a last route
+whose rule covers them.
 
 Talking to a bot and reaching a Host or Project stay separate. A chatting
 sender can start sessions with the route's configuration and use `/status`,
@@ -231,9 +234,9 @@ mode that runs tools without asking. The app lists them before you confirm a
 save. New routes start from the safe side: a mention in groups, final answers
 only, tool requests denied.
 
-Older files that use `match:` and `audience: { kind: … }` still load: the Hub
-reads them as one rule (`members` → Members, `conversationParticipants` →
-Anyone, `match` → Where).
+A route takes its audience only as a list of rules. A file that still carries a
+route `match:`, a one-value `audience: { kind: … }` or an account `fallback:`
+fails validation.
 
 ## Limits
 

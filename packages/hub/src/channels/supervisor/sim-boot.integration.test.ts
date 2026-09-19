@@ -22,6 +22,8 @@ import {
   SIM_TELEGRAM_CHAT,
   SIM_TELEGRAM_SENDER,
   SIM_ORG_ID,
+  SIM_STREAM_SLACK_CHANNEL,
+  SIM_STREAM_TELEGRAM_CHAT,
   startChannelSimBoot,
   type ChannelSimBoot,
 } from "../../test-utils/channel-sim-boot.js";
@@ -32,17 +34,15 @@ import type { ChannelReplyBindingRef } from "../plane/types.js";
 
 const ENABLED = process.env["RUN_CHANNEL_SIM_BOOT"] === "1";
 
-// The streaming scenarios drive their own conversations. A root conversation
-// that is already bound owns every thread/topic message under it — the plane
-// answers an inbound from the binding's route before it matches text — so a
-// topic of the chat the earlier scenarios bound would inherit their `tool`
-// route, not the streaming one.
-const STREAM_TELEGRAM_CHAT = -1_001_777_555;
+// The streaming scenarios drive their own conversations: the streaming Routes
+// are narrowed to them, and a root conversation that is already bound owns
+// every thread/topic message under it.
+const STREAM_TELEGRAM_CHAT = SIM_STREAM_TELEGRAM_CHAT;
 /** Workspace organization drives its own chat: the assertion is about the
  * FIRST session of a conversation, which a chat bound by another scenario no
  * longer has. */
 const WORKSPACE_TELEGRAM_CHAT = -1_001_777_600;
-const STREAM_SLACK_CHANNEL = "C_SIM_STREAM";
+const STREAM_SLACK_CHANNEL = SIM_STREAM_SLACK_CHANNEL;
 
 let boot: ChannelSimBoot;
 

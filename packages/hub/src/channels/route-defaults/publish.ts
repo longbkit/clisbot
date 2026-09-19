@@ -6,7 +6,6 @@
 import type { Database } from "../../db/types.js";
 import { AccessPolicyError } from "../../access/store.js";
 import { ChannelConfigurationConflictError } from "../../db/errors.js";
-import { catchAllRoute } from "../approvals/index.js";
 import type { AgentControls } from "../config/agent-controls.js";
 import type { CompiledRoute } from "../config/compile.js";
 import type { FollowUp } from "../config/schema.js";
@@ -185,7 +184,5 @@ function compiledRoute(
   const account = controlPlane.accounts.find(
     (candidate) => candidate.channel === target.channel && candidate.accountId === target.accountId,
   );
-  if (account === undefined) return undefined;
-  if (target.position !== "fallback") return account.routes[target.position];
-  return account.fallback.deny ? undefined : catchAllRoute(account.fallback);
+  return account?.routes[target.position];
 }

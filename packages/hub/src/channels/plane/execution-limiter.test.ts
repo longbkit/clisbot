@@ -65,7 +65,6 @@ function fixture() {
     defaults,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
   let now = 1_000;
   const timers = new Map<number, () => void>();

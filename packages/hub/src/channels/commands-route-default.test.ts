@@ -23,13 +23,14 @@ enabled: true
 connectionId: slack-support
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - match: { kind: channel, ids: [C0], contains: other }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0] } }]
+    contains: other
     agent: assistant
     environment: lab
-  - match: { kind: channel, ids: [C1], contains: deploy }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
+    contains: deploy
     agent: assistant
     environment: lab
-fallback: { deny: true }
 `;
 
 const NAMED = { provider: "codex", model: "gpt-5.6-luna", thinkingOptionId: "medium" };

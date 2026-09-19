@@ -17,7 +17,6 @@ import {
   OutboundPathSchema,
   ReplyAnchorSchema,
   ReactionNotificationsSchema,
-  RouteMatchKindSchema,
   SlackTransportModeSchema,
   DiscordTransportModeSchema,
   FeishuTransportModeSchema,
@@ -519,28 +518,6 @@ export const ZalouserAccountConfigSchema = z.looseObject({
 });
 export type ZalouserAccountConfig = z.infer<typeof ZalouserAccountConfigSchema>;
 
-// COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-// The pre-rules conversation selector. Still parsed so every stored revision
-// loads; `config/audience-migration.ts` turns it into audience rules.
-export const RouteMatchSchema = z
-  .object({
-    kind: RouteMatchKindSchema,
-    // Native provider ids: Slack channel/thread ids, Telegram chat ids (numbers
-    // in YAML are accepted and normalized to strings at compile).
-    ids: z.array(z.union([z.string(), z.number()])).optional(),
-    contains: z.string().min(1).optional(),
-  })
-  .strict();
-export type RouteMatch = z.infer<typeof RouteMatchSchema>;
-
-// COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-// The one-value audience the rules replaced.
-export const RouteAudienceSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("members") }).strict(),
-  z.object({ kind: z.literal("conversationParticipants") }).strict(),
-]);
-export type RouteAudience = z.infer<typeof RouteAudienceSchema>;
-
 /** The organization roles a Who may name. `admin` includes Owners; `member`
  * is every linked Member whatever their role. */
 export const AUDIENCE_ROLES = ["owner", "admin", "member"] as const;
@@ -649,15 +626,12 @@ export type AccountLimits = z.infer<typeof AccountLimitsSchema>;
  */
 export const RouteSchema = z
   .object({
-    /** Who may talk, where. Read together with `match`/the one-value
-     * `audience` through `config/audience-migration.ts`; a route needs one of
-     * the two shapes. */
-    audience: z.union([z.array(AudienceRuleSchema), RouteAudienceSchema]).optional(),
+    /** Who may talk, where: the Route applies to the conversations its rules'
+     * Where covers, and admits a sender any covering rule names. */
+    audience: z.array(AudienceRuleSchema),
     // Optional literal content discriminator. This selects a route only when
     // no durable direct-Agent binding already owns the inbound conversation.
     contains: z.string().min(1).optional(),
-    // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-    match: RouteMatchSchema.optional(),
     agent: z.string().min(1).optional(),
     environment: z.string().min(1).optional(),
     workflow: z.string().min(1).optional(),
@@ -689,12 +663,6 @@ export const RouteSchema = z
   .strict();
 export type Route = z.infer<typeof RouteSchema>;
 
-export const FallbackSchema = z.union([
-  z.object({ deny: z.literal(true) }).strict(),
-  RouteSchema.omit({ match: true, contains: true }),
-]);
-export type Fallback = z.infer<typeof FallbackSchema>;
-
 export const AccountFileSchema = z
   .object({
     channel: z.string().min(1),
@@ -715,8 +683,8 @@ export const AccountFileSchema = z
       .strict()
       .optional(),
     defaults: ChannelDefaultsSchema.optional(),
+    /** Ordered; a sender no Route admits is refused. */
     routes: z.array(RouteSchema).optional(),
-    fallback: FallbackSchema.optional(),
     limits: AccountLimitsSchema.optional(),
   })
   .strict();

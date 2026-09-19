@@ -166,8 +166,12 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     defaults: DEFAULTS,
     approval: [],
     routes: [route],
-    fallback: { deny: true },
   };
+}
+
+/** An account and the Route it serves, the same object on both sides. */
+function routed(route: CompiledRoute = makeRoute()): [CompiledChannelAccount, CompiledRoute] {
+  return [makeAccount(route), route];
 }
 
 function makeControlPlane(account: CompiledChannelAccount): ChannelControlPlane {
@@ -353,8 +357,7 @@ describe("bind (root marker, reply.anchor = thread)", () => {
 
     const outcome = await engine.bindOrSteer(
       message({ externalMessageId: MARKER_TS }),
-      makeAccount(makeRoute()),
-      makeRoute(),
+      ...routed(),
     );
     assert.equal(outcome.kind, "bound");
 
@@ -382,7 +385,7 @@ describe("bind (root marker, reply.anchor = thread)", () => {
       externalMessageId: "1700000000.000002",
       text: "continue",
     });
-    const steered = await engine.bindOrSteer(followUp, makeAccount(makeRoute()), makeRoute());
+    const steered = await engine.bindOrSteer(followUp, ...routed());
     assert.equal(steered.kind, "steered");
     assert.equal(steered.kind === "steered" ? steered.agentId : "", binding?.agentId);
     assert.equal(created.length, 1, "the thread follow-up reuses the marker's session");
@@ -396,7 +399,7 @@ describe("bind (first mention)", () => {
     const { daemon, created, messages, sources } = makeFakeDaemon();
     const engine = makeEngine(store, daemon);
 
-    const outcome = await engine.bindOrSteer(message(), makeAccount(makeRoute()), makeRoute());
+    const outcome = await engine.bindOrSteer(message(), ...routed());
 
     assert.equal(outcome.kind, "bound");
     assert.equal(outcome.kind === "bound" ? outcome.newSession : false, true);
@@ -513,7 +516,8 @@ describe("bind (first mention)", () => {
   it("records the created agent's home (create-time cwd) through noteAgentCwd", async () => {
     const { daemon, created } = makeFakeDaemon();
     const cwds: { agentId: string; cwd: string }[] = [];
-    const account = makeAccount(makeRoute());
+    const route = makeRoute("C0CWD");
+    const account = makeAccount(route);
     const engine = new BindingEngine({
       organizationId: ORGANIZATION_ID,
       controlPlane: makeControlPlane(account),
@@ -528,7 +532,6 @@ describe("bind (first mention)", () => {
         cwds.push({ agentId, cwd });
       },
     });
-    const route = makeRoute("C0CWD");
 
     const outcome = await engine.bindOrSteer(
       message({
@@ -1052,8 +1055,7 @@ describe("orphan recovery (restart / resume)", () => {
       message({
         conversation: { ...CHANNEL_CONVERSATION, id: "C0INLINE", rootConversationId: "C0INLINE" },
       }),
-      makeAccount(makeRoute()),
-      makeRoute(),
+      ...routed(),
     );
     assert.equal(outcome.kind, "bound");
     assert.equal(
@@ -1217,7 +1219,7 @@ describe("orphan recovery (restart / resume)", () => {
         },
       }),
       account,
-      makeRoute(),
+      account.routes[0]!,
     );
     assert.equal(outcome.kind, "bound");
     assert.equal(
@@ -1255,11 +1257,7 @@ it("mints the persisted provider bundle after a session reset", async () => {
   );
   const fake = makeFakeDaemon();
   const engine = makeEngine(store, fake.daemon);
-  const result = await engine.bindOrSteer(
-    message({ externalMessageId: marker }),
-    makeAccount(makeRoute()),
-    makeRoute(),
-  );
+  const result = await engine.bindOrSteer(message({ externalMessageId: marker }), ...routed());
   assert.equal(result.kind, "bound");
   assert.deepEqual(fake.created[0]?.config, {
     provider: "claude",

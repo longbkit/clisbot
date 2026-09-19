@@ -16,11 +16,9 @@ import {
   audienceRuleFromDraft,
   audienceRuleSentence,
   audienceRulesComplete,
-  fallbackAudienceDraft,
   isOpenAudienceDraft,
   membersEverywhereRule,
   routeAudienceDraft,
-  routeAudienceSummary,
   type AudienceNames,
   type AudienceRuleDraft,
 } from "./channel-route-audience";
@@ -189,8 +187,7 @@ const APPROVAL_LABELS = {
 };
 interface EditingRoute {
   accountKey: string;
-  /** A Route position, or the account's catch-all. */
-  routeIndex: number | "fallback";
+  routeIndex: number;
 }
 
 type ChannelEditor =
@@ -1004,12 +1001,10 @@ function AutomationChannelInputs({
   );
 }
 
-/** True when one of the account's Routes, or its fallback, runs this Automation. */
+/** True when one of the account's Routes runs this Automation. */
 function accountFeedsAutomation(account: RecordValue, automationName: string): boolean {
-  return (
-    arrayField(account, "routes").some(
-      (route) => (route as RecordValue).workflow === automationName,
-    ) || objectField(account, "fallback")?.workflow === automationName
+  return arrayField(account, "routes").some(
+    (route) => (route as RecordValue).workflow === automationName,
   );
 }
 
@@ -1068,11 +1063,6 @@ function AutomationChannelAccount({
         removeRoute={removeRoute}
         automationName={automationName}
       />
-      {objectField(account, "fallback")?.workflow === automationName ? (
-        <Text style={settingsStyles.rowHint}>
-          The catch-all invokes this Automation. Edit it from the Channel Route in Channels.
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -1552,7 +1542,6 @@ function ChannelAccountRow({
         pending={pending}
         retryAccount={retryAccount}
         updateAccount={updateAccount}
-        editRoute={editRoute}
       />
       <ChannelAccountRouteList
         visible={selected}
@@ -1589,7 +1578,6 @@ function ChannelAccountDetails({
   pending,
   retryAccount,
   updateAccount,
-  editRoute,
 }: {
   visible: boolean;
   account: RecordValue;
@@ -1606,7 +1594,6 @@ function ChannelAccountDetails({
   pending: boolean;
   retryAccount(account: RecordValue): Promise<void>;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
-  editRoute(route: EditingRoute): void;
 }) {
   const [showRuntimeDetails, setShowRuntimeDetails] = useState(false);
   const [showLimits, setShowLimits] = useState(false);
@@ -1667,12 +1654,6 @@ function ChannelAccountDetails({
           pending={pending}
         />
       ) : null}
-      <ChannelCatchAllRow
-        account={account}
-        accountKey={channelAccountKey(account)}
-        pending={pending}
-        editRoute={editRoute}
-      />
       {showRuntimeDetails ? (
         <View style={settingsStyles.row}>
           <Text
@@ -1900,43 +1881,6 @@ function adminLines(
   return admins.map(({ subject, by }) => (by === null ? subject : `${subject} · by ${by}`));
 }
 
-/** Everyone else: what the account does with a message no Route admits. */
-function ChannelCatchAllRow({
-  account,
-  accountKey,
-  pending,
-  editRoute,
-}: {
-  account: RecordValue;
-  accountKey: string;
-  pending: boolean;
-  editRoute(route: EditingRoute): void;
-}) {
-  const names = useAudienceNames(undefined);
-  const edit = useCallback(
-    () => editRoute({ accountKey, routeIndex: "fallback" }),
-    [accountKey, editRoute],
-  );
-  const fallback = objectField(account, "fallback");
-  const draft = fallbackAudienceDraft(fallback);
-  const summary = draft.deny
-    ? "Denied: messages no Route admits are refused."
-    : `${routeAudienceSummary(draft.rules, names)
-        .map(({ place, who }) => `${place}: ${who}`)
-        .join(" · ")} → ${routeTargetSummary(fallback ?? EMPTY_RECORD)}`;
-  return (
-    <View style={[settingsStyles.row, styles.detailRow]}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Everyone else (catch-all)</Text>
-        <Text style={settingsStyles.rowHint}>{summary}</Text>
-      </View>
-      <Button size="xs" variant="outline" disabled={pending} onPress={edit}>
-        Edit catch-all
-      </Button>
-    </View>
-  );
-}
-
 /** Names for the ids audience rules store: Teams, Members and observed conversations. */
 function useAudienceNames(
   metadata: z.infer<typeof HubObservedChannelConversationsSchema> | undefined,
@@ -2015,10 +1959,16 @@ function ChannelAccountRouteList({
     staleTimeMs: 15_000,
   });
   if (!visible) return null;
+  const refusal = automationName === undefined ? <RouteRefusalRow /> : null;
   if (routes.length === 0) {
-    return <EmptyRow message="No Routes are configured for this Channel Route." />;
+    return (
+      <>
+        <EmptyRow message="No Routes are configured for this Channel Route." />
+        {refusal}
+      </>
+    );
   }
-  return routes.map((route, routeIndex) =>
+  const rows = routes.map((route, routeIndex) =>
     automationName !== undefined && route.workflow !== automationName ? null : (
       <ChannelRouteRow
         key={`${accountKey}:route:${String(routeIndex)}`}
@@ -2040,6 +1990,21 @@ function ChannelAccountRouteList({
         removeRoute={removeRoute}
       />
     ),
+  );
+  return (
+    <>
+      {rows}
+      {refusal}
+    </>
+  );
+}
+
+/** There is no catch-all: a sender needs a Route whose audience rules admit them. */
+function RouteRefusalRow() {
+  return (
+    <View style={settingsStyles.row}>
+      <Text style={settingsStyles.rowHint}>Anyone no Route admits is refused.</Text>
+    </View>
   );
 }
 
@@ -2325,7 +2290,6 @@ function ChannelAccountForm({
   const [audienceRules, setAudienceRulesState] = useState<AudienceRuleDraft[]>(
     initial.audienceRules,
   );
-  const [fallbackDeny, setFallbackDeny] = useState(initial.fallbackDeny);
   const [routeCondition, setRouteCondition] = useState<RouteCondition>(initial.routeCondition);
   const [behavior, setBehavior] = useState<ChannelRouteBehavior>(initial.behavior.behavior);
   const [approvalChoice, setApprovalChoice] = useState<RouteApprovalChoice>(
@@ -2457,7 +2421,6 @@ function ChannelAccountForm({
     routeCondition,
     contains,
     audienceComplete: audienceRulesComplete(audienceRules),
-    fallbackDeny: initial.editingFallback && fallbackDeny,
     parsedRouteLimits,
     existingTarget,
     target,
@@ -2490,7 +2453,6 @@ function ChannelAccountForm({
     (value: string) => setRouteCondition(value as RouteCondition),
     [],
   );
-  const changeFallbackDeny = useCallback((admit: boolean) => setFallbackDeny(!admit), []);
   const changeRequireMention = useCallback(
     (requireMention: boolean) => setBehavior((current) => ({ ...current, requireMention })),
     [],
@@ -2591,21 +2553,6 @@ function ChannelAccountForm({
 
   const submit = useCallback(async () => {
     if (!canSave || duplicateAccount) return;
-    const editingFallback = initial.editingFallback && editing !== null;
-    if (editingFallback && fallbackDeny) {
-      const nextAccounts = existingAccounts.map((account) =>
-        channelAccountKey(account) === editing.accountKey
-          ? { ...account, fallback: { deny: true } }
-          : account,
-      );
-      const confirmed = await confirmDialog({
-        title: "Deny everyone else?",
-        message: "Messages no Route admits are refused.",
-        confirmLabel: "Save catch-all",
-      });
-      if (confirmed && mounted.current) save(nextAccounts, resource);
-      return;
-    }
     const routeTarget = formRouteTarget(existingTarget, {
       target,
       automationName,
@@ -2621,7 +2568,7 @@ function ChannelAccountForm({
       routeInput: {
         accountId: effectiveAccountId,
         audience: audienceRules.map(audienceRuleFromDraft),
-        ...(routeCondition === "contains" && !editingFallback ? { contains } : {}),
+        ...(routeCondition === "contains" ? { contains } : {}),
         ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
         behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
         target: routeTarget,
@@ -2680,8 +2627,6 @@ function ChannelAccountForm({
     effectiveAccountId,
     existingAccounts,
     existingTarget,
-    fallbackDeny,
-    initial.editingFallback,
     isEditing,
     open,
     parsedProviderOptions,
@@ -2780,44 +2725,28 @@ function ChannelAccountForm({
   );
   const renderAudience = () => (
     <>
-      <Text style={styles.formHeading}>
-        {initial.editingFallback ? "Everyone else (catch-all)" : "Who may talk, where"}
-      </Text>
-      {initial.editingFallback ? (
-        <RouteBehaviorSwitch
-          label="Answer messages no Route admits"
-          value={!fallbackDeny}
-          onChange={changeFallbackDeny}
-          disabled={pending}
-        />
-      ) : null}
-      {initial.editingFallback && fallbackDeny ? (
-        <Text style={settingsStyles.rowHint}>Messages no Route admits are refused.</Text>
-      ) : (
-        <AudienceRulesEditor
-          rules={audienceRules}
-          setRules={setAudienceRules}
-          teams={audienceOptions.teams}
-          members={audienceOptions.members}
-          channel={selectedConnection?.provider ?? stringField(selectedAccount, "channel")}
-          observedChannel={observedAccountChannel}
-          accountId={observedAccountId}
-          names={audienceNames}
-          errors={audienceErrors}
-          disabled={pending}
-        />
-      )}
-      {initial.editingFallback ? null : (
-        <ChoiceRow
-          label="When"
-          values={ROUTE_CONDITION_VALUES}
-          selected={routeCondition}
-          labels={ROUTE_CONDITION_LABELS}
-          onChange={changeRouteCondition}
-          disabled={pending}
-        />
-      )}
-      {routeCondition === "contains" && !initial.editingFallback ? (
+      <Text style={styles.formHeading}>Who may talk, where</Text>
+      <AudienceRulesEditor
+        rules={audienceRules}
+        setRules={setAudienceRules}
+        teams={audienceOptions.teams}
+        members={audienceOptions.members}
+        channel={selectedConnection?.provider ?? stringField(selectedAccount, "channel")}
+        observedChannel={observedAccountChannel}
+        accountId={observedAccountId}
+        names={audienceNames}
+        errors={audienceErrors}
+        disabled={pending}
+      />
+      <ChoiceRow
+        label="When"
+        values={ROUTE_CONDITION_VALUES}
+        selected={routeCondition}
+        labels={ROUTE_CONDITION_LABELS}
+        onChange={changeRouteCondition}
+        disabled={pending}
+      />
+      {routeCondition === "contains" ? (
         <Field
           label="Only messages containing"
           hint="Case-sensitive literal text used only to select this Route. The full message is still sent to the target."
@@ -2942,17 +2871,13 @@ function ChannelAccountForm({
         <View style={[settingsStyles.card, styles.form]}>
           {renderAccountSelection()}
           {renderAudience()}
-          {initial.editingFallback && fallbackDeny ? null : (
-            <>
-              {fixedAutomationName === undefined ? (
-                renderTarget()
-              ) : (
-                <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
-              )}
-              {renderBehavior()}
-              {renderLimits()}
-            </>
+          {fixedAutomationName === undefined ? (
+            renderTarget()
+          ) : (
+            <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
           )}
+          {renderBehavior()}
+          {renderLimits()}
           {target === "automation" && automationName !== null && !adminScoped ? (
             <AutomationReplyAuthority
               automation={automations.find((item) => item.name === automationName)}
@@ -2973,8 +2898,7 @@ function ChannelAccountForm({
 }
 
 /**
- * The accounts and resource a save writes: the edited Route (or catch-all)
- * replaced in place, a new Channel Route appended, or a Route inserted into
+ * The accounts and resource a save writes: the edited Route replaced in place, a new Channel Route appended, or a Route inserted into
  * the selected account. Null when the form has nothing to write to.
  */
 function nextConfiguration(input: {
@@ -2993,17 +2917,14 @@ function nextConfiguration(input: {
 } | null {
   const { routeInput, existingAccounts, editing, editedRoute } = input;
   if (editing !== null) {
-    const candidate =
-      editedRoute === undefined
-        ? buildChannelRouteCandidate(routeInput)
-        : replaceChannelRouteCandidate({
-            ...routeInput,
-            currentRoute: editedRoute,
-            accounts: existingAccounts,
-          });
+    if (editedRoute === undefined) return null;
+    const candidate = replaceChannelRouteCandidate({
+      ...routeInput,
+      currentRoute: editedRoute,
+      accounts: existingAccounts,
+    });
     const nextAccounts = existingAccounts.map((account) => {
       if (channelAccountKey(account) !== editing.accountKey) return account;
-      if (editing.routeIndex === "fallback") return { ...account, fallback: candidate.route };
       return {
         ...account,
         routes: arrayField(account, "routes").map((route, index) =>
@@ -3993,10 +3914,9 @@ function channelFormInitialState(
   editing: EditingRoute | null,
   resource: RecordValue,
 ) {
-  const { editedAccount, editedRoute, fallbackDeny } = findEditedRoute(accounts, editing);
+  const { editedAccount, editedRoute } = findEditedRoute(accounts, editing);
   const route = editedRoute ?? EMPTY_RECORD;
-  const editingFallback = editing?.routeIndex === "fallback";
-  const audience = initialAudience(editingFallback, editedRoute);
+  const audience = initialAudience(editedRoute);
   const editedLimits = objectField(route, "limits") ?? EMPTY_RECORD;
   const editedWorkflow = stringField(editedRoute, "workflow");
   const editedAgentName = stringField(editedRoute, "agent") ?? "";
@@ -4007,16 +3927,13 @@ function channelFormInitialState(
     editedEnvironmentName,
   );
   const contains = audience.contains;
-  const isEditing =
-    editing !== null && editedAccount !== undefined && (editedRoute !== undefined || fallbackDeny);
+  const isEditing = editing !== null && editedAccount !== undefined && editedRoute !== undefined;
   const environment = managedEnvironmentConfiguration(editedEnvironment);
   return {
     editedAccount,
     editedRoute,
     editedWorkflow,
     isEditing,
-    editingFallback,
-    fallbackDeny,
     accountKey: editing?.accountKey ?? null,
     audienceRules: audience.rules,
     routeCondition: (contains.length > 0 ? "contains" : "all") as RouteCondition,
@@ -4030,11 +3947,10 @@ function channelFormInitialState(
 }
 
 /** The rules the form opens with: the stored ones, or Members everywhere for a new Route. */
-function initialAudience(
-  editingFallback: boolean,
-  editedRoute: RecordValue | undefined,
-): { rules: AudienceRuleDraft[]; contains: string } {
-  if (editingFallback) return { rules: fallbackAudienceDraft(editedRoute).rules, contains: "" };
+function initialAudience(editedRoute: RecordValue | undefined): {
+  rules: AudienceRuleDraft[];
+  contains: string;
+} {
   if (editedRoute === undefined) return { rules: [membersEverywhereRule()], contains: "" };
   return routeAudienceDraft(editedRoute);
 }
@@ -4049,23 +3965,16 @@ function managedEnvironmentConfiguration(environment: RecordValue | null) {
   };
 }
 
-/** The Route being edited; a denying catch-all has no Route yet, only `fallbackDeny`. */
+/** The account and Route being edited. */
 function findEditedRoute(accounts: RecordValue[], editing: EditingRoute | null) {
-  if (editing === null) {
-    return { editedAccount: undefined, editedRoute: undefined, fallbackDeny: false };
-  }
+  if (editing === null) return { editedAccount: undefined, editedRoute: undefined };
   const editedAccount = accounts.find(
     (account) => channelAccountKey(account) === editing.accountKey,
   );
-  if (editing.routeIndex === "fallback") {
-    const fallback = objectField(editedAccount ?? EMPTY_RECORD, "fallback");
-    const deny = fallback === null || fallback["deny"] === true;
-    return { editedAccount, editedRoute: deny ? undefined : fallback, fallbackDeny: deny };
-  }
   const editedRoute = arrayField(editedAccount ?? EMPTY_RECORD, "routes")[editing.routeIndex] as
     | RecordValue
     | undefined;
-  return { editedAccount, editedRoute, fallbackDeny: false };
+  return { editedAccount, editedRoute };
 }
 
 function managedAgentConfiguration(agent: RecordValue | null): ManagedAgentConfigurationValue {
@@ -4114,7 +4023,6 @@ function channelFormTitle(
   kind: ConfigurationKind,
 ): string {
   if (!isEditing) return kind === "account" ? "Add Channel Route" : "Add Route";
-  if (editing?.routeIndex === "fallback") return "Edit catch-all";
   return `Edit Route ${String(Number(editing?.routeIndex ?? 0) + 1)}`;
 }
 
@@ -4138,8 +4046,6 @@ function canSaveChannelRoute(input: {
   routeCondition: RouteCondition;
   contains: string;
   audienceComplete: boolean;
-  /** A denying catch-all needs no rules and no target. */
-  fallbackDeny: boolean;
   parsedRouteLimits: ReturnType<typeof parseChannelLimitsDraft>;
   /** The target the Route keeps (a Channel Route Admin's edit), or null when the form builds one. */
   existingTarget: RecordValue | null;
@@ -4156,7 +4062,6 @@ function canSaveChannelRoute(input: {
   if (input.configurationKind === "route" && input.selectedAccount === undefined) return false;
   if (input.configurationKind === "account" && input.selectedConnection === undefined) return false;
   if (!input.parsedRouteLimits.valid) return false;
-  if (input.fallbackDeny) return true;
   if (!input.followUpTtlValid || !input.audienceComplete) return false;
   if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
   if (input.existingTarget !== null) return true;

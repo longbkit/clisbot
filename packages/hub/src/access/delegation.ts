@@ -28,11 +28,11 @@ export function delegationPrincipal(access: OrganizationAccessValue): Delegation
   };
 }
 
-/** One Route of one Channel account: an index into its `routes`, or its fallback. */
+/** One Route of one Channel account: an index into its `routes`. */
 export interface DelegatedRouteRef {
   channel: string;
   accountId: string;
-  position: number | "fallback";
+  position: number;
 }
 
 /**
@@ -96,10 +96,7 @@ export async function assertChannelConfigurationDelegation(input: {
     executions.push(...executionsFromConfiguration(await configuration, requiredPrivileges));
   };
 
-  const inScope = (
-    account: { channel: string; accountId: string },
-    position: number | "fallback",
-  ) =>
+  const inScope = (account: { channel: string; accountId: string }, position: number) =>
     input.routes === undefined ||
     input.routes.some(
       (route) =>
@@ -115,18 +112,6 @@ export async function assertChannelConfigurationDelegation(input: {
         route.approval,
         route.defaults.outbound.path === "tool",
         route.defaults.agentControls,
-      );
-    }
-    if (
-      !account.fallback.deny &&
-      account.fallback.target !== undefined &&
-      inScope(account, "fallback")
-    ) {
-      await appendTarget(
-        account.fallback.target,
-        account.fallback.approval ?? account.approval,
-        account.defaults.outbound.path === "tool",
-        account.fallback.defaults?.agentControls,
       );
     }
   }

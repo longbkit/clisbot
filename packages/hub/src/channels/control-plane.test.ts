@@ -87,15 +87,11 @@ connectionId: slack:work
 transport:
   mode: socket
 routes:
-  - match:
-      kind: dm
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: codex-safe
     environment: work
-  - match:
-      kind: channel
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
     workflow: handoff
-fallback:
-  deny: true
 `;
 
 const ORG_ID = "org-1";
@@ -360,8 +356,7 @@ accountId: public
 connectionId: slack:public
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: codex-safe
     environment: work
     sync:
@@ -410,8 +405,7 @@ accountId: public
 connectionId: slack:public
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     workflow: public-handoff
     sync:
       finalAnswers: true
@@ -444,8 +438,7 @@ accountId: public
 connectionId: slack:public
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     agent: claude
     environment: work
     sync:
@@ -491,8 +484,7 @@ accountId: public
 connectionId: slack:public
 transport: { mode: socket }
 routes:
-  - match: { kind: channel, ids: [C_CUSTOMER] }
-    audience: { kind: conversationParticipants }
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
     workflow: public-unattended
     sync:
       finalAnswers: true

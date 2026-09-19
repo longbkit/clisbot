@@ -66,8 +66,6 @@ accountId: work
 connectionId: slack-work
 transport:
   mode: socket
-fallback:
-  deny: true
 `;
 
 const ORG_ID = "org-1";
@@ -230,7 +228,7 @@ describe("channel control-plane ops", () => {
       if (file.path === ".paseo/channels/slack/work.yml") {
         return {
           ...file,
-          content: `${ACCOUNT_YAML}\nroutes:\n  - match: { kind: channel }\n    agent: candidate-agent\n    environment: candidate-env\n`,
+          content: `${ACCOUNT_YAML}\nroutes:\n  - audience: [{ who: { roles: [member] }, where: { groups: all } }]\n    agent: candidate-agent\n    environment: candidate-env\n`,
         };
       }
       return file;

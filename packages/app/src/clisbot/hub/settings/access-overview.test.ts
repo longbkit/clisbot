@@ -140,13 +140,14 @@ describe("Access overview projections", () => {
           enabled: false,
           routes: [
             {
-              audience: { kind: "members" },
-              match: { kind: "channel", ids: ["private"] },
+              audience: [{ who: { roles: ["member"] }, where: { conversations: ["private"] } }],
               agent: "internal",
             },
             {
-              audience: { kind: "conversationParticipants" },
-              match: { kind: "channel", ids: ["C1"] },
+              audience: [
+                { who: { roles: ["owner"] }, where: { dm: true } },
+                { who: { anyone: true }, where: { conversations: ["C1"] } },
+              ],
               workflow: "support",
             },
           ],

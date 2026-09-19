@@ -51,7 +51,7 @@ export interface AutomationOutputValue {
 export interface AutomationRouteBacklink {
   channel: string;
   accountId: string;
-  routePosition: number | "fallback";
+  routePosition: number;
 }
 
 export function normalizeAutomationName(value: string): string {
@@ -85,10 +85,6 @@ export function automationRouteBacklinks(
           result.push({ channel, accountId, routePosition: index });
         }
       });
-    }
-    const fallback = account["fallback"];
-    if (isRecord(fallback) && fallback["workflow"] === automationName) {
-      result.push({ channel, accountId, routePosition: "fallback" });
     }
   }
   return result;

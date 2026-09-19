@@ -26,14 +26,12 @@ import {
   isEnabled,
   isOpenAudienceRoute,
   mayTrigger,
-  matchRoute,
   selectRouteForSender,
   type InboundConversation,
 } from "./policy.js";
 import {
   ApprovalEngine,
   assertChannelPosture,
-  catchAllRoute,
   parseApprovalCommand,
   type ApprovalCommand,
 } from "./approvals/index.js";
@@ -62,6 +60,7 @@ import {
   BindingEngine,
   deriveBindingKey,
   parseStoredRouteSummary,
+  recordedRoute,
   storedRouteOwner,
   routeFingerprint,
   routePosition,
@@ -203,18 +202,13 @@ export type ChannelPlaneSnapshot = Pick<
   "channelRevisionId" | "controlPlane" | "resolveAgentSpec" | "resolveAgentAccessTarget"
 >;
 
-/** COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
- * The one-value `audience: { kind: conversationParticipants }` a Workflow run
- * recorded before audience rules. */
-function legacyOpenAudience(route: unknown): boolean {
-  if (typeof route !== "object" || route === null || !("audience" in route)) return false;
-  const audience = route.audience;
-  return (
-    typeof audience === "object" &&
-    audience !== null &&
-    "kind" in audience &&
-    audience.kind === "conversationParticipants"
-  );
+const NOT_ADMITTED_TEXT =
+  "You can't use this bot here yet. Link your account with /link, or ask an admin for access. /me shows what you have.";
+
+/** The refusal inside a thread another Route owns; Routes are named by position, as in the app. */
+function boundThreadRefusalText(account: CompiledChannelAccount, route: CompiledRoute): string {
+  const position = account.routes.indexOf(route) + 1;
+  return `This conversation belongs to Route ${String(position)}, and you are not allowed to use it. Send a new message outside this thread to start your own conversation.`;
 }
 
 /** The plane kind a thread/topic's ROOT conversation carries (the two-pass
@@ -643,9 +637,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         daemon: daemonConnection,
         detachAgent: detachChannelAgent,
-        ...(deps.authorizeChannelUse === undefined
-          ? {}
-          : { authorizeChannelUse: deps.authorizeChannelUse }),
         ...(deps.resolveChannelSender === undefined
           ? {}
           : { resolveChannelSender: deps.resolveChannelSender }),
@@ -706,7 +697,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.update !== undefined ? { update: deps.update } : {}),
       });
       // The S10 posture invariant, asserted at load (not mid-conversation):
-      // every route — and every catch-all fallback — keeps approval-required.
+      // every route keeps approval-required.
       assertChannelPosture(deps.controlPlane.accounts);
       // Orphan recovery needs the daemon session: rebind a surviving agent
       // instead of re-creating it, then re-attach the streams of the markers
@@ -1042,25 +1033,50 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
 
   /**
    * A sender who addressed the bot on a Member Route that does not admit them
-   * hears why once a day, instead of silence. Unaddressed chatter, open Routes
-   * and Workflow Routes stay silent.
+   * hears why instead of silence: once a day in general, once per thread in a
+   * thread another Route already owns. A bound thread never falls through to a
+   * later Route, so the sender is told to start their own conversation
+   * (docs/audits/2026-09-19-route-audience-rules.md#routing). Unaddressed
+   * chatter, open Routes and Workflow Routes stay silent.
    */
   async function postNotAdmittedNotice(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<void> {
-    if (!message.mentionedBot || isOpenAudienceRoute(route) || route.target.kind !== "agent")
+    if (isOpenAudienceRoute(route) || route.target.kind !== "agent") return;
+    const boundThread = await boundThreadOf(message, account);
+    if (!message.mentionedBot && !(boundThread && (await followsUpWithoutMention(message, route))))
       return;
     if ((await mayUseChannel(message, account, route)).allowed) return;
     const day = Math.floor(clock.now() / 86_400_000);
-    if (!notAdmittedNotices.remember(`${message.senderIdentity}:${String(day)}`)) return;
+    const once = boundThread
+      ? `${message.senderIdentity}:${message.conversation.rootConversationId}:${String(message.conversation.threadId)}`
+      : `${message.senderIdentity}:${String(day)}`;
+    if (!notAdmittedNotices.remember(once)) return;
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
       ...commandReplyAddress(message, route.defaults.replyAnchor),
-      text: "You can't use this bot here yet. Link your account with /link, or ask an admin for access. /me shows what you have.",
+      text: boundThread ? boundThreadRefusalText(account, route) : NOT_ADMITTED_TEXT,
     });
+  }
+
+  /** Is this message in a thread that a binding already gave to a Route? */
+  async function boundThreadOf(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+  ): Promise<boolean> {
+    if (message.conversation.threadId === null) return false;
+    const binding = await bindingForInbound(message, account);
+    return binding !== undefined && binding.externalThreadId !== null;
+  }
+
+  async function followsUpWithoutMention(
+    message: InboundMessage,
+    route: CompiledRoute,
+  ): Promise<boolean> {
+    return (await conversationFollowUpMode(store, deps.organizationId, message, route)) === "auto";
   }
 
   /** One short line instead of silence; a waiting message is announced once, not per retry. */
@@ -1710,14 +1726,11 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       ...(deps.resolveChannelSender === undefined
         ? {}
         : { resolveChannelSender: deps.resolveChannelSender }),
-      ...(deps.authorizeChannelUse === undefined
-        ? {}
-        : { authorizeChannelUse: deps.authorizeChannelUse }),
     });
   }
 
-  /** Member-grade admission: an audience rule other than `anyone`, a role
-   * granting `bot.interact`, or (COMPAT) a `channel.use` grant. */
+  /** Member-grade admission: an audience rule other than `anyone`, or a role
+   * granting `bot.interact`. */
   async function mayVerifiedMemberUseChannel(
     message: InboundMessage,
     account: CompiledChannelAccount,
@@ -1735,18 +1748,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (audienceRulesAdmit(route, message.conversation, sender, { membersOnly: true })) {
       return true;
     }
-    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
-      return Promise.resolve(true);
-    }
-    return (
-      (
-        await deps.authorizeChannelUse?.({
-          organizationId: deps.organizationId,
-          account,
-          message,
-        })
-      )?.allowed ?? false
-    );
+    return mayTrigger(message.senderIdentity, deps.controlPlane, account, route);
   }
 
   function callbackMessage(
@@ -2000,9 +2002,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
    * Ordered selection for an unbound conversation: the first Route whose
    * Where covers it (thread and topic messages resolve to their room; a listed
    * thread id narrows to the thread) and whose audience admits the sender. A
-   * Route that refuses the sender is skipped for the next one, then the
-   * catch-all. When none admits, the first applicable Route is returned so the
-   * refusal is worded and audited against it.
+   * Route that refuses the sender is skipped for the next one. When none
+   * admits, the first applicable Route is returned so the refusal is worded
+   * and audited against it.
    */
   async function resolveNewRoute(
     message: InboundMessage,
@@ -2013,7 +2015,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       account,
       message.text,
       async (route) => (await mayUseChannel(message, account, route)).allowed,
-      catchAllRoute,
     );
     return selection.route ?? undefined;
   }
@@ -2108,9 +2109,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   ): CompiledRoute | undefined {
     const account = findAccountForBinding(binding);
     if (account === undefined) return undefined;
-    const owner = storedRouteOwner(account, binding, live);
-    if (owner === undefined) return undefined;
-    return "deny" in owner ? catchAllRoute(owner) : owner;
+    return storedRouteOwner(account, binding, live);
   }
 
   /** The one shared stream consumer; callers own their execution lease shape. */
@@ -2143,7 +2142,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     channel: NonNullable<ReturnType<typeof channelWorkflowOutput>>,
     workflow: string,
   ): CompiledRoute | undefined {
-    if (channel.route_fingerprint !== undefined) {
+    if (channel.route_fingerprint !== undefined && channel.route_position !== undefined) {
       // The run records the ROOT conversation and the thread it started in;
       // a Route's Where reads both (a listed thread id narrows to it).
       const threaded = channel.external_thread_id !== null && channel.root_kind !== "dm";
@@ -2153,20 +2152,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         id: channel.external_thread_id ?? channel.external_conversation_id,
         rootConversationId: channel.external_conversation_id,
       };
-      const matched = matchRoute(conversation, account);
-      const route =
-        matched.route ??
-        (matched.fallback.deny || matched.fallback.target === undefined
-          ? undefined
-          : catchAllRoute(matched.fallback));
+      const route = recordedRoute(account, conversation, {
+        position: channel.route_position,
+        fingerprint: channel.route_fingerprint,
+      });
       return route?.target.kind === "workflow" && route.target.workflow === workflow
         ? route
         : undefined;
     }
-    // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
-    // A run started before rules carries `audience` instead of `audienceRules`.
+    // A run from before route capture recorded no rules: it was Member-only.
     const audienceRules = channel.route.audienceRules ?? [];
-    if (isOpenAudience(audienceRules) || legacyOpenAudience(channel.route)) return undefined;
+    if (isOpenAudience(audienceRules)) return undefined;
     return {
       audienceRules,
       where: { dm: true, groups: ["all"], conversations: [] },
@@ -2256,12 +2252,13 @@ function channelWorkflowOutput(value: unknown):
       trigger_thread_id: string | null;
       trigger_message_id?: string;
       revision_id?: string | null;
-      route_position?: number | "fallback";
+      route_position?: number;
       route_fingerprint?: string;
       route: Pick<
         CompiledRoute,
-        "audienceRules" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
-      >;
+        "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
+      > &
+        Partial<Pick<CompiledRoute, "audienceRules">>;
     }
   | undefined {
   if (!isRecord(value) || value["provider"] !== "channel") return undefined;

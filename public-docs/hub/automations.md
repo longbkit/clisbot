@@ -77,7 +77,7 @@ the final step’s Result section. Enable the Provider, choose Done, then Save W
 Route delivery settings and Automation reply authority are distinct and both must allow replies.
 
 Routes match in account order alongside Routes for other Automations and direct Agents.
-Ordering and fallback editing remain in the full Channels view. **Send test message** checks
+A sender no Route admits is refused. Reorder Routes in the full Channels view. **Send test message** checks
 outbound delivery only; it does not prove the complete input → Automation → reply flow.
 
 ## Direct Agent conversations and advanced definitions

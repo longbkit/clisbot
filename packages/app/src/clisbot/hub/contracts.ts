@@ -887,7 +887,7 @@ export const HubChannelActivitySchema = z.object({
       channel: HubChannelNameSchema.optional(),
       accountId: z.string().optional(),
       createdAt: z.string(),
-      routePosition: z.union([z.number().int().nonnegative(), z.literal("fallback")]),
+      routePosition: z.number().int().nonnegative(),
       conversationId: z.string(),
       threadId: z.string().nullable(),
       providerSenderId: z.string(),

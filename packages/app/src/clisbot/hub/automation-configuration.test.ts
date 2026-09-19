@@ -251,7 +251,9 @@ describe("Automation configuration", () => {
     expect(parseSingleAgentAutomationYaml(yaml)).toBeNull();
   });
 
-  it("finds Channel routes that invoke an Automation without inventing route IDs", () => {
+  it("finds Channel routes that invoke an Automation by their position", () => {
+    const GROUP_MEMBERS = [{ who: { roles: ["member"] }, where: { groups: "all" } }];
+    const DM_MEMBERS = [{ who: { roles: ["member"] }, where: { dm: true } }];
     expect(
       automationRouteBacklinks(
         [
@@ -259,10 +261,13 @@ describe("Automation configuration", () => {
             channel: "slack",
             accountId: "support",
             routes: [
-              { match: { kind: "channel" }, workflow: "customer-handoff" },
-              { match: { kind: "dm" }, agent: "assistant" },
+              { audience: GROUP_MEMBERS, workflow: "customer-handoff" },
+              { audience: DM_MEMBERS, agent: "assistant" },
+              {
+                audience: [{ who: { anyone: true }, where: { dm: true } }],
+                workflow: "customer-handoff",
+              },
             ],
-            fallback: { workflow: "customer-handoff" },
           },
           { channel: "telegram", accountId: "alerts", routes: [] },
         ],
@@ -270,7 +275,7 @@ describe("Automation configuration", () => {
       ),
     ).toEqual([
       { channel: "slack", accountId: "support", routePosition: 0 },
-      { channel: "slack", accountId: "support", routePosition: "fallback" },
+      { channel: "slack", accountId: "support", routePosition: 2 },
     ]);
   });
 });

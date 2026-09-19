@@ -100,7 +100,7 @@ One inbound message walks this path. Each row is the file to open.
 | Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                               |
 | Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                                             |
 | Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                                    |
-| Audience rules      | `channels/config/audience.ts`, `config/audience-migration.ts`      | "[who] may talk in [where]" per Route; the app edits them in `packages/app/src/clisbot/hub/settings/channel-route-audience-fields.tsx`. |
+| Audience rules      | `channels/config/audience.ts`                                      | "[who] may talk in [where]" per Route; the app edits them in `packages/app/src/clisbot/hub/settings/channel-route-audience-fields.tsx`. |
 | Session workspace   | `channels/workspace-organization.ts:71`                            | Which workspace a created session lands in (`workspace.organize`). See [workspace organization](../workspace-organization/README.md).   |
 | Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                                              |
 | Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                              |
@@ -243,14 +243,20 @@ operator-facing behaviour is documented once, in
   runs only when a covering rule needs it — `anyone` and `identities` decide
   without a read. Unlinked senders are `null`, which only those two can admit.
 - **Routes are ordered and fall through by sender** (`selectRouteForSender`).
-  A Route that covers the conversation but admits nobody is skipped for the next,
-  then the catch-all — this is what allows tiers (Owner on a strong Agent first,
-  Anyone in public rooms on a limited one after it). When no Route admits, the
-  first applicable one is returned so the refusal is worded against it.
-- **The old shape still loads.** `match` and the one-value `audience` are read
-  through `config/audience-migration.ts` (`COMPAT(route-audience-rules)`), and the
-  start-time job in `access-migration.ts` rewrites stored files and folds
-  `channel.use` grants into rules ([operations](../../guides/developer-guide/channels-operations.md#the-audience-migration-on-start)).
+  A Route that covers the conversation but admits nobody is skipped for the next
+  — this is what allows tiers (Owner on a strong Agent first, Anyone in public
+  rooms on a limited one after it). There is no catch-all: when no Route admits,
+  the first applicable one is returned so the refusal is worded against it.
+- **One answer to "which Route owns this".** A bound thread and a running
+  Workflow's output both resolve through `recordedRoute`
+  (`bindings/stored-route.ts`): among the Routes whose Where still covers the
+  conversation, the recorded fingerprint, then the recorded position, then the
+  first. Matching on the conversation alone would hand a tier-2 thread to
+  Route 1 and cancel a tier-2 Workflow's output.
+- **Only the rules shape loads.** A stored `match`, one-value `audience` or
+  account `fallback` fails validation; the one-time script in
+  `channels/one-time/` converted the stored data
+  ([operations](../../guides/developer-guide/channels-operations.md#the-one-time-route-migration)).
 
 `mayUseChannelRoute` (`policy/gate.ts`) is the one implementation both
 `execution.ts` and the bindings engine call. Ways in, in order: an audience rule;

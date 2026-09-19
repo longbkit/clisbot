@@ -224,8 +224,8 @@ vi.mock("./automation-settings", () => ({
 }));
 
 const route = {
-  match: { kind: "channel", ids: ["C1"], contains: "#help" },
-  audience: { kind: "members" },
+  audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1"] } }],
+  contains: "#help",
   workflow: "support",
   binding: { key: "thread" },
   sync: { subagents: { finalAnswers: true } },
@@ -420,15 +420,16 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByText("Only Organization Admins so far.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Manage Admins in Access" })).toBeTruthy();
     expect(screen.queryByText(/channel\.use/)).toBeNull();
-    expect(screen.getByText("Everyone else (catch-all)")).toBeTruthy();
-    expect(screen.getByText(/Denied: messages no Route admits are refused/)).toBeTruthy();
+    // No catch-all: one fixed line under the Routes says what happens to everyone else.
+    expect(screen.queryByText(/catch-all/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit catch-all" })).toBeNull();
+    expect(screen.getByText("Anyone no Route admits is refused.")).toBeTruthy();
   });
 
   it("needs a Where on every rule: emptying the conversations blocks saving until Group chat is on", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    // The old `match: {kind: channel, ids: [C1]}` reads as one rule: Members in C1.
     expect(screen.getByText("Members may talk in C1")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Conversation IDs"), {
       target: { value: "" },
@@ -448,13 +449,15 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(saved.match).toBeUndefined();
   });
 
-  it("reads an id-less old Route as every group chat and offers the Slack visibility filter", async () => {
+  it("reads a Route open to every group chat and offers the Slack visibility filter", async () => {
     const unrestricted = {
       ...configuration,
       accounts: [
         {
           ...account,
-          routes: [{ ...route, match: { kind: "channel", contains: "#help" } }],
+          routes: [
+            { ...route, audience: [{ who: { roles: ["member"] }, where: { groups: "all" } }] },
+          ],
         },
       ],
     };
@@ -649,7 +652,8 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
   it("reorders Routes using icon actions while preserving the other configuration", async () => {
     const otherRoute = {
       ...route,
-      match: { kind: "channel", ids: ["C2"], contains: "#second" },
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
+      contains: "#second",
     };
     const multiple = {
       ...configuration,
@@ -1014,7 +1018,6 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
           ...account,
           routes: [
             {
-              match: route.match,
               audience: route.audience,
               agent: "support-agent",
               environment: "support-env",
@@ -1166,7 +1169,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
 describe("Automation Channel inputs", { timeout: 20_000 }, () => {
   it("edits the canonical Route while preserving direct Agent Routes and custom policy", async () => {
     const directRoute = {
-      match: { kind: "dm" },
+      audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
       agent: "personal",
       environment: "local",
     };
@@ -1186,7 +1189,7 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
-    const { match: _match, audience: _audience, ...routeSettings } = route;
+    const { audience: _audience, contains: _contains, ...routeSettings } = route;
     expect(adapters.put.mock.calls[0]![1]).toMatchObject({
       expectedRevisionId: "revision",
       accounts: [
@@ -1242,7 +1245,7 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
               ...account,
               routes: [
                 {
-                  match: { kind: "dm" },
+                  audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
                   agent: "personal",
                   environment: "local",
                 },

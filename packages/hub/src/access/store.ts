@@ -78,8 +78,8 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "approval.other",
   ]),
   team: new Set(["hub.access.manage"]),
-  // `channel.use` is no longer grantable: audience rules decide who talks to a
-  // Route. Stored rows are folded by channels/access-migration.ts.
+  // `channel.use` is not grantable: audience rules decide who talks to a Route
+  // (docs/audits/2026-09-19-route-audience-rules.md).
   channel_account: new Set(["hub.access.manage", "channel.manage"]),
   automation: new Set(["hub.access.manage", "automation.run"]),
 };

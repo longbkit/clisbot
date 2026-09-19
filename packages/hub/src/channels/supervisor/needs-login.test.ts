@@ -57,7 +57,6 @@ function compiledAccount(): CompiledChannelAccount {
     defaults: {} as CompiledChannelAccount["defaults"],
     approval: [],
     routes: [],
-    fallback: { deny: true } as CompiledChannelAccount["fallback"],
   };
 }
 

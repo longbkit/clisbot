@@ -28,7 +28,6 @@ export interface RouteDefaultCommandDependencies {
   selectionKey(context: LifecycleCommandContext): ChannelConversationKey;
 }
 
-const FALLBACK_LABEL = "the fallback route";
 const ROUTE_CHANGED =
   "This route changed since this session started. Check /routedefault, then try again.";
 
@@ -40,7 +39,7 @@ export async function routeDefaultText(
   const conversation = await deps.conversationConfig(context);
   const label = routeLabel(context);
   return [
-    label === FALLBACK_LABEL ? "Fallback route" : capitalize(label),
+    capitalize(label),
     `Default: ${configurationText(route)}`,
     ...(sameAgentControls(controlsOf(route), controlsOf(conversation))
       ? []
@@ -122,10 +121,9 @@ function outcomeText(outcome: Exclude<RouteDefaultOutcome, { status: "published"
   return ROUTE_CHANGED;
 }
 
-/** `route #3 (mention, contains "deploy")`, or `the fallback route`. */
+/** `route #3 (mention, contains "deploy")`. */
 export function routeLabel(context: LifecycleCommandContext): string {
   const position = routePosition(context.account, context.route);
-  if (position === "fallback") return FALLBACK_LABEL;
   const traits = [
     ...(context.route.defaults.requireMention ? ["mention"] : []),
     ...(context.route.contains === undefined

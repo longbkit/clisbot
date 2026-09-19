@@ -1936,7 +1936,7 @@ export const channelReplyCapabilities = pgTable(
     // text and never dereferenced: a replaced revision must not delete a
     // capability a live turn still holds.
     channelRevisionId: text("channel_revision_id"),
-    /** The Route's position, `fallback` for the fallback Route. */
+    /** The Route's position: an index into the account's `routes`. */
     routePosition: text("route_position").notNull(),
     routeFingerprint: text("route_fingerprint").notNull(),
     channel: text().notNull(),

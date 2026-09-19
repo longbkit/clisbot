@@ -116,12 +116,6 @@ export type ReactionNotifications = z.infer<typeof ReactionNotificationsSchema>;
 export const EditNotificationsSchema = z.enum(["off", "all"]);
 export type EditNotifications = z.infer<typeof EditNotificationsSchema>;
 
-// --- Routes (§4.3.6) ----------------------------------------------------------
-
-/** `routes[].match.kind` — the conversation kind a route matches. */
-export const RouteMatchKindSchema = z.enum(["dm", "channel", "thread", "group", "topic"]);
-export type RouteMatchKind = z.infer<typeof RouteMatchKindSchema>;
-
 // --- Transport (§4.3.6) -------------------------------------------------------
 
 export const SlackTransportModeSchema = z.enum(["socket", "webhook"]);

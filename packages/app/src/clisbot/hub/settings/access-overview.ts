@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { HubAccessAssignmentSchema, HubMemberSchema, HubTeamSchema } from "../contracts";
+import {
+  audienceWhereLabel,
+  routeAudienceDraft,
+  type AudienceNames,
+} from "./channel-route-audience";
 
 export function assignmentsForSubject(
   assignments: z.infer<typeof HubAccessAssignmentSchema>[],
@@ -42,8 +47,6 @@ export function assignmentsForResource(
 }
 
 const routeSchema = z.object({
-  audience: z.object({ kind: z.literal("conversationParticipants") }),
-  match: z.object({ kind: z.string(), ids: z.array(z.string()).optional() }),
   enabled: z.boolean().optional(),
   workflow: z.string().optional(),
   agent: z.string().optional(),
@@ -55,7 +58,17 @@ const accountSchema = z.object({
   routes: z.array(z.unknown()),
 });
 
-/** Published Route configuration stays authoritative; this is only an Access projection. */
+/** The Access page names places by their ids; Channels resolves them to room names. */
+const ID_NAMES: AudienceNames = {
+  teamName: (id) => id,
+  memberName: (id) => id,
+  conversationLabel: (id) => id,
+};
+
+/**
+ * Routes with a rule whose Who is Anyone, and where those rules apply.
+ * Published Route configuration stays authoritative; this is only an Access projection.
+ */
 export function publicAccessRoutes(accounts: Record<string, unknown>[]) {
   return accounts.flatMap((value) => {
     const account = accountSchema.safeParse(value);
@@ -63,12 +76,15 @@ export function publicAccessRoutes(accounts: Record<string, unknown>[]) {
     return account.data.routes.flatMap((routeValue, index) => {
       const route = routeSchema.safeParse(routeValue);
       if (!route.success) return [];
+      const rules = routeAudienceDraft(routeValue as Record<string, unknown>).rules;
+      const open = rules.filter((rule) => rule.who.anyone);
+      if (open.length === 0) return [];
       return [
         {
           key: `${account.data.channel}:${account.data.accountId}:${String(index)}`,
           account: `${account.data.channel} · ${account.data.accountId}`,
           enabled: account.data.enabled !== false && route.data.enabled !== false,
-          conversations: route.data.match.ids?.join(", ") || `Any ${route.data.match.kind}`,
+          conversations: open.map((rule) => audienceWhereLabel(rule.where, ID_NAMES)).join("; "),
           target: route.data.workflow ?? route.data.agent ?? "Target unavailable",
         },
       ];

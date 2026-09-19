@@ -131,7 +131,6 @@ const account = {
   connectionId: "connection",
   transport: { mode: "socket" },
   routes: [route],
-  fallback: { deny: true },
 };
 const data: Record<string, unknown> = {
   "access-assignments/effective?include=team": {
