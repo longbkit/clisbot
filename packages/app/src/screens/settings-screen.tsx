@@ -1752,6 +1752,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     );
   }
 
+  const contentStyle = detailContentStyle(view);
   if (isCompactLayout) {
     return (
       <View style={styles.container}>
@@ -1765,7 +1766,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           style={styles.scrollView}
           contentContainerStyle={insetBottomStyle}
         >
-          <View style={styles.content}>
+          <View style={contentStyle}>
             <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
               {content}
             </HubSettingsDetailScrollProvider>
@@ -1807,7 +1808,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               style={styles.scrollView}
               contentContainerStyle={insetBottomStyle}
             >
-              <View style={styles.content}>
+              <View style={contentStyle}>
                 <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
                   {content}
                 </HubSettingsDetailScrollProvider>
@@ -1849,6 +1850,9 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: 720,
     alignSelf: "center",
+  },
+  hubContent: {
+    maxWidth: 1120,
   },
   aboutValue: {
     color: theme.colors.foregroundMuted,
@@ -1908,6 +1912,12 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
   },
 }));
+// Clisbot fusion: Hub pages hold tables and master-detail views, so they get a
+// wider column. Upstream sections keep their 720.
+const hubContentStyle = [styles.content, styles.hubContent];
+function detailContentStyle(view: SettingsView) {
+  return view.kind === "hub" ? hubContentStyle : styles.content;
+}
 
 const desktopStyles = StyleSheet.create((theme) => ({
   row: {

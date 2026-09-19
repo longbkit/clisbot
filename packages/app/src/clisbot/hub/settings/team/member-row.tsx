@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { MemberChatCell } from "./member-chat-cell";
 import { memberTeamNames, type MemberDirectoryRow } from "./member-directory";
@@ -55,13 +56,22 @@ export function MemberRow({
     [remove, removeLocked, view],
   );
   const canManageMembers = capabilities?.manageMembers === true;
+  // A phone has no room for columns: cells stack full width, Role goes under them.
+  const compact = useIsCompactFormFactor();
+  const cell = compact ? styles.stackedCell : styles.cell;
   return (
-    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
+    <View
+      style={[
+        settingsStyles.row,
+        bordered ? settingsStyles.rowBorder : null,
+        compact ? styles.stackedRow : null,
+      ]}
+    >
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{member.name}</Text>
         <Text style={settingsStyles.rowHint}>{member.email}</Text>
-        <View style={styles.cells}>
-          <View style={styles.cell}>
+        <View style={compact ? styles.stackedCells : styles.cells}>
+          <View style={cell}>
             <Text style={styles.cellLabel}>Teams</Text>
             <View style={styles.cellLine}>
               <Text style={settingsStyles.rowHint}>{memberTeamNames(member, teams)}</Text>
@@ -73,7 +83,7 @@ export function MemberRow({
             </View>
           </View>
           {chat === undefined ? null : (
-            <View style={styles.cell}>
+            <View style={cell}>
               <Text style={styles.cellLabel}>Chat</Text>
               <MemberChatCell links={chat} canLink={canLinkChat} pending={pending} onLink={view} />
             </View>
@@ -113,6 +123,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     minHeight: buttonControlHeight.xs,
   },
+  stackedCells: { gap: theme.spacing[2], marginTop: theme.spacing[1] },
+  stackedCell: { gap: theme.spacing[0.5] },
+  stackedRow: { flexDirection: "column", alignItems: "stretch", gap: theme.spacing[3] },
   cellLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   trailing: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[2] },
 }));
