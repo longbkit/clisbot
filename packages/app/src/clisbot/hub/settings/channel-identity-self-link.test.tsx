@@ -94,12 +94,14 @@ vi.mock("@/components/ui/button", () => ({
     children,
     onPress,
     disabled,
+    accessibilityLabel,
   }: {
     children: ReactNode;
     onPress(): void;
     disabled?: boolean;
+    accessibilityLabel?: string;
   }) => (
-    <button type="button" disabled={disabled} onClick={onPress}>
+    <button type="button" disabled={disabled} onClick={onPress} aria-label={accessibilityLabel}>
       {children}
     </button>
   ),

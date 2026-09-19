@@ -15,7 +15,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
 import { ScreenTitle } from "@/components/headers/screen-title";
@@ -24,7 +24,6 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
-import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { Switch } from "@/components/ui/switch";
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
 import { useFetchQuery } from "@/data/query";
@@ -79,6 +78,7 @@ import {
 } from "./managed-agent-configuration-fields";
 import { AutomationActivity } from "./automation-run-details";
 import { BackLink } from "./back-link";
+import { ViewTabs, type ViewTab } from "./view-tabs";
 
 export interface AutomationConnection {
   id: string;
@@ -398,7 +398,7 @@ function canRunAutomation(
 }
 
 type AutomationDetailView = "overview" | "channels" | "configuration" | "runs" | "revisions";
-const AUTOMATION_DETAIL_VIEWS: SegmentedControlOption<AutomationDetailView>[] = [
+const AUTOMATION_DETAIL_VIEWS: ViewTab<AutomationDetailView>[] = [
   { value: "overview", label: "Overview" },
   { value: "configuration", label: "Configuration" },
   { value: "runs", label: "Runs" },
@@ -566,9 +566,9 @@ function AutomationDetail({
         close={close}
         disabled={pending !== null}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailTabs}>
-        <SegmentedControl options={detailViews} value={view} onValueChange={setView} size="sm" />
-      </ScrollView>
+      <View style={styles.detailTabs}>
+        <ViewTabs tabs={detailViews} value={view} onChange={setView} />
+      </View>
       {typeof automation.pausedReason === "string" ? (
         <Alert variant="warning" title={`Paused: ${automation.pausedReason}`}>
           {canManage

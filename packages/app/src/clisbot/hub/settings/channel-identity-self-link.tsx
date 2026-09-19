@@ -393,14 +393,22 @@ function linkInstruction(realm: LinkRealm): string {
   return `Send this command from your own ${realm.channelLabel} account to ${target}. In a direct message send it as is; in a group, mention the bot in the same message.`;
 }
 
+// setTimeout fires at once past this delay, so a far deadline waits in steps.
+const MAX_TIMER_MS = 2_147_483_647;
+
 function useExpired(expiresAt: string): boolean {
   const deadline = new Date(expiresAt).getTime();
   const [expired, setExpired] = useState(() => Date.now() >= deadline);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (expired) return;
-    const timer = setTimeout(() => setExpired(true), Math.max(deadline - Date.now(), 0));
+    const remaining = Math.max(deadline - Date.now(), 0);
+    const timer = setTimeout(
+      () => (remaining > MAX_TIMER_MS ? setTick((current) => current + 1) : setExpired(true)),
+      Math.min(remaining, MAX_TIMER_MS),
+    );
     return () => clearTimeout(timer);
-  }, [deadline, expired]);
+  }, [deadline, expired, tick]);
   return expired;
 }
 

@@ -600,7 +600,7 @@ describe("Automations for Members", () => {
     };
     render(<AutomationSettings />);
     fireEvent.click(screen.getByRole("button", { name: "Review and enable" }));
-    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
     expect(
       screen.getByText(
         "Runs with Lead's access on Project A. The runner sees results but gets no Project access in the app.",
@@ -648,7 +648,7 @@ describe("Automation workspace navigation", () => {
     fireEvent.click(screen.getByText("triage"));
     expect(screen.getByText("Workstation").textContent).toBe("Workstation");
     expect(screen.queryByRole("button", { name: "Activate Automation changes" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Configuration" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
     expect(screen.queryByLabelText("Automation YAML")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Edit step" }));
     fireEvent.click(screen.getByRole("button", { name: "Instructions" }));
@@ -656,9 +656,9 @@ describe("Automation workspace navigation", () => {
       target: { value: "Keep this draft" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
-    fireEvent.click(screen.getByRole("button", { name: "Runs" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runs" }));
     expect(screen.getByText("No runs yet.").textContent).toBe("No runs yet.");
-    fireEvent.click(screen.getByRole("button", { name: "Configuration" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit step" }));
     fireEvent.click(screen.getByRole("button", { name: "Instructions" }));
     expect((screen.getByLabelText("Prompt") as HTMLInputElement).value).toBe("Keep this draft");
@@ -667,8 +667,8 @@ describe("Automation workspace navigation", () => {
     fireEvent.change(screen.getByLabelText("Route draft"), {
       target: { value: "Keep route draft" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
-    fireEvent.click(screen.getByRole("button", { name: "Configuration" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
     expect((screen.getByLabelText("Route draft") as HTMLInputElement).value).toBe(
       "Keep route draft",
     );

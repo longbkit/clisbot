@@ -404,8 +404,8 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     const yaml = screen.getByLabelText("Configuration YAML") as HTMLTextAreaElement;
     const draft = `${yaml.value}\n# draft retained locally`;
     fireEvent.change(yaml, { target: { value: draft } });
-    fireEvent.click(screen.getByRole("button", { name: "Activity" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connections" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
     fireEvent.click(screen.getByRole("button", { name: "Advanced YAML" }));
     expect((screen.getByLabelText("Configuration YAML") as HTMLTextAreaElement).value).toBe(draft);
     fireEvent.click(screen.getByRole("button", { name: "Manage" }));
@@ -806,10 +806,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Details" }));
     expect(screen.getByRole("button", { name: "Back to Activity" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Connections" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Connections" }));
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.queryByText("Channel activity")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Activity" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByRole("button", { name: "Back to Activity" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back to Activity" }));
     expect(screen.getByRole("button", { name: "Details" })).toBeTruthy();

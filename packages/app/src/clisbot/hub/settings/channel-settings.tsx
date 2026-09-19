@@ -129,7 +129,6 @@ import { ChannelPairingPanel } from "./channel-pairing-panel";
 import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 import { ChannelOperationsView } from "./channel-operations-view";
-import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { DaemonProjectField } from "./daemon-project-field";
 import {
   ManagedAgentConfigurationFields,
@@ -144,6 +143,7 @@ import {
 import { type AutomationConnection, SingleAgentAutomationForm } from "./automation-settings";
 import { BackLink } from "./back-link";
 import { useWideContent } from "./wide-content";
+import { ViewTabs, type ViewTab } from "./view-tabs";
 
 type RecordValue = ChannelConfigurationRecord;
 type RouteTarget = "agent" | "automation";
@@ -252,7 +252,7 @@ export function ChannelSettings({
  * admission. The `accounts`/`catalog` values stay as the stored view ids. */
 type ChannelView = "accounts" | "catalog" | "operations" | "activity";
 
-const CHANNEL_VIEWS: SegmentedControlOption<ChannelView>[] = [
+const CHANNEL_VIEWS: ViewTab<ChannelView>[] = [
   { value: "accounts", label: "Connections" },
   { value: "catalog", label: "Channel Integrations" },
   { value: "operations", label: "Operations" },
@@ -773,12 +773,7 @@ function ChannelSettingsContent({
   }
   const navigation = (
     <SettingsSection title="Channels">
-      <SegmentedControl
-        options={CHANNEL_VIEWS}
-        value={channelView}
-        onValueChange={setChannelView}
-        size="sm"
-      />
+      <ViewTabs tabs={CHANNEL_VIEWS} value={channelView} onChange={setChannelView} />
     </SettingsSection>
   );
   const SecondaryView = CHANNEL_SECONDARY_VIEWS[channelView];

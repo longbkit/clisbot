@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import type { SegmentedControlOption } from "@/components/ui/segmented-control";
+import type { ViewTab } from "../view-tabs";
 
 export type PeopleView = "members" | "teams" | "invitations" | "access";
 
@@ -12,7 +12,7 @@ export type PeopleView = "members" | "teams" | "invitations" | "access";
 export function peopleViews(
   showInvitations: boolean,
   managesPeople: boolean,
-): SegmentedControlOption<PeopleView>[] {
+): ViewTab<PeopleView>[] {
   const access = { value: "access" as const, label: "Access" };
   if (!managesPeople) return [access];
   return [
@@ -25,7 +25,7 @@ export function peopleViews(
 
 /** The tab lives in the URL (`?view=teams`) so a refresh, Back, or a shared link keeps it. */
 export function usePeopleView(
-  views: readonly SegmentedControlOption<PeopleView>[],
+  views: readonly ViewTab<PeopleView>[],
 ): [PeopleView, (view: PeopleView) => void] {
   const router = useRouter();
   const params = useLocalSearchParams<{ view?: string }>();

@@ -4,7 +4,6 @@ import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { TeamAccessSection } from "./team-access-section";
 import { TeamMemberRows } from "./team-member-rows";
 import { canInvitePeople, canManageTeamMembership } from "./team-membership";
@@ -13,6 +12,7 @@ import type { HubAccount, HubTeam, TeamResources } from "./types";
 import { useTeamAdminAction } from "./use-people-actions";
 import type { TeamActions } from "./use-team-actions";
 import { BackLink } from "../back-link";
+import { ViewTabs, type ViewTab } from "../view-tabs";
 
 type TeamView = "members" | "access" | "settings";
 
@@ -21,7 +21,7 @@ type TeamView = "members" | "access" | "settings";
  * for the latter); Settings (rename, delete) for Organization Admins only.
  */
 function teamViews(canManage: boolean, organizationAdmin: boolean) {
-  const views: SegmentedControlOption<TeamView>[] = [{ value: "members", label: "Members" }];
+  const views: ViewTab<TeamView>[] = [{ value: "members", label: "Members" }];
   if (canManage) views.push({ value: "access", label: "Access" });
   if (organizationAdmin) views.push({ value: "settings", label: "Settings" });
   return views;
@@ -71,9 +71,7 @@ export function SelectedTeamDetail({
           ) : null}
         </View>
         {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-        {views.length > 1 ? (
-          <SegmentedControl options={views} value={view} onValueChange={setView} size="sm" />
-        ) : null}
+        {views.length > 1 ? <ViewTabs tabs={views} value={view} onChange={setView} /> : null}
       </SettingsSection>
       {view === "members" ? (
         <SettingsSection title="Members">

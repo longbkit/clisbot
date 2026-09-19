@@ -3,7 +3,6 @@ import { View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useHubAccount } from "../../account-provider";
 import { AccessSettings } from "../access-settings";
 import { InvitationsTab } from "./invitations-tab";
@@ -20,6 +19,7 @@ import { useInvitePeople, usePeopleSelection } from "./use-people-screen";
 import { useTeamActions } from "./use-team-actions";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useWideContent } from "../wide-content";
+import { ViewTabs } from "../view-tabs";
 
 /** Settings → People: Members, Teams, and Invitations, with one Invite people modal for all three. */
 export function TeamSettings() {
@@ -100,7 +100,7 @@ export function TeamSettings() {
   return (
     <View>
       <SettingsSection title="People" trailing={inviteButton}>
-        <SegmentedControl options={views} value={view} onValueChange={setView} size="sm" />
+        <ViewTabs tabs={views} value={view} onChange={setView} />
         {people.notice === null ? null : <Alert variant="success" title={people.notice} />}
       </SettingsSection>
       {view === "members" ? (
