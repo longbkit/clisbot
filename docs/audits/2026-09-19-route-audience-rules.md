@@ -1,6 +1,6 @@
 # Route audience rules: one place decides who talks to the bot (2026-09-19)
 
-Decision record. Status: decided and built 2026-09-19 (hub: `channels/config/audience.ts`, `policy/gate.ts`, `access-migration.ts`, `management-api/channel-admin.ts`; app: `settings/channel-route-audience*.ts(x)`). Supersedes the chat-authority
+Decision record. Status: decided and built 2026-09-19 (hub: `channels/config/audience.ts`, `policy/gate.ts`, `bindings/stored-route.ts`, `management-api/channel-admin.ts`, the one-time `channels/one-time/`; app: `settings/channel-route-audience*.ts(x)`). Supersedes the chat-authority
 sources in [2026-09-18](2026-09-18-channel-chat-authority-and-limits.md#chat-authority-is-separate-from-hostproject-access)
 (`channel.use` **or** the Route's audience/`access:` admission). The rest of
 that record (execution vouched by the publisher, warnings, limits) stands.

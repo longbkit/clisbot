@@ -36,6 +36,8 @@ export interface ConvertedAccount {
   fallbackPosition: number | undefined;
   /** Grants whose `channel.use` is now expressed as rules. */
   foldedGrantIds: string[];
+  /** Routes (by position) whose old `match` the rules can only state wider. */
+  widenedRoutes: number[];
 }
 
 // The old shapes, loose: every other key passes through untouched.
@@ -67,6 +69,9 @@ export function convertAccountFile(
 ): ConvertedAccount {
   const { routes: legacyRoutes, fallback, ...account } = LegacyAccountSchema.parse(raw);
   const routes = (legacyRoutes ?? []).map(routeInNewShape);
+  const widenedRoutes = (legacyRoutes ?? []).flatMap((route, position) =>
+    route.match !== undefined && widensMatch(route.match) ? [position] : [],
+  );
   const catchAll =
     fallback === undefined || "deny" in fallback ? undefined : fallbackAsRoute(fallback);
   const fallbackPosition = catchAll === undefined ? undefined : routes.length;
@@ -76,7 +81,7 @@ export function convertAccountFile(
     ...account,
     ...(legacyRoutes === undefined && catchAll === undefined ? {} : { routes: folded.routes }),
   });
-  return { account: converted, fallbackPosition, foldedGrantIds: folded.grantIds };
+  return { account: converted, fallbackPosition, foldedGrantIds: folded.grantIds, widenedRoutes };
 }
 
 /** `match` + one-value `audience` → rules; a route already in rules is kept. */
@@ -113,11 +118,17 @@ function legacyWho(audience: unknown): AudienceRule["who"] {
     : { roles: ["member"] };
 }
 
-/** Threads and topics belong to their room: an id-less thread route covers every group. */
+/** Listed ids stay listed, a DM's included. An id-less thread or topic route
+ * matched only threaded messages; rules cannot say "threads only", so it
+ * covers its whole room and `widensMatch` reports it. */
 function whereFromMatch(match: z.infer<typeof LegacyMatchSchema>): AudienceWhere {
   const ids = (match.ids ?? []).map(String);
-  if (match.kind === "dm") return { dm: true };
-  return ids.length === 0 ? { groups: "all" } : { conversations: ids };
+  if (ids.length > 0) return { conversations: ids };
+  return match.kind === "dm" ? { dm: true } : { groups: "all" };
+}
+
+function widensMatch(match: z.infer<typeof LegacyMatchSchema>): boolean {
+  return (match.kind === "thread" || match.kind === "topic") && (match.ids ?? []).length === 0;
 }
 
 /**

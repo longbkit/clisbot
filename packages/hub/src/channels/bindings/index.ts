@@ -162,7 +162,8 @@ export class BindingEngine {
     } else if (route.defaults.requireMention && !message.mentionedBot) {
       return { allowed: false, reason: "not mentioned; requireMention is on" };
     }
-    return this.mayUse(message, account, route);
+    const decision = await this.mayUse(message, account, route);
+    return decision.allowed ? decision : { ...decision, audienceRefused: true };
   }
 
   /**

@@ -8,6 +8,7 @@ import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "../../db/ru
 import { migrateChannelRoutesOnce } from "./migrate-channel-routes-once.js";
 
 const ORG = "org-once";
+const ORG_WITHOUT_CHANNELS = "org-no-channels";
 const ACCOUNT_FILE = ".paseo/channels/slack/work.yml";
 
 // The old shape on every axis: `match` + one-value `audience`, and an enabled catch-all.
@@ -30,7 +31,9 @@ let bundle: DatabaseRuntimeBundle;
 
 async function seed(): Promise<void> {
   const db = bundle.runtime;
-  await db.query(`insert into organization (id, name, slug) values ($1, $1, $1)`, [ORG]);
+  for (const id of [ORG, ORG_WITHOUT_CHANNELS]) {
+    await db.query(`insert into organization (id, name, slug) values ($1, $1, $1)`, [id]);
+  }
   const revisions: string[] = [];
   for (const version of [1, 2]) {
     const inserted = await db.query<{ id: string }>(
@@ -49,8 +52,10 @@ async function seed(): Promise<void> {
     `insert into access_assignments
        (organization_id, subject_kind, subject_id, resource_kind, resource_id, privileges, constraints)
      values ($1, 'member', 'm1', 'channel_account', 'slack/work', '["channel.use"]', '{"conversation":{"kind":"all"}}'),
-            ($1, 'member', 'm2', 'channel_account', 'slack/work', '["channel.use","channel.manage"]', '{"conversation":{"kind":"all"}}')`,
-    [ORG],
+            ($1, 'member', 'm2', 'channel_account', 'slack/work', '["channel.use","channel.manage"]', '{"conversation":{"kind":"all"}}'),
+            ($1, 'member', 'm3', 'channel_account', 'slack/work', '["channel.use"]', '{}'),
+            ($2, 'member', 'm4', 'channel_account', 'slack/other', '["channel.use"]', '{}')`,
+    [ORG, ORG_WITHOUT_CHANNELS],
   );
   await db.query(
     `insert into thread_bindings
@@ -92,6 +97,7 @@ describe("migrateChannelRoutesOnce", () => {
         catchAllsBecomingRoutes: 1,
         grantsFolded: 2,
         revisionsDeleted: 1,
+        review: ["1 channel.use grant(s) grant nothing today and are retired unfolded"],
       },
     ]);
     expect(result.leftovers["fallbackBindings"]).toBe(1);
@@ -132,9 +138,9 @@ describe("migrateChannelRoutesOnce", () => {
       revisionId: revision.rows[0]!.id,
     });
 
+    // Folded or not, every channel.use is gone; the Admin row keeps Admin.
     const grants = await db.query<{ subject_id: string; privileges: string[] }>(
-      `select subject_id, privileges from access_assignments where organization_id = $1`,
-      [ORG],
+      `select subject_id, privileges from access_assignments`,
     );
     expect(grants.rows).toEqual([{ subject_id: "m2", privileges: ["channel.manage"] }]);
   });

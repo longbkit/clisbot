@@ -13,6 +13,9 @@ import { deriveBindingKey } from "./stored-route.js";
 export interface FollowUpAdmission {
   allowed: boolean;
   reason?: string | undefined;
+  /** The message was for the bot (mention and follow-up gates passed) and the
+   * Route's audience refused the sender. */
+  audienceRefused?: boolean;
 }
 
 /** The key a conversation's `/followup` override is stored against: its binding key. */

@@ -370,6 +370,28 @@ describe("allowlist enforcement", () => {
     await harness.plane.stop();
   });
 
+  it("stays silent to chatter the follow-up gate turned away in a bound thread", async () => {
+    const route = makeRoute({ where: { dm: false, groups: ["all"], conversations: [] } });
+    const harness = makeHarness({
+      route: {
+        ...route,
+        // An `auto` follow-up window that has already ended.
+        defaults: { ...route.defaults, followUp: { mode: "auto", ttlMinutes: 0 } },
+      },
+    });
+    await harness.plane.start(harness.daemon, store);
+    const topic = { kind: "topic" as const, id: "8", rootConversationId: "-100300", threadId: "8" };
+    await deliver(harness, dm({ senderIdentity: ALICE, conversation: topic }));
+
+    // Not addressed to the bot after the window: the follow-up gate refuses first.
+    await deliver(
+      harness,
+      dm({ senderIdentity: STRANGER, conversation: topic, mentionedBot: false }),
+    );
+    assert.equal(harness.posted.filter((text) => text.includes("belongs to Route")).length, 0);
+    await harness.plane.stop();
+  });
+
   it("leaves admission alone when no access block was authored", async () => {
     const harness = makeHarness({ route: makeRoute({}) });
     await harness.plane.start(harness.daemon, store);

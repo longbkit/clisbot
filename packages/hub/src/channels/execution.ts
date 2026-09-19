@@ -62,6 +62,7 @@ import {
   parseStoredRouteSummary,
   recordedRoute,
   storedRouteOwner,
+  type FollowUpAdmission,
   routeFingerprint,
   routePosition,
 } from "./bindings/index.js";
@@ -1032,23 +1033,24 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   /**
-   * A sender who addressed the bot on a Member Route that does not admit them
-   * hears why instead of silence: once a day in general, once per thread in a
-   * thread another Route already owns. A bound thread never falls through to a
-   * later Route, so the sender is told to start their own conversation
-   * (docs/audits/2026-09-19-route-audience-rules.md#routing). Unaddressed
-   * chatter, open Routes and Workflow Routes stay silent.
+   * A sender the Route's audience refused hears why instead of silence: once a
+   * day when they addressed the bot, once per thread in a thread another
+   * sender bound. A bound thread never falls through to a later Route, so the
+   * sender is told to start their own conversation
+   * (docs/audits/2026-09-19-route-audience-rules.md#routing). Chatter the
+   * mention and follow-up gates already turned away, open Routes and Workflow
+   * Routes stay silent.
    */
   async function postNotAdmittedNotice(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    refusal: FollowUpAdmission,
   ): Promise<void> {
-    if (isOpenAudienceRoute(route) || route.target.kind !== "agent") return;
-    const boundThread = await boundThreadOf(message, account);
-    if (!message.mentionedBot && !(boundThread && (await followsUpWithoutMention(message, route))))
+    if (!refusal.audienceRefused || isOpenAudienceRoute(route) || route.target.kind !== "agent")
       return;
-    if ((await mayUseChannel(message, account, route)).allowed) return;
+    const boundThread = await boundThreadOf(message, account);
+    if (!boundThread && !message.mentionedBot) return;
     const day = Math.floor(clock.now() / 86_400_000);
     const once = boundThread
       ? `${message.senderIdentity}:${message.conversation.rootConversationId}:${String(message.conversation.threadId)}`
@@ -1070,13 +1072,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (message.conversation.threadId === null) return false;
     const binding = await bindingForInbound(message, account);
     return binding !== undefined && binding.externalThreadId !== null;
-  }
-
-  async function followsUpWithoutMention(
-    message: InboundMessage,
-    route: CompiledRoute,
-  ): Promise<boolean> {
-    return (await conversationFollowUpMode(store, deps.organizationId, message, route)) === "auto";
   }
 
   /** One short line instead of silence; a waiting message is announced once, not per retry. */
@@ -1108,7 +1103,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ? await admitWorkflowMessage(message, account, route)
         : await bindingsEngine().admit(message, account, route);
     if (!sender.allowed) {
-      await postNotAdmittedNotice(message, account, route);
+      await postNotAdmittedNotice(message, account, route, sender);
       return recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",

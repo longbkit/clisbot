@@ -108,6 +108,20 @@ describe("convertAccountFile", () => {
       audience: [{ who: { roles: ["member"] }, where: { groups: "all" } }],
     });
     expect(converted.account.routes?.[0]).not.toHaveProperty("match");
+    // Rules cannot say "threads only": the dry run lists the Route.
+    expect(converted.widenedRoutes).toEqual([0]);
+  });
+
+  it("keeps a DM route's listed ids instead of covering every DM", () => {
+    const converted = convertAccountFile(
+      { ...BASE, routes: [{ agent: "a", match: { kind: "dm", ids: ["D1"] } }] },
+      [],
+    );
+
+    expect(converted.account.routes?.[0]?.audience).toEqual([
+      { who: { roles: ["member"] }, where: { conversations: ["D1"] } },
+    ]);
+    expect(converted.widenedRoutes).toEqual([]);
   });
 });
 

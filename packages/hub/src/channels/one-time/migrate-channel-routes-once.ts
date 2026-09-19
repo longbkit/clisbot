@@ -32,17 +32,28 @@ interface StoredFile {
   content: string;
 }
 
-/** `<channel>/<accountId>` → the catch-all's new position; null = it was off. */
-type FallbackPositions = Map<string, number | null>;
+interface AccountKey {
+  channel: string;
+  accountId: string;
+}
+
+/** Where one account's catch-all now sits; null = it was off. */
+interface FallbackPosition extends AccountKey {
+  position: number | null;
+}
 
 interface OrganizationPlan {
   organizationId: string;
   activeRevisionId: string;
   files: StoredFile[];
-  fallbackPositions: FallbackPositions;
+  fallbackPositions: FallbackPosition[];
   foldedGrantIds: string[];
   deletedRevisions: number;
+  /** For a person to read before --apply; nothing here blocks the run. */
+  review: string[];
 }
+
+const START_TIME_REWRITE = "# Rewritten by the Hub on start";
 
 const DUMP_TABLES = [
   "channel_configuration_revisions",
@@ -64,8 +75,9 @@ async function planOrganization(
     [activeRevisionId],
   );
   const grants = await channelUseGrants(db, organizationId);
-  const fallbackPositions: FallbackPositions = new Map();
+  const fallbackPositions: FallbackPosition[] = [];
   const foldedGrantIds: string[] = [];
+  const review: string[] = [];
   const files = (active.rows[0]?.files ?? []).map((file) => {
     if (!file.path.startsWith(`${CHANNELS_DIRECTORY}/`) || file.path === CHANNEL_POLICY_PATH) {
       return file;
@@ -74,10 +86,17 @@ async function planOrganization(
     const { channel, accountId } = AccountKeySchema.parse(raw);
     const own = grants.filter((g) => g.channel === channel && g.accountId === accountId);
     const converted = convertAccountFile(raw, own);
-    fallbackPositions.set(`${channel}/${accountId}`, converted.fallbackPosition ?? null);
+    fallbackPositions.push({ channel, accountId, position: converted.fallbackPosition ?? null });
     foldedGrantIds.push(...converted.foldedGrantIds);
+    review.push(...reviewNotes(file, converted.widenedRoutes));
     return { path: file.path, content: dump(converted.account, { lineWidth: -1 }) };
   });
+  const unfolded = grants.filter((grant) => !foldedGrantIds.includes(grant.id)).length;
+  if (unfolded > 0) {
+    review.push(
+      `${String(unfolded)} channel.use grant(s) grant nothing today and are retired unfolded`,
+    );
+  }
   const others = await db.query<{ count: string }>(
     `select count(*)::text as count from channel_configuration_revisions
      where organization_id = $1 and id <> $2`,
@@ -90,7 +109,21 @@ async function planOrganization(
     fallbackPositions,
     foldedGrantIds,
     deletedRevisions: Number(others.rows[0]?.count ?? 0),
+    review,
   };
+}
+
+function reviewNotes(file: StoredFile, widenedRoutes: readonly number[]): string[] {
+  const notes = widenedRoutes.map(
+    (position) =>
+      `${file.path} Route ${String(position + 1)}: an id-less thread/topic match now covers its whole room`,
+  );
+  // The start-time job (afdf0d51d..ca4e311b1) folded grants with their full
+  // scope and deleted them; deleting older revisions removes the original.
+  if (file.content.startsWith(START_TIME_REWRITE)) {
+    notes.push(`${file.path} was rewritten by the start-time job: check its grant rules by hand`);
+  }
+  return notes;
 }
 
 async function channelUseGrants(db: QueryHandle, organizationId: string) {
@@ -107,7 +140,9 @@ async function channelUseGrants(db: QueryHandle, organizationId: string) {
     [organizationId],
   );
   return rows.rows.map((row): ChannelUseGrant => {
-    const [channel = "", accountId = ""] = row.resource_id.split("/").map(decodeURIComponent);
+    const separator = row.resource_id.indexOf("/");
+    const channel = decodeURIComponent(row.resource_id.slice(0, separator));
+    const accountId = decodeURIComponent(row.resource_id.slice(separator + 1));
     const constraints = AccessConstraintsSchema.safeParse(row.constraints);
     return {
       id: row.id,
@@ -135,25 +170,28 @@ async function applyPlan(db: QueryHandle, plan: OrganizationPlan): Promise<void>
      where organization_id = $1 and route ? 'selection'`,
     [plan.organizationId, plan.activeRevisionId],
   );
-  for (const [key, position] of plan.fallbackPositions) {
-    await remapFallback(db, plan.organizationId, key, position);
+  for (const { position, ...account } of plan.fallbackPositions) {
+    await remapFallback(db, plan.organizationId, account, position);
   }
   // Accounts gone from the configuration keep no Route to point at.
   await remapFallback(db, plan.organizationId, undefined, null);
-  await retireChannelUse(db, plan.foldedGrantIds);
+  await retireChannelUse(db, plan.organizationId);
+  const left = await leftovers(db, plan.organizationId);
+  if (Object.values(left).some((n) => n !== 0)) {
+    throw new Error(`organization ${plan.organizationId} still has ${JSON.stringify(left)}`);
+  }
 }
 
 /** Every stored `"fallback"` position of one account (every account when
- * `key` is undefined) → the catch-all's new index, or dropped where there is
- * no catch-all to point at. */
+ * `account` is undefined) → the catch-all's new index, or dropped where there
+ * is no catch-all to point at. */
 async function remapFallback(
   db: QueryHandle,
   organizationId: string,
-  key: string | undefined,
+  account: AccountKey | undefined,
   position: number | null,
 ): Promise<void> {
-  const [channel = null, accountId = null] = key?.split("/") ?? [];
-  const args = [organizationId, channel, accountId, position];
+  const args = [organizationId, account?.channel ?? null, account?.accountId ?? null, position];
   await db.query(
     `update thread_bindings set route = case when $4::int is null
        then route - 'selection'
@@ -195,25 +233,44 @@ async function remapFallback(
   );
 }
 
-/** A Use-only row is deleted; an Admin row keeps `channel.manage`. */
-async function retireChannelUse(db: QueryHandle, ids: readonly string[]): Promise<void> {
-  if (ids.length === 0) return;
+/**
+ * Every `channel.use` is retired, folded or not: a grant with no conversation
+ * scope, on an account the configuration no longer has, or in an organization
+ * with no configuration granted nothing. A Use-only row is deleted; an Admin
+ * row keeps `channel.manage`. `organizationId` undefined = every organization.
+ */
+async function retireChannelUse(db: QueryHandle, organizationId: string | undefined) {
+  const scope = `($1::text is null or organization_id = $1) and privileges ? 'channel.use'`;
   await db.query(
-    `update access_assignments set privileges = privileges - 'channel.use' where id = any($1)`,
-    [ids],
+    `delete from access_assignments where ${scope} and jsonb_array_length(privileges) = 1`,
+    [organizationId ?? null],
   );
   await db.query(
-    `delete from access_assignments where id = any($1) and jsonb_array_length(privileges) = 0`,
-    [ids],
+    `update access_assignments set privileges = privileges - 'channel.use' where ${scope}`,
+    [organizationId ?? null],
   );
 }
 
-/** Every leftover of the old shapes, as named counts; all must be zero. */
-async function leftovers(db: QueryHandle): Promise<Record<string, number>> {
-  const count = async (sql: string) =>
-    Number((await db.query<{ n: string }>(`select count(*)::text as n from ${sql}`)).rows[0]?.n);
+/** Every leftover of the old shapes, as named counts (all must be zero), for
+ * one organization or, with `organizationId` undefined, the whole Hub. */
+async function leftovers(
+  db: QueryHandle,
+  organizationId?: string,
+): Promise<Record<string, number>> {
+  const org = [organizationId ?? null];
+  const inOrg = `($1::text is null or organization_id = $1)`;
+  const count = async (from: string, where: string) =>
+    Number(
+      (
+        await db.query<{ n: string }>(
+          `select count(*)::text as n from ${from} where ${inOrg} and ${where}`,
+          org,
+        )
+      ).rows[0]?.n,
+    );
   const revisions = await db.query<{ files: StoredFile[] }>(
-    `select files from channel_configuration_revisions`,
+    `select files from channel_configuration_revisions where ${inOrg}`,
+    org,
   );
   const oldShapeFiles = revisions.rows
     .flatMap((row) => row.files)
@@ -221,25 +278,20 @@ async function leftovers(db: QueryHandle): Promise<Record<string, number>> {
       (file) => file.path.startsWith(`${CHANNELS_DIRECTORY}/`) && file.path !== CHANNEL_POLICY_PATH,
     )
     .filter((file) => !AccountFileSchema.safeParse(load(file.content)).success).length;
+  const position = `route->'selection'->>'position' = 'fallback'`;
+  const runPosition = `output_context->'channel'->>'route_position' = 'fallback'`;
   return {
     oldShapeFiles,
     extraRevisions: await count(
-      `channel_configuration_revisions r where not exists (select 1 from organization_channel_configurations c where c.active_revision_id = r.id)`,
+      "channel_configuration_revisions r",
+      "not exists (select 1 from organization_channel_configurations c where c.active_revision_id = r.id)",
     ),
-    fallbackBindings: await count(
-      `thread_bindings where route->'selection'->>'position' = 'fallback'`,
-    ),
-    fallbackExecutions: await count(
-      `agent_executions where output_context->'channel'->>'route_position' = 'fallback'`,
-    ),
-    fallbackTriggerRuns: await count(
-      `trigger_runs where output_context->'channel'->>'route_position' = 'fallback'`,
-    ),
-    fallbackCapabilities: await count(
-      `channel_reply_capabilities where route_position = 'fallback'`,
-    ),
-    fallbackAuditEvents: await count(`audit_events where evidence->>'routePosition' = 'fallback'`),
-    channelUseGrants: await count(`access_assignments where privileges ? 'channel.use'`),
+    fallbackBindings: await count("thread_bindings", position),
+    fallbackExecutions: await count("agent_executions", runPosition),
+    fallbackTriggerRuns: await count("trigger_runs", runPosition),
+    fallbackCapabilities: await count("channel_reply_capabilities", "route_position = 'fallback'"),
+    fallbackAuditEvents: await count("audit_events", "evidence->>'routePosition' = 'fallback'"),
+    channelUseGrants: await count("access_assignments", "privileges ? 'channel.use'"),
   };
 }
 
@@ -274,16 +326,20 @@ export async function migrateChannelRoutesOnce(
   if (!options.apply) return { organizations, leftovers: await leftovers(db) };
   await dumpTables(db, options.dumpPath);
   for (const plan of plans) await db.transaction((tx) => applyPlan(tx, plan));
+  // Organizations without a channel configuration still hold grants.
+  await db.transaction((tx) => retireChannelUse(tx, undefined));
   return { organizations, leftovers: await leftovers(db), dumpPath: options.dumpPath };
 }
 
 function summary(plan: OrganizationPlan) {
   return {
     organizationId: plan.organizationId,
-    accounts: plan.fallbackPositions.size,
-    catchAllsBecomingRoutes: [...plan.fallbackPositions.values()].filter((p) => p !== null).length,
+    accounts: plan.fallbackPositions.length,
+    catchAllsBecomingRoutes: plan.fallbackPositions.filter(({ position }) => position !== null)
+      .length,
     grantsFolded: plan.foldedGrantIds.length,
     revisionsDeleted: plan.deletedRevisions,
+    review: plan.review,
   };
 }
 

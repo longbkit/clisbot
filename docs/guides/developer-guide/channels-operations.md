@@ -250,12 +250,16 @@ node --import tsx src/channels/one-time/migrate-channel-routes-once.ts --data-di
 
 The dry run prints, per organization, how many catch-alls become a last Route,
 how many grants fold and how many old revisions go, plus the current
-`leftovers`. `--apply` dumps every row it may touch to
+`leftovers`. Read its `review` list before `--apply`: an id-less thread/topic
+Route now covers its whole room, a file the removed start-time job rewrote may
+carry grant rules wider than the Route (fix them in the Route editor), and
+`channel.use` grants that granted nothing are retired unfolded. `--apply` dumps every row it may touch to
 `/tmp/channel-routes-once-<ms>.json` first, rewrites the active revision in
 place, deletes the other revisions, repoints stored `"fallback"` positions
 (bindings, Workflow runs, reply capabilities, activity) at the new last Route,
-and retires the folded grants. It exits 1 when any `leftovers` count is not
-zero. The Hub fails to load an old-shape account file, so run it before the
+and retires every `channel.use`. Each organization runs in one transaction that
+re-counts its leftovers before committing and rolls back if any is not zero;
+the script then exits 1. The Hub fails to load an old-shape account file, so run it before the
 first start, not after.
 
 Delete the `one-time/` folder once it has run on every Hub that holds data.
