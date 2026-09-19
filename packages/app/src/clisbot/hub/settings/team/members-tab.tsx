@@ -15,7 +15,7 @@ import {
   memberDirectoryRows,
   type MemberFilter,
 } from "./member-directory";
-import { MemberRow, type MemberRowHandlers } from "./member-row";
+import { MemberRow, MemberTableHeader, type MemberRowHandlers } from "./member-row";
 import { canInvitePeople } from "./team-membership";
 import type { HubAccount, TeamResources } from "./types";
 
@@ -80,12 +80,18 @@ export function MembersTab({
             : `${String(visible.length)} of ${countLabel(rows.length, "Member")}`}
         </Text>
         <View style={settingsStyles.card}>
+          {shown.length === 0 ? null : (
+            <MemberTableHeader
+              chat={shown.some((row) => row.chat !== undefined)}
+              role={capabilities?.manageMembers === true}
+            />
+          )}
           {shown.length === 0 ? (
             <EmptyRow
               message={rows.length === 0 ? "No Members are available." : "No Members match."}
             />
           ) : (
-            shown.map((row, index) => (
+            shown.map((row) => (
               <MemberRow
                 key={row.member.id}
                 row={row}
@@ -94,7 +100,7 @@ export function MembersTab({
                 canLinkChat={hub.signedIn?.isInstanceOperator === true}
                 canInvite={canInvitePeople(resources.authority)}
                 pending={pending}
-                bordered={index > 0}
+                bordered
                 handlers={handlers}
               />
             ))
