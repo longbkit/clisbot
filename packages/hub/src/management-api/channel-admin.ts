@@ -3,16 +3,25 @@
 // delegation-implementation.md row B). The organization capability keeps the
 // full `channel-configuration` / `channel-accounts` surface in `index.ts`; this
 // file is the narrowed one — that account's file, its activity and ingress,
-// its status and QR relink. The Connection (bot token), the policy file and
-// every other account stay out of reach: an account file saved here must keep
-// its `connectionId`, `transport` and `config` exactly as stored.
+// its status and QR relink, the conversations and senders it has seen. The
+// Connection (bot token), the policy file and every other account stay out of
+// reach: an account file saved here must keep its `connectionId`, `transport`
+// and `config` exactly as stored, and the credentials in `config` are never
+// shown here (`channels/config/account-secrets.ts`).
 
 import { dump, load } from "js-yaml";
 import { z } from "zod";
-import { assertChannelConfigurationDelegation } from "../access/delegation.js";
+import {
+  assertChannelConfigurationDelegation,
+  routesNeedingDelegation,
+} from "../access/delegation.js";
 import type { AccessStore } from "../access/store.js";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import { holdsChannelAccountManagement } from "../channels/access-grants.js";
+import {
+  redactAccountConfig,
+  restoreAccountConfigSecrets,
+} from "../channels/config/account-secrets.js";
 import type { CompiledChannelAccount } from "../channels/config/compile.js";
 import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 import { AccountFileSchema, type AccountFile } from "../channels/config/schema.js";
@@ -33,10 +42,16 @@ import {
   withChannelIngressHealth,
 } from "./channel-ingress.js";
 import { channelControlPlaneView } from "./channel-plane-gate.js";
+import { accountConversationsView, accountSendersView } from "./channel-account-directory.js";
+
+/** The per-account reads both a Route Admin and the organization capability
+ * reach through this handler: `channel-accounts/<channel>/<account>/<read>`. */
+const ACCOUNT_DIRECTORY_READS = new Set(["conversations", "senders"]);
 
 /** Whether the management dispatch hands this request to the Route Admin
- * handler: an account-scoped path under the three channel resources, or any
- * `channel-accounts` path for a caller without the organization capability. */
+ * handler: an account-scoped path under the three channel resources, an
+ * account directory read, or any `channel-accounts` path for a caller without
+ * the organization capability. */
 export function channelAdminHandles(
   resource: string | undefined,
   segments: readonly string[],
@@ -47,7 +62,9 @@ export function channelAdminHandles(
     resource === "channel-activity" ||
     resource === "channel-ingress";
   if (accountScoped) return segments[3] === "accounts";
-  return resource === "channel-accounts" && !access.capabilities.manageChannels;
+  if (resource !== "channel-accounts") return false;
+  const directoryRead = segments.length === 6 && ACCOUNT_DIRECTORY_READS.has(segments[5] ?? "");
+  return directoryRead || !access.capabilities.manageChannels;
 }
 
 export interface ChannelAdminDeps {
@@ -73,6 +90,8 @@ const accountFileRequestSchema = z
  *   channel-activity/accounts/<channel>/<accountId>        GET
  *   channel-ingress/accounts/<channel>/<accountId>         GET
  *   channel-accounts/<channel>/<accountId>/status          GET
+ *   channel-accounts/<channel>/<accountId>/conversations   GET
+ *   channel-accounts/<channel>/<accountId>/senders         GET
  *   channel-accounts/<channel>/<accountId>/qr/<verb>       POST
  */
 export async function handleChannelAccountAdmin(
@@ -146,11 +165,30 @@ async function accountOperation(
     return Response.json(await channelIngressListPage(deps.runtime, organizationId, query));
   }
   if (resource !== "channel-accounts") return undefined;
-  if (tail[0] === "status" && method === "GET") {
-    return accountStatusView(deps, organizationId, target);
-  }
   if (tail[0] === "qr" && method === "POST") {
     return accountQrLogin(deps, input.requestId, organizationId, { target, account }, tail[1]);
+  }
+  return method === "GET"
+    ? accountRead(deps, organizationId, tail, { target, account })
+    : undefined;
+}
+
+/** `channel-accounts/<channel>/<account>/<read>`: status and the directory reads. */
+async function accountRead(
+  deps: ChannelAdminDeps,
+  organizationId: string,
+  tail: readonly string[],
+  input: { target: AccountTarget; account: CompiledChannelAccount },
+): Promise<Response | undefined> {
+  if (tail[0] === "status") return accountStatusView(deps, organizationId, input.target);
+  if (tail.length !== 1) return undefined;
+  if (tail[0] === "conversations") {
+    return Response.json(
+      await accountConversationsView(deps, organizationId, input.target, input.account),
+    );
+  }
+  if (tail[0] === "senders") {
+    return Response.json(await accountSendersView(deps.runtime, organizationId, input.account));
   }
   return undefined;
 }
@@ -196,6 +234,18 @@ function storedAccountFile(
   return file === undefined ? undefined : AccountFileSchema.parse(load(file.content));
 }
 
+/** An account file as this surface shows it: `config` without credentials. */
+function shownAccountFile(file: AccountFile | undefined): AccountFile | null {
+  if (file === undefined) return null;
+  return file.config === undefined
+    ? file
+    : { ...file, config: redactAccountConfig(file.channel, file.config) };
+}
+
+function shownCompiledAccount(account: CompiledChannelAccount): CompiledChannelAccount {
+  return { ...account, config: redactAccountConfig(account.channel, account.config) };
+}
+
 async function accountWarnings(
   deps: ChannelAdminDeps,
   snapshot: ChannelControlPlaneSnapshot,
@@ -223,14 +273,15 @@ async function accountConfigurationView(
       snapshot.revision === null
         ? null
         : { id: snapshot.revision.id, version: snapshot.revision.version },
-    account: storedAccountFile(snapshot, account) ?? null,
-    effective: account,
+    account: shownAccountFile(storedAccountFile(snapshot, account)),
+    effective: shownCompiledAccount(account),
     warnings: await accountWarnings(deps, snapshot, account),
   });
 }
 
-/** Save one account file: same identity, same Connection/transport/config,
- * every Route re-checked against what the saver may delegate. */
+/** Save one account file: same identity, same Connection/transport/config
+ * (credentials kept as stored), and every Route whose delegated parts changed
+ * re-checked against what the saver may delegate. */
 async function saveAccountFile(
   deps: ChannelAdminDeps,
   access: OrganizationAccessValue,
@@ -240,15 +291,18 @@ async function saveAccountFile(
 ): Promise<Response> {
   const body = accountFileRequestSchema.safeParse(await request.json().catch(() => undefined));
   if (!body.success) throw new ProductRequestError(400, "invalid_request_body");
-  const next = body.data.account;
-  if (next.channel !== account.channel || next.accountId !== account.accountId) {
+  if (
+    body.data.account.channel !== account.channel ||
+    body.data.account.accountId !== account.accountId
+  ) {
     throw new ProductRequestError(400, "invalid_channel_account_identity");
   }
   const stored = storedAccountFile(snapshot, account);
   if (stored === undefined) throw new ProductRequestError(404, "channel_account_unavailable");
-  if (!access.capabilities.manageChannels && !keepsConnection(stored, next)) {
+  if (!access.capabilities.manageChannels && !keepsConnection(stored, body.data.account)) {
     throw new ProductRequestError(403, "channel_connection_change_forbidden");
   }
+  const next = withStoredSecrets(access, stored, body.data.account);
   const path = accountPath(account);
   const files: HubBundleFile[] = [
     ...snapshot.files.filter((file) => file.path !== path),
@@ -268,7 +322,7 @@ async function saveAccountFile(
         },
         bundle,
         controlPlane,
-        routes: delegatedRoutes(account, next),
+        routes: routesNeedingDelegation(account, candidateAccount(controlPlane, account)),
       }),
   });
   const reconciliation = await deps.channelSupervisor?.reconcile();
@@ -282,8 +336,9 @@ async function saveAccountFile(
       active.revision === null
         ? null
         : { id: active.revision.id, version: active.revision.version },
-    account: effective === undefined ? null : storedAccountFile(active, effective),
-    effective: effective ?? null,
+    account:
+      effective === undefined ? null : shownAccountFile(storedAccountFile(active, effective)),
+    effective: effective === undefined ? null : shownCompiledAccount(effective),
     warnings: warnings.filter(
       (warning) => warning.channel === account.channel && warning.accountId === account.accountId,
     ),
@@ -291,25 +346,50 @@ async function saveAccountFile(
   });
 }
 
-/** Every Route of this account: what the save re-checks. */
-function delegatedRoutes(
-  account: { channel: string; accountId: string },
-  next: AccountFile,
-): { channel: string; accountId: string; position: number }[] {
-  return (next.routes ?? []).map((_, position) => ({
-    channel: account.channel,
-    accountId: account.accountId,
-    position,
-  }));
+/** The saved account as the candidate compiled it. */
+function candidateAccount(
+  controlPlane: { accounts: readonly CompiledChannelAccount[] },
+  account: CompiledChannelAccount,
+): CompiledChannelAccount {
+  const compiled = controlPlane.accounts.find(
+    (candidate) =>
+      candidate.channel === account.channel && candidate.accountId === account.accountId,
+  );
+  if (compiled === undefined) throw new ProductRequestError(404, "channel_account_unavailable");
+  return compiled;
 }
 
-/** The parts of an account file only the organization may change. */
+/** The parts of an account file only the organization may change. The
+ * credentials were never shown here, so they are compared without them. */
 function keepsConnection(stored: AccountFile, next: AccountFile): boolean {
+  const shown = (file: AccountFile) =>
+    JSON.stringify(
+      file.config === undefined ? null : redactAccountConfig(file.channel, file.config),
+    );
   return (
     stored.connectionId === next.connectionId &&
     JSON.stringify(stored.transport ?? null) === JSON.stringify(next.transport ?? null) &&
-    JSON.stringify(stored.config ?? null) === JSON.stringify(next.config ?? null)
+    shown(stored) === shown(next)
   );
+}
+
+/** The file to write: a Route Admin's `config` is the stored one, whole; the
+ * organization capability's gets back every stored credential it left out. */
+function withStoredSecrets(
+  access: OrganizationAccessValue,
+  stored: AccountFile,
+  next: AccountFile,
+): AccountFile {
+  if (!access.capabilities.manageChannels) {
+    const kept: AccountFile = { ...next };
+    delete kept.config;
+    return stored.config === undefined ? kept : { ...kept, config: stored.config };
+  }
+  if (stored.config === undefined) return next;
+  return {
+    ...next,
+    config: restoreAccountConfigSecrets(next.channel, stored.config, next.config ?? {}),
+  };
 }
 
 function scopedActivityQuery(request: Request, target: AccountTarget) {

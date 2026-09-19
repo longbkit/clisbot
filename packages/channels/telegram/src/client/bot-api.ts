@@ -101,7 +101,7 @@ export interface SendTextOptions {
  * text, other) so the cast of the real client's `api` stays truthful. */
 export interface TelegramApi {
   getMe(): Promise<TelegramBotInfo>;
-  getChat(chatId: string): Promise<{ id: number; type?: string; title?: string }>;
+  getChat(chatId: string): Promise<{ id: number; type?: string; title?: string; username?: string }>;
   sendMessage(
     chatId: number,
     text: string,

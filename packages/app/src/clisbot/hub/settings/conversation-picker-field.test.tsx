@@ -3,7 +3,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConversationSelectionFields } from "./conversation-picker-field";
+import { ConversationSelectionFields, SenderSelectionFields } from "./conversation-picker-field";
 
 const adapters = vi.hoisted(() => ({ get: vi.fn(), accountId: "owner" }));
 vi.mock("../account-provider", () => ({
@@ -230,5 +230,54 @@ describe("Conversation selection", () => {
     expect(screen.getByRole("button", { name: "Remove C1" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Enter IDs" }));
     expect((screen.getByLabelText("Conversation IDs") as HTMLTextAreaElement).value).toBe("C1");
+  });
+});
+
+function SenderHarness() {
+  const [value, setValue] = React.useState("");
+  return (
+    <>
+      <SenderSelectionFields
+        channel="zalouser"
+        accountId="personal"
+        value={value}
+        onChange={setValue}
+        disabled={false}
+      />
+      <output aria-label="Canonical IDs">{value}</output>
+    </>
+  );
+}
+
+describe("Sender selection", () => {
+  it("offers the people who messaged the bot and stores their channel identity", async () => {
+    adapters.get.mockResolvedValue({
+      senders: [
+        {
+          id: "Z-1",
+          identity: "zalouser:Z-1",
+          name: "Guest",
+          username: null,
+          lastSeenAt: "2026-09-12T10:00:00.000Z",
+        },
+      ],
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SenderHarness />
+      </QueryClientProvider>,
+    );
+    await waitFor(() =>
+      expect(adapters.get).toHaveBeenCalledWith(
+        "channel-accounts/zalouser/personal/senders",
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Choose people who messaged the bot" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Choose Guest" }));
+    expect(screen.getByLabelText("Canonical IDs").textContent).toBe("zalouser:Z-1");
+    expect(screen.getByText("Guest")).toBeTruthy();
   });
 });

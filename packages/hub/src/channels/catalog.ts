@@ -138,6 +138,9 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
       "native-actions",
       "group-dm",
       "emoji-discovery",
+      // The inbound event states whether the room is public or private, so a
+      // Route's "public only" / "private only" Where can match here.
+      "visibility",
     ],
     extraTools: ["slack.emoji-list"],
     notes: [
@@ -201,6 +204,8 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
       "approval",
       "native-actions",
       "emoji-discovery",
+      // A group with a public @username is public, any other group private.
+      "visibility",
     ],
     extraTools: ["telegram.sticker-search", "telegram.emoji-list"],
     notes: [

@@ -111,6 +111,55 @@ it("projects direct-Agent bindings and Workflow receipts into one scoped catalog
   );
 });
 
+it("lists every room the bot has seen in the ingress queue, with the visibility it reported", async () => {
+  const row = (id: string, ctxPayload: Record<string, unknown>, at: string, thread?: string) => ({
+    organizationId: ORGANIZATION_ID,
+    channel: "telegram",
+    accountId: "ops",
+    externalEventId: `update:${id}`,
+    externalMessageId: id,
+    externalConversationId: String(ctxPayload["ChatId"]),
+    ...(thread === undefined ? {} : { externalThreadId: thread }),
+    laneKey: `telegram:ops:${String(ctxPayload["ChatId"])}`,
+    payload: { channel: "telegram", accountId: "ops", ctxPayload },
+    status: "completed" as const,
+    createdAt: new Date(at),
+  });
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.channelIngressQueue)
+    .values([
+      row(
+        "1",
+        { ChatId: "-100", ChatType: "group", ConversationLabel: "QC", Visibility: "public" },
+        "2026-09-04T10:00:00Z",
+        "7",
+      ),
+      row("2", { ChatId: "42", ChatType: "direct", SenderName: "Hoa" }, "2026-09-05T10:00:00Z"),
+      row(
+        "3",
+        { ChatId: "-200", ChatType: "group", ConversationLabel: "Private" },
+        "2026-09-03T10:00:00Z",
+      ),
+    ]);
+
+  const conversations = await listObservedChannelConversations(bundle.runtime, {
+    organizationId: ORGANIZATION_ID,
+    channel: "telegram",
+    accountId: "ops",
+  });
+
+  assert.deepEqual(
+    conversations.map(({ id, kind, label, visibility }) => ({ id, kind, label, visibility })),
+    [
+      { id: "42", kind: "dm", label: "Hoa", visibility: "private" },
+      { id: "-100", kind: "group", label: "QC", visibility: "public" },
+      { id: "7", kind: "topic", label: "QC", visibility: "public" },
+      { id: "-200", kind: "group", label: "Private", visibility: "unknown" },
+    ],
+  );
+});
+
 function workflowPayload(
   accountId: string,
   conversationId: string,

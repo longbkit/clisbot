@@ -50,27 +50,8 @@ it("Guest grants are explicit and separate from linked Member grants", async () 
       daemonReference: TEST_DAEMON_ID,
       projectId: "project-a",
     };
+    // `channel.use` is not a grant: audience rules decide who reaches a Route.
     expect((await access.authorizeChannelPrivilege(input)).allowed).toBe(false);
-    await db.insert(schema.accessAssignments).values({
-      organizationId: "org",
-      subjectKind: "guest",
-      subjectId: "guest",
-      resourceKind: "channel_account",
-      resourceId: "slack/support",
-      privileges: ["channel.use"],
-      constraints: { conversation: { kind: "specific", conversationIds: ["C1"] } },
-    });
-    expect((await access.authorizeChannelPrivilege(input)).allowed).toBe(true);
-    for (const changed of [
-      { accountId: "other" },
-      { organizationId: "other" },
-      {
-        conversation: { kind: "channel" as const, id: "C2", rootConversationId: "C2" },
-      },
-    ])
-      expect((await access.authorizeChannelPrivilege({ ...input, ...changed })).allowed).toBe(
-        false,
-      );
 
     const guestDaemon = {
       subjectKind: "guest" as const,

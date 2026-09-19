@@ -72,6 +72,7 @@ export const CHANNEL_CAPABILITY_LABELS: Readonly<Record<string, string>> = {
   "native-actions": "Native commands",
   "group-dm": "Group DMs",
   "emoji-discovery": "Emoji discovery",
+  visibility: "Public and private groups",
 };
 
 /**

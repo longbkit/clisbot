@@ -133,6 +133,17 @@ describe("message events", () => {
     expect(own?.event.isOwnMessage).toBe(true);
   });
 
+  it("states a group's visibility from its @username, and none for a DM", () => {
+    const visibility = (chat: Record<string, unknown>) =>
+      buildTelegramMessageEvent([message({ chat })], 5, PARAMS)?.event.visibility;
+    expect(visibility({ id: -1, type: "supergroup", title: "Open", username: "open_qc" })).toBe(
+      "public",
+    );
+    expect(visibility({ id: -2, type: "supergroup", title: "Closed" })).toBe("private");
+    expect(visibility({ id: -3, type: "group", title: "Basic" })).toBe("private");
+    expect(visibility({ id: 42, type: "private", username: "human" })).toBeUndefined();
+  });
+
   it("reports a DM as chatType direct and carries the topic id", () => {
     const dm = buildTelegramMessageEvent(
       [message({ chat: { id: 42, type: "private" } })],

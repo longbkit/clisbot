@@ -10,7 +10,7 @@ import {
   HubChannelRuntimeStatusSchema,
 } from "../contracts";
 import type { HubChannelIngressEvent, HubChannelIngressStatus } from "../contracts";
-import { channelAccountResource, type ChannelAccountRef } from "./channel-settings-hooks";
+import { channelAccountResource, type ChannelAccountRef } from "../channel-account-requests";
 
 export const CHANNEL_DEAD_LETTER_PAGE = 25;
 

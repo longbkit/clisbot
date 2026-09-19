@@ -242,7 +242,7 @@ export function compileTransport(
  * fails at deploy instead of at start. The shapes are loose: an upstream account
  * file carries knobs this Hub never reads.
  */
-const ACCOUNT_CONFIG_SCHEMAS: Record<string, z.ZodType> = {
+export const ACCOUNT_CONFIG_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   googlechat: GoogleChatAccountConfigSchema,
   feishu: FeishuAccountConfigSchema,
   zalo: ZaloAccountConfigSchema,

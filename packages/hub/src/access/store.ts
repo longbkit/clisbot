@@ -888,41 +888,20 @@ export class AccessStore {
     });
   }
 
-  /** Resolves one provider sender to a Hub Member and evaluates an exact Channel-account grant. */
-  async allowsChannelPrivilege(input: ChannelPrivilegeRequest): Promise<boolean> {
-    return (await this.authorizeChannelPrivilege(input)).allowed;
-  }
-
+  /**
+   * Whether the sender may use one Project privilege through a channel. Reaching
+   * the bot is the Route's audience rules, checked before any command or
+   * approval runs; here only the sender's Host and Project grants decide.
+   * `channel.use` is no longer a grant (docs/audits/2026-09-19-route-audience-rules.md),
+   * so no Project grant carries it and asking for it is refused.
+   */
   async authorizeChannelPrivilege(
     input: ChannelPrivilegeRequest,
   ): Promise<ChannelPrivilegeDecision> {
-    if (input.privilege !== "channel.use") {
-      // Reaching the bot is the Route's audience rules, checked before any
-      // command or approval runs; here only the Project grant decides.
-      const authority = await this.resolveChannelAgentAccess(input);
-      return authority.unrestricted || authority.privileges.includes(input.privilege)
-        ? { allowed: true }
-        : { allowed: false, reason: `Access does not grant ${input.privilege} for this Project` };
-    }
-    const identity = await this.resolveChannelMember(input);
-    if (identity?.role === "owner") return { allowed: true };
-    const assignments = await this.channelSubjectAssignments(input, identity);
-    const allowed = assignments.some(
-      ({ resourceKind, resourceId, privileges, constraints }) =>
-        resourceKind === "channel_account" &&
-        resourceId === formatChannelAccountResourceId(input.channel, input.accountId) &&
-        privileges.includes(input.privilege) &&
-        conversationCovers(constraints.conversation, input.conversation),
-    );
-    return allowed
+    const authority = await this.resolveChannelAgentAccess(input);
+    return authority.unrestricted || authority.privileges.includes(input.privilege)
       ? { allowed: true }
-      : {
-          allowed: false,
-          reason:
-            identity === undefined
-              ? "sender identity is not linked to a Hub Member on this Connection"
-              : "linked Hub Member does not have access to this conversation",
-        };
+      : { allowed: false, reason: `Access does not grant ${input.privilege} for this Project` };
   }
 
   async resolveChannelAgentConfigurations(input: ChannelPrivilegeRequest): Promise<{
@@ -1627,19 +1606,6 @@ function validateConstraints(assignment: AccessAssignmentInput): void {
       "Agent configuration constraints require agent.create",
     );
   }
-}
-
-function conversationCovers(
-  constraint: AccessAssignmentInput["constraints"]["conversation"],
-  conversation: ChannelPrivilegeRequest["conversation"],
-): boolean {
-  if (constraint === undefined) return false;
-  if (constraint.kind === "all") return true;
-  if (constraint.kind === "direct_messages") return conversation.kind === "dm";
-  if (constraint.kind === "public_channels") return conversation.visibility === "public";
-  return constraint.conversationIds.some(
-    (id) => id === conversation.id || id === conversation.rootConversationId,
-  );
 }
 
 function createChannelIdentityChallengeCode(): string {

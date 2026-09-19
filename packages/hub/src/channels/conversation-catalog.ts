@@ -24,12 +24,16 @@ export interface ObservedChannelConversation {
   observedAt: Date;
 }
 
+type Visibility = ObservedChannelConversation["visibility"];
+
 interface ConversationFact {
   channel: SupportedChannelName;
   rootConversationId: string;
   threadId: string | null;
   rootKind: "dm" | "channel" | "group";
   label: string | null;
+  /** What the vertical reported on the message; absent = unknown. */
+  visibility?: "public" | "private";
   observedAt: Date;
 }
 
@@ -39,8 +43,10 @@ const RESULT_LIMIT = 200;
 /**
  * Read-only projection over durable Channel artifacts. Direct-Agent traffic
  * already creates thread bindings; Workflow traffic already creates Channel
- * provider receipts. No provider directory polling or second writable
- * configuration store is introduced.
+ * provider receipts; every inbound message, admitted or refused, sits in the
+ * ingress queue until retention prunes it (`ingress/retention.ts`), so every
+ * channel lists the rooms its bot has seen. No provider directory polling or
+ * second writable configuration store is introduced.
  */
 export async function listObservedChannelConversations(
   runtime: DatabaseRuntime,
@@ -51,7 +57,7 @@ export async function listObservedChannelConversations(
   },
 ): Promise<ObservedChannelConversation[]> {
   const database = runtime.drizzle();
-  const [bindings, receipts] = await Promise.all([
+  const [bindings, receipts, ingress] = await Promise.all([
     database
       .select({
         externalConversationId: schema.threadBindings.externalConversationId,
@@ -85,6 +91,7 @@ export async function listObservedChannelConversations(
       )
       .orderBy(desc(schema.providerEventReceipts.receivedAt))
       .limit(READ_LIMIT),
+    ingressConversationFacts(runtime, input),
   ]);
 
   const facts: ConversationFact[] = [];
@@ -97,6 +104,7 @@ export async function listObservedChannelConversations(
       threadId: row.externalThreadId,
       rootKind: rootKind(summary.kind),
       label: summary.label,
+      ...(summary.visibility === undefined ? {} : { visibility: summary.visibility }),
       observedAt: row.createdAt,
     });
   }
@@ -113,7 +121,67 @@ export async function listObservedChannelConversations(
       observedAt: row.receivedAt,
     });
   }
+  facts.push(...ingress);
   return projectFacts(facts).slice(0, RESULT_LIMIT);
+}
+
+/** The rooms of recent inbound messages, as the vertical described them in the
+ * queued ctxPayload. Threads are left to bindings except a Telegram forum
+ * topic, which is a named, lasting place a Route can pick. */
+async function ingressConversationFacts(
+  runtime: DatabaseRuntime,
+  input: { organizationId: string; channel: SupportedChannelName; accountId: string },
+): Promise<ConversationFact[]> {
+  const queue = schema.channelIngressQueue;
+  const field = (name: string) =>
+    sql<string | null>`${queue.payload} #>> ${sql.raw(`'{ctxPayload,${name}}'`)}`;
+  const rows = await runtime
+    .drizzle()
+    .select({
+      rootConversationId: queue.externalConversationId,
+      threadId: queue.externalThreadId,
+      chatType: field("ChatType"),
+      label: field("ConversationLabel"),
+      senderName: field("SenderName"),
+      visibility: field("Visibility"),
+      createdAt: queue.createdAt,
+    })
+    .from(queue)
+    .where(
+      and(
+        eq(queue.organizationId, input.organizationId),
+        eq(queue.channel, input.channel),
+        eq(queue.accountId, input.accountId),
+      ),
+    )
+    .orderBy(desc(queue.createdAt))
+    .limit(READ_LIMIT);
+  return rows.map((row) => {
+    const kind = ingressRootKind(row.chatType);
+    const fact: ConversationFact = {
+      channel: input.channel,
+      rootConversationId: row.rootConversationId,
+      threadId: input.channel === "telegram" ? row.threadId : null,
+      rootKind: kind,
+      label: displayLabel(row.label ?? (kind === "dm" ? row.senderName : null)),
+      observedAt: row.createdAt,
+    };
+    if (row.visibility === "public" || row.visibility === "private") {
+      fact.visibility = row.visibility;
+    }
+    return fact;
+  });
+}
+
+function ingressRootKind(chatType: string | null): "dm" | "channel" | "group" {
+  if (chatType === "direct") return "dm";
+  if (chatType === "channel") return "channel";
+  return "group";
+}
+
+function displayLabel(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.slice(0, 200) : null;
 }
 
 function projectFacts(facts: readonly ConversationFact[]): ObservedChannelConversation[] {
@@ -127,7 +195,7 @@ function projectFacts(facts: readonly ConversationFact[]): ObservedChannelConver
       rootConversationId: fact.rootConversationId,
       threadId: null,
       label: fact.label,
-      visibility: fact.rootKind === "dm" ? "private" : "unknown",
+      visibility: factVisibility(fact),
       observedAt: fact.observedAt,
     });
     if (fact.threadId === null) continue;
@@ -137,13 +205,18 @@ function projectFacts(facts: readonly ConversationFact[]): ObservedChannelConver
       rootConversationId: fact.rootConversationId,
       threadId: fact.threadId,
       label: fact.label,
-      visibility: fact.rootKind === "dm" ? "private" : "unknown",
+      visibility: factVisibility(fact),
       observedAt: fact.observedAt,
     });
   }
   return [...projected.values()].toSorted(
     (left, right) => right.observedAt.getTime() - left.observedAt.getTime(),
   );
+}
+
+function factVisibility(fact: ConversationFact): Visibility {
+  if (fact.rootKind === "dm") return "private";
+  return fact.visibility ?? "unknown";
 }
 
 function addObservation(
@@ -156,23 +229,30 @@ function addObservation(
     observations.set(key, observation);
     return;
   }
-  if (current.label === null && observation.label !== null) {
-    observations.set(key, { ...current, label: observation.label });
+  // The newest fact wins; an older one only fills what it left unknown.
+  const label = current.label ?? observation.label;
+  const visibility = current.visibility === "unknown" ? observation.visibility : current.visibility;
+  if (label !== current.label || visibility !== current.visibility) {
+    observations.set(key, { ...current, label, visibility });
   }
 }
 
-function storedConversationSummary(
-  stored: unknown,
-): { kind: ChannelConversationKind; label: string | null } | null {
+function storedConversationSummary(stored: unknown): {
+  kind: ChannelConversationKind;
+  label: string | null;
+  visibility?: "public" | "private";
+} | null {
   if (typeof stored !== "object" || stored === null) return null;
   const match = Reflect.get(stored, "match");
   if (typeof match !== "object" || match === null) return null;
   const kind = Reflect.get(match, "kind");
   if (!isConversationKind(kind)) return null;
   const label = Reflect.get(stored, "conversationLabel");
+  const visibility = Reflect.get(match, "visibility");
   return {
     kind,
-    label: typeof label === "string" && label.trim().length > 0 ? label.trim().slice(0, 200) : null,
+    label: typeof label === "string" ? displayLabel(label) : null,
+    ...(visibility === "public" || visibility === "private" ? { visibility } : {}),
   };
 }
 

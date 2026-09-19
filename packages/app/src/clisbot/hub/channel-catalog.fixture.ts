@@ -77,6 +77,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
         "native-actions",
         "group-dm",
         "emoji-discovery",
+        "visibility",
       ],
       extraTools: ["slack.read", "slack.upload", "slack.emoji-list"],
       notes: [
@@ -148,6 +149,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
         "approval",
         "native-actions",
         "emoji-discovery",
+        "visibility",
       ],
       extraTools: ["telegram.sticker-search", "telegram.emoji-list"],
       notes: [

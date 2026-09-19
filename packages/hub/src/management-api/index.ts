@@ -1,4 +1,3 @@
-import { configuredChannelDestinations } from "../channels/configured-destinations.js";
 import { ChannelAccessStore, type ChannelPairingRecord } from "../db/channel-access.js";
 import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
 import {
@@ -15,6 +14,7 @@ import { channelIngressAccountKey } from "../channels/ingress/health.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
 import { channelCatalogView } from "./channel-catalog.js";
 import { channelAdminHandles, handleChannelAccountAdmin } from "./channel-admin.js";
+import { holdsAnyChannelAccountManagement } from "../channels/access-grants.js";
 import { channelConfigurationRevisionList, channelControlPlaneView } from "./channel-plane-gate.js";
 import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 import {
@@ -535,9 +535,18 @@ export class ManagementApi {
     if (resource === "access-events") return this.accessDelegation.accessEvents(request, access);
     if (resource === "members") return this.listMembers(organizationId);
     // The channel catalog is the same for every organization; the guard is what
-    // makes it organization-scoped (`management-api/channel-catalog.ts`).
+    // makes it organization-scoped (`management-api/channel-catalog.ts`). A
+    // Channel Route Admin reads it too: the Route editor asks it which channels
+    // report a room's visibility.
     if (resource === "channel-catalog") {
-      this.requireHubAction(access, "channel.manage");
+      if (!access.capabilities.manageChannels) {
+        const admin = await holdsAnyChannelAccountManagement(this.options.runtime, {
+          organizationId,
+          membershipId: access.membership.id,
+          userId: access.account.id,
+        });
+        if (!admin) this.requireHubAction(access, "channel.manage");
+      }
       return Response.json({ channels: channelCatalogView() });
     }
     return undefined;
@@ -1267,9 +1276,6 @@ export class ManagementApi {
         await channelActivityView(this.options.runtime, access.organization.id, channel, accountId),
       );
     }
-    if (operation === "conversations") {
-      return this.listChannelAccountConversations(access, channel, accountId, account);
-    }
     if (operation === "test-preview") {
       return this.previewChannelAccountTest(
         request,
@@ -1427,40 +1433,6 @@ export class ManagementApi {
     return Response.json({
       runtimeAvailable: this.options.channelSupervisor !== null,
       accounts: withChannelIngressHealth(running, ingress),
-    });
-  }
-
-  private async listChannelAccountConversations(
-    access: OrganizationAccessValue,
-    channel: SupportedChannelName,
-    accountId: string,
-    account: CompiledChannelAccount,
-  ): Promise<Response> {
-    const conversations = await listObservedChannelConversations(this.options.runtime, {
-      organizationId: access.organization.id,
-      channel,
-      accountId,
-    });
-    const destinations = await configuredChannelDestinations(
-      account,
-      conversations,
-      (conversationId, budget) =>
-        this.options.channelSupervisor?.resolveConversation?.({
-          organizationId: access.organization.id,
-          channel,
-          accountId,
-          connectionId: account.connectionId,
-          conversationId,
-          budget,
-        }) ?? Promise.resolve(null),
-    );
-    return Response.json({
-      destinations,
-      conversations: conversations.map((conversation) =>
-        Object.assign({}, conversation, {
-          observedAt: conversation.observedAt.toISOString(),
-        }),
-      ),
     });
   }
 
@@ -2020,9 +1992,9 @@ function externalIdentityLabel(value: unknown): string | null {
 
 /** Every per-account operation the management contract routes. `qr:*` is the
  * QR login (`channels/supervisor/qr-login.ts`); the rest are the pre-existing
- * conversation, activity and test verbs. */
+ * activity and test verbs. The conversation and sender reads are the Channel
+ * Route Admin handler's (`channel-admin.ts`), for every caller. */
 type ChannelAccountOperation =
-  | "conversations"
   | "activity"
   | "retry"
   | "test"
@@ -2041,7 +2013,6 @@ function channelAccountOperation(
   }
   if (segments.length !== 6) return undefined;
   if (request.method === "GET" && segments[5] === "pairing") return "pairing";
-  if (request.method === "GET" && segments[5] === "conversations") return "conversations";
   if (request.method === "GET" && segments[5] === "activity") return "activity";
   if (request.method === "GET" && segments[5] === "test-preview") return "test-preview";
   if (request.method === "POST" && segments[5] === "retry") return "retry";

@@ -232,9 +232,13 @@ operator-facing behaviour is documented once, in
 - **Where is decided on the conversation, Who on the sender.** `config/audience.ts`
   owns both. DM is a Where like any other, so a rule covering group chats never
   admits a DM. `groups: public|private` matches only when the vertical reports
-  the room's visibility on the event itself (`InboundConversationDetail.visibility`);
-  Slack does, from `channel_type` (`channel` public, `group`/`mpim` private), no
-  other vertical does yet, so on them a public/private filter matches nothing.
+  the room's visibility on the event itself (`InboundConversationDetail.visibility`).
+  Slack does, from `channel_type` (`channel` public, `group`/`mpim` private);
+  Telegram does, from the chat object (a group with an @username is public, any
+  other group private). No other event states it, so there a public/private
+  filter matches nothing. A vertical that reports it claims the `visibility`
+  catalog capability; the Route editor reads that claim to offer the filter and
+  to warn when a rule uses it on a channel without it.
   Threads and topics belong to their room; a thread or topic id under
   `conversations` narrows to it.
 - **Who resolves per message.** `resolveChannelSender` (`policy/sender-facts.ts`)
@@ -260,8 +264,9 @@ operator-facing behaviour is documented once, in
 
 `mayUseChannelRoute` (`policy/gate.ts`) is the one implementation both
 `execution.ts` and the bindings engine call. Ways in, in order: an audience rule;
-then the Advanced paths below, unchanged; then, under the same COMPAT tag, a
-`channel.use` grant until every organization has been migrated.
+then the Advanced paths below, unchanged. `channel.use` is no longer read
+anywhere: the one-time script folded stored grants into rules, and
+`authorizeChannelPrivilege` answers only Project privileges.
 
 The **sender gate** is upstream's. `resolveDmGroupAccessWithLists` is ported
 verbatim into `@getpaseo/channels-core/security/dm-policy-shared`, and

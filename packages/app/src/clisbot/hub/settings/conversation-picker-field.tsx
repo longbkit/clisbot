@@ -14,11 +14,15 @@ import type { EditingTextInputHandle } from "@/components/ui/text-input";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectFieldTrigger } from "@/components/ui/select-field";
+import type { z } from "zod";
 import { useFetchQuery } from "@/data/query";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";
-import { HubObservedChannelConversationsSchema } from "../contracts";
+import {
+  HubObservedChannelConversationsSchema,
+  HubObservedChannelSendersSchema,
+} from "../contracts";
 import {
   observedConversationOptions,
   splitConversationIds,
@@ -26,6 +30,72 @@ import {
   type ConversationOption,
 } from "../conversation-picker";
 
+/** The words the id picker uses for what it picks. */
+interface IdPickerLabels {
+  choose: string;
+  search: string;
+  empty: string;
+  none: string;
+  manualField: string;
+  manualHint: string;
+  unavailable: string;
+}
+
+const CONVERSATION_LABELS: IdPickerLabels = {
+  choose: "Choose conversations",
+  search: "Search by name or provider ID",
+  empty: "No conversation matches this search.",
+  none: "No conversations selected.",
+  manualField: "Conversation IDs",
+  manualHint:
+    "Enter multiple IDs separated by commas or new lines. These update the selected conversations above.",
+  unavailable:
+    "Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs manually.",
+};
+
+const SENDER_LABELS: IdPickerLabels = {
+  choose: "Choose people who messaged the bot",
+  search: "Search by name, username or ID",
+  empty: "Nobody outside the Hub matches this search.",
+  none: "No senders selected.",
+  manualField: "Sender IDs",
+  manualHint:
+    "Channel user ids, separated by commas or new lines: U0ALICE or slack:U0ALICE. Use this for someone who has not messaged the bot yet.",
+  unavailable:
+    "The people who messaged this bot are unavailable. Your selected IDs are unchanged; you can enter IDs manually.",
+};
+
+/** Reads one per-account directory list (`conversations` or `senders`). */
+function useAccountDirectory<Schema extends z.ZodType>(
+  read: "conversations" | "senders",
+  channel: string | null,
+  accountId: string | null,
+  schema: Schema,
+) {
+  const hub = useHubAccount();
+  const organizationId = hub.signedIn?.organization.id ?? "";
+  const path =
+    channel === null || accountId === null
+      ? ""
+      : `channel-accounts/${encodeURIComponent(channel)}/${encodeURIComponent(accountId)}/${read}`;
+  return useFetchQuery({
+    queryKey: [
+      ...hubResourceQueryKey(
+        { origin: hub.origin, organizationId, accountId: hub.signedIn?.account.id ?? null },
+        `channel-${read}`,
+      ),
+      channel,
+      accountId,
+    ],
+    queryFn: () => hub.api().get(path, schema),
+    enabled: organizationId.length > 0 && path.length > 0,
+    retry: false,
+    dataShape: "value",
+    staleTimeMs: 15_000,
+  });
+}
+
+/** Conversations this bot has seen, plus the ones Routes already name, searchable by name. */
 export function ConversationSelectionFields({
   channel,
   accountId,
@@ -36,7 +106,7 @@ export function ConversationSelectionFields({
   hint,
   placeholder,
 }: {
-  channel: "slack" | "telegram" | null;
+  channel: string | null;
   accountId: string | null;
   kind?: ConversationKind;
   value: string;
@@ -45,29 +115,107 @@ export function ConversationSelectionFields({
   hint: string;
   placeholder: string;
 }) {
-  const hub = useHubAccount();
-  const organizationId = hub.signedIn?.organization.id ?? "";
-  const observations = useFetchQuery({
-    queryKey: [
-      ...hubResourceQueryKey(
-        { origin: hub.origin, organizationId, accountId: hub.signedIn?.account.id ?? null },
-        "channel-conversations",
+  const observations = useAccountDirectory(
+    "conversations",
+    channel,
+    accountId,
+    HubObservedChannelConversationsSchema,
+  );
+  const options = useMemo(
+    () =>
+      observedConversationOptions(
+        observations.data?.conversations ?? [],
+        kind,
+        observations.data?.destinations,
       ),
-      channel,
-      accountId,
-    ],
-    queryFn: () =>
-      hub
-        .api()
-        .get(
-          `channel-accounts/${encodeURIComponent(channel!)}/${encodeURIComponent(accountId!)}/conversations`,
-          HubObservedChannelConversationsSchema,
-        ),
-    enabled: organizationId.length > 0 && channel !== null && accountId !== null,
-    retry: false,
-    dataShape: "value",
-    staleTimeMs: 15_000,
-  });
+    [kind, observations.data?.conversations, observations.data?.destinations],
+  );
+  return (
+    <IdSelectionFields
+      pickerKey={`${channel}:${accountId}:${kind}`}
+      options={options}
+      labels={CONVERSATION_LABELS}
+      loadFailed={Boolean(observations.error)}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      hint={hint}
+      placeholder={placeholder}
+    />
+  );
+}
+
+/** People who messaged this bot and are not linked to a Member: a Route's
+ * "senders outside the Hub". Manual ids stay available for someone new. */
+export function SenderSelectionFields({
+  channel,
+  accountId,
+  value,
+  onChange,
+  disabled,
+}: {
+  channel: string | null;
+  accountId: string | null;
+  value: string;
+  onChange(value: string): void;
+  disabled: boolean;
+}) {
+  const senders = useAccountDirectory(
+    "senders",
+    channel,
+    accountId,
+    HubObservedChannelSendersSchema,
+  );
+  const options = useMemo<ConversationOption[]>(
+    () =>
+      (senders.data?.senders ?? []).map((sender) => ({
+        id: sender.identity,
+        conversationId: sender.identity,
+        label: sender.name ?? sender.username ?? sender.id,
+        description: [sender.username ? `@${sender.username}` : null, sender.id]
+          .filter(Boolean)
+          .join(" · "),
+      })),
+    [senders.data?.senders],
+  );
+  return (
+    <IdSelectionFields
+      pickerKey={`${channel}:${accountId}:senders`}
+      options={options}
+      labels={SENDER_LABELS}
+      loadFailed={Boolean(senders.error)}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      hint="People outside the Hub, picked from those who already messaged this bot."
+      placeholder="U0ALICE, U0BOB"
+    />
+  );
+}
+
+/** Selected ids as named rows, a searchable picker over `options`, and manual id entry. */
+function IdSelectionFields({
+  pickerKey,
+  options,
+  labels,
+  loadFailed,
+  value,
+  onChange,
+  disabled,
+  hint,
+  placeholder,
+}: {
+  pickerKey: string;
+  options: readonly ConversationOption[];
+  labels: IdPickerLabels;
+  loadFailed: boolean;
+  value: string;
+  onChange(value: string): void;
+  disabled: boolean;
+  hint: string;
+  placeholder: string;
+}) {
+  const hub = useHubAccount();
   const [manualEntry, setManualEntry] = useState(false);
   const toggleManualEntry = useCallback(() => setManualEntry((current) => !current), []);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -78,15 +226,6 @@ export function ConversationSelectionFields({
     inputRef.current?.replaceText(value);
   }, [value]);
   const selectedIds = useMemo(() => splitConversationIds(value), [value]);
-  const options = useMemo(
-    () =>
-      observedConversationOptions(
-        observations.data?.conversations ?? [],
-        kind,
-        observations.data?.destinations,
-      ),
-    [kind, observations.data?.conversations, observations.data?.destinations],
-  );
   const setSelectedIds = useCallback(
     (ids: readonly string[]) => {
       const next = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].join(", ");
@@ -105,11 +244,11 @@ export function ConversationSelectionFields({
   );
 
   return (
-    // The Conversations choice above already names this group, so a Field label
-    // here would only repeat the selected button's own text.
+    // The choice above already names this group, so a Field label here would
+    // only repeat the selected button's own text.
     <View style={styles.selection}>
       {selectedIds.length === 0 ? (
-        <Text style={settingsStyles.rowHint}>No conversations selected.</Text>
+        <Text style={settingsStyles.rowHint}>{labels.none}</Text>
       ) : (
         selectedIds.map((id) => (
           <SelectedConversation
@@ -125,8 +264,9 @@ export function ConversationSelectionFields({
       <View style={styles.pickerRow}>
         {options.length > 0 ? (
           <ObservedConversationPicker
-            key={`${hub.origin}:${hub.signedIn?.account.id}:${organizationId}:${channel}:${accountId}:${kind}`}
+            key={`${hub.origin}:${hub.signedIn?.account.id}:${hub.signedIn?.organization.id}:${pickerKey}`}
             options={options}
+            labels={labels}
             selectedIds={selectedIds}
             onChange={setSelectedIds}
             disabled={disabled}
@@ -137,10 +277,7 @@ export function ConversationSelectionFields({
         </Button>
       </View>
       {manualEntry ? (
-        <Field
-          label="Conversation IDs"
-          hint="Enter multiple IDs separated by commas or new lines. These update the selected conversations above."
-        >
+        <Field label={labels.manualField} hint={labels.manualHint}>
           <FormTextInput
             ref={inputRef}
             initialValue={value}
@@ -153,12 +290,7 @@ export function ConversationSelectionFields({
           />
         </Field>
       ) : null}
-      {observations.error ? (
-        <Text style={settingsStyles.rowHint}>
-          Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs
-          manually.
-        </Text>
-      ) : null}
+      {loadFailed ? <Text style={settingsStyles.rowHint}>{labels.unavailable}</Text> : null}
       <Text style={settingsStyles.rowHint}>{hint}</Text>
     </View>
   );
@@ -207,11 +339,13 @@ function SelectedConversation({
 
 function ObservedConversationPicker({
   options,
+  labels,
   selectedIds,
   onChange,
   disabled,
 }: {
   options: readonly ConversationOption[];
+  labels: IdPickerLabels;
   selectedIds: readonly string[];
   onChange(ids: readonly string[]): void;
   disabled: boolean;
@@ -277,13 +411,13 @@ function ObservedConversationPicker({
           onFocus={onFocus}
           onBlur={onBlur}
           accessibilityRole="button"
-          accessibilityLabel="Choose conversations"
+          accessibilityLabel={labels.choose}
         >
           {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <SelectFieldTrigger
-              label="Choose conversations"
+              label={labels.choose}
               isPlaceholder={false}
-              placeholder="Choose conversations"
+              placeholder={labels.choose}
               hovered={Boolean(hovered)}
               focused={focused}
               active={pressed || open}
@@ -297,9 +431,9 @@ function ObservedConversationPicker({
         value=""
         onSelect={toggle}
         searchable
-        searchPlaceholder="Search by name or provider ID"
-        emptyText="No conversation matches this search."
-        title="Choose conversations"
+        searchPlaceholder={labels.search}
+        emptyText={labels.empty}
+        title={labels.choose}
         stickyHeader={pickerActions}
         open={open}
         onOpenChange={setOpen}

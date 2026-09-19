@@ -7,9 +7,10 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FormTextInput } from "@/components/ui/form-field";
 import { settingsStyles } from "@/styles/settings";
+import { channelCatalogEntry, channelCatalogLabel } from "../channel-catalog";
 import { HUB_AUDIENCE_ROLES, type HubAudienceRole } from "../contracts";
+import { useChannelCatalog } from "./channel-catalog-queries";
 import { RouteBehaviorSwitch } from "./channel-route-behavior-rows";
 import {
   AUDIENCE_ROLE_LABELS,
@@ -17,11 +18,12 @@ import {
   channelReportsVisibility,
   emptyAudienceRule,
   routeAudienceSummary,
+  visibilityFilterMatchesNothing,
   type AudienceGroups,
   type AudienceNames,
   type AudienceRuleDraft,
 } from "./channel-route-audience";
-import { ConversationSelectionFields } from "./conversation-picker-field";
+import { ConversationSelectionFields, SenderSelectionFields } from "./conversation-picker-field";
 
 export interface AudienceOption {
   id: string;
@@ -36,8 +38,8 @@ export interface AudienceRulesEditorProps {
   members: readonly AudienceOption[];
   /** The account's channel: decides whether the public/private filter is offered. */
   channel: string | null;
-  /** The channels whose conversations the picker can search. */
-  observedChannel: "slack" | "telegram" | null;
+  /** The account the conversation and sender pickers read. */
+  observedChannel: string | null;
   accountId: string | null;
   names: AudienceNames;
   /** Hub validation messages by rule index (`audienceRuleErrors`). */
@@ -77,6 +79,20 @@ export function AudienceRulesEditor({
     [setRules],
   );
   const summary = useMemo(() => routeAudienceSummary(rules, names), [rules, names]);
+  const catalog = useChannelCatalog();
+  const place = useMemo<AudiencePlace>(
+    () => ({
+      channel,
+      channelName:
+        channel === null ? "This channel" : channelCatalogLabel(catalog.entries, channel),
+      reportsVisibility: channelReportsVisibility(
+        channel === null ? undefined : channelCatalogEntry(catalog.entries, channel),
+      ),
+      observedChannel,
+      accountId,
+    }),
+    [accountId, catalog.entries, channel, observedChannel],
+  );
   return (
     <View style={styles.editor}>
       {rules.map((rule, index) => (
@@ -86,9 +102,7 @@ export function AudienceRulesEditor({
           rule={rule}
           teams={teams}
           members={members}
-          channel={channel}
-          observedChannel={observedChannel}
-          accountId={accountId}
+          place={place}
           names={names}
           error={errors.get(index) ?? null}
           removable={rules.length > 1}
@@ -107,14 +121,21 @@ export function AudienceRulesEditor({
   );
 }
 
+/** What the rows need to know about the account the Route belongs to. */
+interface AudiencePlace {
+  channel: string | null;
+  channelName: string;
+  reportsVisibility: boolean;
+  observedChannel: string | null;
+  accountId: string | null;
+}
+
 function AudienceRuleRow({
   index,
   rule,
   teams,
   members,
-  channel,
-  observedChannel,
-  accountId,
+  place,
   names,
   error,
   removable,
@@ -126,9 +147,7 @@ function AudienceRuleRow({
   rule: AudienceRuleDraft;
   teams: readonly AudienceOption[];
   members: readonly AudienceOption[];
-  channel: string | null;
-  observedChannel: "slack" | "telegram" | null;
-  accountId: string | null;
+  place: AudiencePlace;
   names: AudienceNames;
   error: string | null;
   removable: boolean;
@@ -168,14 +187,13 @@ function AudienceRuleRow({
         who={rule.who}
         teams={teams}
         members={members}
+        place={place}
         disabled={disabled}
         setWho={setWho}
       />
       <AudienceWhereFields
         where={rule.where}
-        channel={channel}
-        observedChannel={observedChannel}
-        accountId={accountId}
+        place={place}
         disabled={disabled}
         setWhere={setWhere}
       />
@@ -189,12 +207,14 @@ function AudienceWhoFields({
   who,
   teams,
   members,
+  place,
   disabled,
   setWho,
 }: {
   who: AudienceRuleDraft["who"];
   teams: readonly AudienceOption[];
   members: readonly AudienceOption[];
+  place: AudiencePlace;
   disabled: boolean;
   setWho(patch: Partial<AudienceRuleDraft["who"]>): void;
 }) {
@@ -285,19 +305,13 @@ function AudienceWhoFields({
         {showAdvanced ? "Hide senders outside the Hub" : "Advanced: senders outside the Hub"}
       </Button>
       {showAdvanced ? (
-        <Field
-          label="Sender identities"
-          hint="Channel user ids of senders who have no Hub account, separated by commas: U0ALICE or slack:U0ALICE."
-        >
-          <FormTextInput
-            initialValue={who.identities}
-            onChangeText={changeIdentities}
-            placeholder="U0ALICE, U0BOB"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!disabled}
-          />
-        </Field>
+        <SenderSelectionFields
+          channel={place.observedChannel}
+          accountId={place.accountId}
+          value={who.identities}
+          onChange={changeIdentities}
+          disabled={disabled}
+        />
       ) : null}
     </View>
   );
@@ -312,16 +326,12 @@ const GROUP_FILTER_LABELS: Record<Exclude<AudienceGroups, "off">, string> = {
 
 function AudienceWhereFields({
   where,
-  channel,
-  observedChannel,
-  accountId,
+  place,
   disabled,
   setWhere,
 }: {
   where: AudienceRuleDraft["where"];
-  channel: string | null;
-  observedChannel: "slack" | "telegram" | null;
-  accountId: string | null;
+  place: AudiencePlace;
   disabled: boolean;
   setWhere(patch: Partial<AudienceRuleDraft["where"]>): void;
 }) {
@@ -340,6 +350,8 @@ function AudienceWhereFields({
     (conversations: string) => setWhere({ conversations }),
     [setWhere],
   );
+  // A stored public/private filter stays editable where it matches nothing.
+  const filtered = where.groups === "public" || where.groups === "private";
   return (
     <View style={styles.part}>
       <Text style={styles.label}>Where</Text>
@@ -350,7 +362,7 @@ function AudienceWhereFields({
         onChange={changeGroups}
         disabled={disabled}
       />
-      {where.groups !== "off" && channelReportsVisibility(channel) ? (
+      {where.groups !== "off" && (place.reportsVisibility || filtered) ? (
         <View style={styles.chips}>
           {GROUP_FILTER_VALUES.map((value) => (
             <ToggleChip
@@ -364,13 +376,20 @@ function AudienceWhereFields({
           ))}
         </View>
       ) : null}
+      {visibilityFilterMatchesNothing(where, place.reportsVisibility) ? (
+        <Alert
+          variant="warning"
+          title={`${place.channelName} does not report whether a group chat is public or private`}
+          description="This filter matches no group chat here. Choose All, or name the conversations under Specific conversations."
+        />
+      ) : null}
       <Button size="xs" variant="ghost" disabled={disabled} onPress={toggleSpecific}>
         {showSpecific ? "Hide specific conversations" : "Specific conversations…"}
       </Button>
       {showSpecific ? (
         <ConversationSelectionFields
-          channel={observedChannel}
-          accountId={accountId}
+          channel={place.observedChannel}
+          accountId={place.accountId}
           value={where.conversations}
           onChange={changeConversations}
           disabled={disabled}

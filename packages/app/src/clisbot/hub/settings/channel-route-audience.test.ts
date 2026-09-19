@@ -4,9 +4,11 @@ import {
   audienceRuleFromDraft,
   audienceRuleSentence,
   audienceRulesComplete,
+  channelReportsVisibility,
   membersEverywhereRule,
   routeAudienceDraft,
   routeAudienceSummary,
+  visibilityFilterMatchesNothing,
   type AudienceNames,
 } from "./channel-route-audience";
 
@@ -132,5 +134,20 @@ describe("audienceRuleErrors", () => {
       [3, "an audience rule needs at least one Where part"],
     ]);
     expect(audienceRuleErrors("something else", 0).size).toBe(0);
+  });
+});
+
+describe("room visibility", () => {
+  it("follows the channel catalog's visibility capability", () => {
+    expect(channelReportsVisibility({ capabilities: ["text", "visibility"] })).toBe(true);
+    expect(channelReportsVisibility({ capabilities: ["text"] })).toBe(false);
+    expect(channelReportsVisibility(undefined)).toBe(false);
+  });
+
+  it("flags a public/private filter where the channel reports no visibility", () => {
+    const where = { dm: false, groups: "public" as const, conversations: "" };
+    expect(visibilityFilterMatchesNothing(where, false)).toBe(true);
+    expect(visibilityFilterMatchesNothing(where, true)).toBe(false);
+    expect(visibilityFilterMatchesNothing({ ...where, groups: "all" }, false)).toBe(false);
   });
 });

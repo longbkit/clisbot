@@ -6,7 +6,12 @@ import {
 } from "../config/compiler.js";
 import type { Database } from "../db/types.js";
 import type { OrganizationAccessValue } from "../auth/organization-access.js";
-import type { ChannelControlPlane, RouteTarget } from "../channels/config/compile.js";
+import type {
+  ChannelControlPlane,
+  CompiledChannelAccount,
+  CompiledRoute,
+  RouteTarget,
+} from "../channels/config/compile.js";
 import type { ApprovalRule } from "../channels/config/schema.js";
 import { applyAgentControls, type AgentControls } from "../channels/config/agent-controls.js";
 import { privilegeCovers } from "../channels/config/privileges.js";
@@ -120,6 +125,41 @@ export async function assertChannelConfigurationDelegation(input: {
     ...input.principal,
     executions,
   });
+}
+
+/**
+ * The Routes of a candidate account a Channel Route Admin save must re-check:
+ * those whose delegated parts (target, approvals, the tool reply path, Agent
+ * controls) match no Route of the active account. Each active Route answers
+ * for one candidate Route, so reordering or deleting Routes needs no check and
+ * copying a Route the saver could not publish still does. An audience-only
+ * edit changes none of these parts: who may talk is the Route Admin's to decide.
+ */
+export function routesNeedingDelegation(
+  active: CompiledChannelAccount | undefined,
+  candidate: CompiledChannelAccount,
+): DelegatedRouteRef[] {
+  const unmatched = (active?.routes ?? []).map(delegatedRouteParts);
+  const refs: DelegatedRouteRef[] = [];
+  for (const [position, route] of candidate.routes.entries()) {
+    const at = unmatched.indexOf(delegatedRouteParts(route));
+    if (at >= 0) {
+      unmatched.splice(at, 1);
+      continue;
+    }
+    refs.push({ channel: candidate.channel, accountId: candidate.accountId, position });
+  }
+  return refs;
+}
+
+/** What `assertChannelConfigurationDelegation` reads from one compiled Route. */
+function delegatedRouteParts(route: CompiledRoute): string {
+  return JSON.stringify([
+    route.target,
+    route.approval,
+    route.defaults.outbound.path === "tool",
+    route.defaults.agentControls ?? null,
+  ]);
 }
 
 /** Authorizes every possible Agent choice in one resolved Automation document. */

@@ -102,7 +102,7 @@ export async function channelIdentityText(
   account: CompiledChannelAccount,
   route?: CompiledRoute,
 ): Promise<string> {
-  const request = commandAccessRequest(deps, message, account, route, "channel.use");
+  const request = commandAccessRequest(deps, message, account, route, "agent.interact");
   const member = await deps.commandAccess?.resolveChannelMember(request);
   const privileges = ["agent.interact", "agent.create", "approval.config"] as const;
   const decisions = await Promise.all(

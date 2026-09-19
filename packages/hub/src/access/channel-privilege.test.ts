@@ -9,9 +9,11 @@ import {
   insertTestSlackConnection,
   TEST_SLACK_CONNECTION_ID,
 } from "../test-utils/channel-identity.js";
-import { AccessStore, type ChannelPrivilegeRequest } from "./store.js";
+import { AccessStore } from "./store.js";
 
-it("diagnoses unlinked senders separately from missing grants without bypassing Connection scope", async () => {
+// Who a channel sender is: one link resolves on every bot of its identity realm
+// and nowhere else. Whether they may talk is the Route's audience rules.
+it("resolves a linked sender within its identity realm only", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-channel-admission-"));
   const { runtime } = await embeddedDatabaseRuntime(root);
   try {
@@ -39,83 +41,39 @@ it("diagnoses unlinked senders separately from missing grants without bypassing 
       teamId: "T2",
     });
     const access = new AccessStore(runtime);
-    const input: ChannelPrivilegeRequest = {
+    const input = {
       organizationId: "org",
       connectionId: TEST_SLACK_CONNECTION_ID,
       channel: "slack",
-      accountId: "support",
       senderIdentity: "slack:UOWNER",
-      privilege: "channel.use",
-      conversation: { kind: "channel", id: "C1", rootConversationId: "C1" },
     };
-    const unlinked = {
-      allowed: false,
-      reason: "sender identity is not linked to a Hub Member on this Connection",
-    };
-    assert.deepEqual(await access.authorizeChannelPrivilege(input), unlinked);
-    assert.equal(await access.allowsChannelPrivilege(input), false);
-    await db.insert(schema.channelIdentities).values([
-      {
-        organizationId: "org",
-        memberId: "owner-membership",
-        identityRealm: "slack:T1",
-        connectionId: TEST_SLACK_CONNECTION_ID,
-        externalSubjectId: "UOWNER",
-        verificationMethod: "channel_challenge",
-        verifiedAt: new Date(),
-      },
-      {
-        organizationId: "org",
-        memberId: "member-membership",
-        identityRealm: "slack:T1",
-        connectionId: TEST_SLACK_CONNECTION_ID,
-        externalSubjectId: "UMEMBER",
-        verificationMethod: "channel_challenge",
-        verifiedAt: new Date(),
-      },
-    ]);
-    assert.deepEqual(await access.authorizeChannelPrivilege(input), { allowed: true });
-    assert.deepEqual(
-      await access.authorizeChannelPrivilege({ ...input, connectionId: sameWorkspace }),
-      { allowed: true },
+    assert.equal(await access.resolveChannelMember(input), undefined);
+    await db.insert(schema.channelIdentities).values({
+      organizationId: "org",
+      memberId: "owner-membership",
+      identityRealm: "slack:T1",
+      connectionId: TEST_SLACK_CONNECTION_ID,
+      externalSubjectId: "UOWNER",
+      verificationMethod: "channel_challenge",
+      verifiedAt: new Date(),
+    });
+    assert.equal((await access.resolveChannelMember(input))?.membershipId, "owner-membership");
+    assert.equal(
+      (await access.resolveChannelMember({ ...input, connectionId: sameWorkspace }))?.membershipId,
+      "owner-membership",
       "one link resolves on every bot in the workspace",
     );
-    assert.deepEqual(
-      await access.authorizeChannelPrivilege({ ...input, connectionId: otherWorkspace }),
-      unlinked,
-      "the same user id in another workspace is not the same person",
-    );
-    assert.deepEqual(
-      await access.authorizeChannelPrivilege({ ...input, connectionId: "another-connection" }),
-      unlinked,
-    );
-    assert.deepEqual(
-      await access.authorizeChannelPrivilege({ ...input, organizationId: "another-org" }),
-      unlinked,
-    );
-    const memberInput = { ...input, senderIdentity: "slack:UMEMBER" };
-    const missingAccess = {
-      allowed: false,
-      reason: "linked Hub Member does not have access to this conversation",
-    };
-    assert.deepEqual(await access.authorizeChannelPrivilege(memberInput), missingAccess);
-    await db.insert(schema.accessAssignments).values({
-      organizationId: "org",
-      subjectKind: "member",
-      subjectId: "member-membership",
-      resourceKind: "channel_account",
-      resourceId: "slack/support",
-      privileges: ["channel.use"],
-      constraints: { conversation: { kind: "specific", conversationIds: ["C1"] } },
-    });
-    assert.deepEqual(await access.authorizeChannelPrivilege(memberInput), { allowed: true });
-    assert.deepEqual(
-      await access.authorizeChannelPrivilege({
-        ...memberInput,
-        conversation: { kind: "channel", id: "C2", rootConversationId: "C2" },
-      }),
-      missingAccess,
-    );
+    for (const changed of [
+      { connectionId: otherWorkspace },
+      { connectionId: "another-connection" },
+      { organizationId: "another-org" },
+    ]) {
+      assert.equal(
+        await access.resolveChannelMember({ ...input, ...changed }),
+        undefined,
+        "the same user id elsewhere is not the same person",
+      );
+    }
   } finally {
     await runtime.close();
     await rm(root, { recursive: true, force: true });

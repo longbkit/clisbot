@@ -87,18 +87,8 @@ describe("save Automation with Channel inputs", () => {
     expect(post).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
-  it("retries access grants without rewriting saved Routes", async () => {
-    const { api, post, put } = transport();
-    const basePost = post.getMockImplementation()!;
-    let fail = true;
-    post.mockImplementation(async (path, body) => {
-      if (path === "access-assignments/batch" && fail) {
-        fail = false;
-        throw new Error("access denied");
-      }
-      return basePost(path, body);
-    });
-    const progress: AutomationInputSaveProgress = {};
+  it("never writes Channel grants: who may talk to the bot is the Route's audience rules", async () => {
+    const { api, post } = transport();
     const shared = {
       ...draft,
       grants: [
@@ -110,10 +100,7 @@ describe("save Automation with Channel inputs", () => {
         },
       ],
     };
-    await expect(saveAutomationWithInputs(api, yaml, shared, progress)).rejects.toThrow(
-      "Channel access could not be saved",
-    );
-    await saveAutomationWithInputs(api, yaml, shared, progress);
-    expect(put.mock.calls.filter(([path]) => path === "channel-configuration")).toHaveLength(1);
+    await saveAutomationWithInputs(api, yaml, shared, {});
+    expect(post.mock.calls.some(([path]) => path.startsWith("access-assignments"))).toBe(false);
   });
 });

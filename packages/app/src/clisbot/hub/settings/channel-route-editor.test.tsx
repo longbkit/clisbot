@@ -469,8 +469,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.queryByLabelText("Conversation IDs")).toBeNull();
     expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
-    // Slack reports visibility, so the filter is offered; the sentence follows it.
-    fireEvent.click(screen.getByRole("button", { name: "Public only" }));
+    // The catalog says Slack reports visibility, so the filter is offered once
+    // it loads; the sentence follows it.
+    fireEvent.click(await screen.findByRole("button", { name: "Public only" }));
     expect(screen.getByText("Members may talk in every public group chat")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,

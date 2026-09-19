@@ -24,6 +24,7 @@ export const resolveTelegramConversation: ResolveConversationFn = async ({
   return {
     label: chat.title?.trim().slice(0, 200) || null,
     kind,
-    visibility: chat.type === "private" ? "private" : "unknown",
+    // A DM is private; a group or channel is public exactly when it has an @username.
+    visibility: chat.type === "private" || chat.username === undefined ? "private" : "public",
   };
 };

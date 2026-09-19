@@ -31,7 +31,7 @@ export async function memberTeamIds(
  * through a Team. The organization capability is the caller's to check first;
  * this is the delegated grant only (docs/features/access/scoped-admins.md).
  */
-export async function holdsChannelAccountManagement(
+export function holdsChannelAccountManagement(
   runtime: DatabaseRuntime,
   input: {
     organizationId: string;
@@ -40,6 +40,27 @@ export async function holdsChannelAccountManagement(
     channel: string;
     accountId: string;
   },
+): Promise<boolean> {
+  return holdsManagement(
+    runtime,
+    input,
+    formatChannelAccountResourceId(input.channel, input.accountId),
+  );
+}
+
+/** Whether a Member is Channel Route Admin of any account (the channel catalog
+ * and other account-neutral reads a Route Admin's screens need). */
+export function holdsAnyChannelAccountManagement(
+  runtime: DatabaseRuntime,
+  input: { organizationId: string; membershipId: string; userId: string },
+): Promise<boolean> {
+  return holdsManagement(runtime, input, undefined);
+}
+
+async function holdsManagement(
+  runtime: DatabaseRuntime,
+  input: { organizationId: string; membershipId: string; userId: string },
+  resourceId: string | undefined,
 ): Promise<boolean> {
   const teams = await memberTeamIds(runtime, input.organizationId, input.userId);
   const rows = await runtime
@@ -54,10 +75,7 @@ export async function holdsChannelAccountManagement(
       and(
         eq(schema.accessAssignments.organizationId, input.organizationId),
         eq(schema.accessAssignments.resourceKind, "channel_account"),
-        eq(
-          schema.accessAssignments.resourceId,
-          formatChannelAccountResourceId(input.channel, input.accountId),
-        ),
+        resourceId === undefined ? undefined : eq(schema.accessAssignments.resourceId, resourceId),
       ),
     );
   return rows.some(

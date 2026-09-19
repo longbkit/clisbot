@@ -84,6 +84,13 @@ describe("channel catalog", () => {
     }
   });
 
+  it("claims room visibility only where the inbound event states it", () => {
+    const reporting = CHANNEL_CATALOG.filter((entry) =>
+      entry.capabilities.includes("visibility"),
+    ).map((entry) => entry.id);
+    expect(reporting).toEqual(["slack", "telegram"]);
+  });
+
   it("advertises only the capabilities each later vertical has on its production path", () => {
     const feishu = getChannelCatalogEntry("feishu");
     expect(feishu?.sdkPackages).toEqual(["@larksuiteoapi/node-sdk"]);

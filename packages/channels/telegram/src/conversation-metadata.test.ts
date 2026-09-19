@@ -26,7 +26,7 @@ it("fetches the group title without claiming a forum topic name or exposing chat
   expect(await resolveTelegramConversation(args)).toEqual({
     label: "Support forum",
     kind: "group",
-    visibility: "unknown",
+    visibility: "private",
   });
   expect(getChat).toHaveBeenCalledWith("-123");
   // The port made the per-method table (`request-timeouts.ts`) own the request
@@ -37,6 +37,10 @@ it("fetches the group title without claiming a forum topic name or exposing chat
     "test-token",
     expect.objectContaining({ timeoutSeconds: 60 }),
   );
+});
+it("reports a group with an @username as public", async () => {
+  getChat.mockResolvedValue({ id: -123, type: "supergroup", title: "Open", username: "open_qc" });
+  expect(await resolveTelegramConversation(args)).toMatchObject({ visibility: "public" });
 });
 it("does not use a renamed alias or mismatched chat ID as another destination", async () => {
   getChat.mockResolvedValue({ id: -456, title: "Other chat" });

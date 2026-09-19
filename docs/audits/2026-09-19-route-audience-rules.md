@@ -33,13 +33,21 @@ in [where]". A sender is admitted when any rule matches (union).
 
 **Who** — multi-select, mixed:
 
-| Kind     | Values                                                                                                    |
-| -------- | --------------------------------------------------------------------------------------------------------- |
-| Role     | Owner, Admins, Members (every linked Member). Resolved per message, so later role changes apply           |
-| Team     | One or more Teams                                                                                         |
-| Person   | One or more Members                                                                                       |
-| Anyone   | Every sender, unlinked ones included (the Guest subject). Keeps the open-Route warning and default limits |
-| Advanced | Senders outside the Hub, picked from people who already messaged the bot. Replaces `allowFrom`            |
+| Kind     | Values                                                                                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Role     | Owner, Admins, Members (every linked Member). Resolved per message, so later role changes apply                                                                                |
+| Team     | One or more Teams                                                                                                                                                              |
+| Person   | One or more Members                                                                                                                                                            |
+| Anyone   | Every sender, unlinked ones included (the Guest subject). Keeps the open-Route warning and default limits                                                                      |
+| Advanced | Senders outside the Hub, picked from people who already messaged the bot. Does the job of `allowFrom` for new rules; existing `access:` blocks stay as they are (not migrated) |
+
+Advanced is built as a picker over `channel-accounts/<channel>/<account>/senders`
+(`channels/observed-senders.ts`): distinct senders in the account's ingress
+queue, newest first, minus those linked to a Member in the bot's identity realm.
+The queue keeps every inbound message, admitted or refused, until retention
+(30 days); someone who has not messaged the bot yet is typed as an id. The
+Specific search reads the same queue beside bindings and Workflow receipts, so
+it lists every conversation a bot has seen on every channel.
 
 **Where** — the parts add up:
 
@@ -54,15 +62,25 @@ to their room; pick one under Specific only to narrow to it.
 
 Who uses Hub Members and Teams, and each person links their Slack, Telegram, Zalo, and other accounts through Channel identities, so one Who works on every channel. Where uses the generic names below; a channel that lacks a kind hides it, and the layout reads the same everywhere.
 
-| Generic        | Slack                       | Telegram                                    | Zalo (personal) | Zalo OA   | Discord                      | Google Chat       | Feishu        |
-| -------------- | --------------------------- | ------------------------------------------- | --------------- | --------- | ---------------------------- | ----------------- | ------------- |
-| DM             | DM                          | Private chat                                | 1:1 chat        | 1:1 chat  | DM                           | DM                | P2P chat      |
-| Group chat     | Channel, group DM           | Group, supergroup                           | Group           | To verify | Server channel, group DM     | Space, group chat | Group         |
-| Public/private | Yes                         | Probably (a group with @username is public) | No              | —         | No (roles decide)            | To verify         | Probably      |
-| Specific shows | `#qc-bugs`, `🔒#qc-private` | `QC Group`, `QC Group › Release` (topic)    | Group name      | —         | `Server › #channel`          | Space name        | Group name    |
-| Thread/topic   | Thread → channel            | Forum topic → group                         | —               | —         | Thread, forum post → channel | Thread → space    | Topic → group |
+| Generic        | Slack                       | Telegram                                 | Zalo (personal) | Zalo OA                   | Discord                      | Google Chat       | Feishu        |
+| -------------- | --------------------------- | ---------------------------------------- | --------------- | ------------------------- | ---------------------------- | ----------------- | ------------- |
+| DM             | DM                          | Private chat                             | 1:1 chat        | 1:1 chat                  | DM                           | DM                | P2P chat      |
+| Group chat     | Channel, group DM           | Group, supergroup                        | Group           | Group (`chat_type GROUP`) | Server channel, group DM     | Space, group chat | Group         |
+| Public/private | Yes                         | Yes (a group with @username is public)   | No              | No                        | No (roles decide)            | No                | No            |
+| Specific shows | `#qc-bugs`, `🔒#qc-private` | `QC Group`, `QC Group › Release` (topic) | Group name      | Group name                | `Server › #channel`          | Space name        | Group name    |
+| Thread/topic   | Thread → channel            | Forum topic → group                      | —               | —                         | Thread, forum post → channel | Thread → space    | Topic → group |
 
-Cells marked "to verify" or "probably" are checked per vertical when built. Where a kind is absent the control is hidden.
+Public/private was verified per vertical on 2026-09-19 against what the inbound
+event carries; nothing is fetched to learn it. Slack states it in
+`channel_type`; Telegram's chat object carries `username` only for a public
+group. Zalo personal and Zalo OA events say only group or not. Discord guild
+channel events carry no visibility (roles and overwrites decide who sees a
+channel). A Google Chat event's space carries `spaceType`, not its access
+setting. A Feishu message event's `chat_type` is `p2p` or `group`; visibility
+is only in `im.chat.get`. A channel that reports it claims the `visibility`
+capability in the Hub catalog (`channels/catalog.ts`); the editor offers the
+filter there and warns on a rule that uses it anywhere else, because such a
+rule matches no group chat. Where a kind is absent the control is hidden.
 
 One configuration, several channels:
 

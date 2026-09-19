@@ -1,15 +1,14 @@
-import { AutomationInputDraftContext } from "./automation-input-draft";
+import { AutomationInputDraftContext, draftBaseline } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
+import { saveChangedAccounts, type ChannelAccountRef } from "../channel-account-requests";
 import {
-  saveAdministeredAccount,
   useChannelConfigurationPreview,
   useChannelRouteAdminScope,
   useChannelRouteWarnings,
   useChannelSettingsQueries,
   useReportDraftEditing,
   useScrollToTopOn,
-  type ChannelAccountRef,
 } from "./channel-settings-hooks";
 import {
   audienceRuleErrors,
@@ -206,9 +205,19 @@ export function ChannelSettings({
   const hub = useHubAccount();
   const router = useRouter();
   const adminScope = useChannelRouteAdminScope();
+  const automationInput = useContext(AutomationInputDraftContext) !== null;
   const openAccount = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
   if (hub.loading || adminScope.status === "loading")
     return <Text style={settingsStyles.rowHint}>Loading Channels...</Text>;
+  if (adminScope.status === "none" && automationInput)
+    // A Channel input is a Route on a bot, so adding one is Channel Route Admin work.
+    return (
+      <Alert
+        variant="info"
+        title="Channel inputs need Channel Route Admin"
+        description="A Channel input adds a Route to a Channel bot. Ask an Organization Admin to make you Channel Route Admin of that bot, or to add this input for you."
+      />
+    );
   if (adminScope.status === "none")
     return (
       <SettingsSection title="Channels">
@@ -352,23 +361,23 @@ function ChannelSettingsContent({
       if (inputDraft) {
         inputDraft.stage({
           ...candidate,
-          expectedRevisionId: inputDraft.draft
-            ? inputDraft.draft.expectedRevisionId
-            : (current.revision?.id ?? null),
-          grants: inputDraft.draft?.grants ?? [],
+          ...draftBaseline(
+            inputDraft.draft,
+            { revisionId: current.revision?.id ?? null, accounts: current.accounts },
+            adminScoped,
+          ),
         });
         return;
       }
       if (adminScoped) {
         // A Channel Route Admin saves one account file at a time; the Hub
         // validates it and refuses a changed Connection.
-        const changed = accounts.filter(
-          (account) =>
-            !current.accounts.some((stored) => JSON.stringify(stored) === JSON.stringify(account)),
+        await saveChangedAccounts(
+          hub.api(),
+          accounts,
+          current.accounts,
+          current.revision?.id ?? null,
         );
-        for (const account of changed) {
-          await saveAdministeredAccount(hub.api(), account, current.revision?.id ?? null);
-        }
         await Promise.all([channels.refetch(), runtimeStatus.refetch()]);
         return;
       }
@@ -615,13 +624,14 @@ function ChannelSettingsContent({
         if (inputDraft) {
           if (!channels.data) throw new Error("Channel configuration is still loading.");
           inputDraft.stage({
-            expectedRevisionId: inputDraft.draft
-              ? inputDraft.draft.expectedRevisionId
-              : editorRevisionId,
+            ...draftBaseline(
+              inputDraft.draft,
+              { revisionId: editorRevisionId, accounts: channels.data.accounts },
+              adminScoped,
+            ),
             accounts,
             resource,
             policy: channels.data.policy ?? {},
-            grants: inputDraft.draft?.grants ?? [],
           });
           setEditor(null);
           return;
@@ -4012,7 +4022,7 @@ function channelFormSelection(input: {
     selectedConnection,
     effectiveAccountId:
       input.configurationKind === "account" ? input.accountId.trim() : existingAccountId,
-    observedAccountChannel: channelReplyProviderName(stringField(selectedAccount, "channel")),
+    observedAccountChannel: stringField(selectedAccount, "channel"),
     observedAccountId: stringField(selectedAccount, "accountId"),
   };
 }

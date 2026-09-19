@@ -405,6 +405,10 @@ export type ZaloTransport = z.infer<typeof ZaloTransportSchema>;
 
 // --- Vertical-owned account config (`account.config`) ---------------------------
 //
+// A credential key carries `.meta(SECRET)`; `account-secrets.ts` reads that mark
+// so a Channel Route Admin never sees or overwrites it.
+const SECRET = { secret: true } as const;
+//
 // The account's `config` block is passed through to the vertical verbatim
 // (`AccountFileSchema.config`), because each vertical type-checks its own keys on
 // read. For the channels wired in slices 14b/15b/16b the Hub additionally
@@ -442,9 +446,9 @@ export type GoogleChatAccountConfig = z.infer<typeof GoogleChatAccountConfigSche
  * upstream account file. */
 export const FeishuAccountConfigSchema = z.looseObject({
   appId: z.string().min(1).optional(),
-  appSecret: z.string().min(1).optional(),
-  verificationToken: z.string().min(1).optional(),
-  encryptKey: z.string().min(1).optional(),
+  appSecret: z.string().min(1).optional().meta(SECRET),
+  verificationToken: z.string().min(1).optional().meta(SECRET),
+  encryptKey: z.string().min(1).optional().meta(SECRET),
   domain: z.enum(["feishu", "lark"]).optional(),
   connectionMode: FeishuTransportModeSchema.optional(),
   webhookPath: z.string().min(1).optional(),
@@ -481,7 +485,7 @@ export const ZaloAccountConfigSchema = z.looseObject({
   webhookPort: z.number().int().min(1).max(65_535).optional(),
   webhookHost: z.string().min(1).optional(),
   /** 8-256 chars, enforced again by the vertical at start. */
-  webhookSecret: z.string().min(8).max(256).optional(),
+  webhookSecret: z.string().min(8).max(256).optional().meta(SECRET),
   mediaMaxMb: z.number().positive().optional(),
   proxy: z.string().min(1).optional(),
   botNames: z.array(z.string().min(1)).optional(),

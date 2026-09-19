@@ -126,28 +126,25 @@ describe("local owner onboarding on embedded storage", () => {
       expect(first.status, JSON.stringify(await first.clone().json())).toBe(200);
       expect((await first.json()).owner.ready).toBe(true);
       const snapshot = await loadChannelControlPlane(database, preparation.organizationId);
-      expect(snapshot.controlPlane.accounts[0]?.routes).toHaveLength(3);
+      expect(snapshot.controlPlane.accounts[0]?.routes).toHaveLength(2);
       expect(JSON.stringify(snapshot.files)).not.toContain("test-private-token");
       const identity = (await access.listChannelIdentities(preparation.organizationId))[0]!;
-      const permission = {
+      const sender = {
         organizationId: preparation.organizationId,
         channel: "telegram",
-        accountId: "personal-assistant",
         connectionId: identity.connectionId,
         senderIdentity: "telegram:123456",
-        privilege: "channel.use" as const,
-        conversation: { kind: "dm" as const, id: "123456", rootConversationId: "123456" },
       };
-      expect(await access.allowsChannelPrivilege(permission)).toBe(true);
+      expect((await access.resolveChannelMember(sender))?.role).toBe("owner");
       expect(
-        await access.allowsChannelPrivilege({ ...permission, senderIdentity: "telegram:stranger" }),
-      ).toBe(false);
+        await access.resolveChannelMember({ ...sender, senderIdentity: "telegram:stranger" }),
+      ).toBeUndefined();
       const again = await ops.addChannel(request("POST", body));
       expect(again.status).toBe(200);
       expect(
         (await loadChannelControlPlane(database, preparation.organizationId)).controlPlane
           .accounts[0]?.routes,
-      ).toHaveLength(3);
+      ).toHaveLength(2);
       expect(await database.listProjectsForOrganization(preparation.organizationId)).toEqual([]);
       vi.stubEnv("CLISBOT_ONBOARDING_ENABLED", "0");
       expect((await ops.addChannel(request("PUT", {}))).status).toBe(404);

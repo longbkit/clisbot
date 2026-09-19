@@ -27,7 +27,7 @@ import {
 import { channelSeverityVariant } from "../channel-account-health";
 import { ChannelDeadLetterList } from "./channel-dead-letter-list";
 import { CHANNEL_DEAD_LETTER_PAGE, useChannelIngressQueries } from "./channel-operations-queries";
-import type { ChannelAccountRef } from "./channel-settings-hooks";
+import type { ChannelAccountRef } from "../channel-account-requests";
 import { useChannelCatalog } from "./channel-catalog-queries";
 
 /**

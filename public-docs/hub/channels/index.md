@@ -179,11 +179,18 @@ Rules are the only place that decides who may chat; the Access page grants
 only **Channel Route Admin**.
 
 - **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,
-  Anyone (unlinked senders included), or channel user ids outside the Hub.
-- **Where**: DM, Group chat (every room, group or space — on Slack optionally
-  public or private only), and specific conversations picked from one search
-  box. The parts add up. A rule that covers group chats does not cover DMs
+  Anyone (unlinked senders included), or senders outside the Hub, picked from
+  the people who already messaged the bot (or typed as channel user ids).
+- **Where**: DM, Group chat (every room, group or space — on Slack and Telegram
+  optionally public or private only), and specific conversations picked from
+  one search box that lists every conversation the bot has seen, on every
+  channel. The parts add up. A rule that covers group chats does not cover DMs
   unless it says DM.
+
+Public or private is what the platform says on the message: a Slack channel's
+type, and on Telegram a group with a public @username is public, any other
+group private. Other channels do not say, so a public-only or private-only rule
+matches no group chat there; the editor warns when a rule asks for it.
 
 ```yaml
 routes:
@@ -219,7 +226,11 @@ answering an approval needs an `approval.*` privilege.
 The person who publishes a route vouches for what it runs: saving checks that
 they may hand out its Host, Project, Agent configuration and automatic
 approvals. A Channel Route Admin edits the routes of one account through the
-app, keeps its Connection and target as they are, and is checked the same way.
+app and keeps its Connection as it is. Only a route whose target, approvals,
+reply path or Agent controls changed is checked against their access, so a
+Channel Route Admin can change who may talk to a route they could not publish.
+The bot token and every credential in the account's settings are never shown
+to a Channel Route Admin and survive their saves unchanged.
 
 Commands never need a mention. `requireMention` decides when a plain message
 wakes the agent.

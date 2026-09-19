@@ -323,3 +323,186 @@ it("lets a Channel Route Admin manage exactly one account", async () => {
   assert.equal((await owner.handle(apiRequest("/channel-configuration", "GET"))).status, 200);
   assert.equal((await owner.handle(apiRequest(accountPath, "GET"))).status, 200);
 });
+
+function apis(channelSupervisor = supervisor()) {
+  const access = new AccessStore(bundle.runtime);
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor,
+  };
+  return {
+    admin: new ManagementApi({
+      ...common,
+      auth: accessFor({
+        userId: ADMIN_USER,
+        membershipId: ADMIN_MEMBERSHIP,
+        role: "member",
+        manageChannels: false,
+      }),
+    }),
+    owner: new ManagementApi({
+      ...common,
+      auth: accessFor({
+        userId: OWNER_USER,
+        membershipId: OWNER_MEMBERSHIP,
+        role: "owner",
+        manageChannels: true,
+      }),
+    }),
+  };
+}
+
+interface AccountView {
+  revision: { id: string };
+  account: Record<string, unknown> & { routes?: Record<string, unknown>[] };
+  effective: { config: Record<string, unknown> };
+}
+
+async function readAccount(api: ManagementApi): Promise<AccountView> {
+  const response = await api.handle(apiRequest(accountPath, "GET"));
+  assert.equal(response.status, 200, await response.clone().text());
+  return (await response.json()) as AccountView;
+}
+
+it("hides credentials from a Route Admin and re-checks only the Routes whose delegated parts changed", async () => {
+  const { admin, owner } = apis();
+  // The organization publishes a Route on an Agent the Route Admin holds no
+  // grant for, and a credential inside `config`.
+  const published = await readAccount(owner);
+  const route = {
+    audience: [{ who: { roles: ["admin"] }, where: { dm: true } }],
+    agent: "coding",
+    environment: "work",
+  };
+  const seeded = await owner.handle(
+    apiRequest(accountPath, "PUT", {
+      account: {
+        ...published.account,
+        config: { ...(published.account["config"] as object), sessionToken: "s3cret" },
+        routes: [route],
+      },
+      expectedRevisionId: published.revision.id,
+    }),
+  );
+  assert.equal(seeded.status, 200, await seeded.clone().text());
+
+  const shown = await readAccount(admin);
+  assert.equal(JSON.stringify(shown).includes("s3cret"), false, "no credential is shown");
+  assert.deepEqual(shown.account["config"], { profile: PROFILE });
+  assert.equal(shown.effective.config["sessionToken"], undefined);
+
+  // An audience-only edit saves, and the stored credential survives it.
+  const widened = await admin.handle(
+    apiRequest(accountPath, "PUT", {
+      account: {
+        ...shown.account,
+        routes: [{ ...route, audience: [{ who: { anyone: true }, where: { dm: true } }] }],
+      },
+      expectedRevisionId: shown.revision.id,
+    }),
+  );
+  assert.equal(widened.status, 200, await widened.clone().text());
+  const active = await database.findActiveChannelConfiguration(ORGANIZATION_ID);
+  const stored = active?.files.find(({ path }) => path.endsWith(`/${ACCOUNT_ID}.yml`));
+  assert.equal(
+    (load(stored?.content ?? "") as { config?: Record<string, unknown> }).config?.["sessionToken"],
+    "s3cret",
+  );
+
+  // Copying the Route the Route Admin could not publish is a new delegation.
+  const current = await readAccount(admin);
+  const copied = await admin.handle(
+    apiRequest(accountPath, "PUT", {
+      account: { ...current.account, routes: [...(current.account.routes ?? []), route] },
+      expectedRevisionId: current.revision.id,
+    }),
+  );
+  assert.equal(copied.status, 403, await copied.clone().text());
+  assert.equal(((await copied.json()) as { error: string }).error, "access_denied");
+
+  // The organization can still replace the credential by stating it.
+  const replaced = await owner.handle(
+    apiRequest(accountPath, "PUT", {
+      account: {
+        ...current.account,
+        config: { profile: PROFILE, sessionToken: "rotated" },
+      },
+      expectedRevisionId: current.revision.id,
+    }),
+  );
+  assert.equal(replaced.status, 200, await replaced.clone().text());
+  const rotated = (await database.findActiveChannelConfiguration(ORGANIZATION_ID))?.files.find(
+    ({ path }) => path.endsWith(`/${ACCOUNT_ID}.yml`),
+  );
+  assert.match(rotated?.content ?? "", /sessionToken: rotated/u);
+});
+
+it("lists the senders outside the Hub and the conversations one bot has seen", async () => {
+  const { admin, owner } = apis();
+  const db = bundle.runtime.drizzle();
+  const inbound = (id: string, sender: string, name: string, chat: string, at: string) => ({
+    organizationId: ORGANIZATION_ID,
+    channel: "zalouser",
+    accountId: ACCOUNT_ID,
+    externalEventId: `event-${id}`,
+    externalMessageId: id,
+    externalConversationId: chat,
+    laneKey: `zalouser:${ACCOUNT_ID}:${chat}`,
+    payload: {
+      ctxPayload: { ChatId: chat, ChatType: "group", SenderId: sender, SenderName: name },
+    },
+    status: "completed" as const,
+    createdAt: new Date(at),
+  });
+  await db
+    .insert(schema.channelIngressQueue)
+    .values([
+      inbound("1", "Z-GUEST", "Guest", "G-1", "2026-09-10T10:00:00Z"),
+      inbound("2", "Z-OWNER", "Owner", "G-1", "2026-09-11T10:00:00Z"),
+      inbound("3", "Z-GUEST", "Guest renamed", "G-2", "2026-09-12T10:00:00Z"),
+    ]);
+  await db.insert(schema.channelIdentities).values({
+    organizationId: ORGANIZATION_ID,
+    memberId: OWNER_MEMBERSHIP,
+    identityRealm: `zalouser:bot:${connectionId}`,
+    connectionId,
+    externalSubjectId: "Z-OWNER",
+    verificationMethod: "administrator",
+    verifiedAt: new Date(),
+  });
+
+  for (const api of [admin, owner]) {
+    const senders = await api.handle(
+      apiRequest(`/channel-accounts/zalouser/${ACCOUNT_ID}/senders`, "GET"),
+    );
+    assert.equal(senders.status, 200, await senders.clone().text());
+    const body = (await senders.json()) as { senders: { identity: string; name: string }[] };
+    assert.deepEqual(
+      body.senders.map(({ identity, name }) => ({ identity, name })),
+      [{ identity: "zalouser:Z-GUEST", name: "Guest renamed" }],
+      "a linked Member is not offered",
+    );
+    const conversations = await api.handle(
+      apiRequest(`/channel-accounts/zalouser/${ACCOUNT_ID}/conversations`, "GET"),
+    );
+    assert.equal(conversations.status, 200, await conversations.clone().text());
+    const seen = (await conversations.json()) as { conversations: { id: string }[] };
+    assert.deepEqual(
+      seen.conversations.map(({ id }) => id),
+      ["G-2", "G-1"],
+    );
+  }
+  assert.equal(
+    (
+      await admin.handle(
+        apiRequest(`/channel-accounts/zalouser/${OTHER_ACCOUNT_ID}/senders`, "GET"),
+      )
+    ).status,
+    403,
+  );
+  // The channel catalog answers a Route Admin too: the Route editor reads it.
+  assert.equal((await admin.handle(apiRequest("/channel-catalog", "GET"))).status, 200);
+});

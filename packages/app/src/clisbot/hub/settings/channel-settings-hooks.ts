@@ -18,7 +18,7 @@ import {
   HubTeamsSchema,
   type HubChannelAccountConfiguration,
 } from "../contracts";
-import type { HubApiClient } from "../api-client";
+import { channelAccountResource, type ChannelAccountRef } from "../channel-account-requests";
 import { hubResourceQueryKey } from "../query-keys";
 import { AutomationInputDraftContext, type AutomationChannelDraft } from "./automation-input-draft";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
@@ -28,11 +28,6 @@ type HubRuntimeStatus = z.infer<typeof HubChannelRuntimeStatusSchema>;
 type HubEffectiveAccess = z.infer<typeof HubEffectiveAccessSchema>;
 /** The signed-in organization; empty until sign-in resolves, which keeps the queries idle. */
 type HubResourceQueryScope = Parameters<typeof hubResourceQueryKey>[0] & { organizationId: string };
-
-export interface ChannelAccountRef {
-  channel: string;
-  accountId: string;
-}
 
 /**
  * Who the Channels screen serves: the organization capability sees and saves
@@ -89,10 +84,6 @@ function parseChannelAccountRef(resourceId: string): ChannelAccountRef | null {
   } catch {
     return null;
   }
-}
-
-export function channelAccountResource(ref: ChannelAccountRef): string {
-  return `${encodeURIComponent(ref.channel)}/${encodeURIComponent(ref.accountId)}`;
 }
 
 /**
@@ -233,20 +224,6 @@ function administeredConfiguration(
     effective: files.map((file) => file.effective),
     warnings: files.flatMap((file) => file.warnings),
   };
-}
-
-/** Save one administered account through its own endpoint; the response is that account's view. */
-export function saveAdministeredAccount(
-  api: HubApiClient,
-  account: Record<string, unknown>,
-  expectedRevisionId: string | null,
-): Promise<HubChannelAccountConfiguration> {
-  const ref = { channel: String(account["channel"]), accountId: String(account["accountId"]) };
-  return api.put(
-    `channel-configuration/accounts/${channelAccountResource(ref)}`,
-    { account, expectedRevisionId },
-    HubChannelAccountConfigurationSchema,
-  );
 }
 
 /**

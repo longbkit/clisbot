@@ -186,14 +186,26 @@ function recordValue(value: unknown): ChannelConfigurationRecord | null {
 // --- Channel facts ---------------------------------------------------------------
 
 /**
- * Which channels report a room's public/private visibility. The Where filter is
- * offered only there: elsewhere the filter would match nothing.
- * `packages/hub/src/channels/config/audience.ts` is the runtime side.
+ * The Hub catalog capability a channel claims when its inbound event states a
+ * room's public/private visibility (`packages/hub/src/channels/catalog.ts`).
+ * The Where filter is offered only there: elsewhere it matches nothing
+ * (`packages/hub/src/channels/config/audience.ts` is the runtime side).
  */
-const VISIBILITY_REPORTED_BY: Readonly<Record<string, true>> = { slack: true };
+export const VISIBILITY_CAPABILITY = "visibility";
 
-export function channelReportsVisibility(channel: string | null | undefined): boolean {
-  return channel !== null && channel !== undefined && VISIBILITY_REPORTED_BY[channel] === true;
+export function channelReportsVisibility(
+  entry: { capabilities: readonly string[] } | undefined,
+): boolean {
+  return entry?.capabilities.includes(VISIBILITY_CAPABILITY) === true;
+}
+
+/** A public-only or private-only group filter on a channel that never reports
+ * visibility: that part of the rule matches no group chat. */
+export function visibilityFilterMatchesNothing(
+  where: AudienceRuleDraft["where"],
+  reportsVisibility: boolean,
+): boolean {
+  return !reportsVisibility && (where.groups === "public" || where.groups === "private");
 }
 
 // --- Summaries ----------------------------------------------------------------------

@@ -171,9 +171,17 @@ function senderChatFields(senderChat: Chat | undefined): Partial<ChannelInboundE
   };
 }
 
-function conversationLabel(chat: Chat | undefined): Partial<ChannelInboundEvent> {
-  const title = (chat as { title?: string } | undefined)?.title;
-  return title !== undefined ? { conversationLabel: title } : {};
+/** The room's label and, for a group, its visibility: Telegram states a public
+ * group by giving it an @username on the chat object itself, so a group without
+ * one is private. A private chat (DM) carries none. */
+function conversationFacts(chat: Chat | undefined): Partial<ChannelInboundEvent> {
+  const room = chat as { type?: string; title?: string; username?: string } | undefined;
+  const title = room?.title;
+  const group = room !== undefined && room.type !== undefined && room.type !== "private";
+  return {
+    ...(title !== undefined ? { conversationLabel: title } : {}),
+    ...(group ? { visibility: room.username === undefined ? "private" : "public" } : {}),
+  };
 }
 
 // ------------------------------------------------------------------- body
@@ -264,7 +272,7 @@ function baseMessageEvent(
     body: buildTelegramMessageBody(messages),
     wasMentioned: mention.wasMentioned,
     timestampMs: typeof anchor.date === "number" ? anchor.date * 1000 : Date.now(),
-    ...conversationLabel(chat),
+    ...conversationFacts(chat),
     // Loop guard: own ONLY when the sender is this bot. A different bot (the
     // E2E master bot, any automation bot) is a legitimate external sender.
     isOwnMessage: senderId === String(params.botId),
@@ -349,7 +357,7 @@ export function buildTelegramTopicEvent(
       body: `${TELEGRAM_BODY_LABELS.topic} ${detail}`,
       wasMentioned: false,
       timestampMs: typeof msg.date === "number" ? msg.date * 1000 : Date.now(),
-      ...conversationLabel(chat),
+      ...conversationFacts(chat),
       isOwnMessage: from?.id === params.botId,
       kind: "topic",
       facts: {
@@ -394,7 +402,7 @@ export function buildTelegramMembershipEvent(
       body: `${label === "joined" ? TELEGRAM_BODY_LABELS.joined : TELEGRAM_BODY_LABELS.left} ${who.join(", ")}`,
       wasMentioned: false,
       timestampMs: typeof msg.date === "number" ? msg.date * 1000 : Date.now(),
-      ...conversationLabel(chat),
+      ...conversationFacts(chat),
       isOwnMessage: false,
       kind: "member",
       facts: {
@@ -439,7 +447,7 @@ export function buildTelegramChatMemberEvent(
       } (${status ?? "unknown"})`,
       wasMentioned: false,
       timestampMs: updated.date * 1000,
-      ...conversationLabel(chat),
+      ...conversationFacts(chat),
       isOwnMessage: updated.from?.id === params.botId,
       kind: "member",
       facts: { member: { userId: String(who?.id ?? ""), joined: !gone } },
@@ -480,7 +488,7 @@ export function buildTelegramReactionEvent(
       body: `${TELEGRAM_BODY_LABELS.reaction} ${emojis === "" ? "(cleared)" : emojis} on message ${reaction.message_id}`,
       wasMentioned: false,
       timestampMs: reaction.date * 1000,
-      ...conversationLabel(chat),
+      ...conversationFacts(chat),
       isOwnMessage: user?.id === params.botId,
       kind: "reaction",
       facts: {
@@ -567,7 +575,7 @@ export function buildTelegramCallbackEvent(
       // A button press on our own card is an explicit address of this bot.
       wasMentioned: true,
       timestampMs: Date.now(),
-      ...conversationLabel(chat as Chat),
+      ...conversationFacts(chat as Chat),
       isOwnMessage: from.id === params.botId,
       kind: "callback",
       facts: {
