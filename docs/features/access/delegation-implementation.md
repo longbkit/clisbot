@@ -71,7 +71,8 @@ only by the coordinator after each wave.
   moves to the account settings. The Channel identities tab is removed.
 - Member detail: role dropdown Member / Admin / Owner (Owner option only for Owners, with
   confirmation; last Owner cannot step down; Admin sees an Owner's role read-only); Remove
-  in a Danger zone, not beside the role buttons.
+  behind the header's … menu (a Danger zone section until 2026-09-20), not beside the role
+  control.
 - Access summary grouped by resource kind, level worded by `access-level-summary.ts`,
   "every Project" for Host grants, raw privileges collapsed.
 

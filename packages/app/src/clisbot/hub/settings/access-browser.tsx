@@ -26,6 +26,7 @@ import {
 import type { GrantGrouping } from "./access-grant-rows";
 import { AccessGrantsTable, type GrantActions } from "./access-grants-table";
 import { BackLink } from "./back-link";
+import { DetailHeader } from "./detail-header";
 import { FilterChips } from "./filter-chips";
 import { countLabel } from "./labels";
 import { tableStyles } from "./table-styles";
@@ -247,17 +248,17 @@ function EntryDetail({
   grantTo(entry: AccessEntry): void;
 }) {
   const grant = useCallback(() => grantTo(entry), [entry, grantTo]);
+  const grantButton = useMemo(
+    () => (
+      <Button size="sm" variant="outline" disabled={actions.pending} onPress={grant}>
+        Grant access…
+      </Button>
+    ),
+    [actions.pending, grant],
+  );
   return (
     <View style={styles.stack}>
-      <View style={styles.detailHeader}>
-        <View style={styles.entryText}>
-          <Text style={styles.detailTitle}>{entry.title}</Text>
-          <Text style={styles.muted}>{entry.subtitle}</Text>
-        </View>
-        <Button size="sm" variant="outline" disabled={actions.pending} onPress={grant}>
-          Grant access…
-        </Button>
-      </View>
+      <DetailHeader title={entry.title} subtitle={entry.subtitle} actions={grantButton} />
       <AccessGrantsTable
         rows={entry.rows}
         grouping={grouping}
@@ -281,12 +282,6 @@ const styles = StyleSheet.create((theme) => ({
   detail: { flex: 1, minWidth: 0 },
   entry: { gap: theme.spacing[3] },
   entryText: { flex: 1, minWidth: 0, gap: theme.spacing[0.5] },
-  detailHeader: { flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
   title: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
-  detailTitle: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.medium,
-  },
   muted: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.base },
 }));

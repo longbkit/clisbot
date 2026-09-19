@@ -16,7 +16,7 @@ const hub = vi.hoisted(() => ({
   cancelInvitation: vi.fn(async () => {}),
   changeMemberRole: vi.fn(async (_input: { memberId: string; role: string }) => {}),
   removeMember: vi.fn(async (_memberId: string) => {}),
-  api: () => ({ post: fixtures.post, delete: fixtures.delete }),
+  api: () => ({ post: fixtures.post, put: fixtures.put, delete: fixtures.delete }),
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
   registrationToken: null,
@@ -38,6 +38,7 @@ const fixtures = vi.hoisted(() => ({
   >,
   push: vi.fn(),
   post: vi.fn(async (_path: string, _body?: unknown) => ({})),
+  put: vi.fn(async (_path: string, _body?: unknown) => ({})),
   delete: vi.fn(async (_path: string) => {}),
   notAdded: vi.fn(),
 }));
@@ -534,8 +535,7 @@ function typePeople(text: string) {
 }
 
 function openMember(name: string) {
-  const row = screen.getByText(name).parentElement!.parentElement!;
-  fireEvent.click(within(row).getByRole("button", { name: "View" }));
+  fireEvent.click(screen.getByRole("button", { name: `Open ${name}` }));
 }
 
 function openTeam(name: string) {
@@ -763,6 +763,29 @@ describe("Member roles", () => {
 });
 
 describe("Member detail", () => {
+  it("lists only the Member's Teams, adds one through Add to Team, and removes through the menu", async () => {
+    render(<HubSettingsContent section="team" />);
+    openMember("Alice");
+    const teams = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
+    expect(within(teams).getByText("Support")).toBeTruthy();
+    expect(within(teams).queryByText("Sales")).toBeNull();
+    fireEvent.click(within(teams).getByRole("button", { name: "Add to Team…" }));
+    const sheet = screen.getByRole("dialog", { name: "Add Alice to a Team" });
+    fireEvent.change(within(sheet).getByLabelText("Team"), { target: { value: "team-2" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Add to Team" }));
+    await waitFor(() =>
+      expect(fixtures.post).toHaveBeenCalledWith(
+        "teams/team-2/members",
+        { userId: "user-1" },
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(within(teams).getByRole("button", { name: "Remove from Team" }));
+    await waitFor(() =>
+      expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1/members/user-1"),
+    );
+  });
+
   it("stays on the Member when removing fails, and shows why", async () => {
     const { confirmDialog } = await import("@/utils/confirm-dialog");
     vi.mocked(confirmDialog).mockResolvedValue(true);
@@ -961,11 +984,22 @@ describe("Team detail Members", () => {
     await waitFor(() => expect(screen.getByText("Team Admin needs a newer Hub.")).toBeTruthy());
     expect((screen.getByLabelText("Team role") as HTMLSelectElement).disabled).toBe(true);
   });
-  it("renames and deletes the Team from its Settings tab", async () => {
+  it("renames and deletes the Team from its header menu", async () => {
     const { confirmDialog } = await import("@/utils/confirm-dialog");
     vi.mocked(confirmDialog).mockResolvedValue(true);
     openTeam("Support");
-    openTab("Settings");
+    expect(screen.queryByRole("tab", { name: "Settings" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Rename Team" }));
+    const dialog = screen.getByRole("dialog", { name: "Rename Team" });
+    fireEvent.change(within(dialog).getByLabelText("Team name"), { target: { value: "Care" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Rename Team" }));
+    await waitFor(() =>
+      expect(fixtures.put).toHaveBeenCalledWith(
+        "teams/team-1",
+        { name: "Care" },
+        expect.anything(),
+      ),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Delete Team" }));
     await waitFor(() => expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1"));
   });

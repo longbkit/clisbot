@@ -37,11 +37,23 @@ export function TeamAccessSection({
 }) {
   const members = resources.members.data?.members ?? NO_MEMBERS;
   const teams = useMemo(() => [team], [team]);
+  const manage = useMemo(
+    () => (
+      <Button size="sm" variant="outline" disabled={pending} onPress={manageAccess}>
+        Manage access
+      </Button>
+    ),
+    [manageAccess, pending],
+  );
   if (!resources.canManageResources) {
     return <TeamAdminAccess team={team} teams={teams} members={members} />;
   }
   return (
-    <SettingsSection title="Access">
+    <SettingsSection
+      title="Access"
+      info="What every Member of this Team can use. A change here reaches all of them."
+      trailing={manage}
+    >
       <SubjectGrantsTable
         subjectKind="team"
         subjectId={team.id}
@@ -50,11 +62,8 @@ export function TeamAccessSection({
         accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
         members={members}
         teams={teams}
-        empty="No resource access granted"
+        empty="No access yet. Grant some with Manage access."
       />
-      <Button variant="outline" disabled={pending} onPress={manageAccess}>
-        Manage access
-      </Button>
     </SettingsSection>
   );
 }

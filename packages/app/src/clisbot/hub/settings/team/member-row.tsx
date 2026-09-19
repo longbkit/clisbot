@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
@@ -86,12 +86,7 @@ export function MemberRow({
       <RowActionsMenu label={`Actions for ${member.name}`} actions={actions} disabled={pending} />
     </View>
   );
-  const identity = (
-    <>
-      <Text style={settingsStyles.rowTitle}>{member.name}</Text>
-      <Text style={settingsStyles.rowHint}>{member.email}</Text>
-    </>
-  );
+  const identity = <MemberIdentity member={member} open={view} />;
   const border = bordered ? settingsStyles.rowBorder : null;
   // A phone has no room for columns: the row becomes a card, each value labelled.
   if (compact)
@@ -132,6 +127,28 @@ export function MemberTableHeader({ chat, role }: { chat: boolean; role: boolean
   );
 }
 
+/** The name opens the Member, the way a directory row does everywhere; hover underlines it. */
+function MemberIdentity({ member, open }: { member: HubMember; open(): void }) {
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${member.name}`}
+        onPress={open}
+      >
+        {renderMemberName(member.name)}
+      </Pressable>
+      <Text style={settingsStyles.rowHint}>{member.email}</Text>
+    </View>
+  );
+}
+
+function renderMemberName(name: string) {
+  return function MemberName({ hovered }: PressableStateCallbackType & { hovered?: boolean }) {
+    return <Text style={hovered ? styles.nameHovered : styles.nameLink}>{name}</Text>;
+  };
+}
+
 function LabelledCell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={styles.stackedCell}>
@@ -153,6 +170,17 @@ const styles = StyleSheet.create((theme) => ({
     flexWrap: "wrap",
     gap: theme.spacing[2],
     minHeight: buttonControlHeight.xs,
+  },
+  nameLink: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    alignSelf: "flex-start",
+  },
+  nameHovered: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    alignSelf: "flex-start",
+    textDecorationLine: "underline",
   },
   cellLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   trailing: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[2] },

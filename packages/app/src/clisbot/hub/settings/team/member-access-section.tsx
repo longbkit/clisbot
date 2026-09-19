@@ -1,4 +1,5 @@
-import { Text } from "react-native";
+import { useMemo } from "react";
+import { View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
@@ -36,30 +37,36 @@ export function MemberAccessSection({
 }) {
   const assignments = resources.assignments.data?.assignments ?? NO_ASSIGNMENTS;
   const directCount = subjectAssignments(assignments, "member", member.id).length;
-  return (
-    <SettingsSection title="Access">
-      {member.role === "owner" ? (
-        <InfoRow title="Full organization access" hint="Owner · No setup required" />
-      ) : (
-        <>
-          <SubjectGrantsTable
-            subjectKind="member"
-            subjectId={member.id}
-            assignments={assignments}
-            resources={resources.catalog.data?.resources ?? NO_RESOURCES}
-            accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
-            members={resources.members.data?.members ?? NO_MEMBERS}
-            teams={teams}
-            empty="No resource access granted"
-          />
-          <Text style={settingsStyles.rowHint}>
-            {`${countLabel(directCount, "direct assignment")}; Team access is marked with its Team.`}
-          </Text>
-        </>
-      )}
-      <Button variant="outline" disabled={pending} onPress={manageAccess}>
+  const manage = useMemo(
+    () => (
+      <Button size="sm" variant="outline" disabled={pending} onPress={manageAccess}>
         Manage access
       </Button>
+    ),
+    [manageAccess, pending],
+  );
+  return (
+    <SettingsSection
+      title="Access"
+      info={`What ${member.name} can use: ${countLabel(directCount, "direct grant")}, and their Teams' grants marked with the Team.`}
+      trailing={manage}
+    >
+      {member.role === "owner" ? (
+        <View style={settingsStyles.card}>
+          <InfoRow title="Everything" hint="An Owner's access is automatic; no grant is needed." />
+        </View>
+      ) : (
+        <SubjectGrantsTable
+          subjectKind="member"
+          subjectId={member.id}
+          assignments={assignments}
+          resources={resources.catalog.data?.resources ?? NO_RESOURCES}
+          accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
+          members={resources.members.data?.members ?? NO_MEMBERS}
+          teams={teams}
+          empty="No access yet. Grant some, or add them to a Team that has it."
+        />
+      )}
     </SettingsSection>
   );
 }

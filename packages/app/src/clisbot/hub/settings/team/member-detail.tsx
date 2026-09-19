@@ -1,11 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
 import { capitalizeLabel } from "../labels";
-import { InfoRow } from "../resource-rows";
 import { MemberAccessSection } from "./member-access-section";
 import { MemberChatAccounts } from "./member-chat-accounts";
 import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
@@ -15,6 +13,8 @@ import { canManageTeamMembership } from "./team-membership";
 import type { HubAccount, HubMember, TeamResources } from "./types";
 import type { TeamActions } from "./use-team-actions";
 import { BackLink } from "../back-link";
+import { DetailHeader, LabeledRow } from "../detail-header";
+import { RowActionsMenu } from "./row-actions-menu";
 
 export function SelectedMemberDetail({
   hub,
@@ -43,22 +43,23 @@ export function SelectedMemberDetail({
     (teamId: string) => canManageTeamMembership(authority, teamId),
     [authority],
   );
+  const lock = memberRemoveLockReason(member, members, capabilities);
+  const menu = useMemo(
+    () =>
+      canManageMembers ? (
+        <MemberMenu member={member} lock={lock} actions={actions} back={back} />
+      ) : null,
+    [actions, back, canManageMembers, lock, member],
+  );
   return (
     <View>
       <BackLink to="People & access" onPress={back} disabled={pending} />
-      <SettingsSection title={member.name}>
-        {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
-        {member.role === "owner" ? (
-          <Alert
-            variant="success"
-            title="Full organization access"
-            description="Owner access is automatic and does not depend on Team or direct assignments."
-          />
-        ) : null}
+      <DetailHeader title={member.name} subtitle={member.email} actions={menu} />
+      {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
+      <SettingsSection title="Details">
         <View style={settingsStyles.card}>
-          <InfoRow title="Email" hint={member.email} />
-          {canManageMembers ? (
-            <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+          <LabeledRow label="Role">
+            {canManageMembers ? (
               <MemberRoleSelect
                 member={member}
                 members={members}
@@ -66,11 +67,19 @@ export function SelectedMemberDetail({
                 pending={pending}
                 setRole={setRole}
               />
-            </View>
-          ) : (
-            <InfoRow title="Organization role" hint={capitalizeLabel(member.role)} bordered />
-          )}
-          <InfoRow title="Status" hint="Active" bordered />
+            ) : (
+              <Text style={settingsStyles.rowTitle}>{capitalizeLabel(member.role)}</Text>
+            )}
+            {member.role === "owner" ? (
+              <Text style={settingsStyles.rowHint}>{OWNER_HINT}</Text>
+            ) : null}
+          </LabeledRow>
+          <LabeledRow label="Status" bordered>
+            <Text style={settingsStyles.rowTitle}>Active</Text>
+            {canManageMembers && lock !== null ? (
+              <Text style={settingsStyles.rowHint}>{lock}</Text>
+            ) : null}
+          </LabeledRow>
         </View>
       </SettingsSection>
       <MemberTeamsSection
@@ -82,13 +91,6 @@ export function SelectedMemberDetail({
       {/* Other roles cannot read Connections or access assignments; Account shows their own. */}
       {resources.canManageResources ? (
         <>
-          <MemberChatAccounts
-            hub={hub}
-            member={member}
-            resources={resources}
-            run={actions.run}
-            pending={pending}
-          />
           <MemberAccessSection
             member={member}
             teams={teams}
@@ -96,22 +98,24 @@ export function SelectedMemberDetail({
             pending={pending}
             manageAccess={manageAccess}
           />
+          <MemberChatAccounts
+            hub={hub}
+            member={member}
+            resources={resources}
+            run={actions.run}
+            pending={pending}
+          />
         </>
-      ) : null}
-      {canManageMembers ? (
-        <MemberDangerZone
-          member={member}
-          lock={memberRemoveLockReason(member, members, capabilities)}
-          actions={actions}
-          back={back}
-        />
       ) : null}
     </View>
   );
 }
 
-/** Removing the Member; disabled, with the Hub's reason, when the Hub would refuse. */
-function MemberDangerZone({
+const OWNER_HINT =
+  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
+
+/** Removing the Member sits behind the menu; disabled when the Hub would refuse (why is under Status). */
+function MemberMenu({
   member,
   lock,
   actions,
@@ -125,13 +129,16 @@ function MemberDangerZone({
   const remove = useCallback(async () => {
     if (await actions.removeMember(member.id, member.name)) back();
   }, [actions, back, member.id, member.name]);
-  const removeMember = useCallback(() => void remove(), [remove]);
-  return (
-    <SettingsSection title="Danger zone">
-      <Button variant="outline" disabled={actions.pending || lock !== null} onPress={removeMember}>
-        Remove Member
-      </Button>
-      {lock === null ? null : <Text style={settingsStyles.rowHint}>{lock}</Text>}
-    </SettingsSection>
+  const items = useMemo(
+    () => [
+      {
+        label: "Remove Member",
+        destructive: true,
+        disabled: actions.pending || lock !== null,
+        onSelect: () => void remove(),
+      },
+    ],
+    [actions.pending, lock, remove],
   );
+  return <RowActionsMenu label={`Actions for ${member.name}`} actions={items} disabled={false} />;
 }
