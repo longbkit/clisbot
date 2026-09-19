@@ -2,12 +2,29 @@ import { AutomationInputDraftContext } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
 import {
+  saveAdministeredAccount,
   useChannelConfigurationPreview,
+  useChannelRouteAdminScope,
   useChannelRouteWarnings,
   useChannelSettingsQueries,
   useReportDraftEditing,
   useScrollToTopOn,
+  type ChannelAccountRef,
 } from "./channel-settings-hooks";
+import {
+  audienceRuleErrors,
+  audienceRuleFromDraft,
+  audienceRuleSentence,
+  audienceRulesComplete,
+  fallbackAudienceDraft,
+  isOpenAudienceDraft,
+  membersEverywhereRule,
+  routeAudienceDraft,
+  routeAudienceSummary,
+  type AudienceNames,
+  type AudienceRuleDraft,
+} from "./channel-route-audience";
+import { AudienceRulesEditor, type AudienceOption } from "./channel-route-audience-fields";
 import { AdvancedConfigurationSection, useChannelYamlForm } from "./channel-advanced-configuration";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -47,7 +64,6 @@ import { HubApiError } from "../api-client";
 import { hubResourceQueryKey } from "../query-keys";
 import {
   CHANNEL_ROUTE_TARGET_VALUES,
-  channelMembersAudienceLabel,
   initialChannelRouteTarget,
   initialChannelReplyAnchor,
 } from "../channel-onboarding";
@@ -63,11 +79,12 @@ import {
   DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
   DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
   insertChannelRoute,
+  isDirectMessageOnly,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
+  routeContainsText,
   type ChannelConfigurationRecord,
   type ChannelRouteBehavior,
-  type ChannelRouteMatchKind,
   type ChannelRouteTarget,
 } from "../channel-configuration";
 import {
@@ -106,7 +123,6 @@ import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 import { ChannelOperationsView } from "./channel-operations-view";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import { ConversationSelectionFields } from "./conversation-picker-field";
 import { DaemonProjectField } from "./daemon-project-field";
 import {
   ManagedAgentConfigurationFields,
@@ -123,9 +139,7 @@ import { type AutomationConnection, SingleAgentAutomationForm } from "./automati
 
 type RecordValue = ChannelConfigurationRecord;
 type RouteTarget = "agent" | "automation";
-type MatchKind = ChannelRouteMatchKind;
 type RouteCondition = "all" | "contains";
-type RouteAudience = "members" | "conversationParticipants";
 type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 const FOLLOW_UP_TTL_ERROR = "Use a positive whole number of minutes.";
 type ConfigurationKind = "account" | "route";
@@ -145,23 +159,15 @@ type HubRevision = z.infer<typeof HubChannelRevisionsSchema>["revisions"][number
 type HubChannelConfiguration = z.infer<typeof HubChannelConfigurationSchema>;
 
 const EMPTY_RECORD: RecordValue = {};
-const MATCH_KIND_VALUES = ["dm", "channel", "thread", "group", "topic"];
-// Only `dm` needs spelling out; the rest read correctly once capitalized.
-const MATCH_KIND_LABELS = { dm: "Direct Message (DM)" };
-const CONVERSATION_SCOPE_VALUES = ["specific", "all"];
-const CONVERSATION_SCOPE_LABELS = {
-  specific: "Selected conversations",
-  all: "Any matching conversation",
-};
+/** What a Channel Route Admin's editor gets for the organization-wide resources it never reads. */
+const EMPTY_CONNECTIONS: HubConnections = { connections: [], providerApplications: [] };
+const EMPTY_AUTOMATIONS: HubAutomations = { automations: [] };
+const EMPTY_DAEMONS: HubDaemons = { daemons: [] };
+const EMPTY_TEAMS: HubTeams = { teams: [] };
 const ROUTE_CONDITION_VALUES = ["all", "contains"];
 const ROUTE_CONDITION_LABELS = {
   all: "Every eligible message",
-  contains: "Message contains…",
-};
-const ROUTE_AUDIENCE_VALUES = ["members", "conversationParticipants"];
-const ROUTE_AUDIENCE_LABELS = {
-  members: "Members with access",
-  conversationParticipants: "Anyone in matching conversations",
+  contains: "Only messages containing…",
 };
 const ROUTE_TARGET_LABELS = {
   agent: "Start or continue an Agent",
@@ -183,22 +189,14 @@ const APPROVAL_LABELS = {
 };
 interface EditingRoute {
   accountKey: string;
-  routeIndex: number;
+  /** A Route position, or the account's catch-all. */
+  routeIndex: number | "fallback";
 }
 
 type ChannelEditor =
   | { kind: "account" }
   | { kind: "route"; accountKey: string }
   | { kind: "edit"; route: EditingRoute };
-
-interface ChannelTeamGrant {
-  channel: string;
-  accountId: string;
-  teamIds: string[];
-  conversation:
-    | { kind: "direct_messages" | "public_channels" }
-    | { kind: "specific"; conversationIds: string[] };
-}
 
 export interface AutomationChannelScope {
   automationName: string;
@@ -210,9 +208,11 @@ export function ChannelSettings({
 }: Partial<AutomationChannelScope> & { embedded?: boolean } = {}) {
   const hub = useHubAccount();
   const router = useRouter();
+  const adminScope = useChannelRouteAdminScope();
   const openAccount = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
-  if (hub.loading) return <Text style={settingsStyles.rowHint}>Loading Channels...</Text>;
-  if (hub.signedIn?.capabilities.manageResources !== true)
+  if (hub.loading || adminScope.status === "loading")
+    return <Text style={settingsStyles.rowHint}>Loading Channels...</Text>;
+  if (adminScope.status === "none")
     return (
       <SettingsSection title="Channels">
         <Alert
@@ -229,7 +229,11 @@ export function ChannelSettings({
     <ConfirmationProvider
       key={JSON.stringify([hub.origin, hub.signedIn?.account.id, hub.signedIn?.organization.id])}
     >
-      <ChannelSettingsContent automationName={automationName} embedded={embedded} />
+      <ChannelSettingsContent
+        automationName={automationName}
+        embedded={embedded}
+        adminAccounts={adminScope.status === "accounts" ? adminScope.accounts : null}
+      />
     </ConfirmationProvider>
   );
 }
@@ -247,7 +251,12 @@ const CHANNEL_VIEWS: SegmentedControlOption<ChannelView>[] = [
 ];
 
 /** The views that render on their own, with no state from the accounts editor. */
-const CHANNEL_SECONDARY_VIEWS: Partial<Record<ChannelView, () => ReactElement>> = {
+const CHANNEL_SECONDARY_VIEWS: Partial<
+  Record<
+    ChannelView,
+    (props: { adminAccounts: readonly ChannelAccountRef[] | null }) => ReactElement
+  >
+> = {
   catalog: ChannelCatalogView,
   operations: ChannelOperationsView,
 };
@@ -255,16 +264,19 @@ const CHANNEL_SECONDARY_VIEWS: Partial<Record<ChannelView, () => ReactElement>> 
 function ChannelSettingsContent({
   automationName,
   embedded,
-}: Partial<AutomationChannelScope> & { embedded: boolean }) {
+  adminAccounts,
+}: Partial<AutomationChannelScope> & {
+  embedded: boolean;
+  /** The accounts a Channel Route Admin administers; null for the organization capability. */
+  adminAccounts: readonly ChannelAccountRef[] | null;
+}) {
   const [choosingInput, setChoosingInput] = useState(false);
   const toggleChoosingInput = useCallback(() => setChoosingInput((current) => !current), []);
   const confirmDialog = useConfirmation();
   const queryClient = useQueryClient();
-  const router = useRouter();
   const {
     hub,
     scope: queryScope,
-    canManage,
     isInstanceOperator,
     inputDraft,
     draftPending,
@@ -278,7 +290,8 @@ function ChannelSettingsContent({
     runtimeStatus,
     teams,
     assignments,
-  } = useChannelSettingsQueries();
+  } = useChannelSettingsQueries(adminAccounts);
+  const adminScoped = adminAccounts !== null;
   const { organizationId, accountId: hubAccountId } = queryScope;
   const yamlForm = useChannelYamlForm(channels.data);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -349,6 +362,19 @@ function ChannelSettingsContent({
         });
         return;
       }
+      if (adminScoped) {
+        // A Channel Route Admin saves one account file at a time; the Hub
+        // validates it and refuses a changed Connection.
+        const changed = accounts.filter(
+          (account) =>
+            !current.accounts.some((stored) => JSON.stringify(stored) === JSON.stringify(account)),
+        );
+        for (const account of changed) {
+          await saveAdministeredAccount(hub.api(), account, current.revision?.id ?? null);
+        }
+        await Promise.all([channels.refetch(), runtimeStatus.refetch()]);
+        return;
+      }
       await hub.api().post("channel-configuration/validate", candidate, HubChannelValidationSchema);
       const saved = await hub.api().put(
         "channel-configuration",
@@ -367,7 +393,17 @@ function ChannelSettingsContent({
       );
       void Promise.all([channels.refetch(), history.refetch(), runtimeStatus.refetch()]);
     },
-    [channels, history, hub, runtimeStatus, queryClient, organizationId, hubAccountId, inputDraft],
+    [
+      adminScoped,
+      channels,
+      history,
+      hub,
+      runtimeStatus,
+      queryClient,
+      organizationId,
+      hubAccountId,
+      inputDraft,
+    ],
   );
 
   const removeAccount = useCallback(
@@ -559,9 +595,6 @@ function ChannelSettingsContent({
       assignments.refetch(),
     ]);
   }, [channels, connections, runtimeStatus, history, automations, daemons, teams, assignments]);
-  const openAccess = useCallback(() => {
-    router.push(buildHubSettingsRoute("access"));
-  }, [router]);
   const cancelRouteEdit = useCallback(() => setEditor(null), []);
   const editRoute = useCallback(
     (route: EditingRoute) => beginEdit({ kind: "edit", route }),
@@ -580,7 +613,7 @@ function ChannelSettingsContent({
     [automations, hub],
   );
   const saveChannelBehavior = useCallback(
-    (accounts: RecordValue[], resource: RecordValue, teamGrant?: ChannelTeamGrant) => {
+    (accounts: RecordValue[], resource: RecordValue, createdAccountKey?: string) => {
       void mutate(async () => {
         if (inputDraft) {
           if (!channels.data) throw new Error("Channel configuration is still loading.");
@@ -591,26 +624,21 @@ function ChannelSettingsContent({
             accounts,
             resource,
             policy: channels.data.policy ?? {},
-            grants: teamGrant
-              ? [
-                  ...(inputDraft.draft?.grants ?? []).filter(
-                    (grant) =>
-                      grant.channel !== teamGrant.channel ||
-                      grant.accountId !== teamGrant.accountId,
-                  ),
-                  teamGrant,
-                ]
-              : (inputDraft.draft?.grants ?? []),
+            grants: inputDraft.draft?.grants ?? [],
           });
           setEditor(null);
           return;
         }
-        const currentConfiguration = queryClient.getQueryData<HubChannelConfiguration>(
-          hubResourceQueryKey(
-            { origin: hub.origin, organizationId, accountId: hubAccountId },
-            "channel-configuration",
-          ),
-        );
+        // An admin-scoped screen holds its accounts under its own query key, so
+        // the loaded view is the freshest revision it can compare against.
+        const currentConfiguration = adminScoped
+          ? channels.data
+          : queryClient.getQueryData<HubChannelConfiguration>(
+              hubResourceQueryKey(
+                { origin: hub.origin, organizationId, accountId: hubAccountId },
+                "channel-configuration",
+              ),
+            );
         if ((currentConfiguration?.revision?.id ?? null) !== editorRevisionId) {
           throw new Error(
             "Channel configuration changed while editing. Cancel and reopen this Route before saving.",
@@ -618,40 +646,13 @@ function ChannelSettingsContent({
         }
         await replaceConfiguration(accounts, resource);
         setEditor(null);
-        if (teamGrant !== undefined) {
-          setSelectedAccountKey(`${teamGrant.channel}:${teamGrant.accountId}`);
-          if (teamGrant.teamIds.length > 0) {
-            try {
-              await hub.api().post(
-                "access-assignments/batch",
-                {
-                  assignments: teamGrant.teamIds.map((teamId) => ({
-                    subjectKind: "team",
-                    subjectId: teamId,
-                    resourceKind: "channel_account",
-                    resourceId: channelAccountResourceId(teamGrant.channel, teamGrant.accountId),
-                    privileges: ["channel.use"],
-                    constraints: { conversation: teamGrant.conversation },
-                  })),
-                },
-                HubAccessAssignmentsSchema,
-              );
-              await assignments.refetch();
-            } catch (error) {
-              const detail = error instanceof Error ? error.message : "Hub request failed.";
-              throw new Error(
-                `Route saved, but Team access could not be updated. Open Manage access to finish sharing this Channel Route. ${detail}`,
-                { cause: error },
-              );
-            }
-          }
-        }
+        if (createdAccountKey !== undefined) setSelectedAccountKey(createdAccountKey);
       });
     },
     [
+      adminScoped,
       inputDraft,
       channels.data,
-      assignments,
       hub,
       mutate,
       replaceConfiguration,
@@ -700,23 +701,32 @@ function ChannelSettingsContent({
     [mutate, replaceConfiguration],
   );
 
+  const sources = editorSourcesFor(adminScoped, {
+    channels,
+    connections,
+    automations,
+    daemons,
+    teams,
+    runtimeStatus,
+  });
   if (editor !== null)
     return (
       <ChannelManagementSection
         key={channelFormKey(editor)}
         editor={editor}
         automationName={automationName}
-        queries={[channels, connections, automations, daemons, teams]}
+        queries={sources.editorQueries}
         retry={refreshStatus}
         error={mutationError}
         channels={channels.data}
-        connections={connections.data}
-        automations={automations.data}
-        daemons={daemons.data}
-        teams={teams.data}
+        connections={sources.connections}
+        automations={sources.automations}
+        daemons={sources.daemons}
+        teams={sources.teams}
         channelConnections={channelConnections}
         pending={pending}
         isInstanceOperator={isInstanceOperator}
+        adminScoped={adminScoped}
         cancelRouteEdit={cancelRouteEdit}
         createRouteAutomation={createRouteAutomation}
         saveChannelBehavior={saveChannelBehavior}
@@ -760,7 +770,7 @@ function ChannelSettingsContent({
     return (
       <View>
         {navigation}
-        <SecondaryView />
+        <SecondaryView adminAccounts={adminAccounts} />
       </View>
     );
   if (channelView === "activity")
@@ -770,6 +780,7 @@ function ChannelSettingsContent({
         <ChannelActivity
           accounts={channels.data?.accounts}
           connections={connections.data?.connections}
+          accountScoped={adminScoped}
           state={activityState}
           onChange={setActivityState}
         />
@@ -784,18 +795,17 @@ function ChannelSettingsContent({
         runtimeStatus={runtimeStatus.data}
         teams={teams.data}
         assignments={assignments.data}
-        queries={[channels, connections, runtimeStatus, teams, assignments]}
+        queries={sources.accountQueries}
         refreshing={statusRefreshing}
         mutationError={mutationError}
         testResult={testResult}
         selectedAccountKey={selectedAccountKey}
-        canManage={canManage}
+        adminScoped={adminScoped}
         pending={pending}
         refreshStatus={refreshStatus}
         selectAccount={setSelectedAccountKey}
         updateAccount={updateAccount}
         removeAccount={removeAccount}
-        openAccess={openAccess}
         retryAccount={retryAccount}
         editRoute={editRoute}
         addAccount={addAccount}
@@ -805,21 +815,101 @@ function ChannelSettingsContent({
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
-      {selectedAccountKey === null ? (
-        <ChannelRevisionHistory
-          revisions={history.data?.revisions}
-          activeRevisionId={channels.data?.revision?.id}
-        />
-      ) : null}
-      <AdvancedConfigurationSection
-        model={yamlForm}
-        error={mutationError}
+      <ChannelConfigurationExtras
+        visible={!adminScoped}
+        showHistory={selectedAccountKey === null}
+        revisions={history.data?.revisions}
         channels={channels.data}
+        yamlForm={yamlForm}
+        error={mutationError}
         pending={pending}
         validate={validateAdvancedConfiguration}
         save={saveAdvancedConfiguration}
       />
     </View>
+  );
+}
+
+/**
+ * What the editor and the accounts list read, by viewer. A Channel Route Admin
+ * never reads the organization-wide Connections, Automations, Hosts or
+ * revisions: the form shows the target as managed elsewhere instead.
+ */
+function editorSourcesFor(
+  adminScoped: boolean,
+  queries: {
+    channels: SourceQuery<HubChannelConfiguration>;
+    connections: SourceQuery<HubConnections>;
+    automations: SourceQuery<HubAutomations>;
+    daemons: SourceQuery<HubDaemons>;
+    teams: SourceQuery<HubTeams>;
+    runtimeStatus: SourceQuery<HubRuntimeStatus>;
+  },
+) {
+  const { channels, connections, automations, daemons, teams, runtimeStatus } = queries;
+  if (adminScoped) {
+    return {
+      editorQueries: [channels],
+      accountQueries: [channels, runtimeStatus],
+      connections: EMPTY_CONNECTIONS,
+      automations: EMPTY_AUTOMATIONS,
+      daemons: EMPTY_DAEMONS,
+      teams: teams.data ?? EMPTY_TEAMS,
+    };
+  }
+  return {
+    editorQueries: [channels, connections, automations, daemons, teams],
+    accountQueries: [channels, connections, runtimeStatus],
+    connections: connections.data,
+    automations: automations.data,
+    daemons: daemons.data,
+    teams: teams.data,
+  };
+}
+
+interface SourceQuery<Data> {
+  data: Data | undefined;
+  isPending: boolean;
+  error: Error | null;
+}
+
+/** Revision history and Advanced YAML: organization-wide, so hidden from a Channel Route Admin. */
+function ChannelConfigurationExtras({
+  visible,
+  showHistory,
+  revisions,
+  channels,
+  yamlForm,
+  error,
+  pending,
+  validate,
+  save,
+}: {
+  visible: boolean;
+  showHistory: boolean;
+  revisions: HubRevision[] | undefined;
+  channels: HubChannelConfiguration | undefined;
+  yamlForm: ReturnType<typeof useChannelYamlForm>;
+  error: string | null;
+  pending: boolean;
+  validate(candidate: ReturnType<typeof parseChannelConfigurationYaml>): Promise<void>;
+  save(candidate: ReturnType<typeof parseChannelConfigurationYaml>): Promise<boolean>;
+}) {
+  if (!visible) return null;
+  return (
+    <>
+      {showHistory ? (
+        <ChannelRevisionHistory revisions={revisions} activeRevisionId={channels?.revision?.id} />
+      ) : null}
+      <AdvancedConfigurationSection
+        model={yamlForm}
+        error={error}
+        channels={channels}
+        pending={pending}
+        validate={validate}
+        save={save}
+      />
+    </>
   );
 }
 
@@ -980,7 +1070,7 @@ function AutomationChannelAccount({
       />
       {objectField(account, "fallback")?.workflow === automationName ? (
         <Text style={settingsStyles.rowHint}>
-          Fallback invokes this Automation. Edit fallback in Channels advanced configuration.
+          The catch-all invokes this Automation. Edit it from the Channel Route in Channels.
         </Text>
       ) : null}
     </View>
@@ -1019,13 +1109,12 @@ function ChannelAccountsSection({
   mutationError,
   testResult,
   selectedAccountKey,
-  canManage,
+  adminScoped,
   pending,
   refreshStatus,
   selectAccount,
   updateAccount,
   removeAccount,
-  openAccess,
   retryAccount,
   editRoute,
   addAccount,
@@ -1045,13 +1134,13 @@ function ChannelAccountsSection({
   mutationError: string | null;
   testResult: string | null;
   selectedAccountKey: string | null;
-  canManage: boolean;
+  /** A Channel Route Admin: their accounts only, nothing organization-wide. */
+  adminScoped: boolean;
   pending: boolean;
   refreshStatus(): void;
   selectAccount(key: string | null): void;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
-  openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
   addAccount(): void;
@@ -1068,12 +1157,12 @@ function ChannelAccountsSection({
         {/* Two fixed actions rather than one that changes meaning with the
             selection: a new Channel Route always carries the Channel Account
             picker, while Add Route only adds a rule to the open one. */}
-        {canManage ? (
+        {adminScoped ? null : (
           <Button size="sm" disabled={pending} onPress={addAccount}>
             Add Channel Route
           </Button>
-        ) : null}
-        {canManage && selectedAccountKey !== null ? (
+        )}
+        {selectedAccountKey !== null ? (
           <Button size="sm" variant="outline" disabled={pending} onPress={addRoute}>
             Add Route
           </Button>
@@ -1092,16 +1181,16 @@ function ChannelAccountsSection({
         connections={connections?.connections ?? []}
         runtimes={runtimeStatus?.accounts ?? []}
         runtimeAvailable={runtimeStatus?.runtimeAvailable}
+        warnings={channels?.warnings}
         assignments={assignments?.assignments}
         teams={teams?.teams ?? []}
         revisionVersion={channels?.revision?.version}
         selectedAccountKey={selectedAccountKey}
-        canManage={canManage}
+        adminScoped={adminScoped}
         pending={pending}
         selectAccount={selectAccount}
         updateAccount={updateAccount}
         removeAccount={removeAccount}
-        openAccess={openAccess}
         retryAccount={retryAccount}
         editRoute={editRoute}
         testRoute={testRoute}
@@ -1126,6 +1215,7 @@ function ChannelManagementSection({
   channelConnections,
   pending,
   isInstanceOperator,
+  adminScoped,
   cancelRouteEdit,
   createRouteAutomation,
   saveChannelBehavior,
@@ -1144,12 +1234,13 @@ function ChannelManagementSection({
   channelConnections: HubConnection[];
   pending: boolean;
   isInstanceOperator: boolean;
+  adminScoped: boolean;
   cancelRouteEdit(): void;
   createRouteAutomation(yaml: string): Promise<string>;
   saveChannelBehavior(
     accounts: RecordValue[],
     resource: RecordValue,
-    teamGrant?: ChannelTeamGrant,
+    createdAccountKey?: string,
   ): void;
   saveConnection(body: unknown): Promise<HubConnection>;
 }) {
@@ -1222,6 +1313,8 @@ function ChannelManagementSection({
           initialAccountKey={accountKey}
           createdConnectionId={createdConnectionId}
           pending={pending}
+          adminScoped={adminScoped}
+          saveError={error}
           cancelEdit={cancelRouteEdit}
           createRouteAutomation={createRouteAutomation}
           save={saveChannelBehavior}
@@ -1255,16 +1348,16 @@ function ChannelAccountList({
   connections,
   runtimes,
   runtimeAvailable,
+  warnings,
   assignments,
   teams,
   revisionVersion,
   selectedAccountKey,
-  canManage,
+  adminScoped,
   pending,
   selectAccount,
   updateAccount,
   removeAccount,
-  openAccess,
   retryAccount,
   editRoute,
   testRoute,
@@ -1275,16 +1368,16 @@ function ChannelAccountList({
   connections: HubConnection[];
   runtimes: HubRuntimeAccount[];
   runtimeAvailable: boolean | undefined;
+  warnings: HubChannelConfiguration["warnings"];
   assignments: HubAssignment[] | undefined;
   teams: HubTeam[];
   revisionVersion: number | undefined;
   selectedAccountKey: string | null;
-  canManage: boolean;
+  adminScoped: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
-  openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
@@ -1313,16 +1406,16 @@ function ChannelAccountList({
             connections={connections}
             runtimes={runtimes}
             runtimeAvailable={runtimeAvailable}
+            warnings={warnings}
             assignments={assignments}
             teams={teams}
             revisionVersion={revisionVersion}
             selected={selectedAccountKey === channelAccountKey(account)}
-            canManage={canManage}
+            adminScoped={adminScoped}
             pending={pending}
             selectAccount={selectAccount}
             updateAccount={updateAccount}
             removeAccount={removeAccount}
-            openAccess={openAccess}
             retryAccount={retryAccount}
             editRoute={editRoute}
             testRoute={testRoute}
@@ -1340,16 +1433,16 @@ function ChannelAccountRow({
   connections,
   runtimes,
   runtimeAvailable,
+  warnings,
   assignments,
   teams,
   revisionVersion,
   selected,
-  canManage,
+  adminScoped,
   pending,
   selectAccount,
   updateAccount,
   removeAccount,
-  openAccess,
   retryAccount,
   editRoute,
   testRoute,
@@ -1361,16 +1454,16 @@ function ChannelAccountRow({
   connections: HubConnection[];
   runtimes: HubRuntimeAccount[];
   runtimeAvailable: boolean | undefined;
+  warnings: HubChannelConfiguration["warnings"];
   assignments: HubAssignment[] | undefined;
   teams: HubTeam[];
   revisionVersion: number | undefined;
   selected: boolean;
-  canManage: boolean;
+  adminScoped: boolean;
   pending: boolean;
   selectAccount(key: string | null): void;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
   removeAccount(account: RecordValue): Promise<void>;
-  openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
   editRoute(route: EditingRoute): void;
   testRoute(account: RecordValue, route: RecordValue): Promise<void>;
@@ -1410,32 +1503,38 @@ function ChannelAccountRow({
             <Text style={settingsStyles.rowTitle}>{`${channelLabel(channel)} · ${accountId}`}</Text>
           </View>
           <Text style={settingsStyles.rowHint}>
-            {channelAccountStatus(enabled, runtimeAvailable, runtime, connection, routes.length)}
+            {channelAccountStatus(
+              enabled,
+              runtimeAvailable,
+              runtime,
+              adminScoped ? MANAGED_BY_ORGANIZATION : channelConnectionLabel(connection),
+              routes.length,
+            )}
           </Text>
         </View>
-        {canManage ? (
-          <View style={styles.actions}>
-            <Button
-              size="xs"
-              variant={selected ? "secondary" : "outline"}
-              disabled={pending}
-              onPress={toggleSelected}
-            >
-              {selected ? "Back to Channel Routes" : "Manage"}
-            </Button>
-            <Switch
-              value={enabled}
-              onValueChange={toggleEnabled}
-              disabled={pending}
-              accessibilityLabel={`${enabled ? "Disable" : "Enable"} ${accountId}`}
-            />
+        <View style={styles.actions}>
+          <Button
+            size="xs"
+            variant={selected ? "secondary" : "outline"}
+            disabled={pending}
+            onPress={toggleSelected}
+          >
+            {selected ? "Back to Channel Routes" : "Manage"}
+          </Button>
+          <Switch
+            value={enabled}
+            onValueChange={toggleEnabled}
+            disabled={pending}
+            accessibilityLabel={`${enabled ? "Disable" : "Enable"} ${accountId}`}
+          />
+          {adminScoped ? null : (
             <ChannelActionsMenu
               label={`Actions for ${accountId}`}
               disabled={pending}
               remove={remove}
             />
-          </View>
-        ) : null}
+          )}
+        </View>
       </View>
       <ChannelAccountDetails
         visible={selected}
@@ -1449,19 +1548,21 @@ function ChannelAccountRow({
         teams={teams}
         revisionVersion={revisionVersion}
         enabled={enabled}
+        adminScoped={adminScoped}
         pending={pending}
-        openAccess={openAccess}
         retryAccount={retryAccount}
         updateAccount={updateAccount}
+        editRoute={editRoute}
       />
       <ChannelAccountRouteList
         visible={selected}
         account={account}
         accountKey={key}
         routes={routes}
+        warnings={warnings}
         enabled={enabled}
         runtime={runtime}
-        canManage={canManage}
+        canManage
         pending={pending}
         editRoute={editRoute}
         testRoute={testRoute}
@@ -1484,10 +1585,11 @@ function ChannelAccountDetails({
   teams,
   revisionVersion,
   enabled,
+  adminScoped,
   pending,
-  openAccess,
   retryAccount,
   updateAccount,
+  editRoute,
 }: {
   visible: boolean;
   account: RecordValue;
@@ -1500,10 +1602,11 @@ function ChannelAccountDetails({
   teams: HubTeam[];
   revisionVersion: number | undefined;
   enabled: boolean;
+  adminScoped: boolean;
   pending: boolean;
-  openAccess(): void;
   retryAccount(account: RecordValue): Promise<void>;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
+  editRoute(route: EditingRoute): void;
 }) {
   const [showRuntimeDetails, setShowRuntimeDetails] = useState(false);
   const [showLimits, setShowLimits] = useState(false);
@@ -1527,6 +1630,7 @@ function ChannelAccountDetails({
         runtime={runtime}
         runtimeAvailable={runtimeAvailable}
         enabled={enabled}
+        adminScoped={adminScoped}
         pending={pending}
         showingAccess={showAccess}
         showingRuntimeDetails={showRuntimeDetails}
@@ -1553,16 +1657,22 @@ function ChannelAccountDetails({
         />
       ) : null}
       {showAccess ? (
-        <ChannelAccountAccess
+        <ChannelRouteAdmins
           channel={channel}
           accountId={accountId}
           connection={connection}
           assignments={assignments}
           teams={teams}
+          adminScoped={adminScoped}
           pending={pending}
-          openAccess={openAccess}
         />
       ) : null}
+      <ChannelCatchAllRow
+        account={account}
+        accountKey={channelAccountKey(account)}
+        pending={pending}
+        editRoute={editRoute}
+      />
       {showRuntimeDetails ? (
         <View style={settingsStyles.row}>
           <Text
@@ -1599,6 +1709,7 @@ function ChannelAccountActions({
   runtime,
   runtimeAvailable,
   enabled,
+  adminScoped,
   pending,
   showingAccess,
   showingRuntimeDetails,
@@ -1615,6 +1726,7 @@ function ChannelAccountActions({
   connection: HubConnection | undefined;
   runtime: HubRuntimeAccount | undefined;
   runtimeAvailable: boolean | undefined;
+  adminScoped: boolean;
   enabled: boolean;
   pending: boolean;
   showingAccess: boolean;
@@ -1639,7 +1751,7 @@ function ChannelAccountActions({
   return (
     <View style={[settingsStyles.row, styles.actions]}>
       <Button size="sm" variant="ghost" onPress={toggleAccess}>
-        {showingAccess ? "Hide access" : "Who can use this?"}
+        {showingAccess ? "Hide access" : "Access"}
       </Button>
       <Button size="sm" variant="ghost" onPress={toggleLimits}>
         {showingLimits ? "Hide limits" : "Limits"}
@@ -1652,7 +1764,7 @@ function ChannelAccountActions({
           {showingLinking ? "Hide linking" : "Link with QR"}
         </Button>
       ) : null}
-      {connected || needsLinking ? null : (
+      {connected || needsLinking || adminScoped ? null : (
         <Button size="sm" variant="outline" disabled={pending} onPress={openConfiguration}>
           Manage Connection
         </Button>
@@ -1682,24 +1794,31 @@ function ChannelAccountQrLinking({ channel, accountId }: { channel: string; acco
   );
 }
 
-function ChannelAccountAccess({
+/**
+ * The Channel Route's Access tab: who administers it. Who may talk is decided
+ * by each Route's audience rules, so no Use grant is offered here
+ * (docs/features/access/scoped-admins.md).
+ */
+function ChannelRouteAdmins({
   channel,
   accountId,
   connection,
   assignments,
   teams,
+  adminScoped,
   pending,
-  openAccess,
 }: {
   channel: string;
   accountId: string;
   connection: HubConnection | undefined;
   assignments: HubAssignment[] | undefined;
   teams: HubTeam[];
+  adminScoped: boolean;
   pending: boolean;
-  openAccess(): void;
 }) {
+  const hub = useHubAccount();
   const router = useRouter();
+  const resourceId = channelAccountResourceId(channel, accountId);
   const openIdentity = useCallback(
     () =>
       router.push({
@@ -1711,44 +1830,127 @@ function ChannelAccountAccess({
       }),
     [router, connection?.id],
   );
-  const access = (assignments ?? []).filter(
-    (assignment) =>
-      assignment.resourceKind === "channel_account" &&
-      assignment.resourceId === channelAccountResourceId(channel, accountId),
+  // The Access page preselects the Route from these params.
+  const openAccess = useCallback(
+    () =>
+      router.push({
+        pathname: "/settings/hub/[hubSection]",
+        params: { hubSection: "access", resourceKind: "channel_account", resourceId },
+      }),
+    [router, resourceId],
   );
-  const teamNames = access.flatMap((assignment) => {
-    if (assignment.subjectKind !== "team") return [];
-    const team = teams.find(({ id }) => id === assignment.subjectId);
-    return team === undefined ? [] : [team.name];
-  });
-  const canLinkIdentity = connection?.canLinkIdentity === true;
+  const members = hub.signedIn?.team?.members ?? [];
+  const subjectName = (assignment: HubAssignment): string => {
+    if (assignment.subjectKind === "team") {
+      const team = teams.find(({ id }) => id === assignment.subjectId);
+      return `Team ${team?.name ?? assignment.subjectId}`;
+    }
+    return members.find(({ id }) => id === assignment.subjectId)?.name ?? assignment.subjectId;
+  };
+  const admins = (assignments ?? [])
+    .filter(
+      (assignment) =>
+        assignment.resourceKind === "channel_account" &&
+        assignment.resourceId === resourceId &&
+        assignment.privileges.includes("channel.manage"),
+    )
+    .map((assignment) => ({
+      id: assignment.id,
+      subject: subjectName(assignment),
+      by: members.find(({ userId }) => userId === assignment.createdByUserId)?.name ?? null,
+    }));
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Who can use this Channel Route?</Text>
+        <Text style={settingsStyles.rowTitle}>Channel Route Admins</Text>
         <Text style={settingsStyles.rowHint}>
-          Each Route chooses its audience. Members with access requires a linked Channel identity.
-          Owners have access automatically; other Members need a matching grant. Anyone in
-          conversation admits participants without a Member grant.
+          Admins edit this Channel Route’s Routes, audience rules, status and relink. Who may talk
+          to the bot is set on each Route.
         </Text>
-        <Text style={settingsStyles.rowHint}>
-          {assignments === undefined
-            ? "Access information is not loaded yet. Refresh status to retry."
-            : channelAccessStatus(teamNames, access.length)}
-        </Text>
-        <ChannelPairingPanel channel={channel} accountId={accountId} disabled={pending} />
+        {adminLines(assignments === undefined, admins).map((line, index) => (
+          <Text key={admins[index]?.id ?? line} style={settingsStyles.rowHint}>
+            {line}
+          </Text>
+        ))}
+        {adminScoped ? null : (
+          <ChannelPairingPanel channel={channel} accountId={accountId} disabled={pending} />
+        )}
         <View style={styles.actions}>
-          {canLinkIdentity ? (
+          {connection?.canLinkIdentity === true ? (
             <Button size="sm" variant="outline" disabled={pending} onPress={openIdentity}>
               Your Channel identities
             </Button>
           ) : null}
           <Button size="sm" variant="outline" disabled={pending} onPress={openAccess}>
-            Manage access
+            Manage Admins in Access
           </Button>
         </View>
       </View>
     </View>
+  );
+}
+
+/** One line per Admin, or the one line that says why there are none. */
+function adminLines(
+  loading: boolean,
+  admins: readonly { subject: string; by: string | null }[],
+): string[] {
+  if (loading) return ["Admins are not loaded yet."];
+  if (admins.length === 0) return ["Only Organization Admins so far."];
+  return admins.map(({ subject, by }) => (by === null ? subject : `${subject} · by ${by}`));
+}
+
+/** Everyone else: what the account does with a message no Route admits. */
+function ChannelCatchAllRow({
+  account,
+  accountKey,
+  pending,
+  editRoute,
+}: {
+  account: RecordValue;
+  accountKey: string;
+  pending: boolean;
+  editRoute(route: EditingRoute): void;
+}) {
+  const names = useAudienceNames(undefined);
+  const edit = useCallback(
+    () => editRoute({ accountKey, routeIndex: "fallback" }),
+    [accountKey, editRoute],
+  );
+  const fallback = objectField(account, "fallback");
+  const draft = fallbackAudienceDraft(fallback);
+  const summary = draft.deny
+    ? "Denied: messages no Route admits are refused."
+    : `${routeAudienceSummary(draft.rules, names)
+        .map(({ place, who }) => `${place}: ${who}`)
+        .join(" · ")} → ${routeTargetSummary(fallback ?? EMPTY_RECORD)}`;
+  return (
+    <View style={[settingsStyles.row, styles.detailRow]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>Everyone else (catch-all)</Text>
+        <Text style={settingsStyles.rowHint}>{summary}</Text>
+      </View>
+      <Button size="xs" variant="outline" disabled={pending} onPress={edit}>
+        Edit catch-all
+      </Button>
+    </View>
+  );
+}
+
+/** Names for the ids audience rules store: Teams, Members and observed conversations. */
+function useAudienceNames(
+  metadata: z.infer<typeof HubObservedChannelConversationsSchema> | undefined,
+  teams: readonly HubTeam[] = [],
+): AudienceNames {
+  const hub = useHubAccount();
+  const members = hub.signedIn?.team?.members;
+  return useMemo(
+    () => ({
+      teamName: (id) => teams.find((team) => team.id === id)?.name ?? id,
+      memberName: (id) => members?.find((member) => member.id === id)?.name ?? id,
+      conversationLabel: (id) => channelDestinationLabel(id, metadata),
+    }),
+    [members, metadata, teams],
   );
 }
 
@@ -1758,6 +1960,7 @@ function ChannelAccountRouteList({
   account,
   accountKey,
   routes,
+  warnings,
   enabled,
   runtime,
   canManage,
@@ -1772,6 +1975,7 @@ function ChannelAccountRouteList({
   account: RecordValue;
   accountKey: string;
   routes: RecordValue[];
+  warnings?: HubChannelConfiguration["warnings"];
   enabled: boolean;
   runtime: HubRuntimeAccount | undefined;
   canManage: boolean;
@@ -1823,6 +2027,7 @@ function ChannelAccountRouteList({
         accountKey={accountKey}
         route={route}
         metadata={metadata.data}
+        warnings={warnings}
         routeIndex={routeIndex}
         routeCount={routes.length}
         enabled={enabled}
@@ -1860,6 +2065,7 @@ function ChannelRouteRow({
   accountKey,
   route,
   metadata,
+  warnings: accountWarnings,
   routeIndex,
   routeCount,
   enabled,
@@ -1876,6 +2082,7 @@ function ChannelRouteRow({
   accountKey: string;
   route: RecordValue;
   metadata: z.infer<typeof HubObservedChannelConversationsSchema> | undefined;
+  warnings: HubChannelConfiguration["warnings"];
   routeIndex: number;
   routeCount: number;
   enabled: boolean;
@@ -1888,6 +2095,7 @@ function ChannelRouteRow({
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
   const compact = useIsCompactFormFactor();
+  const names = useAudienceNames(metadata);
   const runTest = useCallback(() => {
     void testRoute(account, route);
   }, [account, route, testRoute]);
@@ -1904,6 +2112,7 @@ function ChannelRouteRow({
     void removeRoute(account, routeIndex);
   }, [account, removeRoute, routeIndex]);
   const warnings = useChannelRouteWarnings(
+    accountWarnings,
     stringField(account, "channel"),
     stringField(account, "accountId"),
     routeIndex,
@@ -1927,7 +2136,7 @@ function ChannelRouteRow({
         <Text style={settingsStyles.rowTitle}>
           {`Route ${String(routeIndex + 1)} · ${routeTargetSummary(route)}`}
         </Text>
-        <Text style={settingsStyles.rowHint}>{routeMatchSummary(route, metadata)}</Text>
+        <Text style={settingsStyles.rowHint}>{routeAudienceLine(route, names)}</Text>
         <Text style={settingsStyles.rowHint}>{routeBehaviorSummary(route)}</Text>
         <Text style={settingsStyles.rowHint}>{channelLimitsSummary(route["limits"])}</Text>
         <RouteWarnings warnings={warnings} />
@@ -2059,6 +2268,8 @@ function ChannelAccountForm({
   initialAccountKey,
   createdConnectionId,
   pending,
+  adminScoped,
+  saveError,
   cancelEdit,
   connectChannelAccount,
   createRouteAutomation,
@@ -2081,11 +2292,15 @@ function ChannelAccountForm({
   initialAccountKey: string | null;
   createdConnectionId: string | null;
   pending: boolean;
+  /** A Channel Route Admin: the target is shown, not edited, and saved as it is. */
+  adminScoped: boolean;
+  /** The last save's refusal, so rule-level Hub errors land on their rows. */
+  saveError: string | null;
   cancelEdit(): void;
   /** Absent when the form edits an account that already has its Channel Account. */
   connectChannelAccount?: () => void;
   createRouteAutomation(yaml: string): Promise<string>;
-  save(accounts: RecordValue[], resource: RecordValue, teamGrant?: ChannelTeamGrant): void;
+  save(accounts: RecordValue[], resource: RecordValue, createdAccountKey?: string): void;
 }) {
   const inputDraft = useContext(AutomationInputDraftContext);
   const hub = useHubAccount();
@@ -2107,13 +2322,11 @@ function ChannelAccountForm({
     if (createdConnectionId !== null) setConnectionId(createdConnectionId);
   }, [createdConnectionId]);
   const [accountId, setAccountId] = useState("");
-  const [matchKind, setMatchKind] = useState<MatchKind>(initial.matchKind);
-  const [conversationIds, setConversationIds] = useState(initial.conversationIds);
-  const [conversationScope, setConversationScope] = useState(() =>
-    initialConversationScope(initial),
+  const [audienceRules, setAudienceRulesState] = useState<AudienceRuleDraft[]>(
+    initial.audienceRules,
   );
+  const [fallbackDeny, setFallbackDeny] = useState(initial.fallbackDeny);
   const [routeCondition, setRouteCondition] = useState<RouteCondition>(initial.routeCondition);
-  const [audience, setAudience] = useState<RouteAudience>(initial.audience);
   const [behavior, setBehavior] = useState<ChannelRouteBehavior>(initial.behavior.behavior);
   const [approvalChoice, setApprovalChoice] = useState<RouteApprovalChoice>(
     initial.behavior.approvalChoice,
@@ -2121,15 +2334,39 @@ function ChannelAccountForm({
   const [followUpTtlDraft, setFollowUpTtlDraft] = useState(() =>
     String(initial.behavior.behavior.followUpTtlMinutes),
   );
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
-  const memberAudienceLabel = channelMembersAudienceLabel({
-    membership: hub.signedIn?.membership ?? null,
-    members: hub.signedIn?.team?.members,
-    selectedTeamIds,
-  });
-  const audienceLabels = useMemo(
-    () => ({ ...ROUTE_AUDIENCE_LABELS, members: memberAudienceLabel }),
-    [memberAudienceLabel],
+  const open = isOpenAudienceDraft(audienceRules);
+  const dmOnly = isDirectMessageOnly(audienceRules.map(audienceRuleFromDraft));
+  // Opening the Route to Anyone (or closing it again) starts from that
+  // audience's behavior; everything stays editable afterwards.
+  const setAudienceRules = useCallback<Dispatch<SetStateAction<AudienceRuleDraft[]>>>(
+    (update) => {
+      const next = typeof update === "function" ? update(audienceRules) : update;
+      setAudienceRulesState(next);
+      const nextOpen = isOpenAudienceDraft(next);
+      if (nextOpen === open) return;
+      const defaults = nextOpen
+        ? DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR
+        : DEFAULT_MEMBER_ROUTE_BEHAVIOR;
+      setBehavior(defaults);
+      setApprovalChoice(defaults.approvalMode ?? "custom");
+      setFollowUpTtlDraft(String(defaults.followUpTtlMinutes));
+    },
+    [audienceRules, open],
+  );
+  const audienceOptions = useMemo<{ teams: AudienceOption[]; members: AudienceOption[] }>(
+    () => ({
+      teams: teams.map(({ id, name }) => ({ id, name })),
+      members: (hub.signedIn?.team?.members ?? []).map(({ id, name }) => ({ id, name })),
+    }),
+    [hub.signedIn?.team?.members, teams],
+  );
+  const audienceNames = useAudienceNames(undefined, teams);
+  const audienceErrors = useMemo(
+    () =>
+      saveError === null
+        ? new Map<number, string>()
+        : audienceRuleErrors(saveError, editing?.routeIndex ?? 0),
+    [editing?.routeIndex, saveError],
   );
 
   const [contains, setContains] = useState(initial.contains);
@@ -2198,11 +2435,19 @@ function ChannelAccountForm({
     [automations],
   );
   const followUpTtlValid = isFollowUpTtlDraftValid({
-    audience,
-    matchKind,
+    dmOnly,
     behavior,
     draft: followUpTtlDraft,
   });
+  // A Channel Route Admin keeps the Route's target; a new Route of theirs
+  // copies the target of one the account already has.
+  const [existingTargetIndex, setExistingTargetIndex] = useState<string | null>(null);
+  const existingTarget = adminExistingTarget(
+    adminScoped,
+    editedRoute,
+    selectedAccount,
+    existingTargetIndex,
+  );
   const canSave = canSaveChannelRoute({
     followUpTtlValid,
     selectedConnection,
@@ -2211,10 +2456,10 @@ function ChannelAccountForm({
     selectedAccount,
     routeCondition,
     contains,
-    audience,
+    audienceComplete: audienceRulesComplete(audienceRules),
+    fallbackDeny: initial.editingFallback && fallbackDeny,
     parsedRouteLimits,
-    conversationScope,
-    conversationIds,
+    existingTarget,
     target,
     automationName,
     daemonId,
@@ -2241,31 +2486,11 @@ function ChannelAccountForm({
     [daemonId, daemonOptions],
   );
   const automationNames = useMemo(() => automations.map(({ name }) => name), [automations]);
-  const changeMatchKind = useCallback((value: string) => {
-    setMatchKind(value as MatchKind);
-    setConversationIds("");
-  }, []);
-  const changeConversationScope = useCallback((value: string) => {
-    setConversationScope(value);
-    if (value === "all") setConversationIds("");
-  }, []);
   const changeRouteCondition = useCallback(
     (value: string) => setRouteCondition(value as RouteCondition),
     [],
   );
-  // Switching who can use the Route starts from that audience's behavior;
-  // everything stays editable afterwards.
-  const changeAudience = useCallback((value: string) => {
-    const nextAudience = value as RouteAudience;
-    setAudience(nextAudience);
-    const defaults =
-      nextAudience === "conversationParticipants"
-        ? DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR
-        : DEFAULT_MEMBER_ROUTE_BEHAVIOR;
-    setBehavior(defaults);
-    setApprovalChoice(defaults.approvalMode ?? "custom");
-    setFollowUpTtlDraft(String(defaults.followUpTtlMinutes));
-  }, []);
+  const changeFallbackDeny = useCallback((admit: boolean) => setFallbackDeny(!admit), []);
   const changeRequireMention = useCallback(
     (requireMention: boolean) => setBehavior((current) => ({ ...current, requireMention })),
     [],
@@ -2365,81 +2590,52 @@ function ChannelAccountForm({
   );
 
   const submit = useCallback(async () => {
-    if (!canSave || duplicateAccount || selectedConnection === undefined) return;
-    const worktree = worktreeTargetFromConfiguration(workspace);
-    const routeTarget = buildRouteTarget({
+    if (!canSave || duplicateAccount) return;
+    const editingFallback = initial.editingFallback && editing !== null;
+    if (editingFallback && fallbackDeny) {
+      const nextAccounts = existingAccounts.map((account) =>
+        channelAccountKey(account) === editing.accountKey
+          ? { ...account, fallback: { deny: true } }
+          : account,
+      );
+      const confirmed = await confirmDialog({
+        title: "Deny everyone else?",
+        message: "Messages no Route admits are refused.",
+        confirmLabel: "Save catch-all",
+      });
+      if (confirmed && mounted.current) save(nextAccounts, resource);
+      return;
+    }
+    const routeTarget = formRouteTarget(existingTarget, {
       target,
       automationName,
       daemonId,
       projectId,
       cwd,
-      worktree,
+      worktree: worktreeTargetFromConfiguration(workspace),
       agentConfiguration,
       parsedProviderOptions,
     });
     if (routeTarget === null) return;
-    const routeInput = {
-      accountId: effectiveAccountId,
-      matchKind,
-      conversationIds,
-      ...(routeCondition === "contains" ? { contains } : {}),
-      audience,
-      ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
-      behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
-      target: routeTarget,
-      resource,
-    };
-    let nextAccounts: RecordValue[];
-    let nextResource: RecordValue;
-    let nextRoute: RecordValue;
-    let teamGrant: ChannelTeamGrant | undefined;
-    if (isEditing && editedRoute !== undefined && editing !== null) {
-      const candidate = replaceChannelRouteCandidate({
-        ...routeInput,
-        currentRoute: editedRoute,
-        accounts: existingAccounts,
-      });
-      nextAccounts = existingAccounts.map((account) => {
-        if (channelAccountKey(account) !== editing.accountKey) return account;
-        return {
-          ...account,
-          routes: arrayField(account, "routes").map((route, index) =>
-            index === editing.routeIndex ? candidate.route : route,
-          ),
-        };
-      });
-      nextResource = candidate.resource;
-      nextRoute = candidate.route;
-    } else if (configurationKind === "account") {
-      const candidate = buildChannelAccountCandidate({
-        ...routeInput,
-        connection: selectedConnection,
-      });
-      nextAccounts = [...existingAccounts, candidate.account];
-      nextResource = candidate.resource;
-      nextRoute = arrayField(candidate.account, "routes")[0] as RecordValue;
-      teamGrant = {
-        channel: selectedConnection.provider,
+    const next = nextConfiguration({
+      routeInput: {
         accountId: effectiveAccountId,
-        teamIds: selectedTeamIds,
-        conversation: conversationAccessForRoute(matchKind, splitConversationIds(conversationIds)),
-      };
-    } else {
-      if (selectedAccount === undefined) return;
-      const candidate = buildChannelRouteCandidate(routeInput);
-      nextAccounts = existingAccounts.map((account) => {
-        if (account !== selectedAccount) return account;
-        return {
-          ...account,
-          routes: insertChannelRoute(
-            arrayField(account, "routes") as RecordValue[],
-            candidate.route,
-          ),
-        };
-      });
-      nextResource = candidate.resource;
-      nextRoute = candidate.route;
-    }
+        audience: audienceRules.map(audienceRuleFromDraft),
+        ...(routeCondition === "contains" && !editingFallback ? { contains } : {}),
+        ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
+        behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
+        target: routeTarget,
+        resource,
+      },
+      existingAccounts,
+      editing: isEditing ? editing : null,
+      editedRoute,
+      configurationKind,
+      selectedConnection,
+      selectedAccount,
+    });
+    if (next === null) return;
+    const { nextAccounts, nextResource, nextRoute, createdAccountKey } = next;
     const review: RouteReviewInput = {
       warnings: warningsForRoute(
         await previewWarnings(nextAccounts, nextResource),
@@ -2447,32 +2643,35 @@ function ChannelAccountForm({
         nextRoute,
       ),
       route: nextRoute,
-      target: routeTargetReviewLabel(target, automationName, agentConfiguration),
-      teams: teams.filter(({ id }) => selectedTeamIds.includes(id)).map(({ name }) => name),
+      target:
+        existingTarget === null
+          ? routeTargetReviewLabel(target, automationName, agentConfiguration)
+          : routeTargetSummary(existingTarget),
+      audience: audienceRules.map((rule) => audienceRuleSentence(rule, audienceNames)),
     };
     const confirmed = await confirmDialog({
       title: inputDraft
         ? "Use this input in the Automation?"
-        : routeConfirmationTitle(audience, approvalChoice, isEditing),
+        : routeConfirmationTitle(open, approvalChoice, isEditing),
       message: routeReviewMessage(review),
       body: routeReviewBody(review),
       confirmLabel: inputDraft ? "Use input" : channelFormSubmitLabel(isEditing),
-      destructive: audience === "conversationParticipants" || approvalChoice === "auto-allow",
+      destructive: open || approvalChoice === "auto-allow",
     });
     if (!confirmed || !mounted.current) return;
-    save(nextAccounts, nextResource, teamGrant);
+    save(nextAccounts, nextResource, createdAccountKey);
   }, [
     inputDraft,
     agentConfiguration,
     approvalChoice,
-    audience,
+    audienceNames,
+    audienceRules,
     automationName,
     behavior,
     canSave,
     confirmDialog,
     configurationKind,
     contains,
-    conversationIds,
     cwd,
     daemonId,
     duplicateAccount,
@@ -2480,8 +2679,11 @@ function ChannelAccountForm({
     editing,
     effectiveAccountId,
     existingAccounts,
+    existingTarget,
+    fallbackDeny,
+    initial.editingFallback,
     isEditing,
-    matchKind,
+    open,
     parsedProviderOptions,
     parsedRouteLimits,
     projectId,
@@ -2490,9 +2692,7 @@ function ChannelAccountForm({
     save,
     selectedAccount,
     selectedConnection,
-    selectedTeamIds,
     target,
-    teams,
     workspace,
     previewWarnings,
   ]);
@@ -2578,53 +2778,48 @@ function ChannelAccountForm({
       ) : null}
     </>
   );
-  const renderRouteMatch = () => (
+  const renderAudience = () => (
     <>
-      <ChoiceRow
-        label="Conversation type"
-        values={MATCH_KIND_VALUES}
-        selected={matchKind}
-        labels={MATCH_KIND_LABELS}
-        onChange={changeMatchKind}
-        disabled={pending}
-      />
-      {audience === "members" ? (
-        <ChoiceRow
-          label="Conversations"
-          values={CONVERSATION_SCOPE_VALUES}
-          labels={CONVERSATION_SCOPE_LABELS}
-          selected={conversationScope}
-          onChange={changeConversationScope}
+      <Text style={styles.formHeading}>
+        {initial.editingFallback ? "Everyone else (catch-all)" : "Who may talk, where"}
+      </Text>
+      {initial.editingFallback ? (
+        <RouteBehaviorSwitch
+          label="Answer messages no Route admits"
+          value={!fallbackDeny}
+          onChange={changeFallbackDeny}
           disabled={pending}
         />
       ) : null}
-      {conversationScope === "specific" ? (
-        <ConversationSelectionFields
-          channel={observedAccountChannel}
-          accountId={observedAccountId}
-          kind={matchKind}
-          value={conversationIds}
-          onChange={setConversationIds}
-          disabled={pending}
-          hint="Select at least one conversation. Only these exact conversations can match this Route."
-          placeholder={matchKind === "dm" ? "D0123, D0456" : "C0123, C0456"}
-        />
+      {initial.editingFallback && fallbackDeny ? (
+        <Text style={settingsStyles.rowHint}>Messages no Route admits are refused.</Text>
       ) : (
-        <Text style={settingsStyles.rowHint}>
-          Any conversation of the selected type the bot is in can match this Route.
-        </Text>
+        <AudienceRulesEditor
+          rules={audienceRules}
+          setRules={setAudienceRules}
+          teams={audienceOptions.teams}
+          members={audienceOptions.members}
+          channel={selectedConnection?.provider ?? stringField(selectedAccount, "channel")}
+          observedChannel={observedAccountChannel}
+          accountId={observedAccountId}
+          names={audienceNames}
+          errors={audienceErrors}
+          disabled={pending}
+        />
       )}
-      <ChoiceRow
-        label="When"
-        values={ROUTE_CONDITION_VALUES}
-        selected={routeCondition}
-        labels={ROUTE_CONDITION_LABELS}
-        onChange={changeRouteCondition}
-        disabled={pending}
-      />
-      {routeCondition === "contains" ? (
+      {initial.editingFallback ? null : (
+        <ChoiceRow
+          label="When"
+          values={ROUTE_CONDITION_VALUES}
+          selected={routeCondition}
+          labels={ROUTE_CONDITION_LABELS}
+          onChange={changeRouteCondition}
+          disabled={pending}
+        />
+      )}
+      {routeCondition === "contains" && !initial.editingFallback ? (
         <Field
-          label="Contains exact text"
+          label="Only messages containing"
           hint="Case-sensitive literal text used only to select this Route. The full message is still sent to the target."
         >
           <FormTextInput
@@ -2637,27 +2832,11 @@ function ChannelAccountForm({
           />
         </Field>
       ) : null}
-      <ChoiceRow
-        label="Who can use it"
-        values={ROUTE_AUDIENCE_VALUES}
-        selected={audience}
-        labels={audienceLabels}
-        onChange={changeAudience}
-        disabled={pending}
-      />
     </>
   );
   const renderLimits = () => {
-    const open = audience === "conversationParticipants";
     return (
       <>
-        {open ? (
-          <Alert
-            variant="warning"
-            title="Anyone in the matching conversations can use this Route"
-            description="They can talk to the Agent this Route runs, with the settings below. This does not give them Paseo, Host or Project access. The Hub warns about wide choices after you save."
-          />
-        ) : null}
         <Text style={styles.formHeading}>Limits</Text>
         <Text style={settingsStyles.rowHint}>
           Counted across every conversation this Route matches. Messages over a rate or run limit
@@ -2677,19 +2856,9 @@ function ChannelAccountForm({
   const renderBehavior = () => {
     return (
       <RouteBehaviorFields
-        matchKind={matchKind}
+        dmOnly={dmOnly}
         behavior={behavior}
         approvalChoice={approvalChoice}
-        showTeamAccess={
-          audience === "members" &&
-          configurationKind === "account" &&
-          !isEditing &&
-          teams.length > 0
-        }
-        teams={teams}
-        selectedTeamIds={selectedTeamIds}
-        setSelectedTeamIds={setSelectedTeamIds}
-        conversationIds={conversationIds}
         pending={pending}
         changeRequireMention={changeRequireMention}
         followUpTtlDraft={followUpTtlDraft}
@@ -2706,36 +2875,48 @@ function ChannelAccountForm({
       />
     );
   };
-  const renderTarget = () => (
-    <RouteTargetFields
-      target={target}
-      changeTarget={changeTarget}
-      automationName={automationName}
-      automationDisplay={automationDisplay}
-      automationOptions={automationOptions}
-      setAutomationName={setAutomationName}
-      automationCreatePending={automationCreatePending}
-      showAutomationCreator={showAutomationCreator}
-      showAutomationForm={showAutomationForm}
-      automationCreateError={automationCreateError}
-      daemonId={daemonId}
-      daemonDisplay={daemonDisplay}
-      daemonOptions={daemonOptions}
-      changeDaemon={changeDaemon}
-      projectId={projectId}
-      setProjectId={setProjectId}
-      cwd={cwd}
-      setCwd={setCwd}
-      workspace={workspace}
-      setWorkspace={setWorkspace}
-      selectedDaemonServerId={selectedDaemonServerId}
-      agentConfiguration={agentConfiguration}
-      setAgentConfiguration={setAgentConfiguration}
-      parsedProviderOptions={parsedProviderOptions}
-      setProviderOptions={setProviderOptions}
-      pending={pending}
-    />
-  );
+  const renderTarget = () => {
+    if (adminScoped)
+      return (
+        <ChannelRouteAdminTarget
+          editedRoute={editedRoute}
+          routes={arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[]}
+          selectedIndex={existingTargetIndex}
+          onChange={setExistingTargetIndex}
+          disabled={pending}
+        />
+      );
+    return (
+      <RouteTargetFields
+        target={target}
+        changeTarget={changeTarget}
+        automationName={automationName}
+        automationDisplay={automationDisplay}
+        automationOptions={automationOptions}
+        setAutomationName={setAutomationName}
+        automationCreatePending={automationCreatePending}
+        showAutomationCreator={showAutomationCreator}
+        showAutomationForm={showAutomationForm}
+        automationCreateError={automationCreateError}
+        daemonId={daemonId}
+        daemonDisplay={daemonDisplay}
+        daemonOptions={daemonOptions}
+        changeDaemon={changeDaemon}
+        projectId={projectId}
+        setProjectId={setProjectId}
+        cwd={cwd}
+        setCwd={setCwd}
+        workspace={workspace}
+        setWorkspace={setWorkspace}
+        selectedDaemonServerId={selectedDaemonServerId}
+        agentConfiguration={agentConfiguration}
+        setAgentConfiguration={setAgentConfiguration}
+        parsedProviderOptions={parsedProviderOptions}
+        setProviderOptions={setProviderOptions}
+        pending={pending}
+      />
+    );
+  };
   const renderAutomationCreator = () => {
     if (target !== "automation" || !showAutomationCreator) return null;
     return (
@@ -2760,15 +2941,19 @@ function ChannelAccountForm({
       <SettingsSection title={formTitle}>
         <View style={[settingsStyles.card, styles.form]}>
           {renderAccountSelection()}
-          {renderRouteMatch()}
-          {fixedAutomationName === undefined ? (
-            renderTarget()
-          ) : (
-            <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
+          {renderAudience()}
+          {initial.editingFallback && fallbackDeny ? null : (
+            <>
+              {fixedAutomationName === undefined ? (
+                renderTarget()
+              ) : (
+                <Text style={styles.formHeading}>{`Run Automation: ${fixedAutomationName}`}</Text>
+              )}
+              {renderBehavior()}
+              {renderLimits()}
+            </>
           )}
-          {renderBehavior()}
-          {renderLimits()}
-          {target === "automation" && automationName !== null ? (
+          {target === "automation" && automationName !== null && !adminScoped ? (
             <AutomationReplyAuthority
               automation={automations.find((item) => item.name === automationName)}
               channel={selectedConnection?.provider}
@@ -2787,6 +2972,76 @@ function ChannelAccountForm({
   );
 }
 
+/**
+ * The accounts and resource a save writes: the edited Route (or catch-all)
+ * replaced in place, a new Channel Route appended, or a Route inserted into
+ * the selected account. Null when the form has nothing to write to.
+ */
+function nextConfiguration(input: {
+  routeInput: Parameters<typeof buildChannelRouteCandidate>[0];
+  existingAccounts: RecordValue[];
+  editing: EditingRoute | null;
+  editedRoute: RecordValue | undefined;
+  configurationKind: ConfigurationKind;
+  selectedConnection: { id: string; provider: string } | undefined;
+  selectedAccount: RecordValue | undefined;
+}): {
+  nextAccounts: RecordValue[];
+  nextResource: RecordValue;
+  nextRoute: RecordValue;
+  createdAccountKey?: string;
+} | null {
+  const { routeInput, existingAccounts, editing, editedRoute } = input;
+  if (editing !== null) {
+    const candidate =
+      editedRoute === undefined
+        ? buildChannelRouteCandidate(routeInput)
+        : replaceChannelRouteCandidate({
+            ...routeInput,
+            currentRoute: editedRoute,
+            accounts: existingAccounts,
+          });
+    const nextAccounts = existingAccounts.map((account) => {
+      if (channelAccountKey(account) !== editing.accountKey) return account;
+      if (editing.routeIndex === "fallback") return { ...account, fallback: candidate.route };
+      return {
+        ...account,
+        routes: arrayField(account, "routes").map((route, index) =>
+          index === editing.routeIndex ? candidate.route : route,
+        ),
+      };
+    });
+    return { nextAccounts, nextResource: candidate.resource, nextRoute: candidate.route };
+  }
+  if (input.configurationKind === "account") {
+    if (input.selectedConnection === undefined) return null;
+    const candidate = buildChannelAccountCandidate({
+      ...routeInput,
+      connection: input.selectedConnection,
+    });
+    return {
+      nextAccounts: [...existingAccounts, candidate.account],
+      nextResource: candidate.resource,
+      nextRoute: arrayField(candidate.account, "routes")[0] as RecordValue,
+      createdAccountKey: channelAccountKey(candidate.account),
+    };
+  }
+  const { selectedAccount } = input;
+  if (selectedAccount === undefined) return null;
+  const candidate = buildChannelRouteCandidate(routeInput);
+  const nextAccounts = existingAccounts.map((account) =>
+    account === selectedAccount
+      ? Object.assign({}, account, {
+          routes: insertChannelRoute(
+            arrayField(account, "routes") as RecordValue[],
+            candidate.route,
+          ),
+        })
+      : account,
+  );
+  return { nextAccounts, nextResource: candidate.resource, nextRoute: candidate.route };
+}
+
 function channelConfigurationKind(
   isEditing: boolean,
   initialAccountKey: string | null,
@@ -2794,9 +3049,68 @@ function channelConfigurationKind(
   return isEditing || initialAccountKey !== null ? "route" : "account";
 }
 
-/** A Route that names Conversations, or admits participants, starts on the selected list. */
-function initialConversationScope(initial: { conversationIds: string }): string {
-  return initial.conversationIds.length > 0 ? "specific" : "all";
+/** The Route whose target a Channel Route Admin's save keeps; null when the form builds one. */
+function adminExistingTarget(
+  adminScoped: boolean,
+  editedRoute: RecordValue | undefined,
+  selectedAccount: RecordValue | undefined,
+  existingTargetIndex: string | null,
+): RecordValue | null {
+  if (!adminScoped) return null;
+  if (editedRoute !== undefined) return editedRoute;
+  if (existingTargetIndex === null) return null;
+  const routes = arrayField(selectedAccount ?? EMPTY_RECORD, "routes") as RecordValue[];
+  return routes[Number(existingTargetIndex)] ?? null;
+}
+
+/**
+ * What a Channel Route Admin sees for the target: the Route keeps the Agent or
+ * Automation it has, since the shared resource file that defines it is the
+ * organization's. A new Route of theirs copies the target of one the account
+ * already runs.
+ */
+function ChannelRouteAdminTarget({
+  editedRoute,
+  routes,
+  selectedIndex,
+  onChange,
+  disabled,
+}: {
+  editedRoute: RecordValue | undefined;
+  routes: RecordValue[];
+  selectedIndex: string | null;
+  onChange(index: string | null): void;
+  disabled: boolean;
+}) {
+  const options = useMemo<SelectFieldOption<string>[]>(
+    () =>
+      routes.map((route, index) => ({
+        id: String(index),
+        value: String(index),
+        label: `Same as Route ${String(index + 1)} · ${routeTargetSummary(route)}`,
+      })),
+    [routes],
+  );
+  if (editedRoute !== undefined)
+    return (
+      <Field label="Target" hint={MANAGED_BY_ORGANIZATION}>
+        <Text style={settingsStyles.rowTitle}>{routeTargetSummary(editedRoute)}</Text>
+      </Field>
+    );
+  return (
+    <SelectField
+      label="Target"
+      hint={`${MANAGED_BY_ORGANIZATION}. Pick the target of a Route this account already runs.`}
+      value={selectedIndex}
+      selectedDisplay={selectedOptionDisplay(options, selectedIndex)}
+      options={options}
+      onChange={onChange}
+      placeholder="Choose a target"
+      emptyText="This account has no Route to copy a target from."
+      title="Target"
+      disabled={disabled}
+    />
+  );
 }
 
 function daemonServerId(daemons: HubDaemon[], daemonId: string | null): string | null {
@@ -2855,14 +3169,9 @@ function AutomationReplyAuthority({
 }
 
 function RouteBehaviorFields({
-  matchKind,
+  dmOnly,
   behavior,
   approvalChoice,
-  showTeamAccess,
-  teams,
-  selectedTeamIds,
-  setSelectedTeamIds,
-  conversationIds,
   pending,
   changeRequireMention,
   followUpTtlDraft,
@@ -2877,14 +3186,10 @@ function RouteBehaviorFields({
   changeToolCalls,
   changeApprovalChoice,
 }: {
-  matchKind: MatchKind;
+  /** Every rule covers DMs only: mention and thread settings do not apply. */
+  dmOnly: boolean;
   behavior: ChannelRouteBehavior;
   approvalChoice: RouteApprovalChoice;
-  showTeamAccess: boolean;
-  teams: HubTeam[];
-  selectedTeamIds: string[];
-  setSelectedTeamIds: Dispatch<SetStateAction<string[]>>;
-  conversationIds: string;
   pending: boolean;
   changeRequireMention(value: boolean): void;
   followUpTtlDraft: string;
@@ -2903,7 +3208,7 @@ function RouteBehaviorFields({
   return (
     <>
       <Text style={styles.formHeading}>Replies and approvals</Text>
-      {matchKind === "dm" ? null : (
+      {dmOnly ? null : (
         <RouteBehaviorSwitch
           label="Require a mention"
           value={behavior.requireMention}
@@ -2911,7 +3216,7 @@ function RouteBehaviorFields({
           disabled={pending}
         />
       )}
-      {matchKind !== "dm" && behavior.requireMention ? (
+      {!dmOnly && behavior.requireMention ? (
         <RouteFollowUpFields
           behavior={behavior}
           followUpTtlDraft={followUpTtlDraft}
@@ -2921,7 +3226,7 @@ function RouteBehaviorFields({
           changeFollowUpTtlMinutes={changeFollowUpTtlMinutes}
         />
       ) : null}
-      {matchKind === "dm" ? null : (
+      {dmOnly ? null : (
         <RouteBehaviorSwitch
           label="Reply in a thread"
           value={behavior.replyAnchor === "thread"}
@@ -2956,18 +3261,6 @@ function RouteBehaviorFields({
         onChange={changeApprovalChoice}
         disabled={pending}
       />
-      {showTeamAccess ? (
-        <View style={styles.inlineFields}>
-          <Text style={styles.formHeading}>Team access</Text>
-          <TeamAccessChoices
-            teams={teams}
-            selectedTeamIds={selectedTeamIds}
-            setSelectedTeamIds={setSelectedTeamIds}
-            disabled={pending}
-          />
-          <Text style={settingsStyles.rowHint}>{teamAccessHint(conversationIds, matchKind)}</Text>
-        </View>
-      ) : null}
     </>
   );
 }
@@ -3349,66 +3642,6 @@ function ChoiceButton({
   );
 }
 
-function TeamAccessChoices({
-  teams,
-  selectedTeamIds,
-  setSelectedTeamIds,
-  disabled,
-}: {
-  teams: HubTeam[];
-  selectedTeamIds: string[];
-  setSelectedTeamIds: Dispatch<SetStateAction<string[]>>;
-  disabled: boolean;
-}) {
-  if (teams.length === 0) {
-    return (
-      <Text style={settingsStyles.rowHint}>
-        Owners can use this Channel Route automatically. Add Teams later from Access.
-      </Text>
-    );
-  }
-  return teams.map((team) => (
-    <TeamAccessSwitch
-      key={team.id}
-      team={team}
-      selected={selectedTeamIds.includes(team.id)}
-      setSelectedTeamIds={setSelectedTeamIds}
-      disabled={disabled}
-    />
-  ));
-}
-
-function TeamAccessSwitch({
-  team,
-  selected,
-  setSelectedTeamIds,
-  disabled,
-}: {
-  team: HubTeam;
-  selected: boolean;
-  setSelectedTeamIds: Dispatch<SetStateAction<string[]>>;
-  disabled: boolean;
-}) {
-  const change = useCallback(
-    (nextSelected: boolean) => {
-      setSelectedTeamIds((current) => {
-        if (nextSelected) return [...current, team.id];
-        return current.filter((id) => id !== team.id);
-      });
-    },
-    [setSelectedTeamIds, team.id],
-  );
-  const memberSuffix = team.userIds.length === 1 ? "" : "s";
-  return (
-    <RouteBehaviorSwitch
-      label={`${team.name} · ${String(team.userIds.length)} Member${memberSuffix}`}
-      value={selected}
-      onChange={change}
-      disabled={disabled}
-    />
-  );
-}
-
 function QueryFeedback({
   queries,
 }: {
@@ -3457,38 +3690,28 @@ function channelAccountLabel(account: RecordValue | undefined): string {
   return `${channelLabel(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
 }
 
+/** What a Channel Route Admin sees where the Connection would be named. */
+const MANAGED_BY_ORGANIZATION = "Managed by Organization Admins";
+
+function channelConnectionLabel(connection: HubConnection | undefined): string {
+  return connection === undefined ? "Connection unavailable" : channelConnectionDetail(connection);
+}
+
 function channelAccountStatus(
   enabled: boolean,
   runtimeAvailable: boolean | undefined,
   runtime: HubRuntimeAccount | undefined,
-  connection: HubConnection | undefined,
+  connectionLabel: string,
   routeCount: number,
 ): string {
   const runtimeLabel = enabled ? channelRuntimeLabel(runtimeAvailable, runtime) : "Disabled";
-  const connectionLabel =
-    connection === undefined ? "Connection unavailable" : channelConnectionDetail(connection);
   const routeSuffix = routeCount === 1 ? "" : "s";
   return `${runtimeLabel} · ${connectionLabel} · ${String(routeCount)} route${routeSuffix}`;
-}
-
-function channelAccessStatus(teamNames: string[], assignmentCount: number): string {
-  if (assignmentCount === 0)
-    return "No Member or Team grants. Owners retain access to Members Routes.";
-  const summary = `${assignmentCount} Member or Team access grants; conversation limits may apply.`;
-  return teamNames.length === 0 ? summary : `${summary} Teams: ${teamNames.join(", ")}.`;
 }
 
 function arrayField(record: RecordValue, key: string): unknown[] {
   const value = record[key];
   return Array.isArray(value) ? value : [];
-}
-
-function stringArrayField(record: RecordValue, key: string): string[] {
-  return arrayField(record, key)
-    .filter(
-      (value): value is string | number => typeof value === "string" || typeof value === "number",
-    )
-    .map(String);
 }
 
 function withAccountPatch(account: RecordValue, patch: RecordValue): RecordValue {
@@ -3610,7 +3833,8 @@ function approvalSummary(approvalChoice: RouteApprovalChoice): string {
 interface RouteReviewInput {
   route: RecordValue;
   target: string;
-  teams: string[];
+  /** One sentence per audience rule. */
+  audience: string[];
   /** The Hub's warnings for this Route, from validating the candidate. */
   warnings: string[];
 }
@@ -3638,17 +3862,13 @@ function warningsForRoute(
  * platform dialog's plain text cannot drift apart. */
 function routeReviewFacts(input: RouteReviewInput): { label: string; value: string }[] {
   return [
-    { label: "Conversation", value: routeMatchSummary(input.route) },
+    { label: "Audience", value: input.audience.join("\n") },
+    ...(routeContainsText(input.route) === null
+      ? []
+      : [{ label: "Only messages containing", value: routeContainsText(input.route)! }]),
     { label: "Target", value: input.target },
     { label: "Reply method", value: routeReplySummary(input.route) },
     { label: "Tool requests", value: routeToolRequestSummary(input.route) },
-    {
-      label: "Access",
-      value:
-        input.teams.length === 0
-          ? "owners and existing assignments"
-          : `owners and ${input.teams.join(", ")}`,
-    },
     ...(input.warnings.length === 0
       ? []
       : [{ label: "Warnings", value: input.warnings.join("\n") }]),
@@ -3675,14 +3895,6 @@ function routeReviewBody(input: RouteReviewInput): React.ReactNode {
   );
 }
 
-function conversationAccessForRoute(
-  matchKind: MatchKind,
-  conversationIds: string[],
-): ChannelTeamGrant["conversation"] {
-  if (conversationIds.length > 0) return { kind: "specific", conversationIds };
-  return matchKind === "dm" ? { kind: "direct_messages" } : { kind: "public_channels" };
-}
-
 function channelRuntimeLabel(
   runtimeAvailable: boolean | undefined,
   runtime: { transport: string } | undefined,
@@ -3704,48 +3916,24 @@ function channelRuntimeLabel(
   }
 }
 
-function routeMatchKind(record: RecordValue): MatchKind {
-  const value = stringField(record, "kind");
-  return value === "channel" || value === "thread" || value === "group" || value === "topic"
-    ? value
-    : "dm";
+/** One line per Route row: each rule as a sentence, then the text filter. */
+function routeAudienceLine(route: RecordValue, names: AudienceNames): string {
+  const { rules, contains } = routeAudienceDraft(route);
+  const sentences = rules.map((rule) => audienceRuleSentence(rule, names)).join(" · ");
+  return contains.length === 0 ? sentences : `${sentences} · Contains “${contains}”`;
 }
 
-function routeMatchSummary(
-  route: RecordValue,
-  metadata?: z.infer<typeof HubObservedChannelConversationsSchema>,
-): string {
-  const match = objectField(route, "match");
-  if (match === null) return "Match unavailable";
-  const kind = stringField(match, "kind") ?? "conversation";
-  const ids = arrayField(match, "ids").filter(
-    (value): value is string => typeof value === "string",
-  );
-  const contains = stringField(match, "contains");
-  const scopeKind = matchKindSummaryLabel(kind);
-  const scope =
-    ids.length === 0
-      ? `Any ${scopeKind}`
-      : `${scopeKind} · ${ids.map((id) => channelDestinationLabel(id, kind, metadata)).join(", ")}`;
-  const audience = objectField(route, "audience");
-  const audienceLabel =
-    stringField(audience ?? undefined, "kind") === "conversationParticipants"
-      ? "Anyone in matching conversations"
-      : "Members with access";
-  const condition = contains === null ? scope : `${scope} · Contains “${contains}”`;
-  return `${condition} · ${audienceLabel}`;
-}
-
+/** A conversation id as the observed directory names it; a private room carries a lock. */
 function channelDestinationLabel(
   id: string,
-  kind: string,
   metadata: z.infer<typeof HubObservedChannelConversationsSchema> | undefined,
 ): string {
   const candidates = [...(metadata?.destinations ?? []), ...(metadata?.conversations ?? [])];
-  const named = candidates.find((item) => item.id === id && item.kind === kind && item.label);
+  const named = candidates.find((item) => item.id === id && item.label);
   if (!named?.label || named.label === id) return id;
-  if (named.threadId !== null) return `${named.label} · ${channelLabel(kind)} ${id}`;
-  return `${named.label} (${id})`;
+  const lock = named.visibility === "private" ? "🔒 " : "";
+  if (named.threadId !== null) return `${lock}${named.label} · ${channelLabel(named.kind)} ${id}`;
+  return `${lock}${named.label} (${id})`;
 }
 
 function ChannelTestPreview({ preview }: { preview: z.infer<typeof HubChannelTestPreviewSchema> }) {
@@ -3779,20 +3967,13 @@ function ChannelTestPreview({ preview }: { preview: z.infer<typeof HubChannelTes
   );
 }
 
+/** The first named conversation of the Route's rules: where a test message can go. */
 function routeTestTarget(route: RecordValue): { conversationId: string } | null {
-  const match = objectField(route, "match");
-  if (match === null) return null;
-  const kind = stringField(match, "kind");
-  if (kind === "thread" || kind === "topic") return null;
-  const conversationId = arrayField(match, "ids").find(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
-  return conversationId === undefined ? null : { conversationId };
-}
-
-/** `DM` inside a sentence; the button spells it out, a summary line does not. */
-function matchKindSummaryLabel(kind: string): string {
-  return kind === "dm" ? "DM" : kind;
+  for (const rule of routeAudienceDraft(route).rules) {
+    const [conversationId] = splitConversationIds(rule.where.conversations);
+    if (conversationId !== undefined) return { conversationId };
+  }
+  return null;
 }
 
 function channelLabel(value: string): string {
@@ -3812,10 +3993,10 @@ function channelFormInitialState(
   editing: EditingRoute | null,
   resource: RecordValue,
 ) {
-  const { editedAccount, editedRoute } = findEditedRoute(accounts, editing);
+  const { editedAccount, editedRoute, fallbackDeny } = findEditedRoute(accounts, editing);
   const route = editedRoute ?? EMPTY_RECORD;
-  const editedMatch = objectField(route, "match") ?? EMPTY_RECORD;
-  const editedAudience = objectField(route, "audience") ?? EMPTY_RECORD;
+  const editingFallback = editing?.routeIndex === "fallback";
+  const audience = initialAudience(editingFallback, editedRoute);
   const editedLimits = objectField(route, "limits") ?? EMPTY_RECORD;
   const editedWorkflow = stringField(editedRoute, "workflow");
   const editedAgentName = stringField(editedRoute, "agent") ?? "";
@@ -3825,21 +4006,20 @@ function channelFormInitialState(
     objectField(resource, "environments") ?? EMPTY_RECORD,
     editedEnvironmentName,
   );
-  const contains = stringField(editedMatch, "contains") ?? "";
-  const isEditing = editing !== null && editedAccount !== undefined && editedRoute !== undefined;
+  const contains = audience.contains;
+  const isEditing =
+    editing !== null && editedAccount !== undefined && (editedRoute !== undefined || fallbackDeny);
   const environment = managedEnvironmentConfiguration(editedEnvironment);
   return {
     editedAccount,
     editedRoute,
     editedWorkflow,
     isEditing,
+    editingFallback,
+    fallbackDeny,
     accountKey: editing?.accountKey ?? null,
-    matchKind: routeMatchKind(editedMatch),
-    conversationIds: stringArrayField(editedMatch, "ids").join(", "),
+    audienceRules: audience.rules,
     routeCondition: (contains.length > 0 ? "contains" : "all") as RouteCondition,
-    audience: (stringField(editedAudience, "kind") === "conversationParticipants"
-      ? "conversationParticipants"
-      : "members") as RouteAudience,
     behavior: routeBehaviorDraft(editedRoute),
     contains,
     routeLimits: channelLimitsDraft(editedLimits),
@@ -3847,6 +4027,16 @@ function channelFormInitialState(
     agentConfiguration: managedAgentConfiguration(editedAgent),
     providerOptions: formatOptionalObject(objectField(editedAgent ?? EMPTY_RECORD, "options")),
   };
+}
+
+/** The rules the form opens with: the stored ones, or Members everywhere for a new Route. */
+function initialAudience(
+  editingFallback: boolean,
+  editedRoute: RecordValue | undefined,
+): { rules: AudienceRuleDraft[]; contains: string } {
+  if (editingFallback) return { rules: fallbackAudienceDraft(editedRoute).rules, contains: "" };
+  if (editedRoute === undefined) return { rules: [membersEverywhereRule()], contains: "" };
+  return routeAudienceDraft(editedRoute);
 }
 
 function managedEnvironmentConfiguration(environment: RecordValue | null) {
@@ -3859,17 +4049,23 @@ function managedEnvironmentConfiguration(environment: RecordValue | null) {
   };
 }
 
+/** The Route being edited; a denying catch-all has no Route yet, only `fallbackDeny`. */
 function findEditedRoute(accounts: RecordValue[], editing: EditingRoute | null) {
   if (editing === null) {
-    return { editedAccount: undefined, editedRoute: undefined };
+    return { editedAccount: undefined, editedRoute: undefined, fallbackDeny: false };
   }
   const editedAccount = accounts.find(
     (account) => channelAccountKey(account) === editing.accountKey,
   );
+  if (editing.routeIndex === "fallback") {
+    const fallback = objectField(editedAccount ?? EMPTY_RECORD, "fallback");
+    const deny = fallback === null || fallback["deny"] === true;
+    return { editedAccount, editedRoute: deny ? undefined : fallback, fallbackDeny: deny };
+  }
   const editedRoute = arrayField(editedAccount ?? EMPTY_RECORD, "routes")[editing.routeIndex] as
     | RecordValue
     | undefined;
-  return { editedAccount, editedRoute };
+  return { editedAccount, editedRoute, fallbackDeny: false };
 }
 
 function managedAgentConfiguration(agent: RecordValue | null): ManagedAgentConfigurationValue {
@@ -3918,21 +4114,18 @@ function channelFormTitle(
   kind: ConfigurationKind,
 ): string {
   if (!isEditing) return kind === "account" ? "Add Channel Route" : "Add Route";
-  return `Edit Route ${String((editing?.routeIndex ?? 0) + 1)}`;
+  if (editing?.routeIndex === "fallback") return "Edit catch-all";
+  return `Edit Route ${String(Number(editing?.routeIndex ?? 0) + 1)}`;
 }
 
 /** The minutes field only blocks saving while it is shown. */
 function isFollowUpTtlDraftValid(input: {
-  audience: RouteAudience;
-  matchKind: MatchKind;
+  dmOnly: boolean;
   behavior: ChannelRouteBehavior;
   draft: string;
 }): boolean {
   const shown =
-    input.audience === "members" &&
-    input.matchKind !== "dm" &&
-    input.behavior.requireMention &&
-    input.behavior.followUpMode === "auto";
+    !input.dmOnly && input.behavior.requireMention && input.behavior.followUpMode === "auto";
   return !shown || parseChannelFollowUpTtlMinutes(input.draft) !== null;
 }
 
@@ -3944,10 +4137,12 @@ function canSaveChannelRoute(input: {
   selectedAccount: RecordValue | undefined;
   routeCondition: RouteCondition;
   contains: string;
-  audience: RouteAudience;
+  audienceComplete: boolean;
+  /** A denying catch-all needs no rules and no target. */
+  fallbackDeny: boolean;
   parsedRouteLimits: ReturnType<typeof parseChannelLimitsDraft>;
-  conversationScope: string;
-  conversationIds: string;
+  /** The target the Route keeps (a Channel Route Admin's edit), or null when the form builds one. */
+  existingTarget: RecordValue | null;
   target: RouteTarget;
   automationName: string | null;
   daemonId: string | null;
@@ -3957,16 +4152,14 @@ function canSaveChannelRoute(input: {
   provider: string;
   providerOptionsValid: boolean;
 }): boolean {
-  if (input.selectedConnection === undefined || input.effectiveAccountId.length === 0) return false;
-  if (!input.followUpTtlValid) return false;
+  if (input.effectiveAccountId.length === 0) return false;
   if (input.configurationKind === "route" && input.selectedAccount === undefined) return false;
-  if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
-  if (
-    input.conversationScope === "specific" &&
-    splitConversationIds(input.conversationIds).length === 0
-  )
-    return false;
+  if (input.configurationKind === "account" && input.selectedConnection === undefined) return false;
   if (!input.parsedRouteLimits.valid) return false;
+  if (input.fallbackDeny) return true;
+  if (!input.followUpTtlValid || !input.audienceComplete) return false;
+  if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
+  if (input.existingTarget !== null) return true;
   if (input.target === "automation") return input.automationName !== null;
   return (
     input.daemonId !== null &&
@@ -3976,6 +4169,15 @@ function canSaveChannelRoute(input: {
     input.provider.trim().length > 0 &&
     input.providerOptionsValid
   );
+}
+
+/** The Route keeps its target when the form was not allowed to rebuild one. */
+function formRouteTarget(
+  existingTarget: RecordValue | null,
+  form: Parameters<typeof buildRouteTarget>[0],
+): ChannelRouteTarget | null {
+  if (existingTarget !== null) return { kind: "existing", route: existingTarget };
+  return buildRouteTarget(form);
 }
 
 function buildRouteTarget(input: {
@@ -4016,13 +4218,11 @@ function buildRouteTarget(input: {
 }
 
 function routeConfirmationTitle(
-  audience: RouteAudience,
+  open: boolean,
   approvalChoice: RouteApprovalChoice,
   isEditing: boolean,
 ): string {
-  if (audience === "conversationParticipants") {
-    return "Open this Route to anyone in matching conversations?";
-  }
+  if (open) return "Open this Route to anyone in the matching conversations?";
   if (approvalChoice === "auto-allow") return "Activate automatic tool access?";
   return isEditing ? "Save Route?" : "Activate Route?";
 }
@@ -4039,14 +4239,6 @@ function routeTargetReviewLabel(
 
 function channelFormSubmitLabel(isEditing: boolean): string {
   return isEditing ? "Save Route" : "Activate Route";
-}
-
-function teamAccessHint(conversationIds: string, matchKind: MatchKind): string {
-  if (splitConversationIds(conversationIds).length > 0) {
-    return "Selected Teams receive access only to the listed Conversations.";
-  }
-  if (matchKind === "dm") return "Selected Teams receive access to direct messages.";
-  return "Selected Teams receive access to verified public Conversations. Broader access remains configurable in Access.";
 }
 
 function parseOptionalObject(

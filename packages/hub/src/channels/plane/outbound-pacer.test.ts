@@ -4,7 +4,8 @@ import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js
 import { OutboundPacer } from "./outbound-pacer.js";
 
 const ROUTE = {
-  match: { kind: "channel", ids: ["C1"] },
+  audienceRules: [],
+  where: { dm: false, groups: [], conversations: ["C1"] },
   target: { kind: "agent", agent: "a", environment: "e", template: null },
   limits: { messagesSentPerMinute: 1 },
 } as unknown as CompiledRoute;

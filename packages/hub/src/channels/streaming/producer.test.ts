@@ -74,7 +74,8 @@ function context(params: {
   streaming: SyncStreaming | undefined;
 }): StreamContext {
   const route: CompiledRoute = {
-    match: { kind: "channel", ids: [params.conversation] },
+    audienceRules: [],
+    where: { dm: false, groups: [], conversations: [params.conversation] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [],

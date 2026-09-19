@@ -232,6 +232,31 @@ What to grep for, by question:
 
 A silent `hub.log` around an inbound message that never got an answer means the event did not reach the plane at all — check the transport and the queue depth before reading anything else.
 
+## The audience migration on start
+
+`COMPAT(route-audience-rules)`: once per organization, before any account
+starts, the Hub rewrites account files that still use `match` / the one-value
+`audience` into audience rules and folds every `channel.use` Access grant on a
+Channel account into a rule on each of that account's Routes and its catch-all
+(`packages/hub/src/channels/access-migration.ts`, table in the
+[decision](../../audits/2026-09-19-route-audience-rules.md#migration-automatic)).
+It writes one new revision, then deletes the folded grant rows; the rewritten
+file starts with a `# Rewritten by the Hub on start` comment. Grep `hub.log` for:
+
+- `channel audience migration applied` — carries `accounts`, `routes`, `grants`
+  and the new `revisionId`.
+- `channel audience migration skipped` (debug) — nothing old-shaped, no grants.
+- `channel audience migration left grants without a configuration` — the
+  organization has grants but no active channel revision; the rows stay until
+  a revision exists.
+- `channel audience migration failed` — that organization is left as it was and
+  the next start retries. A crash between the revision write and the grant
+  delete replays the fold on the next start, appending the same rule again;
+  remove the duplicate rule in the Route editor.
+
+A grant on an account the active revision does not configure is left in place
+and reported in the next start's counts once the account exists.
+
 ## Following upstream
 
 `npm run channels:sync:check` verifies every package against its manifest; `npm run channels:sync:report` lists what moved upstream since the pinned baseline. The upstream checkout comes from `$OPENCLAW_UPSTREAM_DIR`, defaulting to `~/projects/openclaw-private`, and is read through `git` at explicit commits, so the checkout may sit on any branch.

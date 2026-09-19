@@ -31,7 +31,7 @@ export const ChannelWorkflowRequestPayloadSchema = z.object({
       z.custom<
         Pick<
           CompiledRoute,
-          "audience" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
+          "audienceRules" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
         >
       >(),
   }),

@@ -59,14 +59,16 @@ describe("onboarding configuration defaults", () => {
     const seeded = configureOnboardingRoute(initial, "slack", "assistant", input);
     const account = load(seeded.find((f) => f.path === accountPath)!.content) as {
       routes: Array<{
-        match: { kind: string };
+        audience: Array<{ where: { dm?: boolean; groups?: string } }>;
         reply?: { anchor: string };
         interaction: { requireMention: boolean };
       }>;
     };
-    expect(account.routes.find((r) => r.match.kind === "channel")?.reply?.anchor).toBe("thread");
+    const inGroups = (r: { audience: Array<{ where: { groups?: string } }> }) =>
+      r.audience[0]?.where.groups === "all";
+    expect(account.routes.find(inGroups)?.reply?.anchor).toBe("thread");
     account.routes[0]!.interaction.requireMention = true;
-    account.routes = account.routes.filter((r) => r.match.kind !== "channel");
+    account.routes = account.routes.filter((r) => !inGroups(r));
     const edited = seeded.map((f) =>
       f.path === accountPath ? { path: f.path, content: dump(account) } : f,
     );

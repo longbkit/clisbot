@@ -10,7 +10,8 @@ const STRANGER = "slack:U0NOBODY";
 
 function route(overrides: Partial<CompiledRoute> = {}): CompiledRoute {
   return {
-    match: { kind: "channel", ids: [] },
+    audienceRules: [],
+    where: { dm: false, groups: ["all"], conversations: [] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [

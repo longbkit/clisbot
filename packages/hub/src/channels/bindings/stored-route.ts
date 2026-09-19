@@ -5,17 +5,20 @@
 // engine (`index.ts`) decides, this file only derives the key and writes/reads
 // the row's `route` blob.
 //
-// Two readers carry decisions and they are the only ones that do:
+// Three readers carry decisions and they are the only ones that do:
 // `parseStoredRouteSummary` gives the conversation to re-match the route on,
-// and `parseStoredRouteTarget` gives the target to compare it against.
+// `storedRouteOwner` picks the Route the bound conversation stays with, and
+// `parseStoredRouteTarget` gives the target to compare it against.
 
 import { createHash } from "node:crypto";
 import type {
   CompiledChannelAccount,
+  CompiledFallback,
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import type { InboundConversation } from "../policy.js";
+import { routeConversationMatches, type InboundConversation } from "../policy.js";
+import type { ThreadBindingRecord } from "../../db/types.js";
 import {
   SLACK_THREAD_TS_PATTERN,
   type InboundConversationDetail,
@@ -23,8 +26,15 @@ import {
 } from "../plane/types.js";
 
 export interface StoredRouteSummary {
-  /** The original route-match descriptor (`kind` + native id). */
-  match: { kind: InboundConversationDetail["kind"]; id: string };
+  /** The conversation the route was matched on: its own level (`kind` +
+   * native id), the room it belongs to, and the visibility the vertical
+   * reported — everything a Route's Where is decided on. */
+  match: {
+    kind: InboundConversationDetail["kind"];
+    id: string;
+    rootConversationId?: string;
+    visibility?: "public" | "private";
+  };
   target: CompiledRoute["target"];
   bindingKey: EffectiveDefaults["bindingKey"];
   replyAnchor: EffectiveDefaults["replyAnchor"];
@@ -46,16 +56,12 @@ export function bindingSummary(
   selection?: { revisionId: string | null; position: number | "fallback" },
   conversationLabel?: string,
 ): StoredRouteSummary {
-  // The route may have matched a thread message at its root-level descriptor;
-  // store the level the route declares, not necessarily the inbound's most
-  // specific level. Fallbacks use the root descriptor.
-  const atInboundLevel = route.match.kind === conversation.kind;
-  const match = atInboundLevel
-    ? { kind: conversation.kind, id: conversation.id }
-    : {
-        kind: rootKind(conversation.kind),
-        id: conversation.rootConversationId,
-      };
+  const match = {
+    kind: conversation.kind,
+    id: conversation.id,
+    rootConversationId: conversation.rootConversationId,
+    ...(conversation.visibility === undefined ? {} : { visibility: conversation.visibility }),
+  };
   const safeConversationLabel = conversationLabel?.trim().slice(0, 200);
   return {
     match,
@@ -140,8 +146,9 @@ export function parseStoredRouteTarget(stored: unknown): CompiledRoute["target"]
   };
 }
 
-/** The route-match descriptor the facade re-matches on re-attach; undefined when
- * the row carries no summary (or a malformed one). */
+/** The conversation descriptor the facade re-matches on re-attach; undefined
+ * when the row carries no summary (or a malformed one). A row written before
+ * the room and visibility were recorded reads as its own room. */
 export function parseStoredRouteSummary(stored: unknown): InboundConversation | undefined {
   if (typeof stored !== "object" || stored === null) return undefined;
   const match = (stored as { match?: unknown }).match;
@@ -149,13 +156,43 @@ export function parseStoredRouteSummary(stored: unknown): InboundConversation | 
   const kind = (match as { kind?: unknown }).kind;
   const id = (match as { id?: unknown }).id;
   if (typeof kind !== "string" || typeof id !== "string") return undefined;
-  return { kind: kind as InboundConversationDetail["kind"], id };
+  const root = (match as { rootConversationId?: unknown }).rootConversationId;
+  const visibility = (match as { visibility?: unknown }).visibility;
+  return {
+    kind: kind as InboundConversationDetail["kind"],
+    id,
+    ...(typeof root === "string" ? { rootConversationId: root } : {}),
+    ...(visibility === "public" || visibility === "private" ? { visibility } : {}),
+  };
 }
 
-function rootKind(kind: InboundConversationDetail["kind"]): "dm" | "channel" | "group" {
-  if (kind === "thread") return "channel";
-  if (kind === "topic") return "group";
-  return kind;
+/**
+ * The Route a bound conversation stays with. A bound conversation never falls
+ * through by sender (docs/audits/2026-09-19-route-audience-rules.md#routing):
+ * among the Routes whose Where still covers the recorded conversation, the one
+ * the binding recorded — by content hash while it is unchanged, by position
+ * after an edit — and otherwise the first that covers it. No Route covering
+ * it → the catch-all when there is one, else undefined (unserved).
+ */
+export function storedRouteOwner(
+  account: CompiledChannelAccount,
+  binding: Pick<ThreadBindingRecord, "route" | "externalConversationId">,
+  live?: InboundConversation,
+): CompiledRoute | CompiledFallback | undefined {
+  const conversation = live ??
+    parseStoredRouteSummary(binding.route) ?? {
+      kind: "channel" as const,
+      id: binding.externalConversationId,
+    };
+  const covering = account.routes.filter((route) => routeConversationMatches(route, conversation));
+  if (covering.length === 0) return account.fallback.deny ? undefined : account.fallback;
+  const selection = parseStoredRouteSelection(binding.route);
+  if (selection === undefined) return covering[0];
+  const byFingerprint = covering.find((route) => routeFingerprint(route) === selection.fingerprint);
+  if (byFingerprint !== undefined) return byFingerprint;
+  const byPosition =
+    selection.position === "fallback" ? undefined : account.routes[selection.position];
+  return byPosition !== undefined && covering.includes(byPosition) ? byPosition : covering[0];
 }
 
 /** The durable thread key (conversation + native thread id) a binding is keyed by. */

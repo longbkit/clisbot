@@ -4,45 +4,135 @@ import type { z } from "zod";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "../account-provider";
 import {
+  HUB_ACCESS_INCLUDE,
   HubAccessAssignmentsSchema,
   HubAutomationsSchema,
+  HubChannelAccountConfigurationSchema,
   HubChannelConfigurationSchema,
   HubChannelRevisionsSchema,
   HubChannelRuntimeStatusSchema,
   HubChannelValidationSchema,
   HubConnectionsSchema,
   HubDaemonsSchema,
+  HubEffectiveAccessSchema,
   HubTeamsSchema,
+  type HubChannelAccountConfiguration,
 } from "../contracts";
+import type { HubApiClient } from "../api-client";
 import { hubResourceQueryKey } from "../query-keys";
 import { AutomationInputDraftContext, type AutomationChannelDraft } from "./automation-input-draft";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
 
 type HubChannelConfiguration = z.infer<typeof HubChannelConfigurationSchema>;
+type HubRuntimeStatus = z.infer<typeof HubChannelRuntimeStatusSchema>;
+type HubEffectiveAccess = z.infer<typeof HubEffectiveAccessSchema>;
 /** The signed-in organization; empty until sign-in resolves, which keeps the queries idle. */
 type HubResourceQueryScope = Parameters<typeof hubResourceQueryKey>[0] & { organizationId: string };
 
-/** Everything the Channels screen reads from the Hub, for the signed-in organization. */
-export function useChannelSettingsQueries() {
+export interface ChannelAccountRef {
+  channel: string;
+  accountId: string;
+}
+
+/**
+ * Who the Channels screen serves: the organization capability sees and saves
+ * the whole configuration; a Member who is Channel Route Admin of some
+ * accounts (`channel.manage` on `channel_account`, direct or via a Team) sees
+ * only those, through the per-account endpoints
+ * (docs/features/access/scoped-admins.md).
+ */
+export type ChannelRouteAdminScope =
+  | { status: "loading" }
+  | { status: "organization" }
+  | { status: "none" }
+  | { status: "accounts"; accounts: readonly ChannelAccountRef[] };
+
+export function useChannelRouteAdminScope(): ChannelRouteAdminScope {
+  const hub = useHubAccount();
+  const scope = hubQueryScope(hub);
+  const canManage = hub.signedIn?.capabilities.manageResources === true;
+  const effective = useHubResource(
+    scope,
+    `access-assignments/effective${HUB_ACCESS_INCLUDE}`,
+    HubEffectiveAccessSchema,
+    hubResourceQueryKey(scope, "access-assignments/effective"),
+    !canManage,
+  );
+  return useMemo<ChannelRouteAdminScope>(() => {
+    if (canManage) return { status: "organization" };
+    if (effective.data === undefined) return { status: effective.error ? "none" : "loading" };
+    const accounts = channelAccountsAdministered(effective.data);
+    return accounts.length === 0 ? { status: "none" } : { status: "accounts", accounts };
+  }, [canManage, effective.data, effective.error]);
+}
+
+/** The Channel accounts a viewer's effective grants let them administer. */
+export function channelAccountsAdministered(access: HubEffectiveAccess): ChannelAccountRef[] {
+  const refs = new Map<string, ChannelAccountRef>();
+  for (const grant of access.grants) {
+    if (grant.resource.kind !== "channel_account") continue;
+    if (!grant.privileges.includes("channel.manage")) continue;
+    const ref = parseChannelAccountRef(grant.resource.id);
+    if (ref !== null) refs.set(grant.resource.id, ref);
+  }
+  return [...refs.values()];
+}
+
+/** The inverse of the Hub's `formatChannelAccountResourceId`: `<channel>/<accountId>`, URL-encoded. */
+function parseChannelAccountRef(resourceId: string): ChannelAccountRef | null {
+  const separator = resourceId.indexOf("/");
+  if (separator <= 0) return null;
+  try {
+    const channel = decodeURIComponent(resourceId.slice(0, separator));
+    const accountId = decodeURIComponent(resourceId.slice(separator + 1));
+    return accountId.length === 0 ? null : { channel, accountId };
+  } catch {
+    return null;
+  }
+}
+
+export function channelAccountResource(ref: ChannelAccountRef): string {
+  return `${encodeURIComponent(ref.channel)}/${encodeURIComponent(ref.accountId)}`;
+}
+
+/**
+ * Everything the Channels screen reads from the Hub. With `adminAccounts` the
+ * reads narrow to those accounts' endpoints and the organization-wide
+ * resources (Connections, Automations, Hosts, revisions) stay unread.
+ */
+export function useChannelSettingsQueries(adminAccounts: readonly ChannelAccountRef[] | null) {
   const hub = useHubAccount();
   const scope = hubQueryScope(hub);
   const inputDraft = useContext(AutomationInputDraftContext);
-  const channelQuery = useHubResource(
+  const organizationWide = adminAccounts === null;
+  const organizationQuery = useHubResource(
     scope,
     "channel-configuration",
     HubChannelConfigurationSchema,
+    undefined,
+    organizationWide,
   );
+  const accountsQuery = useAdministeredAccounts(scope, adminAccounts);
+  const channelQuery = organizationWide ? organizationQuery : accountsQuery.configuration;
   const channels = useMemo(
     () => ({ ...channelQuery, data: withInputDraft(channelQuery.data, inputDraft?.draft) }),
     [channelQuery, inputDraft?.draft],
   );
-  const connections = useHubResource(scope, "connections", HubConnectionsSchema);
-  const runtimeStatus = useHubResource(
+  const connections = useHubResource(
+    scope,
+    "connections",
+    HubConnectionsSchema,
+    undefined,
+    organizationWide,
+  );
+  const organizationStatus = useHubResource(
     scope,
     "channel-accounts/status",
     HubChannelRuntimeStatusSchema,
     [...hubResourceQueryKey(scope, "channel-accounts"), "status"],
+    organizationWide,
   );
+  const runtimeStatus = organizationWide ? organizationStatus : accountsQuery.status;
   return {
     hub,
     scope,
@@ -54,16 +144,109 @@ export function useChannelSettingsQueries() {
     connections,
     channelConnections: useChannelConnections(connections.data, inputDraft?.provider),
     statusRefreshing: connections.isFetching || runtimeStatus.isFetching,
-    automations: useHubResource(scope, "automations", HubAutomationsSchema),
-    daemons: useHubResource(scope, "daemons", HubDaemonsSchema),
-    history: useHubResource(scope, "channel-configuration/revisions", HubChannelRevisionsSchema, [
-      ...hubResourceQueryKey(scope, "channel-configuration"),
-      "revisions",
-    ]),
+    automations: useHubResource(
+      scope,
+      "automations",
+      HubAutomationsSchema,
+      undefined,
+      organizationWide,
+    ),
+    daemons: useHubResource(scope, "daemons", HubDaemonsSchema, undefined, organizationWide),
+    history: useHubResource(
+      scope,
+      "channel-configuration/revisions",
+      HubChannelRevisionsSchema,
+      [...hubResourceQueryKey(scope, "channel-configuration"), "revisions"],
+      organizationWide,
+    ),
     runtimeStatus,
     teams: useHubResource(scope, "teams", HubTeamsSchema),
     assignments: useHubResource(scope, "access-assignments", HubAccessAssignmentsSchema),
   };
+}
+
+/** The administered accounts' files and status, read per account and merged. */
+function useAdministeredAccounts(
+  scope: HubResourceQueryScope,
+  accounts: readonly ChannelAccountRef[] | null,
+) {
+  const hub = useHubAccount();
+  const refs = accounts ?? [];
+  const keys = refs.map(channelAccountResource);
+  const enabled = scope.organizationId.length > 0 && refs.length > 0;
+  const configuration = useFetchQuery({
+    queryKey: [...hubResourceQueryKey(scope, "channel-configuration"), "accounts", ...keys],
+    queryFn: async (): Promise<HubChannelConfiguration> => {
+      const files = await Promise.all(
+        refs.map((ref) =>
+          hub
+            .api()
+            .get(
+              `channel-configuration/accounts/${channelAccountResource(ref)}`,
+              HubChannelAccountConfigurationSchema,
+            ),
+        ),
+      );
+      return administeredConfiguration(files);
+    },
+    enabled,
+    retry: false,
+    dataShape: "value",
+    staleTimeMs: 15_000,
+  });
+  const status = useFetchQuery({
+    queryKey: [...hubResourceQueryKey(scope, "channel-accounts"), "status", ...keys],
+    queryFn: async (): Promise<HubRuntimeStatus> => {
+      const pages = await Promise.all(
+        refs.map((ref) =>
+          hub
+            .api()
+            .get(
+              `channel-accounts/${channelAccountResource(ref)}/status`,
+              HubChannelRuntimeStatusSchema,
+            ),
+        ),
+      );
+      return {
+        runtimeAvailable: pages.every((page) => page.runtimeAvailable),
+        accounts: pages.flatMap((page) => page.accounts),
+      };
+    },
+    enabled,
+    retry: false,
+    dataShape: "value",
+    staleTimeMs: 15_000,
+  });
+  return { configuration, status };
+}
+
+/** One configuration view out of per-account reads: the same revision, no shared files. */
+function administeredConfiguration(
+  files: readonly HubChannelAccountConfiguration[],
+): HubChannelConfiguration {
+  const revision = files.find((file) => file.revision !== null)?.revision ?? null;
+  return {
+    revision: revision === null ? null : { ...revision, createdAt: "" },
+    policy: {},
+    accounts: files.flatMap((file) => (file.account === null ? [] : [file.account])),
+    resource: {},
+    effective: files.map((file) => file.effective),
+    warnings: files.flatMap((file) => file.warnings),
+  };
+}
+
+/** Save one administered account through its own endpoint; the response is that account's view. */
+export function saveAdministeredAccount(
+  api: HubApiClient,
+  account: Record<string, unknown>,
+  expectedRevisionId: string | null,
+): Promise<HubChannelAccountConfiguration> {
+  const ref = { channel: String(account["channel"]), accountId: String(account["accountId"]) };
+  return api.put(
+    `channel-configuration/accounts/${channelAccountResource(ref)}`,
+    { account, expectedRevisionId },
+    HubChannelAccountConfigurationSchema,
+  );
 }
 
 /**
@@ -99,21 +282,16 @@ export function useChannelConfigurationPreview(): (
   );
 }
 
-/** The Hub's warnings for one Route, read from the shared Channel configuration query. */
+/** The Hub's warnings for one Route, out of the loaded configuration's list. */
 export function useChannelRouteWarnings(
+  warnings: HubChannelConfiguration["warnings"],
   channel: string | null,
   accountId: string | null,
   routeIndex: number,
 ): string[] {
-  const scope = hubQueryScope(useHubAccount());
-  const configuration = useHubResource(
-    scope,
-    "channel-configuration",
-    HubChannelConfigurationSchema,
-  );
   return useMemo(
     () =>
-      (configuration.data?.warnings ?? [])
+      (warnings ?? [])
         .filter(
           (warning) =>
             warning.channel === channel &&
@@ -121,7 +299,7 @@ export function useChannelRouteWarnings(
             warning.route === routeIndex,
         )
         .map(({ message }) => message),
-    [accountId, channel, configuration.data?.warnings, routeIndex],
+    [accountId, channel, warnings, routeIndex],
   );
 }
 
@@ -175,12 +353,13 @@ function useHubResource<Schema extends z.ZodType>(
   path: string,
   schema: Schema,
   queryKey: QueryKey = hubResourceQueryKey(scope, path),
+  enabled = true,
 ) {
   const hub = useHubAccount();
   return useFetchQuery({
     queryKey,
     queryFn: () => hub.api().get(path, schema),
-    enabled: scope.organizationId.length > 0,
+    enabled: enabled && scope.organizationId.length > 0,
     retry: false,
     dataShape: "value",
     staleTimeMs: 15_000,

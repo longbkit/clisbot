@@ -519,24 +519,84 @@ export const ZalouserAccountConfigSchema = z.looseObject({
 });
 export type ZalouserAccountConfig = z.infer<typeof ZalouserAccountConfigSchema>;
 
+// COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+// The pre-rules conversation selector. Still parsed so every stored revision
+// loads; `config/audience-migration.ts` turns it into audience rules.
 export const RouteMatchSchema = z
   .object({
     kind: RouteMatchKindSchema,
     // Native provider ids: Slack channel/thread ids, Telegram chat ids (numbers
     // in YAML are accepted and normalized to strings at compile).
     ids: z.array(z.union([z.string(), z.number()])).optional(),
-    // Optional literal content discriminator. This selects a route only when
-    // no durable direct-Agent binding already owns the inbound conversation.
     contains: z.string().min(1).optional(),
   })
   .strict();
 export type RouteMatch = z.infer<typeof RouteMatchSchema>;
 
+// COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+// The one-value audience the rules replaced.
 export const RouteAudienceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("members") }).strict(),
   z.object({ kind: z.literal("conversationParticipants") }).strict(),
 ]);
 export type RouteAudience = z.infer<typeof RouteAudienceSchema>;
+
+/** The organization roles a Who may name. `admin` includes Owners; `member`
+ * is every linked Member whatever their role. */
+export const AUDIENCE_ROLES = ["owner", "admin", "member"] as const;
+export type AudienceRole = (typeof AUDIENCE_ROLES)[number];
+
+/** Who may talk: any listed part matches (docs/audits/2026-09-19-route-audience-rules.md). */
+export const AudienceWhoSchema = z
+  .object({
+    roles: z.array(z.enum(AUDIENCE_ROLES)).optional(),
+    /** Team ids. */
+    teams: z.array(z.string().min(1)).optional(),
+    /** Membership ids (a Member of this organization). */
+    members: z.array(z.string().min(1)).optional(),
+    /** Every sender, unlinked ones included (the Guest subject). */
+    anyone: z.boolean().optional(),
+    /** Advanced: channel identities outside the Hub (`slack:U0…`, or the
+     * bare provider id), the replacement for `allowFrom`. */
+    identities: z.array(z.string().min(1)).optional(),
+  })
+  .strict()
+  .refine(
+    (who) =>
+      who.anyone === true ||
+      [who.roles, who.teams, who.members, who.identities].some(
+        (part) => part !== undefined && part.length > 0,
+      ),
+    { message: "an audience rule needs at least one Who part" },
+  );
+export type AudienceWho = z.infer<typeof AudienceWhoSchema>;
+
+/** Where the Who may talk: the parts add up. `groups` covers every
+ * conversation with two or more people; `public`/`private` only match where
+ * the platform reports the room's visibility. Threads and topics belong to
+ * their room; a thread/topic id under `conversations` narrows to it. */
+export const AudienceWhereSchema = z
+  .object({
+    dm: z.boolean().optional(),
+    groups: z.enum(["off", "all", "public", "private"]).optional(),
+    /** Native conversation ids (numbers in YAML are normalized to strings). */
+    conversations: z.array(z.union([z.string().min(1), z.number()])).optional(),
+  })
+  .strict()
+  .refine(
+    (where) =>
+      where.dm === true ||
+      (where.groups !== undefined && where.groups !== "off") ||
+      (where.conversations !== undefined && where.conversations.length > 0),
+    { message: "an audience rule needs at least one Where part" },
+  );
+export type AudienceWhere = z.infer<typeof AudienceWhereSchema>;
+
+/** One "[who] may talk in [where]" sentence; a sender is admitted when any rule matches. */
+export const AudienceRuleSchema = z
+  .object({ who: AudienceWhoSchema, where: AudienceWhereSchema })
+  .strict();
+export type AudienceRule = z.infer<typeof AudienceRuleSchema>;
 
 /** Every limit a Bot, a Conversation or a Route can carry, in display order. */
 export const CHANNEL_LIMIT_NAMES = [
@@ -589,8 +649,15 @@ export type AccountLimits = z.infer<typeof AccountLimitsSchema>;
  */
 export const RouteSchema = z
   .object({
-    match: RouteMatchSchema,
-    audience: RouteAudienceSchema.optional(),
+    /** Who may talk, where. Read together with `match`/the one-value
+     * `audience` through `config/audience-migration.ts`; a route needs one of
+     * the two shapes. */
+    audience: z.union([z.array(AudienceRuleSchema), RouteAudienceSchema]).optional(),
+    // Optional literal content discriminator. This selects a route only when
+    // no durable direct-Agent binding already owns the inbound conversation.
+    contains: z.string().min(1).optional(),
+    // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+    match: RouteMatchSchema.optional(),
     agent: z.string().min(1).optional(),
     environment: z.string().min(1).optional(),
     workflow: z.string().min(1).optional(),
@@ -624,7 +691,7 @@ export type Route = z.infer<typeof RouteSchema>;
 
 export const FallbackSchema = z.union([
   z.object({ deny: z.literal(true) }).strict(),
-  RouteSchema.omit({ match: true }),
+  RouteSchema.omit({ match: true, contains: true }),
 ]);
 export type Fallback = z.infer<typeof FallbackSchema>;
 

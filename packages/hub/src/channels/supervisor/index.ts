@@ -158,6 +158,8 @@ export function flatInboundNormalizer(params: InboundReplyParams): InboundMessag
   const chatId = confirmedString(ctx["ChatId"]);
   const conversation = planeConversation(params.channel, chatType, chatId, ctx["MessageThreadId"]);
   if (conversation === null) return null;
+  const visibility = ctx["Visibility"];
+  if (visibility === "public" || visibility === "private") conversation.visibility = visibility;
   // The plane's identity model is `<channel>:<provider-id>` (implementation doc
   // §4.3.2); the ctxPayload carries the raw native id, so the prefix is applied
   // here — the native → plane boundary — and nowhere else.
@@ -1344,17 +1346,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
       ...commandPlaneOptions(this.options, this.routeDefaults),
-      ...(this.options.authorizeChannelUse === undefined
-        ? {}
-        : { authorizeChannelUse: this.options.authorizeChannelUse }),
-      ...(this.options.authorizeChannelApproval === undefined
-        ? {}
-        : { authorizeChannelApproval: this.options.authorizeChannelApproval }),
-      ...(this.options.consumeChannelIdentityChallenge === undefined
-        ? {}
-        : {
-            consumeChannelIdentityChallenge: this.options.consumeChannelIdentityChallenge,
-          }),
+      ...pickDefined(this.options, [
+        "authorizeChannelUse",
+        "resolveChannelSender",
+        "authorizeChannelApproval",
+        "consumeChannelIdentityChallenge",
+      ]),
       recordChannelInboundActivity: (input) => this.store.recordChannelInboundActivity(input),
       logger: this.logger,
       post: planePost,
@@ -2186,6 +2183,19 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
  */
 export function createChannelSupervisor(options: ChannelSupervisorOptions): ChannelSupervisor {
   return new ChannelSupervisorImpl(options);
+}
+
+/** The named options that are set, so an absent one never lands as an explicit `undefined`. */
+function pickDefined<T extends object, K extends keyof T>(
+  source: T,
+  keys: readonly K[],
+): { [P in K]?: Exclude<T[P], undefined> } {
+  const picked: { [P in K]?: Exclude<T[P], undefined> } = {};
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined) picked[key] = value as Exclude<T[K], undefined>;
+  }
+  return picked;
 }
 
 function commandPlaneOptions(

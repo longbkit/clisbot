@@ -166,7 +166,10 @@ describe("compileChannelControlPlane", () => {
     assert.equal(account.approval.length, 3);
     assert.equal(account.approval[0]!.match, "command.destructive");
     assert.equal(account.routes.length, 4);
-    assert.equal(account.routes[0]!.match.contains, "#triage");
+    assert.equal(account.routes[0]!.contains, "#triage");
+    // COMPAT(route-audience-rules): the old `match` reads as one rule.
+    assert.deepEqual(account.routes[0]!.where, { dm: false, groups: [], conversations: ["C0APP"] });
+    assert.deepEqual(account.routes[0]!.audienceRules[0]?.who.roles, ["member"]);
     assert.equal(account.fallback.deny, true);
   });
 
@@ -219,8 +222,11 @@ routes:
 `,
       }),
     );
-    assert.deepEqual(safe.accounts[0]?.routes[0]?.audience, {
-      kind: "conversationParticipants",
+    assert.equal(safe.accounts[0]?.routes[0]?.audienceRules[0]?.who.anyone, true);
+    assert.deepEqual(safe.accounts[0]?.routes[0]?.where, {
+      dm: false,
+      groups: [],
+      conversations: ["C_CUSTOMER"],
     });
     assert.deepEqual(safe.accounts[0]?.routes[0]?.limits, OPEN_AUDIENCE_ROUTE_LIMITS);
 
@@ -248,7 +254,7 @@ routes:
     approval: [{ match: "*", mode: auto-deny }]
 `,
       },
-      /Anyone in any channel/u,
+      /Anyone in any group chat or channel/u,
     );
     expectRouteWarning(
       {
@@ -883,9 +889,9 @@ routes:
     assert.equal(account.config["textChunkMode"], "newline");
   });
 
-  it("rejects a Zalo Personal route kind the channel never emits", () => {
-    expectCompileError(
-      {
+  it("reads a legacy id-less thread route as every group chat", () => {
+    const plane = compileChannelControlPlane(
+      input({
         [".paseo/channels/zalouser/main.yml"]: `
 channel: zalouser
 accountId: main
@@ -896,9 +902,13 @@ routes:
     agent: worker-app
     environment: repo-app
 `,
-      },
-      /zalouser never emits a thread conversation/,
+      }),
     );
+    assert.deepEqual(plane.accounts[0]?.routes[0]?.where, {
+      dm: false,
+      groups: ["all"],
+      conversations: [],
+    });
   });
 
   it("rejects a wrong-typed Zalo Personal config knob at deploy", () => {
@@ -956,26 +966,12 @@ routes:
     assert.equal(account.channel, "discord");
     assert.deepEqual(account.transport, { mode: "gateway" });
     assert.deepEqual(
-      account.routes.map((route) => route.match.kind),
-      ["dm", "channel", "thread"],
-    );
-  });
-
-  it("rejects a Discord route kind Discord never emits", () => {
-    expectCompileError(
-      {
-        [".paseo/channels/discord/main.yml"]: `
-channel: discord
-accountId: main
-connectionId: connection-id
-transport: { mode: gateway }
-routes:
-  - match: { kind: topic }
-    agent: worker-app
-    environment: repo-app
-`,
-      },
-      /discord never emits a topic conversation/i,
+      account.routes.map((route) => route.where),
+      [
+        { dm: true, groups: [], conversations: [] },
+        { dm: false, groups: [], conversations: ["123456789012345678"] },
+        { dm: false, groups: ["all"], conversations: [] },
+      ],
     );
   });
 
@@ -1014,39 +1010,6 @@ transport: { mode: webhook }
 `,
       },
       /webhook transport is not implemented/,
-    );
-  });
-
-  it("rejects route kinds a channel can never emit", () => {
-    expectCompileError(
-      {
-        [".paseo/channels/slack/work.yml"]: `
-channel: slack
-accountId: work
-connectionId: connection-id
-transport: { mode: socket }
-routes:
-  - match: { kind: topic }
-    agent: worker-app
-    environment: repo-app
-`,
-      },
-      /slack never emits a topic conversation/,
-    );
-    expectCompileError(
-      {
-        [".paseo/channels/telegram/work.yml"]: `
-channel: telegram
-accountId: work
-connectionId: connection-id
-transport: { mode: polling }
-routes:
-  - match: { kind: thread }
-    agent: worker-app
-    environment: repo-app
-`,
-      },
-      /telegram never emits a thread conversation/,
     );
   });
 });
@@ -1223,39 +1186,6 @@ transport: { mode: polling }
       /Invalid option|expected/,
     );
   });
-
-  it("refuses a conversation kind the channel never emits", () => {
-    expectCompileError(
-      {
-        [".paseo/channels/zalo/oa.yml"]: `
-channel: zalo
-accountId: oa
-connectionId: zalo-oa
-transport: { mode: polling }
-routes:
-  - match: { kind: thread }
-    agent: worker-app
-    environment: repo-app
-`,
-      },
-      /zalo never emits a thread conversation/,
-    );
-    expectCompileError(
-      {
-        [".paseo/channels/googlechat/workspace.yml"]: `
-channel: googlechat
-accountId: workspace
-connectionId: googlechat-workspace
-transport: { mode: webhook }
-routes:
-  - match: { kind: topic }
-    agent: worker-app
-    environment: repo-app
-`,
-      },
-      /googlechat never emits a topic conversation/,
-    );
-  });
 });
 
 describe("access defaults", () => {
@@ -1367,6 +1297,61 @@ fallback: { deny: true }`),
 fallback: { deny: true }`),
       },
       /agent ghost is not defined in hub\.yml/,
+    );
+  });
+});
+
+describe("audience rules", () => {
+  it("compiles the new shape: rules on audience, contains at route level", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience:
+      - who: { roles: [owner, admin] }
+        where: { dm: true, groups: all }
+      - who: { teams: [qc] }
+        where: { groups: public, conversations: [C0PRIVATE] }
+    contains: deploy
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const route = plane.accounts[0]!.routes[0]!;
+    assert.equal(route.contains, "deploy");
+    assert.deepEqual(route.where, {
+      dm: true,
+      groups: ["all", "public"],
+      conversations: ["C0PRIVATE"],
+    });
+    assert.deepEqual(route.audienceRules[1]?.who.teams, ["qc"]);
+    assert.equal(route.limits, undefined, "no anyone rule, no open-audience defaults");
+  });
+
+  it("reports a rule with no Who part under routes[i].audience[j]", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience:
+      - who: { roles: [owner] }
+        where: { dm: true }
+      - who: {}
+        where: { dm: true }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /work\.yml\.routes\.0\.audience\.1\.who: an audience rule needs at least one Who part/,
     );
   });
 });

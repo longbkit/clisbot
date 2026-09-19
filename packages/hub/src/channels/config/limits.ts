@@ -31,15 +31,13 @@ export function resolveLimits(
   return Object.keys(resolved).length === 0 ? undefined : resolved;
 }
 
-/** A Route's limits; an open-audience Route starts from the conservative defaults. */
+/** A Route's limits; an open-audience Route (any rule with `anyone`) starts
+ * from the conservative defaults. */
 export function compileRouteLimits(
   authored: ChannelLimits | undefined,
-  audience: "members" | "conversationParticipants",
+  openAudience: boolean,
 ): { limits?: ResolvedLimits } {
-  const limits = resolveLimits(
-    authored,
-    audience === "conversationParticipants" ? OPEN_AUDIENCE_ROUTE_LIMITS : undefined,
-  );
+  const limits = resolveLimits(authored, openAudience ? OPEN_AUDIENCE_ROUTE_LIMITS : undefined);
   return limits === undefined ? {} : { limits };
 }
 

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { compileAudienceRule } from "../config/audience.js";
 import { describe, it } from "vitest";
 import type {
   CompiledChannelAccount,
@@ -29,8 +30,10 @@ const defaults: EffectiveDefaults = {
 
 function fixture() {
   const route: CompiledRoute = {
-    match: { kind: "channel", ids: ["C_PUBLIC"] },
-    audience: { kind: "conversationParticipants" },
+    audienceRules: [
+      compileAudienceRule({ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }),
+    ],
+    where: { dm: false, groups: [], conversations: ["C_PUBLIC"] },
     target: {
       kind: "agent",
       agent: "worker",
@@ -316,7 +319,7 @@ describe("ChannelExecutionLimiter", () => {
 
   it("cancels only open-audience runs when the policy is replaced", async () => {
     const f = fixture();
-    const member = { ...f.route, audience: { kind: "members" as const }, limits: {} };
+    const member = { ...f.route, audienceRules: [], limits: {} };
     f.account.limits = { bot: { maxConcurrentRuns: 5 } };
     const admit = (route: typeof f.route, sender: string) =>
       f.limiter.admit({

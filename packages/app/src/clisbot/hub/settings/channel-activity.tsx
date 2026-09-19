@@ -64,19 +64,30 @@ type ChangeActivity = Dispatch<SetStateAction<ChannelActivityState>>;
 export function ChannelActivity({
   accounts = EMPTY_ACCOUNTS,
   connections = EMPTY_CONNECTIONS,
-  state,
+  accountScoped = false,
+  state: requestedState,
   onChange,
 }: {
   accounts?: AccountRecord[];
   connections?: Connection[];
+  /** A Channel Route Admin reads each account's own activity; there is no "all". */
+  accountScoped?: boolean;
   state: ChannelActivityState;
   onChange: ChangeActivity;
 }) {
   const compact = useIsCompactFormFactor();
   const catalog = useChannelCatalog();
+  const state = useMemo(() => {
+    const firstAccountKey = accounts
+      .map((account) => `${String(account.channel)}:${String(account.accountId)}`)
+      .find((key) => key.length > 0);
+    return accountScoped && requestedState.accountKey === ALL && firstAccountKey !== undefined
+      ? { ...requestedState, accountKey: firstAccountKey }
+      : requestedState;
+  }, [accountScoped, accounts, requestedState]);
   const accountOptions = useMemo<SelectFieldOption<string>[]>(
     () => [
-      { id: ALL, value: ALL, label: "All accounts" },
+      ...(accountScoped ? [] : [{ id: ALL, value: ALL, label: "All accounts" }]),
       ...accounts.flatMap((account) => {
         if (typeof account.channel !== "string" || typeof account.accountId !== "string") return [];
         const value = `${account.channel}:${account.accountId}`;
@@ -91,7 +102,7 @@ export function ChannelActivity({
     ],
     // The catalog arrives after the accounts do; without it here the options
     // would keep the fallback label for the rest of the session.
-    [accounts, catalog.entries],
+    [accountScoped, accounts, catalog.entries],
   );
   const selectedAccount = accounts.find(
     (account) => `${String(account.channel)}:${String(account.accountId)}` === state.accountKey,
@@ -196,6 +207,7 @@ export function ChannelActivity({
         key={JSON.stringify([state.accountKey, state.route, state.outcome])}
         accounts={accounts}
         connections={connections}
+        accountScoped={accountScoped}
         state={state}
         onChange={onChange}
         clearFilters={clearFilters}
@@ -204,29 +216,47 @@ export function ChannelActivity({
   );
 }
 
-function activityResource(state: ChannelActivityState, page: number): string {
+/**
+ * The organization-wide `channel-activity` list, or — for a Channel Route
+ * Admin — the account's own `channel-activity/accounts/<channel>/<accountId>`,
+ * the only one they may read.
+ */
+function activityResource(
+  state: ChannelActivityState,
+  page: number,
+  accountScoped: boolean,
+): string {
   const params = new URLSearchParams({ limit: "25" });
+  let path = "channel-activity";
   if (state.accountKey !== ALL) {
     const separator = state.accountKey.indexOf(":");
-    params.set("channel", state.accountKey.slice(0, separator));
-    params.set("accountId", state.accountKey.slice(separator + 1));
+    const channel = state.accountKey.slice(0, separator);
+    const accountId = state.accountKey.slice(separator + 1);
+    if (accountScoped) {
+      path = `channel-activity/accounts/${encodeURIComponent(channel)}/${encodeURIComponent(accountId)}`;
+    } else {
+      params.set("channel", channel);
+      params.set("accountId", accountId);
+    }
     if (state.route !== ALL) params.set("routePosition", state.route);
   }
   if (state.outcome !== ALL) params.set("outcome", state.outcome);
   const cursor = state.cursors[page];
   if (cursor) params.set("cursor", cursor);
-  return `channel-activity?${params.toString()}`;
+  return `${path}?${params.toString()}`;
 }
 
 function ChannelActivityResults({
   accounts,
   connections,
+  accountScoped,
   state,
   onChange,
   clearFilters,
 }: {
   accounts: AccountRecord[];
   connections: Connection[];
+  accountScoped: boolean;
   state: ChannelActivityState;
   onChange: ChangeActivity;
   clearFilters(): void;
@@ -238,7 +268,7 @@ function ChannelActivityResults({
     organizationId: hub.signedIn?.organization.id ?? null,
     accountId: hub.signedIn?.account.id ?? null,
   };
-  const resource = activityResource(state, state.page);
+  const resource = activityResource(state, state.page, accountScoped);
   const activity = useFetchQuery({
     queryKey: hubResourceQueryKey(scope, resource),
     queryFn: () => hub.api().get(resource, HubChannelActivitySchema),
@@ -248,7 +278,7 @@ function ChannelActivityResults({
     staleTimeMs: 15_000,
   });
   const previous = client.getQueryData<ActivityPage>(
-    hubResourceQueryKey(scope, activityResource(state, state.previousPage)),
+    hubResourceQueryKey(scope, activityResource(state, state.previousPage, accountScoped)),
   );
   const page = activity.data ?? previous;
   const showingPrevious =

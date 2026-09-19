@@ -20,7 +20,13 @@ it("bounds uncached lookup work while allowing later configured destinations to 
   });
   const account = {
     routes: [
-      { match: { kind: "channel" as const, ids: Array.from({ length: 35 }, (_, i) => `C${i}`) } },
+      {
+        where: {
+          dm: false,
+          groups: [],
+          conversations: Array.from({ length: 35 }, (_, i) => `C${i}`),
+        },
+      },
     ],
   };
   const first = await configuredChannelDestinations(account, [], resolve);
@@ -37,7 +43,7 @@ it("never invents a topic parent or treats group titles as topic titles", async 
     kind: "group" as const,
     visibility: "unknown" as const,
   }));
-  const account = { routes: [{ match: { kind: "topic" as const, ids: ["42", "unknown-topic"] } }] };
+  const account = { routes: [{ where: { dm: false, groups: [], conversations: ["42"] } }] };
   const rows = await configuredChannelDestinations(
     account,
     [

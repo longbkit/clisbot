@@ -38,6 +38,10 @@ export interface InboundConversationDetail {
   rootConversationId: string;
   /** The native thread/topic id within the root conversation (null at root level). */
   threadId: string | null;
+  /** The room's visibility when the vertical reports it (Slack: `channel_type`
+   * `channel` = public, `group`/`mpim` = private); absent = unknown, so an
+   * audience rule filtered to public or private rooms does not match. */
+  visibility?: "public" | "private";
 }
 
 /**
@@ -365,7 +369,17 @@ export type SessionLinkRenderer = (agentId: string) => string;
  */
 export type InboundNormalizer = (params: InboundReplyParams) => InboundMessage | null;
 
-/** Optional Hub Member/Team authority layered beside the existing Channel policy. */
+/** The sender's Hub Member facts an audience rule's Who is decided on: the
+ * linked membership, its organization role, its Teams. Null = not linked. */
+export type ChannelSenderResolver = (input: {
+  organizationId: string;
+  account: CompiledChannelAccount;
+  senderIdentity: string;
+}) => Promise<{ membershipId: string; role: string; teamIds: readonly string[] } | null>;
+
+/** COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+ * The `channel.use` Access-grant way in, until the start-time migration has
+ * folded every grant into audience rules. */
 export type ChannelUseAuthorizer = (input: {
   organizationId: string;
   account: CompiledChannelAccount;
@@ -433,6 +447,9 @@ export interface ChannelPlaneDeps {
     workflowName: string;
   }) => Promise<import("../../workflows/channel-status.js").ChannelWorkflowRunSummary[]>;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
+  /** Resolves a sender to their Member facts for audience rules; absent = only
+   * `anyone` and `identities` rules can admit. */
+  resolveChannelSender?: ChannelSenderResolver | undefined;
   authorizeChannelApproval?: ChannelApprovalAuthorizer | undefined;
   consumeChannelIdentityChallenge?: ChannelIdentityChallengeConsumer | undefined;
   /** Durable, bounded audit sink for open-audience inbound decisions. */

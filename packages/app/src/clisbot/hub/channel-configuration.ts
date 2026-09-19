@@ -1,5 +1,5 @@
 import { parse, stringify } from "yaml";
-import { splitConversationIds } from "./conversation-picker";
+import type { HubAudienceRule } from "./contracts";
 import type { WorktreeTarget } from "./workspace-configuration";
 
 export type ChannelConfigurationRecord = Record<string, unknown>;
@@ -7,6 +7,10 @@ export type ChannelRouteMatchKind = "dm" | "channel" | "thread" | "group" | "top
 
 export type ChannelRouteTarget =
   | { kind: "automation"; automationName: string }
+  /** Keep the target the Route already has (`agent`/`environment`/`workflow`,
+   * `agentControls`): what a Channel Route Admin saves, since the shared
+   * resource file that defines an Agent is not theirs to change. */
+  | { kind: "existing"; route: ChannelConfigurationRecord }
   | {
       kind: "agent";
       daemonId: string;
@@ -104,10 +108,9 @@ export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: Partial<Record<ChannelLimitName
 
 interface ChannelRouteCandidateInput {
   accountId: string;
-  matchKind: ChannelRouteMatchKind;
-  conversationIds: string;
+  /** Who may talk, where: at least one rule (`channel-route-audience.ts` builds them). */
+  audience: readonly HubAudienceRule[];
   contains?: string;
-  audience?: "members" | "conversationParticipants";
   limits?: ChannelLimits;
   behavior?: ChannelRouteBehavior;
   target: ChannelRouteTarget;
@@ -163,10 +166,8 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
   const accountId = input.accountId.trim();
   const candidate = buildChannelRouteCandidate({
     accountId,
-    matchKind: input.matchKind,
-    conversationIds: input.conversationIds,
+    audience: input.audience,
     ...(input.contains === undefined ? {} : { contains: input.contains }),
-    ...(input.audience === undefined ? {} : { audience: input.audience }),
     ...(input.limits === undefined ? {} : { limits: input.limits }),
     ...(input.behavior === undefined ? {} : { behavior: input.behavior }),
     target: input.target,
@@ -191,31 +192,30 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   route: ChannelConfigurationRecord;
   resource: ChannelConfigurationRecord;
 } {
-  const ids = splitConversationIds(input.conversationIds);
   const contains = input.contains?.trim();
-  const match = {
-    kind: input.matchKind,
-    ...(ids.length > 0 ? { ids } : {}),
-    ...(contains ? { contains } : {}),
-  };
-  const openAudience = input.audience === "conversationParticipants";
+  const audience = input.audience.map(audienceRuleRecord);
+  const openAudience = audience.some((rule) => rule.who.anyone === true);
   const limits = authoredLimits(input.limits);
   const behavior =
-    input.behavior === undefined ? {} : routeBehaviorSettings(input.behavior, input.matchKind);
+    input.behavior === undefined
+      ? {}
+      : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience));
   const audiencePolicy = {
-    audience: { kind: openAudience ? "conversationParticipants" : "members" },
+    audience,
+    ...(contains ? { contains } : {}),
     ...(openAudience ? withQuietSync(behavior) : behavior),
     ...(limits === undefined ? {} : { limits }),
   };
   let resource = input.resource;
   let route: ChannelConfigurationRecord;
   if (input.target.kind === "automation") {
-    route = { match, ...audiencePolicy, workflow: input.target.automationName };
+    route = { ...audiencePolicy, workflow: input.target.automationName };
+  } else if (input.target.kind === "existing") {
+    route = { ...audiencePolicy, ...routeTargetKeys(input.target.route) };
   } else {
     const direct = buildDirectAgentTarget(input, input.target);
     resource = direct.resource;
     route = {
-      match,
       ...audiencePolicy,
       agent: direct.resourceName,
       environment: direct.resourceName,
@@ -225,6 +225,60 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
     route,
     resource,
   };
+}
+
+/** The wire shape of one rule: only the parts that are set, ids as strings. */
+function audienceRuleRecord(rule: HubAudienceRule): HubAudienceRule {
+  const { who, where } = rule;
+  return {
+    who: {
+      ...(who.roles !== undefined && who.roles.length > 0 ? { roles: [...who.roles] } : {}),
+      ...(who.teams !== undefined && who.teams.length > 0 ? { teams: [...who.teams] } : {}),
+      ...(who.members !== undefined && who.members.length > 0 ? { members: [...who.members] } : {}),
+      ...(who.anyone === true ? { anyone: true } : {}),
+      ...(who.identities !== undefined && who.identities.length > 0
+        ? { identities: [...who.identities] }
+        : {}),
+    },
+    where: {
+      ...(where.dm === true ? { dm: true } : {}),
+      ...(where.groups !== undefined && where.groups !== "off" ? { groups: where.groups } : {}),
+      ...(where.conversations !== undefined && where.conversations.length > 0
+        ? { conversations: where.conversations.map(String) }
+        : {}),
+    },
+  };
+}
+
+/** True when every rule covers DMs and nothing else: mention and thread settings do not apply. */
+export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean {
+  return (
+    rules.length > 0 &&
+    rules.every(
+      ({ where }) =>
+        where.dm === true &&
+        (where.groups === undefined || where.groups === "off") &&
+        (where.conversations === undefined || where.conversations.length === 0),
+    )
+  );
+}
+
+/** Whether a stored Route admits everyone somewhere, whichever audience shape it uses. */
+export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean {
+  const audience = route["audience"];
+  if (Array.isArray(audience)) {
+    return audience.some((rule) => isRecord(rule) && recordField(rule, "who")["anyone"] === true);
+  }
+  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+  return recordField(route, "audience")["kind"] === "conversationParticipants";
+}
+
+/** What names a Route's target, kept verbatim when the target is not rebuilt. */
+function routeTargetKeys(route: ChannelConfigurationRecord): ChannelConfigurationRecord {
+  const keys = ["agent", "environment", "workflow", "agents", "models", "agentControls"];
+  return Object.fromEntries(
+    keys.flatMap((key) => (Object.hasOwn(route, key) ? [[key, route[key]]] : [])),
+  );
 }
 
 function buildDirectAgentTarget(
@@ -270,9 +324,9 @@ function buildDirectAgentTarget(
 
 function routeBehaviorSettings(
   behavior: ChannelRouteBehavior,
-  matchKind: ChannelRouteMatchKind,
+  dmOnly: boolean,
 ): ChannelConfigurationRecord {
-  const followUp = routeFollowUpSetting(behavior, matchKind);
+  const followUp = routeFollowUpSetting(behavior, dmOnly);
   return {
     interaction: {
       requireMention: behavior.requireMention,
@@ -301,9 +355,9 @@ function routeBehaviorSettings(
  */
 function routeFollowUpSetting(
   behavior: ChannelRouteBehavior,
-  matchKind: ChannelRouteMatchKind,
+  dmOnly: boolean,
 ): ChannelConfigurationRecord | undefined {
-  if (!behavior.followUpEdited || matchKind === "dm") return behavior.followUpAuthored;
+  if (!behavior.followUpEdited || dmOnly) return behavior.followUpAuthored;
   if (behavior.followUpMode === "auto") {
     return { mode: "auto", ttlMinutes: behavior.followUpTtlMinutes };
   }
@@ -388,7 +442,7 @@ function preserveRouteSettings(
   );
   // Changing who can use the Route starts from that audience's defaults;
   // keeping it keeps the settings the form does not show.
-  const sameAudience = audienceKind(current) === audienceKind(replacement);
+  const sameAudience = isOpenAudienceRoute(current) === isOpenAudienceRoute(replacement);
   if (sameAudience) {
     for (const key of ["interaction", "sync", "approval"] as const) {
       if (Object.hasOwn(current, key)) preserved[key] = current[key];
@@ -413,11 +467,6 @@ function preserveRouteSettings(
     };
   }
   return merged;
-}
-
-function audienceKind(route: ChannelConfigurationRecord): string {
-  const kind = recordField(route, "audience")["kind"];
-  return kind === "conversationParticipants" ? kind : "members";
 }
 
 /**
@@ -509,16 +558,18 @@ export function insertChannelRoute(
   routes: readonly ChannelConfigurationRecord[],
   route: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord[] {
-  if (!routeContainsText(route)) return [...routes, route];
-  const catchAll = routes.findIndex((candidate) => !routeContainsText(candidate));
+  if (routeContainsText(route) === null) return [...routes, route];
+  const catchAll = routes.findIndex((candidate) => routeContainsText(candidate) === null);
   return catchAll < 0
     ? [...routes, route]
     : [...routes.slice(0, catchAll), route, ...routes.slice(catchAll)];
 }
 
-function routeContainsText(route: ChannelConfigurationRecord): boolean {
-  const match = recordField(route, "match");
-  return typeof match["contains"] === "string" && match["contains"].length > 0;
+/** Route-level `contains`; a stored pre-rules Route still carries it under `match`. */
+export function routeContainsText(route: ChannelConfigurationRecord): string | null {
+  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+  const contains = route["contains"] ?? recordField(route, "match")["contains"];
+  return typeof contains === "string" && contains.length > 0 ? contains : null;
 }
 
 function recordField(record: ChannelConfigurationRecord, key: string): ChannelConfigurationRecord {

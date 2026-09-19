@@ -45,6 +45,7 @@ import { processingSurfaceFor } from "../plane/processing.js";
 import type {
   InboundMessage,
   InboundOutcome,
+  ChannelSenderResolver,
   ChannelUseAuthorizer,
   SupportedChannelName,
   PlaneClock,
@@ -60,6 +61,7 @@ export {
   parseStoredRouteTarget,
   routeFingerprint,
   routePosition,
+  storedRouteOwner,
   type StoredRouteSummary,
   type ThreadKey,
 } from "./stored-route.js";
@@ -110,6 +112,7 @@ interface BindingEngineContext extends SessionCreateContext {
   clock: PlaneClock;
   store: ChannelStore;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
+  resolveChannelSender?: ChannelSenderResolver | undefined;
   /** Release a session the plane no longer streams — the conversation moved to
    * another target. Absent = the engine only cancels and unbinds it. */
   detachAgent?: ((agentId: string) => Promise<void> | void) | undefined;
@@ -633,6 +636,9 @@ export class BindingEngine {
       account,
       route,
       message,
+      ...(this.context.resolveChannelSender === undefined
+        ? {}
+        : { resolveChannelSender: this.context.resolveChannelSender }),
       ...(this.context.authorizeChannelUse === undefined
         ? {}
         : { authorizeChannelUse: this.context.authorizeChannelUse }),

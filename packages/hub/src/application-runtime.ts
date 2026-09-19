@@ -16,6 +16,7 @@ import {
 } from "@getpaseo/protocol/daemon-endpoints";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import { reportFailure } from "./failures/index.js";
+import { composeNotificationMailer } from "./invitations/index.js";
 import { resolveRouteTenant } from "./projects/access.js";
 import { capabilitiesFor } from "./auth/organization-policy.js";
 import type { DaemonDispatchLifecycleOptions } from "./daemons/lifecycle.js";
@@ -59,6 +60,9 @@ import {
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
 } from "./channels/control-plane.js";
+import { createChannelUseGrantSource } from "./channels/access-grants.js";
+import { migrateChannelAudiences } from "./channels/access-migration.js";
+import { createChannelSenderResolver } from "./channels/policy/sender-facts.js";
 import type { ChannelSupervisor } from "./channels/supervisor/types.js";
 
 export interface ApplicationCompositionOptions {
@@ -192,6 +196,16 @@ async function createOwnedApplicationRuntime(
     await channelSupervisor?.stopAll();
   });
   await application.hub.start(registrations.flatMap((registration) => registration.sources));
+  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+  // Fold `channel.use` grants and old-shape routes into audience rules before
+  // any account starts, so the first inbound already reads the new revision.
+  if (channelSupervisor !== null && options.database !== null && options.databaseRuntime) {
+    await migrateChannelAudiences({
+      database: options.database,
+      grants: createChannelUseGrantSource(options.databaseRuntime),
+      logger: channelLogger,
+    });
+  }
   // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
   // channel account. Isolated per account (failures never abort the boot);
   // the supervisor is null whenever the kill-switch is off.
@@ -555,6 +569,7 @@ function createManagementApi(
   ) {
     return null;
   }
+  const notificationMailer = composeNotificationMailer();
   return new ManagementApi({
     database: options.database,
     runtime: options.databaseRuntime,
@@ -569,6 +584,7 @@ function createManagementApi(
     manualRuns: publicOperations,
     revokeDaemon,
     renameDaemon,
+    ...(notificationMailer === undefined ? {} : { notificationMailer }),
   });
 }
 
@@ -668,9 +684,13 @@ async function createChannelSupervisorAtComposition(
               }),
           }
         : {}),
+      ...(access === null || options.databaseRuntime === undefined
+        ? {}
+        : { resolveChannelSender: createChannelSenderResolver(access, options.databaseRuntime) }),
       ...(access === null
         ? {}
         : {
+            // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
             authorizeChannelUse: ({ organizationId, account, message }) =>
               access.authorizeChannelPrivilege({
                 organizationId,

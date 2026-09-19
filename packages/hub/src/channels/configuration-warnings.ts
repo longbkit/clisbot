@@ -63,12 +63,23 @@ export async function channelConfigurationWarnings(input: {
 /** What the Route itself lets anyone in the conversation do. */
 export function openRouteWarnings(route: CompiledRoute): string[] {
   const warnings: string[] = [];
-  if (route.match.ids.length === 0) {
-    warnings.push(`Anyone in any ${route.match.kind} the bot is in can use this Route.`);
+  const open = route.audienceRules.filter(({ who }) => who.anyone);
+  const groups = open.map(({ where }) => where.groups).filter((filter) => filter !== undefined);
+  if (groups.length > 0) {
+    const scope = groups.includes("all")
+      ? ""
+      : ` ${groups.includes("public") ? "public" : "private"}`;
+    warnings.push(`Anyone in any${scope} group chat or channel the bot is in can use this Route.`);
   }
-  if (route.match.kind !== "dm" && !route.defaults.requireMention) {
+  if (open.some(({ where }) => where.dm)) {
+    warnings.push("Anyone who can message the bot directly can use this Route.");
+  }
+  const inRooms = open.some(
+    ({ where }) => where.groups !== undefined || where.conversations.length > 0,
+  );
+  if (inRooms && !route.defaults.requireMention) {
     warnings.push("The bot answers every message here, not only when it is mentioned.");
-  } else if (route.match.kind !== "dm" && route.defaults.followUp.mode === "auto") {
+  } else if (inRooms && route.defaults.followUp.mode === "auto") {
     warnings.push(
       `After a mention, the bot answers anyone here without one for ${String(route.defaults.followUp.ttlMinutes)} minutes.`,
     );

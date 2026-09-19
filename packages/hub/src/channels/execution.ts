@@ -20,11 +20,14 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { InboundReplyParams } from "./loader/host.js";
+import { isOpenAudience } from "./config/audience.js";
 import {
+  audienceRulesAdmit,
   isEnabled,
   isOpenAudienceRoute,
   mayTrigger,
   matchRoute,
+  selectRouteForSender,
   type InboundConversation,
 } from "./policy.js";
 import {
@@ -46,6 +49,7 @@ import {
 import { redeemChannelCommandButton } from "./command-buttons.js";
 import {
   admitChannelAccess,
+  audienceSenderFor,
   mayUseChannelRoute,
   type ChannelAccessGateOutcome,
 } from "./policy/gate.js";
@@ -58,6 +62,7 @@ import {
   BindingEngine,
   deriveBindingKey,
   parseStoredRouteSummary,
+  storedRouteOwner,
   routeFingerprint,
   routePosition,
 } from "./bindings/index.js";
@@ -197,6 +202,20 @@ export type ChannelPlaneSnapshot = Pick<
   ChannelPlaneDeps,
   "channelRevisionId" | "controlPlane" | "resolveAgentSpec" | "resolveAgentAccessTarget"
 >;
+
+/** COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+ * The one-value `audience: { kind: conversationParticipants }` a Workflow run
+ * recorded before audience rules. */
+function legacyOpenAudience(route: unknown): boolean {
+  if (typeof route !== "object" || route === null || !("audience" in route)) return false;
+  const audience = route.audience;
+  return (
+    typeof audience === "object" &&
+    audience !== null &&
+    "kind" in audience &&
+    audience.kind === "conversationParticipants"
+  );
+}
 
 /** The plane kind a thread/topic's ROOT conversation carries (the two-pass
  * match's second descriptor; inbound.md). A thread sits in a Slack channel; a
@@ -627,6 +646,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.authorizeChannelUse === undefined
           ? {}
           : { authorizeChannelUse: deps.authorizeChannelUse }),
+        ...(deps.resolveChannelSender === undefined
+          ? {}
+          : { resolveChannelSender: deps.resolveChannelSender }),
         get resolveAgentSpec() {
           return deps.resolveAgentSpec;
         },
@@ -1150,7 +1172,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             route_position: routePosition(account, route),
             route_fingerprint: routeFingerprint(route),
             route: {
-              ...(route.audience === undefined ? {} : { audience: route.audience }),
+              audienceRules: [...route.audienceRules],
               defaultRoles: [...route.defaultRoles],
               assignments: [...route.assignments],
               defaults: route.defaults,
@@ -1685,17 +1707,34 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       account,
       route,
       message,
+      ...(deps.resolveChannelSender === undefined
+        ? {}
+        : { resolveChannelSender: deps.resolveChannelSender }),
       ...(deps.authorizeChannelUse === undefined
         ? {}
         : { authorizeChannelUse: deps.authorizeChannelUse }),
     });
   }
 
+  /** Member-grade admission: an audience rule other than `anyone`, a role
+   * granting `bot.interact`, or (COMPAT) a `channel.use` grant. */
   async function mayVerifiedMemberUseChannel(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<boolean> {
+    const sender = await audienceSenderFor({
+      organizationId: deps.organizationId,
+      account,
+      route,
+      message,
+      ...(deps.resolveChannelSender === undefined
+        ? {}
+        : { resolveChannelSender: deps.resolveChannelSender }),
+    });
+    if (audienceRulesAdmit(route, message.conversation, sender, { membersOnly: true })) {
+      return true;
+    }
     if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
       return Promise.resolve(true);
     }
@@ -1912,14 +1951,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   ): Promise<InboundRouteResolution> {
     const binding = await bindingForInbound(message, account);
     if (binding !== undefined) {
-      const route = routeForBinding(binding);
+      // A bound conversation stays with its Route: the live conversation
+      // decides which Routes still cover it, the binding decides which of
+      // those owns it, and the sender never moves it to another one.
+      const route = routeForBinding(binding, message.conversation);
       // No route owns this conversation any more: the account stopped serving
       // it, which is the same silence it had before it was ever bound. Whether
       // the bound session is still the right one to answer with is the binding
       // engine's call, after admission.
       return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
     }
-    const route = resolveNewRoute(message, account);
+    const route = await resolveNewRoute(message, account);
     return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
   }
 
@@ -1955,33 +1997,25 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   /**
-   * Two-pass route match (pinned-vertical-contracts/inbound.md): a
-   * thread/topic-level message matches the THREAD-LEVEL descriptor first
-   * (`{kind: thread|topic, id: threadId}`), then the ROOT descriptor
-   * (`{kind: dm|channel|group, id: rootConversationId}`); first hit in
-   * declaration order wins. `matchRoute` stays a pure single-level matcher.
-   * A root-level message carries no thread id — one pass at the root.
+   * Ordered selection for an unbound conversation: the first Route whose
+   * Where covers it (thread and topic messages resolve to their room; a listed
+   * thread id narrows to the thread) and whose audience admits the sender. A
+   * Route that refuses the sender is skipped for the next one, then the
+   * catch-all. When none admits, the first applicable Route is returned so the
+   * refusal is worded and audited against it.
    */
-  function resolveNewRoute(
+  async function resolveNewRoute(
     message: InboundMessage,
     account: CompiledChannelAccount,
-  ): CompiledRoute | undefined {
-    const conversation = message.conversation;
-    const rootKind = rootKindOf(conversation.kind);
-    const descriptors =
-      conversation.threadId !== null
-        ? [
-            { kind: conversation.kind, id: conversation.id },
-            { kind: rootKind, id: conversation.rootConversationId },
-          ]
-        : [{ kind: rootKind, id: conversation.rootConversationId }];
-    for (const descriptor of descriptors) {
-      const match = matchRoute(descriptor, account, message.text);
-      if (match.route !== null) return match.route;
-    }
-    const fallback = account.fallback;
-    if (fallback.deny) return undefined;
-    return catchAllRoute(fallback);
+  ): Promise<CompiledRoute | undefined> {
+    const selection = await selectRouteForSender(
+      message.conversation,
+      account,
+      message.text,
+      async (route) => (await mayUseChannel(message, account, route)).allowed,
+      catchAllRoute,
+    );
+    return selection.route ?? undefined;
   }
 
   function streamContextFor(
@@ -2059,26 +2093,24 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   /**
-   * Which route owns this conversation now.
-   *
-   * Matched on the conversation the binding recorded (kind + id), never on the
-   * message text: `matchRoute` without text cannot select a `contains` route,
-   * so a later keyword in an ongoing conversation can never move it to another
-   * route. Config edits are therefore free — a route keeps owning its
-   * conversations while it keeps matching them, and the authority gates behind
-   * this (access, `bot.interact`, command privileges, approval) re-evaluate
+   * Which route owns this conversation now (`storedRouteOwner`): matched on
+   * the conversation, never on the message text, so a later keyword in an
+   * ongoing conversation can never move it to another route, and never on the
+   * sender, so two people in one thread never reach two Routes. Config edits
+   * are therefore free — a route keeps owning its conversations while its
+   * Where keeps covering them, and the authority gates behind this (audience
+   * rules, access, `bot.interact`, command privileges, approval) re-evaluate
    * against the route as it is now, on every message.
    */
-  function routeForBinding(binding: ThreadBindingRecord): CompiledRoute | undefined {
+  function routeForBinding(
+    binding: ThreadBindingRecord,
+    live?: InboundConversation,
+  ): CompiledRoute | undefined {
     const account = findAccountForBinding(binding);
     if (account === undefined) return undefined;
-    const descriptor = parseStoredRouteSummary(binding.route) ?? {
-      kind: "channel" as const,
-      id: binding.externalConversationId,
-    };
-    const matched = matchRoute(descriptor, account);
-    if (matched.route !== null) return matched.route;
-    return matched.fallback.deny ? undefined : catchAllRoute(matched.fallback);
+    const owner = storedRouteOwner(account, binding, live);
+    if (owner === undefined) return undefined;
+    return "deny" in owner ? catchAllRoute(owner) : owner;
   }
 
   /** The one shared stream consumer; callers own their execution lease shape. */
@@ -2112,34 +2144,32 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     workflow: string,
   ): CompiledRoute | undefined {
     if (channel.route_fingerprint !== undefined) {
-      // The run records the ROOT conversation, so a route declared at the
-      // thread/topic level is asked at that level first, with the thread the
-      // run started in; a root-level route answers the second question.
-      const descriptors: InboundConversation[] = [];
-      if (channel.external_thread_id !== null && channel.root_kind !== "dm") {
-        descriptors.push({
-          kind: channel.root_kind === "group" ? "topic" : "thread",
-          id: channel.external_thread_id,
-        });
-      }
-      descriptors.push({ kind: channel.root_kind, id: channel.external_conversation_id });
-      for (const conversation of descriptors) {
-        const matched = matchRoute(conversation, account);
-        const route =
-          matched.route ??
-          (matched.fallback.deny || matched.fallback.target === undefined
-            ? undefined
-            : catchAllRoute(matched.fallback));
-        if (route?.target.kind === "workflow" && route.target.workflow === workflow) return route;
-      }
-      return undefined;
+      // The run records the ROOT conversation and the thread it started in;
+      // a Route's Where reads both (a listed thread id narrows to it).
+      const threaded = channel.external_thread_id !== null && channel.root_kind !== "dm";
+      const threadKind = channel.root_kind === "group" ? "topic" : "thread";
+      const conversation: InboundConversation = {
+        kind: threaded ? threadKind : channel.root_kind,
+        id: channel.external_thread_id ?? channel.external_conversation_id,
+        rootConversationId: channel.external_conversation_id,
+      };
+      const matched = matchRoute(conversation, account);
+      const route =
+        matched.route ??
+        (matched.fallback.deny || matched.fallback.target === undefined
+          ? undefined
+          : catchAllRoute(matched.fallback));
+      return route?.target.kind === "workflow" && route.target.workflow === workflow
+        ? route
+        : undefined;
     }
-    if (channel.route.audience?.kind === "conversationParticipants") {
-      return undefined;
-    }
+    // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
+    // A run started before rules carries `audience` instead of `audienceRules`.
+    const audienceRules = channel.route.audienceRules ?? [];
+    if (isOpenAudience(audienceRules) || legacyOpenAudience(channel.route)) return undefined;
     return {
-      match: { kind: channel.root_kind, ids: [] },
-      ...(channel.route.audience === undefined ? {} : { audience: channel.route.audience }),
+      audienceRules,
+      where: { dm: true, groups: ["all"], conversations: [] },
       target: { kind: "workflow", workflow },
       defaultRoles: channel.route.defaultRoles,
       assignments: channel.route.assignments,
@@ -2230,7 +2260,7 @@ function channelWorkflowOutput(value: unknown):
       route_fingerprint?: string;
       route: Pick<
         CompiledRoute,
-        "audience" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
+        "audienceRules" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
       >;
     }
   | undefined {

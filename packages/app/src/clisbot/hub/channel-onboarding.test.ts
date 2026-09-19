@@ -15,8 +15,7 @@ describe("Channel onboarding defaults", () => {
     expect(initialChannelReplyAnchor(true, "thread")).toBe("thread");
     const candidate = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C_SUPPORT",
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C_SUPPORT"] } }],
       target: { kind: "automation", automationName: "support" },
       behavior: DEFAULT_MEMBER_ROUTE_BEHAVIOR,
       resource: {},

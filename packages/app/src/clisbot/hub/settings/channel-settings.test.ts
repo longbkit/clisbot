@@ -38,8 +38,7 @@ describe("buildChannelAccountCandidate", () => {
     const result = buildChannelAccountCandidate({
       connection: { id: "telegram-connection", provider: "telegram" },
       accountId: " Customer Support ",
-      matchKind: "channel",
-      conversationIds: " C1, C2\nC1\r\n, C2 ",
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1", "C2"] } }],
       contains: " #triage ",
       target: {
         kind: "agent",
@@ -71,12 +70,8 @@ describe("buildChannelAccountCandidate", () => {
       transport: { mode: "polling" },
       routes: [
         {
-          match: {
-            kind: "channel",
-            ids: ["C1", "C2"],
-            contains: "#triage",
-          },
-          audience: { kind: "members" },
+          audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1", "C2"] } }],
+          contains: "#triage",
           agent: "channel-customer-support",
           environment: "channel-customer-support",
         },
@@ -116,8 +111,7 @@ describe("buildChannelAccountCandidate", () => {
     const result = buildChannelAccountCandidate({
       connection: { id: "slack-connection", provider: "slack" },
       accountId: "triage",
-      matchKind: "dm",
-      conversationIds: "",
+      audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
       target: { kind: "automation", automationName: "customer-handoff" },
       resource,
     });
@@ -131,8 +125,7 @@ describe("buildChannelAccountCandidate", () => {
       transport: { mode: "socket" },
       routes: [
         {
-          match: { kind: "dm" },
-          audience: { kind: "members" },
+          audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
           workflow: "customer-handoff",
         },
       ],
@@ -144,9 +137,7 @@ describe("buildChannelAccountCandidate", () => {
   it("writes an open-audience Route from its own behavior, limits and Fast mode", () => {
     const result = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C_CUSTOMER",
-      audience: "conversationParticipants",
+      audience: [{ who: { anyone: true }, where: { conversations: ["C_CUSTOMER"] } }],
       behavior: DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
       limits: { maxConcurrentRuns: 10, messagesSentPerMinute: "off" },
       target: {
@@ -161,7 +152,7 @@ describe("buildChannelAccountCandidate", () => {
     });
 
     expect(result.route).toMatchObject({
-      audience: { kind: "conversationParticipants" },
+      audience: [{ who: { anyone: true }, where: { conversations: ["C_CUSTOMER"] } }],
       interaction: { requireMention: true },
       outbound: { path: "relay" },
       sync: {
@@ -186,8 +177,7 @@ describe("buildChannelAccountCandidate", () => {
   it("writes the same reply and approval controls for Member and open-audience Routes", () => {
     const member = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C_SUPPORT",
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C_SUPPORT"] } }],
       behavior: {
         requireMention: false,
         followUpMode: "mention-only",
@@ -220,9 +210,7 @@ describe("buildChannelAccountCandidate", () => {
 
     const open = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C_PUBLIC",
-      audience: "conversationParticipants",
+      audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
       behavior: {
         requireMention: false,
         followUpMode: "mention-only",
@@ -239,7 +227,7 @@ describe("buildChannelAccountCandidate", () => {
       resource: {},
     });
     expect(open.route).toMatchObject({
-      audience: { kind: "conversationParticipants" },
+      audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
       interaction: { requireMention: false },
       outbound: { path: "tool" },
       sync: { finalAnswers: false, toolCalls: true },
@@ -248,10 +236,10 @@ describe("buildChannelAccountCandidate", () => {
   });
 
   it("adds a specific Route before a catch-all and keeps direct resources unique", () => {
+    const audience = [{ who: { roles: ["member" as const] }, where: { conversations: ["C1"] } }];
     const first = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C1",
+      audience,
       target: {
         kind: "agent",
         daemonId: "daemon-1",
@@ -263,8 +251,7 @@ describe("buildChannelAccountCandidate", () => {
     });
     const second = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C1",
+      audience,
       contains: "#triage",
       target: {
         kind: "agent",
@@ -278,14 +265,17 @@ describe("buildChannelAccountCandidate", () => {
 
     expect(insertChannelRoute([first.route], second.route)).toEqual([
       expect.objectContaining({
-        match: { kind: "channel", ids: ["C1"], contains: "#triage" },
+        audience,
+        contains: "#triage",
         agent: "channel-support-2",
       }),
       expect.objectContaining({
-        match: { kind: "channel", ids: ["C1"] },
+        audience,
         agent: "channel-support",
       }),
     ]);
+    expect(first.route).not.toHaveProperty("match");
+    expect(first.route).not.toHaveProperty("contains");
   });
 
   it("edits an exclusively owned direct Agent resource in place", () => {
@@ -307,8 +297,7 @@ describe("buildChannelAccountCandidate", () => {
     const account = { accountId: "support", routes: [route] };
     const result = replaceChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C2",
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
       behavior: {
         requireMention: false,
         followUpMode: "mention-only",
@@ -361,11 +350,11 @@ describe("buildChannelAccountCandidate", () => {
       interaction: { requireMention: false },
       reply: { anchor: "thread" },
       outbound: { path: "relay" },
-      match: { kind: "channel", ids: ["C2"] },
-      audience: { kind: "members" },
+      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
       agent: "support-agent",
       environment: "support-agent",
     });
+    expect(result.route).not.toHaveProperty("match");
     expect(result.resource).toMatchObject({
       agents: { "support-agent": { provider: "claude" } },
       environments: {
@@ -397,8 +386,7 @@ describe("buildChannelAccountCandidate", () => {
     };
     const copied = replaceChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "",
+      audience: [{ who: { roles: ["member"] }, where: { groups: "all" } }],
       target: {
         kind: "agent",
         daemonId: "daemon-2",
@@ -423,8 +411,7 @@ describe("buildChannelAccountCandidate", () => {
 
     const automated = replaceChannelRouteCandidate({
       accountId: "solo",
-      matchKind: "dm",
-      conversationIds: "",
+      audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
       target: { kind: "automation", automationName: "triage" },
       resource: {
         agents: { solo: { provider: "codex" } },
@@ -450,8 +437,7 @@ describe("buildChannelAccountCandidate", () => {
       ],
     });
     expect(automated.route).toEqual({
-      match: { kind: "dm" },
-      audience: { kind: "members" },
+      audience: [{ who: { roles: ["member"] }, where: { dm: true } }],
       workflow: "triage",
     });
     expect(automated.resource).toEqual({ agents: {}, environments: {} });
@@ -465,12 +451,19 @@ describe("Route follow-up policy", () => {
   ) {
     return buildChannelRouteCandidate({
       accountId: "support",
-      matchKind,
-      conversationIds: "C_SUPPORT",
+      audience: [supportWhere(matchKind)],
       behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, ...behavior },
       target: { kind: "automation", automationName: "triage" },
       resource: {},
     }).route;
+  }
+
+  /** Members in `#support`, or Members in DMs when the Route is DM-only. */
+  function supportWhere(matchKind: "channel" | "dm") {
+    return {
+      who: { roles: ["member" as const] },
+      where: matchKind === "dm" ? { dm: true } : { conversations: ["C_SUPPORT"] },
+    };
   }
 
   /** Loads `interaction` into the form, applies the user's edits, and saves over it. */
@@ -480,15 +473,13 @@ describe("Route follow-up policy", () => {
     matchKind: "channel" | "dm" = "channel",
   ) {
     const currentRoute = {
-      match: { kind: matchKind, ids: ["C_SUPPORT"] },
-      audience: { kind: "members" },
+      audience: [supportWhere(matchKind)],
       workflow: "triage",
       interaction,
     };
     return replaceChannelRouteCandidate({
       accountId: "support",
-      matchKind,
-      conversationIds: "C_SUPPORT",
+      audience: [supportWhere(matchKind)],
       behavior: {
         ...DEFAULT_MEMBER_ROUTE_BEHAVIOR,
         ...channelRouteFollowUp(interaction),
@@ -587,9 +578,7 @@ describe("Route follow-up policy", () => {
   it("writes an open-audience Route's follow-up like a Member Route's", () => {
     const open = buildChannelRouteCandidate({
       accountId: "support",
-      matchKind: "channel",
-      conversationIds: "C_PUBLIC",
-      audience: "conversationParticipants",
+      audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
       behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, followUpMode: "auto", followUpEdited: true },
       target: { kind: "automation", automationName: "triage" },
       resource: {},

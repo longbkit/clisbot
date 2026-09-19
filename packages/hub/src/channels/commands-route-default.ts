@@ -128,9 +128,9 @@ export function routeLabel(context: LifecycleCommandContext): string {
   if (position === "fallback") return FALLBACK_LABEL;
   const traits = [
     ...(context.route.defaults.requireMention ? ["mention"] : []),
-    ...(context.route.match.contains === undefined
+    ...(context.route.contains === undefined
       ? []
-      : [`contains ${JSON.stringify(context.route.match.contains)}`]),
+      : [`contains ${JSON.stringify(context.route.contains)}`]),
   ];
   return `route #${position + 1}${traits.length === 0 ? "" : ` (${traits.join(", ")})`}`;
 }

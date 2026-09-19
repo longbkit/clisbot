@@ -128,6 +128,7 @@ export interface ChannelSupervisorOptions {
   env?: NodeJS.ProcessEnv;
   dispatchWorkflow?: import("../plane/types.js").ChannelPlaneDeps["dispatchWorkflow"];
   authorizeChannelUse?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelUse"];
+  resolveChannelSender?: import("../plane/types.js").ChannelPlaneDeps["resolveChannelSender"];
   authorizeChannelApproval?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelApproval"];
   consumeChannelIdentityChallenge?: import("../plane/types.js").ChannelPlaneDeps["consumeChannelIdentityChallenge"];
   /** Transfer one Slack app's Socket Mode consumer to this Channel account. */

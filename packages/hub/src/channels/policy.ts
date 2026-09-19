@@ -23,6 +23,14 @@ import type {
 import type { RoleAssignment } from "./config/schema.js";
 import { privilegeCovers, roleGrants, type CompiledRole } from "./config/privileges.js";
 import { PRIVILEGE_LEAVES } from "./config/enums.js";
+import {
+  isOpenAudience,
+  rulesCovering,
+  whereCovers,
+  whoMatches,
+  type AudienceConversation,
+  type AudienceSender,
+} from "./config/audience.js";
 import type { AgentPermissionRequest } from "./daemon/types.js";
 
 // --- Tool classes ---------------------------------------------------------------
@@ -282,12 +290,7 @@ export function isEnabled(
 // --- Routing ---------------------------------------------------------------------------
 
 /** An inbound conversation descriptor for route matching. */
-export interface InboundConversation {
-  /** The conversation's native kind, in the route match vocabulary. */
-  kind: "dm" | "channel" | "thread" | "group" | "topic";
-  /** The native conversation id (provider id, string). */
-  id: string;
-}
+export type InboundConversation = AudienceConversation;
 
 /** The outcome of matching an inbound conversation against an account. */
 export interface RouteMatchResult {
@@ -299,30 +302,30 @@ export interface RouteMatchResult {
   target: RouteTarget | null;
 }
 
-/** Does the structural part of a route match this conversation? */
+/** Does the Route's Where cover this conversation? */
 export function routeConversationMatches(
-  match: CompiledRoute["match"],
+  route: Pick<CompiledRoute, "where">,
   conversation: InboundConversation,
 ): boolean {
-  if (match.kind !== conversation.kind) return false;
-  return match.ids.length === 0 || match.ids.includes(conversation.id);
+  return whereCovers(route.where, conversation);
 }
 
-/** Does a route match this conversation and normalized inbound text? */
+/** Does a route apply to this conversation and normalized inbound text? */
 export function routeMatches(
-  match: CompiledRoute["match"],
+  route: Pick<CompiledRoute, "where" | "contains">,
   conversation: InboundConversation,
   text?: string,
 ): boolean {
-  if (!routeConversationMatches(match, conversation)) return false;
-  return match.contains === undefined || (text !== undefined && text.includes(match.contains));
+  if (!routeConversationMatches(route, conversation)) return false;
+  return route.contains === undefined || (text !== undefined && text.includes(route.contains));
 }
 
 /**
- * Routes in declaration order, first match wins (empty `ids` = kind-level
- * match, so a `kind: dm` route matches any DM). No route matched → the
+ * Routes in declaration order, first Route whose Where covers the
+ * conversation (and whose `contains` matches) wins. No route matched → the
  * fallback: the deny marker, or the catch-all route when `fallback.deny` is
- * false (§4.3.6).
+ * false (§4.3.6). Conversation-only: the sender is not consulted, which is what
+ * a bound conversation needs (it stays with its Route and never falls through).
  */
 export function matchRoute(
   conversation: InboundConversation,
@@ -330,7 +333,7 @@ export function matchRoute(
   text?: string,
 ): RouteMatchResult {
   const route =
-    account.routes.find((candidate) => routeMatches(candidate.match, conversation, text)) ?? null;
+    account.routes.find((candidate) => routeMatches(candidate, conversation, text)) ?? null;
   if (route !== null) return { route, fallback: account.fallback, target: route.target };
   const fallback = account.fallback;
   return {
@@ -338,6 +341,38 @@ export function matchRoute(
     fallback,
     target: fallback.deny ? null : (fallback.target ?? null),
   };
+}
+
+/** What ordered selection found for an unbound conversation. */
+export interface RouteSelection {
+  /** The Route that applies, or null when the fallback denies. */
+  route: CompiledRoute | null;
+  /** Whether `route` admits the sender. False = every applicable Route
+   * refused them; `route` is then the first one, so the refusal can be worded
+   * against it. */
+  admitted: boolean;
+}
+
+/**
+ * Ordered selection for a NEW conversation: the first Route whose Where and
+ * `contains` apply AND that admits the sender. A Route that applies but
+ * refuses the sender is skipped — the next Route is tried, then the catch-all
+ * fallback — so tiers by audience work (Owner on a strong Agent first, Anyone
+ * in public rooms on a limited one after it).
+ */
+export async function selectRouteForSender(
+  conversation: InboundConversation,
+  account: CompiledChannelAccount,
+  text: string | undefined,
+  admits: (route: CompiledRoute) => Promise<boolean>,
+  catchAll: (fallback: CompiledFallback) => CompiledRoute,
+): Promise<RouteSelection> {
+  const candidates = account.routes.filter((route) => routeMatches(route, conversation, text));
+  if (!account.fallback.deny) candidates.push(catchAll(account.fallback));
+  for (const route of candidates) {
+    if (await admits(route)) return { route, admitted: true };
+  }
+  return { route: candidates[0] ?? null, admitted: false };
 }
 
 // --- Role scopes per decision level ---------------------------------------------------
@@ -400,14 +435,29 @@ export function mayTrigger(
 }
 
 /**
- * An open-audience Route admits anyone in the conversations it matches, so
- * being one is enough to pass the sender gate. Which conversations, and whether
- * a mention is needed, are the Route's own `match` and
- * `interaction.requireMention` — the same gates a Member Route uses. The
+ * An open-audience Route has a rule that admits anyone somewhere. Where, and
+ * whether a mention is needed, are that rule's Where and the Route's
+ * `interaction.requireMention` — the same gates a Member rule uses. The
  * configuration warns about wide choices; it does not forbid them.
  */
-export function isOpenAudienceRoute(route: CompiledRoute): boolean {
-  return route.audience?.kind === "conversationParticipants";
+export function isOpenAudienceRoute(route: Pick<CompiledRoute, "audienceRules">): boolean {
+  return isOpenAudience(route.audienceRules);
+}
+
+/**
+ * The audience-rule decision: admitted when any rule whose Where covers the
+ * conversation names the sender. `anyone` rules are skipped when the caller
+ * asks for a Member-grade admission (approval answers, card clicks).
+ */
+export function audienceRulesAdmit(
+  route: Pick<CompiledRoute, "audienceRules">,
+  conversation: InboundConversation,
+  sender: AudienceSender,
+  options: { membersOnly?: boolean } = {},
+): boolean {
+  return rulesCovering(route.audienceRules, conversation).some(
+    (rule) => !(options.membersOnly === true && rule.who.anyone) && whoMatches(rule.who, sender),
+  );
 }
 
 /** Legacy Channel identities count as Members only when explicitly mapped or assigned. */

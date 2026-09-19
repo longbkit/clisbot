@@ -651,7 +651,9 @@ export function assertChannelPosture(accounts: readonly CompiledChannelAccount[]
 export function catchAllRoute(fallback: CompiledFallback): CompiledRoute {
   const target = fallback.target;
   return {
-    match: { kind: "channel", ids: [] },
+    audienceRules: fallback.audienceRules ?? [],
+    // The catch-all covers every conversation no earlier Route claimed.
+    where: { dm: true, groups: ["all"], conversations: [] },
     target: target ?? { kind: "workflow", workflow: "none" },
     defaultRoles: fallback.defaultRoles ?? [],
     assignments: fallback.assignments ?? [],

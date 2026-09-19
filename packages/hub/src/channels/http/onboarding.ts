@@ -90,20 +90,18 @@ export function configureOnboardingRoute(
   const retained = (account.routes ?? []).filter(
     (route) => route.agent !== key || route.environment !== key,
   );
-  const kinds =
-    channel === "telegram"
-      ? (["dm", "group", "topic"] as const)
-      : (["dm", "channel", "thread"] as const);
+  // One Route per Where: Members in DMs answer without a mention; Members in
+  // every group chat (threads and topics belong to their room) need one.
+  const wheres = [{ dm: true }, { groups: "all" as const }];
   if (retained.length === (account.routes ?? []).length)
     account.routes = [
       ...retained,
-      ...kinds.map((kind) => ({
-        match: { kind },
-        audience: { kind: "members" as const },
+      ...wheres.map((where) => ({
+        audience: [{ who: { roles: ["member" as const] }, where }],
         agent: key,
         environment: key,
-        interaction: { requireMention: kind !== "dm" },
-        reply: channel === "slack" && kind !== "dm" ? { anchor: "thread" as const } : undefined,
+        interaction: { requireMention: where.dm !== true },
+        reply: channel === "slack" && where.dm !== true ? { anchor: "thread" as const } : undefined,
         sync: { finalAnswers: true },
       })),
     ];

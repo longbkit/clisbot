@@ -46,7 +46,8 @@ const defaults: EffectiveDefaults = {
   },
 };
 const route: CompiledRoute = {
-  match: { kind: "channel", ids: [] },
+  audienceRules: [],
+  where: { dm: false, groups: ["all"], conversations: [] },
   target: { kind: "agent", agent: "worker", environment: "repo", template: null },
   defaultRoles: [],
   assignments: [],

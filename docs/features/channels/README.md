@@ -86,25 +86,26 @@ A transport that cannot express the invariant does not ship. If you find yoursel
 
 One inbound message walks this path. Each row is the file to open.
 
-| Stage               | File                                                               | What it decides                                                                                                                       |
-| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Catalog             | `packages/hub/src/channels/catalog.ts:85`                          | Metadata only: label, auth kind, transports, credentials, claimed capabilities, extra tools.                                          |
-| Supported names     | `catalog.ts:512`                                                   | `SUPPORTED_CHANNEL_NAMES` — every channel union, zod enum, `Record` key and DB check constraint derives from this tuple.              |
-| Pins                | `packages/hub/channel-pins.json`, `channels/install/pins.ts:141`   | Which supply serves the channel: `published`, `bundled`, or `in-repo`.                                                                |
-| Loader              | `channels/loader/load-channel.ts:213`                              | Imports the entry, calls `setChannelRuntime`, produces the plugin.                                                                    |
-| Config enums/schema | `channels/config/enums.ts:14`, `config/schema.ts`                  | What an operator may author on an account and a Route.                                                                                |
-| Compile             | `channels/config/compile.ts:173`, `compile-support.ts:195`         | Authored YAML → `ChannelControlPlane`. `DRIVABLE_TRANSPORT_MODES` is where a mode the Hub cannot receive on is refused.               |
-| Defaults fold       | `channels/config/inheritance.ts`                                   | `defaults:` layers (org < account < route) → the one effective block a route carries, plus the approval-rule merge.                   |
-| Account carriers    | `channels/supervisor/account-carriers.ts:162`                      | The per-account credential projection handed to `startAccount`. See below.                                                            |
-| Connections         | `db/channel-connections.ts:29`, `credentials/credential-cipher.ts` | One table per channel; AES-256-GCM envelope bound by AAD to its scope.                                                                |
-| Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                             |
-| Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                                           |
-| Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                                  |
-| Session workspace   | `channels/workspace-organization.ts:71`                            | Which workspace a created session lands in (`workspace.organize`). See [workspace organization](../workspace-organization/README.md). |
-| Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                                            |
-| Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                            |
-| Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                              |
-| Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                                       |
+| Stage               | File                                                               | What it decides                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalog             | `packages/hub/src/channels/catalog.ts:85`                          | Metadata only: label, auth kind, transports, credentials, claimed capabilities, extra tools.                                            |
+| Supported names     | `catalog.ts:512`                                                   | `SUPPORTED_CHANNEL_NAMES` — every channel union, zod enum, `Record` key and DB check constraint derives from this tuple.                |
+| Pins                | `packages/hub/channel-pins.json`, `channels/install/pins.ts:141`   | Which supply serves the channel: `published`, `bundled`, or `in-repo`.                                                                  |
+| Loader              | `channels/loader/load-channel.ts:213`                              | Imports the entry, calls `setChannelRuntime`, produces the plugin.                                                                      |
+| Config enums/schema | `channels/config/enums.ts:14`, `config/schema.ts`                  | What an operator may author on an account and a Route.                                                                                  |
+| Compile             | `channels/config/compile.ts:173`, `compile-support.ts:195`         | Authored YAML → `ChannelControlPlane`. `DRIVABLE_TRANSPORT_MODES` is where a mode the Hub cannot receive on is refused.                 |
+| Defaults fold       | `channels/config/inheritance.ts`                                   | `defaults:` layers (org < account < route) → the one effective block a route carries, plus the approval-rule merge.                     |
+| Account carriers    | `channels/supervisor/account-carriers.ts:162`                      | The per-account credential projection handed to `startAccount`. See below.                                                              |
+| Connections         | `db/channel-connections.ts:29`, `credentials/credential-cipher.ts` | One table per channel; AES-256-GCM envelope bound by AAD to its scope.                                                                  |
+| Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                               |
+| Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                                             |
+| Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                                    |
+| Audience rules      | `channels/config/audience.ts`, `config/audience-migration.ts`      | "[who] may talk in [where]" per Route; the app edits them in `packages/app/src/clisbot/hub/settings/channel-route-audience-fields.tsx`. |
+| Session workspace   | `channels/workspace-organization.ts:71`                            | Which workspace a created session lands in (`workspace.organize`). See [workspace organization](../workspace-organization/README.md).   |
+| Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                                              |
+| Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                              |
+| Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                                |
+| Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                                         |
 
 ### What a carrier is
 
@@ -219,10 +220,42 @@ Ordered, and each step names the file. Derived from how Zalo and Feishu were wir
 
 ## Access policy
 
-Two gates decide whether an inbound message may start a turn, and both have to
-allow. Operator-facing behaviour is documented once, in
-[`public-docs/hub/channels/index.md`](../../../public-docs/hub/channels/index.md); this
-is why it is shaped the way it is.
+Who may talk to a Route is the Route's own **audience rules** — a list of
+"[who] may talk in [where]" sentences, any one of which admits
+([decision](../../audits/2026-09-19-route-audience-rules.md)). The rules are the
+Route's conversation selector too: a Route applies to a conversation when the
+union of its rules' Where covers it (`CompiledRoute.where`), plus the
+Route-level `contains` text filter. What follows describes the gate as built;
+operator-facing behaviour is documented once, in
+[`public-docs/hub/channels/index.md`](../../../public-docs/hub/channels/index.md).
+
+- **Where is decided on the conversation, Who on the sender.** `config/audience.ts`
+  owns both. DM is a Where like any other, so a rule covering group chats never
+  admits a DM. `groups: public|private` matches only when the vertical reports
+  the room's visibility on the event itself (`InboundConversationDetail.visibility`);
+  Slack does, from `channel_type` (`channel` public, `group`/`mpim` private), no
+  other vertical does yet, so on them a public/private filter matches nothing.
+  Threads and topics belong to their room; a thread or topic id under
+  `conversations` narrows to it.
+- **Who resolves per message.** `resolveChannelSender` (`policy/sender-facts.ts`)
+  maps the sender through Channel identities to a Member, their organization role
+  and Teams; `admin` includes Owners, `member` is every linked Member. The resolver
+  runs only when a covering rule needs it — `anyone` and `identities` decide
+  without a read. Unlinked senders are `null`, which only those two can admit.
+- **Routes are ordered and fall through by sender** (`selectRouteForSender`).
+  A Route that covers the conversation but admits nobody is skipped for the next,
+  then the catch-all — this is what allows tiers (Owner on a strong Agent first,
+  Anyone in public rooms on a limited one after it). When no Route admits, the
+  first applicable one is returned so the refusal is worded against it.
+- **The old shape still loads.** `match` and the one-value `audience` are read
+  through `config/audience-migration.ts` (`COMPAT(route-audience-rules)`), and the
+  start-time job in `access-migration.ts` rewrites stored files and folds
+  `channel.use` grants into rules ([operations](../../guides/developer-guide/channels-operations.md#the-audience-migration-on-start)).
+
+`mayUseChannelRoute` (`policy/gate.ts`) is the one implementation both
+`execution.ts` and the bindings engine call. Ways in, in order: an audience rule;
+then the Advanced paths below, unchanged; then, under the same COMPAT tag, a
+`channel.use` grant until every organization has been migrated.
 
 The **sender gate** is upstream's. `resolveDmGroupAccessWithLists` is ported
 verbatim into `@getpaseo/channels-core/security/dm-policy-shared`, and
@@ -254,30 +287,27 @@ Three shapes are worth knowing:
   has to be the grant.
 - **A bound conversation answers two routing questions, and only two.** Which
   route owns this conversation now, and does its target still match the bound
-  session. The first is answered by matching the conversation the binding
-  recorded (kind + id) — `matchRoute` is called without text, so a `contains`
-  route can never capture a conversation that is already bound. The second
-  compares the stored `target` with the route's: same target keeps the session,
-  a different one releases the binding and mints a session at the new target,
-  no route at all leaves the conversation unserved and silent. A Route's
-  default Agent controls (`agentControls:`) are not part of the target, so
-  changing them keeps every session, and a revision that changes nothing else
-  is adopted without restarting accounts ([Route defaults](../slash-commands/README.md#route-defaults)). A conversation
+  session. The first is `storedRouteOwner` (`bindings/stored-route.ts`): among the
+  Routes whose Where covers the conversation the binding recorded (its level, its
+  room, its reported visibility), the one the binding recorded — by content hash
+  while unchanged, by position after an edit — else the first that covers it. The
+  sender is never consulted and the message text never is, so a bound
+  conversation does not fall through: two people in one thread reach one Route
+  and one session, and a `contains` keyword can never capture a bound
+  conversation. The second compares the stored `target` with the route's: same
+  target keeps the session, a different one releases the binding and mints a
+  session at the new target, no route at all leaves the conversation unserved
+  and silent. A Route's default Agent controls (`agentControls:`) are not part of
+  the target, so changing them keeps every session, and a revision that changes
+  nothing else is adopted without restarting accounts
+  ([Route defaults](../slash-commands/README.md#route-defaults)). A conversation
   routed to a Workflow retires its bound session too — a Workflow mints no
   binding, so a session left behind would post beside the run. Retiring is
   gated exactly like starting: an inbound the route would not admit changes
-  nothing. Authority is not
-  part of this: `access:`, `bot.interact`, command privileges and approval all
-  re-evaluate against the route as it is now, on every message, so tightening a
-  policy takes effect on live conversations instead of stranding them.
-
-  This replaces a rule that compared the route's content hash
-  (`routeFingerprint`) and refused everything on a mismatch. Any edit to a
-  route — `sync.threadLink`, a template typo, an org-level default that folds
-  into every route — rewrote the hash and made every conversation bound under
-  it unanswerable, with `/new` refused too and only `/help` still working. The
-  hash survives as provenance on the binding row and as the route stamp on a
-  reply capability; no routing decision reads it.
+  nothing. Authority is not part of this: audience rules, `access:`,
+  `bot.interact`, command privileges and approval all re-evaluate against the
+  route as it is now, on every message, so tightening a policy takes effect on
+  live conversations instead of stranding them.
 
 - **The `/agent` and `/model` choice is conversation-scoped, not
   binding-scoped.** It cannot live on `thread_bindings`: a choice is made before

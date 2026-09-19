@@ -140,6 +140,9 @@ export interface ChannelInboundEvent {
   /** The native thread/topic id (Slack thread ts / Telegram
    * `message_thread_id`); null at root level. */
   messageThreadId?: string | null;
+  /** The room's visibility when the platform states it on the event itself
+   * (Slack `channel_type`); absent = unknown. Never fetched. */
+  visibility?: "public" | "private";
   /** The sender's native id (Slack `U…` / Telegram numeric). */
   senderId: string;
   senderName?: string;
@@ -188,6 +191,7 @@ export function buildInboundCtxPayload(
   if (event.messageThreadId !== null && event.messageThreadId !== undefined) {
     payload["MessageThreadId"] = event.messageThreadId;
   }
+  if (event.visibility !== undefined) payload["Visibility"] = event.visibility;
   if (event.senderName !== undefined) payload["SenderName"] = event.senderName;
   if (event.senderUsername !== undefined) payload["SenderUsername"] = event.senderUsername;
   if (event.conversationLabel !== undefined) payload["ConversationLabel"] = event.conversationLabel;

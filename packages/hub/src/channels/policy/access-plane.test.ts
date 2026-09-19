@@ -54,10 +54,11 @@ const DEFAULTS: EffectiveDefaults = {
 function makeRoute(options: {
   access?: EffectiveAccess;
   selectable?: CompiledRoute["selectable"];
-  match?: CompiledRoute["match"];
+  where?: CompiledRoute["where"];
 }): CompiledRoute {
   return {
-    match: options.match ?? { kind: "dm", ids: [] },
+    audienceRules: [],
+    where: options.where ?? { dm: true, groups: [], conversations: [] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [
@@ -505,7 +506,7 @@ describe("org Access command authority and live configuration", () => {
       // Everyone may use this shared conversation; command privileges remain independently gated.
       authorizeChannelUse: async () => ({ allowed: true }),
       route: makeRoute({
-        match: { kind: "group", ids: ["-200"] },
+        where: { dm: false, groups: [], conversations: ["-200"] },
         selectable: { models: ["legacy-route-model"], agents: [] },
       }),
       ...(commandAccess === undefined ? {} : { commandAccess }),
@@ -622,7 +623,7 @@ describe("mention mode", () => {
   it("runs a native command without a mention, but never a plain message", async () => {
     const harness = makeHarness({
       accountId: "mention",
-      route: makeRoute({ match: { kind: "group", ids: [] } }),
+      route: makeRoute({ where: { dm: false, groups: ["all"], conversations: [] } }),
     });
     await harness.plane.start(harness.daemon, store);
     const unmentioned = dm({

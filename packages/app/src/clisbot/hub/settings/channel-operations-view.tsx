@@ -27,11 +27,21 @@ import {
 import { channelSeverityVariant } from "../channel-account-health";
 import { ChannelDeadLetterList } from "./channel-dead-letter-list";
 import { CHANNEL_DEAD_LETTER_PAGE, useChannelIngressQueries } from "./channel-operations-queries";
+import type { ChannelAccountRef } from "./channel-settings-hooks";
 import { useChannelCatalog } from "./channel-catalog-queries";
 
-/** Channels → Operations: queue depth, dead letters, resubmit and prune. */
-export function ChannelOperationsView() {
-  const queries = useChannelIngressQueries();
+/**
+ * Channels → Operations: queue depth, dead letters, resubmit and prune. A
+ * Channel Route Admin (`adminAccounts`) sees their accounts' depth and dead
+ * letters; resubmit and prune stay organization-wide.
+ */
+export function ChannelOperationsView({
+  adminAccounts = null,
+}: {
+  adminAccounts?: readonly ChannelAccountRef[] | null;
+}) {
+  const queries = useChannelIngressQueries(adminAccounts);
+  const readOnly = adminAccounts !== null;
   // Labels only. An unavailable catalog leaves the rows keyed by channel id.
   const catalog = useChannelCatalog();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -62,8 +72,11 @@ export function ChannelOperationsView() {
     [queries.fetching, refresh],
   );
   const deadLetterActions = useMemo(
-    () => <DeadLetterActions pending={pending} ids={ids} run={run} disabled={unavailable} />,
-    [ids, pending, run, unavailable],
+    () =>
+      readOnly ? undefined : (
+        <DeadLetterActions pending={pending} ids={ids} run={run} disabled={unavailable} />
+      ),
+    [ids, pending, readOnly, run, unavailable],
   );
   return (
     <View style={styles.view}>

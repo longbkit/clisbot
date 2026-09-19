@@ -413,31 +413,42 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Up")).toBeNull();
     expect(screen.queryByText("Down")).toBeNull();
     expect(screen.queryByText("Connection and access")).toBeNull();
-    expect(screen.queryByText(/No Member or Team grants/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Who can use this?" }));
-    expect(screen.getByText(/Owners have access automatically/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Manage access" })).toBeTruthy();
+    expect(screen.queryByText(/Channel Route Admins/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Access" }));
+    // The Access tab lists Admins only: no Use grant is offered anywhere.
+    expect(screen.getByText("Channel Route Admins")).toBeTruthy();
+    expect(screen.getByText("Only Organization Admins so far.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Manage Admins in Access" })).toBeTruthy();
+    expect(screen.queryByText(/channel\.use/)).toBeNull();
+    expect(screen.getByText("Everyone else (catch-all)")).toBeTruthy();
+    expect(screen.getByText(/Denied: messages no Route admits are refused/)).toBeTruthy();
   });
 
-  it("requires an explicit Any choice before broadening an emptied specific Route", async () => {
+  it("needs a Where on every rule: emptying the conversations blocks saving until Group chat is on", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    // The old `match: {kind: channel, ids: [C1]}` reads as one rule: Members in C1.
+    expect(screen.getByText("Members may talk in C1")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Conversation IDs"), {
       target: { value: "" },
     });
+    expect(screen.getByText("Members may talk in nowhere yet")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
     expect(adapters.put).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Any matching conversation" }));
-    expect(screen.queryByLabelText("Conversation IDs")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Group chat"));
+    expect(screen.getByText("Members may talk in every group chat")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalled());
-    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].match.ids).toBeUndefined();
+    const saved = adapters.put.mock.calls[0]![1].accounts[0].routes[0];
+    expect(saved.audience).toEqual([{ who: { roles: ["member"] }, where: { groups: "all" } }]);
+    expect(saved.contains).toBe("#help");
+    expect(saved.match).toBeUndefined();
   });
 
-  it("preserves an existing unrestricted Member Route until specific selection is explicit", async () => {
+  it("reads an id-less old Route as every group chat and offers the Slack visibility filter", async () => {
     const unrestricted = {
       ...configuration,
       accounts: [
@@ -454,26 +465,61 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.queryByLabelText("Conversation IDs")).toBeNull();
+    expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
+    // Slack reports visibility, so the filter is offered; the sentence follows it.
+    fireEvent.click(screen.getByRole("button", { name: "Public only" }));
+    expect(screen.getByText("Members may talk in every public group chat")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Selected conversations" }));
+    fireEvent.click(screen.getByLabelText("Group chat"));
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
     expect(adapters.put).not.toHaveBeenCalled();
   });
 
-  it("clears specific IDs on conversation type change and requires a new selection", async () => {
+  it("adds and removes rules, warns on Anyone, and summarizes the Route by place", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.click(screen.getByRole("button", { name: "Group" }));
-    expect((screen.getByLabelText("Conversation IDs") as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Add rule" }));
+    // A fresh row names nobody and nowhere, so it blocks saving until filled.
+    expect(screen.getByText("Nobody yet may talk in nowhere yet")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
+    fireEvent.click(screen.getAllByRole("button", { name: "Anyone" })[1]!);
+    expect(
+      screen.getByText("Anyone in the matching conversations can use this Route"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getAllByLabelText("DM")[1]!);
+    expect(screen.getByText("Anyone may talk in DMs")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    // The per-Route summary groups who may talk by place.
+    expect(screen.getByText("C1")).toBeTruthy();
+    expect(screen.getAllByText("Members").length).toBeGreaterThan(1);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Rule 2" }));
+    expect(screen.queryByText("Anyone may talk in DMs")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove Rule 1" })).toBeNull();
     expect(adapters.put).not.toHaveBeenCalled();
+  });
+
+  it("lands the Hub's rule-level refusal on the rule it names", async () => {
+    adapters.put.mockRejectedValue(
+      new Error(
+        "channels/slack/support.yml.routes.0.audience.0.who: an audience rule needs at least one Who part",
+      ),
+    );
+    renderChannels();
+    fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    // The whole message stays in the header; the rule's row gets only its part.
+    expect(await screen.findByText("an audience rule needs at least one Who part")).toBeTruthy();
+    expect(screen.getByText(/routes\.0\.audience\.0\.who/)).toBeTruthy();
   });
 
   it.each([false, true])(
@@ -559,7 +605,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     cleanup();
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    expect(screen.getByText(/channel · C1/)).toBeTruthy();
+    expect(screen.getByText(/Members may talk in C1/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
   });
 
@@ -714,9 +760,11 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     // Route; the account it will use is still named here.
     expect(screen.queryByRole("button", { name: "Connect a Channel Integration" })).toBeNull();
     expect(screen.getByText("Slack · support")).toBeTruthy();
-    // `dm` is spelled out so the choice is not read as a two-letter word.
-    expect(screen.getByRole("button", { name: "Direct Message (DM)" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Channel" }));
+    // A new Route starts as Members everywhere: one rule, DM and Group chat on.
+    expect(screen.getByText("Who may talk, where")).toBeTruthy();
+    expect(screen.getByText("Members may talk in DMs and every group chat")).toBeTruthy();
+    expect((screen.getByLabelText("DM") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Group chat") as HTMLInputElement).checked).toBe(true);
     // A new Route starts an Agent; Automation is still experimental and says so.
     expect(screen.queryByLabelText("Automation")).toBeNull();
     expect(screen.queryByText("Experimental")).toBeNull();
@@ -926,11 +974,19 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     );
   });
 
-  it("gives Members an Account recovery path without requesting management configuration", () => {
+  it("gives Members an Account recovery path without requesting management configuration", async () => {
     adapters.canManage = false;
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "access-assignments/effective?include=team"
+        ? { owner: false, grants: [] }
+        : data[resource],
+    );
     renderChannels();
-    expect(screen.getByRole("button", { name: "Open Account settings" })).toBeTruthy();
-    expect(adapters.get).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Open Account settings" })).toBeTruthy();
+    // Only the viewer's own effective access was read: no configuration, no status.
+    expect(adapters.get.mock.calls.map(([resource]) => resource)).toEqual([
+      "access-assignments/effective?include=team",
+    ]);
   });
 
   it("keeps a Route that stored Text forward on the relay path the owner chose", async () => {
@@ -1023,7 +1079,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
   it("opens the seeded Route immediately and Cancel returns to the selected account without saving", async () => {
     await openEditor();
     expect((screen.getByLabelText("Conversation IDs") as HTMLInputElement).value).toBe("C1");
-    expect((screen.getByLabelText("Contains exact text") as HTMLInputElement).value).toBe("#help");
+    expect((screen.getByLabelText("Only messages containing") as HTMLInputElement).value).toBe(
+      "#help",
+    );
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(false);
     expect(screen.queryByText("Channel Routes")).toBeNull();
     expect(screen.queryByText("Add Channel behavior")).toBeNull();
@@ -1053,7 +1111,8 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
           expect.objectContaining({
             routes: [
               expect.objectContaining({
-                match: { kind: "channel", ids: ["C2"], contains: "#help" },
+                audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
+                contains: "#help",
                 binding: route.binding,
                 approval: route.approval,
                 sync: expect.objectContaining({
@@ -1080,7 +1139,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
       expect((screen.getByLabelText("Automation") as HTMLSelectElement).value).toBe("new-support"),
     );
     expect((screen.getByLabelText("Conversation IDs") as HTMLInputElement).value).toBe("C2");
-    expect((screen.getByLabelText("Contains exact text") as HTMLInputElement).value).toBe("#help");
+    expect((screen.getByLabelText("Only messages containing") as HTMLInputElement).value).toBe(
+      "#help",
+    );
     expect(adapters.put).not.toHaveBeenCalled();
   });
 
@@ -1120,19 +1181,28 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     fireEvent.click(await screen.findByRole("button", { name: "Edit input and replies" }));
     expect(screen.queryByRole("button", { name: "Start or continue an Agent" })).toBeNull();
     expect(screen.getByText("Run Automation: support").textContent).toBe("Run Automation: support");
-    fireEvent.change(screen.getByLabelText("Contains exact text"), {
+    fireEvent.change(screen.getByLabelText("Only messages containing"), {
       target: { value: "#triage" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const { match: _match, audience: _audience, ...routeSettings } = route;
     expect(adapters.put.mock.calls[0]![1]).toMatchObject({
       expectedRevisionId: "revision",
       accounts: [
         {
-          routes: [directRoute, { ...route, match: { ...route.match, contains: "#triage" } }],
+          routes: [
+            directRoute,
+            {
+              ...routeSettings,
+              audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1"] } }],
+              contains: "#triage",
+            },
+          ],
         },
       ],
     });
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[1].match).toBeUndefined();
     await screen.findByRole("button", { name: "Edit input and replies" });
   });
 
@@ -1140,12 +1210,14 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
     adapters.put.mockRejectedValue(new Error("Configuration changed; reload before saving."));
     renderChannels("support");
     fireEvent.click(await screen.findByRole("button", { name: "Edit input and replies" }));
-    fireEvent.change(screen.getByLabelText("Contains exact text"), {
+    fireEvent.change(screen.getByLabelText("Only messages containing"), {
       target: { value: "#draft" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await screen.findByText("Configuration changed; reload before saving.");
-    expect((screen.getByLabelText("Contains exact text") as HTMLInputElement).value).toBe("#draft");
+    expect((screen.getByLabelText("Only messages containing") as HTMLInputElement).value).toBe(
+      "#draft",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await screen.findByRole("button", { name: "Edit input and replies" });
     expect(adapters.put).toHaveBeenCalledTimes(1);
@@ -1154,7 +1226,7 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
   it("refuses to apply an old draft after another surface reorders the shared configuration", async () => {
     renderChannels("support");
     fireEvent.click(await screen.findByRole("button", { name: "Edit input and replies" }));
-    fireEvent.change(screen.getByLabelText("Contains exact text"), {
+    fireEvent.change(screen.getByLabelText("Only messages containing"), {
       target: { value: "#draft" },
     });
     await act(async () => {
@@ -1186,7 +1258,9 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
       "Channel configuration changed while editing. Cancel and reopen this Route before saving.",
     );
     expect(adapters.put).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("Contains exact text") as HTMLInputElement).value).toBe("#draft");
+    expect((screen.getByLabelText("Only messages containing") as HTMLInputElement).value).toBe(
+      "#draft",
+    );
   });
 
   it("stages an Automation input with the shared editor without publishing a Route", async () => {
@@ -1200,7 +1274,7 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit input and replies" }));
-    fireEvent.change(screen.getByLabelText("Contains exact text"), {
+    fireEvent.change(screen.getByLabelText("Only messages containing"), {
       target: { value: "#draft" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Use input" }));
@@ -1212,7 +1286,8 @@ describe("Automation Channel inputs", { timeout: 20_000 }, () => {
           routes: [
             {
               workflow: "support",
-              match: expect.objectContaining({ contains: "#draft" }),
+              contains: "#draft",
+              audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1"] } }],
             },
           ],
         },

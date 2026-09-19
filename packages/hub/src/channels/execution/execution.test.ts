@@ -1,3 +1,4 @@
+import { compileAudienceRule } from "../config/audience.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-channels): targeted tests for the execution plane facade
 // (plan §4-S2). Drives `createChannelPlane` end to end over the real ChannelStore
@@ -78,7 +79,8 @@ const DEFAULTS: EffectiveDefaults = {
 // Kind-level match: any channel conversation resolves this route.
 function makeRoute(overrides: { approval?: CompiledRoute["approval"] } = {}): CompiledRoute {
   return {
-    match: { kind: "channel", ids: [] },
+    audienceRules: [],
+    where: { dm: false, groups: ["all"], conversations: [] },
     target: {
       kind: "agent",
       agent: "worker",
@@ -555,7 +557,9 @@ describe("workflow route", () => {
     const direct = makeRoute();
     const workflow: CompiledRoute = {
       ...makeRoute(),
-      match: { kind: "channel", ids: [], contains: "#triage" },
+      audienceRules: [],
+      where: { dm: false, groups: ["all"], conversations: [] },
+      contains: "#triage",
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const account: CompiledChannelAccount = {
@@ -774,7 +778,8 @@ describe("workflow route", () => {
     // this conversation is no longer served at all.
     const narrowed: CompiledRoute = {
       ...makeRoute(),
-      match: { kind: "channel", ids: ["C0OTHER"] },
+      audienceRules: [],
+      where: { dm: false, groups: [], conversations: ["C0OTHER"] },
     };
     const after = makeHarness({ account: makeAccount(narrowed) });
     await after.plane.start(after.fake.daemon, store);
@@ -1128,8 +1133,10 @@ describe("selected-conversation audience", () => {
   function openRoute(conversationId: string): CompiledRoute {
     return {
       ...makeRoute(),
-      match: { kind: "channel", ids: [conversationId] },
-      audience: { kind: "conversationParticipants" },
+      audienceRules: [
+        compileAudienceRule({ who: { anyone: true }, where: { conversations: [conversationId] } }),
+      ],
+      where: { dm: false, groups: [], conversations: [conversationId] },
       defaultRoles: [],
       assignments: [],
       approval: [{ match: "*", mode: "auto-deny" }],
@@ -2101,7 +2108,8 @@ describe("channel session commands", () => {
   it("keeps attaching a workflow stream to a thread-level route", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
-      match: { kind: "thread", ids: [] },
+      audienceRules: [],
+      where: { dm: false, groups: ["all"], conversations: [] },
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const harness = makeHarness({ account: makeAccount(route) });
@@ -2163,7 +2171,9 @@ describe("channel session commands", () => {
   it("uses captured Workflow context for approval callbacks and /stop", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
-      match: { kind: "channel", ids: [], contains: "#triage" },
+      audienceRules: [],
+      where: { dm: false, groups: ["all"], conversations: [] },
+      contains: "#triage",
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const harness = makeHarness({ account: makeAccount(route) });

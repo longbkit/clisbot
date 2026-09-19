@@ -101,7 +101,7 @@ Approve and deny also arrive as button presses where the platform has buttons.
 
 ```yaml
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker
     environment: repo
     agents: [reviewer] # plus `worker`, the route's own — always offered
@@ -121,7 +121,8 @@ automations share:
 
 ```yaml
 routes:
-  - match: { kind: channel, ids: [C0APP], contains: deploy }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    contains: deploy
     agent: worker
     environment: repo
     agentControls: { provider: claude, model: claude-opus-5, thinkingOptionId: high }
@@ -170,41 +171,69 @@ they change where the conversation goes:
 - narrowing or removing the route so it no longer matches the conversation
   leaves it unserved, and the bot stops answering there.
 
-## Who may do what
+## Who may talk, where
 
-Talking to a bot and reaching a Host or Project are separate permissions.
+Each route carries **audience rules**. A rule is one sentence, "[who] may talk
+in [where]", and a sender is admitted when any rule of the route matches.
+Rules are the only place that decides who may chat; the Access page grants
+only **Channel Route Admin**.
 
-- **Chat.** A sender with `channel.use` on the account, or anyone in a
-  conversation matched by an open-audience route
-  (`audience: { kind: conversationParticipants }`), talks to the route's Agent.
-  They can start sessions with the route's configuration and use `/status`,
-  `/stop`, `/new`, `/fork`, `/side`, `/quick`, `/steer`, `/queue`, `/skill` and
-  `/command`. Chat gives no access to the Host, the Project, or the Paseo app.
-- **Changing the configuration.** `/agent`, `/model`, `/provider`, `/effort`,
-  `/permission`, `/cowork` and `/resume` need the sender's own Access grants on
-  the route's Project, and answering an approval needs an `approval.*`
-  privilege.
+- **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,
+  Anyone (unlinked senders included), or channel user ids outside the Hub.
+- **Where**: DM, Group chat (every room, group or space — on Slack optionally
+  public or private only), and specific conversations picked from one search
+  box. The parts add up. A rule that covers group chats does not cover DMs
+  unless it says DM.
+
+```yaml
+routes:
+  - audience:
+      - who: { roles: [owner, admin] }
+        where: { dm: true, groups: all }
+      - who: { teams: [team-qc] }
+        where: { groups: public, conversations: [C0QCPRIVATE] }
+      - who: { anyone: true }
+        where: { conversations: [C0HELP] }
+    contains: deploy # optional text filter, route-level
+    agent: worker
+    environment: repo
+```
+
+Routes stay ordered. A route applies when a rule's Where covers the
+conversation (and `contains`, if set, matches); if the sender matches none of
+that route's rules, the next route is tried. A bound conversation does not fall
+through: the route that started the session owns it. The catch-all (`fallback`)
+takes the same rules, or `deny: true`.
+
+Talking to a bot and reaching a Host or Project stay separate. A chatting
+sender can start sessions with the route's configuration and use `/status`,
+`/stop`, `/new`, `/fork`, `/side`, `/quick`, `/steer`, `/queue`, `/skill` and
+`/command`; chat gives no access to the Host, the Project, or the Paseo app.
+`/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/cowork` and
+`/resume` need the sender's own Access grants on the route's Project, and
+answering an approval needs an `approval.*` privilege.
 
 The person who publishes a route vouches for what it runs: saving checks that
 they may hand out its Host, Project, Agent configuration and automatic
-approvals. A sender is checked only when they change or reach beyond that.
-
-An unlinked sender is the Guest group. Grant Guest `channel.use` to open a
-Member route to everyone, or use an open-audience route.
+approvals. A Channel Route Admin edits the routes of one account through the
+app, keeps its Connection and target as they are, and is checked the same way.
 
 Commands never need a mention. `requireMention` decides when a plain message
 wakes the agent.
 
-### Open-audience routes
+### Routes open to Anyone
 
-Configure an open-audience route like any other: every conversation of a kind or
-named ones, with or without a mention, any reply mode, any approval rule, any
-Agent mode. The Hub saves it and lists a warning on the route for each wide
-choice: no named conversations, no mention needed, a follow-up window that
-lets anyone talk without a mention, output beyond the final answer, tool
-approvals allowed automatically, Fast mode, or a mode that runs tools without
-asking. The app lists them before you confirm a save. New routes start from the safe side: a mention in groups,
-final answers only, tool requests denied.
+A rule with `anyone: true` works like any other. The Hub saves it and lists a
+warning on the route for each wide choice: no named conversations, no mention
+needed, a follow-up window that lets anyone talk without a mention, output
+beyond the final answer, tool approvals allowed automatically, Fast mode, or a
+mode that runs tools without asking. The app lists them before you confirm a
+save. New routes start from the safe side: a mention in groups, final answers
+only, tool requests denied.
+
+Older files that use `match:` and `audience: { kind: … }` still load: the Hub
+reads them as one rule (`members` → Members, `conversationParticipants` →
+Anyone, `match` → Where).
 
 ## Limits
 
@@ -227,7 +256,7 @@ limits: # the whole bot
   perConversation: # each channel, group or DM; threads count toward their channel
     messagesPerMinute: 30
 routes:
-  - match: { kind: channel, ids: [C0SUPPORT] }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0SUPPORT] } }]
     limits: { maxConcurrentRuns: 5, maxRuntimeSeconds: off }
 ```
 

@@ -14,7 +14,7 @@ interface Destination {
 
 /** Enrich only authored destinations, never enumerate a provider directory. */
 export async function configuredChannelDestinations(
-  account: { routes: ReadonlyArray<Pick<CompiledChannelAccount["routes"][number], "match">> },
+  account: { routes: ReadonlyArray<Pick<CompiledChannelAccount["routes"][number], "where">> },
   observed: readonly ObservedChannelConversation[],
   resolve: (
     id: string,
@@ -22,21 +22,25 @@ export async function configuredChannelDestinations(
   ) => Promise<ChannelConversationMetadata | null>,
 ) {
   const destinations = new Map<string, Destination>();
-  for (const { match } of account.routes) {
-    for (const id of match.ids) {
+  // An authored id names a room or a thread/topic inside one; the observed
+  // catalog says which, and an id never seen yet reads as a room.
+  for (const { where } of account.routes) {
+    for (const id of where.conversations) {
       if (id === "*" || destinations.size >= 200) continue;
-      if (match.kind === "thread" || match.kind === "topic") {
-        const matching = observed.filter((item) => item.kind === match.kind && item.id === id);
-        for (const item of matching.slice(0, 200 - destinations.size)) {
-          destinations.set(`${item.kind}:${item.rootConversationId}:${id}`, item);
-        }
-      } else {
-        destinations.set(`${match.kind}:${id}`, {
+      const seen = observed.filter(
+        (item) => item.id === id || (item.rootConversationId === id && item.threadId === null),
+      );
+      if (seen.length === 0) {
+        destinations.set(`channel:${id}`, {
           id,
-          kind: match.kind,
+          kind: "channel",
           rootConversationId: id,
           threadId: null,
         });
+        continue;
+      }
+      for (const item of seen.slice(0, 200 - destinations.size)) {
+        destinations.set(`${item.kind}:${item.rootConversationId}:${item.id}`, item);
       }
     }
   }

@@ -12,8 +12,14 @@ import type {
   CompiledRoute,
 } from "../config/compile.js";
 import type { ChannelAccessStore } from "../../db/channel-access.js";
-import type { ChannelUseAuthorizer, InboundMessage, SupportedChannelName } from "../plane/types.js";
-import { isOpenAudienceRoute, mayTrigger } from "../policy.js";
+import type {
+  ChannelSenderResolver,
+  ChannelUseAuthorizer,
+  InboundMessage,
+  SupportedChannelName,
+} from "../plane/types.js";
+import { needsSenderFacts, type AudienceSender } from "../config/audience.js";
+import { audienceRulesAdmit, mayTrigger } from "../policy.js";
 import { evaluateChannelAccess, type DmGroupAccessReasonCode } from "./access.js";
 import { mintPairingCode, pairingChallengeText } from "./pairing.js";
 
@@ -101,15 +107,43 @@ export async function admitChannelAccess(input: {
 }
 
 /**
+ * The sender as the audience rules see them. Member facts are resolved only
+ * when a covering rule needs them (roles, Teams, Members); an `anyone` or
+ * `identities` rule decides without a database read.
+ */
+export async function audienceSenderFor(input: {
+  organizationId: string;
+  account: CompiledChannelAccount;
+  route: CompiledRoute;
+  message: InboundMessage;
+  resolveChannelSender?: ChannelSenderResolver | undefined;
+}): Promise<AudienceSender> {
+  const identity = input.message.senderIdentity;
+  if (input.resolveChannelSender === undefined || !needsSenderFacts(input.route.audienceRules)) {
+    return { identity, member: null };
+  }
+  return {
+    identity,
+    member: await input.resolveChannelSender({
+      organizationId: input.organizationId,
+      account: input.account,
+      senderIdentity: identity,
+    }),
+  };
+}
+
+/**
  * The one "may this sender use this route" decision, shared by the plane facade
  * and the bindings engine so neither can drift from the other.
  *
- * Four ways in, in order: the route opened its audience; the sender's roles
- * grant `bot.interact`; the route authored an `access:` block and it admits
- * them (this is what makes pairing mean something — an operator-approved
- * stranger has no Hub identity and no role, and approval is the grant); or the
- * Hub's own access store says yes. A sender the access gate REFUSES never gets
- * here: `admitChannelAccess` settles the message in the plane first.
+ * Ways in, in order: an audience rule whose Where covers the conversation
+ * names the sender (docs/audits/2026-09-19-route-audience-rules.md); the
+ * Advanced paths — the sender's roles grant `bot.interact`, or the route
+ * authored an `access:` block and it admits them (this is what makes pairing
+ * mean something — an operator-approved stranger has no Hub identity and no
+ * role, and approval is the grant); and, until the start-time migration has
+ * run everywhere, a `channel.use` Access grant. A sender the access gate
+ * REFUSES never gets here: `admitChannelAccess` settles the message first.
  */
 export async function mayUseChannelRoute(input: {
   store?: ChannelAccessStore | undefined;
@@ -118,10 +152,12 @@ export async function mayUseChannelRoute(input: {
   account: CompiledChannelAccount;
   route: CompiledRoute;
   message: InboundMessage;
+  resolveChannelSender?: ChannelSenderResolver | undefined;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
 }): Promise<ChannelPrivilegeDecision> {
   const { account, controlPlane, message, route } = input;
-  if (isOpenAudienceRoute(route)) return { allowed: true };
+  const sender = await audienceSenderFor(input);
+  if (audienceRulesAdmit(route, message.conversation, sender)) return { allowed: true };
   if (mayTrigger(message.senderIdentity, controlPlane, account, route)) return { allowed: true };
   if (route.defaults.access !== undefined && input.store !== undefined) {
     const storeAllowFrom = await input.store.listApprovedPairedSenders({
@@ -136,6 +172,7 @@ export async function mayUseChannelRoute(input: {
     });
     if (decision.decision === "allow") return { allowed: true };
   }
+  // COMPAT(route-audience-rules): added 2026-09-19, remove after 2027-03-19.
   return (
     (await input.authorizeChannelUse?.({
       organizationId: input.organizationId,

@@ -134,7 +134,8 @@ function makeRoute(
   } = {},
 ): CompiledRoute {
   return {
-    match: { kind: "channel", ids: [externalConversationId] },
+    audienceRules: [],
+    where: { dm: false, groups: [], conversations: [externalConversationId] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: ["interactor"],
     assignments: [

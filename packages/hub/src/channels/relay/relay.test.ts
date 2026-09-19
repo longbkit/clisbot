@@ -78,7 +78,8 @@ function context(
   } = {},
 ): StreamContext {
   const route: CompiledRoute = overrides.route ?? {
-    match: { kind: "channel", ids: [CONVERSATION] },
+    audienceRules: [],
+    where: { dm: false, groups: [], conversations: [CONVERSATION] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [],

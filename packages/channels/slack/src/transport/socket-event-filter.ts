@@ -101,6 +101,17 @@ export function resolveSlackChatType(channelType: "im" | "mpim" | "channel" | "g
   return "channel";
 }
 
+/** The room's visibility from the event's own `channel_type`: a `channel` is
+ * public, a `group` (private channel) or `mpim` is private; a DM has no
+ * visibility. No `conversations.info` call is made for this. */
+export function resolveSlackVisibility(
+  channelType: "im" | "mpim" | "channel" | "group",
+): "public" | "private" | undefined {
+  if (channelType === "channel") return "public";
+  if (channelType === "group" || channelType === "mpim") return "private";
+  return undefined;
+}
+
 /** Slack ts ("1700000000.000200") → milliseconds (pinned
  * `resolveSlackTimestampMs`). */
 const SLACK_TIMESTAMP_RE = /^\d+\.\d+$/;
@@ -189,6 +200,9 @@ export function buildSlackInboundEvent(
     externalConversationId: channelId,
     chatType: resolveSlackChatType(channelType),
     ...(threadTs !== undefined ? { messageThreadId: threadTs } : { messageThreadId: null }),
+    ...(resolveSlackVisibility(channelType) === undefined
+      ? {}
+      : { visibility: resolveSlackVisibility(channelType) }),
     senderId,
     body: text,
     wasMentioned: resolveSlackWasMentioned(event, source, identity),

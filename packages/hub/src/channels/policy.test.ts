@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { compileAudienceRule } from "./config/audience.js";
 import { describe, it } from "vitest";
 import type {
   ChannelControlPlane,
@@ -138,7 +139,9 @@ function makeAccount(overrides: AccountOverrides = {}): CompiledChannelAccount {
 }
 
 interface RouteOverrides {
-  match?: CompiledRoute["match"];
+  audienceRules?: CompiledRoute["audienceRules"];
+  where?: CompiledRoute["where"];
+  contains?: string;
   target?: CompiledRoute["target"];
   defaultRoles?: string[];
   /** Route-scoped assignments only; the helper prepends org ⊕ account. */
@@ -156,7 +159,9 @@ function routeFor(
   overrides: RouteOverrides = {},
 ): CompiledRoute {
   return {
-    match: overrides.match ?? { kind: "channel", ids: ["C0APP"] },
+    audienceRules: overrides.audienceRules ?? [],
+    where: overrides.where ?? { dm: false, groups: [], conversations: ["C0APP"] },
+    ...(overrides.contains === undefined ? {} : { contains: overrides.contains }),
     target: overrides.target ?? {
       kind: "agent",
       agent: "worker-app",
@@ -426,9 +431,13 @@ describe("route matching (first match wins)", () => {
     const plane = makePlane();
     const account = makeAccount({
       routes: [
-        routeFor(plane, accountStub(), { match: { kind: "channel", ids: [] } }), // kind-level
         routeFor(plane, accountStub(), {
-          match: { kind: "channel", ids: ["C0APP"] },
+          audienceRules: [],
+          where: { dm: false, groups: ["all"], conversations: [] },
+        }), // kind-level
+        routeFor(plane, accountStub(), {
+          audienceRules: [],
+          where: { dm: false, groups: [], conversations: ["C0APP"] },
         }),
       ],
     });
@@ -441,7 +450,8 @@ describe("route matching (first match wins)", () => {
     const account = makeAccount({
       routes: [
         routeFor(plane, accountStub(), {
-          match: { kind: "channel", ids: ["C0APP"] },
+          audienceRules: [],
+          where: { dm: false, groups: [], conversations: ["C0APP"] },
         }),
       ],
     });
@@ -454,11 +464,14 @@ describe("route matching (first match wins)", () => {
     const account = makeAccount({
       routes: [
         routeFor(plane, accountStub(), {
-          match: { kind: "channel", ids: ["C0APP"], contains: "#triage" },
+          audienceRules: [],
+          where: { dm: false, groups: [], conversations: ["C0APP"] },
+          contains: "#triage",
           target: { kind: "workflow", workflow: "triage" },
         }),
         routeFor(plane, accountStub(), {
-          match: { kind: "channel", ids: ["C0APP"] },
+          audienceRules: [],
+          where: { dm: false, groups: [], conversations: ["C0APP"] },
         }),
       ],
     });
@@ -476,7 +489,12 @@ describe("route matching (first match wins)", () => {
   it("matches kind-level routes with empty ids (incl. DMs)", () => {
     const plane = makePlane();
     const account = makeAccount({
-      routes: [routeFor(plane, accountStub(), { match: { kind: "dm", ids: [] } })],
+      routes: [
+        routeFor(plane, accountStub(), {
+          audienceRules: [],
+          where: { dm: true, groups: [], conversations: [] },
+        }),
+      ],
     });
     assert.ok(matchRoute({ kind: "dm", id: "D1" }, account).route !== null);
     assert.ok(matchRoute({ kind: "channel", id: "C1" }, account).route === null);
@@ -487,7 +505,8 @@ describe("route matching (first match wins)", () => {
     const account = makeAccount({
       routes: [
         routeFor(plane, accountStub(), {
-          match: { kind: "channel", ids: ["C0APP"] },
+          audienceRules: [],
+          where: { dm: false, groups: [], conversations: ["C0APP"] },
         }),
       ],
       fallback: { deny: true },
@@ -725,7 +744,10 @@ describe("mayTrigger", () => {
     const plane = makePlane({ assignments: [], identityOwners: {}, users: {} });
     const account = makeAccount({ defaultRoles: [] });
     const members = routeFor(plane, account, { defaultRoles: [], routeAssignments: [] });
-    const open = { ...members, audience: { kind: "conversationParticipants" as const } };
+    const open = {
+      ...members,
+      audienceRules: [compileAudienceRule({ who: { anyone: true }, where: { groups: "all" } })],
+    };
     assert.equal(isOpenAudienceRoute(open), true);
     assert.equal(isOpenAudienceRoute(members), false);
   });

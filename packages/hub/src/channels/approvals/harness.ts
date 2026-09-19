@@ -47,7 +47,8 @@ const DEFAULTS: EffectiveDefaults = {
 
 export function makeRoute(): CompiledRoute {
   return {
-    match: { kind: "channel", ids: ["C0APP"] },
+    audienceRules: [],
+    where: { dm: false, groups: [], conversations: ["C0APP"] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: ["interactor"],
     assignments: [

@@ -5,7 +5,8 @@ import { resolveSelection, selectionMenu } from "./selection.js";
 
 function route(selectable?: CompiledRoute["selectable"]): CompiledRoute {
   return {
-    match: { kind: "channel", ids: [] },
+    audienceRules: [],
+    where: { dm: false, groups: ["all"], conversations: [] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [],

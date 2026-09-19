@@ -33,6 +33,14 @@ import {
 } from "./schema.js";
 
 import type { CompiledRole } from "./privileges.js";
+import {
+  compileAudienceRule,
+  deriveRouteWhere,
+  isOpenAudience,
+  type CompiledAudienceRule,
+  type RouteWhere,
+} from "./audience.js";
+import { migrateFallbackAudience, migrateRouteAudience } from "./audience-migration.js";
 import { foldDefaults, mergeApproval, requireStarFallback } from "./inheritance.js";
 import {
   compileAccountLimits,
@@ -86,14 +94,12 @@ export type RouteTarget =
   | { kind: "workflow"; workflow: string };
 
 export interface CompiledRoute {
-  match: {
-    kind: "dm" | "channel" | "thread" | "group" | "topic";
-    ids: string[];
-    /** Case-sensitive literal substring; absent leaves text out of matching. */
-    contains?: string;
-  };
-  /** Omitted only on in-memory legacy fixtures; compiled revisions always set it. */
-  audience?: { kind: "members" | "conversationParticipants" };
+  /** Who may talk, where — in authored order; any matching rule admits. */
+  audienceRules: readonly CompiledAudienceRule[];
+  /** The union of the rules' Where: the conversations this Route applies to. */
+  where: RouteWhere;
+  /** Case-sensitive literal substring; absent leaves text out of matching. */
+  contains?: string;
   target: RouteTarget;
   defaultRoles: string[];
   assignments: readonly RoleAssignment[];
@@ -117,6 +123,8 @@ export interface CompiledFallback {
   deny: boolean;
   /** Catch-all route when `deny` is false; inherits the account layers. */
   target?: RouteTarget;
+  /** Who the catch-all admits; its Where is every conversation. */
+  audienceRules?: readonly CompiledAudienceRule[];
   defaultRoles?: string[];
   assignments?: readonly RoleAssignment[];
   defaults?: EffectiveDefaults;
@@ -293,7 +301,6 @@ function compileAccount(
     compileRoute(route, {
       file,
       index,
-      channel,
       input,
       users,
       defaultRoles: route.policy?.defaultRoles ?? layers.defaultRoles,
@@ -340,7 +347,6 @@ function compileRoute(
   context: {
     file: HubBundleFile;
     index: number;
-    channel: string;
     input: ChannelCompileInput;
     users: Record<string, CompiledUser>;
     defaultRoles: string[];
@@ -351,27 +357,24 @@ function compileRoute(
 ): CompiledRoute {
   validateAssignments(context.assignments, context.users, context.file.path);
   requireStarFallback([context.file.path, "routes", context.index], context.approval);
-  validateRouteKind(context.channel, route.match.kind, [
-    context.file.path,
-    "routes",
-    context.index,
-    "match",
-    "kind",
-  ]);
-  const audience = route.audience ?? { kind: "members" as const };
+  const migrated = migrateRouteAudience(route);
+  if (migrated.rules.length === 0) {
+    issue(
+      [context.file.path, "routes", context.index, "audience"],
+      "a route needs at least one audience rule",
+    );
+  }
+  const audienceRules = migrated.rules.map(compileAudienceRule);
   return {
-    match: {
-      kind: route.match.kind,
-      ids: (route.match.ids ?? []).map(String),
-      ...(route.match.contains === undefined ? {} : { contains: route.match.contains }),
-    },
-    audience,
+    audienceRules,
+    where: deriveRouteWhere(audienceRules),
+    ...(migrated.contains === undefined ? {} : { contains: migrated.contains }),
     target: compileRouteTarget(route, context),
     defaultRoles: context.defaultRoles,
     assignments: context.assignments,
     defaults: context.defaults,
     approval: context.approval,
-    ...compileRouteLimits(route.limits, audience.kind),
+    ...compileRouteLimits(route.limits, isOpenAudience(audienceRules)),
     ...compileRouteSelectable(route, context),
   };
 }
@@ -396,34 +399,6 @@ function compileRouteSelectable(
     }
   }
   return { selectable: { agents: [...(route.agents ?? [])], models: [...(route.models ?? [])] } };
-}
-
-/**
- * The conversation kinds each channel actually emits. A Discord thread IS a
- * channel, so a thread route matches on `thread` and a guild text channel on
- * `channel`; Discord, Google Chat and Feishu have no Telegram-style forum
- * `topic` and no Slack-style multi-person `group`. Feishu spells a 1:1 chat
- * `p2p` (a `dm` here) and a reply chain (`root_id`) a `thread`. Zalo and Zalo
- * Personal have exactly two kinds and no thread surface at all.
- */
-const ROUTE_KINDS: Readonly<Record<string, readonly string[]>> = {
-  slack: ["dm", "channel", "thread", "group"],
-  telegram: ["dm", "group", "topic"],
-  discord: ["dm", "channel", "thread"],
-  googlechat: ["dm", "channel", "thread"],
-  feishu: ["dm", "channel", "thread"],
-  zalo: ["dm", "group"],
-  zalouser: ["dm", "group"],
-};
-
-function validateRouteKind(
-  channel: string,
-  kind: Route["match"]["kind"],
-  path: readonly (string | number)[],
-): void {
-  if (!(ROUTE_KINDS[channel] ?? []).includes(kind)) {
-    issue(path, `${channel} never emits a ${kind} conversation`);
-  }
 }
 
 interface RouteTargetRef {
@@ -502,6 +477,7 @@ function compileFallback(
   validateAssignments(assignments, context.users, context.file.path);
   const approval = mergeApproval(context.accountApproval, fallback.approval);
   requireStarFallback([context.file.path, "fallback"], approval);
+  const audienceRules = migrateFallbackAudience(fallback).rules.map(compileAudienceRule);
   return {
     deny: false,
     target: compileRouteTarget(fallback, {
@@ -509,11 +485,12 @@ function compileFallback(
       index: -1,
       input: context.input,
     }),
+    audienceRules,
     defaultRoles: fallback.policy?.defaultRoles ?? context.accountDefaultRoles,
     assignments,
     defaults: foldDefaults([...context.accountLayers, fallback]),
     approval,
-    ...compileRouteLimits(fallback.limits, "members"),
+    ...compileRouteLimits(fallback.limits, isOpenAudience(audienceRules)),
     ...compileRouteSelectable(fallback as Route, {
       file: context.file,
       index: -1,
