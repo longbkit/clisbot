@@ -351,7 +351,7 @@ function ManagedAccessContent({
     edit,
   });
   const grantActions = useMemo(() => ({ pending, edit, remove }), [edit, pending, remove]);
-  const subjectOptions = assignmentSubjectOptions(members, teams);
+  const subjectOptions = useMemo(() => assignmentSubjectOptions(members, teams), [members, teams]);
   return (
     <View>
       <SettingsSection title="Access" info={accessInfo(authority.unrestricted)}>

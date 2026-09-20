@@ -51,6 +51,7 @@ export function HubHostOnboardingRow({
       daemonId: item.daemonId,
     }),
   );
+  const disconnect = useHostDisconnect(item.daemonId, item.daemonSlug);
   const status = hubHostStatusPresentation(failure === null ? item.status : "error");
   const unreachable =
     failure === null &&
@@ -68,6 +69,9 @@ export function HubHostOnboardingRow({
       <Text style={failure === null ? settingsStyles.rowHint : settingsStyles.rowError}>
         {failure?.message ?? description}
       </Text>
+      {disconnect.error ? (
+        <Text style={settingsStyles.rowError}>{disconnect.error.message}</Text>
+      ) : null}
       {unreachable ? (
         <CopyableCommand command={`${cliCommand} daemon status`} copyLabel="Copy" />
       ) : null}
@@ -76,7 +80,7 @@ export function HubHostOnboardingRow({
         <HostConnectionsAction item={item} failure={failure} />
         <ManagedHostRename daemonId={item.daemonId} name={item.daemonSlug} />
         {item.canManage && hub.signedIn?.capabilities.manageResources ? (
-          <HostDisconnectMenu item={item} />
+          <HostDisconnectMenu item={item} host={disconnect} />
         ) : null}
       </View>
     </View>
@@ -84,8 +88,13 @@ export function HubHostOnboardingRow({
 }
 
 /** Disconnect sits behind the menu, away from the everyday actions beside it. */
-function HostDisconnectMenu({ item }: { item: HubHostOnboardingItem }) {
-  const host = useHostDisconnect(item.daemonId, item.daemonSlug);
+function HostDisconnectMenu({
+  item,
+  host,
+}: {
+  item: HubHostOnboardingItem;
+  host: ReturnType<typeof useHostDisconnect>;
+}) {
   const actions = useMemo(
     () => [
       {
@@ -97,12 +106,7 @@ function HostDisconnectMenu({ item }: { item: HubHostOnboardingItem }) {
     ],
     [host.disconnect, host.done, host.pending],
   );
-  return (
-    <>
-      <RowActionsMenu label={`Actions for ${item.label}`} actions={actions} disabled={false} />
-      {host.error ? <Text style={settingsStyles.rowError}>{host.error.message}</Text> : null}
-    </>
-  );
+  return <RowActionsMenu label={`Actions for ${item.label}`} actions={actions} disabled={false} />;
 }
 
 /** Retry a failed synchronization, reconnect an unreachable Host, or open an online one. */

@@ -17,6 +17,10 @@ export type HubTeam = z.infer<typeof HubTeamsSchema>["teams"][number];
 export type AgentConfigurationCatalog = NonNullable<AccessResource["agentConfigurationCatalog"]>;
 
 /** Also accepts a raw kind, so a route param can address a resource before the catalog loads. */
+/** What being an Owner grants, said once for every screen that explains the role. */
+export const OWNER_ACCESS_HINT =
+  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
+
 export function resourceKey(resource: { kind: string; id: string }): string {
   return `${resource.kind}\0${resource.id}`;
 }

@@ -47,6 +47,42 @@ const VIEW_OPTIONS: SegmentedControlOption<GrantGrouping>[] = [
   { value: "resource", label: "Resources" },
 ];
 
+/**
+ * How the list is narrowed right now. It lives above the list, so opening an
+ * entry on a phone and coming back keeps the search someone just typed.
+ */
+interface EntryListState {
+  filter: EntryFilter;
+  search: string;
+  shown: number;
+  setFilter(filter: EntryFilter): void;
+  setSearch(search: string): void;
+  showMore(): void;
+  reset(): void;
+}
+
+function useEntryListState(): EntryListState {
+  const [filter, setChosenFilter] = useState<EntryFilter>("all");
+  const [search, setQuery] = useState("");
+  const [shown, setShown] = useState(PAGE_SIZE);
+  // Narrowing the list starts it over; otherwise a search lands on page three.
+  const setFilter = useCallback((next: EntryFilter) => {
+    setChosenFilter(next);
+    setShown(PAGE_SIZE);
+  }, []);
+  const setSearch = useCallback((next: string) => {
+    setQuery(next);
+    setShown(PAGE_SIZE);
+  }, []);
+  const showMore = useCallback(() => setShown((current) => current + PAGE_SIZE), []);
+  const reset = useCallback(() => {
+    setChosenFilter("all");
+    setQuery("");
+    setShown(PAGE_SIZE);
+  }, []);
+  return { filter, search, shown, setFilter, setSearch, showMore, reset };
+}
+
 export function AccessBrowser({
   entries,
   grouping,
@@ -66,6 +102,7 @@ export function AccessBrowser({
   /** Opens the grant sheet on this entry. */
   grantTo(entry: AccessEntry): void;
 }) {
+  const list = useEntryListState();
   const compactFormFactor = useIsCompactFormFactor();
   const [width, setWidth] = useState<number | null>(null);
   const measure = useCallback(
@@ -79,6 +116,14 @@ export function AccessBrowser({
     selectedKey ?? (compact ? null : (entries.find(({ rows }) => rows.length > 0)?.key ?? null));
   const selected = entries.find(({ key }) => key === openKey) ?? null;
   const back = useCallback(() => onSelect(null), [onSelect]);
+  // The other axis lists other things, so its chips and search start over.
+  const changeGrouping = useCallback(
+    (next: GrantGrouping) => {
+      list.reset();
+      onGroupingChange(next);
+    },
+    [list, onGroupingChange],
+  );
   const detail =
     selected === null ? (
       <Text style={styles.muted}>Choose someone or something on the left to see its access.</Text>
@@ -99,33 +144,23 @@ export function AccessBrowser({
         <SegmentedControl
           options={VIEW_OPTIONS}
           value={grouping}
-          onValueChange={onGroupingChange}
+          onValueChange={changeGrouping}
           size="sm"
         />
       </View>
-      {compact ? (
-        <EntryList
-          key={grouping}
-          entries={entries}
-          grouping={grouping}
-          selectedKey={null}
-          drillIn
-          onSelect={onSelect}
-        />
-      ) : (
-        <View style={styles.columns}>
-          <View style={styles.master}>
-            <EntryList
-              key={grouping}
-              entries={entries}
-              grouping={grouping}
-              selectedKey={openKey}
-              onSelect={onSelect}
-            />
-          </View>
-          <View style={styles.detail}>{detail}</View>
+      <View style={compact ? null : styles.columns}>
+        <View style={compact ? null : styles.master}>
+          <EntryList
+            entries={entries}
+            grouping={grouping}
+            list={list}
+            selectedKey={compact ? null : openKey}
+            drillIn={compact}
+            onSelect={onSelect}
+          />
         </View>
-      )}
+        {compact ? null : <View style={styles.detail}>{detail}</View>}
+      </View>
     </View>
   );
 }
@@ -133,37 +168,32 @@ export function AccessBrowser({
 function EntryList({
   entries,
   grouping,
+  list,
   selectedKey,
-  drillIn = false,
+  drillIn,
   onSelect,
 }: {
   entries: readonly AccessEntry[];
   grouping: GrantGrouping;
+  list: EntryListState;
   selectedKey: string | null;
   /** The entry opens on its own screen: each row shows it leads somewhere. */
-  drillIn?: boolean;
+  drillIn: boolean;
   onSelect(key: string): void;
 }) {
-  const [filter, setFilter] = useState<EntryFilter>("all");
-  const [search, setSearch] = useState("");
-  const [shown, setShown] = useState(PAGE_SIZE);
+  const { filter, search, shown } = list;
   const chips = useMemo(() => entryFilterChips(entries, grouping), [entries, grouping]);
   const visible = useMemo(() => filterEntries(entries, filter, search), [entries, filter, search]);
-  const changeFilter = useCallback((value: EntryFilter) => {
-    setFilter(value);
-    setShown(PAGE_SIZE);
-  }, []);
-  const showMore = useCallback(() => setShown((current) => current + PAGE_SIZE), []);
   const remaining = visible.length - shown;
   return (
     <View style={styles.stack}>
       <SearchField
         value={search}
-        onChangeText={setSearch}
+        onChangeText={list.setSearch}
         placeholder={grouping === "subject" ? "Search people and Teams" : "Search resources"}
         clearAccessibilityLabel="Clear Access search"
       />
-      <FilterChips chips={chips} value={filter} onChange={changeFilter} />
+      <FilterChips chips={chips} value={filter} onChange={list.setFilter} />
       <View style={settingsStyles.card}>
         {visible.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
@@ -185,7 +215,7 @@ function EntryList({
         )}
       </View>
       {remaining > 0 ? (
-        <Button size="sm" variant="ghost" onPress={showMore}>
+        <Button size="sm" variant="ghost" onPress={list.showMore}>
           {`Show ${String(Math.min(remaining, PAGE_SIZE))} more of ${String(remaining)}`}
         </Button>
       ) : null}

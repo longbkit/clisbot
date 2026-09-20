@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { settingsStyles } from "@/styles/settings";
+import { OWNER_ACCESS_HINT } from "../access-catalog";
 import { capitalizeLabel } from "../labels";
 import { MemberAccessSection } from "./member-access-section";
 import { MemberChatAccounts } from "./member-chat-accounts";
@@ -10,11 +11,14 @@ import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
 import { MemberRoleSelect } from "./member-role-select";
 import { MemberTeamsSection } from "./member-teams-section";
 import { canManageTeamMembership } from "./team-membership";
-import type { HubAccount, HubMember, TeamResources } from "./types";
+import type { HubAccount, HubMember, HubTeam, TeamResources } from "./types";
 import type { TeamActions } from "./use-team-actions";
 import { BackLink } from "../back-link";
 import { DetailHeader, LabeledRow } from "../detail-header";
 import { RowActionsMenu } from "./row-actions-menu";
+
+const NO_TEAMS: HubTeam[] = [];
+const NO_MEMBERS: HubMember[] = [];
 
 export function SelectedMemberDetail({
   hub,
@@ -36,8 +40,8 @@ export function SelectedMemberDetail({
   const { pending } = actions;
   const capabilities = hub.signedIn?.capabilities;
   const canManageMembers = capabilities?.manageMembers === true;
-  const teams = resources.teams.data?.teams ?? [];
-  const members = resources.members.data?.members ?? [];
+  const teams = resources.teams.data?.teams ?? NO_TEAMS;
+  const members = resources.members.data?.members ?? NO_MEMBERS;
   const { authority } = resources;
   const canManageTeam = useCallback(
     (teamId: string) => canManageTeamMembership(authority, teamId),
@@ -71,7 +75,7 @@ export function SelectedMemberDetail({
               <Text style={settingsStyles.rowTitle}>{capitalizeLabel(member.role)}</Text>
             )}
             {member.role === "owner" ? (
-              <Text style={settingsStyles.rowHint}>{OWNER_HINT}</Text>
+              <Text style={settingsStyles.rowHint}>{OWNER_ACCESS_HINT}</Text>
             ) : null}
           </LabeledRow>
           <LabeledRow label="Status" bordered>
@@ -110,9 +114,6 @@ export function SelectedMemberDetail({
     </View>
   );
 }
-
-const OWNER_HINT =
-  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
 
 /** Removing the Member sits behind the menu; disabled when the Hub would refuse (why is under Status). */
 function MemberMenu({

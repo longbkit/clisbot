@@ -9,8 +9,18 @@ import { useChannelCatalog } from "../channel-catalog-queries";
 import { ChannelIdentityLinkForm } from "../channel-identity-link-form";
 import { tableStyles } from "../table-styles";
 import { RowActionsMenu } from "./row-actions-menu";
-import type { HubAccount, HubIdentity, HubMember, HubRun, TeamResources } from "./types";
+import type {
+  HubAccount,
+  HubConnection,
+  HubIdentity,
+  HubMember,
+  HubRun,
+  TeamResources,
+} from "./types";
 import { useIdentityActions } from "./use-people-actions";
+
+const NO_IDENTITIES: HubIdentity[] = [];
+const NO_CONNECTIONS: HubConnection[] = [];
 
 const INFO =
   "One Member can link several chat accounts. A link covers its identity realm: every Telegram, Discord, or Google Chat bot; one Slack workspace; or one Feishu or Zalo bot. Members link their own from Account; only an instance operator links one by its raw provider id.";
@@ -42,10 +52,10 @@ export function MemberChatAccounts({
     },
     [close, link],
   );
-  const identities = (resources.identities.data?.identities ?? []).filter(
+  const identities = (resources.identities.data?.identities ?? NO_IDENTITIES).filter(
     ({ memberId }) => memberId === member.id,
   );
-  const connections = resources.connections.data?.connections ?? [];
+  const connections = resources.connections.data?.connections ?? NO_CONNECTIONS;
   const operator = hub.signedIn?.isInstanceOperator === true;
   const linkButton = useMemo(
     () =>

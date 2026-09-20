@@ -7,14 +7,11 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { OWNER_ACCESS_HINT } from "./access-catalog";
 import { DetailRow, OrganizationTitle } from "../organization-identity";
 
 type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
-
-/** What an Owner's role means, next to the role rather than in a box of its own. */
-const OWNER_HINT =
-  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
 
 /**
  * The organization every Hub action applies to, and your role in it. Owners rename it in
@@ -52,7 +49,11 @@ export function OrganizationHeader({
           ) : null}
         </View>
         <DetailRow label="Organization ID" value={organizationSlug} />
-        <DetailRow label="Your role" value={roleLabel} hint={isOwner ? OWNER_HINT : undefined} />
+        <DetailRow
+          label="Your role"
+          value={roleLabel}
+          hint={isOwner ? OWNER_ACCESS_HINT : undefined}
+        />
         {renaming ? (
           <RenameOrganization
             hub={hub}

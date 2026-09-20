@@ -11,7 +11,8 @@ export interface TeamActions {
   addTeamMember(teamId: string, userId: string): Promise<void>;
   removeTeamMember(teamId: string, userId: string): void;
   addTeamMembers(teamId: string, userIds: string[]): Promise<string[]>;
-  renameTeam(teamId: string, name: string): Promise<boolean>;
+  /** Rejects with the Hub's reason, so a dialog can keep it in front of the person. */
+  renameTeam(teamId: string, name: string): Promise<void>;
   removeTeam(teamId: string, name: string): Promise<boolean>;
   removeMember(memberId: string, name: string): Promise<boolean>;
 }
@@ -20,20 +21,32 @@ export interface TeamActions {
 export function useHubRun() {
   const [pending, setPending] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const run = useCallback<HubRun>(async (operation) => {
+  /** Shows the failure on the screen and passes it on, for a caller that shows it too. */
+  const runOrThrow = useCallback(async (operation: () => Promise<void>) => {
     setMutationError(null);
     setPending(true);
     try {
       await operation();
-      return true;
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : "Hub request failed.");
-      return false;
+      const failure = error instanceof Error ? error : new Error("Hub request failed.");
+      setMutationError(failure.message);
+      throw failure;
     } finally {
       setPending(false);
     }
   }, []);
-  return { pending, mutationError, setMutationError, run };
+  const run = useCallback<HubRun>(
+    async (operation) => {
+      try {
+        await runOrThrow(operation);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [runOrThrow],
+  );
+  return { pending, mutationError, setMutationError, run, runOrThrow };
 }
 
 export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamActions {
@@ -61,11 +74,11 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
   const addTeamMembers = useAddTeamMembers(runner.run, addTeamMember, resources);
   const renameTeam = useCallback(
     (teamId: string, name: string) =>
-      run(async () => {
+      runner.runOrThrow(async () => {
         await hub.api().put(`teams/${encodeURIComponent(teamId)}`, { name }, HubTeamSchema);
         await teams.refetch();
       }),
-    [hub, run, teams],
+    [hub, runner, teams],
   );
   const removeTeam = useCallback(
     async (teamId: string, name: string) => {

@@ -122,11 +122,7 @@ function TeamMenu({
   const [renaming, setRenaming] = useState(false);
   const close = useCallback(() => setRenaming(false), []);
   const rename = useCallback(
-    async (name: string) => {
-      if (!(await actions.renameTeam(team.id, name.trim()))) {
-        throw new Error("The Team was not renamed.");
-      }
-    },
+    (name: string) => actions.renameTeam(team.id, name.trim()),
     [actions, team.id],
   );
   const remove = useCallback(async () => {

@@ -1,7 +1,11 @@
 // Hub tables and selectable lists share one set of surface steps, so a header,
-// a plain row, and a selected row are always three distinct tones: grey header,
-// white rows, and a selected row a full step darker. A settings card alone is
-// surface1, which is too close to surface2 for either to read.
+// a plain row, and a selected row are always three distinct tones. A settings
+// card alone is surface1, which is too close to surface2 for either to read.
+//
+// The steps run in opposite directions per theme, which is the palette working
+// as intended: in light, rows (surface0) are lighter than the card and the
+// header (surface2) is darker; in dark, surface0 is the darkest tone, so rows
+// recede and the header lifts. Both keep three separate tones.
 
 import { StyleSheet } from "react-native-unistyles";
 
