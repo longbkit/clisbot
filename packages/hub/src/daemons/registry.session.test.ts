@@ -60,6 +60,29 @@ test("stream frames reach the subscriber", async () => {
   client.stop();
 });
 
+// `rpc_error` is the one frame the execution path and the session driver both
+// answer with. Live, a refused `workspace.create.request` was swallowed by the
+// execution path and the caller waited out its 30s timeout instead.
+test("a refused RPC fails with the daemon's reason, not a timeout", async () => {
+  harness = await DaemonRegistryHarness.start();
+  const client = clientFor(harness);
+
+  const refused = client.call("workspace.create.request", { source: { path: "/repo" } });
+  const request = await harness.nextSessionRequest("workspace.create.request");
+  harness.sendSessionMessage({
+    type: "rpc_error",
+    payload: {
+      requestId: request.requestId,
+      requestType: "workspace.create.request",
+      error: "You do not have permission to perform this action.",
+      code: "access_denied",
+    },
+  });
+
+  await expect(refused).rejects.toThrow("You do not have permission");
+  client.stop();
+});
+
 // A Host that is away is a fact the Hub holds, not something to wait 30s for.
 test("a call fails at once while the Host is away", async () => {
   harness = await DaemonRegistryHarness.start();

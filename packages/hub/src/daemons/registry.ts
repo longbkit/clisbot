@@ -393,7 +393,7 @@ export class ActiveDaemonRegistry {
     const envelope = HubExecutionOutboundSchema.safeParse(value);
     if (!envelope.success) return this.receiveSessionFrame(active, value);
     const message = envelope.data.message;
-    if (message.type === "rpc_error") return this.receiveRpcError(active, message.payload);
+    if (message.type === "rpc_error") return this.receiveRpcError(active, message.payload, value);
     const created = HubExecutionAgentCreateResponseSchema.safeParse(message);
     if (created.success) return this.receiveCreate(active, created.data);
     const controlled = HubExecutionControlResponseSchema.safeParse(message);
@@ -620,13 +620,20 @@ export class ActiveDaemonRegistry {
     for (const [, request] of related) request.resolve(snapshot);
   }
 
+  /**
+   * `rpc_error` is the one frame both worlds answer with, so an error for a
+   * request this registry did not make belongs to whoever did: without the
+   * hand-off a refused session RPC waits out its timeout instead of failing.
+   */
   private receiveRpcError(
     active: ActiveSocket,
     payload: { requestId: string; error: string },
+    frame: unknown,
   ): void {
     const requests = this.pendingFor(active.daemon.id);
     const pending = requests.get(payload.requestId);
-    if (pending?.generation !== active.generation) return;
+    if (pending === undefined) return this.receiveSessionFrame(active, frame);
+    if (pending.generation !== active.generation) return;
     requests.delete(payload.requestId);
     pending.reject(new Error(payload.error));
   }

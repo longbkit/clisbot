@@ -7,6 +7,7 @@ import {
   type HubGuidedSetupEnvironment,
 } from "./init.js";
 import { hubLoginResumeCommand, resolveHubInitConnection } from "./init-plan.js";
+import { DEFAULT_HUB_CONNECTION_PERMISSIONS } from "./permissions.js";
 
 type LoginConnectionChoice = "connect" | "skip";
 
@@ -80,7 +81,7 @@ async function applyLoginConnection(
     reportMessage(environment, `Skipped daemon connection. ${later}`);
     return;
   }
-  await ensureDaemonConnection(origin, environment, true, ["hub.execute"]);
+  await ensureDaemonConnection(origin, environment, true, DEFAULT_HUB_CONNECTION_PERMISSIONS);
   reportMessage(
     environment,
     "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  paseo hub disconnect",

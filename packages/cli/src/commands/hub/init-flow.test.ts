@@ -14,6 +14,7 @@ import {
 } from "./init.js";
 import { LOGIN_CONNECTION_QUESTION, planHubLoginConnection } from "./login-connection.js";
 import { runHubLogin } from "./login.js";
+import { DEFAULT_HUB_CONNECTION_PERMISSIONS } from "./permissions.js";
 
 const directories: string[] = [];
 
@@ -52,7 +53,9 @@ describe("Hub login connection asked before browser approval", () => {
     assert.deepEqual(prompts.selections, [LOGIN_CONNECTION_QUESTION]);
     assert.deepEqual(prompts.confirmations, []);
     assert.equal(daemon.connections, 1);
-    assert.deepEqual((await daemon.getHubStatus()).status.permissions, ["hub.execute"]);
+    assert.deepEqual((await daemon.getHubStatus()).status.permissions, [
+      ...DEFAULT_HUB_CONNECTION_PERMISSIONS,
+    ]);
     assert.equal(
       prompts.messages[0],
       "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  paseo hub disconnect",

@@ -6,6 +6,27 @@ import { withHubDaemon } from "./daemon-client.js";
 import { reportHubProgress, type HubReporter } from "./reporter.js";
 import { hubStatusResult } from "./status-output.js";
 
+/**
+ * What connecting to a Hub asks for by default.
+ *
+ * A Hub drives this daemon the way a local client does: it creates agents and
+ * workspaces, steers them, answers their permission prompts, and reads which
+ * providers and models exist to offer them. Asking for `hub.execute` alone left
+ * half of that refused — a channel could start a session but not name its
+ * workspace, switch its model, or list the profiles behind `/agent`.
+ *
+ * Administration is deliberately not in here: `daemon.manage`, `access.manage`,
+ * `tunnel.manage` and `automation.manage` stay with the operator. Narrow this
+ * further per daemon with `paseo hub permissions revoke <permission>`.
+ */
+export const DEFAULT_HUB_CONNECTION_PERMISSIONS: readonly string[] = [
+  "hub.execute",
+  "daemon.read",
+  "workspace.read",
+  "workspace.write",
+  "workspace.manage",
+];
+
 interface HubPermissionsOptions {
   host?: string;
   json?: boolean;

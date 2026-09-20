@@ -17,6 +17,14 @@ function rawDataToText(data: RawData): string {
   return data.toString();
 }
 
+async function waitForHello(messages: readonly string[]): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (!messages.some((message) => HubDaemonHelloSchema.safeParse(JSON.parse(message)).success)) {
+    if (Date.now() > deadline) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 describe("daemon socket protocol negotiation", () => {
   it.each([
     {
@@ -89,7 +97,12 @@ describe("daemon socket protocol negotiation", () => {
         client.once("open", resolve);
         client.once("error", reject);
       });
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      // The hello crosses a real socket, so one microtask turn is not enough:
+      // wait for it when it is expected, and give it a moment to prove absent
+      // when it is not.
+      await (expectsHello
+        ? waitForHello(messages)
+        : new Promise<void>((resolve) => setTimeout(resolve, 50)));
 
       assert.equal(negotiatedProtocol, expectedProtocol);
       assert.equal(

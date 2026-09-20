@@ -39,6 +39,7 @@ import {
   type HubStarterAgentProvider,
   type HubStarterAgentRuntime,
 } from "./starter-agent-runtime.js";
+import { DEFAULT_HUB_CONNECTION_PERMISSIONS } from "./permissions.js";
 import {
   availableStarterTriggerConnections,
   type HubStarterTriggerConnection,
@@ -206,7 +207,12 @@ export async function continueHubGuidedSetup(
       "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nAgents can access files and run commands allowed by their workspace runtime.",
       false,
     );
-    await ensureDaemonConnection(origin, environment, true, grantExecution ? ["hub.execute"] : []);
+    await ensureDaemonConnection(
+      origin,
+      environment,
+      true,
+      grantExecution ? DEFAULT_HUB_CONNECTION_PERMISSIONS : [],
+    );
     if (!grantExecution) {
       reportMessage(
         environment,
@@ -278,7 +284,7 @@ export async function ensureDaemonConnection(
   origin: string,
   environment: HubGuidedSetupEnvironment,
   confirmed = false,
-  permissions: readonly string[] = ["hub.execute"],
+  permissions: readonly string[] = DEFAULT_HUB_CONNECTION_PERMISSIONS,
 ): Promise<string> {
   const status = await withHubDaemon(environment.daemon, undefined, async (daemon) =>
     daemon.getHubStatus().then((response) => response.status),
@@ -318,7 +324,7 @@ export async function ensureDaemonConnection(
 async function connectDaemon(
   origin: string,
   environment: HubGuidedSetupEnvironment,
-  permissions: readonly string[] = ["hub.execute"],
+  permissions: readonly string[] = DEFAULT_HUB_CONNECTION_PERMISSIONS,
 ): Promise<string> {
   await runHubConnect(
     origin,

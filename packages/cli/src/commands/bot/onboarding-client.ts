@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { ControlPlaneTarget } from "../control-plane.js";
 import { requestHub } from "../hub/hub-client/internal/transport.js";
+import { DEFAULT_HUB_CONNECTION_PERMISSIONS } from "../hub/permissions.js";
 
 export function isOnboardingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return !["0", "false", "off", "no"].includes(
@@ -36,9 +37,11 @@ export async function connectOnboardingDaemon(
     failureMessage: "Local Account setup is incomplete",
   });
   if (!current.hubOrigin)
-    await client.connectHub(target.origin, setup.enrollmentToken, ["hub.execute"]);
+    await client.connectHub(target.origin, setup.enrollmentToken, [
+      ...DEFAULT_HUB_CONNECTION_PERMISSIONS,
+    ]);
   else if (!current.permissions.includes("hub.execute"))
-    await client.updateHubPermissions({ grant: ["hub.execute"] });
+    await client.updateHubPermissions({ grant: [...DEFAULT_HUB_CONNECTION_PERMISSIONS] });
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     const status = (await client.getHubStatus()).status;

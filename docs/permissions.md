@@ -31,6 +31,14 @@ A pairing invitation is neither. It is an expiring, single-use exchange that cre
 | `automation.manage` | Schedules, heartbeats, and loops                                           |
 | `hub.execute`       | Agent lifecycle, agent/workspace observation, and workspace recovery       |
 
+Connecting a daemon to a Hub asks for `hub.execute`, `daemon.read`, `workspace.read`,
+`workspace.write` and `workspace.manage` (`DEFAULT_HUB_CONNECTION_PERMISSIONS`, `packages/cli/src/commands/hub/permissions.ts`).
+A Hub drives the daemon the way a local client does — it creates agents and workspaces, steers
+them, answers their prompts, and reads which providers exist to offer them — so asking for
+`hub.execute` alone left half of that refused. Administration stays with the operator:
+`daemon.manage`, `access.manage`, `tunnel.manage` and `automation.manage` are not in the default.
+Narrow a connection with `paseo hub permissions revoke <permission>`.
+
 Agents and terminals use workspace authority. Both can execute code and mutate the workspace, so separate write permissions would claim an isolation boundary the daemon cannot enforce.
 
 Owner, operator, and viewer are UI presets expanded into explicit permissions. Do not persist them as roles. Adding a permission must not silently widen an existing principal.

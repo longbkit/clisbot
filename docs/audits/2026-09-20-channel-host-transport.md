@@ -41,6 +41,19 @@ Consequences worth knowing:
 - **One fact, two screens.** `presence` on the `daemons` resource is both "the Hub holds this Host" and "channels on this Host can answer". Settings → Hosts shows it per Host, a Route row shows it for the Host that Route runs on.
 - **Dialing out is now a choice, not a default.** An explicit daemon target still dials, and so does an account whose Host the Hub cannot resolve.
 
+## What riding the enrollment changed
+
+The dial-out client held a trusted local session, which carries every authority. Riding the Host's
+own connection means the channel plane is bounded by what that Host granted its Hub — which is the
+point, but `hub.execute` alone refused `workspace.create.request`, `set_agent_model_request`, the
+provider and model lists, and `agent.fork_context.request`. A refusal was worse than a denial: the
+registry consumed the `rpc_error` frame as if it were an execution reply, so the caller waited out
+its 30 s timeout with nothing to show.
+
+Both are fixed at the source rather than per operation. A Hub connection now asks for the set a
+client needs ([permissions](../permissions.md)), and an `rpc_error` for a request the execution
+path never made is handed to whoever did.
+
 ## Still open
 
-A failed create still leaves its pending marker behind, so the thread that failed stays wedged even after the Host returns (`channels/bindings/index.ts` `settleCreationFailure`). Releasing it on a definite failure, and re-driving the inbound after a reconnect, are a separate change.
+A failed create still leaves its pending marker behind, so the thread that failed stays wedged even after the Host returns (`channels/bindings/index.ts` `settleCreationFailure`). Releasing it on a definite failure, and re-driving the inbound after a reconnect, are a separate change. It is finding 1 in the [stability and scalability audit](2026-09-20-channel-stability-scalability-audit.md).
