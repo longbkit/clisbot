@@ -1,30 +1,37 @@
-import { useCallback, useMemo, type ReactElement, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
 import type { GestureResponderEvent } from "react-native";
 import { Plus, Server, Settings } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { useHostRuntimeSnapshot, useHosts, type ActiveConnection } from "@/runtime/host-runtime";
-import { isManagedAccessHost, MANAGED_ACCESS_HOST_LABEL } from "@/hosts/managed-access";
+import {
+  isManagedAccessHost,
+  MANAGED_ACCESS_HOST_LABEL,
+  MANAGED_ACCESS_HOST_TOOLTIP,
+} from "@/hosts/managed-access";
 import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { orderHostsLocalFirst } from "@/types/host-connection";
 import {
   ADD_HOST_OPTION_ID,
   ALL_HOSTS_OPTION_ID,
   ENABLE_BUILT_IN_DAEMON_OPTION_ID,
-  getHostPickerLabel,
+  shouldSearchHostPicker,
 } from "./host-picker-constants";
 
 export {
   ADD_HOST_OPTION_ID,
   ALL_HOSTS_OPTION_ID,
   ENABLE_BUILT_IN_DAEMON_OPTION_ID,
+  getHostFilterPickerValue,
   getHostPickerLabel,
-};
+  HOST_PICKER_SEARCHABLE_THRESHOLD,
+  shouldSearchHostPicker,
+} from "./host-picker-constants";
 
-const SEARCHABLE_THRESHOLD = 10;
 type RenderHostOption = NonNullable<ComboboxProps["renderOption"]>;
 interface HostPickerHost {
   serverId: string;
@@ -35,6 +42,70 @@ export function HostStatusDotSlot({ serverId }: { serverId: string }): ReactElem
   return (
     <View style={styles.statusDotSlot}>
       <HostStatusDot serverId={serverId} />
+    </View>
+  );
+}
+
+function ManagedAccessGlyph({ serverId }: { serverId: string }): ReactElement {
+  const { theme } = useUnistyles();
+  const handlePress = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+  }, []);
+
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger
+        onPress={handlePress}
+        accessibilityLabel={MANAGED_ACCESS_HOST_LABEL}
+        testID={`host-picker-managed-${serverId}`}
+      >
+        <ManagedAccessIcon size={theme.iconSize.sm} />
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center" offset={6}>
+        <Text style={styles.managedAccessTooltip}>{MANAGED_ACCESS_HOST_TOOLTIP}</Text>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * Settings lives on its own hit target so a press on the host row can filter without opening
+ * configuration. Hover is tracked on a plain View so it does not fight the row Pressable.
+ */
+function HostSettingsButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: (event: GestureResponderEvent) => void;
+}): ReactElement {
+  const { theme } = useUnistyles();
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => {
+    setHovered(false);
+    setPressed(false);
+  }, []);
+  const handlePressIn = useCallback(() => setPressed(true), []);
+  const handlePressOut = useCallback(() => setPressed(false), []);
+
+  return (
+    <View
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      style={[styles.settingsButton, (hovered || pressed) && styles.settingsButtonHighlighted]}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${label} settings`}
+        style={styles.settingsButtonHit}
+      >
+        <Settings size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
+      </Pressable>
     </View>
   );
 }
@@ -75,7 +146,6 @@ export function HostPickerOption({
   onOpenHostSettings,
   testID,
 }: HostPickerOptionProps): ReactElement {
-  const { theme } = useUnistyles();
   const activeConnection = useHostRuntimeSnapshot(serverId)?.activeConnection ?? null;
   const connectionLabel =
     showActiveConnection && activeConnection
@@ -91,32 +161,15 @@ export function HostPickerOption({
     [onOpenHostSettings, serverId],
   );
   const trailingSlot = useMemo(() => {
-    const managedIcon = managedAccess ? (
-      <ManagedAccessIcon size={theme.iconSize.sm} testID={`host-picker-managed-${serverId}`} />
-    ) : null;
+    const managedIcon = managedAccess ? <ManagedAccessGlyph serverId={serverId} /> : null;
     if (!onOpenHostSettings) return managedIcon ?? undefined;
     return (
       <View style={styles.trailing}>
         {managedIcon}
-        <Pressable
-          onPress={handleSettingsPress}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${label} settings`}
-        >
-          <Settings size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
-        </Pressable>
+        <HostSettingsButton label={label} onPress={handleSettingsPress} />
       </View>
     );
-  }, [
-    handleSettingsPress,
-    label,
-    managedAccess,
-    onOpenHostSettings,
-    serverId,
-    theme.colors.foregroundMuted,
-    theme.iconSize.sm,
-  ]);
+  }, [handleSettingsPress, label, managedAccess, onOpenHostSettings, serverId]);
 
   return (
     <ComboboxItem
@@ -234,7 +287,7 @@ export function HostPicker({
     return hostOptions;
   }, [orderedHosts, includeAllHost, includeAddHost, includeEnableBuiltInDaemon]);
 
-  const isSearchable = searchable === true && orderedHosts.length > SEARCHABLE_THRESHOLD;
+  const isSearchable = shouldSearchHostPicker(orderedHosts.length, searchable);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -345,12 +398,32 @@ const styles = StyleSheet.create((theme) => ({
   trailing: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
+    gap: theme.spacing[1],
   },
   statusDotSlot: {
     width: theme.iconSize.sm,
     height: theme.iconSize.sm,
     alignItems: "center",
     justifyContent: "center",
+  },
+  settingsButton: {
+    width: 24,
+    height: 24,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsButtonHit: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsButtonHighlighted: {
+    backgroundColor: theme.colors.interactionHighlight,
+  },
+  managedAccessTooltip: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.popoverForeground,
   },
 }));

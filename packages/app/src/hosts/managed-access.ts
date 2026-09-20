@@ -3,6 +3,10 @@ import type { HostConnection, HostProfile } from "@/types/host-connection";
 /** UI text for a Host whose sessions Hub admits with access tickets (managed access `external`). */
 export const MANAGED_ACCESS_HOST_LABEL = "Managed access";
 
+/** Hover copy for the shield glyph: how this Host is reached, not a connection status. */
+export const MANAGED_ACCESS_HOST_TOOLTIP =
+  "Reached through Hub managed access. Sessions on this host require an access ticket.";
+
 /**
  * Whether a Host is reached through Hub managed access. Read from the saved profile so every
  * surface (Host picker, Host overview, Host badge) can tell it apart synchronously, including

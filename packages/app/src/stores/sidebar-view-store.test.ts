@@ -3,6 +3,7 @@ import type { StateStorage } from "zustand/middleware";
 import {
   createSidebarViewStorage,
   hasActiveSidebarLabelFilter,
+  hasActiveSidebarListFilters,
   migrateSidebarViewState,
   SIDEBAR_UNLABELLED_LABEL_KEY,
   useSidebarViewStore,
@@ -63,6 +64,36 @@ describe("sidebar view store", () => {
     store.clearHostFilters();
 
     expect(useSidebarViewStore.getState().hostFilters).toEqual([]);
+  });
+
+  it("clears host, project, label, user, and channel filters together", () => {
+    const store = useSidebarViewStore.getState();
+    store.pinHostFilter("host-a");
+    store.toggleProjectFilter("proj-a");
+    store.toggleLabelFilter("bug");
+    store.toggleUserFilter("user-a");
+    store.toggleChannelFilter("channel-a");
+
+    store.clearAllFilters();
+
+    expect(useSidebarViewStore.getState()).toMatchObject({
+      hostFilters: [],
+      projectFilters: [],
+      labelFilter: { labels: [] },
+      userFilters: [],
+      channelFilters: [],
+    });
+    expect(hasActiveSidebarListFilters(useSidebarViewStore.getState())).toBe(false);
+  });
+
+  it("pins the sidebar to one host, replacing any previous selection", () => {
+    const store = useSidebarViewStore.getState();
+    store.toggleHostFilter("host-a");
+    store.toggleHostFilter("host-b");
+
+    store.pinHostFilter("host-c");
+
+    expect(useSidebarViewStore.getState().hostFilters).toEqual(["host-c"]);
   });
 
   it("keeps host filters that still point at available hosts", () => {

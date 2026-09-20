@@ -34,6 +34,23 @@ export function hasActiveSidebarLabelFilter(filter: SidebarLabelFilter): boolean
   return filter.labels.length > 0;
 }
 
+/** Any allowlist that can hide workspaces, not grouping or row-display preferences. */
+export function hasActiveSidebarListFilters(state: {
+  hostFilters: readonly string[];
+  projectFilters: readonly string[];
+  labelFilter: SidebarLabelFilter;
+  userFilters: readonly string[];
+  channelFilters: readonly string[];
+}): boolean {
+  return (
+    state.hostFilters.length > 0 ||
+    state.projectFilters.length > 0 ||
+    hasActiveSidebarLabelFilter(state.labelFilter) ||
+    state.userFilters.length > 0 ||
+    state.channelFilters.length > 0
+  );
+}
+
 /**
  * Include/exclude toggle over an allowlist, shared by the host and project filters.
  *
@@ -69,7 +86,9 @@ interface SidebarViewStoreState {
   clearChannelFilters: () => void;
   setGroupMode: (mode: SidebarGroupMode) => void;
   toggleHostFilter: (serverId: string) => void;
+  pinHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
+  clearAllFilters: () => void;
   toggleProjectFilter: (viewKey: string) => void;
   clearProjectFilters: () => void;
   toggleLabelFilter: (name: string) => void;
@@ -213,7 +232,16 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       setGroupMode: (mode) => set({ groupMode: mode }),
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
+      pinHostFilter: (serverId) => set({ hostFilters: [serverId] }),
       clearHostFilters: () => set({ hostFilters: [] }),
+      clearAllFilters: () =>
+        set({
+          hostFilters: [],
+          projectFilters: [],
+          labelFilter: emptyLabelFilter(),
+          userFilters: [],
+          channelFilters: [],
+        }),
       toggleProjectFilter: (viewKey) =>
         set((state) => ({ projectFilters: toggleFilterEntry(state.projectFilters, viewKey) })),
       clearProjectFilters: () => set({ projectFilters: [] }),

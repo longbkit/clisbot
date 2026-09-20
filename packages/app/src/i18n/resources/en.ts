@@ -1123,6 +1123,7 @@ export const en = {
       addProject: "Add project",
       newWorkspace: "New workspace",
       hosts: "Hosts",
+      hostsFiltered: "Hosts (filter on)",
       settings: "Settings",
       closeSidebar: "Close sidebar",
     },

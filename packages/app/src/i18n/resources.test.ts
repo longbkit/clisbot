@@ -448,6 +448,7 @@ describe("translation resources", () => {
     expect(en.sidebar.host.searchPlaceholder).toBe("Search hosts...");
     expect(en.sidebar.actions.addProject).toBe("Add project");
     expect(en.sidebar.actions.hosts).toBe("Hosts");
+    expect(en.sidebar.actions.hostsFiltered).toBe("Hosts (filter on)");
     expect(en.sidebar.actions.settings).toBe("Settings");
     expect(en.sidebar.actions.closeSidebar).toBe("Close sidebar");
     expect(en.sidebar.sections.sessions).toBe("History");

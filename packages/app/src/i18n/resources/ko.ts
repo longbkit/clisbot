@@ -1121,6 +1121,7 @@ export const ko: TranslationResources = {
       addProject: "프로젝트 추가",
       newWorkspace: "새 워크스페이스",
       hosts: "호스트",
+      hostsFiltered: "호스트 (필터 적용됨)",
       settings: "설정",
       closeSidebar: "사이드바 닫기",
     },

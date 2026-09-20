@@ -218,6 +218,12 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
     [],
   );
 
+  const hasActiveFilters =
+    preferences.hostFilters.length > 0 ||
+    resolvedProjectFilters.length > 0 ||
+    hasActiveSidebarLabelFilter(preferences.labelFilter) ||
+    preferences.userFilters.length > 0 ||
+    preferences.channelFilters.length > 0;
   const showHostFilter = hosts.length > 1;
   // One project is the whole sidebar, so filtering to it is a no-op with a menu row attached.
   const showProjectFilter = allProjects.length > 1;
@@ -372,7 +378,17 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           accessibilityLabel={t("sidebar.display.trigger")}
           testID="sidebar-display-preferences-menu"
         >
-          <ThemedSettings2 size={14} uniProps={mutedIconMapping} />
+          <View style={styles.triggerGlyph}>
+            <ThemedSettings2 size={14} uniProps={mutedIconMapping} />
+            {hasActiveFilters ? (
+              <View
+                style={styles.triggerIndicator}
+                testID="sidebar-display-filter-indicator"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              />
+            ) : null}
+          </View>
         </MenuTrigger>
         <MenuSurface
           align="end"
@@ -866,6 +882,20 @@ const styles = StyleSheet.create((theme) => ({
   },
   triggerHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
+  },
+  triggerGlyph: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  triggerIndicator: {
+    position: "absolute",
+    top: -1,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.accent,
   },
   // The icon sits in a 14pt menu slot, so the fallback initial is sized down to match rather
   // than reusing the sidebar row's 16pt figure.

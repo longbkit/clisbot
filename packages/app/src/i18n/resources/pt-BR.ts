@@ -1139,6 +1139,7 @@ export const ptBR: TranslationResources = {
       addProject: "Adicionar projeto",
       newWorkspace: "Novo workspace",
       hosts: "Hosts",
+      hostsFiltered: "Hosts (filtro ativo)",
       settings: "Configurações",
       closeSidebar: "Fechar barra lateral",
     },

@@ -1106,6 +1106,7 @@ export const zhCN: TranslationResources = {
       addProject: "添加 project",
       newWorkspace: "新建工作区",
       hosts: "Hosts",
+      hostsFiltered: "Hosts（已筛选）",
       settings: "设置",
       closeSidebar: "关闭侧边栏",
     },

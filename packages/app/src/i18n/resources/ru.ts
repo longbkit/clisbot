@@ -1130,6 +1130,7 @@ export const ru: TranslationResources = {
       addProject: "Добавить проект",
       newWorkspace: "Новое рабочее пространство",
       hosts: "Хосты",
+      hostsFiltered: "Хосты (фильтр включён)",
       settings: "Настройки",
       closeSidebar: "Закрыть боковую панель",
     },

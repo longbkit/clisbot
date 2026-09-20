@@ -1114,6 +1114,7 @@ export const ar: TranslationResources = {
       addProject: "إضافة مشروع",
       newWorkspace: "مساحة عمل جديدة",
       hosts: "المضيفون",
+      hostsFiltered: "المضيفون (التصفية قيد التشغيل)",
       settings: "إعدادات",
       closeSidebar: "إغلاق الشريط الجانبي",
     },

@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { Import, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -17,25 +16,13 @@ import { useSidebarViewStore } from "@/stores/sidebar-view-store";
  */
 export function SidebarFilterEmptyState() {
   const { t } = useTranslation();
-  const clearLabelFilter = useSidebarViewStore((state) => state.clearLabelFilter);
-  const clearProjectFilters = useSidebarViewStore((state) => state.clearProjectFilters);
-  const clearUserFilters = useSidebarViewStore((state) => state.clearUserFilters);
-  const clearChannelFilters = useSidebarViewStore((state) => state.clearChannelFilters);
-  // Clears every filter that can empty the list, not just the one that did. The card names no
-  // filter, so a Clear that undid only one of two active filters would leave it on screen looking
-  // like it had failed.
-  const clearFilters = useCallback(() => {
-    clearLabelFilter();
-    clearProjectFilters();
-    clearUserFilters();
-    clearChannelFilters();
-  }, [clearLabelFilter, clearProjectFilters, clearUserFilters, clearChannelFilters]);
+  const clearAllFilters = useSidebarViewStore((state) => state.clearAllFilters);
 
   return (
     <View style={styles.container} testID="sidebar-filter-empty-state">
       <Text style={styles.title}>{t("sidebar.filterEmpty.title")}</Text>
       <Text style={styles.description}>{t("sidebar.filterEmpty.description")}</Text>
-      <Button variant="ghost" size="sm" onPress={clearFilters}>
+      <Button variant="ghost" size="sm" onPress={clearAllFilters}>
         {t("sidebar.filterEmpty.clear")}
       </Button>
     </View>

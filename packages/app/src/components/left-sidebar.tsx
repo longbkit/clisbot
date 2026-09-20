@@ -21,7 +21,12 @@ import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
   SIDEBAR_RESIZE_FAIL_OFFSET,
 } from "@/components/sidebar-resize-handle-layout";
-import { HostPicker } from "@/components/hosts/host-picker";
+import {
+  ALL_HOSTS_OPTION_ID,
+  getHostFilterPickerValue,
+  HostPicker,
+} from "@/components/hosts/host-picker";
+import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
 import { SidebarHelpMenu } from "@/components/sidebar/sidebar-help-menu";
 import { SidebarResizeHandle } from "@/components/sidebar-resize-handle";
@@ -276,6 +281,8 @@ function FooterIconButton({
   iconSize,
   shortcutKeys,
   theme,
+  indicator,
+  indicatorTestID,
 }: {
   onPress: () => void;
   testID: string;
@@ -285,6 +292,8 @@ function FooterIconButton({
   shortcutKeys?: ReturnType<typeof useShortcutKeys>;
   theme: SidebarTheme;
   buttonRef?: RefObject<View | null>;
+  indicator?: boolean;
+  indicatorTestID?: string;
 }) {
   return (
     <Tooltip delayDuration={300}>
@@ -301,10 +310,20 @@ function FooterIconButton({
           onPress={onPress}
         >
           {({ hovered }) => (
-            <Icon
-              size={iconSize ?? theme.iconSize.md}
-              color={hovered ? theme.colors.foreground : theme.colors.foregroundMuted}
-            />
+            <View style={styles.footerIconGlyph}>
+              <Icon
+                size={iconSize ?? theme.iconSize.md}
+                color={hovered ? theme.colors.foreground : theme.colors.foregroundMuted}
+              />
+              {indicator ? (
+                <View
+                  style={styles.footerIconIndicator}
+                  testID={indicatorTestID}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                />
+              ) : null}
+            </View>
           )}
         </Pressable>
       </TooltipTrigger>
@@ -384,15 +403,28 @@ function SidebarHostPicker({
   onAddHost: () => void;
   onOpenHostSettings: (serverId: string) => void;
 }) {
+  const { t } = useTranslation();
   const hosts = useHosts();
+  const hostFilters = useSidebarViewStore((state) => state.hostFilters);
+  const pinHostFilter = useSidebarViewStore((state) => state.pinHostFilter);
+  const clearHostFilters = useSidebarViewStore((state) => state.clearHostFilters);
   const triggerRef = useRef<View | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const hasActiveHostFilter = hostFilters.length > 0;
+  const includeAllHost = hosts.length > 1 || hasActiveHostFilter;
+  const triggerLabel = hasActiveHostFilter ? t("sidebar.actions.hostsFiltered") : label;
 
   const handleSelect = useCallback(
     (id: string) => {
-      onOpenHostSettings(id);
+      if (id === ALL_HOSTS_OPTION_ID) {
+        clearHostFilters();
+        return;
+      }
+      if (hosts.length > 1) {
+        pinHostFilter(id);
+      }
     },
-    [onOpenHostSettings],
+    [clearHostFilters, hosts.length, pinHostFilter],
   );
 
   const handleOpen = useCallback(() => setIsOpen(true), []);
@@ -400,16 +432,18 @@ function SidebarHostPicker({
   return (
     <HostPicker
       hosts={hosts}
-      value=""
+      value={includeAllHost ? getHostFilterPickerValue(hostFilters) : ""}
       onSelect={handleSelect}
       open={isOpen}
       onOpenChange={setIsOpen}
       anchorRef={triggerRef}
+      includeAllHost={includeAllHost}
       includeAddHost
       onAddHost={onAddHost}
       showActiveConnection
       onOpenHostSettings={onOpenHostSettings}
       searchable
+      title="Filter by host"
       desktopPlacement="top-start"
       desktopMinWidth={240}
       addHostTestID="sidebar-host-add"
@@ -419,10 +453,12 @@ function SidebarHostPicker({
         buttonRef={triggerRef}
         onPress={handleOpen}
         testID="sidebar-hosts-trigger"
-        label={label}
+        label={triggerLabel}
         icon={Server}
         iconSize={theme.iconSize.sm}
         theme={theme}
+        indicator={hasActiveHostFilter}
+        indicatorTestID="sidebar-hosts-filter-indicator"
       />
     </HostPicker>
   );
@@ -808,19 +844,22 @@ function DesktopSidebar({
 function WorkspacesSectionHeader() {
   return (
     <View style={styles.workspacesSectionHeader}>
-      <Text style={styles.workspacesSectionTitle}>Workspaces</Text>
-      <View style={styles.workspacesSectionActions}>
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <View>
-              <SidebarDisplayPreferencesMenu />
-            </View>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="center" offset={8}>
-            <IconTooltipContent label="Display preferences" />
-          </TooltipContent>
-        </Tooltip>
+      <View style={styles.workspacesSectionTitleRow}>
+        <Text style={styles.workspacesSectionTitle}>Workspaces</Text>
+        <View style={styles.workspacesSectionActions}>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <View>
+                <SidebarDisplayPreferencesMenu />
+              </View>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center" offset={8}>
+              <IconTooltipContent label="Display preferences" />
+            </TooltipContent>
+          </Tooltip>
+        </View>
       </View>
+      <SidebarActiveFilters />
     </View>
   );
 }
@@ -853,10 +892,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: 0,
   },
   workspacesSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing[2],
+    gap: theme.spacing[1],
     // Rendered inside the scroll's listContent (paddingHorizontal spacing[2]). The title
     // lands at spacing[2] left to align with project icons. Settings2's painted path stops
     // inside its 14px SVG, so 4px aligns the ink rather than the SVG box to the row rail.
@@ -864,6 +900,12 @@ const styles = StyleSheet.create((theme) => ({
     paddingRight: 4,
     paddingTop: theme.spacing[1],
     paddingBottom: theme.spacing[1],
+  },
+  workspacesSectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[2],
   },
   workspacesSectionTitle: {
     color: theme.colors.foregroundMuted,
@@ -980,6 +1022,20 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     paddingVertical: theme.spacing[1],
     paddingHorizontal: theme.spacing[1],
+  },
+  footerIconGlyph: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footerIconIndicator: {
+    position: "absolute",
+    top: -1,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.accent,
   },
   tooltipRow: {
     flexDirection: "row",

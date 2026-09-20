@@ -18,19 +18,22 @@ const DISABLE_DEFAULT_SEED_ONCE_KEY = "@paseo:e2e-disable-default-seed-once";
 // disable-once flag, then reload — so the fixture skips its reset and the registry survives. This
 // avoids depending on the (unspecified) ordering of multiple Playwright init scripts. Optionally
 // relabels the seeded primary host so assertions can target a distinctive name.
-export async function addOfflineHostAndReload(
+export async function addOfflineHostsAndReload(
   page: Page,
-  input: { serverId: string; label: string; primaryLabel?: string },
+  inputs: Array<{ serverId: string; label: string }>,
+  options?: { primaryLabel?: string },
 ): Promise<void> {
-  const offlineHost = buildSeededHost({
-    serverId: input.serverId,
-    label: input.label,
-    endpoint: "127.0.0.1:59999",
-    nowIso: new Date().toISOString(),
-  });
+  const offlineHosts = inputs.map((input) =>
+    buildSeededHost({
+      serverId: input.serverId,
+      label: input.label,
+      endpoint: "127.0.0.1:59999",
+      nowIso: new Date().toISOString(),
+    }),
+  );
 
   await page.evaluate(
-    ({ host, keys, primaryLabel }) => {
+    ({ hosts, keys, primaryLabel }) => {
       const nonce = localStorage.getItem(keys.nonce);
       if (!nonce) {
         throw new Error("Expected the e2e seed nonce before overriding the host registry.");
@@ -40,24 +43,33 @@ export async function addOfflineHostAndReload(
       if (primaryLabel && registry[0]) {
         registry[0].label = primaryLabel;
       }
-      if (!registry.some((entry) => entry.serverId === host.serverId)) {
-        registry.push(host);
+      for (const host of hosts) {
+        if (!registry.some((entry) => entry.serverId === host.serverId)) {
+          registry.push(host);
+        }
       }
       localStorage.setItem(keys.registry, JSON.stringify(registry));
       localStorage.setItem(keys.disableSeedOnce, nonce);
     },
     {
-      host: offlineHost,
+      hosts: offlineHosts,
       keys: {
         registry: REGISTRY_KEY,
         nonce: SEED_NONCE_KEY,
         disableSeedOnce: DISABLE_DEFAULT_SEED_ONCE_KEY,
       },
-      primaryLabel: input.primaryLabel,
+      primaryLabel: options?.primaryLabel,
     },
   );
 
   await page.reload();
+}
+
+export async function addOfflineHostAndReload(
+  page: Page,
+  input: { serverId: string; label: string; primaryLabel?: string },
+): Promise<void> {
+  await addOfflineHostsAndReload(page, [input], { primaryLabel: input.primaryLabel });
 }
 
 export async function addConnectedHostAndReload(
@@ -149,6 +161,18 @@ export async function toggleHostFilter(page: Page, serverId: string): Promise<vo
 
 export async function selectAllHostsFilter(page: Page): Promise<void> {
   await page.getByTestId("sidebar-host-filter-all").click();
+}
+
+export async function openSidebarHostPicker(page: Page): Promise<void> {
+  await page.getByTestId("sidebar-hosts-trigger").click();
+}
+
+export async function selectSidebarHostPickerHost(page: Page, serverId: string): Promise<void> {
+  await page.getByTestId(`sidebar-host-row-${serverId}`).click();
+}
+
+export async function selectSidebarHostPickerAllHosts(page: Page): Promise<void> {
+  await page.getByTestId("sidebar-host-row-__all_hosts__").click();
 }
 
 export async function openHostAppearanceSettings(page: Page, serverId: string): Promise<void> {

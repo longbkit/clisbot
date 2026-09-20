@@ -1126,6 +1126,7 @@ export const ja: TranslationResources = {
       addProject: "プロジェクトを追加",
       newWorkspace: "新しいワークスペース",
       hosts: "ホスト",
+      hostsFiltered: "ホスト（フィルター中）",
       settings: "設定",
       closeSidebar: "サイドバーを閉じる",
     },

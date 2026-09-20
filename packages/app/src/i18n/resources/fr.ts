@@ -1148,6 +1148,7 @@ export const fr: TranslationResources = {
       addProject: "Ajouter un projet",
       newWorkspace: "Nouvel espace de travail",
       hosts: "Hôtes",
+      hostsFiltered: "Hôtes (filtre actif)",
       settings: "Paramètres",
       closeSidebar: "Fermer la barre latérale",
     },
