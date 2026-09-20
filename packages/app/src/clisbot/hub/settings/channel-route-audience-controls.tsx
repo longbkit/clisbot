@@ -13,10 +13,19 @@ export interface AudienceOption {
 }
 
 /** A labelled row whose control sits under the label. */
-export function PickerRow({ label, children }: { label: string; children: React.ReactNode }) {
+export function PickerRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={styles.part}>
       <Text style={styles.rowLabel}>{label}</Text>
+      {hint === undefined ? null : <Text style={styles.rowHint}>{hint}</Text>}
       {children}
     </View>
   );
@@ -126,9 +135,16 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  // The same label treatment as every Select and text field in this form, so no
+  // row looks more important than the picker beside it.
   rowLabel: {
-    color: theme.colors.foreground,
+    color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
+  },
+  rowHint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: Math.round(theme.fontSize.sm * 1.4),
   },
   chips: {
     flexDirection: "row",

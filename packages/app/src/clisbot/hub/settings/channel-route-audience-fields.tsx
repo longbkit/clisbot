@@ -14,7 +14,7 @@ import { useChannelCatalog } from "./channel-catalog-queries";
 import { ChoiceRow, RouteBehaviorSwitch } from "./channel-route-behavior-rows";
 import { splitConversationIds } from "../conversation-picker";
 import {
-  AUDIENCE_ROLE_LABELS,
+  AUDIENCE_ROLE_CHIP_LABELS,
   audienceRuleSentence,
   audienceWhereLabel,
   audienceWhoLabel,
@@ -403,12 +403,15 @@ function AudiencePeopleFields({
   );
   const changeIdentities = useCallback((identities: string) => setWho({ identities }), [setWho]);
   const roleOptions = useMemo(
-    () => HUB_AUDIENCE_ROLES.map((role) => ({ id: role, name: AUDIENCE_ROLE_LABELS[role] })),
+    () => HUB_AUDIENCE_ROLES.map((role) => ({ id: role, name: AUDIENCE_ROLE_CHIP_LABELS[role] })),
     [],
   );
   return (
     <View style={styles.nested}>
-      <PickerRow label="Roles">
+      <PickerRow
+        label="By organization role"
+        hint="Everyone who holds the role, including people who get it later."
+      >
         <OptionChips
           options={roleOptions}
           selected={who.roles}
@@ -418,7 +421,8 @@ function AudiencePeopleFields({
         />
       </PickerRow>
       <MultiSelectField
-        label="Teams and Members"
+        label="By name"
+        hint="Only the Teams and people you pick; a Team covers whoever is in it."
         options={peopleOptions}
         value={people}
         onChange={changePeople}

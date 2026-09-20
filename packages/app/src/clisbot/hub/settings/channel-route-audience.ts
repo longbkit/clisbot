@@ -30,10 +30,21 @@ export interface AudienceRuleDraft {
   };
 }
 
+/** In a sentence: "Members may talk in …". */
 export const AUDIENCE_ROLE_LABELS: Record<HubAudienceRole, string> = {
-  owner: "Owner",
+  owner: "Owners",
   admin: "Admins",
   member: "Members",
+};
+
+/**
+ * On a chip, where the picker under it lists Members by name: "All Members"
+ * says the role covers everyone who holds it, not some of them.
+ */
+export const AUDIENCE_ROLE_CHIP_LABELS: Record<HubAudienceRole, string> = {
+  owner: "All Owners",
+  admin: "All Admins",
+  member: "All Members",
 };
 
 let ruleSequence = 0;
