@@ -202,9 +202,6 @@ export function ChannelSettings({
   automationName,
   embedded = false,
 }: Partial<AutomationChannelScope> & { embedded?: boolean } = {}) {
-  // One width for every Channels tab and page (Channel Integrations is two
-  // columns), so switching never resizes it. Not when embedded in an Automation.
-  useWideContent(!useIsCompactFormFactor() && automationName === undefined);
   const hub = useHubAccount();
   const router = useRouter();
   const adminScope = useChannelRouteAdminScope();
@@ -308,6 +305,12 @@ function ChannelSettingsContent({
   const [mutationPending, setPending] = useState(false);
   const pending = mutationPending || draftPending;
   const [editor, setEditor] = useState<ChannelEditor | null>(null);
+  // One width for every Channels tab and page (Channel Integrations is two
+  // columns), so switching never resizes it. The Route form is a page of narrow
+  // fields, so it keeps Settings' own column, as every other form does.
+  useWideContent(
+    !useIsCompactFormFactor() && automationName === undefined && !embedded && editor === null,
+  );
   useReportDraftEditing(editor !== null);
   const [editorRevisionId, setEditorRevisionId] = useState<string | null>(null);
   const beginEdit = useCallback(

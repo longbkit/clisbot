@@ -131,6 +131,9 @@ Auto-accept:
 - **One page, one width.** A page with tabs or sub-pages keeps one column width
   throughout, so switching never resizes it: People and Channels ask for the
   wide column on wide screens (`useWideContent`); every other page keeps 720.
+  A form is the exception (2026-09-20): the Route form is a page of narrow
+  fields, so it keeps Settings' 720 column like every other form, and Channels
+  asks for the wide column only while its lists are on screen.
 - **The way back is a link, first on the page:** "← People", "← Connections",
   "← Activity" (`BackLink`), not a boxed "Back to …" button among the page's
   actions.
