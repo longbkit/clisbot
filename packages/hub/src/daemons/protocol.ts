@@ -80,7 +80,8 @@ export type DaemonEvent = DaemonAgentStreamDaemonEvent | DaemonAgentUpdateEvent;
 export type DaemonEventHandler = (event: DaemonEvent) => void | Promise<void>;
 
 /**
- * The Host's own socket, driven as an ordinary daemon session.
+ * COMPAT(clisbot-control-plane): the Host's own socket, driven as an ordinary
+ * daemon session.
  *
  * A Host is private: nothing dials into it, which is why the daemon opens this
  * socket to the Hub and keeps it alive. The daemon attaches that socket as a
@@ -91,12 +92,15 @@ export type DaemonEventHandler = (event: DaemonEvent) => void | Promise<void>;
 export interface DaemonSessionChannel {
   /** The daemon's `server_info` payload, seen when the socket was accepted. */
   readonly serverInfo: Record<string, unknown> | undefined;
+  /** What this Host granted its Hub: a narrow grant refuses calls later. */
+  readonly permissions: readonly string[];
   /** Write one already-enveloped session frame. */
   write(frame: string): Promise<void>;
 }
 
-/** The Host sessions this Hub can drive, narrowed from the registry for the
- * consumers that only need "reach this Host and hear it back". */
+/** COMPAT(clisbot-control-plane): the Host sessions this Hub can drive,
+ * narrowed from the registry for the consumers that only need "reach this Host
+ * and hear it back". */
 export interface DaemonSessionAccess {
   channel(daemonId: string): DaemonSessionChannel | undefined;
   subscribe(daemonId: string, handler: (message: Record<string, unknown>) => void): () => void;

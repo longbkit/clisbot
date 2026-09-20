@@ -204,7 +204,7 @@ export async function continueHubGuidedSetup(
   ) {
     const grantExecution = await requiredConfirm(
       environment,
-      "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nAgents can access files and run commands allowed by their workspace runtime.",
+      "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nHub is granted: run agents, read and write workspaces, create and remove workspaces, and read this daemon's providers and models.\n\nAgents can access files and run commands allowed by their workspace runtime.",
       false,
     );
     await ensureDaemonConnection(
@@ -291,13 +291,23 @@ export async function ensureDaemonConnection(
   );
   const connection = resolveHubInitConnection(status, origin);
   if (connection.kind === "connected") {
-    // A daemon connected before a permission was added to the default set holds
-    // the old, narrower grant; say exactly what to grant rather than naming one.
-    const missing = permissions.filter((permission) => !status.permissions.includes(permission));
-    if (missing.length > 0) {
+    // Running agents needs `hub.execute` and nothing else will do, so that one
+    // stops init. A daemon connected before a permission joined the default set
+    // holds the narrower grant: name what is missing and carry on, because the
+    // Hub features that need it say so themselves when they are refused.
+    if (permissions.includes("hub.execute") && !status.permissions.includes("hub.execute")) {
       throw new HubCommandError(
         "HUB_DAEMON_EXECUTION_NOT_ALLOWED",
-        `This daemon is connected to Hub but is missing ${missing.join(", ")}. Run \`paseo hub permissions grant <permission>\` for each, then run Hub init again.`,
+        "This daemon is connected to Hub but cannot run Hub automations. Run `paseo hub permissions grant hub.execute`, then run Hub init again.",
+      );
+    }
+    const missing = permissions.filter(
+      (permission) => permission !== "hub.execute" && !status.permissions.includes(permission),
+    );
+    if (missing.length > 0) {
+      reportMessage(
+        environment,
+        `This daemon grants Hub less than the default: missing ${missing.join(", ")}.\nGrant each with:\n  paseo hub permissions grant <permission>`,
       );
     }
     return connection.daemonId;

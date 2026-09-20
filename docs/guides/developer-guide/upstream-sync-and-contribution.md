@@ -129,6 +129,30 @@ four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
 - `packages/server/src/server/agent/providers/codex-app-server-agent.ts` and its
   test — retain Fusion behavior alongside the upstream paginated rewind fix.
 
+`getpaseo/hub` has its own overlap, from the channel plane driving a Host over
+the connection that Host holds to the Hub
+([decision](../../audits/2026-09-20-channel-host-transport.md)):
+
+- `packages/hub/src/daemons/registry.ts` — the heaviest of the set. A Fusion
+  block (`sessionChannel`, `sessionAccess`, `subscribeDaemonSession`) plus three
+  edits inside live methods: the socket-close handler, the inbound dispatch
+  chain, and `receiveRpcError`. Expect conflicts here first.
+- `packages/hub/src/daemons/protocol.ts` — additive (`DaemonSessionChannel`,
+  `DaemonSessionAccess`).
+- `packages/hub/src/app.ts` and `packages/hub/src/application-runtime.ts` — one
+  `publishDaemonSessions` field and a late-bound `hostSessions` thread through
+  the composition root; one-line hunks, tagged `COMPAT(clisbot-control-plane)`
+  like every other seam in those two files.
+- `packages/hub/src/daemons/registry.test.ts` and
+  `daemons/test-utils/daemon-registry-harness.ts` — appended helpers.
+- `packages/hub/src/daemons/registry.session.test.ts` — a Fusion file inside an
+  upstream directory.
+
+On the Paseo side the same change adds `packages/cli/src/commands/hub/init.ts`,
+`permissions.ts` and `init-flow.test.ts` (the default permission set a Hub
+connection asks for), and `packages/server/src/server/session.ts` already on the
+list gains the first-message agent naming.
+
 These are files changed on both sides, not proof that all will conflict.
 Record separately: overlap files, actual textual conflicts reported by Git,
 and semantic conflicts found by validation. The `v0.7.2` merge has textual

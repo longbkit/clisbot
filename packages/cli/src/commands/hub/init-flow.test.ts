@@ -110,7 +110,7 @@ describe("Hub guided setup continuation", () => {
 
     assert.deepEqual(prompts.confirmations, [
       "Connect this daemon to Paseo Hub?\n\nConnecting lets Hub identify this daemon and show whether it is online.\nIt does not allow Hub to create workspaces or run agents.",
-      "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nAgents can access files and run commands allowed by their workspace runtime.",
+      "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nHub is granted: run agents, read and write workspaces, create and remove workspaces, and read this daemon's providers and models.\n\nAgents can access files and run commands allowed by their workspace runtime.",
     ]);
     assert.deepEqual(prompts.selections, []);
     assert.deepEqual(prompts.messages, [

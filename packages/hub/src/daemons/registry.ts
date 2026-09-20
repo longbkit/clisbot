@@ -175,7 +175,8 @@ export class ActiveDaemonRegistry {
   }
 
   /**
-   * Drive this Host as a plain daemon session over the socket it already holds
+   * COMPAT(clisbot-control-plane): drive this Host as a plain daemon session
+   * over the socket it already holds
    * (`DaemonSessionChannel`). `undefined` when the Host is not connected or its
    * enrollment does not carry `hub.execute` — the caller refuses at once rather
    * than waiting on a connection that is not there.
@@ -187,6 +188,9 @@ export class ActiveDaemonRegistry {
     return {
       get serverInfo() {
         return active.serverInfo;
+      },
+      get permissions() {
+        return active.daemon.permissions;
       },
       write: (frame) => {
         const current = this.active.get(daemonId);

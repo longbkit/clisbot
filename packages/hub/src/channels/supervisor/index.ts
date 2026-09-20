@@ -1548,6 +1548,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         channel: handle.channel,
         account: handle.accountId,
         host: host.label,
+        // A Host that granted its Hub less than the plane needs refuses calls
+        // one at a time; saying it once here is the operator's lead.
+        permissions: host.sessions.channel(host.id)?.permissions ?? [],
       });
       return connectEnrolledChannelDaemon({
         hostLabel: host.label,

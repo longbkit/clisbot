@@ -54,6 +54,16 @@ Both are fixed at the source rather than per operation. A Hub connection now ask
 client needs ([permissions](../permissions.md)), and an `rpc_error` for a request the execution
 path never made is handed to whoever did.
 
+## Sending it back
+
+The session channel is the piece worth contributing: "drive an enrolled Host as
+an ordinary session over the socket it already holds" carries no Clisbot
+concept, and Hub automations are the obvious second consumer. If `getpaseo/hub`
+takes `DaemonSessionChannel` / `DaemonSessionAccess` and the unmatched
+`rpc_error` hand-off, the overlap from this change collapses to the
+`publishDaemonSessions` seam. The default permission set is not PR-able — it is
+what this product needs, not what upstream's Hub uses.
+
 ## Still open
 
 A failed create still leaves its pending marker behind, so the thread that failed stays wedged even after the Host returns (`channels/bindings/index.ts` `settleCreationFailure`). Releasing it on a definite failure, and re-driving the inbound after a reconnect, are a separate change. It is finding 1 in the [stability and scalability audit](2026-09-20-channel-stability-scalability-audit.md).
