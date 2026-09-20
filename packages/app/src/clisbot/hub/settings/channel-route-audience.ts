@@ -237,7 +237,8 @@ export function audienceWhoLabel(who: AudienceRuleDraft["who"], names: AudienceN
     ...who.roles.map((role) => AUDIENCE_ROLE_LABELS[role]),
     ...who.teams.map((id) => `Team ${names.teamName(id)}`),
     ...who.members.map((id) => names.memberName(id)),
-    ...splitConversationIds(who.identities),
+    // A raw channel id means a sender with no Hub account: a Guest.
+    ...splitConversationIds(who.identities).map((identity) => `Guest ${identity}`),
     ...(who.anyone ? ["Anyone"] : []),
   ];
   return parts.length === 0 ? "Nobody yet" : joinNatural(parts);

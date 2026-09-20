@@ -551,13 +551,13 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       true,
     );
     // The new rule is the one open; the first folded to its summary.
-    expect(screen.getAllByText("By organization role")).toHaveLength(1);
+    expect(screen.getAllByText("By role")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Anyone in the conversation" }));
     expect(
       screen.getByText("Anyone in the matching conversations can use this Route"),
     ).toBeTruthy();
     // Anyone covers everyone, so that rule no longer offers people to pick.
-    expect(screen.queryByText("By organization role")).toBeNull();
+    expect(screen.queryByText("By role")).toBeNull();
     fireEvent.click(screen.getByLabelText("Direct messages"));
     expect(screen.getByText("Anyone may talk in DMs")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
@@ -593,7 +593,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
         : data[resource],
     );
     await openEditor();
-    const people = screen.getByLabelText("By name") as HTMLSelectElement;
+    // All Members already covers everyone with a Hub account, so naming people is off.
+    expect(screen.queryByLabelText("Specific Teams or Members")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All Members" }));
+    const people = screen.getByLabelText("Specific Teams or Members") as HTMLSelectElement;
     expect(Array.from(people.options, ({ value }) => value)).toEqual(["team:team-qc"]);
     // Teams and Members keep their own headings in the list, as in Access.
     expect(people.options[0]!.dataset["group"]).toBe("Teams");
@@ -602,7 +605,6 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].audience[0].who).toEqual({
-      roles: ["member"],
       teams: ["team-qc"],
     });
   });

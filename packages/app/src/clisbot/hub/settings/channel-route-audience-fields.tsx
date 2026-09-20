@@ -376,9 +376,17 @@ function AudiencePeopleFields({
   setWho(patch: Partial<AudienceRuleDraft["who"]>): void;
 }) {
   const toggleRole = useCallback(
-    (role: string) => setWho({ roles: toggled(who.roles, role as HubAudienceRole) }),
+    (role: string) => {
+      const roles = toggled(who.roles, role as HubAudienceRole);
+      // All Members already covers everyone with a Hub account, so the people
+      // picked one by one stop meaning anything: drop them with it.
+      const covered = roles.includes("member");
+      setWho(covered ? { roles, teams: [], members: [] } : { roles });
+    },
     [setWho, who.roles],
   );
+  // Naming people is only a choice while the roles do not already cover them all.
+  const everyMember = who.roles.includes("member");
   const peopleOptions = useMemo(() => teamAndMemberOptions(teams, members), [members, teams]);
   const people = useMemo(
     () => [
@@ -409,8 +417,8 @@ function AudiencePeopleFields({
   return (
     <View style={styles.nested}>
       <PickerRow
-        label="By organization role"
-        hint="Everyone who holds the role, including people who get it later."
+        label="By role"
+        hint="People with a Hub account in this organization, by the role they hold now or later."
       >
         <OptionChips
           options={roleOptions}
@@ -420,18 +428,21 @@ function AudiencePeopleFields({
           empty=""
         />
       </PickerRow>
-      <MultiSelectField
-        label="By name"
-        hint="Only the Teams and people you pick; a Team covers whoever is in it."
-        options={peopleOptions}
-        value={people}
-        onChange={changePeople}
-        disabled={disabled}
-        placeholder="Choose Teams or Members"
-        searchPlaceholder="Search Teams and Members"
-      />
+      {everyMember ? null : (
+        <MultiSelectField
+          label="Specific Teams or Members"
+          hint="Only the people and Teams you pick; a Team covers whoever is in it."
+          options={peopleOptions}
+          value={people}
+          onChange={changePeople}
+          disabled={disabled}
+          placeholder="Choose Teams or Members"
+          searchPlaceholder="Search Teams and Members"
+        />
+      )}
       <DisclosureRow
-        label={`${place.channelName} users without a Hub account`}
+        label="Specific Guests"
+        hint={`${place.channelName} senders with no Hub account linked. They run with the access granted to Guest in People & access.`}
         count={splitConversationIds(who.identities).length}
         disabled={disabled}
       >

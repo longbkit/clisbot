@@ -35,15 +35,15 @@ in [where]". A sender is admitted when any rule matches (union).
 
 **Who** — multi-select, mixed:
 
-| Kind     | Values                                                                                                                                                                                             |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Role     | All Owners, All Admins, All Members (every linked Member). Resolved per message, so later role changes apply. Said as "All …" on its chips, because the picker under them names Members one by one |
-| Team     | One or more Teams                                                                                                                                                                                  |
-| Person   | One or more Members                                                                                                                                                                                |
-| Anyone   | Every sender, unlinked ones included (the Guest subject). Keeps the open-Route warning and default limits                                                                                          |
-| Advanced | Senders outside the Hub, picked from people who already messaged the bot. Does the job of `allowFrom` for new rules; existing `access:` blocks stay as they are (not migrated)                     |
+| Kind   | Values                                                                                                                                                                                                        |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Role   | All Owners, All Admins, All Members (every linked Member). Resolved per message, so later role changes apply. Said as "All …" on its chips, because the picker under them names Members one by one            |
+| Team   | One or more Teams                                                                                                                                                                                             |
+| Person | One or more Members                                                                                                                                                                                           |
+| Anyone | Every sender, unlinked ones included (the Guest subject). Keeps the open-Route warning and default limits                                                                                                     |
+| Guest  | Senders with no Hub account linked ("Specific Guests"), picked from people who already messaged the bot. Does the job of `allowFrom` for new rules; existing `access:` blocks stay as they are (not migrated) |
 
-Advanced is built as a picker over `channel-accounts/<channel>/<account>/senders`
+Specific Guests is built as a picker over `channel-accounts/<channel>/<account>/senders`
 (`channels/observed-senders.ts`): distinct senders in the account's ingress
 queue, newest first, minus those linked to a Member in the bot's identity realm.
 The queue keeps every inbound message, admitted or refused, until retention

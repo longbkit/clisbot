@@ -124,7 +124,10 @@ It is separate from account passwords and the channel credential encryption key
   "Connection" in Member-facing link copy.
 - **Guest group** — The org Access subject for a channel sender without a linked
   Hub Member. Its persisted identity is `(guest, guest)`, with no default grants.
-  Linked Members do not inherit Guest grants.
+  Linked Members do not inherit Guest grants. UI: **Guest** in People & access,
+  and **Specific Guests** on a Route rule, where you name such senders by their
+  channel id. A Route rule's other Who parts name Hub accounts: **By role**
+  (All Owners / All Admins / All Members) and **Specific Teams or Members**.
 - **Channel queue** — The in-memory hold created by `/queue`, released one message
   at a time after a direct Agent turn ends. Distinct from the durable **channel
   ingress queue**, which admits transport events for processing.

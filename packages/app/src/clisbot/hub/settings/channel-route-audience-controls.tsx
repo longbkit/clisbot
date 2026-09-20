@@ -34,11 +34,13 @@ export function PickerRow({
 /** A labelled row folded to its count; it opens on its own when it holds a value. */
 export function DisclosureRow({
   label,
+  hint,
   count,
   disabled,
   children,
 }: {
   label: string;
+  hint?: string;
   count: number;
   disabled: boolean;
   children: React.ReactNode;
@@ -61,6 +63,7 @@ export function DisclosureRow({
           {open ? "Hide" : "Choose"}
         </Button>
       </View>
+      {hint === undefined ? null : <Text style={styles.rowHint}>{hint}</Text>}
       {open ? children : null}
     </View>
   );
