@@ -68,6 +68,7 @@ export {
 export {
   CHANNEL_EXECUTION_ID_LABEL,
   ChannelWorkflowTargetError,
+  applyRouteAutoAccept,
   channelExecutionLabels,
 } from "./session-create.js";
 

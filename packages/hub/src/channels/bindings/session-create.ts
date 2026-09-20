@@ -17,6 +17,7 @@ import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js
 import type { DaemonConnection } from "../daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import { resolveConversationConfiguration } from "../commands-config.js";
+import { autoAllowsEveryToolClass } from "../policy.js";
 import { resolveSessionWorkspaceId } from "../workspace-organization.js";
 import {
   nativeSenderId,
@@ -61,6 +62,24 @@ export interface SessionCreateContext {
  * the title belongs to the reader, and the daemon names an untitled agent from
  * its first message. */
 export const CHANNEL_EXECUTION_ID_LABEL = "clisbot.channel-execution-id";
+const AUTO_ACCEPT_FEATURE_ID = "auto_accept";
+
+/**
+ * Route "Accept automatically" means the session should auto-accept permission
+ * prompts. That is the daemon `auto_accept` feature — independent of
+ * `toolPolicy`, which preapproves exact MCP tools when the provider contract
+ * supports it.
+ */
+export function applyRouteAutoAccept(
+  config: CreateAgentConfig,
+  route: CompiledRoute,
+): CreateAgentConfig {
+  if (!autoAllowsEveryToolClass(route)) return config;
+  return {
+    ...config,
+    featureValues: { ...config.featureValues, [AUTO_ACCEPT_FEATURE_ID]: true },
+  };
+}
 
 export function channelExecutionLabels(pendingExecutionId: string): Record<string, string> {
   return { [CHANNEL_EXECUTION_ID_LABEL]: pendingExecutionId };
@@ -183,7 +202,10 @@ export async function createRouteSession(
     // No per-sender Access check: the Route publisher delegated this
     // configuration and the conversation selection was checked against whoever
     // made it. Chat authority was settled at admission.
-    const config = resolveConversationConfiguration(baseConfig, chosen);
+    const config = applyRouteAutoAccept(
+      resolveConversationConfiguration(baseConfig, chosen),
+      route,
+    );
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
     const created = await context.daemon.createAgent(config, {
       labels: channelExecutionLabels(executionId),

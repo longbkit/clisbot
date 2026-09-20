@@ -25,6 +25,7 @@ import {
   BindingEngine,
   CHANNEL_EXECUTION_ID_LABEL,
   admitFollowUp,
+  applyRouteAutoAccept,
   channelExecutionLabels,
   deriveBindingKey,
 } from "./index.js";
@@ -266,6 +267,20 @@ afterAll(async () => {
 
 // --- deriveBindingKey ------------------------------------------------------
 
+describe("applyRouteAutoAccept", () => {
+  it("sets auto_accept only when every tool class is auto-allowed", () => {
+    const base = { provider: "grok", cwd: "/tmp/repo" };
+    assert.deepEqual(
+      applyRouteAutoAccept(
+        base,
+        makeRoute("C0", { approval: [{ match: "*", mode: "auto-allow" }] }),
+      ).featureValues,
+      { auto_accept: true },
+    );
+    assert.equal(applyRouteAutoAccept(base, makeRoute()).featureValues, undefined);
+  });
+});
+
 describe("deriveBindingKey", () => {
   it("keys on the native thread for binding.key = thread", () => {
     const key = deriveBindingKey(
@@ -465,6 +480,52 @@ describe("bind (first mention)", () => {
 
     assert.deepEqual(workspaces, [], "no workspace is created");
     assert.equal(created[0]?.workspaceId, null, "create_agent carries no workspace");
+  });
+
+  it("turns Auto Accept on when the Route accepts every permission request", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = makeRoute("C0AUTOALLOW", {
+      approval: [{ match: "*", mode: "auto-allow" }],
+    });
+
+    await engine.bindOrSteer(
+      message({
+        text: "hi",
+        conversation: {
+          kind: "channel",
+          id: "C0AUTOALLOW",
+          rootConversationId: "C0AUTOALLOW",
+          threadId: null,
+        },
+      }),
+      makeAccount(route),
+      route,
+    );
+
+    assert.equal(created[0]?.config.featureValues?.["auto_accept"], true);
+  });
+
+  it("leaves Auto Accept unset when the Route still prompts for some tools", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = makeRoute("C0PROMPT");
+
+    await engine.bindOrSteer(
+      message({
+        text: "hi",
+        conversation: {
+          kind: "channel",
+          id: "C0PROMPT",
+          rootConversationId: "C0PROMPT",
+          threadId: null,
+        },
+      }),
+      makeAccount(route),
+      route,
+    );
+
+    assert.equal(created[0]?.config.featureValues?.["auto_accept"], undefined);
   });
 
   // Retargeting retires a running session, so it is gated like starting one:

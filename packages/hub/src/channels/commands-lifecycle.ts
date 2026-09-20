@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { ChannelStore } from "../db/channels.js";
 import type { ThreadBindingRecord } from "../db/types.js";
-import { bindingSummary, deriveBindingKey, routePosition } from "./bindings/index.js";
+import {
+  applyRouteAutoAccept,
+  bindingSummary,
+  deriveBindingKey,
+  routePosition,
+} from "./bindings/index.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
@@ -256,7 +261,10 @@ export class ChannelLifecycleCommands {
     prompt: string | undefined,
   ) {
     try {
-      const config = await this.deps.resolveConfig(context, capability);
+      const config = applyRouteAutoAccept(
+        await this.deps.resolveConfig(context, capability),
+        context.route,
+      );
       const workspaceId = await this.resolveSessionWorkspace(name, context, config, prompt);
       return await this.deps.daemon.createAgent(config, {
         source: context.message,
