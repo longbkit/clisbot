@@ -29,6 +29,7 @@ describe("Hub Host onboarding projection", () => {
           daemonSlug: "workstation",
           label: "workstation",
           canManage: true,
+          hubPresence: presence,
           serverId: null,
           status,
         },
@@ -57,6 +58,7 @@ describe("Hub Host onboarding projection", () => {
         daemonSlug: "workstation",
         label: "workstation",
         canManage: true,
+        hubPresence: "connected",
         serverId: "server-1",
         status: "registering",
       },
@@ -84,6 +86,7 @@ describe("Hub Host onboarding projection", () => {
         daemonSlug: "workstation",
         label: "Development Host",
         canManage: true,
+        hubPresence: "connected",
         serverId: "server-1",
         status: "connecting",
       },
@@ -111,6 +114,7 @@ describe("Hub Host onboarding projection", () => {
         daemonSlug: "workstation",
         label: "Development Host",
         canManage: true,
+        hubPresence: "connected",
         serverId: "server-1",
         status: "online",
       },
@@ -142,6 +146,7 @@ describe("Hub Host onboarding projection", () => {
           serverId: "server-1",
           status,
           canManage: true,
+          hubPresence: "connected",
         },
       ]);
     },
@@ -170,6 +175,7 @@ describe("Hub Host onboarding projection", () => {
         serverId: "server-1",
         status: "online",
         canManage: false,
+        hubPresence: "connected",
       },
     ]);
   });

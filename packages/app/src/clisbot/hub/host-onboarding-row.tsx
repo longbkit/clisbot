@@ -1,3 +1,4 @@
+import { hubLinkPresentation } from "./channel-host-connection";
 import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
@@ -65,6 +66,7 @@ export function HubHostOnboardingRow({
           {item.label}
         </Text>
         <StatusBadge label={status.label} variant={status.variant} />
+        <StatusBadge {...hubLinkPresentation(item.hubPresence)} />
       </View>
       <Text style={failure === null ? settingsStyles.rowHint : settingsStyles.rowError}>
         {failure?.message ?? description}

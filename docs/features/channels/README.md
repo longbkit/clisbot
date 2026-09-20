@@ -98,6 +98,7 @@ One inbound message walks this path. Each row is the file to open.
 | Account carriers    | `channels/supervisor/account-carriers.ts:162`                      | The per-account credential projection handed to `startAccount`. See below.                                                              |
 | Connections         | `db/channel-connections.ts:29`, `credentials/credential-cipher.ts` | One table per channel; AES-256-GCM envelope bound by AAD to its scope.                                                                  |
 | Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                               |
+| Host transport      | `channels/daemon/enrolled-client.ts`, `daemons/registry.ts`        | Reaches the Route's Host over the connection that Host holds to the Hub. See below.                                                     |
 | Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                                             |
 | Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                                    |
 | Audience rules      | `channels/config/audience.ts`                                      | "[who] may talk in [where]" per Route; the app edits them in `packages/app/src/clisbot/hub/settings/channel-route-audience-fields.tsx`. |
@@ -106,6 +107,14 @@ One inbound message walks this path. Each row is the file to open.
 | Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                              |
 | Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                                |
 | Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                                         |
+
+### Reaching a Host
+
+A Host is private: no public address, and nothing dials into it. The daemon opens one socket to the Hub at enrollment and keeps it alive itself, which is why automations have always run over it. The channel plane does the same — `daemons/registry.ts` hands out that socket as a plain daemon session (`DaemonSessionChannel`), and `channels/daemon/enrolled-client.ts` speaks the ordinary session RPCs over it. Both transports share one wire in `channels/daemon/session-protocol.ts`.
+
+Nothing pings to find out whether a Host is there. The Hub is the server for that socket, so a Host that is away fails the call at once with `host_not_connected`, and reconnect stays with the daemon's own retry loop. The app reads the same fact: `presence` on the Hub's `daemons` resource is what both the Hosts screen and a Route row show.
+
+Dialing the daemon back (`channels/daemon/ws-client.ts`) is kept for the two cases that ask for it: an explicit daemon target (`PASEO_HUB_CHANNEL_DAEMON_URL`, or a dev/self-host that wants it), and an account whose Host this Hub cannot resolve. It is not a fallback — a private Host reached that way has to cross the public relay, and a relay socket can go dead with the Hub none the wiser.
 
 ### What a carrier is
 

@@ -36,6 +36,9 @@ import {
   type SetStateAction,
 } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react-native";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { hostConnectionPresentation } from "@/clisbot/hub/channel-host-connection";
+import { RouteHostProvider, useRouteHost } from "./route-host-context";
 import { ChannelActionsMenu } from "./channel-actions-menu";
 import { ConnectionSettingRow, ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
@@ -803,32 +806,34 @@ function ChannelSettingsContent({
   return (
     <View>
       {navigation}
-      <ChannelAccountsSection
-        channels={channels.data}
-        connections={connections.data}
-        runtimeStatus={runtimeStatus.data}
-        teams={teams.data}
-        assignments={assignments.data}
-        queries={sources.accountQueries}
-        refreshing={statusRefreshing}
-        mutationError={mutationError}
-        testResult={testResult}
-        selectedAccountKey={selectedAccountKey}
-        adminScoped={adminScoped}
-        pending={pending}
-        refreshStatus={refreshStatus}
-        selectAccount={setSelectedAccountKey}
-        updateAccount={updateAccount}
-        removeAccount={removeAccount}
-        retryAccount={retryAccount}
-        editRoute={editRoute}
-        addRoute={addRoute}
-        addRouteTo={addRouteTo}
-        openActivity={openAccountActivity}
-        sendTestMessage={sendTestMessage}
-        moveRoute={moveRoute}
-        removeRoute={removeRoute}
-      />
+      <RouteHostProvider configuration={channels.data} daemons={sources.daemons}>
+        <ChannelAccountsSection
+          channels={channels.data}
+          connections={connections.data}
+          runtimeStatus={runtimeStatus.data}
+          teams={teams.data}
+          assignments={assignments.data}
+          queries={sources.accountQueries}
+          refreshing={statusRefreshing}
+          mutationError={mutationError}
+          testResult={testResult}
+          selectedAccountKey={selectedAccountKey}
+          adminScoped={adminScoped}
+          pending={pending}
+          refreshStatus={refreshStatus}
+          selectAccount={setSelectedAccountKey}
+          updateAccount={updateAccount}
+          removeAccount={removeAccount}
+          retryAccount={retryAccount}
+          editRoute={editRoute}
+          addRoute={addRoute}
+          addRouteTo={addRouteTo}
+          openActivity={openAccountActivity}
+          sendTestMessage={sendTestMessage}
+          moveRoute={moveRoute}
+          removeRoute={removeRoute}
+        />
+      </RouteHostProvider>
       <ChannelConfigurationExtras
         visible={!adminScoped}
         showHistory={selectedAccountKey === null}
@@ -1612,6 +1617,14 @@ function ChannelAccountRow({
 }
 
 /** The Connection's Routes start here, with the one way to add another. */
+/** Which Host answers this Route, and whether the Hub is holding it. */
+function RouteHostLine({ route }: { route: RecordValue }) {
+  const host = useRouteHost(route);
+  if (host === null) return null;
+  const presentation = hostConnectionPresentation(host);
+  return <StatusBadge label={presentation.label} variant={presentation.variant} />;
+}
+
 function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): void }) {
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.row]}>
@@ -2215,6 +2228,7 @@ function ChannelRouteRow({
         <Text style={settingsStyles.rowTitle}>
           {`Route ${String(routeIndex + 1)} · ${routeTargetSummary(route)}`}
         </Text>
+        <RouteHostLine route={route} />
         <Text style={settingsStyles.rowHint}>{routeAudienceLine(route, names)}</Text>
         <Text style={settingsStyles.rowHint}>{routeBehaviorSummary(route)}</Text>
         <Text style={settingsStyles.rowHint}>{channelLimitsSummary(route["limits"])}</Text>

@@ -213,7 +213,7 @@ What to grep for, by question:
 
 **Did the account start?** There is no success line. `started` is observed through `paseo channels status`, not the log. Failure says `channel account start failed`; a QR channel says `channel account needs a QR login`.
 
-**Is the transport alive?** `channel daemon connected` / `channel daemon disconnected`.
+**Is the transport alive?** `channel daemon connected` / `channel daemon disconnected`. An account that rides its Host's own connection says so once at start: `channel drives its Host over the Host's own connection`, with the Host's slug. From then on the Host's state is the Hub's own — the app shows it as `Hub connected` on Settings → Hosts and as `Host <slug>` on the Route that runs there. A call made while that Host is away fails immediately with `host_not_connected` rather than waiting out an RPC timeout; the fix is on the Host (start Paseo there, check `paseo hub status`), not on the Hub.
 
 **Did the message get in?** One line per inbound decision, all carrying `dispatched`:
 

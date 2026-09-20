@@ -30,6 +30,10 @@ export interface HubHostOnboardingItem {
   serverId: string | null;
   status: HubHostOnboardingStatus;
   canManage: boolean;
+  /** Whether the Hub holds this Host's connection. The app's own connection to
+   * a Host is a separate thing (`status`): channels and Automations run over
+   * the Hub's, so a Host can be reachable from here and not from there. */
+  hubPresence: string;
 }
 
 export function projectHubHostOnboarding(input: {
@@ -49,6 +53,7 @@ export function projectHubHostOnboarding(input: {
       label: host?.label ?? daemon.slug,
       serverId,
       canManage: daemon.canManage,
+      hubPresence: daemon.presence,
       status: daemonOnboardingStatus(daemon, host, input.connectionStatuses),
     };
   });

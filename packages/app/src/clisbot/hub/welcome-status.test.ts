@@ -17,6 +17,7 @@ function item(status: HubHostOnboardingStatus, label = "workstation"): HubHostOn
     serverId: withoutOffer ? null : "srv",
     status,
     canManage: true,
+    hubPresence: status === "offline" ? "offline" : "connected",
   };
 }
 
