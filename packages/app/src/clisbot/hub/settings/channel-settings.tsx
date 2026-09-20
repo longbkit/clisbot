@@ -1616,7 +1616,6 @@ function ChannelAccountRow({
   );
 }
 
-/** The Connection's Routes start here, with the one way to add another. */
 /** Which Host answers this Route, and whether the Hub is holding it. */
 function RouteHostLine({ route }: { route: RecordValue }) {
   const host = useRouteHost(route);
@@ -1625,6 +1624,7 @@ function RouteHostLine({ route }: { route: RecordValue }) {
   return <StatusBadge label={presentation.label} variant={presentation.variant} />;
 }
 
+/** The Connection's Routes start here, with the one way to add another. */
 function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): void }) {
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.row]}>

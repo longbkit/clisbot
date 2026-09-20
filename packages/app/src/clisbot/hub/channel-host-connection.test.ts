@@ -47,11 +47,16 @@ describe("routeHostConnection", () => {
     }
   });
 
-  // A Host the Hub no longer lists cannot be reached, and saying its id is
-  // more use than saying nothing.
+  // A Host missing from a list that does have Hosts in it cannot be reached,
+  // and saying its id is more use than saying nothing. An empty list is a
+  // different thing and never reaches here (`route-host-context.tsx`).
   it("keeps an unlisted Host visible as offline", () => {
     expect(
-      routeHostConnection({ route: { environment: "repo" }, resource: RESOURCE, daemons: [] }),
+      routeHostConnection({
+        route: { environment: "repo" },
+        resource: RESOURCE,
+        daemons: [{ id: "daemon-9", slug: "other", presence: "connected" }],
+      }),
     ).toEqual({ label: "daemon-1", connected: false });
   });
 });

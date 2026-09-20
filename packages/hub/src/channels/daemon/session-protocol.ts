@@ -2,7 +2,7 @@
 // in-flight RPCs and the frame rules that settle them.
 //
 // Two transports carry the same frames. `ws-client.ts` dials the daemon and
-// speaks them over that socket. `hub-socket.ts` speaks them over the socket the
+// speaks them over that socket. `enrolled-client.ts` speaks them over the socket the
 // Host itself opened to the Hub — the connection a private Host can always
 // make, and the one automations already use. Keeping the frame rules here is
 // what lets the channel plane above the transport stay identical on both.

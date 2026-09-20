@@ -291,10 +291,13 @@ export async function ensureDaemonConnection(
   );
   const connection = resolveHubInitConnection(status, origin);
   if (connection.kind === "connected") {
-    if (permissions.includes("hub.execute") && !status.permissions.includes("hub.execute")) {
+    // A daemon connected before a permission was added to the default set holds
+    // the old, narrower grant; say exactly what to grant rather than naming one.
+    const missing = permissions.filter((permission) => !status.permissions.includes(permission));
+    if (missing.length > 0) {
       throw new HubCommandError(
         "HUB_DAEMON_EXECUTION_NOT_ALLOWED",
-        "This daemon is connected to Hub but cannot run Hub automations. Run `paseo hub permissions grant hub.execute`, then run Hub init again.",
+        `This daemon is connected to Hub but is missing ${missing.join(", ")}. Run \`paseo hub permissions grant <permission>\` for each, then run Hub init again.`,
       );
     }
     return connection.daemonId;

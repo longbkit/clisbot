@@ -87,6 +87,7 @@ export class ActiveDaemonRegistry {
   private readonly subscribersByDaemon = new Map<string, Set<DaemonEventHandler>>();
   private readonly sessionSubscribersByDaemon = new Map<string, Set<SessionFrameHandler>>();
   private readonly connectedHandlers = new Set<DaemonConnectedHandler>();
+  private readonly disconnectedHandlers = new Set<(daemonId: string) => void>();
   private readonly revokedHandlers = new Set<DaemonRevokedHandler>();
   private readonly presenceWrites = new Set<Promise<void>>();
   private generation = 0;
@@ -118,6 +119,9 @@ export class ActiveDaemonRegistry {
       if (this.active.get(daemon.id)?.generation === active.generation) {
         this.active.delete(daemon.id);
         this.rejectGeneration(daemon.id, active.generation);
+        for (const handler of this.disconnectedHandlers) {
+          this.observeHandler(() => handler(daemon.id), "daemon.disconnected.handler", daemon.id);
+        }
         const write = active.presenceReady.then(() =>
           this.database.setDaemonPresence(daemon.id, "offline"),
         );
@@ -205,6 +209,10 @@ export class ActiveDaemonRegistry {
       channel: (daemonId) => this.sessionChannel(daemonId),
       subscribe: (daemonId, handler) => this.subscribeDaemonSession(daemonId, handler),
       onConnected: (handler) => this.onConnected((daemon) => handler(daemon.id)),
+      onDisconnected: (handler) => {
+        this.disconnectedHandlers.add(handler);
+        return () => this.disconnectedHandlers.delete(handler);
+      },
     };
   }
 
@@ -216,7 +224,10 @@ export class ActiveDaemonRegistry {
   subscribeDaemonSession(daemonId: string, handler: SessionFrameHandler): () => void {
     const subscribers = this.sessionSubscribersFor(daemonId);
     subscribers.add(handler);
-    return () => subscribers.delete(handler);
+    return () => {
+      subscribers.delete(handler);
+      if (subscribers.size === 0) this.sessionSubscribersByDaemon.delete(daemonId);
+    };
   }
 
   validateAgentConfiguration(

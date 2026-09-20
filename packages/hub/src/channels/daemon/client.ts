@@ -140,6 +140,9 @@ export interface EnrolledChannelDaemonOptions {
   subscribe: (handler: (message: Record<string, unknown>) => void) => () => void;
   /** Host connection transitions, so `waitForConnected` can be released. */
   onHostConnected?: (handler: () => void) => () => void;
+  /** The Host's socket went: in-flight calls on it are failed at once. */
+  onHostDisconnected?: (handler: () => void) => () => void;
+  onStateChange?: (state: "connected" | "disconnected") => void;
   /** What the Host is called in logs and errors (its slug or id). */
   hostLabel: string;
   rpcTimeoutMs?: number;
@@ -172,6 +175,10 @@ export function connectEnrolledChannelDaemon(
     resolveChannel: options.resolveChannel,
     subscribe: options.subscribe,
     ...(options.onHostConnected === undefined ? {} : { onHostConnected: options.onHostConnected }),
+    ...(options.onHostDisconnected === undefined
+      ? {}
+      : { onHostDisconnected: options.onHostDisconnected }),
+    ...(options.onStateChange === undefined ? {} : { onStateChange: options.onStateChange }),
     ...(options.rpcTimeoutMs === undefined ? {} : { rpcTimeoutMs: options.rpcTimeoutMs }),
     ...(options.onStream === undefined ? {} : { onStream: options.onStream }),
     ...(options.onAgentUpdate === undefined

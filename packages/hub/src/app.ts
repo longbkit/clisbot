@@ -108,9 +108,9 @@ export interface HubRuntimeOptions {
   dispatchTimeoutMs?: number;
   browserOrganizationAccess?: BrowserOrganizationAccess;
   daemonConnectionForId?: DaemonDispatchLifecycleOptions["connectionForDaemon"];
-  /** COMPAT(clisbot-control-plane): hand the channel plane the Host sessions it
-   * drives. The registry is born here, one step after the supervisor, so the
-   * composition root takes it through this sink rather than reaching in. */
+  /** Hand the channel plane the Host sessions it drives. The registry is born
+   * here, one step after the supervisor, so the composition root takes it
+   * through this sink rather than reaching in. */
   publishDaemonSessions?: (access: import("./daemons/protocol.js").DaemonSessionAccess) => void;
 }
 

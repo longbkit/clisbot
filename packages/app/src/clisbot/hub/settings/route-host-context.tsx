@@ -37,7 +37,11 @@ export function RouteHostProvider({
   const resource = configuration?.resource ?? NO_RESOURCE;
   const hosts = daemons?.daemons ?? NO_DAEMONS;
   const resolve = useMemo<RouteHostResolver>(
-    () => (route) => routeHostConnection({ route, resource, daemons: hosts }),
+    // No Host list — still loading, or a Connection Admin who may not read one —
+    // means nothing is known about the Route's Host. Say nothing rather than
+    // call every Host offline.
+    () => (route) =>
+      hosts.length === 0 ? null : routeHostConnection({ route, resource, daemons: hosts }),
     [resource, hosts],
   );
   return <RouteHostContext.Provider value={resolve}>{children}</RouteHostContext.Provider>;

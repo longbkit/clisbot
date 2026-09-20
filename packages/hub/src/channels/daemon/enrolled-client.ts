@@ -21,8 +21,11 @@ export interface EnrolledDaemonClientOptions {
   resolveChannel: () => DaemonSessionChannel | undefined;
   /** Session frames from this Host, across its reconnects. */
   subscribe: (handler: (message: Record<string, unknown>) => void) => () => void;
-  /** Called with the Host's connection transitions, so a waiter can be released. */
+  /** The Host's socket came back: a waiter is released and the state is logged. */
   onHostConnected?: (handler: () => void) => () => void;
+  /** The Host's socket went: what is in flight on it will never answer. */
+  onHostDisconnected?: (handler: () => void) => () => void;
+  onStateChange?: (state: "connected" | "disconnected") => void;
   rpcTimeoutMs?: number;
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
   onAgentUpdate?: (agent: unknown) => void;
@@ -34,7 +37,8 @@ export const HOST_NOT_CONNECTED = "host_not_connected";
 
 export class EnrolledDaemonClient {
   private readonly protocol: DaemonSessionProtocol;
-  private unsubscribe: (() => void) | null = null;
+  private readonly teardown: (() => void)[] = [];
+  private started = false;
   private stopped = false;
 
   constructor(private readonly options: EnrolledDaemonClientOptions) {
@@ -50,7 +54,7 @@ export class EnrolledDaemonClient {
   }
 
   get connected(): boolean {
-    return this.options.resolveChannel() !== undefined;
+    return !this.stopped && this.options.resolveChannel() !== undefined;
   }
 
   get serverInfo(): Record<string, unknown> | undefined {
@@ -58,16 +62,34 @@ export class EnrolledDaemonClient {
   }
 
   connect(): void {
-    if (this.unsubscribe !== null || this.stopped) return;
-    this.unsubscribe = this.options.subscribe((message) => {
-      this.protocol.receive(message as DaemonSessionFrame);
-    });
+    if (this.started || this.stopped) return;
+    this.started = true;
+    this.teardown.push(
+      this.options.subscribe((message) => {
+        this.protocol.receive(message as DaemonSessionFrame);
+      }),
+    );
+    const onConnected = this.options.onHostConnected;
+    if (onConnected !== undefined) {
+      this.teardown.push(onConnected(() => this.options.onStateChange?.("connected")));
+    }
+    const onDisconnected = this.options.onHostDisconnected;
+    if (onDisconnected !== undefined) {
+      // The Host is gone, so nothing in flight on that socket will answer. Fail
+      // it now rather than at the RPC timeout: that stall is the whole reason
+      // the plane stopped dialing out.
+      this.teardown.push(
+        onDisconnected(() => {
+          this.options.onStateChange?.("disconnected");
+          this.protocol.rejectAll(new Error(HOST_NOT_CONNECTED));
+        }),
+      );
+    }
   }
 
   stop(): void {
     this.stopped = true;
-    this.unsubscribe?.();
-    this.unsubscribe = null;
+    for (const release of this.teardown.splice(0)) release();
     this.protocol.rejectAll(new Error("daemon client stopped"));
   }
 

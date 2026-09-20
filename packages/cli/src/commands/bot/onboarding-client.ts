@@ -40,8 +40,12 @@ export async function connectOnboardingDaemon(
     await client.connectHub(target.origin, setup.enrollmentToken, [
       ...DEFAULT_HUB_CONNECTION_PERMISSIONS,
     ]);
-  else if (!current.permissions.includes("hub.execute"))
-    await client.updateHubPermissions({ grant: [...DEFAULT_HUB_CONNECTION_PERMISSIONS] });
+  else {
+    const missing = DEFAULT_HUB_CONNECTION_PERMISSIONS.filter(
+      (permission) => !current.permissions.includes(permission),
+    );
+    if (missing.length > 0) await client.updateHubPermissions({ grant: missing });
+  }
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     const status = (await client.getHubStatus()).status;

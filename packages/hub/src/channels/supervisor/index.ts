@@ -616,6 +616,13 @@ function confirmedString(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }
 
+/** A registry signal narrowed to one Host. */
+function forHost(hostId: string, handler: () => void): (daemonId: string) => void {
+  return (daemonId) => {
+    if (daemonId === hostId) handler();
+  };
+}
+
 class ChannelSupervisorImpl implements ChannelSupervisor {
   readonly channelReplyCapabilities: ChannelReplyCapabilityRegistry;
   private readonly options: ChannelSupervisorOptions;
@@ -1520,14 +1527,6 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   }
 
   /**
-   * Per-daemon connection target + loud failure. Resolves the account's route
-   * daemon to its persisted `ConnectionOffer` candidates (direct → relay) — the
-   * same path any trusted client (app/web) reaches it by, so channels are
-   * multi-daemon by construction — and installs the loud `onConnectFailure` that
-   * replaces the silent `channel daemon disconnected` loop. No resolver / no
-   * offer → the global `daemon` option (env) or loopback discovery stands.
-   */
-  /**
    * Reach this account's Host. The Host's own connection to the Hub is the
    * path (`channels/daemon/enrolled-client.ts`): an ordinary Host is private,
    * with no address to dial, and the Hub is the server for that socket, so a
@@ -1554,10 +1553,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         hostLabel: host.label,
         resolveChannel: () => host.sessions.channel(host.id),
         subscribe: (handler) => host.sessions.subscribe(host.id, handler),
-        onHostConnected: (handler) =>
-          host.sessions.onConnected((daemonId) => {
-            if (daemonId === host.id) handler();
-          }),
+        onHostConnected: (handler) => host.sessions.onConnected(forHost(host.id, handler)),
+        onHostDisconnected: (handler) => host.sessions.onDisconnected(forHost(host.id, handler)),
+        ...(daemonOptions.onStateChange === undefined
+          ? {}
+          : { onStateChange: daemonOptions.onStateChange }),
         ...(daemonOptions.rpcTimeoutMs === undefined
           ? {}
           : { rpcTimeoutMs: daemonOptions.rpcTimeoutMs }),
@@ -1607,6 +1607,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
   }
 
+  /**
+   * Per-daemon connection target + loud failure. Resolves the account's route
+   * daemon to its persisted `ConnectionOffer` candidates (direct → relay) — the
+   * same path any trusted client (app/web) reaches it by, so channels are
+   * multi-daemon by construction — and installs the loud `onConnectFailure` that
+   * replaces the silent `channel daemon disconnected` loop. No resolver / no
+   * offer → the global `daemon` option (env) or loopback discovery stands.
+   */
   private async applyDaemonTarget(
     daemonOptions: ChannelDaemonClientOptions,
     handle: AccountHandle,

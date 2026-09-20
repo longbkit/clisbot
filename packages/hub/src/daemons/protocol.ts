@@ -102,6 +102,8 @@ export interface DaemonSessionAccess {
   subscribe(daemonId: string, handler: (message: Record<string, unknown>) => void): () => void;
   /** Fires when a Host's socket becomes usable, including after a reconnect. */
   onConnected(handler: (daemonId: string) => void): () => void;
+  /** Fires when a Host's socket goes: what is in flight on it will not answer. */
+  onDisconnected(handler: (daemonId: string) => void): () => void;
 }
 
 export interface DaemonConnection {

@@ -14,17 +14,22 @@ afterEach(async () => {
 
 function clientFor(
   started: DaemonRegistryHarness,
-  options: { onStream?: (payload: { agentId: string; event: unknown }) => void } = {},
+  options: {
+    onStream?: (payload: { agentId: string; event: unknown }) => void;
+    onStateChange?: (state: "connected" | "disconnected") => void;
+  } = {},
 ): EnrolledDaemonClient {
   const sessions = started.sessionAccess();
+  const forHost = (handler: () => void) => (daemonId: string) => {
+    if (daemonId === started.hostId) handler();
+  };
   const client = new EnrolledDaemonClient({
     resolveChannel: () => sessions.channel(started.hostId),
     subscribe: (handler) => sessions.subscribe(started.hostId, handler),
-    onHostConnected: (handler) =>
-      sessions.onConnected((daemonId) => {
-        if (daemonId === started.hostId) handler();
-      }),
+    onHostConnected: (handler) => sessions.onConnected(forHost(handler)),
+    onHostDisconnected: (handler) => sessions.onDisconnected(forHost(handler)),
     ...(options.onStream === undefined ? {} : { onStream: options.onStream }),
+    ...(options.onStateChange === undefined ? {} : { onStateChange: options.onStateChange }),
   });
   client.connect();
   return client;
@@ -80,6 +85,23 @@ test("a refused RPC fails with the daemon's reason, not a timeout", async () => 
   });
 
   await expect(refused).rejects.toThrow("You do not have permission");
+  client.stop();
+});
+
+// The stall this transport exists to remove: a call already on the wire when the
+// Host goes must fail with it, not at the RPC timeout.
+test("a call in flight fails when the Host goes, and the state is reported", async () => {
+  harness = await DaemonRegistryHarness.start();
+  const states: string[] = [];
+  const client = clientFor(harness, { onStateChange: (state) => states.push(state) });
+
+  const inFlight = client.call("fetch_agents_request", {});
+  await harness.nextSessionRequest("fetch_agents_request");
+  await harness.stop();
+  harness = undefined;
+
+  await expect(inFlight).rejects.toThrow(HOST_NOT_CONNECTED);
+  expect(states).toContain("disconnected");
   client.stop();
 });
 

@@ -1,3 +1,4 @@
+import type { DaemonPermission } from "@getpaseo/protocol/messages";
 import type { Command } from "commander";
 import { withOutput, type ListResult, type OutputSchema } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
@@ -19,7 +20,7 @@ import { hubStatusResult } from "./status-output.js";
  * `tunnel.manage` and `automation.manage` stay with the operator. Narrow this
  * further per daemon with `paseo hub permissions revoke <permission>`.
  */
-export const DEFAULT_HUB_CONNECTION_PERMISSIONS: readonly string[] = [
+export const DEFAULT_HUB_CONNECTION_PERMISSIONS: readonly DaemonPermission[] = [
   "hub.execute",
   "daemon.read",
   "workspace.read",
@@ -128,6 +129,18 @@ function requireConnectedHub(status: HubStatus): void {
   }
 }
 
+const PERMISSION_DESCRIPTIONS: Record<string, string> = {
+  "daemon.read": "Read daemon configuration, providers, and models",
+  "daemon.manage": "Restart, update, and change daemon configuration",
+  "tunnel.manage": "Relay, Hub, and public endpoint relationships",
+  "access.manage": "Pairing invitations, principals, credentials, and grants",
+  "workspace.read": "Read projects, workspaces, agents, timelines, and files",
+  "workspace.write": "Prompt and control agents, write files, run terminals",
+  "workspace.manage": "Create, rename, archive, and remove projects and workspaces",
+  "automation.manage": "Schedules, heartbeats, and loops",
+  "hub.execute": "Run agents for Hub automations",
+};
+
 function describePermission(permission: string): string {
-  return permission === "hub.execute" ? "Run agents for Hub automations" : permission;
+  return PERMISSION_DESCRIPTIONS[permission] ?? permission;
 }
