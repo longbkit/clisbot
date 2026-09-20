@@ -299,8 +299,8 @@ function buildOpenCodeAutoAcceptFeature(config: AgentSessionConfig): AgentFeatur
     type: "toggle",
     id: OPENCODE_AUTO_ACCEPT_FEATURE_ID,
     label: "Auto Accept",
-    description: "Automatically approves OpenCode tool permission prompts.",
-    tooltip: "Auto accept permission prompts",
+    description: "When on, Paseo approves OpenCode tool permission prompts without asking you.",
+    tooltip: "Paseo auto-accepts permission prompts",
     icon: "shield-check",
     value: isOpenCodeAutoAcceptEnabled(config),
   };

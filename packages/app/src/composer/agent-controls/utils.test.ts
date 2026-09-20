@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   getFeatureHighlightColor,
+  getFeatureToggleAppearance,
+  getFeatureToggleTooltip,
   getFeatureTooltip,
   getAgentControlHintKey,
   normalizeModelId,
@@ -33,10 +35,44 @@ describe("feature metadata helpers", () => {
     ).toBe("Custom");
   });
 
+  it("appends the toggle state to the tooltip", () => {
+    expect(
+      getFeatureToggleTooltip(
+        {
+          label: "Auto Accept",
+          tooltip: "Paseo auto-accepts permission prompts",
+        },
+        "On",
+      ),
+    ).toBe("Paseo auto-accepts permission prompts (On)");
+  });
+
   it("maps feature highlight colors by feature id", () => {
     expect(getFeatureHighlightColor("fast_mode")).toBe("yellow");
+    expect(getFeatureHighlightColor("auto_accept")).toBe("green");
     expect(getFeatureHighlightColor("plan_mode")).toBe("blue");
     expect(getFeatureHighlightColor("other")).toBe("default");
+  });
+
+  it("uses a muted idle color and a status chip when auto-accept is on", () => {
+    const colors = {
+      statusSuccess: "#3e704a",
+      statusWarning: "#7b5d39",
+      statusDotSuccess: "#299f51",
+      statusDotWarning: "#b37824",
+      foregroundMuted: "#71717a",
+      palette: {
+        blue: { 400: "#60a5fa", 500: "#3b82f6", 600: "#2563eb" },
+      },
+    };
+
+    expect(getFeatureToggleAppearance("auto_accept", false, colors)).toEqual({
+      iconColor: "#71717a",
+    });
+    expect(getFeatureToggleAppearance("auto_accept", true, colors)).toEqual({
+      iconColor: "#3e704a",
+      backgroundColor: "rgba(41, 159, 81, 0.24)",
+    });
   });
 });
 

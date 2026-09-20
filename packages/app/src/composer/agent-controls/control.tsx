@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, type ComponentProps } from "react";
+import { forwardRef, useMemo, type ComponentProps } from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
@@ -12,49 +12,108 @@ type AgentControlTriggerProps = Omit<
 > & {
   icon: AgentControlIcon;
   iconColor?: string;
+  selectedBackgroundColor?: string;
   surface: "toolbar" | "sheet";
   label: string;
   value?: string;
   showToolbarLabel?: boolean;
   showCaret?: boolean;
+  selected?: boolean;
   open?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 };
+
+const TOOLBAR_ICON_HIT_SLOP = 8;
+const TOOLBAR_LABEL_HIT_SLOP = { top: 8, bottom: 8 } as const;
+
+function resolveAgentControlHitSlop(
+  hitSlop: AgentControlTriggerProps["hitSlop"],
+  surface: "toolbar" | "sheet",
+  showToolbarLabel: boolean,
+) {
+  if (hitSlop !== undefined) {
+    return hitSlop;
+  }
+  if (surface === "sheet") {
+    return undefined;
+  }
+  if (showToolbarLabel) {
+    return TOOLBAR_LABEL_HIT_SLOP;
+  }
+  return TOOLBAR_ICON_HIT_SLOP;
+}
+
+function buildAgentControlTriggerStyle(input: {
+  isSheet: boolean;
+  showToolbarLabel: boolean;
+  selected: boolean;
+  selectedBackgroundColor?: string;
+  open: boolean;
+  disabled: boolean;
+}) {
+  return ({ pressed, hovered }: PressableStateCallbackType) => [
+    input.isSheet ? styles.sheetRow : styles.toolbarControl,
+    !input.isSheet && !input.showToolbarLabel && styles.toolbarIconOnly,
+    input.selected && {
+      backgroundColor: input.selectedBackgroundColor ?? styles.selectedFallback.backgroundColor,
+    },
+    hovered && !input.selected && (input.isSheet ? styles.sheetRowInteractive : styles.hovered),
+    (pressed || input.open) &&
+      !input.selected &&
+      (input.isSheet ? styles.sheetRowInteractive : styles.pressed),
+    input.disabled && styles.disabled,
+  ];
+}
 
 export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
   function AgentControlTrigger(
     {
       icon: Icon,
       iconColor,
+      selectedBackgroundColor,
       surface,
       label,
       value,
       showToolbarLabel = true,
       showCaret = false,
+      selected = false,
       open = false,
       disabled = false,
       onPress,
       accessibilityLabel,
+      accessibilityRole = "button",
+      accessibilityState,
       testID,
+      hitSlop,
       ...triggerProps
     },
     ref,
   ) {
     const { glyphSize } = useComposerControlLayout();
     const isSheet = surface === "sheet";
+    const isSwitch = accessibilityRole === "switch";
+    const isDisabled = disabled === true;
     const resolvedGlyphSize = isSheet ? 16 : glyphSize;
     const resolvedIconColor = iconColor ?? styles.iconColor.color;
     const showValue = isSheet || showToolbarLabel;
-    const triggerStyle = useCallback(
-      ({ pressed, hovered }: PressableStateCallbackType) => [
-        isSheet ? styles.sheetRow : styles.toolbarControl,
-        !isSheet && !showToolbarLabel && styles.toolbarIconOnly,
-        hovered && (isSheet ? styles.sheetRowInteractive : styles.hovered),
-        (pressed || open) && (isSheet ? styles.sheetRowInteractive : styles.pressed),
-        disabled && styles.disabled,
-      ],
-      [disabled, isSheet, open, showToolbarLabel],
+    const resolvedHitSlop = resolveAgentControlHitSlop(hitSlop, surface, showToolbarLabel);
+    const selectedForeground = selected ? { color: resolvedIconColor } : null;
+    const switchState = useMemo(
+      () => (isSwitch ? { checked: selected, disabled: isDisabled } : undefined),
+      [isDisabled, isSwitch, selected],
+    );
+    const triggerStyle = useMemo(
+      () =>
+        buildAgentControlTriggerStyle({
+          isSheet,
+          showToolbarLabel,
+          selected,
+          selectedBackgroundColor,
+          open,
+          disabled: isDisabled,
+        }),
+      [isDisabled, isSheet, open, selected, selectedBackgroundColor, showToolbarLabel],
     );
 
     return (
@@ -65,7 +124,10 @@ export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
         disabled={disabled}
         onPress={onPress}
         style={triggerStyle}
-        accessibilityRole="button"
+        hitSlop={resolvedHitSlop}
+        accessibilityRole={accessibilityRole}
+        accessibilityState={switchState ?? accessibilityState}
+        aria-checked={isSwitch ? selected : undefined}
         accessibilityLabel={accessibilityLabel}
         testID={testID}
         chevron={showCaret ? undefined : null}
@@ -85,7 +147,14 @@ export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
           </Text>
         ) : null}
         {showValue ? (
-          <Text style={isSheet ? styles.sheetValue : styles.toolbarValue} numberOfLines={1}>
+          <Text
+            style={[
+              isSheet ? styles.sheetValue : styles.toolbarValue,
+              selected && styles.selectedValue,
+              selectedForeground,
+            ]}
+            numberOfLines={1}
+          >
             {value ?? label}
           </Text>
         ) : null}
@@ -166,5 +235,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   iconColor: {
     color: theme.colors.foregroundMuted,
+  },
+  selectedFallback: {
+    backgroundColor: theme.colors.surface2,
+  },
+  selectedValue: {
+    fontWeight: theme.fontWeight.medium,
   },
 }));

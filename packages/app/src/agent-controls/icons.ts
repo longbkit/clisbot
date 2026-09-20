@@ -63,3 +63,13 @@ export function getAgentModeOptionIcon(
 export function getAgentFeatureIcon(icon?: string): AgentControlIcon {
   return (icon ? FEATURE_ICONS[icon] : undefined) ?? Settings2;
 }
+
+export function getAgentFeatureToggleIcon(
+  icon: string | undefined,
+  enabled: boolean,
+): AgentControlIcon {
+  if (icon === "shield-check" && !enabled) {
+    return Shield;
+  }
+  return getAgentFeatureIcon(icon);
+}

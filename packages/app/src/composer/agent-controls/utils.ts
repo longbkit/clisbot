@@ -1,7 +1,12 @@
 import type { AgentFeature, AgentModelDefinition } from "@getpaseo/protocol/agent-types";
 import { i18n } from "@/i18n/i18next";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
-import { FAST_MODE_FEATURE_ID, PLAN_MODE_FEATURE_ID } from "@/agent-controls/policy";
+import {
+  AUTO_ACCEPT_FEATURE_ID,
+  FAST_MODE_FEATURE_ID,
+  PLAN_MODE_FEATURE_ID,
+} from "@/agent-controls/policy";
+import { hexColorWithAlpha } from "@/utils/color";
 
 export type ExplainedAgentControl = "mode" | "model" | "thinking";
 export type FeatureHighlightColor = "blue" | "default" | "green" | "yellow";
@@ -35,16 +40,81 @@ export function getFeatureTooltip(feature: Pick<AgentFeature, "label" | "tooltip
   return feature.tooltip ?? feature.label;
 }
 
+export function getFeatureToggleTooltip(
+  feature: Pick<AgentFeature, "label" | "tooltip">,
+  stateLabel: string,
+): string {
+  return `${getFeatureTooltip(feature)} (${stateLabel})`;
+}
+
 export function getFeatureHighlightColor(featureId: string): FeatureHighlightColor {
   switch (featureId) {
     case FAST_MODE_FEATURE_ID:
       return "yellow";
-    case "auto_accept":
+    case AUTO_ACCEPT_FEATURE_ID:
       return "green";
     case PLAN_MODE_FEATURE_ID:
       return "blue";
     default:
       return "default";
+  }
+}
+
+export interface FeatureTogglePalette {
+  statusSuccess: string;
+  statusWarning: string;
+  statusDotSuccess: string;
+  statusDotWarning: string;
+  foregroundMuted: string;
+  palette: {
+    blue: {
+      400: string;
+      500: string;
+      600: string;
+    };
+  };
+}
+
+export interface FeatureToggleAppearance {
+  iconColor: string;
+  backgroundColor?: string;
+}
+
+const SELECTED_CHIP_ALPHA = 0.24;
+
+export function getFeatureToggleAppearance(
+  featureId: string,
+  enabled: boolean,
+  colors: FeatureTogglePalette,
+  colorScheme: "light" | "dark" = "light",
+): FeatureToggleAppearance {
+  if (!enabled) {
+    return { iconColor: colors.foregroundMuted };
+  }
+
+  switch (getFeatureHighlightColor(featureId)) {
+    case "green":
+      return {
+        iconColor: colors.statusSuccess,
+        backgroundColor: hexColorWithAlpha(colors.statusDotSuccess, SELECTED_CHIP_ALPHA),
+      };
+    case "yellow":
+      return {
+        iconColor: colors.statusWarning,
+        backgroundColor: hexColorWithAlpha(colors.statusDotWarning, SELECTED_CHIP_ALPHA),
+      };
+    case "blue": {
+      const iconColor =
+        colorScheme === "dark" ? colors.palette.blue[400] : colors.palette.blue[600];
+      const fillColor =
+        colorScheme === "dark" ? colors.palette.blue[400] : colors.palette.blue[500];
+      return {
+        iconColor,
+        backgroundColor: hexColorWithAlpha(fillColor, SELECTED_CHIP_ALPHA),
+      };
+    }
+    default:
+      return { iconColor: colors.foregroundMuted };
   }
 }
 

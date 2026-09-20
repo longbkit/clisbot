@@ -102,7 +102,10 @@ const styles = StyleSheet.create((theme) => ({
   row: {
     minWidth: 0,
     maxWidth: "100%",
+    minHeight: "100%",
+    flexGrow: 1,
     flexShrink: 1,
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],

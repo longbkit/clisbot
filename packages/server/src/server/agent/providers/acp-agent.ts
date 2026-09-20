@@ -851,8 +851,8 @@ function buildACPAutoAcceptFeature(config: AgentSessionConfig): AgentFeature {
     type: "toggle",
     id: ACP_AUTO_ACCEPT_FEATURE_ID,
     label: "Auto Accept",
-    description: "Automatically approves ACP permission prompts.",
-    tooltip: "Auto accept permission prompts",
+    description: "When on, Paseo approves ACP permission prompts without asking you.",
+    tooltip: "Paseo auto-accepts permission prompts",
     icon: "shield-check",
     value: isACPAutoAcceptEnabled(config),
   };

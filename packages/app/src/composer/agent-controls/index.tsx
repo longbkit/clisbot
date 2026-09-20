@@ -24,7 +24,11 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useShallow } from "zustand/shallow";
 import { Settings2 } from "lucide-react-native";
-import { getAgentFeatureIcon, ThinkingIcon } from "@/agent-controls/icons";
+import {
+  getAgentFeatureIcon,
+  getAgentFeatureToggleIcon,
+  ThinkingIcon,
+} from "@/agent-controls/icons";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
@@ -54,10 +58,12 @@ import type {
 } from "@getpaseo/protocol/agent-types";
 import type { AgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
 import {
-  getFeatureHighlightColor,
+  getFeatureToggleAppearance,
+  getFeatureToggleTooltip,
   getFeatureTooltip,
   getAgentControlHintKey,
   resolveAgentModelSelection,
+  type FeatureTogglePalette,
 } from "@/composer/agent-controls/utils";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { readMeasuredWidth } from "@/hooks/use-container-width";
@@ -210,30 +216,17 @@ function getModeProviderDefinitions(modeControl: AgentModeControlValue | null) {
   return modeControl?.providerDefinitions ?? EMPTY_AGENT_PROVIDER_DEFINITIONS;
 }
 
-function getFeatureIconColor(
+function getToggleAppearance(
   featureId: string,
   enabled: boolean,
-  palette: {
-    blue: { 400: string };
-    green: { 400: string };
-    yellow: { 400: string };
-  },
-  foregroundMuted: string,
-): string {
-  if (!enabled) {
-    return foregroundMuted;
-  }
-
-  switch (getFeatureHighlightColor(featureId)) {
-    case "blue":
-      return palette.blue[400];
-    case "green":
-      return palette.green[400];
-    case "yellow":
-      return palette.yellow[400];
-    default:
-      return foregroundMuted;
-  }
+  theme: { colorScheme?: string; colors: FeatureTogglePalette },
+) {
+  return getFeatureToggleAppearance(
+    featureId,
+    enabled,
+    theme.colors,
+    theme.colorScheme === "dark" ? "dark" : "light",
+  );
 }
 
 type ActiveSheet = "thinking" | "features" | null;
@@ -550,7 +543,7 @@ function ControlledAgentControls({
   const featureControls = useMemo(
     () =>
       (features ?? []).map((feature) => {
-        if (feature.type === "toggle") return { type: "toggle" as const };
+        if (feature.type === "toggle") return { type: "toggle" as const, label: feature.label };
         const selectedOption = feature.options.find((option) => option.id === feature.value);
         return {
           type: "select" as const,
@@ -1292,6 +1285,7 @@ function DesktopFeatureItem({
   onActionComplete?: () => void;
 }) {
   const { theme } = useUnistyles();
+  const { t } = useTranslation();
   const featureSelector: AgentControlSelector = `feature-${feature.id}`;
   const featureAnchorRef = useRef<View>(null);
 
@@ -1326,29 +1320,31 @@ function DesktopFeatureItem({
   );
 
   if (feature.type === "toggle") {
-    const FeatureIcon = getAgentFeatureIcon(feature.icon);
+    const FeatureIcon = getAgentFeatureToggleIcon(feature.icon, feature.value);
+    const appearance = getToggleAppearance(feature.id, feature.value, theme);
+    const stateLabel = feature.value
+      ? t("agentControls.features.on")
+      : t("agentControls.features.off");
+    const tooltip = getFeatureToggleTooltip(feature, stateLabel);
     return (
       <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild triggerRefProp="ref">
           <AgentControlTrigger
             icon={FeatureIcon}
-            iconColor={getFeatureIconColor(
-              feature.id,
-              feature.value,
-              theme.colors.palette,
-              theme.colors.foregroundMuted,
-            )}
+            iconColor={appearance.iconColor}
+            selectedBackgroundColor={appearance.backgroundColor}
             surface="toolbar"
             label={feature.label}
-            showToolbarLabel={false}
+            selected={feature.value}
             disabled={disabled}
             onPress={handleTogglePress}
-            accessibilityLabel={getFeatureTooltip(feature)}
+            accessibilityRole="switch"
+            accessibilityLabel={tooltip}
             testID={`agent-feature-${feature.id}`}
           />
         </TooltipTrigger>
         <TooltipContent side="top" align="center" offset={8}>
-          <Text style={styles.tooltipText}>{getFeatureTooltip(feature)}</Text>
+          <Text style={styles.tooltipText}>{tooltip}</Text>
         </TooltipContent>
       </Tooltip>
     );
@@ -1439,25 +1435,27 @@ function SheetFeatureItem({
   }, [feature, t]);
 
   if (feature.type === "toggle") {
-    const FeatureIcon = getAgentFeatureIcon(feature.icon);
+    const FeatureIcon = getAgentFeatureToggleIcon(feature.icon, feature.value);
+    const appearance = getToggleAppearance(feature.id, feature.value, theme);
+    const stateLabel = feature.value
+      ? t("agentControls.features.on")
+      : t("agentControls.features.off");
     return (
       <>
         <AgentControlTrigger
           ref={featureAnchorRef}
           icon={FeatureIcon}
-          iconColor={getFeatureIconColor(
-            feature.id,
-            feature.value,
-            theme.colors.palette,
-            theme.colors.foregroundMuted,
-          )}
+          iconColor={appearance.iconColor}
+          selectedBackgroundColor={appearance.backgroundColor}
           surface="sheet"
           label={feature.label}
-          value={feature.value ? t("agentControls.features.on") : t("agentControls.features.off")}
+          value={stateLabel}
+          selected={feature.value}
           open={openSelector === featureSelector}
           disabled={disabled}
           onPress={handleSelectPress}
-          accessibilityLabel={getFeatureTooltip(feature)}
+          accessibilityRole="switch"
+          accessibilityLabel={getFeatureToggleTooltip(feature, stateLabel)}
           testID={`agent-feature-${feature.id}`}
         />
         <Combobox

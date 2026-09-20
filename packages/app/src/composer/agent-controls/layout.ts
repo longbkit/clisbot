@@ -8,7 +8,9 @@ export interface ComposerControlPresence {
   fontScale: number;
 }
 
-export type ComposerFeatureControlPresence = { type: "toggle" } | { type: "select"; label: string };
+export type ComposerFeatureControlPresence =
+  | { type: "toggle"; label: string }
+  | { type: "select"; label: string };
 
 export interface ComposerControlPresentation {
   showCarets: boolean;
@@ -47,7 +49,6 @@ function resolveFeatureControlWidth(
   feature: ComposerFeatureControlPresence,
   fontScale: number,
 ): number {
-  if (feature.type === "toggle") return COMPOSER_TOOLBAR_GEOMETRY.controlSize;
   return (
     COMPOSER_TOOLBAR_GEOMETRY.controlSize +
     COMPOSER_TOOLBAR_GEOMETRY.iconLabelGap +

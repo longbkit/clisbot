@@ -33,20 +33,20 @@ describe("composer control layout", () => {
       hasModel: true,
       hasThinking: true,
       hasMode: true,
-      features: [{ type: "toggle" as const }],
+      features: [{ type: "toggle" as const, label: "Auto Accept" }],
       fontScale: 1,
     };
 
     expect(
       resolveComposerControlDensity({
-        availableWidth: 420,
+        availableWidth: 510,
         currentDensity: "full",
         controls,
       }),
     ).toBe("full");
     expect(
       resolveComposerControlDensity({
-        availableWidth: 380,
+        availableWidth: 480,
         currentDensity: "full",
         controls,
       }),
@@ -83,7 +83,7 @@ describe("composer control layout", () => {
 
   it("budgets extra features and larger text before restoring full labels", () => {
     const base = {
-      availableWidth: 430,
+      availableWidth: 530,
       currentDensity: "condensed" as const,
     };
 
@@ -94,7 +94,7 @@ describe("composer control layout", () => {
           hasModel: true,
           hasThinking: true,
           hasMode: true,
-          features: [{ type: "toggle" }],
+          features: [{ type: "toggle", label: "Auto Accept" }],
           fontScale: 1,
         },
       }),
@@ -106,7 +106,10 @@ describe("composer control layout", () => {
           hasModel: true,
           hasThinking: true,
           hasMode: true,
-          features: [{ type: "toggle" }, { type: "select", label: "Tools" }],
+          features: [
+            { type: "toggle", label: "Auto Accept" },
+            { type: "select", label: "Tools" },
+          ],
           fontScale: 1,
         },
       }),
@@ -118,7 +121,7 @@ describe("composer control layout", () => {
           hasModel: true,
           hasThinking: true,
           hasMode: true,
-          features: [{ type: "toggle" }],
+          features: [{ type: "toggle", label: "Auto Accept" }],
           fontScale: 1.25,
         },
       }),
@@ -127,7 +130,7 @@ describe("composer control layout", () => {
 
   it("condenses before a labeled feature would overflow", () => {
     const base = {
-      availableWidth: 430,
+      availableWidth: 510,
       currentDensity: "full" as const,
       controls: {
         hasModel: true,
@@ -140,7 +143,7 @@ describe("composer control layout", () => {
     expect(
       resolveComposerControlDensity({
         ...base,
-        controls: { ...base.controls, features: [{ type: "toggle" }] },
+        controls: { ...base.controls, features: [{ type: "toggle", label: "Auto Accept" }] },
       }),
     ).toBe("full");
     expect(
