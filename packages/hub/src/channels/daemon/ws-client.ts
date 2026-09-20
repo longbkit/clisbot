@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { WebSocket, type RawData } from "ws";
 import { createClientChannel, type EncryptedChannel, type Transport } from "@getpaseo/relay/e2ee";
 import { isRelayClientWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+import { DaemonSessionProtocol, type DaemonSessionFrame } from "./session-protocol.js";
 
 // The Hub's trusted-client transport to a Paseo daemon. One connection drives the
 // channel control plane: create agents, steer threads, answer permissions, and
@@ -19,12 +20,6 @@ const WS_PROTOCOL_VERSION = 1;
 const HELLO_TIMEOUT_MS = 15_000;
 const DEFAULT_RECONNECT_MIN_MS = 250;
 const DEFAULT_RECONNECT_MAX_MS = 30_000;
-
-interface RpcCall {
-  resolve(value: unknown): void;
-  reject(error: Error): void;
-  timer: NodeJS.Timeout;
-}
 
 export interface TrustedDaemonClientOptions {
   /** Fallback single target. Used only when `urls` is absent/empty. */
@@ -68,11 +63,6 @@ export interface TrustedDaemonClientOptions {
   onSubagentUpdate?: (frame: unknown) => void;
 }
 
-interface Frame {
-  type: string;
-  [key: string]: unknown;
-}
-
 /**
  * A trusted-client socket to one daemon. Requests carry a `requestId`; the reply
  * is either a dedicated `*_response` frame, a `status` frame (create replies with
@@ -85,7 +75,9 @@ export class TrustedDaemonClient extends EventEmitter {
    * per-hello random id would strand the prior lease and split multi-account
    * admission. */
   private readonly clientId: string;
-  private readonly pending = new Map<string, RpcCall>();
+  /** The session wire itself: in-flight RPCs and the frame rules, shared with
+   * the Host-socket transport (`session-protocol.ts`). */
+  private readonly protocol: DaemonSessionProtocol;
   private socket: WebSocket | null = null;
   private helloTimer: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -115,6 +107,19 @@ export class TrustedDaemonClient extends EventEmitter {
     super();
     this.options = options;
     this.clientId = options.clientId ?? randomUUID();
+    this.protocol = new DaemonSessionProtocol({
+      write: (frame) => this.write(frame),
+      ...(options.rpcTimeoutMs === undefined ? {} : { rpcTimeoutMs: options.rpcTimeoutMs }),
+      onServerInfo: (payload) => {
+        this.serverInfo = payload;
+        this.onServerInfo();
+      },
+      ...(options.onStream === undefined ? {} : { onStream: options.onStream }),
+      ...(options.onAgentUpdate === undefined ? {} : { onAgentUpdate: options.onAgentUpdate }),
+      ...(options.onSubagentUpdate === undefined
+        ? {}
+        : { onSubagentUpdate: options.onSubagentUpdate }),
+    });
     this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
     this.candidates =
       options.urls !== undefined && options.urls.length > 0 ? [...options.urls] : [options.url];
@@ -128,7 +133,7 @@ export class TrustedDaemonClient extends EventEmitter {
   stop(): void {
     this.stopped = true;
     this.clearTimers();
-    this.rejectAll(new Error("daemon client stopped"));
+    this.protocol.rejectAll(new Error("daemon client stopped"));
     this.socket?.close();
     this.socket = null;
     this.connected = false;
@@ -176,7 +181,7 @@ export class TrustedDaemonClient extends EventEmitter {
   send(message: Record<string, unknown>): Promise<void> {
     const notConnected = this.notConnectedError();
     if (notConnected !== null) return Promise.reject(notConnected);
-    return this.write(JSON.stringify({ type: "session", message }));
+    return this.protocol.send(message);
   }
 
   /** Write one plaintext JSON frame over the active transport: the relay E2EE
@@ -210,26 +215,7 @@ export class TrustedDaemonClient extends EventEmitter {
   call(requestType: string, fields: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
     const notConnected = this.notConnectedError();
     if (notConnected !== null) return Promise.reject(notConnected);
-    const requestId = randomUUID();
-    const timer = setTimeout(
-      () => {
-        this.emit("rpcError", { requestId, requestType, error: `RPC ${requestType} timed out` });
-        this.reject(
-          requestId,
-          new Error(
-            `RPC ${requestType} timed out after ${timeoutMs ?? this.options.rpcTimeoutMs ?? 30000}ms`,
-          ),
-        );
-      },
-      timeoutMs ?? this.options.rpcTimeoutMs ?? 30_000,
-    );
-    timer.unref?.();
-    return new Promise((resolve, reject) => {
-      this.pending.set(requestId, { resolve, reject, timer });
-      void this.write(
-        JSON.stringify({ type: "session", message: { type: requestType, requestId, ...fields } }),
-      );
-    });
+    return this.protocol.call(requestType, fields, timeoutMs);
   }
 
   private openSocket(): void {
@@ -376,9 +362,9 @@ export class TrustedDaemonClient extends EventEmitter {
   }
 
   private onMessage(raw: string): void {
-    let frame: Frame;
+    let frame: DaemonSessionFrame;
     try {
-      frame = JSON.parse(raw) as Frame;
+      frame = JSON.parse(raw) as DaemonSessionFrame;
     } catch {
       return;
     }
@@ -389,48 +375,7 @@ export class TrustedDaemonClient extends EventEmitter {
     }
     const inner = frame["message"];
     if (frame.type !== "session" || typeof inner !== "object" || inner === null) return;
-    this.dispatch(inner as Frame);
-  }
-
-  private dispatch(message: Frame): void {
-    const type = typeof message["type"] === "string" ? (message["type"] as string) : "";
-    if (
-      type === "status" &&
-      isRecord(message["payload"]) &&
-      message["payload"]["status"] === "server_info"
-    ) {
-      this.serverInfo = message["payload"];
-      this.onServerInfo();
-      return;
-    }
-    if (type === "agent_stream") {
-      const payload = message["payload"] as
-        | { agentId?: unknown; event?: unknown; seq?: unknown }
-        | undefined;
-      if (typeof payload?.agentId === "string") {
-        this.options.onStream?.({
-          agentId: payload.agentId,
-          event: payload.event,
-          ...(typeof payload.seq === "number" ? { seq: payload.seq } : {}),
-        });
-      }
-      return;
-    }
-    if (type === "agent_update") {
-      const payload = message["payload"] as { agent?: unknown } | undefined;
-      if (payload?.agent !== undefined) this.options.onAgentUpdate?.(payload.agent);
-      return;
-    }
-    if (type === "agent.provider_subagents.update") {
-      this.options.onSubagentUpdate?.(message);
-      return;
-    }
-    // Response frames carry the correlation id in the payload (stock wire:
-    // { type, payload: { requestId, ... } }) — request frames carry it top-level.
-    const payload = message["payload"];
-    const requestId = isRecord(payload) ? payload["requestId"] : undefined;
-    if (typeof requestId !== "string") return;
-    this.settle(requestId, message);
+    this.protocol.receive(inner as DaemonSessionFrame);
   }
 
   private onServerInfo(): void {
@@ -452,40 +397,13 @@ export class TrustedDaemonClient extends EventEmitter {
     this.emit("connected");
   }
 
-  private reject(requestId: string, error: Error): void {
-    const entry = this.pending.get(requestId);
-    if (entry === undefined) return;
-    this.pending.delete(requestId);
-    clearTimeout(entry.timer);
-    entry.reject(error);
-  }
-
-  private settle(requestId: string, frame: Frame): void {
-    const entry = this.pending.get(requestId);
-    if (entry === undefined) return;
-    this.pending.delete(requestId);
-    clearTimeout(entry.timer);
-    const type = typeof frame["type"] === "string" ? (frame["type"] as string) : "";
-    if (type === "rpc_error") {
-      const payload = (frame["payload"] ?? {}) as { error?: string };
-      entry.reject(new Error(payload.error ?? "daemon RPC error"));
-      return;
-    }
-    const payload = frame["payload"] ?? frame;
-    if (type === "status" && isRecord(payload) && payload["status"] === "agent_create_failed") {
-      entry.reject(new Error((payload["error"] as string | undefined) ?? "agent create failed"));
-      return;
-    }
-    entry.resolve(payload);
-  }
-
   private onClose(): void {
     this.clearTimers();
     this.channel = null;
     const wasConnected = this.wasConnected;
     this.connected = false;
     this.wasConnected = false;
-    this.rejectAll(new Error("daemon connection closed"));
+    this.protocol.rejectAll(new Error("daemon connection closed"));
     // An explicit stop() already fired "disconnected"; don't fire it again from
     // the socket-close that stop() triggered, and don't schedule a reconnect.
     if (this.stopped) return;
@@ -536,14 +454,6 @@ export class TrustedDaemonClient extends EventEmitter {
     this.reconnectTimer = null;
   }
 
-  private rejectAll(error: Error): void {
-    for (const [requestId, entry] of this.pending) {
-      clearTimeout(entry.timer);
-      entry.reject(error);
-      this.pending.delete(requestId);
-    }
-  }
-
   private notConnectedError(): Error | null {
     if (!this.connected || this.socket === null) {
       return new Error("daemon client is not connected");
@@ -562,8 +472,4 @@ function normalizeRawData(data: RawData, isBinary: boolean): string | ArrayBuffe
     buffer.byteOffset,
     buffer.byteOffset + buffer.byteLength,
   ) as ArrayBuffer;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

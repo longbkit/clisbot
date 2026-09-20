@@ -34,9 +34,11 @@ import { ChannelStore } from "../../db/channels.js";
 import { ChannelReplyCapabilityStore } from "../../db/channel-reply-capabilities.js";
 import {
   connectChannelDaemon,
+  connectEnrolledChannelDaemon,
   type ChannelDaemonClientOptions,
   type DaemonConnection,
 } from "../daemon/client.js";
+import type { DaemonSessionAccess } from "../../daemons/protocol.js";
 import { createChannelPlane, type ChannelPlane } from "../execution.js";
 import { awaitMonitorExit, MONITOR_STOP_GRACE_MS } from "./monitor-stop.js";
 import {
@@ -1433,9 +1435,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       const password = this.env["PASEO_PASSWORD"]?.trim();
       if (password !== undefined && password !== "") daemonOptions.password = password;
     }
-    this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
-    await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
-    const daemon = connectChannelDaemon(daemonOptions);
+    const daemon = await this.connectAccountDaemon(daemonOptions, handle, compiled, snapshot);
     handle.daemon = daemon;
     await plane.start(daemon, this.store);
     // Drain payloads admitted before a previous process stopped. The drain is
@@ -1527,6 +1527,86 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * replaces the silent `channel daemon disconnected` loop. No resolver / no
    * offer → the global `daemon` option (env) or loopback discovery stands.
    */
+  /**
+   * Reach this account's Host. The Host's own connection to the Hub is the
+   * path (`channels/daemon/enrolled-client.ts`): an ordinary Host is private,
+   * with no address to dial, and the Hub is the server for that socket, so a
+   * Host that is away is a fact rather than a 30s timeout.
+   *
+   * Dialing the daemon back stays for the two cases that ask for it: an
+   * explicit daemon target (dev, or a self-host that wants it), and an account
+   * whose Host this Hub cannot resolve.
+   */
+  private async connectAccountDaemon(
+    daemonOptions: ChannelDaemonClientOptions,
+    handle: AccountHandle,
+    compiled: CompiledChannelAccount,
+    snapshot: ChannelControlPlaneSnapshot,
+  ): Promise<DaemonConnection> {
+    const host = await this.resolveEnrolledHost(compiled, snapshot);
+    if (host !== undefined) {
+      this.logger.info?.("channel drives its Host over the Host's own connection", {
+        channel: handle.channel,
+        account: handle.accountId,
+        host: host.label,
+      });
+      return connectEnrolledChannelDaemon({
+        hostLabel: host.label,
+        resolveChannel: () => host.sessions.channel(host.id),
+        subscribe: (handler) => host.sessions.subscribe(host.id, handler),
+        onHostConnected: (handler) =>
+          host.sessions.onConnected((daemonId) => {
+            if (daemonId === host.id) handler();
+          }),
+        ...(daemonOptions.rpcTimeoutMs === undefined
+          ? {}
+          : { rpcTimeoutMs: daemonOptions.rpcTimeoutMs }),
+        ...(daemonOptions.resolveSessionOperationTicket === undefined
+          ? {}
+          : { resolveSessionOperationTicket: daemonOptions.resolveSessionOperationTicket }),
+        ...(daemonOptions.onStream === undefined ? {} : { onStream: daemonOptions.onStream }),
+        ...(daemonOptions.onAgentUpdate === undefined
+          ? {}
+          : { onAgentUpdate: daemonOptions.onAgentUpdate }),
+        ...(daemonOptions.onSubagentUpdate === undefined
+          ? {}
+          : { onSubagentUpdate: daemonOptions.onSubagentUpdate }),
+      });
+    }
+    this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
+    await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
+    return connectChannelDaemon(daemonOptions);
+  }
+
+  /** The enrolled Host this account routes to, when there is one to ride. */
+  private async resolveEnrolledHost(
+    compiled: CompiledChannelAccount,
+    snapshot: ChannelControlPlaneSnapshot,
+  ): Promise<{ id: string; label: string; sessions: DaemonSessionAccess } | undefined> {
+    const sessions = this.options.hostSessions?.();
+    if (sessions === undefined || this.options.resolveDaemonTarget === undefined) return undefined;
+    // An explicit daemon target is the operator saying "dial this one".
+    if (this.options.daemon?.url !== undefined || this.options.daemon?.host !== undefined) {
+      return undefined;
+    }
+    const daemonReference = accountDaemonReference(compiled, snapshot.resolveAgentAccessTarget);
+    if (daemonReference === undefined) return undefined;
+    try {
+      const resolved = await this.options.resolveDaemonTarget({
+        organizationId: snapshot.organizationId,
+        daemonReference,
+      });
+      if (resolved.daemonId === undefined) return undefined;
+      return { id: resolved.daemonId, label: resolved.daemonSlug ?? daemonReference, sessions };
+    } catch (error) {
+      this.logger.warn("channel Host resolution failed", {
+        daemonReference,
+        error: errorMessage(error),
+      });
+      return undefined;
+    }
+  }
+
   private async applyDaemonTarget(
     daemonOptions: ChannelDaemonClientOptions,
     handle: AccountHandle,

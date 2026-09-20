@@ -9,7 +9,9 @@ import { join } from "node:path";
 
 export interface DaemonDiscoveryResult {
   url: string;
-  source: "pid-file" | "default-port" | "env";
+  /** `enrolled` is not a dialed target: the Host's own Hub connection carries
+   * the session, so `url` is the Host's label rather than an address. */
+  source: "pid-file" | "default-port" | "env" | "enrolled";
 }
 
 const DEFAULT_HOST = "127.0.0.1";

@@ -108,6 +108,10 @@ export interface HubRuntimeOptions {
   dispatchTimeoutMs?: number;
   browserOrganizationAccess?: BrowserOrganizationAccess;
   daemonConnectionForId?: DaemonDispatchLifecycleOptions["connectionForDaemon"];
+  /** COMPAT(clisbot-control-plane): hand the channel plane the Host sessions it
+   * drives. The registry is born here, one step after the supervisor, so the
+   * composition root takes it through this sink rather than reaching in. */
+  publishDaemonSessions?: (access: import("./daemons/protocol.js").DaemonSessionAccess) => void;
 }
 
 export interface HubRuntime {
@@ -179,6 +183,7 @@ export function createHubRuntime(options: HubRuntimeOptions): HubRuntime {
 // eslint-disable-next-line complexity -- the composition root wires optional Hub subsystems in one place.
 export function createHubApplication(options: HubRuntimeOptions): HubApplication {
   const daemons = createActiveDaemonRegistry(options);
+  if (daemons !== null) options.publishDaemonSessions?.(daemons.sessionAccess());
   const storeForProject = (projectId: string) => {
     if (options.database === null) throw new DatabaseUnavailableError();
     return new ProjectConfigurationStore(options.database, projectId, daemons ?? undefined);

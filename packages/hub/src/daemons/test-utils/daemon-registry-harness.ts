@@ -107,6 +107,26 @@ export class DaemonRegistryHarness {
     };
   }
 
+  /** The registry narrowed to what a session driver needs. */
+  sessionAccess() {
+    return this.registry.sessionAccess();
+  }
+
+  /** The enrolled Host this harness represents. */
+  get hostId(): string {
+    return this.daemon.id;
+  }
+
+  /** The next session request of `type` the daemon side received. */
+  nextSessionRequest(type: string) {
+    return this.currentSocket().next(type);
+  }
+
+  /** Send one session message from the daemon side. */
+  sendSessionMessage(message: Record<string, unknown>): void {
+    this.currentSocket().send(message);
+  }
+
   respondAgentValidation(
     pending: Awaited<ReturnType<DaemonRegistryHarness["pendingAgentValidation"]>>,
   ): void {

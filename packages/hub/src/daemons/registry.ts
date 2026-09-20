@@ -30,6 +30,8 @@ import {
   type DaemonCreateAgentOptions,
   type DaemonExecutionControlOptions,
   type DaemonEventHandler,
+  type DaemonSessionAccess,
+  type DaemonSessionChannel,
 } from "./protocol.js";
 
 interface PendingCreateRequest {
@@ -58,8 +60,12 @@ interface AgentValidationIssue {
   message: string;
 }
 type PendingRequest = PendingCreateRequest | PendingControlRequest | PendingAgentValidationRequest;
+type SessionFrameHandler = (message: Record<string, unknown>) => void;
+
 interface ActiveSocket {
   sessionStorage?: boolean;
+  /** The daemon's `server_info` payload, kept for session-channel consumers. */
+  serverInfo?: Record<string, unknown>;
   generation: number;
   socket: WebSocket;
   daemon: DaemonRecord;
@@ -79,6 +85,7 @@ export class ActiveDaemonRegistry {
   private readonly active = new Map<string, ActiveSocket>();
   private readonly pendingByDaemon = new Map<string, Map<string, PendingRequest>>();
   private readonly subscribersByDaemon = new Map<string, Set<DaemonEventHandler>>();
+  private readonly sessionSubscribersByDaemon = new Map<string, Set<SessionFrameHandler>>();
   private readonly connectedHandlers = new Set<DaemonConnectedHandler>();
   private readonly revokedHandlers = new Set<DaemonRevokedHandler>();
   private readonly presenceWrites = new Set<Promise<void>>();
@@ -161,6 +168,55 @@ export class ActiveDaemonRegistry {
         return () => subscribers.delete(handler);
       },
     };
+  }
+
+  /**
+   * Drive this Host as a plain daemon session over the socket it already holds
+   * (`DaemonSessionChannel`). `undefined` when the Host is not connected or its
+   * enrollment does not carry `hub.execute` — the caller refuses at once rather
+   * than waiting on a connection that is not there.
+   */
+  sessionChannel(daemonId: string): DaemonSessionChannel | undefined {
+    const active = this.active.get(daemonId);
+    if (!active?.ready || !active.daemon.permissions.includes("hub.execute")) return undefined;
+    const generation = active.generation;
+    return {
+      get serverInfo() {
+        return active.serverInfo;
+      },
+      write: (frame) => {
+        const current = this.active.get(daemonId);
+        if (current === undefined || current.generation !== generation) {
+          return Promise.reject(new Error("host_not_connected"));
+        }
+        return new Promise((resolve, reject) => {
+          current.socket.send(frame, (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+      },
+    };
+  }
+
+  /** This registry, narrowed to what a session driver needs. */
+  sessionAccess(): DaemonSessionAccess {
+    return {
+      channel: (daemonId) => this.sessionChannel(daemonId),
+      subscribe: (daemonId, handler) => this.subscribeDaemonSession(daemonId, handler),
+      onConnected: (handler) => this.onConnected((daemon) => handler(daemon.id)),
+    };
+  }
+
+  /**
+   * Session frames from this Host, for as long as the subscriber wants them.
+   * Independent of the current socket: a Host that drops and comes back keeps
+   * feeding the same subscriber, so the channel plane subscribes once.
+   */
+  subscribeDaemonSession(daemonId: string, handler: SessionFrameHandler): () => void {
+    const subscribers = this.sessionSubscribersFor(daemonId);
+    subscribers.add(handler);
+    return () => subscribers.delete(handler);
   }
 
   validateAgentConfiguration(
@@ -325,6 +381,7 @@ export class ActiveDaemonRegistry {
     }
     const serverInfo = HubDaemonServerInfoEnvelopeSchema.safeParse(value);
     if (serverInfo.success) {
+      active.serverInfo = serverInfo.data.message.payload;
       const features = serverInfo.data.message.payload["features"];
       active.sessionStorage =
         typeof features === "object" &&
@@ -334,7 +391,7 @@ export class ActiveDaemonRegistry {
       return;
     }
     const envelope = HubExecutionOutboundSchema.safeParse(value);
-    if (!envelope.success) return;
+    if (!envelope.success) return this.receiveSessionFrame(active, value);
     const message = envelope.data.message;
     if (message.type === "rpc_error") return this.receiveRpcError(active, message.payload);
     const created = HubExecutionAgentCreateResponseSchema.safeParse(message);
@@ -400,6 +457,32 @@ export class ActiveDaemonRegistry {
       }
       return undefined;
     });
+  }
+
+  /** A session frame the execution schemas do not claim belongs to whoever is
+   * driving this Host as a plain session (today: the channel plane). */
+  private receiveSessionFrame(active: ActiveSocket, value: unknown): void {
+    const subscribers = this.sessionSubscribersByDaemon.get(active.daemon.id);
+    if (subscribers === undefined || subscribers.size === 0) return;
+    if (typeof value !== "object" || value === null) return;
+    const envelope = value as Record<string, unknown>;
+    const message = envelope["message"];
+    if (envelope["type"] !== "session" || typeof message !== "object" || message === null) return;
+    for (const subscriber of subscribers) {
+      this.observeHandler(
+        () => subscriber(message as Record<string, unknown>),
+        "daemon.session.subscriber",
+        active.daemon.id,
+      );
+    }
+  }
+
+  private sessionSubscribersFor(daemonId: string): Set<SessionFrameHandler> {
+    const existing = this.sessionSubscribersByDaemon.get(daemonId);
+    if (existing !== undefined) return existing;
+    const created = new Set<SessionFrameHandler>();
+    this.sessionSubscribersByDaemon.set(daemonId, created);
+    return created;
   }
 
   private notifySubscribers(daemonId: string, event: Parameters<DaemonEventHandler>[0]): void {

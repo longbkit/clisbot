@@ -7,6 +7,8 @@ import {
   type ChannelSystemOperation,
 } from "./session-operation.js";
 import { TrustedDaemonClient } from "./ws-client.js";
+import { EnrolledDaemonClient } from "./enrolled-client.js";
+import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
   AgentPermissionResponse,
@@ -131,6 +133,67 @@ export interface DaemonConnection {
   stop(): void;
 }
 
+export interface EnrolledChannelDaemonOptions {
+  /** This Host's live session channel, or `undefined` while it is away. */
+  resolveChannel: () => DaemonSessionChannel | undefined;
+  /** Session frames from this Host, across its reconnects. */
+  subscribe: (handler: (message: Record<string, unknown>) => void) => () => void;
+  /** Host connection transitions, so `waitForConnected` can be released. */
+  onHostConnected?: (handler: () => void) => () => void;
+  /** What the Host is called in logs and errors (its slug or id). */
+  hostLabel: string;
+  rpcTimeoutMs?: number;
+  resolveSessionOperationTicket?: ChannelOperationTicketResolver;
+  onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
+  onAgentUpdate?: (agent: AgentSnapshot) => void;
+  onSubagentUpdate?: (frame: unknown) => void;
+}
+
+/** What the facade needs of a transport. `ws-client.ts` dials the daemon;
+ * `enrolled-client.ts` rides the socket the Host already holds. */
+export interface ChannelDaemonSocket {
+  readonly serverInfo: Record<string, unknown> | undefined;
+  call(requestType: string, fields: Record<string, unknown>, timeoutMs?: number): Promise<unknown>;
+  send(message: Record<string, unknown>): Promise<void>;
+  waitForConnected(timeoutMs?: number): Promise<void>;
+  stop(): void;
+}
+
+/**
+ * Drive a Host over the connection it already holds to the Hub. This is the
+ * path for an ordinary (private) Host: nothing dials in, and the Hub is the
+ * server for that socket, so a Host that is away is known rather than guessed
+ * (`enrolled-client.ts`).
+ */
+export function connectEnrolledChannelDaemon(
+  options: EnrolledChannelDaemonOptions,
+): DaemonConnection {
+  const socket = new EnrolledDaemonClient({
+    resolveChannel: options.resolveChannel,
+    subscribe: options.subscribe,
+    ...(options.onHostConnected === undefined ? {} : { onHostConnected: options.onHostConnected }),
+    ...(options.rpcTimeoutMs === undefined ? {} : { rpcTimeoutMs: options.rpcTimeoutMs }),
+    ...(options.onStream === undefined ? {} : { onStream: options.onStream }),
+    ...(options.onAgentUpdate === undefined
+      ? {}
+      : {
+          onAgentUpdate: (value: unknown) => {
+            const agent = normalizeAgentSnapshot(value);
+            if (agent !== undefined) options.onAgentUpdate?.(agent);
+          },
+        }),
+    ...(options.onSubagentUpdate === undefined
+      ? {}
+      : { onSubagentUpdate: options.onSubagentUpdate }),
+  });
+  socket.connect();
+  return createFacade(
+    socket,
+    { url: options.hostLabel, source: "enrolled" },
+    options.resolveSessionOperationTicket,
+  );
+}
+
 /**
  * Open one trusted-client connection to a daemon. The `url` option serves the
  * relay-paired team/remote leg; otherwise the loopback target is discovered from
@@ -183,7 +246,7 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
 }
 
 function createFacade(
-  socket: TrustedDaemonClient,
+  socket: ChannelDaemonSocket,
   discovery: DaemonDiscoveryResult,
   resolveIdentity?: ChannelOperationTicketResolver,
 ): DaemonConnection {
@@ -438,7 +501,7 @@ function normalizeAgentSnapshot(value: unknown): AgentSnapshot | undefined {
 
 /** Workspace descriptors, not cwd or a synthetic snapshot projectId, prove Project membership. */
 async function isAgentInProject(
-  socket: TrustedDaemonClient,
+  socket: ChannelDaemonSocket,
   agent: AgentSnapshot,
   projectId: string,
 ): Promise<boolean> {
@@ -483,7 +546,7 @@ function checkedPayload(value: unknown): Record<string, unknown> {
   return payload;
 }
 async function listField<T>(
-  socket: TrustedDaemonClient,
+  socket: ChannelDaemonSocket,
   type: string,
   fields: Record<string, unknown>,
   key: string,
@@ -492,7 +555,7 @@ async function listField<T>(
   return Array.isArray(payload[key]) ? (payload[key] as T[]) : [];
 }
 async function mutate(
-  socket: TrustedDaemonClient,
+  socket: ChannelDaemonSocket,
   type: string,
   fields: Record<string, unknown>,
 ): Promise<void> {

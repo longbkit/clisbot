@@ -124,6 +124,10 @@ async function createOwnedApplicationRuntime(
     | import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"]
     | undefined;
   let recoverChannelExecutions: ((ids: readonly string[]) => Promise<void>) | undefined;
+  // The channel plane drives each Host over the connection that Host holds to
+  // the Hub. The registry owning those sockets is built a step later
+  // (`createHubApplication`), so the supervisor takes this late-bound view.
+  let hostSessions: import("./daemons/protocol.js").DaemonSessionAccess | undefined;
   const channelSupervisor = await createChannelSupervisorAtComposition(
     options,
     accessStore,
@@ -150,6 +154,7 @@ async function createOwnedApplicationRuntime(
         database: options.database,
       });
     },
+    () => hostSessions,
   );
   const channelReplyServer = await createChannelReplyServerAtComposition(
     options,
@@ -175,6 +180,9 @@ async function createOwnedApplicationRuntime(
       channelReplyServer,
       accessStore,
       accessTickets,
+      (access) => {
+        hostSessions = access;
+      },
     ),
   );
   dispatchChannelWorkflow = (input) => application.hub.dispatchChannelWorkflow(input);
@@ -595,6 +603,7 @@ async function createChannelSupervisorAtComposition(
   readWorkflowRuns: NonNullable<
     import("./channels/plane/types.js").ChannelPlaneDeps["readWorkflowRuns"]
   >,
+  hostSessions: () => import("./daemons/protocol.js").DaemonSessionAccess | undefined,
 ): Promise<import("./channels/supervisor/types.js").ChannelSupervisor | null> {
   if (!isChannelsEnabled()) return null;
   if (
@@ -617,6 +626,7 @@ async function createChannelSupervisorAtComposition(
         : undefined;
     const resolveDaemonTarget = createChannelDaemonTargetFactory(database, process.env);
     return factory.createChannelSupervisor({
+      hostSessions,
       ...(access && accessTickets && options.publicBaseUrl
         ? {
             resolveSessionIdentity: (target, source) =>
@@ -788,10 +798,12 @@ async function createChannelDaemonAccessTicketFactory(
 function createChannelDaemonTargetFactory(
   database: Database,
   env: NodeJS.ProcessEnv,
-): (target: {
-  organizationId: string;
-  daemonReference: string;
-}) => Promise<{ urls: string[]; daemonPublicKeyB64?: string }> {
+): (target: { organizationId: string; daemonReference: string }) => Promise<{
+  urls: string[];
+  daemonPublicKeyB64?: string;
+  daemonId?: string;
+  daemonSlug?: string;
+}> {
   const isUuid = (value: string): boolean =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
   const mode = (env["PASEO_HUB_CHANNEL_DAEMON_TRANSPORT"] ?? "auto").toLowerCase();
@@ -806,6 +818,8 @@ function createChannelDaemonTargetFactory(
     return {
       urls: channelDaemonCandidates(offer, mode),
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
+      daemonId: record.id,
+      daemonSlug: record.slug,
     };
   };
 }
@@ -888,8 +902,10 @@ function hubApplicationOptions(
   channelReplyServer: ChannelReplyServer | null,
   accessStore: AccessStore | null,
   accessTickets: AccessTicketService | null,
+  publishDaemonSessions: (access: import("./daemons/protocol.js").DaemonSessionAccess) => void,
 ): HubRuntimeOptions {
   return {
+    publishDaemonSessions,
     database: options.database,
     ...(options.providerApplications ? { providerApplications: options.providerApplications } : {}),
     ...(options.databaseRuntime === undefined ? {} : { databaseRuntime: options.databaseRuntime }),

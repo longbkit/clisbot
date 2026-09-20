@@ -79,6 +79,31 @@ export type DaemonEvent = DaemonAgentStreamDaemonEvent | DaemonAgentUpdateEvent;
 
 export type DaemonEventHandler = (event: DaemonEvent) => void | Promise<void>;
 
+/**
+ * The Host's own socket, driven as an ordinary daemon session.
+ *
+ * A Host is private: nothing dials into it, which is why the daemon opens this
+ * socket to the Hub and keeps it alive. The daemon attaches that socket as a
+ * full session on its side (`relationship-controller.ts` `attachSocket`), so
+ * any session RPC the app can make, the Hub can make here. The channel plane
+ * rides this rather than dialing back through the relay.
+ */
+export interface DaemonSessionChannel {
+  /** The daemon's `server_info` payload, seen when the socket was accepted. */
+  readonly serverInfo: Record<string, unknown> | undefined;
+  /** Write one already-enveloped session frame. */
+  write(frame: string): Promise<void>;
+}
+
+/** The Host sessions this Hub can drive, narrowed from the registry for the
+ * consumers that only need "reach this Host and hear it back". */
+export interface DaemonSessionAccess {
+  channel(daemonId: string): DaemonSessionChannel | undefined;
+  subscribe(daemonId: string, handler: (message: Record<string, unknown>) => void): () => void;
+  /** Fires when a Host's socket becomes usable, including after a reconnect. */
+  onConnected(handler: (daemonId: string) => void): () => void;
+}
+
 export interface DaemonConnection {
   createAgent(options: DaemonCreateAgentOptions): Promise<DaemonAgentSnapshot>;
   controlExecution(options: DaemonExecutionControlOptions): Promise<void>;

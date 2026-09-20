@@ -117,10 +117,19 @@ export interface ChannelSupervisorOptions {
    * multi-daemon by construction. Returns `[]` when the daemon has no offer (or
    * managed access is unwired); the supervisor then falls back to the global
    * `daemon` option (env) or loopback discovery. */
-  resolveDaemonTarget?: (target: {
-    organizationId: string;
-    daemonReference: string;
-  }) => Promise<{ urls: string[]; daemonPublicKeyB64?: string }>;
+  resolveDaemonTarget?: (target: { organizationId: string; daemonReference: string }) => Promise<{
+    urls: string[];
+    daemonPublicKeyB64?: string;
+    /** The Host's stable id, when the reference resolved to an enrolled Host. */
+    daemonId?: string;
+    /** What that Host is called, for logs and errors. */
+    daemonSlug?: string;
+  }>;
+  /** The Host sessions the plane drives, the default transport: a private Host
+   * cannot be dialed, so the plane rides the connection the Host itself holds
+   * (`channels/daemon/enrolled-client.ts`). Late-bound — the registry is built
+   * one step after the supervisor. */
+  hostSessions?: () => import("../../daemons/protocol.js").DaemonSessionAccess | undefined;
   /** The channel-pins path; defaults to the packaged `channel-pins.json`. */
   pinsPath?: string;
   logger?: PlaneLogger;
