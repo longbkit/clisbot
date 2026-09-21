@@ -122,6 +122,11 @@ export class DaemonRegistryHarness {
     return this.currentSocket().next(type);
   }
 
+  /** The `hello` the Hub sent on the current socket, once it has. */
+  get hubHello(): Record<string, unknown> | undefined {
+    return this.currentSocket().hello;
+  }
+
   /** Send one session message from the daemon side. */
   sendSessionMessage(message: Record<string, unknown>): void {
     this.currentSocket().send(message);
@@ -409,6 +414,8 @@ class RegistrySocket {
   private readonly messages: Array<z.infer<typeof SessionRequestSchema>["message"]> = [];
   private waiter: (() => void) | undefined;
   private didClose = false;
+  /** The `hello` the Hub sent on this socket, once it has. */
+  hello: Record<string, unknown> | undefined;
 
   constructor(
     private readonly socket: WebSocket,
@@ -420,6 +427,7 @@ class RegistrySocket {
     socket.on("message", (data) => {
       const value = JSON.parse(readText(data)) as unknown;
       if (isHubHello(value)) {
+        this.hello = value as Record<string, unknown>;
         if (this.helloPermissions) this.sendServerInfo(this.helloPermissions);
         return;
       }

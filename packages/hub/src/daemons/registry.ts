@@ -3,6 +3,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { z } from "zod";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
 import type { Logger } from "pino";
 import type { Database, DaemonRecord } from "../db/types.js";
 import { reportFailure, type FailureKind } from "../failures/index.js";
@@ -144,6 +145,9 @@ export class ActiveDaemonRegistry {
             clientId: `hub:${daemon.id}`,
             clientType: "hub",
             protocolVersion: 1,
+            // The channel plane rides this socket; without these the daemon
+            // hides Grok, Pi and every other non-legacy provider and Agent.
+            capabilities: HUB_CHANNEL_CLIENT_CAPABILITIES,
           }),
         ),
       );

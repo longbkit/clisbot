@@ -7,6 +7,7 @@ import {
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
+  routeEffectiveAgent,
   channelRouteFollowUp,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
   parseChannelFollowUpTtlMinutes,
@@ -585,5 +586,101 @@ describe("Route follow-up policy", () => {
       requireMention: true,
       followUp: { mode: "auto", ttlMinutes: 5 },
     });
+  });
+});
+
+describe("routeEffectiveAgent", () => {
+  const agent = {
+    provider: "codex",
+    model: "gpt-6-astra",
+    mode: "full-access",
+    options: { a: 1 },
+  };
+
+  it("is the named agent when the Route has no promoted default", () => {
+    expect(routeEffectiveAgent(agent, { agent: "support" })).toBe(agent);
+  });
+
+  it("replaces the whole agent with controls that name a provider", () => {
+    expect(
+      routeEffectiveAgent(agent, {
+        agentControls: {
+          provider: "opencode",
+          model: "opencode-go/deepseek-v4.1-flash",
+        },
+      }),
+    ).toEqual({
+      provider: "opencode",
+      model: "opencode-go/deepseek-v4.1-flash",
+    });
+  });
+
+  it("keeps provider options only under the same provider", () => {
+    expect(
+      routeEffectiveAgent(agent, {
+        agentControls: { provider: "codex", model: "gpt-5.5" },
+      }),
+    ).toEqual({ provider: "codex", model: "gpt-5.5", options: { a: 1 } });
+  });
+
+  it("overrides field by field when the controls name no provider", () => {
+    expect(routeEffectiveAgent(agent, { agentControls: { model: "gpt-5.5" } })).toEqual({
+      ...agent,
+      model: "gpt-5.5",
+    });
+  });
+});
+
+describe("replaceChannelRouteCandidate and a promoted default", () => {
+  const route = {
+    audience: [{ who: { roles: ["member" as const] }, where: { conversations: ["C1"] } }],
+    agent: "support-agent",
+    environment: "support-agent",
+    agentControls: {
+      provider: "opencode",
+      model: "opencode-go/deepseek-v4.1-flash",
+    },
+  };
+  const input = {
+    accountId: "support",
+    audience: route.audience,
+    resource: {
+      agents: { "support-agent": { provider: "codex" } },
+      environments: {
+        "support-agent": {
+          kind: "daemon",
+          daemon: "d",
+          projectId: "p",
+          cwd: "/w",
+        },
+      },
+    },
+    currentRoute: route,
+    accounts: [{ accountId: "support", routes: [route] }],
+  };
+
+  it("drops the layer when the form rebuilds the agent, so the form's choice runs", () => {
+    const result = replaceChannelRouteCandidate({
+      ...input,
+      target: {
+        kind: "agent",
+        daemonId: "d",
+        projectId: "p",
+        cwd: "/w",
+        provider: "claude",
+      },
+    });
+    expect(result.route).not.toHaveProperty("agentControls");
+    expect(result.resource).toMatchObject({
+      agents: { "support-agent": { provider: "claude" } },
+    });
+  });
+
+  it("keeps the layer when the Route's target is kept as it is", () => {
+    const result = replaceChannelRouteCandidate({
+      ...input,
+      target: { kind: "existing", route },
+    });
+    expect(result.route).toMatchObject({ agentControls: route.agentControls });
   });
 });

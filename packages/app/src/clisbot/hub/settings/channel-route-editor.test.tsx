@@ -1194,6 +1194,72 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     });
   });
 
+  // `/promoteroutedefault` layers `agentControls` over the named agent. The form
+  // shows the agent the Route really starts, and a save from it writes that
+  // agent: the layer, kept, would override whatever the form saved.
+  it("opens an Agent Route with its promoted default applied and saves it as the Route's agent", async () => {
+    const promoted = {
+      provider: "opencode",
+      model: "opencode-go/deepseek-v4.1-flash",
+      thinkingOptionId: "default",
+    };
+    const promotedConfiguration = {
+      ...configuration,
+      accounts: [
+        {
+          ...account,
+          routes: [
+            {
+              audience: route.audience,
+              agent: "support-agent",
+              environment: "support-agent",
+              agentControls: promoted,
+            },
+          ],
+        },
+      ],
+      resource: {
+        agents: {
+          "support-agent": {
+            provider: "codex",
+            model: "gpt-6-astra",
+            mode: "full-access",
+          },
+        },
+        environments: {
+          "support-agent": {
+            kind: "daemon",
+            daemon: "daemon",
+            projectId: "project",
+            cwd: "/saved/custom",
+          },
+        },
+      },
+    };
+    adapters.get.mockImplementation(async (resource: string) => {
+      if (resource === "channel-configuration") return promotedConfiguration;
+      if (resource === "daemons")
+        return {
+          daemons: [
+            {
+              id: "daemon",
+              slug: "Workstation",
+              connectionOffer: { serverId: "runtime" },
+            },
+          ],
+        };
+      return data[resource];
+    });
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
+    const candidate = adapters.put.mock.calls[0]![1];
+    const saved = candidate.accounts[0].routes[0];
+    expect(saved).not.toHaveProperty("agentControls");
+    expect(candidate.resource.agents[saved.agent]).toMatchObject(promoted);
+    expect(candidate.resource.agents[saved.agent]).not.toHaveProperty("mode");
+  });
+
   it("preserves an Agent Route directory, clears it on Host change, and saves the selected Project root", async () => {
     const agentConfiguration = {
       ...configuration,

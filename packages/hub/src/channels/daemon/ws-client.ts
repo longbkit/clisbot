@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { WebSocket, type RawData } from "ws";
 import { createClientChannel, type EncryptedChannel, type Transport } from "@getpaseo/relay/e2ee";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
 import { isRelayClientWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
 import { DaemonSessionProtocol, type DaemonSessionFrame } from "./session-protocol.js";
 
@@ -346,16 +347,7 @@ export class TrustedDaemonClient extends EventEmitter {
         clientId: this.clientId,
         clientType: "cli",
         protocolVersion: WS_PROTOCOL_VERSION,
-        capabilities: {
-          selective_agent_timeline: true,
-          provider_subagents: true,
-          agent_session_storage: true,
-          // Without it the daemon treats this client as a pre-0.1.45 app and
-          // hides every provider but claude, codex and opencode, so `/provider`
-          // never offered Pi, Grok or any custom ACP provider. The channel
-          // treats provider ids as opaque strings.
-          all_providers: true,
-        },
+        capabilities: HUB_CHANNEL_CLIENT_CAPABILITIES,
         ...(accessTicket === undefined ? {} : { accessTicket }),
       }),
     );

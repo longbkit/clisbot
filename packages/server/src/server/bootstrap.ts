@@ -13,6 +13,7 @@ import path from "node:path";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Logger } from "pino";
 import { z } from "zod";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
 import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
 import { createBranchChangeRouteHandler } from "./script-route-branch-handler.js";
 
@@ -1376,6 +1377,7 @@ export async function createPaseoDaemon(
               clientId: `hub:${options.daemonId}`,
               clientType: "hub",
               protocolVersion: 1,
+              capabilities: HUB_CHANNEL_CLIENT_CAPABILITIES,
             }
           : undefined,
       );

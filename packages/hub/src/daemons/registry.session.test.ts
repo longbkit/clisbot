@@ -2,6 +2,7 @@
 // the channel plane rides (`channels/daemon/enrolled-client.ts`). A private
 // Host has no address to dial, so this is the only path that reaches it.
 import { afterEach, expect, test } from "vitest";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
 import { DaemonRegistryHarness } from "./test-utils/daemon-registry-harness.js";
 import { EnrolledDaemonClient, HOST_NOT_CONNECTED } from "../channels/daemon/enrolled-client.js";
 
@@ -48,6 +49,22 @@ test("an ordinary session RPC rides the Host's own connection", async () => {
 
   expect(await created).toMatchObject({ status: "agent_created", agentId: "agent-1" });
   expect(client.serverInfo).toMatchObject({ status: "server_info" });
+  client.stop();
+});
+
+// Without `all_providers` the daemon hides every provider but claude, codex and
+// opencode, and every Agent on the others, from a Hub that drives it over this
+// socket: `/provider grok` answered "Unknown or unavailable provider" live.
+test("the Hub declares the channel plane's capabilities on the Host's own connection", async () => {
+  harness = await DaemonRegistryHarness.start();
+  const client = clientFor(harness);
+  await expect.poll(() => harness?.hubHello).toBeDefined();
+
+  expect(harness.hubHello).toMatchObject({
+    clientType: "hub",
+    capabilities: HUB_CHANNEL_CLIENT_CAPABILITIES,
+  });
+  expect(harness.hubHello?.["capabilities"]).toMatchObject({ all_providers: true });
   client.stop();
 });
 

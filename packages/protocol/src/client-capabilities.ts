@@ -46,3 +46,18 @@ export const CLIENT_CAPS = {
 } as const;
 
 export type ClientCapability = (typeof CLIENT_CAPS)[keyof typeof CLIENT_CAPS];
+
+/**
+ * What the Hub's channel plane declares in its `hello`, on every transport it
+ * drives a daemon over: the Host-held socket and the dial-out client alike.
+ * Without `all_providers` the daemon takes the Hub for a pre-0.1.45 app and hides
+ * every provider but claude, codex and opencode, and every Agent running on one
+ * of the others, from `/provider`, `listAgents` and `agent_update`. The channel
+ * treats provider ids as opaque strings.
+ */
+export const HUB_CHANNEL_CLIENT_CAPABILITIES = {
+  [CLIENT_CAPS.selectiveAgentTimeline]: true,
+  [CLIENT_CAPS.providerSubagents]: true,
+  [CLIENT_CAPS.agentSessionStorage]: true,
+  [CLIENT_CAPS.allProviders]: true,
+} as const satisfies Partial<Record<ClientCapability, true>>;

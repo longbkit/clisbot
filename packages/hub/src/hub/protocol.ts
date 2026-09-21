@@ -56,6 +56,7 @@ export const HubDaemonHelloSchema = z.object({
   clientId: z.string(),
   clientType: z.literal("hub"),
   protocolVersion: z.literal(1),
+  capabilities: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const HubDaemonServerInfoEnvelopeSchema = z.object({

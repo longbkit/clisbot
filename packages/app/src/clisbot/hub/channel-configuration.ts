@@ -268,6 +268,31 @@ export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean 
   );
 }
 
+/**
+ * The agent a Route starts: its named `hub.yml` agent with the Route's
+ * `agentControls` applied. Mirrors the Hub's `applyAgentControls`: controls
+ * that name a provider are a whole configuration (the agent's provider
+ * `options` survive only under the same provider); controls without one
+ * override the named agent field by field.
+ */
+export function routeEffectiveAgent(
+  agent: ChannelConfigurationRecord | null,
+  route: ChannelConfigurationRecord | undefined,
+): ChannelConfigurationRecord | null {
+  const controls = route?.["agentControls"];
+  if (!isRecord(controls)) return agent;
+  const named = agent ?? {};
+  const provider = stringValue(controls["provider"]);
+  if (provider === null) return { ...named, ...controls, provider: named["provider"] };
+  return {
+    ...controls,
+    provider,
+    ...(provider === named["provider"] && named["options"] !== undefined
+      ? { options: named["options"] }
+      : {}),
+  };
+}
+
 /** Whether a stored Route admits everyone somewhere. */
 export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean {
   const audience = route["audience"];
@@ -427,6 +452,10 @@ export function replaceChannelRouteCandidate(
     ...(reusableName === undefined ? {} : { preferredResourceName: reusableName }),
   });
   const route = preserveRouteSettings(input.currentRoute, candidate.route);
+  // The form opens an agent Route with its `/promoteroutedefault` layer applied
+  // (`routeEffectiveAgent`), so a rebuilt agent target already carries it.
+  // Kept, the layer would override whatever the form just saved.
+  if (input.target.kind === "agent") delete route["agentControls"];
   const nextResource = removeUnusedPreviousTargets({
     resource: candidate.resource,
     accounts: input.accounts,

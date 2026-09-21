@@ -92,6 +92,7 @@ import {
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
   routeContainsText,
+  routeEffectiveAgent,
   type ChannelConfigurationRecord,
   type ChannelRouteBehavior,
   type ChannelRouteQuestions,
@@ -3850,7 +3851,12 @@ function channelFormInitialState(
   const editedWorkflow = stringField(editedRoute, "workflow");
   const editedAgentName = stringField(editedRoute, "agent") ?? "";
   const editedEnvironmentName = stringField(editedRoute, "environment") ?? "";
-  const editedAgent = objectField(objectField(resource, "agents") ?? EMPTY_RECORD, editedAgentName);
+  // What the Route really starts: a `/promoteroutedefault` layer
+  // (`agentControls`) over the named agent, so the form shows what runs.
+  const editedAgent = routeEffectiveAgent(
+    objectField(objectField(resource, "agents") ?? EMPTY_RECORD, editedAgentName),
+    editedRoute,
+  );
   const editedEnvironment = objectField(
     objectField(resource, "environments") ?? EMPTY_RECORD,
     editedEnvironmentName,
