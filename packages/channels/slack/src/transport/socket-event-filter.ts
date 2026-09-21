@@ -162,6 +162,22 @@ export function resolveSlackWasMentioned(
   return new RegExp(`<@${escaped}>`, "i").test(event.text ?? "");
 }
 
+/**
+ * The text without the leading mention that addressed the bot. The mention is a
+ * fact the event already carries (`wasMentioned`); left in the body it reaches
+ * the agent as part of the prompt, and the agent answers in kind — every reply
+ * opened with the bot tagging itself. Only the bot's own leading mention goes:
+ * one further in belongs to the sentence, and a message that is nothing but the
+ * mention keeps it, because an empty body is not a message.
+ */
+export function withoutAddressingMention(text: string, identity: SlackTransportIdentity): string {
+  const botUserId = identity.botUserId?.trim();
+  if (botUserId === undefined || botUserId === "") return text;
+  const escaped = botUserId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = text.replace(new RegExp(`^(?:\\s*<@${escaped}>[\\s,:]*)+`, "i"), "");
+  return stripped === "" ? text : stripped;
+}
+
 /** One normalized inbound event from a raw `message` / `app_mention` payload,
  * or undefined when the payload lacks the ids the L3 needs. */
 export function buildSlackInboundEvent(
@@ -182,7 +198,7 @@ export function buildSlackInboundEvent(
   // Slack's API delivers `text` with its own entity escaping (`=&gt;`,
   // `&lt;@U…&gt;` outside link tokens). Decode at the boundary so the agent
   // reads what the user typed; the outbound render re-escapes idempotently.
-  const text = decodeSlackEntities(event.text ?? "");
+  const text = withoutAddressingMention(decodeSlackEntities(event.text ?? ""), identity);
   const timestampMs =
     resolveSlackTimestampMs(typeof event.event_ts === "string" ? event.event_ts : undefined) ??
     resolveSlackTimestampMs(ts) ??

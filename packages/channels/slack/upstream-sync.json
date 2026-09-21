@@ -741,7 +741,7 @@
     {
       "id": "D-018",
       "file": "src/transport/socket-event-filter.ts",
-      "reason": "Provenance: gathers `monitor/events/messages.ts` (ts->ms, mention fact, own-message filter, payload -> inbound event) and `monitor/channel-type.ts` (`inferSlackChannelType` / `normalizeSlackChannelType` / `resolveSlackChatType`). Mention handling stays a fact; the policy is the Hub's."
+      "reason": "Provenance: gathers `monitor/events/messages.ts` (ts->ms, mention fact, own-message filter, payload -> inbound event) and `monitor/channel-type.ts` (`inferSlackChannelType` / `normalizeSlackChannelType` / `resolveSlackChatType`). Mention handling stays a fact; the policy is the Hub's. The bot's own leading mention is left out of `body` (`withoutAddressingMention`): kept there it reaches the agent as prompt text and the agent opens every reply by tagging itself."
     },
     {
       "id": "D-022",
