@@ -69,9 +69,9 @@ Auto-accept:
   card. Its header keeps the name, status, the enable switch and a … menu
   (Send test message, Refresh status, View activity, Remove). Routes come
   first; under them, Connection settings are rows that show their value and
-  open in place: Admins, Bot limits, Status (revision, integrity, retry, QR
-  relink), Credential (a link to where credentials are managed). They replace
-  the Access / Limits / Status details / Manage Connection buttons.
+  open in place: Admins and Bot limits (2026-09-21; Status and Credential were
+  rows too until then). They replace the Access / Limits / Status details /
+  Manage Connection buttons.
 - **Channel Integrations is master and detail.** Two columns on a wide screen
   (the list, and the chosen channel, the first open by default); on a phone
   the list, then the channel on its own screen with a "← Channel Integrations"
@@ -117,8 +117,25 @@ Auto-accept:
   managing people and what they may use is one job; a Member who manages no one
   sees Access alone, their own access. The moved slugs `access` and
   `configuration` redirect (`MOVED_HUB_SECTIONS`, `packages/app/src/clisbot/hub/navigation.ts`)
-  because the Hub still links to them. A Connection's Credential row shows the
-  provider account in place; there is no API to swap a stored credential yet.
+  because the Hub still links to them.
+- **Connection settings hold what the page decides, nothing it repeats**
+  (2026-09-21): a Connection's header line already reads
+  "Running · VeXeRe · slack-… · 1 route", so the **Status** and **Credential**
+  rows under it said the same words a second time — and Credential contradicted
+  them, because it tested `connection.status === "connected"` while the Hub
+  sends `"active"` for every Channel Connection, so it always read "Not
+  connected" and **Retry runtime**, behind the same literal, never appeared at
+  all. Credential could also change nothing: there is still no API to swap a
+  stored credential. What is left of Status is what the header cannot say in
+  words, shown only when there is something to say: an open Connection whose
+  runtime did not verify or load gets one muted line naming the revision,
+  integrity and load, and one that needs relinking gets the QR panel. A
+  Connection that loaded and runs shows nothing there — Revision history already
+  names the revision. Retry runtime is a … menu action. The header's runtime
+  label says **Needs linking** for `needs-login` instead of falling through to a
+  raw transport name. The Admins panel drops its repeated "Connection Admins"
+  heading and its "Only Organization Admins so far." line: the row's own title
+  and value already carry both.
 - **People becomes "People & access"** (2026-09-20): the page holds Members,
   Teams, Invitations and Access, so the name says both jobs. "People" alone hid
   Access; "Users & permissions" and "Members & access" were set aside, the first

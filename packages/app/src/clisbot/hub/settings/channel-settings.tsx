@@ -1501,13 +1501,18 @@ function ChannelAccountRow({
   );
   const openAccount = useCallback(() => selectAccount(key), [key, selectAccount]);
   const [testing, setTesting] = useState(false);
+  const retry = useCallback(() => {
+    void retryAccount(account);
+  }, [account, retryAccount]);
+  const canRetry = canRetryRuntime({ connection, enabled, runtimeAvailable, runtime });
   const pageActions = useMemo(
     () => [
       { label: "Send test message", onSelect: () => setTesting(true) },
       { label: "Refresh status", onSelect: refreshStatus },
+      ...(canRetry ? [{ label: "Retry runtime", onSelect: retry }] : []),
       { label: "View activity", onSelect: openActivity },
     ],
-    [openActivity, refreshStatus],
+    [canRetry, openActivity, refreshStatus, retry],
   );
   const closeTest = useCallback(() => setTesting(false), []);
   const sendTest = useCallback(
@@ -1574,6 +1579,14 @@ function ChannelAccountRow({
           <Text style={styles.errorText}>{runtime.detail}</Text>
         </View>
       ) : null}
+      {selected ? (
+        <ConnectionRuntimeFacts
+          channel={channel}
+          accountId={accountId}
+          runtime={runtime}
+          revisionVersion={revisionVersion}
+        />
+      ) : null}
       {selected && testing ? (
         <ConnectionTestMessage
           account={account}
@@ -1601,15 +1614,10 @@ function ChannelAccountRow({
         channel={channel}
         accountId={accountId}
         connection={connection}
-        runtime={runtime}
-        runtimeAvailable={runtimeAvailable}
         assignments={assignments}
         teams={teams}
-        revisionVersion={revisionVersion}
-        enabled={enabled}
         adminScoped={adminScoped}
         pending={pending}
-        retryAccount={retryAccount}
         updateAccount={updateAccount}
       />
     </View>
@@ -1621,7 +1629,13 @@ function RouteHostLine({ route }: { route: RecordValue }) {
   const host = useRouteHost(route);
   if (host === null) return null;
   const presentation = hostConnectionPresentation(host);
-  return <StatusBadge label={presentation.label} variant={presentation.variant} />;
+  // A pill sizes to its label. The Route's content column stretches its children,
+  // so the badge needs its own alignment or it spans the row as a grey band.
+  return (
+    <View style={styles.routeInline}>
+      <StatusBadge label={presentation.label} variant={presentation.variant} />
+    </View>
+  );
 }
 
 /** The Connection's Routes start here, with the one way to add another. */
@@ -1640,8 +1654,9 @@ function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): 
 }
 
 /**
- * The Connection's settings, under its Routes: who administers it, the bot's
- * limits, its runtime status, and its credential, each showing its value.
+ * The Connection's settings, under its Routes: the two things this page decides,
+ * each showing its value. Its status and credential are on the header line
+ * already, so a row here would only repeat them.
  */
 function ChannelAccountDetails({
   visible,
@@ -1649,15 +1664,10 @@ function ChannelAccountDetails({
   channel,
   accountId,
   connection,
-  runtime,
-  runtimeAvailable,
   assignments,
   teams,
-  revisionVersion,
-  enabled,
   adminScoped,
   pending,
-  retryAccount,
   updateAccount,
 }: {
   visible: boolean;
@@ -1665,15 +1675,10 @@ function ChannelAccountDetails({
   channel: string;
   accountId: string;
   connection: HubConnection | undefined;
-  runtime: HubRuntimeAccount | undefined;
-  runtimeAvailable: boolean | undefined;
   assignments: HubAssignment[] | undefined;
   teams: HubTeam[];
-  revisionVersion: number | undefined;
-  enabled: boolean;
   adminScoped: boolean;
   pending: boolean;
-  retryAccount(account: RecordValue): Promise<void>;
   updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
 }) {
   if (!visible) return null;
@@ -1715,20 +1720,26 @@ function ChannelAccountDetails({
           updateAccount={updateAccount}
         />
       </ConnectionSettingRow>
-      <ConnectionStatusRow
-        account={account}
-        channel={channel}
-        accountId={accountId}
-        connection={connection}
-        runtime={runtime}
-        runtimeAvailable={runtimeAvailable}
-        revisionVersion={revisionVersion}
-        enabled={enabled}
-        pending={pending}
-        retryAccount={retryAccount}
-      />
-      {adminScoped ? null : <ConnectionCredentialRow connection={connection} />}
     </View>
+  );
+}
+
+/**
+ * Asking the Host to start the account again can only change something when the
+ * Hub holds a credential, the Connection is on, the runtime answers, and it is
+ * not already up.
+ */
+function canRetryRuntime(input: {
+  connection: HubConnection | undefined;
+  enabled: boolean;
+  runtimeAvailable: boolean | undefined;
+  runtime: HubRuntimeAccount | undefined;
+}): boolean {
+  return (
+    input.connection !== undefined &&
+    input.enabled &&
+    input.runtimeAvailable !== false &&
+    input.runtime?.transport !== "started"
   );
 }
 
@@ -1745,92 +1756,38 @@ function connectionAdminCount(
   ).length;
 }
 
-/** The runtime, as the Hub reports it, with the actions that report offers. */
-function ConnectionStatusRow({
-  account,
+/**
+ * What the header line cannot say in words, and only when there is something to
+ * say: which configuration the Host loaded when it did not verify or load, and
+ * the QR panel when the account needs relinking. A healthy Connection shows
+ * nothing here — its header already reads Running, and Revision history names
+ * the revision.
+ */
+function ConnectionRuntimeFacts({
   channel,
   accountId,
-  connection,
   runtime,
-  runtimeAvailable,
   revisionVersion,
-  enabled,
-  pending,
-  retryAccount,
 }: {
-  account: RecordValue;
   channel: string;
   accountId: string;
-  connection: HubConnection | undefined;
   runtime: HubRuntimeAccount | undefined;
-  runtimeAvailable: boolean | undefined;
   revisionVersion: number | undefined;
-  enabled: boolean;
-  pending: boolean;
-  retryAccount(account: RecordValue): Promise<void>;
 }) {
-  const retry = useCallback(() => {
-    void retryAccount(account);
-  }, [account, retryAccount]);
+  const loaded = runtime !== undefined && runtime.integrity === "ok" && runtime.loadTrace === "ok";
   // The Hub reports `needs-login` for a QR-auth account whose profile has no live
   // session. That is the whole signal: nothing else says an account is linkable.
   const needsLinking = runtime?.transport === "needs-login";
-  const canRetry =
-    connection?.status === "connected" && enabled && runtime?.transport !== "started";
-  const label = enabled ? channelRuntimeLabel(runtimeAvailable, runtime) : "Disabled";
+  if (loaded && !needsLinking) return null;
   return (
-    <ConnectionSettingRow title="Status" value={needsLinking ? `${label} · needs linking` : label}>
-      <View style={[settingsStyles.row, styles.statusPanel]}>
+    <View style={[settingsStyles.row, styles.statusPanel]}>
+      {loaded ? null : (
         <Text
           style={settingsStyles.rowHint}
-        >{`Configuration revision ${revisionVersion ?? "—"} · Integrity ${runtime?.integrity ?? "not checked"} · Load ${runtime?.loadTrace ?? "not loaded"}`}</Text>
-        {canRetry ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending || runtimeAvailable === false}
-            onPress={retry}
-          >
-            Retry runtime
-          </Button>
-        ) : null}
-      </View>
+        >{`Configuration revision ${revisionVersion ?? "—"} · Integrity ${runtime?.integrity ?? "not-checked"} · Load ${runtime?.loadTrace ?? "not-loaded"}`}</Text>
+      )}
       {needsLinking ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
-    </ConnectionSettingRow>
-  );
-}
-
-/**
- * The provider account the Connection signs in as, shown in place. The Hub has
- * no way to swap a stored credential yet: to use another token, connect a new
- * Connection and point the Routes at it.
- */
-function ConnectionCredentialRow({ connection }: { connection: HubConnection | undefined }) {
-  const status = connection?.status === "connected" ? "Connected" : "Not connected";
-  return (
-    <ConnectionSettingRow
-      title="Credential"
-      value={`${channelConnectionLabel(connection)} · ${status}`}
-    >
-      <View style={[settingsStyles.row, styles.statusPanel]}>
-        {connection === undefined ? (
-          <Text style={settingsStyles.rowHint}>
-            This Connection&apos;s credential is unavailable.
-          </Text>
-        ) : (
-          <>
-            <Text
-              style={settingsStyles.rowHint}
-            >{`Signs in as ${connection.externalName ?? connection.name}`}</Text>
-            <Text style={settingsStyles.rowHint}>{`Saved as ${connection.name} · ${status}`}</Text>
-            <Text style={settingsStyles.rowHint}>
-              To use another bot token, connect a new one from Add Route, then move this
-              Connection&apos;s Routes to it.
-            </Text>
-          </>
-        )}
-      </View>
-    </ConnectionSettingRow>
+    </View>
   );
 }
 
@@ -1977,7 +1934,9 @@ function ChannelRouteAdmins({
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Connection Admins</Text>
+        {/* The row's title and value already say "Admins" and how many there are,
+            so the panel opens straight into the one thing they cannot: what an
+            Admin may do, and which subjects hold it. */}
         <Text style={settingsStyles.rowHint}>
           Admins edit this Connection’s Routes, audience rules, status and relink. Who may talk to
           the bot is set on each Route.
@@ -2011,7 +1970,8 @@ function adminLines(
   admins: readonly { subject: string; by: string | null }[],
 ): string[] {
   if (loading) return ["Admins are not loaded yet."];
-  if (admins.length === 0) return ["Only Organization Admins so far."];
+  // The row's value already reads "Only Organization Admins".
+  if (admins.length === 0) return [];
   return admins.map(({ subject, by }) => (by === null ? subject : `${subject} · by ${by}`));
 }
 
@@ -2151,10 +2111,12 @@ function RouteWarnings({ warnings }: { warnings: string[] }) {
   if (warnings.length === 0) return null;
   const count = `${String(warnings.length)} warning${warnings.length === 1 ? "" : "s"}`;
   return (
-    <View>
-      <Button size="xs" variant="ghost" onPress={toggle}>
-        {open ? `Hide ${count}` : count}
-      </Button>
+    <View style={styles.routeWarnings}>
+      <View style={styles.routeInline}>
+        <Button size="xs" variant="ghost" onPress={toggle}>
+          {open ? `Hide ${count}` : count}
+        </Button>
+      </View>
       {open ? <Alert variant="warning" title={count} description={warnings.join("\n")} /> : null}
     </View>
   );
@@ -3796,6 +3758,9 @@ function channelRuntimeLabel(
       return "Runtime error";
     case "deferred":
       return "Waiting";
+    // The Hub's word for a QR-auth account whose profile has no live session.
+    case "needs-login":
+      return "Needs linking";
     default:
       return channelLabel(runtime.transport);
   }
@@ -4256,6 +4221,16 @@ const styles = StyleSheet.create((theme) => ({
   },
   routeContent: {
     flexBasis: 256,
+  },
+  // The Route's summary lines are a stretched column: anything that should size
+  // to its own content says so here.
+  routeInline: {
+    alignSelf: "flex-start",
+    marginTop: theme.spacing[1],
+  },
+  routeWarnings: {
+    alignItems: "stretch",
+    gap: theme.spacing[2],
   },
   actions: {
     flexDirection: "row",
