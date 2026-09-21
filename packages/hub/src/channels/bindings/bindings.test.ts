@@ -29,6 +29,7 @@ import {
   channelExecutionLabels,
   deriveBindingKey,
 } from "./index.js";
+import { PENDING_MARKER_TTL_MS } from "./pending-marker.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 
 const ORGANIZATION_ID = "channel-org";
@@ -1109,7 +1110,7 @@ describe("orphan recovery (restart / resume)", () => {
       route: {},
     });
     const surviving = snapshotOf("agent-200", null, channelExecutionLabels(executionId));
-    const { daemon, created } = makeFakeDaemon([surviving]);
+    const { daemon, created, messages } = makeFakeDaemon([surviving]);
     const engine = makeEngine(store, daemon);
 
     const outcome = await engine.bindOrSteer(
@@ -1125,6 +1126,126 @@ describe("orphan recovery (restart / resume)", () => {
       "re-bound, not a new session",
     );
     assert.equal(created.length, 0, "the inline path re-binds without re-creating");
+    assert.deepEqual(
+      messages.map((sent) => sent.agentId),
+      ["agent-200"],
+      "the message that drove the re-bind reaches the agent",
+    );
+  });
+
+  it("an unconfirmed create keeps its marker and retries the message", async () => {
+    const conversation = { ...CHANNEL_CONVERSATION, id: "C0SLOW", rootConversationId: "C0SLOW" };
+    const { daemon, messages } = makeFakeDaemon();
+    let creates = 0;
+    const create = daemon.createAgent;
+    daemon.createAgent = async (config, options) => {
+      creates += 1;
+      if (creates === 1) throw new Error("create_agent_request timed out");
+      return create(config, options);
+    };
+    const clock = new ManualClock(Date.now());
+    const engine = makeEngine(store, daemon, clock);
+
+    await assert.rejects(engine.bindOrSteer(message({ conversation }), ...routed()));
+    const marker = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0SLOW", null);
+    assert.equal(marker?.status, "pending", "the daemon may hold the Agent: the marker stays");
+
+    await assert.rejects(
+      engine.bindOrSteer(message({ conversation }), ...routed()),
+      { name: "ChannelAgentCreatePendingError" },
+      "inside the wait the message is retried, not completed unanswered",
+    );
+
+    clock.advance(PENDING_MARKER_TTL_MS + 1_000);
+    const outcome = await engine.bindOrSteer(message({ conversation }), ...routed());
+    assert.equal(outcome.kind === "bound" && outcome.newSession, true, "the thread starts over");
+    assert.equal(messages.length, 1);
+  });
+
+  it("hands the message back when the Host is busy starting other sessions", async () => {
+    const conversation = { ...CHANNEL_CONVERSATION, id: "C0BUSY", rootConversationId: "C0BUSY" };
+    const { daemon, created } = makeFakeDaemon();
+    daemon.hasFreeCreateSlot = () => false;
+    const engine = makeEngine(store, daemon);
+
+    const outcome = await engine.bindOrSteer(message({ conversation }), ...routed());
+    assert.equal(outcome.kind, "deferred");
+    assert.equal(created.length, 0);
+    assert.equal(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0BUSY", null),
+      undefined,
+      "no marker: the retried message starts clean",
+    );
+  });
+
+  it("binds the reply capability an unconfirmed create was launched with", async () => {
+    const conversation = { ...CHANNEL_CONVERSATION, id: "C0LATE", rootConversationId: "C0LATE" };
+    const capabilities = new ChannelReplyCapabilityRegistry();
+    const agents: AgentSnapshot[] = [];
+    const { daemon, created, messages } = makeFakeDaemon(agents);
+    daemon.createAgent = async (config, options) => {
+      // The daemon finishes the create; only the Hub's call gives up on it.
+      agents.push(snapshotOf("agent-late", null, options?.labels ?? {}));
+      created.push({ config, title: null, labels: options?.labels ?? {}, workspaceId: null });
+      throw new Error("RPC create_agent_request timed out");
+    };
+    const route = makeRoute("C0LATE", {
+      defaults: { outbound: { path: "tool", template: null } },
+    });
+    const account = makeAccount(route);
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(account),
+      logger: SILENT,
+      clock: new ManualClock(Date.now()),
+      store,
+      daemon,
+      replyCapabilities: capabilities,
+      resolveAgentAccessTarget: () => ({ projectRoot: "/tmp/repo" }) as never,
+      resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
+    });
+
+    await assert.rejects(engine.bindOrSteer(message({ conversation }), account, route));
+    const retried = await engine.bindOrSteer(message({ conversation }), account, route);
+    assert.equal(retried.kind === "bound" && retried.agentId, "agent-late");
+    assert.equal(created.length, 1, "the Agent that was created is used, not replaced");
+    assert.equal(capabilities.holdsAgentCapability("agent-late"), true);
+    assert.equal(messages.length, 1);
+  });
+
+  it("a create that never reached the Host releases its marker", async () => {
+    const conversation = { ...CHANNEL_CONVERSATION, id: "C0SPEC", rootConversationId: "C0SPEC" };
+    const { daemon, created } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon, new ManualClock(), () => {
+      throw new Error("no such agent");
+    });
+
+    await assert.rejects(engine.bindOrSteer(message({ conversation }), ...routed()));
+    assert.equal(created.length, 0);
+    assert.equal(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0SPEC", null),
+      undefined,
+      "nothing to recover, so the thread is not wedged",
+    );
+  });
+
+  it("a first prompt the Agent did not take is retried into the bound session", async () => {
+    const conversation = { ...CHANNEL_CONVERSATION, id: "C0DROP", rootConversationId: "C0DROP" };
+    const { daemon, messages, created } = makeFakeDaemon();
+    const send = daemon.sendAgentMessage;
+    let sends = 0;
+    daemon.sendAgentMessage = async (agentId, text, options) => {
+      sends += 1;
+      if (sends === 1) throw new Error("host_not_connected");
+      return send(agentId, text, options);
+    };
+    const engine = makeEngine(store, daemon);
+
+    await assert.rejects(engine.bindOrSteer(message({ conversation }), ...routed()));
+    const retried = await engine.bindOrSteer(message({ conversation }), ...routed());
+    assert.equal(retried.kind, "steered");
+    assert.equal(created.length, 1, "one session, not one per attempt");
+    assert.equal(messages.length, 1);
   });
 
   it("an inline pending marker refuses a sender that mayTrigger denies (no re-bind)", async () => {

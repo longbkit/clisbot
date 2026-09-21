@@ -18,6 +18,8 @@ import type { DaemonConnection } from "../daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import { resolveConversationConfiguration } from "../commands-config.js";
 import { autoAllowsEveryToolClass } from "../policy.js";
+import { HostNotReachedError } from "../daemon/enrolled-client.js";
+import { HostBusyError } from "../daemon/create-gate.js";
 import { resolveSessionWorkspaceId } from "../workspace-organization.js";
 import {
   nativeSenderId,
@@ -97,6 +99,20 @@ export function findChannelExecutionAgent(
       // A create pending across the Hub upgrade still carries the old title marker.
       agent.title === `clisbot-channel:${pendingExecutionId}`,
   );
+}
+
+/**
+ * The create RPC was issued and did not confirm. The daemon may hold the Agent
+ * anyway (a timeout, a socket that dropped mid-call), so the thread's pending
+ * marker is the only way back to it and must stay.
+ */
+export class ChannelAgentCreateUnconfirmedError extends Error {
+  constructor(cause: unknown) {
+    super(`agent create unconfirmed: ${cause instanceof Error ? cause.message : String(cause)}`, {
+      cause,
+    });
+    this.name = "ChannelAgentCreateUnconfirmedError";
+  }
 }
 
 export class ChannelWorkflowTargetError extends Error {
@@ -207,11 +223,17 @@ export async function createRouteSession(
       route,
     );
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
-    const created = await context.daemon.createAgent(config, {
-      labels: channelExecutionLabels(executionId),
-      source: requester,
-      ...(workspaceId === undefined ? {} : { workspaceId }),
-    });
+    const created = await context.daemon
+      .createAgent(config, {
+        labels: channelExecutionLabels(executionId),
+        source: requester,
+        ...(workspaceId === undefined ? {} : { workspaceId }),
+      })
+      .catch((error: unknown) => {
+        // Never written to the Host: there is no Agent to find, so no marker to keep.
+        if (error instanceof HostNotReachedError || error instanceof HostBusyError) throw error;
+        throw new ChannelAgentCreateUnconfirmedError(error);
+      });
     if (
       capabilityToken !== undefined &&
       context.replyCapabilities?.bind(capabilityToken, created.agentId) !== true
@@ -224,7 +246,10 @@ export async function createRouteSession(
     context.noteAgentCwd?.(created.agentId, config.cwd);
     return { agentId: created.agentId };
   } catch (error) {
-    if (capabilityToken !== undefined) {
+    // An unconfirmed create may still produce the Agent, and that Agent was
+    // launched with this token: revoking it now would leave it able to work but
+    // not to answer. The marker's recovery binds it or revokes it.
+    if (capabilityToken !== undefined && !(error instanceof ChannelAgentCreateUnconfirmedError)) {
       context.replyCapabilities?.revoke(capabilityToken);
     }
     throw error;

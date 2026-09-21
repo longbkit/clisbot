@@ -8,6 +8,7 @@ import {
 } from "./session-operation.js";
 import { TrustedDaemonClient } from "./ws-client.js";
 import { EnrolledDaemonClient } from "./enrolled-client.js";
+import { hostHasCreateSlot, withHostCreateSlot } from "./create-gate.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
@@ -29,6 +30,16 @@ import type {
 // (plan §14.7): the embedded form connects over loopback; the team/remote form
 // pairs over the relay with the same ordinary-client wire. Everything here is an
 // existing trusted-client RPC — no new schema, no enrollment.
+
+/**
+ * The two calls that wait on a provider process rather than on the daemon. The
+ * daemon allows a run 60 s to start (`AGENT_RUN_START_TIMEOUT_MS` in
+ * `server/agent/agent-prompt.ts`) and a create boots the same provider, so the
+ * default 30 s gave up on work the daemon then finished: a turn that ran after
+ * the Hub reported it failed, an Agent created with nobody bound to it. Both
+ * stay above the daemon's budget; a Host that is gone fails at once regardless.
+ */
+const PROVIDER_START_RPC_TIMEOUT_MS = 90_000;
 
 export interface ChannelDaemonClientOptions {
   /** The daemon target host:port. Loopback form. */
@@ -84,6 +95,8 @@ export interface DaemonConnection {
   /** Resolves when the trusted session is established (daemon `server_info` seen). */
   waitForConnected(timeoutMs?: number): Promise<void>;
   createAgent(config: CreateAgentConfig, options?: CreateAgentOptions): Promise<CreateAgentResult>;
+  /** Would a create start now? `false` = the Host is busy starting other sessions. */
+  hasFreeCreateSlot(): boolean;
   /** Create the workspace a channel session will land in, so the daemon names
    * it from the first request (`workspace-organization.ts`). */
   createWorkspace(
@@ -145,6 +158,8 @@ export interface EnrolledChannelDaemonOptions {
   onStateChange?: (state: "connected" | "disconnected") => void;
   /** What the Host is called in logs and errors (its slug or id). */
   hostLabel: string;
+  /** The Host's id. Labels repeat across organizations; the create gate must not. */
+  hostId: string;
   rpcTimeoutMs?: number;
   resolveSessionOperationTicket?: ChannelOperationTicketResolver;
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
@@ -198,6 +213,7 @@ export function connectEnrolledChannelDaemon(
     socket,
     { url: options.hostLabel, source: "enrolled" },
     options.resolveSessionOperationTicket,
+    options.hostId,
   );
 }
 
@@ -252,10 +268,43 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
   return createFacade(socket, discovery, options.resolveSessionOperationTicket);
 }
 
+const AGENT_PAGE_LIMIT = 200;
+/** A guard, not a product limit: 5 000 agents on one Host is a leak to look at. */
+const AGENT_PAGE_CEILING = 25;
+
+/**
+ * Every agent on the Host, across pages. The daemon answers one page of 200 by
+ * default, and orphan recovery, command lookups and the running-turn check all
+ * search this list: reading only the first page made an agent past it invisible.
+ */
+async function fetchAllAgents(socket: ChannelDaemonSocket): Promise<AgentSnapshot[]> {
+  const agents: AgentSnapshot[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < AGENT_PAGE_CEILING; page += 1) {
+    const payload = asRecord(
+      await socket.call("fetch_agents_request", {
+        page: { limit: AGENT_PAGE_LIMIT, ...(cursor === undefined ? {} : { cursor }) },
+      }),
+    );
+    const entries = Array.isArray(payload?.["entries"]) ? payload["entries"] : [];
+    for (const entry of entries) {
+      const agent = normalizeAgentSnapshot(asRecord(entry)?.["agent"]);
+      if (agent !== undefined) agents.push(agent);
+    }
+    const pageInfo = asRecord(payload?.["pageInfo"]);
+    const next = pageInfo?.["nextCursor"];
+    if (pageInfo?.["hasMore"] !== true || typeof next !== "string" || next === "") break;
+    cursor = next;
+  }
+  return agents;
+}
+
 function createFacade(
   socket: ChannelDaemonSocket,
   discovery: DaemonDiscoveryResult,
   resolveIdentity?: ChannelOperationTicketResolver,
+  /** Which Host's create gate this connection counts against. */
+  hostKey: string = discovery.url,
 ): DaemonConnection {
   const identify = async (
     type: string,
@@ -276,17 +325,19 @@ function createFacade(
   return {
     discovery,
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
-    createAgent: async (config, options) =>
-      mapCreatedAgent(
-        await socket.call(
-          "create_agent_request",
-          await identify(
-            "create_agent_request",
-            createAgentPayload(config, options),
-            options?.source,
-          ),
+    hasFreeCreateSlot: () => hostHasCreateSlot(hostKey),
+    createAgent: async (config, options) => {
+      const request = await identify(
+        "create_agent_request",
+        createAgentPayload(config, options),
+        options?.source,
+      );
+      return mapCreatedAgent(
+        await withHostCreateSlot(hostKey, () =>
+          socket.call("create_agent_request", request, PROVIDER_START_RPC_TIMEOUT_MS),
         ),
-      ),
+      );
+    },
     createWorkspace: async (input, options) =>
       workspaceIdFromResponse(
         await socket.call(
@@ -314,6 +365,7 @@ function createFacade(
           },
           options?.source,
         ),
+        PROVIDER_START_RPC_TIMEOUT_MS,
       );
       const result = asRecord(payload);
       if (result?.["accepted"] === false)
@@ -341,14 +393,7 @@ function createFacade(
           options?.systemOperation ?? options?.source,
         )),
       }),
-    listAgents: () =>
-      socket.call("fetch_agents_request", {}).then((payload) => {
-        const p = asRecord(payload);
-        const entries = Array.isArray(p?.["entries"]) ? p["entries"] : [];
-        return entries
-          .map((entry) => normalizeAgentSnapshot(asRecord(entry)?.["agent"]))
-          .filter((agent): agent is AgentSnapshot => agent !== undefined);
-      }),
+    listAgents: () => fetchAllAgents(socket),
     isAgentInProject: (agent, projectId) => isAgentInProject(socket, agent, projectId),
     getServerInfo: () => socket.serverInfo as DaemonServerInfo | undefined,
     listAvailableProviders: () =>

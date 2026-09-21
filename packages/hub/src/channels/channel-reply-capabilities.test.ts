@@ -181,6 +181,26 @@ describe("channel reply capabilities across a Hub restart", () => {
     assert.equal(restored.resolve(token, ORGANIZATION_ID)?.requesterSenderId, REQUESTER_SENDER_ID);
   });
 
+  it("binds a capability by its turn, and drops an unbound one at the next restart", async () => {
+    // An unconfirmed create keeps its token so the Agent it may still produce
+    // can answer. Nothing can bind it after a restart (the turn is not
+    // persisted), so it must not stay a live bearer credential until its TTL.
+    const minted = new ChannelReplyCapabilityRegistry({ store });
+    const found = minted.issue(capabilityInput({ turnId: "turn-found" }));
+    const lost = minted.issue(capabilityInput({ turnId: "turn-lost" }));
+    const givenUp = minted.issue(capabilityInput({ turnId: "turn-given-up" }));
+    assert.equal(minted.bindTurn("turn-found", "agent-found"), true);
+    assert.equal(minted.bindTurn("turn-found", "agent-other"), false, "a turn binds once");
+    minted.revokeUnboundTurn("turn-given-up");
+    assert.equal(minted.resolve(givenUp, ORGANIZATION_ID), undefined);
+    await minted.flush();
+
+    const restored = new ChannelReplyCapabilityRegistry({ store });
+    await restored.hydrate();
+    assert.equal(restored.resolve(found, ORGANIZATION_ID)?.agentId, "agent-found");
+    assert.equal(restored.resolve(lost, ORGANIZATION_ID), undefined);
+  });
+
   it("keeps a revoked account out of the restored set", async () => {
     const minted = new ChannelReplyCapabilityRegistry({ store });
     const token = minted.issue(capabilityInput());
@@ -253,8 +273,9 @@ describe("channel reply capabilities across a Hub restart", () => {
   });
 });
 
-function capabilityInput() {
+function capabilityInput(overrides: { turnId?: string } = {}) {
   return {
+    ...overrides,
     organizationId: ORGANIZATION_ID,
     channelRevisionId: "0712b046-e77d-4d2d-8154-cb861e4a80ac",
     routePosition: 0 as const,

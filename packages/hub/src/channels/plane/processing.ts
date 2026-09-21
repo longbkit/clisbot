@@ -59,6 +59,8 @@ export interface ProcessingController {
   bind(id: string, agentId: string): void;
   /** A stream event proves the agent's turn is alive: push the TTL out. */
   touch(agentId: string): void;
+  /** The session is still being created: keep a lease that has no agent yet. */
+  extend(id: string): void;
   /** The agent's turn ended (terminal event, or a detach). */
   closeAgent(agentId: string): void;
   /** A provisional lease whose turn never started (create/send failed). */
@@ -292,6 +294,11 @@ export function createProcessingController(deps: ProcessingControllerDeps): Proc
         const lease = leases.get(id);
         if (lease !== undefined) lease.deadline = deps.now() + ttlMs;
       }
+    },
+
+    extend(id) {
+      const lease = leases.get(id);
+      if (lease !== undefined) lease.deadline = deps.now() + ttlMs;
     },
 
     closeAgent(agentId) {

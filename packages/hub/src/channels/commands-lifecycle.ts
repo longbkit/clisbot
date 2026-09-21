@@ -38,6 +38,8 @@ export interface LifecycleCommandDependencies {
   issueCapability?(context: LifecycleCommandContext): ChannelReplyAgentCapability;
   bindCapability?(token: string, agentId: string): boolean;
   revokeCapability?(token: string): void;
+  /** Revoke what a create that was given up was launched with. */
+  revokeUnboundTurn?(turnId: string): void;
   attach(binding: ThreadBindingRecord, context: LifecycleCommandContext): Promise<void>;
   detach(agentId: string): Promise<void>;
   authorizeResume(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<boolean>;
@@ -110,6 +112,10 @@ export class ChannelLifecycleCommands {
       ...key,
     });
     if (released?.agentId) await this.detach(released.agentId);
+    // A create still pending on this thread is given up with it.
+    if (released?.pendingExecutionId) {
+      this.deps.revokeUnboundTurn?.(released.pendingExecutionId);
+    }
     if (prompt !== undefined && prompt !== "") {
       const accepted = await this.deps.dispatchFresh({
         ...context,

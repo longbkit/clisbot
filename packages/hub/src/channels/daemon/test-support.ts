@@ -16,8 +16,10 @@ export function configurationDaemonStub(): Pick<
   | "buildAgentForkContext"
   | "isAgentInProject"
   | "createWorkspace"
+  | "hasFreeCreateSlot"
 > {
   return {
+    hasFreeCreateSlot: () => true,
     getServerInfo: () => ({
       serverId: "test-daemon",
       features: { agentConfigApply: true, agentForkContext: true },

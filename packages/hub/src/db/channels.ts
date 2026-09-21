@@ -246,6 +246,8 @@ export class ChannelStore {
     externalConversationId: string;
     externalThreadId: string | null;
     expectedAgentId?: string | undefined;
+    /** Release only this execution's pending marker; another row is left alone. */
+    expectedPendingExecutionId?: string | undefined;
   }): Promise<ThreadBindingRecord | undefined> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
@@ -257,6 +259,12 @@ export class ChannelStore {
         input.externalThreadId,
       );
       if (row === undefined) return undefined;
+      if (
+        input.expectedPendingExecutionId !== undefined &&
+        (row.status !== "pending" || row.pendingExecutionId !== input.expectedPendingExecutionId)
+      ) {
+        return undefined;
+      }
       if (input.expectedAgentId !== undefined && row.agentId !== input.expectedAgentId) {
         throw new ChannelThreadBindingConflictError();
       }

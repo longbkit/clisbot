@@ -261,6 +261,23 @@ class FakeDaemon {
         return;
       }
       case "fetch_agents_request": {
+        const page = message["page"] as { cursor?: string } | undefined;
+        if (page?.cursor === "page-2") {
+          client.send(
+            JSON.stringify({
+              type: "session",
+              message: {
+                type: "fetch_agents_response",
+                payload: {
+                  requestId: message["requestId"],
+                  entries: [{ agent: { id: "agent-3", provider: "codex", status: "running" } }],
+                  pageInfo: { nextCursor: null, prevCursor: null, hasMore: false },
+                },
+              },
+            }),
+          );
+          return;
+        }
         client.send(
           JSON.stringify({
             type: "session",
@@ -291,11 +308,7 @@ class FakeDaemon {
                     },
                   },
                 ],
-                pageInfo: {
-                  nextCursor: null,
-                  prevCursor: null,
-                  hasMore: false,
-                },
+                pageInfo: { nextCursor: "page-2", prevCursor: null, hasMore: true },
               },
             },
           }),
@@ -459,11 +472,11 @@ describe("channel trusted-client daemon connection", () => {
     assert.deepEqual(response["updatedPermissions"], [{ rules: ["Bash(npm:*)"] }]);
   });
 
-  it("lists agents through fetch_agents_request", async () => {
+  it("lists agents through fetch_agents_request, across pages", async () => {
     const agents = await client.listAgents();
     assert.deepEqual(
       agents.map((agent) => agent.id),
-      ["agent-1", "agent-2"],
+      ["agent-1", "agent-2", "agent-3"],
     );
   });
 

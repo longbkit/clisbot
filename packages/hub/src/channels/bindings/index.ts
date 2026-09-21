@@ -11,7 +11,7 @@
 // steer. Workflow targets are out of scope: they own their own session
 // lifecycle (implementation doc §4.3.4).
 import { randomUUID } from "node:crypto";
-import { ChannelThreadBindingConflictError, type ChannelStore } from "../../db/channels.js";
+import type { ChannelStore } from "../../db/channels.js";
 import type { ThreadBindingRecord } from "../../db/types.js";
 import type {
   ChannelControlPlane,
@@ -27,12 +27,19 @@ import {
   routePosition,
   type ThreadKey,
 } from "./stored-route.js";
+import { findChannelExecutionAgent } from "./session-create.js";
 import {
-  ChannelWorkflowTargetError,
-  createRouteSession,
-  findChannelExecutionAgent,
-  type SessionCreateContext,
-} from "./session-create.js";
+  createMarkedSession,
+  recordSessionMarker,
+  releasePendingMarker,
+  type SessionStartContext,
+} from "./session-start.js";
+import {
+  ChannelAgentCreatePendingError,
+  HOST_BUSY_RETRY_AFTER_MS,
+  pendingMarkerExpired,
+  recoverOrphanMarkers,
+} from "./pending-marker.js";
 import {
   admitFollowUp,
   conversationFollowUpMode,
@@ -108,7 +115,7 @@ function labelOf(message: InboundMessage): { conversationLabel?: string } {
     : { conversationLabel: message.conversationLabel };
 }
 
-interface BindingEngineContext extends SessionCreateContext {
+interface BindingEngineContext extends SessionStartContext {
   controlPlane: ChannelControlPlane;
   clock: PlaneClock;
   store: ChannelStore;
@@ -206,7 +213,7 @@ export class BindingEngine {
     );
     if (binding === undefined) return this.firstMention(message, account, route, key, subscribe);
     if (binding.status === "pending") {
-      return this.recoverPending(message, account, route, key, binding.pendingExecutionId);
+      return this.recoverPending(message, account, route, binding, subscribe);
     }
     // Abandonment is an explicit operator act (the plane never abandons); the
     // key is permanently held, so steering back needs operator recovery.
@@ -229,46 +236,12 @@ export class BindingEngine {
     return this.followUp(message, account, route, binding.agentId, subscribe);
   }
 
-  /**
-   * Orphan recovery (plan §10): scan the org's pending markers against
-   * `fetch_agents`; a marker whose agent survived (matched by its
-   * execution-id label) is re-bound instead of re-created. A marker with no surviving agent
-   * is left pending — the create may have timed out rather than failed, so a
-   * later inbound (or a later restart) re-checks it.
-   */
-  async recoverOrphans(scope?: {
+  /** The start-time half of orphan recovery; the inline half is `recoverPending`. */
+  recoverOrphans(scope?: {
     channel: SupportedChannelName;
     accountId: string;
   }): Promise<{ rebound: number; leftPending: number }> {
-    const pending = await this.context.store.listPendingThreadBindings(
-      this.context.organizationId,
-      scope,
-    );
-    if (pending.length === 0) return { rebound: 0, leftPending: 0 };
-    const agents = await this.context.daemon.listAgents();
-    let rebound = 0;
-    let leftPending = 0;
-    for (const marker of pending) {
-      const agent = findChannelExecutionAgent(agents, marker.pendingExecutionId ?? "");
-      if (agent === undefined) {
-        leftPending += 1;
-        continue;
-      }
-      await this.context.store.resolvePendingThreadBinding({
-        organizationId: marker.organizationId,
-        accountId: marker.accountId,
-        externalConversationId: marker.externalConversationId,
-        externalThreadId: marker.externalThreadId,
-        agentId: agent.id,
-        resolvedAt: new Date(),
-      });
-      this.context.logger.info?.("orphan recovery re-bound a pending marker", {
-        accountId: marker.accountId,
-        agentId: agent.id,
-      });
-      rebound += 1;
-    }
-    return { rebound, leftPending };
+    return recoverOrphanMarkers(this.context, scope);
   }
 
   // --- Sub-decisions -------------------------------------------------------
@@ -335,97 +308,39 @@ export class BindingEngine {
     key: ThreadKey,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const executionId = randomUUID();
+    // The Host is already starting as many sessions as it runs at once. The
+    // message goes back to the durable queue instead of waiting here, so the
+    // worker it holds is free for conversations that need no new session.
+    if (!this.context.daemon.hasFreeCreateSlot()) {
+      return {
+        kind: "deferred",
+        reason: "the Host is busy starting other sessions",
+        retryAfterMs: HOST_BUSY_RETRY_AFTER_MS,
+      };
+    }
+    const start = { account, route, key, executionId: randomUUID(), message };
     // Admitted: the turn is happening. Raise the surface before any daemon
     // call, keyed provisionally on the execution id and re-keyed to the
     // agent once it exists.
-    this.openSurface(executionId, message, account, route, key);
-    try {
-      await this.context.store.recordPendingThreadBinding({
-        organizationId: this.context.organizationId,
-        channel: account.channel as SupportedChannelName,
-        accountId: account.accountId,
-        externalConversationId: key.externalConversationId,
-        externalThreadId: key.externalThreadId,
-        pendingExecutionId: executionId,
-        initiator: message.senderIdentity,
-        route: bindingSummary(
-          route,
-          message.conversation,
-          {
-            revisionId: this.context.channelRevisionId ?? null,
-            position: routePosition(account, route),
-          },
-          message.conversationLabel,
-        ),
-      });
-    } catch (error) {
-      // A concurrent mention won the insert between our lookup and our insert:
-      // re-read the key and drive the existing marker instead of creating a
-      // second agent. `ChannelThreadBindingConflictError` is the only record
-      // failure here (a missing row is impossible — we just looked it up), so
-      // anything else is a real fault and stays fatal.
-      if (!(error instanceof ChannelThreadBindingConflictError)) throw error;
-      const existing = await this.context.store.findThreadBinding(
-        this.context.organizationId,
-        account.accountId,
-        key.externalConversationId,
-        key.externalThreadId,
-      );
-      if (existing?.status === "pending") {
-        return this.recoverPending(message, account, route, key, existing.pendingExecutionId);
-      }
+    this.openSurface(start.executionId, message, account, route, key);
+    const contested = await recordSessionMarker(this.context, start).catch((error: unknown) => {
+      this.context.processing?.close(start.executionId);
       throw error;
-    }
-    let created;
-    try {
-      created = await createRouteSession(this.context, account, route, key, executionId, message);
-    } catch (error) {
-      return this.settleCreationFailure(error, account, executionId);
-    }
-    await this.context.store.resolvePendingThreadBinding({
-      organizationId: this.context.organizationId,
-      accountId: account.accountId,
-      externalConversationId: key.externalConversationId,
-      externalThreadId: key.externalThreadId,
-      agentId: created.agentId,
-      resolvedAt: new Date(),
     });
-    this.markActive(created.agentId);
-    this.context.processing?.bind(executionId, created.agentId);
-    // Subscribe the session before the prompt: everything the turn emits from
-    // here on is seen, including its terminal event.
-    await subscribe?.(created.agentId);
-    try {
-      await this.context.daemon.sendAgentMessage(created.agentId, message.text, {
-        steer: false,
-        source: message,
-      });
-    } catch (error) {
-      // The turn never started: release the surface, and say so.
-      this.context.processing?.close(executionId);
-      this.context.logger.warn("first prompt delivery failed", {
-        accountId: account.accountId,
-        agentId: created.agentId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        kind: "ignored",
-        reason: "agent did not accept the first prompt",
-      };
+    if (contested !== undefined) {
+      // Another start owns this thread; its recovery raises its own surface.
+      this.context.processing?.close(start.executionId);
+      return this.recoverPending(message, account, route, contested, subscribe);
     }
+    const agentId = await createMarkedSession(this.context, start);
+    await this.deliverFirstPrompt(agentId, start.executionId, message, account, subscribe);
     this.context.logger.info?.("conversation bound to a new agent session", {
       channel: account.channel,
       accountId: account.accountId,
       ...labelOf(message),
-      agentId: created.agentId,
+      agentId,
     });
-    return {
-      kind: "bound",
-      agentId: created.agentId,
-      newSession: true,
-      ...labelOf(message),
-    };
+    return { kind: "bound", agentId, newSession: true, ...labelOf(message) };
   }
 
   /**
@@ -496,51 +411,74 @@ export class BindingEngine {
     return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
   }
 
-  /** A failed create keeps its marker: the daemon may have created the Agent anyway. */
-  private async settleCreationFailure(
-    error: unknown,
-    account: CompiledChannelAccount,
+  /**
+   * Subscribe the session, then deliver the prompt that opened it: everything
+   * the turn emits from here on is seen, including its terminal event. A prompt
+   * the Agent did not take throws, so the message is retried into the session
+   * that is now bound instead of being lost.
+   */
+  private async deliverFirstPrompt(
+    agentId: string,
     executionId: string,
-  ): Promise<InboundOutcome> {
-    this.context.processing?.close(executionId);
-    // The daemon may have created an Agent before the RPC timed out: the
-    // pending marker is the recovery identity, so never recreate or release it.
-    this.context.logger.warn("agent create failed; the thread marker stays pending", {
-      accountId: account.accountId,
-      executionId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { kind: "ignored", reason: "agent create in progress; try again shortly" };
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    subscribe?: (agentId: string) => Promise<void> | void,
+  ): Promise<void> {
+    this.markActive(agentId);
+    this.context.processing?.bind(executionId, agentId);
+    await subscribe?.(agentId);
+    try {
+      await this.context.daemon.sendAgentMessage(agentId, message.text, {
+        steer: false,
+        source: message,
+      });
+    } catch (error) {
+      this.context.processing?.close(executionId);
+      this.context.logger.warn("first prompt delivery failed; the message is retried", {
+        accountId: account.accountId,
+        agentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
-   * A pending marker already exists for this key: rebind when the agent
-   * survived the create-then-crash window, otherwise stay pending. This is the
-   * inline half of orphan recovery (the start-time scan is `recoverOrphans`).
-   * The re-bind is the inbound driving it, so it carries the same admission as
-   * a first mention: `requireMention` and `mayTrigger` both gate it — the
-   * re-bind is not an operator act, and a sender the route does not admit must
-   * not pull the thread to a bound state (nor may an unmentioned message under
-   * `requireMention`).
+   * A pending marker already exists for this key. This is the inline half of
+   * orphan recovery (the start-time scan is `recoverOrphans`): re-bind when the
+   * Agent survived and deliver this message to it; start over once the marker
+   * has waited out its TTL with no Agent; otherwise the create may still land,
+   * so the message is retried. The inbound drives all three, so it carries the
+   * same admission as a first mention.
    */
-
   private async recoverPending(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    key: ThreadKey,
-    pendingExecutionId: string | null,
+    marker: ThreadBindingRecord,
+    subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
     const refusal = await this.admitUnbound(message, account, route);
     if (refusal !== undefined) return refusal;
-    const executionId = pendingExecutionId ?? "";
+    const key = deriveBindingKey(message, route);
+    const executionId = marker.pendingExecutionId ?? "";
     const agents = await this.context.daemon.listAgents();
     const surviving = findChannelExecutionAgent(agents, executionId);
     if (surviving === undefined) {
-      return {
-        kind: "ignored",
-        reason: "agent create in progress; try again shortly",
-      };
+      if (!pendingMarkerExpired(marker, this.context.clock.now())) {
+        throw new ChannelAgentCreatePendingError();
+      }
+      await releasePendingMarker(this.context, account, key, executionId);
+      return this.startSession(message, account, route, key, subscribe);
+    }
+    // The Agent was launched with the capability its create issued; bind it now
+    // that the Agent is known. Without one (a Hub restart forgot the turn) a
+    // `tool` route Agent could only answer into silence, so it is replaced.
+    this.context.replyCapabilities?.bindTurn(executionId, surviving.id);
+    if (this.lostReplyCapability(surviving.id, route)) {
+      await this.context.daemon.cancelAgent(surviving.id).catch(() => undefined);
+      await releasePendingMarker(this.context, account, key, executionId);
+      return this.startSession(message, account, route, key, subscribe);
     }
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
@@ -550,19 +488,15 @@ export class BindingEngine {
       agentId: surviving.id,
       resolvedAt: new Date(),
     });
-    this.markActive(surviving.id);
+    this.openSurface(executionId, message, account, route, key);
+    await this.deliverFirstPrompt(surviving.id, executionId, message, account, subscribe);
     this.context.logger.info?.("inbound re-bound a pending marker", {
       channel: account.channel,
       accountId: account.accountId,
       ...labelOf(message),
       agentId: surviving.id,
     });
-    return {
-      kind: "bound",
-      agentId: surviving.id,
-      newSession: false,
-      ...labelOf(message),
-    };
+    return { kind: "bound", agentId: surviving.id, newSession: false, ...labelOf(message) };
   }
 
   /** A bound thread: admit the follow-up and steer the existing session. */
@@ -671,13 +605,5 @@ export class BindingEngine {
     processing.open(leaseId, surface);
   }
 }
-
-/**
- * The compact route summary stored on the binding row. `selection` pins the
- * immutable revision decision without promoting routes into durable resources:
- * position addresses the route inside that revision and fingerprint proves a
- * later revision retained equivalent target and policy before continuation.
- * Older rows without `selection` remain readable through the legacy match key.
- */
 
 export { admitFollowUp, type FollowUpAdmission } from "./follow-up.js";

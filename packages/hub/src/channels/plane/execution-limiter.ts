@@ -13,6 +13,16 @@ const SWEEP_EVERY_ADMISSIONS = 256;
  * scope is not re-claimed on every drain tick.
  */
 const CONCURRENCY_RETRY_AFTER_MS = 5_000;
+/**
+ * A lease is released by its run's terminal stream event, and that event can be
+ * lost: the Host's socket was down when the turn ended, the daemon crashed, the
+ * agent was killed. Without a runtime limit the slot is then held for good and
+ * the scope refuses everything. So a full scope asks the Host which agents are
+ * still running, at most this often, and lets go of the rest.
+ */
+const LEASE_RECONCILE_EVERY_MS = 15_000;
+/** A run this young may not show as running yet: its prompt was just sent. */
+const LEASE_RECONCILE_GRACE_MS = 30_000;
 
 export interface ExecutionLease {
   id: string;
@@ -39,6 +49,8 @@ interface ExecutionLimiterDeps {
   now: () => number;
   cancelAgent: (agentId: string) => Promise<void>;
   logger: PlaneLogger;
+  /** The Host's running agents; absent = leaked leases are never reconciled. */
+  readRunningAgentIds?: (() => Promise<ReadonlySet<string>>) | undefined;
   schedule?: ((callback: () => void, delayMs: number) => () => void) | undefined;
 }
 
@@ -48,6 +60,8 @@ interface ActiveLease {
   /** An open-audience run stops when its policy is replaced; a Member run keeps going. */
   cancelOnReplace: boolean;
   cancelTimer: () => void;
+  /** When the run's agent became known; the reconcile grace counts from here. */
+  boundAt?: number;
   agentId?: string;
 }
 
@@ -70,6 +84,7 @@ export class ChannelExecutionLimiter {
   private readonly leaseIdsByScope = new Map<string, Set<string>>();
   private readonly leaseIdsByAgent = new Map<string, Set<string>>();
   private admissions = 0;
+  private lastReconcileAt = Number.NEGATIVE_INFINITY;
 
   constructor(deps: ExecutionLimiterDeps) {
     this.deps = deps;
@@ -105,6 +120,7 @@ export class ChannelExecutionLimiter {
       this.leaseIdsByAgent.get(active.agentId)?.delete(active.id);
     }
     active.agentId = agentId;
+    active.boundAt = this.deps.now();
     addToSet(this.leaseIdsByAgent, agentId, active.id);
   }
 
@@ -196,6 +212,7 @@ export class ChannelExecutionLimiter {
       };
     }
     if (this.atConcurrencyLimit(scope)) {
+      void this.reconcileLeases(now);
       return {
         allowed: false,
         reason: `${label} concurrency limit exceeded`,
@@ -282,6 +299,28 @@ export class ChannelExecutionLimiter {
     const scopeKeys = scopes.map(({ key }) => key);
     this.leases.set(id, { id, scopeKeys, cancelOnReplace, cancelTimer });
     for (const key of scopeKeys) addToSet(this.leaseIdsByScope, key, id);
+  }
+
+  /** Let go of leases whose agent the Host no longer reports as running. */
+  private async reconcileLeases(now: number): Promise<void> {
+    const read = this.deps.readRunningAgentIds;
+    if (read === undefined || now - this.lastReconcileAt < LEASE_RECONCILE_EVERY_MS) return;
+    this.lastReconcileAt = now;
+    try {
+      const running = await read();
+      for (const lease of this.leases.values()) {
+        if (lease.agentId === undefined || lease.boundAt === undefined) continue;
+        const settled = now - lease.boundAt >= LEASE_RECONCILE_GRACE_MS;
+        if (!settled || running.has(lease.agentId)) continue;
+        this.deps.logger.warn("channel run lease released: its agent is not running", {
+          agentId: lease.agentId,
+          scopes: lease.scopeKeys,
+        });
+        this.release(lease.id);
+      }
+    } catch {
+      // The Host is away: nothing is known, so nothing is released.
+    }
   }
 
   private release(leaseId: string): void {

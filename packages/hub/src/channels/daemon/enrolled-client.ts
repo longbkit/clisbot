@@ -35,6 +35,27 @@ export interface EnrolledDaemonClientOptions {
 /** A Host that is not connected has nothing to wait for; say so in one word. */
 export const HOST_NOT_CONNECTED = "host_not_connected";
 
+/**
+ * The call was refused before anything was written: the Host was already away.
+ * Unlike a call that was in flight when the socket dropped, its fate is known.
+ */
+export class HostNotReachedError extends Error {
+  constructor() {
+    super(HOST_NOT_CONNECTED);
+    this.name = "HostNotReachedError";
+  }
+}
+
+/** Did this failure, or anything it wraps, come from a Host that is away? */
+export function isHostNotConnected(error: unknown): boolean {
+  let current = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current.message === HOST_NOT_CONNECTED) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 export class EnrolledDaemonClient {
   private readonly protocol: DaemonSessionProtocol;
   private readonly teardown: (() => void)[] = [];
@@ -94,7 +115,7 @@ export class EnrolledDaemonClient {
   }
 
   call(requestType: string, fields: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
-    if (!this.connected) return Promise.reject(new Error(HOST_NOT_CONNECTED));
+    if (!this.connected) return Promise.reject(new HostNotReachedError());
     return this.protocol.call(requestType, fields, timeoutMs);
   }
 

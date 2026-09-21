@@ -61,6 +61,8 @@ function sinkFor(
   });
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function admit(
   accountId: string,
   eventId: string,
@@ -75,6 +77,9 @@ async function admit(
     laneKey,
     payload: { event: eventId },
   });
+  // Arrival order is `(created_at, id)` and the id is random: rows stamped in
+  // the same instant have no order for a test to assert.
+  await sleep(3);
 }
 
 async function readEvent(accountId: string, eventId: string): Promise<ChannelIngressQueueRecord> {
@@ -101,8 +106,6 @@ function drainFor(
     ...overrides,
   });
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("channel ingress drain", () => {
   it("schedules the upstream backoff delay for a retryable failure", async () => {
@@ -249,6 +252,56 @@ describe("channel ingress drain", () => {
     assert.equal(delivered.length, 1);
   });
 
+  it("dispatches conversations in parallel and keeps one conversation in order", async () => {
+    const accountId = "parallel";
+    await admit(accountId, "event-a-1", "lane-a");
+    await admit(accountId, "event-a-2", "lane-a");
+    await admit(accountId, "event-b-1", "lane-b");
+    const started: string[] = [];
+    let running = 0;
+    let peak = 0;
+    const drain = drainFor(accountId, {
+      dispatch: async (payload) => {
+        started.push((payload as { event: string }).event);
+        running += 1;
+        peak = Math.max(peak, running);
+        await sleep(40);
+        running -= 1;
+      },
+    });
+
+    const pass = await drain.drainOnce();
+    assert.equal(pass.completed, 3);
+    assert.equal(peak, 2, "the second conversation does not wait behind the first");
+    assert.ok(
+      started.indexOf("event-a-1") < started.indexOf("event-a-2"),
+      "a lane never has two live claims, so its order holds",
+    );
+  });
+
+  it("wakes for a handed-back event when it comes due, ahead of the interval", async () => {
+    const accountId = "due-wake";
+    await admit(accountId, "event-due-1");
+    let attempts = 0;
+    const drain = drainFor(accountId, {
+      intervalMs: 60_000,
+      dispatch: async () => {
+        attempts += 1;
+        return attempts === 1
+          ? { kind: "deferred", reason: "route busy", retryAfterMs: 50 }
+          : undefined;
+      },
+    });
+    drain.start();
+    try {
+      await sleep(400);
+      assert.equal(attempts, 2);
+      assert.equal((await readEvent(accountId, "event-due-1")).status, "completed");
+    } finally {
+      await drain.stop();
+    }
+  });
+
   it("recovers a dead worker's claim and delivers the event exactly once", async () => {
     const accountId = "crash";
     await admit(accountId, "event-crash");
@@ -361,6 +414,9 @@ describe("channel ingress drain", () => {
       workerId: `${CHANNEL}:${accountId}:drain`,
       abortSignal: new AbortController().signal,
       leaseMs: 5,
+      // One worker: with a 5 ms lease a second in-flight claim would be stale
+      // too, and the recovery below counts exactly the one under test.
+      concurrency: 1,
       dispatch: async (payload) => {
         const event = (payload as { event: string }).event;
         delivered.push(event);

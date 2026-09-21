@@ -118,6 +118,7 @@ import {
 } from "../state/keyed-store.js";
 import { encryptedStateNamespaces } from "../state/encrypted-namespaces.js";
 import { isSettledTransport, monitorFailureTransport } from "./needs-login.js";
+import { AccountRestartScheduler } from "./account-restart.js";
 import { runQrLoginVerb, type QrLoginResult, type QrLoginVerb } from "./qr-login.js";
 import { openChannelSecretStateBackend } from "../state/secret-backend.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
@@ -631,6 +632,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private readonly store: ChannelStore;
   private readonly pinsPath: string;
   private readonly handles = new Map<string, AccountHandle>();
+  /** Restarts an account whose transport died on its own (`account-restart.ts`). */
+  private readonly restarts = new AccountRestartScheduler({
+    // A start that was deferred (account disabled or removed) was decided, not
+    // broken: only a failed one is tried again.
+    restart: async (channel, accountId) => {
+      await this.startAccount(channel, accountId);
+      return this.handles.get(handleKey(channel, accountId))?.transport !== "failed";
+    },
+    log: (message, detail) => this.logger.warn(message, detail),
+  });
   /** One durable ingress drain per started account, keyed like `handles`. */
   private readonly drains = new Map<string, ChannelIngressDrain>();
   /** Verticals loaded for a QR login on an account that is not started, keyed
@@ -782,9 +793,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         this.startTransport(handle, snapshot, compiled, loaded),
       );
       handle.revisionId = snapshot.revision?.id ?? null;
-      handle.revisionSignature = revisionSignature(snapshot);
+      handle.revisionSignature = revisionSignature(snapshot, { channel, accountId });
       handle.transport = "started";
       delete handle.detail;
+      this.restarts.noteStarted(handleKey(channel, accountId));
       return {
         channel,
         account: accountId,
@@ -850,6 +862,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     for (const [key, handle] of this.handles) {
       if (desired.has(key)) continue;
       this.handles.delete(key);
+      this.restarts.cancel(key);
       this.disposeSetupSession(handle.channel, handle.accountId);
       // Only an account gone from the configuration retires its reply
       // capabilities; a disabled one keeps them, and its sessions post again
@@ -894,7 +907,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       handle.plane === undefined ||
       handle.transport !== "started" ||
       handle.revisionSignature === undefined ||
-      handle.revisionSignature !== revisionSignature(snapshot)
+      handle.revisionSignature !==
+        revisionSignature(snapshot, { channel: handle.channel, accountId: handle.accountId })
     ) {
       return false;
     }
@@ -930,6 +944,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   async stopAll(): Promise<void> {
     if (!this.enabled()) return;
     await this.retentionSweep.stop();
+    this.restarts.stop();
     for (const [key, session] of this.setupSessions) {
       this.setupSessions.delete(key);
       session.dispose();
@@ -1554,6 +1569,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       });
       return connectEnrolledChannelDaemon({
         hostLabel: host.label,
+        hostId: host.id,
         resolveChannel: () => host.sessions.channel(host.id),
         subscribe: (handler) => host.sessions.subscribe(host.id, handler),
         onHostConnected: (handler) => host.sessions.onConnected(forHost(host.id, handler)),
@@ -1702,6 +1718,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           detail: outcome.detail,
         });
         break;
+      case "deferred":
+        this.logger.info?.("channel inbound deferred", { ...base, reason: outcome.reason });
+        break;
       case "ignored":
         // The message never reached the agent: the reason is the operator's
         // only lead (route miss, kill switch, mention policy, permissions).
@@ -1796,6 +1815,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           channel: handle.channel,
           account: handle.accountId,
         });
+        this.restartIfUnasked(handle);
       }
     } catch (error) {
       const detail = errorMessage(error);
@@ -1816,7 +1836,15 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         account: handle.accountId,
         error: detail,
       });
+      this.restartIfUnasked(handle);
     }
+  }
+
+  /** A monitor that ended while its account is still the live one died on its own. */
+  private restartIfUnasked(handle: AccountHandle): void {
+    const key = handleKey(handle.channel, handle.accountId);
+    if (handle.abortController.signal.aborted || this.handles.get(key) !== handle) return;
+    this.restarts.schedule(key, handle.channel, handle.accountId);
   }
 
   private startAccountContext(

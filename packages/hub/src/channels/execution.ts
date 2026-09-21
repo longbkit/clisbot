@@ -19,6 +19,8 @@ import type { AgentExecutionRecord, ThreadBindingRecord } from "../db/types.js";
 import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
+import { isHostNotConnected } from "./daemon/enrolled-client.js";
+import { AgentEventOrder } from "./plane/agent-event-order.js";
 import type { InboundReplyParams } from "./loader/host.js";
 import { isOpenAudience } from "./config/audience.js";
 import {
@@ -201,6 +203,14 @@ const NOT_ADMITTED_TEXT =
   "You can't use this bot here yet. Link your account with /link, or ask an admin for access. /me shows what you have.";
 
 /** The refusal inside a thread another Route owns; Routes are named by position, as in the app. */
+const WAIT_NOTICE_TEXT = {
+  queued: "Busy right now. Your message is queued and runs when there is room.",
+  "too-long": "This message is longer than this bot accepts. Shorten it and send it again.",
+  starting: "Starting a session for you. This can take a minute.",
+  "host-away":
+    "The machine that runs this bot is not connected right now. Your message is queued and runs when it is back.",
+} as const;
+
 function boundThreadRefusalText(account: CompiledChannelAccount, route: CompiledRoute): string {
   const position = account.routes.indexOf(route) + 1;
   return `This conversation belongs to Route ${String(position)}, and you are not allowed to use it. Send a new message outside this thread to start your own conversation.`;
@@ -281,6 +291,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   let executionLimiter: ChannelExecutionLimiter | undefined;
   /** Messages already told they are waiting for a limit, so a retry is not announced again. */
   const waitingNotices = new OnceMemory(1_000);
+  const agentEventOrder = new AgentEventOrder();
   /** Senders already told today that this bot does not admit them. */
   const notAdmittedNotices = new OnceMemory(1_000);
   const subscribed = new Set<string>();
@@ -432,11 +443,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // The follow-up window counts from the agent's latest activity, so a
       // long turn keeps it open and it closes `ttlMinutes` after the turn ends.
       bindings?.markActive(agentId);
-      await consumeAgentStream(agentId, event);
-      await lifecycleCommands?.onStream(agentId, event);
-      if (isTerminalStreamEvent(event)) {
-        executionLimiter?.completeAgent(agentId);
-      }
+      await agentEventOrder.run(agentId, async () => {
+        await consumeAgentStream(agentId, event);
+        await lifecycleCommands?.onStream(agentId, event);
+        if (isTerminalStreamEvent(event)) {
+          executionLimiter?.completeAgent(agentId);
+        }
+      });
     },
 
     async onWorkflowStreamEvent({ execution, agentId, event }) {
@@ -535,15 +548,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // Built first: both the inbound path (which opens a surface per accepted
       // message) and the relay (which keeps it alive and releases it) take it
       // at construction.
+      const readRunningAgentIds = async () =>
+        new Set(
+          (await daemonConnection.listAgents())
+            // An agent still starting is as alive as one mid-turn.
+            .filter((agent) => agent.status === "running" || agent.status === "initializing")
+            .map((agent) => agent.id),
+        );
       processing = createProcessingController({
         logger,
         now: () => clock.now(),
-        readRunningAgentIds: async () =>
-          new Set(
-            (await daemonConnection.listAgents())
-              .filter((agent) => agent.status === "running")
-              .map((agent) => agent.id),
-          ),
+        readRunningAgentIds,
         ...(deps.typing !== undefined ? { drive: deps.typing } : {}),
         ...(deps.processingTtlMs !== undefined ? { ttlMs: deps.processingTtlMs } : {}),
       });
@@ -551,6 +566,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         logger,
         now: () => clock.now(),
         cancelAgent: (agentId) => daemonConnection.cancelAgent(agentId),
+        readRunningAgentIds,
       });
       lifecycleCommands = new ChannelLifecycleCommands({
         organizationId: deps.organizationId,
@@ -587,6 +603,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         },
         bindCapability: (token, agentId) => deps.replyCapabilities?.bind(token, agentId) ?? false,
         revokeCapability: (token) => deps.replyCapabilities?.revoke(token),
+        revokeUnboundTurn: (turnId) => deps.replyCapabilities?.revokeUnboundTurn(turnId),
         authorizeResume: (agent, context) => commandDispatcher!.authorizeResume(agent, context),
         authorizeQueued: async (context) => {
           if (!isEnabled(deps.envFlag, deps.controlPlane, context.account)) return false;
@@ -632,6 +649,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         daemon: daemonConnection,
         detachAgent: detachChannelAgent,
+        onSlowStart: (message, account, route) =>
+          void postWaitNotice(message, account, route, "starting").catch(() => undefined),
         ...(deps.resolveChannelSender === undefined
           ? {}
           : { resolveChannelSender: deps.resolveChannelSender }),
@@ -1013,7 +1032,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (admission.retryAfterMs !== undefined) {
       declined.deferred = { reason: admission.reason, retryAfterMs: admission.retryAfterMs };
     }
-    await postLimitNotice(message, account, route, admission.retryAfterMs !== undefined);
+    await postWaitNotice(
+      message,
+      account,
+      route,
+      admission.retryAfterMs !== undefined ? "queued" : "too-long",
+    );
     return {
       refused: await recordChannelActivity(message, account, route, {
         result: declined,
@@ -1066,21 +1090,20 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   /** One short line instead of silence; a waiting message is announced once, not per retry. */
-  async function postLimitNotice(
+  async function postWaitNotice(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    waiting: boolean,
+    notice: keyof typeof WAIT_NOTICE_TEXT,
   ): Promise<void> {
     const key = message.externalMessageId ?? message.ingressId;
+    const waiting = notice !== "too-long";
     if (waiting && (key === undefined || !waitingNotices.remember(key))) return;
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
       ...commandReplyAddress(message, route.defaults.replyAnchor),
-      text: waiting
-        ? "Busy right now. Your message is queued and runs when there is room."
-        : "This message is longer than this bot accepts. Shorten it and send it again.",
+      text: WAIT_NOTICE_TEXT[notice],
     });
   }
 
@@ -1238,6 +1261,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
     } catch (error) {
       executionLimiter?.complete(executionLease);
+      // The message is retried; a Host that is away can stay away, so say so.
+      if (isHostNotConnected(error)) {
+        await postWaitNotice(message, account, route, "host-away").catch(() => undefined);
+      }
       await recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
@@ -1254,8 +1281,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     } else {
       executionLimiter?.complete(executionLease);
     }
+    const dispatched = result(outcome.kind === "bound" || outcome.kind === "steered", outcome);
+    if (outcome.kind === "deferred") {
+      dispatched.deferred = { reason: outcome.reason, retryAfterMs: outcome.retryAfterMs };
+      await postWaitNotice(message, account, route, "queued").catch(() => undefined);
+    }
     return recordChannelActivity(message, account, route, {
-      result: result(outcome.kind === "bound" || outcome.kind === "steered", outcome),
+      result: dispatched,
       limitDecision: "allowed",
     });
   }

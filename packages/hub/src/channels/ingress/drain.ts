@@ -34,6 +34,15 @@ export const DEFAULT_INGRESS_CLAIM_LEASE_MS = 30_000;
 export const DEFAULT_INGRESS_DRAIN_INTERVAL_MS = 15_000;
 /** Claims one pass will start before yielding, so one lane cannot hog a pump. */
 export const DEFAULT_INGRESS_DRAIN_BATCH = 32;
+/**
+ * Claims one account dispatches at once. The claim statement already keeps a
+ * lane to one live claim, so this is how many conversations move in parallel.
+ * A dispatch that starts a session holds its worker for the whole create, and a
+ * Host runs at most `MAX_CONCURRENT_CREATES_PER_HOST` (8) of those — a message
+ * past that is handed back, not held. Staying above that number is what keeps
+ * workers free for follow-ups and commands while a Host is starting sessions.
+ */
+export const DEFAULT_INGRESS_DRAIN_CONCURRENCY = 12;
 
 /**
  * The plane refused this event for now — a route concurrency or rate ceiling,
@@ -72,6 +81,7 @@ export interface ChannelIngressDrainOptions {
   leaseMs?: number;
   intervalMs?: number;
   batchLimit?: number;
+  concurrency?: number;
   now?: () => number;
 }
 
@@ -106,14 +116,6 @@ export interface ChannelIngressDrain {
   stop(): Promise<void>;
 }
 
-interface DrainState {
-  timer: ReturnType<typeof setInterval> | undefined;
-  pump: Promise<void> | undefined;
-  running: boolean;
-  requested: boolean;
-  stopped: boolean;
-}
-
 /** One claim's lease keeper: the refresh timer plus the dispatch's abort. */
 interface ClaimLease {
   /** Aborts when the account stops or when this claim's lease is lost. */
@@ -130,6 +132,12 @@ function formatError(error: unknown): string {
 function emptyPass(): ChannelIngressDrainPass {
   return { claimed: 0, completed: 0, retried: 0, deadLettered: 0, deferred: 0, abandoned: 0 };
 }
+
+/** The drain's options plus the one thing a settle tells the loop. */
+type DrainRun = ChannelIngressDrainOptions & {
+  /** A row went back to the queue and comes due again at `retryAt`. */
+  handedBack?: (retryAt: Date) => void;
+};
 
 /**
  * Keep the claim's lease alive for as long as the dispatch runs, and cut the
@@ -233,7 +241,7 @@ async function settleCompleted(
 
 /** Back-pressure: hand the row back with its attempt, due again shortly. */
 async function settleDeferral(
-  options: ChannelIngressDrainOptions,
+  options: DrainRun,
   claim: InboundQueueClaim,
   deferral: ChannelIngressDeferral,
   pass: ChannelIngressDrainPass,
@@ -251,6 +259,7 @@ async function settleDeferral(
     }),
   );
   if (!settled) return;
+  options.handedBack?.(retryAt);
   pass.deferred += 1;
   options.log?.deferred?.(claim, { reason: deferral.reason, retryAt });
 }
@@ -262,7 +271,7 @@ async function settleDeferral(
  * upstream's meaning before the policy reads it.
  */
 async function settleFailure(
-  options: ChannelIngressDrainOptions,
+  options: DrainRun,
   claim: InboundQueueClaim,
   error: unknown,
   pass: ChannelIngressDrainPass,
@@ -309,13 +318,14 @@ async function settleFailure(
     options.queue.fail({ ...settle, error: disposition.message, disposition: "retry", retryAt }),
   );
   if (!settled) return;
+  options.handedBack?.(retryAt);
   pass.retried += 1;
   options.log?.retried?.(claim, { message: disposition.message, retryAt });
 }
 
 /** Dispatch one claim under a live lease and settle it exactly once. */
 async function processClaim(
-  options: ChannelIngressDrainOptions,
+  options: DrainRun,
   claim: InboundQueueClaim,
   pass: ChannelIngressDrainPass,
 ): Promise<void> {
@@ -343,97 +353,158 @@ async function processClaim(
   await settleCompleted(options, claim, pass);
 }
 
-/** Build the account-scoped drain. Nothing runs until `start()`/`drainOnce()`. */
-export function createChannelIngressDrain(
-  options: ChannelIngressDrainOptions,
-): ChannelIngressDrain {
-  const state: DrainState = {
-    timer: undefined,
-    pump: undefined,
-    running: false,
-    requested: false,
-    stopped: false,
+/**
+ * One pass: recover, then let `concurrency` workers claim and dispatch until
+ * the queue has nothing claimable or the batch is spent.
+ */
+async function runDrainPass(
+  options: DrainRun,
+  batchLimit: number,
+  isStopped: () => boolean,
+): Promise<ChannelIngressDrainPass> {
+  const pass = emptyPass();
+  const scope = {
+    organizationId: options.organizationId,
+    channel: options.channel,
+    accountId: options.accountId,
   };
-  const isStopped = () => state.stopped || options.abortSignal.aborted;
-
-  const drainOnce = async (): Promise<ChannelIngressDrainPass> => {
-    const pass = emptyPass();
-    const scope = {
-      organizationId: options.organizationId,
-      channel: options.channel,
-      accountId: options.accountId,
-    };
-    // Recover first: a claim whose owner died holds its lane until its lease
-    // expires, and only recovery makes it claimable again.
-    await options.queue.recover?.(scope);
-    const batchLimit = options.batchLimit ?? DEFAULT_INGRESS_DRAIN_BATCH;
+  // Recover first: a claim whose owner died holds its lane until its lease
+  // expires, and only recovery makes it claimable again.
+  await options.queue.recover?.(scope);
+  // Workers may overshoot the batch by one claim each; an empty claim must not
+  // count, or a pass over a full backlog would never look full.
+  const work = async (): Promise<void> => {
     while (pass.claimed < batchLimit && !isStopped()) {
       const claim = await options.queue.claim({
         ...scope,
         workerId: options.workerId,
         leaseMs: options.leaseMs ?? DEFAULT_INGRESS_CLAIM_LEASE_MS,
       });
-      if (claim === undefined) break;
+      if (claim === undefined) return;
       pass.claimed += 1;
       await processClaim(options, claim, pass);
     }
-    return pass;
   };
+  const workers = Math.max(1, options.concurrency ?? DEFAULT_INGRESS_DRAIN_CONCURRENCY);
+  // A queue fault in one worker ends the pass only after the others settle: a
+  // claim in flight is never left without its settle write.
+  const settled = await Promise.allSettled(Array.from({ length: workers }, work));
+  const fault = settled.find((entry) => entry.status === "rejected");
+  if (fault !== undefined) throw fault.reason;
+  return pass;
+}
 
-  // `running` is cleared in the same synchronous step as the last `requested`
-  // read. Clearing it from a `.finally()` on the pump promise would leave a
-  // microtask-wide window in which `requestDrain()` sets `requested` on a pump
-  // that has already stopped reading it, and the wake would be lost until the
-  // interval timer came round.
-  const pump = async (): Promise<void> => {
-    try {
-      do {
-        state.requested = false;
-        if (isStopped()) return;
-        try {
-          await drainOnce();
-        } catch (error) {
-          // A queue fault must not kill the loop: the timer retries the pass.
-          options.log?.faulted?.(error);
-          return;
-        }
-      } while (state.requested);
-    } finally {
-      state.running = false;
-    }
-  };
+/**
+ * The account-scoped drain. `running` is cleared in the same synchronous step
+ * as the last `requested` read: clearing it from a `.finally()` on the pump
+ * promise would leave a microtask-wide window in which `requestDrain()` sets
+ * `requested` on a pump that has already stopped reading it, and the wake would
+ * be lost until the interval timer came round.
+ */
+class IngressDrain implements ChannelIngressDrain {
+  private timer: ReturnType<typeof setInterval> | undefined;
+  /** One-shot wake for the earliest handed-back row, ahead of the interval. */
+  private dueTimer: ReturnType<typeof setTimeout> | undefined;
+  /** When `dueTimer` fires; a later due time never replaces an earlier one. */
+  private dueAt: number | undefined;
+  /** The earliest due time the passes since the last arm handed back. */
+  private nextDueAt: number | undefined;
+  private pumping: Promise<void> | undefined;
+  private running = false;
+  private requested = false;
+  private stopped = false;
+  private readonly batchSize: number;
+  private readonly run: DrainRun;
 
-  const requestDrain = (): void => {
-    if (isStopped()) return;
-    if (state.running) {
-      state.requested = true;
+  constructor(private readonly options: ChannelIngressDrainOptions) {
+    this.batchSize = options.batchLimit ?? DEFAULT_INGRESS_DRAIN_BATCH;
+    this.run = {
+      ...options,
+      handedBack: (retryAt) => {
+        this.nextDueAt = Math.min(this.nextDueAt ?? Infinity, retryAt.getTime());
+      },
+    };
+  }
+
+  start(): void {
+    if (this.isStopped() || this.timer !== undefined) return;
+    const timer = setInterval(
+      this.requestDrain,
+      this.options.intervalMs ?? DEFAULT_INGRESS_DRAIN_INTERVAL_MS,
+    );
+    timer.unref?.();
+    this.timer = timer;
+    this.requestDrain();
+  }
+
+  readonly requestDrain = (): void => {
+    if (this.isStopped()) return;
+    if (this.running) {
+      this.requested = true;
       return;
     }
-    state.running = true;
-    state.pump = pump();
+    this.running = true;
+    this.pumping = this.pump();
   };
 
-  return {
-    start: () => {
-      if (isStopped() || state.timer !== undefined) return;
-      const timer = setInterval(
-        requestDrain,
-        options.intervalMs ?? DEFAULT_INGRESS_DRAIN_INTERVAL_MS,
-      );
-      timer.unref?.();
-      state.timer = timer;
-      requestDrain();
-    },
-    requestDrain,
-    drainOnce,
-    stop: async () => {
-      state.stopped = true;
-      state.requested = false;
-      if (state.timer !== undefined) {
-        clearInterval(state.timer);
-        state.timer = undefined;
-      }
-      await state.pump?.catch(() => undefined);
-    },
-  };
+  readonly drainOnce = (): Promise<ChannelIngressDrainPass> =>
+    runDrainPass(this.run, this.batchSize, this.isStopped);
+
+  async stop(): Promise<void> {
+    this.stopped = true;
+    this.requested = false;
+    if (this.timer !== undefined) clearInterval(this.timer);
+    if (this.dueTimer !== undefined) clearTimeout(this.dueTimer);
+    this.timer = undefined;
+    this.dueTimer = undefined;
+    await this.pumping?.catch(() => undefined);
+  }
+
+  private readonly isStopped = (): boolean => this.stopped || this.options.abortSignal.aborted;
+
+  private async pump(): Promise<void> {
+    try {
+      do {
+        this.requested = false;
+        if (this.isStopped()) return;
+        const pass = await this.drainOnce();
+        this.armDueTimer();
+        // A full pass means the backlog is longer than one batch: keep going
+        // rather than leaving the rest to the interval timer.
+        if (pass.claimed >= this.batchSize) this.requested = true;
+      } while (this.requested);
+    } catch (error) {
+      // A queue fault must not kill the loop: the timer retries the pass.
+      this.options.log?.faulted?.(error);
+    } finally {
+      this.running = false;
+    }
+  }
+
+  /** Wake for the earliest row a pass handed back, instead of the next tick. */
+  private armDueTimer(): void {
+    const dueAt = this.nextDueAt;
+    this.nextDueAt = undefined;
+    if (dueAt === undefined || this.isStopped()) return;
+    if (this.dueAt !== undefined && this.dueAt <= dueAt) return;
+    if (this.dueTimer !== undefined) clearTimeout(this.dueTimer);
+    this.dueAt = dueAt;
+    const timer = setTimeout(
+      () => {
+        this.dueTimer = undefined;
+        this.dueAt = undefined;
+        this.requestDrain();
+      },
+      Math.max(0, dueAt - (this.options.now?.() ?? Date.now())),
+    );
+    timer.unref?.();
+    this.dueTimer = timer;
+  }
+}
+
+/** Build the account-scoped drain. Nothing runs until `start()`/`drainOnce()`. */
+export function createChannelIngressDrain(
+  options: ChannelIngressDrainOptions,
+): ChannelIngressDrain {
+  return new IngressDrain(options);
 }

@@ -159,6 +159,17 @@ Upstream's `ingress-queue.ts` / `ingress-drain.ts` are not portable: they are wr
 
 One consequence worth knowing before you read the drain: a Fusion claim consumes its attempt at claim time, so the stored count is shifted back by one before upstream's policy sees it (`drain.ts:259`).
 
+### Starting a session without losing the message
+
+A first message costs a session create, and a create is the slowest call on the path: the daemon spawns a provider process and waits for it. Four rules follow from that, and they hold together:
+
+- **A message is completed only when it was handled.** A create or first prompt that fails throws, so the drain retries the row. Returning `ignored` there completed the row and the sender heard nothing.
+- **The pending marker is given up on a known outcome or a timeout, never on a guess.** A call refused before it was written (`HostNotReachedError`) releases the marker at once. A create that was issued and did not confirm keeps it, because the daemon may hold the Agent; the retried message finds that Agent by its execution-id label, binds the reply capability the create issued (`bindTurn`), and delivers the prompt. After `PENDING_MARKER_TTL_MS` with no Agent the marker is released and the thread starts over (`bindings/pending-marker.ts`, `bindings/session-start.ts`).
+- **A create never waits while holding a worker.** A Host runs `MAX_CONCURRENT_CREATES_PER_HOST` creates at once (`daemon/create-gate.ts`). Past that, `startSession` returns `deferred` before it records a marker, and the row goes back to the queue. The drain runs more workers per account than the gate has slots, so follow-ups and commands keep moving while a Host is busy starting sessions. The release budget (50) bounds how long a message waits for a slot.
+- **A slow create is visible.** While it runs, the typing surface is extended every 20 s (it has no agent yet, so the TTL sweep would drop it) and the sender is told once.
+
+Lanes keep one conversation in order while conversations run in parallel. Arrival order is `(created_at, id)` with a random id, so two rows of one lane stamped in the same instant have no defined order.
+
 ## The `fusion/*` pattern
 
 Every vertical has a `src/fusion/` directory, and the split inside a package is the same everywhere:

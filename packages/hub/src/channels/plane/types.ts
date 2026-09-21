@@ -90,7 +90,9 @@ export type InboundOutcome =
     }
   | { kind: "workflow"; workflow: string; deliveryId: string }
   | { kind: "command"; handled: boolean; detail?: string | undefined }
-  | { kind: "ignored"; reason: string };
+  | { kind: "ignored"; reason: string }
+  /** Admitted, but it cannot start yet: whoever holds the durable copy brings it back. */
+  | { kind: "deferred"; reason: string; retryAfterMs: number };
 
 /**
  * Back-pressure, not a decision. The plane would accept this message but has no

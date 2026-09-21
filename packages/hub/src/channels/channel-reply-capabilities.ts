@@ -202,7 +202,11 @@ export interface ChannelReplyCapabilityService {
    * loss, and replacing on it would end every session after a failed boot read.
    */
   holdsAgentCapability(agentId: string): boolean;
+  /** Bind the capability a create was launched with, once that create's Agent is found. */
+  bindTurn(turnId: string, agentId: string): boolean;
   revoke(token: string): void;
+  /** Revoke what a create that never produced an Agent was launched with. */
+  revokeUnboundTurn(turnId: string): void;
   revokeAccount(organizationId: string, channel: string, accountId: string): void;
   /** Load the durable capabilities this process must keep answering. */
   hydrate?(): Promise<void>;
@@ -257,12 +261,21 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
     const now = new Date(this.now());
     const rows = await this.store.listActive(now);
     let restored = 0;
+    const unbindable: string[] = [];
     for (const row of rows) {
       const capability = fromRow(row, this.turnOutputMax);
       if (capability === undefined) continue;
+      // An unbound capability is bound by its turn, and the turn is not
+      // persisted: after a restart nothing can bind it, so it must not stay a
+      // live bearer credential until its TTL.
+      if (capability.agentId === null) {
+        unbindable.push(row.tokenHash);
+        continue;
+      }
       this.capabilities.set(row.tokenHash, capability);
       restored += 1;
     }
+    if (unbindable.length > 0) await this.store.deleteTokens(unbindable);
     this.hydrated = true;
     await this.store.deleteExpired(now);
     this.logger?.info?.("channel reply capabilities restored", { restored, rows: rows.length });
@@ -311,7 +324,7 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
    * list at session start and the Agent went the whole session with no way to
    * reply (live 2026-09-07: agent b33fd0d6 reported "the required
    * `channel_reply` message tool isn't available"). The token is the bearer
-   * credential and a failed create revokes it, so the binding is a record of
+   * credential and a create that produced no Agent revokes it, so the binding is a record of
    * WHICH Agent holds the capability, not the thing that authorizes the call.
    */
   resolve(token: string, organizationId: string): ChannelReplyCapability | undefined {
@@ -371,6 +384,26 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
       if (capability.agentId === agentId && this.active(hash) !== undefined) return true;
     }
     return false;
+  }
+
+  bindTurn(turnId: string, agentId: string): boolean {
+    for (const [hash, capability] of this.capabilities) {
+      if (capability.turnId !== turnId || capability.agentId !== null) continue;
+      if (this.active(hash) === undefined) continue;
+      capability.agentId = agentId;
+      this.persist("bind", (store) => store.bind(hash, agentId));
+      return true;
+    }
+    return false;
+  }
+
+  revokeUnboundTurn(turnId: string): void {
+    const hashes = [...this.capabilities]
+      .filter(([, capability]) => capability.turnId === turnId && capability.agentId === null)
+      .map(([hash]) => hash);
+    if (hashes.length === 0) return;
+    for (const hash of hashes) this.capabilities.delete(hash);
+    this.persist("revoke", (store) => store.deleteTokens(hashes));
   }
 
   revoke(token: string): void {

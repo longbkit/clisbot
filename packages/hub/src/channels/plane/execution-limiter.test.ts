@@ -67,6 +67,7 @@ function fixture() {
     routes: [route],
   };
   let now = 1_000;
+  const running = new Set<string>();
   const timers = new Map<number, () => void>();
   let sequence = 0;
   const cancelled: string[] = [];
@@ -76,6 +77,7 @@ function fixture() {
       cancelled.push(agentId);
     },
     logger: { warn: () => undefined },
+    readRunningAgentIds: async () => running,
     schedule: (callback) => {
       const id = sequence++;
       timers.set(id, callback);
@@ -87,6 +89,7 @@ function fixture() {
     route,
     limiter,
     cancelled,
+    running,
     advance(ms: number) {
       now += ms;
     },
@@ -253,6 +256,36 @@ describe("ChannelExecutionLimiter", () => {
     f.expire();
     await Promise.resolve();
     assert.deepEqual(f.cancelled, ["agent-2"]);
+  });
+
+  it("frees a slot whose run ended without its terminal event being seen", async () => {
+    const f = fixture();
+    const admit = (senderIdentity: string) =>
+      f.limiter.admit({
+        account: f.account,
+        route: f.route,
+        conversationId: "C_PUBLIC",
+        senderIdentity,
+        text: "go",
+      });
+    const first = admit("slack:alice");
+    assert.equal(first.allowed, true);
+    if (!first.allowed) return;
+    f.limiter.bind(first.lease, "agent-1");
+    f.running.add("agent-1");
+
+    f.advance(31_000);
+    assert.equal(admit("slack:bob").allowed, false, "the run is alive: the slot is held");
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(admit("slack:bob").allowed, false, "a running agent keeps its lease");
+
+    f.running.delete("agent-1");
+    f.advance(16_000);
+    assert.equal(admit("slack:carol").allowed, false, "this refusal asks the Host");
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(admit("slack:carol").allowed, true, "the dead run's slot is free");
   });
 
   it("cancels each active Agent once during policy replacement", async () => {

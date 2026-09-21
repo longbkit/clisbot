@@ -2525,14 +2525,13 @@ describe("processing lease (accepted inbound opens it)", () => {
       },
     });
 
-    const result = await harness.plane.onInbound({
-      channel: "slack",
-      accountId: ACCOUNT_ID,
-      ctxPayload: {},
-    });
+    // A throw, not an `ignored` outcome: the durable ingress retries the
+    // message instead of completing it unanswered.
+    await assert.rejects(
+      harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} }),
+    );
     await settle();
 
-    assert.equal(result.outcome?.kind, "ignored");
     // The start reached the wire (the lease opened before the create), so the
     // failed turn must have taken it back down.
     assert.deepEqual(
@@ -2553,14 +2552,13 @@ describe("processing lease (accepted inbound opens it)", () => {
       },
     });
 
-    const result = await harness.plane.onInbound({
-      channel: "slack",
-      accountId: ACCOUNT_ID,
-      ctxPayload: {},
-    });
+    // A throw, not an `ignored` outcome: the durable ingress retries the
+    // message instead of completing it unanswered.
+    await assert.rejects(
+      harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} }),
+    );
     await settle();
 
-    assert.equal(result.outcome?.kind, "ignored");
     assert.deepEqual(
       harness.driven.map((d) => d.action),
       ["start", "stop"],

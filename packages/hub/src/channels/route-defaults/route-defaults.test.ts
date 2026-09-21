@@ -61,6 +61,23 @@ describe("route default agent controls", () => {
     assert.deepEqual(promoted.accounts[0]!.routes[0]!.defaults.agentControls, OPUS);
   });
 
+  it("keeps an account's signature when only a neighbour account changes", () => {
+    const neighbour = (route: string): HubBundleFile => ({
+      path: ".paseo/channels/slack/sales.yml",
+      content: account(route)
+        .replace("accountId: support", "accountId: sales")
+        .replace("connectionId: slack-support", "connectionId: slack-sales"),
+    });
+    const before = [...files(), neighbour("")];
+    const after = [...files(), neighbour("    interaction: { requireMention: false }")];
+    const support = { channel: "slack", accountId: "support" };
+    const sales = { channel: "slack", accountId: "sales" };
+    const sign = (revision: HubBundleFile[], scope: typeof support) =>
+      revisionSignature({ files: revision, controlPlane: compile(revision) }, scope);
+    assert.equal(sign(before, support), sign(after, support), "the untouched bot keeps running");
+    assert.notEqual(sign(before, sales), sign(after, sales), "the edited bot restarts");
+  });
+
   it("keeps the Route's identity and revision signature when only the default changes", () => {
     const before = files();
     const after = writeRouteAgentControls(before, "slack", "support", 0, OPUS);
