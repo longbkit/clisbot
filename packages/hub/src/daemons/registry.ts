@@ -19,6 +19,7 @@ import {
   HubExecutionControlResponseSchema,
   HubExecutionOutboundSchema,
   HubDaemonHelloSchema,
+  hubSessionClientId,
   HubDaemonServerInfoEnvelopeSchema,
   ManagedAccessLeaseRevokeRequestSchema,
   ManagedAccessLeaseRevokeResponseSchema,
@@ -142,7 +143,7 @@ export class ActiveDaemonRegistry {
         JSON.stringify(
           HubDaemonHelloSchema.parse({
             type: "hello",
-            clientId: `hub:${daemon.id}`,
+            clientId: hubSessionClientId(daemon.id),
             clientType: "hub",
             protocolVersion: 1,
             // The channel plane rides this socket; without these the daemon

@@ -6,6 +6,7 @@ import type { AccessStore } from "../../access/store.js";
 import type { Database } from "../../db/types.js";
 import { normalizeHubOrigin } from "../../managed-access/hub-origin.js";
 import type { AccessTicketService } from "../../managed-access/tickets.js";
+import { hubSessionClientId } from "../../hub/protocol.js";
 import type { InboundMessage } from "../plane/types.js";
 
 /** Where an operation is admitted, plus the account's provider name lookup for its conversation. */
@@ -18,6 +19,18 @@ export interface ChannelIdentityTarget {
 export interface ChannelOperationTarget extends ChannelIdentityTarget {
   daemonReference: string;
   clientId: string;
+}
+
+/**
+ * Where a channel operation that rides a Host's own socket is admitted. The
+ * daemon checks a ticket against the client id of the session presenting it,
+ * which on this socket is the Hub's own `hello`, not a dial-out account's.
+ */
+export function hostSocketOperationTarget(
+  hostId: string,
+  identity: ChannelIdentityTarget,
+): ChannelOperationTarget {
+  return { ...identity, daemonReference: hostId, clientId: hubSessionClientId(hostId) };
 }
 export interface ChannelSystemOperation {
   kind: "system";

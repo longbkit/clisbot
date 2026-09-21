@@ -51,6 +51,15 @@ export function isHubFinishExecutionToolName(name: string): boolean {
   return name === "hub.finish_execution" || name === "mcp__hub__finish_execution";
 }
 
+/**
+ * The client id the Hub says `hello` with on a Host's own socket. The daemon
+ * binds a session operation ticket to the client id of the session that
+ * presents it, so a ticket for this socket must name exactly this.
+ */
+export function hubSessionClientId(daemonId: string): string {
+  return `hub:${daemonId}`;
+}
+
 export const HubDaemonHelloSchema = z.object({
   type: z.literal("hello"),
   clientId: z.string(),

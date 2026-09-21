@@ -39,6 +39,7 @@ import {
   type DaemonConnection,
 } from "../daemon/client.js";
 import type { DaemonSessionAccess } from "../../daemons/protocol.js";
+import { hostSocketOperationTarget } from "../daemon/session-operation.js";
 import { createChannelPlane, type ChannelPlane } from "../execution.js";
 import { awaitMonitorExit, MONITOR_STOP_GRACE_MS } from "./monitor-stop.js";
 import {
@@ -1514,6 +1515,32 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       )?.label ?? null;
   }
 
+  /**
+   * The sender identity a Slack message carries onto the Host (the session's
+   * creator and channel). The dial-out leg set it in `applyChannelAdmissionTicket`;
+   * this leg returns before that, so without it every channel session was
+   * written with no creator and no channel. The daemon checks a ticket against
+   * the client id of the session presenting it, and on this socket that is the
+   * Hub's own `hello` (`hostSocketOperationTarget`), not the dial-out account's.
+   */
+  private enrolledOperationTicket(
+    hostId: string,
+    compiled: CompiledChannelAccount,
+    snapshot: ChannelControlPlaneSnapshot,
+  ): Pick<ChannelDaemonClientOptions, "resolveSessionOperationTicket"> {
+    const build = this.options.buildSessionOperationTicketResolver;
+    if (build === undefined) return {};
+    return {
+      resolveSessionOperationTicket: build(
+        hostSocketOperationTarget(hostId, {
+          organizationId: snapshot.organizationId,
+          connectionId: compiled.connectionId,
+          resolveConversationLabel: this.conversationLabelResolver(snapshot, compiled),
+        }),
+      ),
+    };
+  }
+
   private applyChannelAdmissionTicket(
     daemonOptions: ChannelDaemonClientOptions,
     handle: AccountHandle,
@@ -1580,9 +1607,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         ...(daemonOptions.rpcTimeoutMs === undefined
           ? {}
           : { rpcTimeoutMs: daemonOptions.rpcTimeoutMs }),
-        ...(daemonOptions.resolveSessionOperationTicket === undefined
-          ? {}
-          : { resolveSessionOperationTicket: daemonOptions.resolveSessionOperationTicket }),
+        ...this.enrolledOperationTicket(host.id, compiled, snapshot),
         ...(daemonOptions.onStream === undefined ? {} : { onStream: daemonOptions.onStream }),
         ...(daemonOptions.onAgentUpdate === undefined
           ? {}
