@@ -14,6 +14,7 @@ import {
   translateOpenCodeEvent,
 } from "./opencode-agent.js";
 import { streamSession } from "./test-utils/session-stream-adapter.js";
+import { PromptNotDeliveredError } from "../prompt-not-delivered-error.js";
 import {
   TestOpenCodeClient,
   TestOpenCodeHarness,
@@ -3520,6 +3521,57 @@ describe("OpenCode adapter startTurn error handling", () => {
     }
   });
 
+  test("is idle for release only while no run, permission, or child session is live", async () => {
+    const { parent: session, openCode } = await createParentSession("ses_idle_release");
+    session.subscribe(() => undefined);
+    expect(session.isIdleForRelease?.()).toBe(true);
+
+    openCode.emitEvent({
+      type: "session.status",
+      properties: { sessionID: "ses_idle_release", status: { type: "busy" } },
+    });
+    await vi.waitFor(() => expect(session.isIdleForRelease?.()).toBe(false));
+    openCode.emitEvent({ type: "session.idle", properties: { sessionID: "ses_idle_release" } });
+    await vi.waitFor(() => expect(session.isIdleForRelease?.()).toBe(true));
+
+    openCode.emitEvent({
+      type: "permission.asked",
+      properties: {
+        id: "permission-holds-runtime",
+        sessionID: "ses_idle_release",
+        permission: "bash",
+        patterns: ["npm test"],
+        metadata: { command: "npm test", cwd: "/workspace/repo" },
+      },
+    });
+    await vi.waitFor(() => expect(session.getPendingPermissions()).toHaveLength(1));
+    expect(session.isIdleForRelease?.()).toBe(false);
+
+    await session.close();
+    expect(session.isIdleForRelease?.()).toBe(false);
+  });
+
+  test("closing an idle session releases its OpenCode server and resume reacquires one", async () => {
+    const runtime = new TestOpenCodeHarness();
+    const openCode = new TestOpenCodeClient();
+    openCode.sessionCreateResponse = { data: { id: "ses_idle_resume" } };
+    runtime.enqueueClient(openCode);
+    const client = new OpenCodeAgentClient(createTestLogger(), undefined, {
+      serverManager: runtime,
+      createClient: runtime.createClient,
+    });
+    const session = await client.createSession({ provider: "opencode", cwd: "/workspace/repo" });
+    expect(session.isIdleForRelease?.()).toBe(true);
+
+    await session.close();
+    expect(runtime.acquisitions).toEqual([{ kind: "current", releaseCount: 1 }]);
+
+    const resumed = await client.resumeSession(session.describePersistence()!);
+    expect(resumed.id).toBe("ses_idle_resume");
+    expect(runtime.acquisitions.at(-1)).toEqual({ kind: "current", releaseCount: 0 });
+    await resumed.close();
+  });
+
   test("continues ordered ingress after one event callback rejects", async () => {
     const { parent: session, openCode } = await createParentSession("ses_ingress_recovery");
     const events: AgentStreamEvent[] = [];
@@ -3594,10 +3646,35 @@ describe("OpenCode adapter startTurn error handling", () => {
 
       await vi.advanceTimersByTimeAsync(1);
       await rejection;
+      await expect(dispatch).rejects.toBeInstanceOf(PromptNotDeliveredError);
       expect(settled).toBe(true);
       expect(openCode.calls.sessionPromptAsync).toHaveLength(0);
     } finally {
       vi.useRealTimers();
+      await session.close();
+    }
+  });
+
+  test("reports a transport that dies before readiness as an undelivered prompt", async () => {
+    const openCode = new TestOpenCodeClient();
+    const session = new __openCodeInternals.OpenCodeAgentSession(
+      { provider: "opencode", cwd: "/workspace/repo" },
+      openCode.asSdkClient(),
+      "ses_readiness_exit",
+      createTestLogger(),
+      new Map(),
+      {
+        ready: () => Promise.reject(new Error("OpenCode server exited")),
+        subscribe: () => () => undefined,
+      },
+    );
+    try {
+      const dispatch = session.startTurn("never sent");
+      await expect(dispatch).rejects.toThrow("OpenCode server exited");
+      await expect(dispatch).rejects.toBeInstanceOf(PromptNotDeliveredError);
+      expect(openCode.calls.sessionPromptAsync).toHaveLength(0);
+      expect(session.isIdleForRelease()).toBe(true);
+    } finally {
       await session.close();
     }
   });

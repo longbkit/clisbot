@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ProductRequestError } from "../auth/organization-access.js";
 import { requireChannelPlane } from "./channel-plane-gate.js";
@@ -95,7 +95,9 @@ export async function channelActivityPage(
     .where(
       and(
         eq(auditEvents.organizationId, organizationId),
-        eq(auditEvents.action, "channel.inbound.processed"),
+        // A final answer the relay gave up on is recorded with the same
+        // evidence shape (db/channel-delivery-retries.ts), outcome `error`.
+        inArray(auditEvents.action, ["channel.inbound.processed", "channel.outbound.failed"]),
         eq(auditEvents.subjectType, "channel_account"),
         query.accountId !== undefined
           ? eq(auditEvents.subjectId, `${query.channel}/${query.accountId}`)

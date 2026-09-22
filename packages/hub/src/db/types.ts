@@ -5,7 +5,9 @@ import type {
   AgentExecutionStatus,
   ChannelLedgerDirection,
   DeliveryLedgerStatus,
+  DeliveryRetryPayload,
   ChannelIngressQueueStatus,
+  ChannelInboxState,
   MachineSource,
   MachineStatus,
   ThreadBindingStatus,
@@ -1858,6 +1860,8 @@ export interface DeliveryLedgerRecord {
   turnId: string | null;
   attempts: number;
   failureReason: string | null;
+  /** Set while a failed final answer waits for the relay's next attempt. */
+  nextAttemptAt: Date | null;
 }
 
 export interface RecordDeliveryInput {
@@ -1891,6 +1895,8 @@ export interface FailDeliveryInput {
   eventTurnId: string;
   sequence: number;
   failureReason: string;
+  /** Keep the message for another attempt at `nextAttemptAt` (final answers). */
+  retry?: { payload: DeliveryRetryPayload; nextAttemptAt: Date } | undefined;
 }
 
 /** Result of recording a delivery: created when the attempt is new, duplicate on replay. */
@@ -1952,6 +1958,12 @@ export interface ChannelIngressQueueRecord {
   /** When an operator reopened this row from the dead letter; null if never. */
   resubmittedAt: Date | null;
   completedAt: Date | null;
+  /** The binding the plane filed the message under; null until it did. */
+  bindingKey: string | null;
+  /** The message's place in its binding's inbox; null = not filed. */
+  inboxState: ChannelInboxState | null;
+  /** The daemon message id of the first prompt that carried it; null = none did. */
+  sentIn: string | null;
 }
 
 export interface EnqueueChannelIngressInput {

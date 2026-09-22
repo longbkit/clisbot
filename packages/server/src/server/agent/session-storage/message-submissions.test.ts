@@ -80,3 +80,48 @@ it("rebuilds a deleted index without readmitting existing IDs", async () => {
     (await store.writeMessageSubmission("agent", { ...record, id: "__proto__" })).created,
   ).toBe(false);
 });
+
+it("re-admits a withdrawn message once, keeping its original sender and time", async () => {
+  const { directory, store } = await storage();
+  await store.writeMessageSubmission("agent", record);
+  const withdrawal = { ...record, withdrawn: true as const };
+  const withdrawn = await store.writeMessageSubmission("agent", withdrawal);
+  expect(withdrawn).toMatchObject({
+    created: false,
+    record: { status: "pending", withdrawn: true },
+  });
+  expect((await store.writeMessageSubmission("agent", withdrawal)).created).toBe(false);
+
+  const restarted = new FileAgentTimelineStore(async () => directory);
+  const readmitted = await restarted.writeMessageSubmission("agent", {
+    ...record,
+    timestamp: "later",
+  });
+  expect(readmitted.created).toBe(true);
+  expect(readmitted.record).toEqual({ ...record, operation: expect.any(Object) });
+  expect((await restarted.writeMessageSubmission("agent", record)).created).toBe(false);
+  const applied = await restarted.writeMessageSubmission("agent", { ...record, status: "applied" });
+  expect(applied.record).not.toHaveProperty("withdrawn");
+  await expect(restarted.writeMessageSubmission("agent", withdrawal)).resolves.toMatchObject({
+    record: { status: "applied" },
+  });
+});
+
+it("persists a withdrawal as pending, which a daemon without the flag refuses to replay", async () => {
+  const { directory, store } = await storage();
+  await store.writeMessageSubmission("agent", record);
+  await store.writeMessageSubmission("agent", { ...record, withdrawn: true });
+
+  const lines = (await fs.readFile(path.join(directory, "events.jsonl"), "utf8"))
+    .split("\n")
+    .filter((line) => line.includes('"submission"'));
+  const persisted = JSON.parse(lines.at(-1)!) as { value: MessageSubmission };
+  expect(persisted.value).toMatchObject({ id: record.id, status: "pending", withdrawn: true });
+});
+
+it("cannot withdraw a message that was never admitted", async () => {
+  const { store } = await storage();
+  await expect(
+    store.writeMessageSubmission("agent", { ...record, withdrawn: true }),
+  ).rejects.toThrow("not durably admitted");
+});

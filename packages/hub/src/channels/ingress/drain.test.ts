@@ -15,11 +15,16 @@ import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import { embeddedDatabaseRuntime } from "../../db/runtime/index.js";
 import type { DatabaseRuntimeBundle } from "../../db/runtime/index.js";
 import {
+  accountDrainConcurrency,
   createChannelIngressDrain,
   type ChannelIngressDrain,
   type ChannelIngressDrainOptions,
 } from "./drain.js";
 import { resolveHubIngressNonRetryableFailure } from "./non-retryable.js";
+import { sessionLaneKey } from "./session-lane.js";
+import type { CompiledChannelAccount } from "../config/compile.js";
+import type { InboundMessage } from "../plane/types.js";
+import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import {
   createChannelIngressQueueSink,
   type ChannelIngressQueueSinkOptions,
@@ -277,6 +282,219 @@ describe("channel ingress drain", () => {
       started.indexOf("event-a-1") < started.indexOf("event-a-2"),
       "a lane never has two live claims, so its order holds",
     );
+  });
+
+  it("caps a busy account at its pool share while another account proceeds", async () => {
+    // A pool of 4 connections: each account's drain may keep 2 busy.
+    const concurrency = accountDrainConcurrency(4);
+    assert.equal(concurrency, 2);
+    for (const lane of ["a", "b", "c", "d"]) await admit("busy", `busy-${lane}`, `busy-${lane}`);
+    await admit("quiet", "quiet-1");
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let inFlight = 0;
+    let peak = 0;
+    const busy = drainFor("busy", {
+      intervalMs: 600_000,
+      concurrency,
+      dispatch: async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await held;
+        inFlight -= 1;
+      },
+    });
+    const quietDelivered: string[] = [];
+    const quiet = drainFor("quiet", {
+      intervalMs: 600_000,
+      concurrency,
+      dispatch: async (_payload, claim) => {
+        quietDelivered.push(claim.id);
+      },
+    });
+    busy.start();
+    try {
+      const busyWorkers = () => inFlight;
+      for (let tick = 0; tick < 50 && busyWorkers() < concurrency; tick += 1) await sleep(5);
+      quiet.start();
+      const quietStatus = async () => (await readEvent("quiet", "quiet-1")).status;
+      for (let tick = 0; tick < 50 && (await quietStatus()) !== "completed"; tick += 1) {
+        await sleep(5);
+      }
+      assert.equal(await quietStatus(), "completed");
+      assert.equal(quietDelivered.length, 1);
+      assert.equal(peak, concurrency, "the busy account never runs past its share");
+    } finally {
+      release();
+      await busy.stop();
+      await quiet.stop();
+    }
+    assert.equal(accountDrainConcurrency(undefined), 12, "PGlite keeps the default");
+    assert.equal(accountDrainConcurrency(30), 12);
+    assert.equal(accountDrainConcurrency(1), 1);
+  });
+
+  it("keeps two accounts stuck in slow session creates from delaying a third account", async () => {
+    // Default pool: each account runs its full share of 12 workers. A daemon
+    // wait holds no database connection, so 24 stuck dispatches on two accounts
+    // must not hold up another account's follow-up.
+    const concurrency = accountDrainConcurrency(30);
+    for (const accountId of ["creating-1", "creating-2"]) {
+      for (let index = 0; index < concurrency; index += 1) {
+        await admit(accountId, `${accountId}-${index}`, `${accountId}-lane-${index}`);
+      }
+    }
+    await admit("follow-up", "follow-up-1");
+    let release: () => void = () => undefined;
+    const creates = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let stuck = 0;
+    const slowCreate = async () => {
+      stuck += 1;
+      await creates;
+    };
+    const creating = ["creating-1", "creating-2"].map((accountId) =>
+      drainFor(accountId, { intervalMs: 600_000, concurrency, dispatch: slowCreate }),
+    );
+    const followUp = drainFor("follow-up", {
+      intervalMs: 600_000,
+      concurrency,
+      dispatch: async () => undefined,
+    });
+    for (const drain of creating) drain.start();
+    try {
+      const stuckNow = () => stuck;
+      for (let tick = 0; tick < 100 && stuckNow() < 2 * concurrency; tick += 1) await sleep(5);
+      assert.equal(stuck, 2 * concurrency);
+      followUp.start();
+      const status = async () => (await readEvent("follow-up", "follow-up-1")).status;
+      for (let tick = 0; tick < 50 && (await status()) !== "completed"; tick += 1) await sleep(5);
+      assert.equal(await status(), "completed");
+    } finally {
+      release();
+      await Promise.all([...creating, followUp].map((drain) => drain.stop()));
+    }
+  });
+
+  it("claims a new conversation while another one's dispatch is still running", async () => {
+    // The pool must not wait for its slowest dispatch before it claims again:
+    // one Host RPC waiting out its timeout would otherwise hold every other
+    // conversation of the account behind it.
+    const accountId = "slow-lane";
+    await admit(accountId, "event-slow", "lane-slow");
+    let releaseSlow: () => void = () => undefined;
+    const slowHeld = new Promise<void>((resolve) => {
+      releaseSlow = resolve;
+    });
+    const delivered: string[] = [];
+    const drain = drainFor(accountId, {
+      intervalMs: 600_000,
+      dispatch: async (payload) => {
+        const event = (payload as { event: string }).event;
+        delivered.push(event);
+        if (event === "event-slow") await slowHeld;
+      },
+    });
+    drain.start();
+    try {
+      for (let tick = 0; tick < 50 && delivered.length === 0; tick += 1) await sleep(5);
+      assert.deepEqual(delivered, ["event-slow"]);
+
+      await admit(accountId, "event-fast", "lane-fast");
+      drain.requestDrain();
+      for (let tick = 0; tick < 50 && delivered.length < 2; tick += 1) await sleep(5);
+
+      assert.deepEqual(delivered, ["event-slow", "event-fast"]);
+      assert.equal((await readEvent(accountId, "event-fast")).status, "completed");
+      assert.equal((await readEvent(accountId, "event-slow")).status, "claimed");
+    } finally {
+      releaseSlow();
+      await drain.stop();
+    }
+    assert.equal((await readEvent(accountId, "event-slow")).status, "completed");
+  });
+
+  it("dead-letters a message the daemon holds a receipt for, and frees its lane", async () => {
+    const accountId = "receipt-refused";
+    await admit(accountId, "event-refused", "lane-refused");
+    await admit(accountId, "event-behind", "lane-refused");
+    const delivered: string[] = [];
+    const drain = drainFor(accountId, {
+      dispatch: async (payload) => {
+        const event = (payload as { event: string }).event;
+        delivered.push(event);
+        if (event === "event-refused") {
+          throw new AgentRequestRefusedError("agent_request_outcome_unknown");
+        }
+      },
+    });
+
+    const pass = await drain.drainOnce();
+
+    assert.equal(pass.deadLettered, 1);
+    assert.equal(pass.retried, 0);
+    const refused = await readEvent(accountId, "event-refused");
+    assert.equal(refused.status, "dead_letter");
+    assert.equal(refused.failedReason, "agent-request-refused");
+    assert.equal(refused.lastError, "agent_request_outcome_unknown");
+    assert.deepEqual(delivered, ["event-refused", "event-behind"], "the lane moved on");
+  });
+
+  it("reports a dead-letter once, whichever rule ended the row", async () => {
+    const accountId = "dead-letter-report";
+    await admit(accountId, "event-refused-report", "lane-report-1");
+    await admit(accountId, "event-deferred-report", "lane-report-2");
+    const reported: string[] = [];
+    const queue = sinkFor(accountId, {
+      releaseBudget: { maxReleases: 1, pendingTtlMs: 24 * 60 * 60 * 1_000 },
+      onDeadLettered: (record) => reported.push(record.externalEventId),
+    });
+    const drain = createChannelIngressDrain({
+      queue,
+      organizationId: ORGANIZATION_ID,
+      channel: CHANNEL,
+      accountId,
+      workerId: `${CHANNEL}:${accountId}:drain`,
+      abortSignal: new AbortController().signal,
+      resolveNonRetryableFailure: resolveHubIngressNonRetryableFailure,
+      dispatch: async (payload) => {
+        if ((payload as { event: string }).event === "event-refused-report") {
+          throw new AgentRequestRefusedError("agent_request_key_conflict");
+        }
+        return { kind: "deferred" as const, reason: "busy", retryAfterMs: 0 };
+      },
+    });
+
+    await drain.drainOnce();
+    await drain.drainOnce();
+
+    assert.deepEqual(reported.sort(), ["event-deferred-report", "event-refused-report"]);
+  });
+
+  it("admits under the session lane when one is known, and the transport's otherwise", async () => {
+    const accountId = "session-lane";
+    const enqueue = (laneOf: () => string | undefined, eventId: string) =>
+      sinkFor(accountId, { sessionLaneKey: laneOf }).enqueue({
+        channel: CHANNEL,
+        accountId,
+        externalEventId: eventId,
+        externalMessageId: eventId,
+        externalConversationId: "conversation",
+        laneKey: "transport-lane",
+        payload: { event: eventId },
+      });
+    await enqueue(() => "session-lane", "event-session");
+    await enqueue(() => undefined, "event-unsettled");
+    await enqueue(() => {
+      throw new Error("routes unreadable");
+    }, "event-faulted");
+
+    assert.equal((await readEvent(accountId, "event-session")).laneKey, "session-lane");
+    assert.equal((await readEvent(accountId, "event-unsettled")).laneKey, "transport-lane");
+    assert.equal((await readEvent(accountId, "event-faulted")).laneKey, "transport-lane");
   });
 
   it("wakes for a handed-back event when it comes due, ahead of the interval", async () => {
@@ -591,3 +809,66 @@ describe("channel ingress drain", () => {
 async function microtasks(count: number): Promise<void> {
   for (let step = 0; step < count; step += 1) await Promise.resolve();
 }
+
+describe("concurrent slash commands", () => {
+  // A Slack Route that opens a thread per root message: the root is no session.
+  const threadAnchored = {
+    channel: "slack",
+    accountId: "commands",
+    routes: [
+      {
+        where: { dm: false, groups: ["all"], conversations: [] },
+        defaults: { bindingKey: "thread", replyAnchor: "thread" },
+      },
+    ],
+  } as unknown as CompiledChannelAccount;
+  const command = (triggerId: string): InboundMessage => ({
+    channel: "slack",
+    accountId: "commands",
+    senderIdentity: "slack:U0ALICE",
+    text: "status",
+    mentionedBot: true,
+    externalMessageId: triggerId,
+    conversation: { kind: "channel", id: "C0ROOT", rootConversationId: "C0ROOT", threadId: null },
+  });
+
+  it("dispatches two root /status commands side by side, not one behind the other", async () => {
+    const accountId = "commands";
+    const sink = sinkFor(accountId, {
+      sessionLaneKey: (payload) =>
+        sessionLaneKey(threadAnchored, command((payload as { event: string }).event), "status"),
+    });
+    for (const triggerId of ["trigger-a", "trigger-b"]) {
+      await sink.enqueue({
+        channel: CHANNEL,
+        accountId,
+        externalEventId: triggerId,
+        externalMessageId: triggerId,
+        externalConversationId: "C0ROOT",
+        // The transport's lane: every native command of the channel shares it.
+        laneKey: "slack:commands:C0ROOT:root",
+        payload: { event: triggerId },
+      });
+    }
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const running: string[] = [];
+    const drain = drainFor(accountId, {
+      intervalMs: 600_000,
+      dispatch: async (payload) => {
+        running.push((payload as { event: string }).event);
+        await held;
+      },
+    });
+    drain.start();
+    try {
+      for (let tick = 0; tick < 100 && running.length < 2; tick += 1) await sleep(5);
+      assert.deepEqual(running.toSorted(), ["trigger-a", "trigger-b"], "both in flight at once");
+    } finally {
+      release();
+      await drain.stop();
+    }
+  });
+});

@@ -364,6 +364,23 @@ routes:
 // --- Inbound normalizer -------------------------------------------------------
 
 describe("flatInboundNormalizer", () => {
+  it("carries the sender's name and handle the vertical stored on the row", () => {
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "C0APP",
+        SenderId: "U018WR2K090",
+        SenderName: "Minh Dương",
+        SenderUsername: "minh.duong",
+      },
+    });
+    assert.equal(message?.senderName, "Minh Dương");
+    assert.equal(message?.senderUsername, "minh.duong");
+  });
+
   it("maps MessageSid to the marker's externalMessageId", () => {
     const message = flatInboundNormalizer({
       channel: "slack",

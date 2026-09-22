@@ -27,8 +27,10 @@ import {
   TelegramTransportModeSchema,
   StreamingModeSchema,
   ThreadLinkSchema,
+  WhenBusySchema,
 } from "./enums.js";
 import { AgentControlsSchema } from "./agent-controls.js";
+import { BatchingSchema, ContextDefaultsSchema } from "./conversation.js";
 // --- Shared value shapes ------------------------------------------------------
 
 /** `<channel>:<provider-id>` identity; email is `email:<address>` (§4.3.7). */
@@ -68,6 +70,7 @@ export const InteractionDefaultsSchema = z
   .object({
     requireMention: z.boolean().optional(),
     followUp: FollowUpSchema.optional(),
+    whenBusy: WhenBusySchema.optional(),
   })
   .strict();
 export type InteractionDefaults = z.infer<typeof InteractionDefaultsSchema>;
@@ -310,6 +313,9 @@ export const ChannelDefaultsSchema = z
     sync: SyncDefaultsSchema.optional(),
     agentControls: AgentControlsSchema.optional(),
     questions: QuestionsModeSchema.optional(),
+    // The conversation leaves (`conversation.ts`).
+    context: ContextDefaultsSchema.optional(),
+    batching: BatchingSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
   })
   .strict();
@@ -699,6 +705,8 @@ export const RouteSchema = z
     // Default Agent controls over the named `agent:` (`agent-controls.ts`).
     agentControls: AgentControlsSchema.optional(),
     questions: QuestionsModeSchema.optional(),
+    context: ContextDefaultsSchema.optional(),
+    batching: BatchingSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
     limits: ChannelLimitsSchema.optional(),
   })

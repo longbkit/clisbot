@@ -277,6 +277,7 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
     appToken,
     identity: {
       ...(probe.botUserId !== undefined ? { botUserId: probe.botUserId } : {}),
+      ...(probe.botName !== undefined ? { botName: probe.botName } : {}),
       ...(probe.botId !== undefined ? { botId: probe.botId } : {}),
       ...(probe.teamId !== undefined ? { teamId: probe.teamId } : {}),
       ...(probe.apiAppId !== undefined ? { apiAppId: probe.apiAppId } : {}),

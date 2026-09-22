@@ -701,8 +701,9 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     assert.ok(send !== undefined, "no send_agent_message_request");
     assert.equal(send["agentId"], "agent-1");
     assert.equal(send["text"], ctxPayload["Body"]);
-    // steer:false (the first prompt that starts the turn) = "interrupt".
-    assert.equal(send["activeTurnBehavior"], "interrupt");
+    // Every channel prompt is one request per message, first prompt included,
+    // so its retry replays the same fingerprint (bindings/index.ts `deliverPrompt`).
+    assert.equal(send["activeTurnBehavior"], "steer");
   });
 
   it("drives a real-shape Slack inbound through a workflow route without creating a direct Agent", async () => {

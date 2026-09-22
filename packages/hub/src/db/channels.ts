@@ -7,6 +7,9 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import * as schema from "./schema.js";
 import { ChannelAccessStore } from "./channel-access.js";
+import { ChannelDeliveryRetryStore } from "./channel-delivery-retries.js";
+import { ChannelInboxStore } from "./channel-inbox.js";
+import { toChannelIngress } from "./channel-ingress-record.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
 import type { DatabaseRuntime, DrizzleHandle } from "./runtime/index.js";
 import type {
@@ -98,10 +101,16 @@ export class ChannelStore {
   /** The access plane's tables (pairing, `/agent` + `/model` selection). Its
    * own module so neither file grows past the size the standards allow. */
   readonly access: ChannelAccessStore;
+  /** Failed final answers waiting for the relay's next attempt. */
+  readonly deliveryRetries: ChannelDeliveryRetryStore;
+  /** Each binding's inbox over the ingress rows (`channel-inbox.ts`). */
+  readonly inbox: ChannelInboxStore;
 
   constructor(private readonly runtime: DatabaseRuntime) {
     this.database = runtime.drizzle();
     this.access = new ChannelAccessStore(this.database);
+    this.inbox = new ChannelInboxStore(this.database);
+    this.deliveryRetries = new ChannelDeliveryRetryStore(runtime);
   }
 
   /**
@@ -474,6 +483,7 @@ export class ChannelStore {
         .set({
           status: "recorded",
           failureReason: null,
+          nextAttemptAt: null,
           attempts: sql`${schema.deliveryLedger.attempts} + 1`,
         })
         .where(eq(schema.deliveryLedger.id, existing.id))
@@ -506,6 +516,8 @@ export class ChannelStore {
           postedAt: input.postedAt,
           externalMessageId: input.externalMessageId,
           failureReason: null,
+          retryPayload: null,
+          nextAttemptAt: null,
         })
         .where(eq(schema.deliveryLedger.id, row.id))
         .returning();
@@ -515,7 +527,9 @@ export class ChannelStore {
   }
 
   /** Mark a recorded delivery that failed to post. A later record attempt
-   * atomically re-arms this row and increments `attempts`. */
+   * atomically re-arms this row and increments `attempts`. `retry` keeps the
+   * message on the row for the relay's retrier (`deliveryRetries`); without
+   * it the row is done, and any earlier retry payload is cleared. */
   async failDelivery(input: FailDeliveryInput): Promise<DeliveryLedgerRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
@@ -536,12 +550,39 @@ export class ChannelStore {
         .set({
           status: "failed",
           failureReason: input.failureReason,
+          retryPayload: input.retry?.payload ?? null,
+          nextAttemptAt: input.retry?.nextAttemptAt ?? null,
         })
         .where(eq(schema.deliveryLedger.id, row.id))
         .returning();
       if (updated === undefined) throw new ChannelDeliveryRecordNotFoundError();
       return toDeliveryLedger(updated);
     });
+  }
+
+  /**
+   * A post that may have landed — it timed out, lost its connection, or failed
+   * after part of it was posted. The row stays `recorded`, the state
+   * `recordDelivery` never re-arms, so neither a replay nor a restart posts it
+   * again; only the reason is kept. A double post is worse than a lost one.
+   */
+  async recordUncertainDelivery(input: FailDeliveryInput): Promise<void> {
+    const ledger = schema.deliveryLedger;
+    await this.database
+      .update(ledger)
+      .set({ failureReason: input.failureReason, retryPayload: null, nextAttemptAt: null })
+      .where(
+        and(
+          eq(ledger.organizationId, input.organizationId),
+          eq(ledger.accountId, input.accountId),
+          eq(ledger.direction, "out"),
+          eq(ledger.externalConversationId, input.externalConversationId),
+          deliveryThreadMatches(input.externalThreadId),
+          eq(ledger.eventTurnId, input.eventTurnId),
+          eq(ledger.sequence, input.sequence),
+          eq(ledger.status, "recorded"),
+        ),
+      );
   }
 
   /**
@@ -1461,36 +1502,6 @@ function toDeliveryLedger(row: typeof schema.deliveryLedger.$inferSelect): Deliv
     turnId: row.turnId,
     attempts: row.attempts,
     failureReason: row.failureReason,
-  };
-}
-
-function toChannelIngress(
-  row: typeof schema.channelIngressQueue.$inferSelect,
-): ChannelIngressQueueRecord {
-  return {
-    id: row.id,
-    organizationId: row.organizationId,
-    channel: row.channel,
-    accountId: row.accountId,
-    externalEventId: row.externalEventId,
-    externalMessageId: row.externalMessageId,
-    externalConversationId: row.externalConversationId,
-    externalThreadId: row.externalThreadId,
-    laneKey: row.laneKey,
-    payload: row.payload,
-    status: row.status,
-    attempts: row.attempts,
-    releases: row.releases,
-    availableAt: row.availableAt,
-    claimedBy: row.claimedBy,
-    claimToken: row.claimToken,
-    leaseExpiresAt: row.leaseExpiresAt,
-    lastAttemptAt: row.lastAttemptAt,
-    lastError: row.lastError,
-    failedReason: row.failedReason,
-    failedAt: row.failedAt,
-    createdAt: row.createdAt,
-    resubmittedAt: row.resubmittedAt,
-    completedAt: row.completedAt,
+    nextAttemptAt: row.nextAttemptAt,
   };
 }

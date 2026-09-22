@@ -152,10 +152,17 @@ function threadIdOf(msg: { message_thread_id?: number }): string | null {
   return msg.message_thread_id === undefined ? null : String(msg.message_thread_id);
 }
 
+/** The sender's name as clisbot always showed it: first and last name, else
+ * the @username; the username is the handle. */
 function senderFields(from: User | undefined): Partial<ChannelInboundEvent> {
   if (from === undefined) return {};
+  const fullName = [from.first_name, from.last_name]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+  const senderName = fullName || from.username;
   return {
-    ...(from.first_name !== undefined ? { senderName: from.first_name } : {}),
+    ...(senderName ? { senderName } : {}),
     ...(from.username !== undefined ? { senderUsername: from.username } : {}),
   };
 }

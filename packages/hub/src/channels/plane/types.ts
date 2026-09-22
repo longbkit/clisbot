@@ -20,6 +20,7 @@ import type { ChannelReplyCapabilityService } from "../channel-reply-capabilitie
 import type { RecordChannelInboundActivityInput } from "../../db/channels.js";
 import type { ChannelStreamingDriver } from "../streaming/types.js";
 import type { SupportedChannelName } from "../catalog.js";
+import type { OutboundFailure } from "./outbound-failure.js";
 import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
 
 // The channel-name vocabulary is catalog-owned (`catalog.ts`
@@ -59,6 +60,9 @@ export interface InboundMessage {
    * `first_name`, Slack resolved user name) — used for friendly
    * decided-state wording; absent = the engine falls back to the identity. */
   senderName?: string;
+  /** The sender's handle when the platform has one (Slack `name`, Telegram
+   * `username`), shown after the identity: `Name (slack:U018, @minh)`. */
+  senderUsername?: string;
   /** The message text (command text for approval replies). */
   text: string;
   /** True when the bot was explicitly mentioned/addressed. */
@@ -92,7 +96,10 @@ export type InboundOutcome =
   | { kind: "command"; handled: boolean; detail?: string | undefined }
   | { kind: "ignored"; reason: string }
   /** Admitted, but it cannot start yet: whoever holds the durable copy brings it back. */
-  | { kind: "deferred"; reason: string; retryAfterMs: number };
+  | { kind: "deferred"; reason: string; retryAfterMs: number }
+  /** Admitted and filed `held` in its binding's inbox: a later flush sends it
+   * with the others (`bindings/held-flush.ts`). */
+  | { kind: "held"; reason: string };
 
 /**
  * Back-pressure, not a decision. The plane would accept this message but has no
@@ -161,6 +168,10 @@ export interface OutboundPostParams {
    * Only a vertical that declares presentation support is given one; it
    * compiles the blocks itself and `text` stays the fallback rendering. */
   presentation?: MessagePresentation | undefined;
+  /** `progress` marks a status line (a running tool, a tool result): the
+   * outbound pacer keeps only the newest one waiting per thread and sends a
+   * queued answer ahead of it. Absent = an answer, never dropped. */
+  priority?: "progress" | undefined;
 }
 
 export interface OutboundPostResult {
@@ -168,6 +179,9 @@ export interface OutboundPostResult {
   /** The native message id the channel assigned (Slack `ts`, Telegram id). */
   externalMessageId?: string | undefined;
   error?: string | undefined;
+  /** What a failed write means for trying again; absent when the failure was
+   * decided before any platform call (no account, no send path). */
+  failure?: OutboundFailure | undefined;
   /** COMPAT(clisbot-control-plane): true when the post carried native
    * interactive markup (a card the resolution can update in place). */
   cardPosted?: boolean | undefined;
@@ -207,6 +221,7 @@ export interface MediaPostResult {
    * path (the notice's id is `externalMessageId`). */
   mediaPosted?: boolean | undefined;
   error?: string | undefined;
+  failure?: OutboundFailure | undefined;
 }
 
 /** The channel's native-media send path (its published `sendMedia` adapter).
@@ -449,6 +464,12 @@ export interface ChannelPlaneDeps {
     | undefined;
   logger: PlaneLogger;
   post: PostFn;
+  /** Admit a held binding's flush row to this account's ingress queue
+   * (`bindings/held-flush.ts`). Absent = batching and `whenBusy: queue` never
+   * hold: nothing could send what they held. */
+  admitHeldFlush?:
+    | ((flush: import("../bindings/held-flush.js").HeldFlushAdmission) => Promise<void>)
+    | undefined;
   /** Tell the outbound pacer which Route serves a conversation (its Route-scope
    * `messagesSentPerMinute`). Absent = no Route-scope pacing. */
   noteOutboundRoute?:

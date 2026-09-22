@@ -87,6 +87,8 @@ function makeProvider(overrides: Partial<SlackBoltProviderOptions> = {}) {
       admitted.push(event);
     },
     abortSignal: controller.signal,
+    // No Slack to ask for names in these tests.
+    senders: { name: async (_client, event) => event },
     interop: {
       App,
       HTTPReceiver,

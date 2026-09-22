@@ -582,6 +582,20 @@
       "when": 1789794043886,
       "tag": "0082_automation_paused_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1790088336690,
+      "tag": "0083_delivery_ledger_retry",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1790092081671,
+      "tag": "0084_channel_binding_inbox",
+      "breakpoints": true
     }
   ]
 }

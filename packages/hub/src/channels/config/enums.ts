@@ -33,6 +33,17 @@ export type ReplyAnchor = z.infer<typeof ReplyAnchorSchema>;
 export const FollowUpModeSchema = z.enum(["auto", "mention-only"]);
 export type FollowUpMode = z.infer<typeof FollowUpModeSchema>;
 
+/** `interaction.whenBusy` — what a message does while its binding's turn runs:
+ * `steer` adds it to the running turn, `queue` holds it until the turn ends
+ * (docs/features/channels/conversation-flow.md). */
+export const WhenBusySchema = z.enum(["steer", "queue"]);
+export type WhenBusy = z.infer<typeof WhenBusySchema>;
+
+/** `context.unmentioned` — whose messages without a mention are kept as quoted
+ * context for the binding's next trigger. */
+export const ContextUnmentionedSchema = z.enum(["everyone", "allowed-senders", "none"]);
+export type ContextUnmentioned = z.infer<typeof ContextUnmentionedSchema>;
+
 // --- Sync (§4.3.6) ------------------------------------------------------------
 
 /** `sync.threadLink` — which link (if any) opens the session in a client. */

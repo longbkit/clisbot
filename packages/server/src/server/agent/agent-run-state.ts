@@ -17,7 +17,7 @@ export interface PendingForegroundRun {
   start:
     | { status: "pending" }
     | { status: "started"; turnId: string }
-    | { status: "failed"; error: string };
+    | { status: "failed"; error: string; cause?: unknown };
   settled: boolean;
   settledPromise: Promise<void>;
   resolveSettled: () => void;

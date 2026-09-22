@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
+import { PromptNotDeliveredError } from "../prompt-not-delivered-error.js";
 import { AgentRequests } from "./index.js";
 
 const directories: string[] = [];
@@ -100,6 +101,26 @@ test("ambiguous provider delivery is never blindly replayed after restart", asyn
   await expect(new AgentRequests(directory).send(input)).rejects.toThrow(
     "agent_request_outcome_unknown",
   );
+  expect(deliveries).toBe(1);
+});
+
+test("a message the provider provably never received can be retried with the same key", async () => {
+  const { requests, directory } = await fixture();
+  let reachable = false;
+  let deliveries = 0;
+  const input = {
+    agentId: "agent",
+    messageId: "arrival",
+    request: { text: "hello" },
+    send: async () => {
+      if (!reachable) throw new PromptNotDeliveredError("your message was not sent");
+      deliveries++;
+    },
+  };
+  await expect(requests.send(input)).rejects.toThrow("your message was not sent");
+  reachable = true;
+  await new AgentRequests(directory).send(input);
+  await requests.send(input);
   expect(deliveries).toBe(1);
 });
 

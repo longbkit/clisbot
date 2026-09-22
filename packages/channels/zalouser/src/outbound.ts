@@ -47,6 +47,9 @@ export const sendText: SendTextFn = async (args) => {
     accountId: String(args.accountId ?? ""),
     to: String(args.to),
     text: String(args.text),
+    // Reported per chunk that landed, so the Hub can tell a partly posted
+    // answer from a failed one.
+    ...(args.onDeliveryResult === undefined ? {} : { onDeliveryResult: args.onDeliveryResult }),
   });
   if (result.messageId === undefined) {
     throw new Error("Zalouser sendText produced no message");

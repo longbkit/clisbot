@@ -98,6 +98,9 @@ export const sendText: SendTextFn = async (args) =>
     logPresentationAdmission({ args, notes: presented.notes });
     const result = await sendMessageTelegram(to, presented.text ?? String(args.text), {
       ...opts,
+      // Reported per message that landed (caption, then chunked text), so the
+      // Hub can tell a partly posted answer from a failed one.
+      ...(args.onDeliveryResult === undefined ? {} : { onDeliveryResult: args.onDeliveryResult }),
       ...(replyMarkup && typeof replyMarkup === "object"
         ? { buttons: (replyMarkup as { inline_keyboard?: unknown }).inline_keyboard as never }
         : presented.buttons === undefined

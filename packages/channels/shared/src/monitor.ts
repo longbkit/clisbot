@@ -267,6 +267,21 @@ export interface InboundEventDecision {
   reason?: string;
 }
 
+/**
+ * The durable ingress lane an inbound waits in: rows of one lane run one at a
+ * time, in arrival order, and different lanes run in parallel. The spelling is
+ * owned here so every admission — this processor's fallback and the Hub's
+ * session-scoped refinement — writes one format.
+ */
+export function inboundLaneKey(params: {
+  channel: string;
+  accountId: string;
+  conversationId: string;
+  threadId: string | null | undefined;
+}): string {
+  return `${params.channel}:${params.accountId}:${params.conversationId}:${params.threadId ?? "root"}`;
+}
+
 /** One processor per (channel, account) — owns the in-flight set and the
  * ledger sink for that account's inbound stream. */
 export function createInboundEventProcessor(options: InboundEventProcessorOptions): {
@@ -278,7 +293,8 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
   const sink: InboundLedgerSink | undefined = hostRuntime.inboundLedger;
   const logger = options.logger;
 
-  async function process(event: ChannelInboundEvent): Promise<InboundEventDecision> {
+  /** Why an event is refused before admission, or undefined to admit it. */
+  function refusalBeforeAdmission(event: ChannelInboundEvent): InboundEventDecision | undefined {
     if (!seen.remember(event.externalEventId))
       return { dispatched: false, reason: "in-flight duplicate" };
     if (
@@ -287,6 +303,12 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
     )
       return { dispatched: false, reason: "own message" };
     if (event.body.trim() === "") return { dispatched: false, reason: "empty body" };
+    return undefined;
+  }
+
+  async function process(event: ChannelInboundEvent): Promise<InboundEventDecision> {
+    const refusal = refusalBeforeAdmission(event);
+    if (refusal !== undefined) return refusal;
 
     // Queue admission is the ACK/offset boundary. Persist the complete normalized
     // event before invoking the Hub so a crash can be drained after restart.
@@ -303,7 +325,14 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
           ...(event.messageThreadId === undefined
             ? {}
             : { externalThreadId: event.messageThreadId }),
-          laneKey: `${channel}:${accountId}:${event.externalConversationId}:${event.messageThreadId ?? "root"}`,
+          // The thread the transport saw. The Hub narrows it to the session
+          // the message will reach when the account's Routes decide that.
+          laneKey: inboundLaneKey({
+            channel,
+            accountId,
+            conversationId: event.externalConversationId,
+            threadId: event.messageThreadId,
+          }),
           payload: {
             channel,
             accountId,

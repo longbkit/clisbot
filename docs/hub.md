@@ -59,7 +59,10 @@ workspace or starting a turn. Deleting that agent does not make its old creation
 Confirmed message delivery is also journaled, so retrying its message ID does not submit it again.
 An unfinished delivery after restart reports `agent_request_outcome_unknown`: a provider can have
 accepted a prompt before the daemon recorded success, so automatic resubmission could duplicate
-work. Inspect the agent before choosing a new message ID. Receipts contain identity and request
+work. Inspect the agent before choosing a new message ID. A failure that proves the provider never
+received the prompt (`PromptNotDeliveredError`, such as OpenCode's event stream never becoming
+ready) drops the receipt and withdraws the message's submission, so retrying the same message ID
+delivers it once. Receipts contain identity and request
 hashes, never prompts, environment values, or credentials.
 
 Before messaging an archived workspace, call `workspace.recovery.inspect.request`, then

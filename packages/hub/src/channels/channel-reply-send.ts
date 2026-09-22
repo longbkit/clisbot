@@ -17,7 +17,13 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import { accountScope, type ChannelReplyCapability } from "./channel-reply-capabilities.js";
 import type { ChannelReplyMcp } from "./channel-reply.js";
-import { errorText, toolFailure, toolSuccess } from "./channel-reply-results.js";
+import { errorText, failedSendText, toolFailure, toolSuccess } from "./channel-reply-results.js";
+import type { OutboundFailure } from "./plane/outbound-failure.js";
+import {
+  createSendLedger,
+  type SendLedger,
+  type SendReservation,
+} from "./channel-reply-send-ledger.js";
 import { isMediaChannel } from "./channel-message-tool.js";
 import {
   ChannelMediaRefusedError,
@@ -203,7 +209,7 @@ async function runSend(
   }
   const structuredContent = sendStructuredContent(
     ref,
-    { args: call.args, eventTurnId },
+    { args: call.args, eventTurnId, failure: seam.failure },
     outcome,
     admission.notes,
   );
@@ -211,7 +217,7 @@ async function runSend(
     const reason = outcome.error ?? "the channel post failed";
     await settleFailedSend(ledger, attempt, seam, reason);
     return {
-      content: [{ type: "text" as const, text: `message post failed: ${reason}` }],
+      content: [{ type: "text" as const, text: failedSendText(reason, seam.failure) }],
       structuredContent,
       isError: true,
     };
@@ -280,36 +286,52 @@ function issuedSendParams(
   };
 }
 
+/** The post seam as `runSend` sees it: the post, and what its failures meant. */
+interface SendSeam {
+  post: (params: HubOutboundSendParams) => Promise<HubOutboundSendResult>;
+  /** True once a post may have landed without a confirmation. */
+  ambiguous: boolean;
+  /** The last failed post's classification, for the Agent. */
+  failure: OutboundFailure | undefined;
+}
+
 /**
- * The Hub's post seam, remembering whether it ever threw.
+ * The Hub's post seam, remembering whether an outcome was ever left unknown.
  *
- * A seam that returns `ok: false` reported a decided outcome — the channel
- * refused the message. A seam that THREW did not: the transport died with the
- * request in flight, so the message may have landed. The two settle
- * differently, and only the seam knows which happened.
+ * A seam that returns `ok: false` usually reported a decided outcome — the
+ * channel refused the message. A seam that THREW did not: the transport died
+ * with the request in flight, so the message may have landed. A write that
+ * timed out or lost its connection (`failure.mayHavePosted`) is the same
+ * unknown. The two settle differently, and only the seam knows which happened.
  */
-function ambiguityAwarePost(
-  mcp: ChannelReplyMcp,
-  ref: ChannelReplyBindingRef,
-): { post: (params: HubOutboundSendParams) => Promise<HubOutboundSendResult>; threw: boolean } {
-  const seam = {
-    threw: false,
+function ambiguityAwarePost(mcp: ChannelReplyMcp, ref: ChannelReplyBindingRef): SendSeam {
+  const seam: SendSeam = {
+    ambiguous: false,
+    failure: undefined,
     post: async (params: HubOutboundSendParams): Promise<HubOutboundSendResult> => {
       try {
-        return params.media === undefined
-          ? await mcp.post(
-              ref,
-              params.text,
-              params.presentation === undefined ? undefined : { presentation: params.presentation },
-            )
-          : await mediaPost(mcp, ref, params.media);
+        const result = await postOnce(mcp, ref, params);
+        if (!result.ok) seam.failure = result.failure;
+        if (result.failure?.mayHavePosted === true) seam.ambiguous = true;
+        return result;
       } catch (error) {
-        seam.threw = true;
+        seam.ambiguous = true;
         throw error;
       }
     },
   };
   return seam;
+}
+
+async function postOnce(
+  mcp: ChannelReplyMcp,
+  ref: ChannelReplyBindingRef,
+  params: HubOutboundSendParams,
+): Promise<HubOutboundSendResult> {
+  if (params.media !== undefined) return await mediaPost(mcp, ref, params.media);
+  const options =
+    params.presentation === undefined ? undefined : { presentation: params.presentation };
+  return await mcp.post(ref, params.text, options);
 }
 
 /**
@@ -325,10 +347,10 @@ function ambiguityAwarePost(
 async function settleFailedSend(
   ledger: SendLedger,
   attempt: ChannelReplyOutputAttempt,
-  seam: { threw: boolean },
+  seam: Pick<SendSeam, "ambiguous">,
   reason: string,
 ): Promise<void> {
-  if (seam.threw) return;
+  if (seam.ambiguous) return;
   await ledger.failOpenRow(reason);
   await attempt.fail();
 }
@@ -338,7 +360,11 @@ async function settleFailedSend(
  * is bound to and the ledger key the retry would replay. */
 function sendStructuredContent(
   ref: ChannelReplyBindingRef,
-  call: { args: Record<string, unknown>; eventTurnId: string },
+  call: {
+    args: Record<string, unknown>;
+    eventTurnId: string;
+    failure: OutboundFailure | undefined;
+  },
   outcome: ChannelMessageActionOutcome,
   presentationNotes: readonly MessagePresentationBlockNote[],
 ): Record<string, unknown> {
@@ -358,6 +384,10 @@ function sendStructuredContent(
     ...(deliveries === undefined ? {} : { deliveries }),
     ...(outcome.sentBeforeError === true ? { sentBeforeError: true } : {}),
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
+    // Whether sending again can help: `rate_limited` (after
+    // `retryAfterSeconds`), `timeout` (it may already be posted), or a refusal
+    // retrying cannot change (`channel_not_found`, `missing_scope`, …).
+    ...(outcome.ok || call.failure === undefined ? {} : { failure: call.failure }),
   };
 }
 
@@ -390,6 +420,7 @@ async function mediaPost(
       : { externalMessageId: result.externalMessageId }),
     ...(result.mediaPosted === undefined ? {} : { mediaPosted: result.mediaPosted }),
     ...(result.error === undefined ? {} : { error: result.error }),
+    ...(result.failure === undefined ? {} : { failure: result.failure }),
   };
 }
 
@@ -406,130 +437,6 @@ function sendFileStager(capability: ChannelReplyCapability): ChannelMediaStager 
     channel,
     ...(capability.projectRoot === undefined ? {} : { projectRoot: capability.projectRoot }),
   });
-}
-
-/** What the anchor row says about a send that may already have happened. */
-type SendReservation =
-  | { decision: "post" }
-  | { decision: "replayed"; messageId?: string | undefined }
-  | { decision: "in-flight" };
-
-interface SendLedger {
-  /** Claims the send's anchor row (sequence 0) and reports what to do with it. */
-  reserve(): Promise<SendReservation>;
-  /** Records, posts and confirms one platform message. */
-  post(run: () => Promise<HubOutboundSendResult>): Promise<HubOutboundSendResult>;
-  /** Fails whatever row is open after the runner threw before posting. */
-  failOpenRow(reason: string): Promise<void>;
-}
-
-/**
- * The delivery ledger for one `send`.
- *
- * One send can produce several platform messages (the reply text, then one per
- * attachment), so the ledger records one row per message under the same
- * `eventTurnId`, numbered by `sequence`. Sequence 0 is the idempotency anchor:
- * it is claimed before any platform I/O. A prior attempt replays the whole send
- * only when every row under the key is `posted`; a partly delivered send
- * resumes at its first undelivered message and skips the rest.
- */
-function createSendLedger(
-  mcp: ChannelReplyMcp,
-  ref: ChannelReplyBindingRef,
-  eventTurnId: string,
-): SendLedger {
-  const row = (sequence: number) => ({
-    organizationId: mcp.organizationId,
-    accountId: ref.accountId,
-    externalConversationId: ref.externalConversationId,
-    externalThreadId: ref.externalThreadId,
-    eventTurnId,
-    sequence,
-  });
-  let next = 0;
-  let open: number | undefined;
-  /** Sequences an earlier attempt already delivered, with their native ids;
-   * the resumed run skips them instead of posting them twice. */
-  const alreadyPosted = new Map<number, string | undefined>();
-  const record = async (sequence: number) =>
-    await mcp.store.recordDelivery({ ...row(sequence), channel: ref.channel });
-  return {
-    async reserve() {
-      const recorded = await record(0);
-      next = 1;
-      // A `failed` prior row is re-armed by `recordDelivery` (status back to
-      // `recorded`, `attempts` incremented) and posts again on the same row: one
-      // failed send must not burn the key for the rest of the execution. Only a
-      // `posted` row replays, and only an in-flight or unknown outcome refuses.
-      if (recorded.created || recorded.record.status === "failed") {
-        open = 0;
-        return { decision: "post" };
-      }
-      if (recorded.record.status !== "posted") return { decision: "in-flight" };
-      // The anchor landed, but a send is only replayed once EVERY message it
-      // produced landed. A retry after a failed attachment resumes from the
-      // first row that is not posted; the delivered ones are skipped in `post`.
-      const rows = await mcp.store.listTurnDeliveries(
-        mcp.organizationId,
-        ref.accountId,
-        ref.externalConversationId,
-        ref.externalThreadId,
-        eventTurnId,
-      );
-      if (rows.every((entry) => entry.status === "posted")) {
-        return {
-          decision: "replayed",
-          ...(recorded.record.externalMessageId === null
-            ? {}
-            : { messageId: recorded.record.externalMessageId }),
-        };
-      }
-      for (const entry of rows) {
-        if (entry.status !== "posted") continue;
-        alreadyPosted.set(entry.sequence, entry.externalMessageId ?? undefined);
-      }
-      next = 0;
-      open = undefined;
-      return { decision: "post" };
-    },
-    async post(run) {
-      // Sequence 0 is already recorded by `reserve`; later messages claim their
-      // own row before the post, keeping record-before-post per message.
-      const sequence = open ?? next++;
-      if (alreadyPosted.has(sequence)) {
-        const externalMessageId = alreadyPosted.get(sequence);
-        return { ok: true, ...(externalMessageId === undefined ? {} : { externalMessageId }) };
-      }
-      if (open === undefined) {
-        const recorded = await record(sequence);
-        if (!recorded.created && recorded.record.status !== "failed") {
-          return { ok: false, error: "delivery is already recorded; not re-posting" };
-        }
-      }
-      open = sequence;
-      const result = await run();
-      if (!result.ok) {
-        await mcp.store.failDelivery({
-          ...row(sequence),
-          failureReason: result.error ?? "the channel post failed",
-        });
-        open = undefined;
-        return result;
-      }
-      await mcp.store.confirmDelivery({
-        ...row(sequence),
-        externalMessageId: result.externalMessageId ?? "",
-        postedAt: new Date(),
-      });
-      open = undefined;
-      return result;
-    },
-    async failOpenRow(reason) {
-      if (open === undefined) return;
-      await mcp.store.failDelivery({ ...row(open), failureReason: reason });
-      open = undefined;
-    },
-  };
 }
 
 /** Answers a send whose anchor row was already claimed by an earlier attempt. */

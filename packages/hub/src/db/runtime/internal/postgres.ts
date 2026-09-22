@@ -22,12 +22,33 @@ import { runtimeFile } from "../../../runtime-files.js";
 const QUERY_DEADLINE_MS = 3_000;
 const MIGRATIONS_FOLDER = runtimeFile("drizzle");
 const DEFAULT_POSTGRES_DATABASE = "postgres";
+/**
+ * The Hub's connection pool. `pg` defaults to 10 for the whole process, fewer
+ * than one busy channel account's drain workers (12). 30 lets two busy
+ * accounts each keep their half-pool share (`accountDrainConcurrency`) while
+ * the rest of the Hub still connects, and stays well inside PostgreSQL's
+ * default `max_connections` (100) for a second Hub process or a migration.
+ */
+export const DEFAULT_POSTGRES_POOL_SIZE = 30;
+const POOL_SIZE_VARIABLE = "PASEO_HUB_DATABASE_POOL_SIZE";
+
+/** The pool size from `PASEO_HUB_DATABASE_POOL_SIZE`, or the default. */
+export function postgresPoolSize(environment: Record<string, string | undefined>): number {
+  const raw = environment[POOL_SIZE_VARIABLE]?.trim();
+  if (raw === undefined || raw === "") return DEFAULT_POSTGRES_POOL_SIZE;
+  const size = Number(raw);
+  if (!Number.isInteger(size) || size < 1) {
+    throw new Error(`${POOL_SIZE_VARIABLE} must be a positive integer, got "${raw}"`);
+  }
+  return size;
+}
 
 export async function createPostgresRuntime(
   connectionString: string,
+  poolSize: number = DEFAULT_POSTGRES_POOL_SIZE,
 ): Promise<DatabaseRuntimeBundle> {
   await ensureDatabaseExists(connectionString);
-  const pool = createPool(connectionString);
+  const pool = createPool(connectionString, poolSize);
   const runtime = new PostgresRuntime(pool);
   return {
     runtime,
@@ -37,9 +58,11 @@ export async function createPostgresRuntime(
 
 class PostgresRuntime implements DatabaseRuntime {
   private readonly database;
+  readonly connectionLimit: number;
 
   constructor(private readonly pool: Pool) {
     this.database = drizzle(pool, { schema });
+    this.connectionLimit = pool.options.max;
   }
 
   query<Row extends QueryRow = QueryRow>(sql: string, params: readonly unknown[] = []) {
@@ -138,9 +161,10 @@ async function ensureDatabaseExists(connectionString: string): Promise<void> {
 }
 
 /** @package */
-export function createPool(connectionString: string): Pool {
+export function createPool(connectionString: string, max?: number): Pool {
   const config: PoolConfig = {
     connectionString,
+    ...(max === undefined ? {} : { max }),
     connectionTimeoutMillis: QUERY_DEADLINE_MS,
     query_timeout: QUERY_DEADLINE_MS,
     statement_timeout: QUERY_DEADLINE_MS,

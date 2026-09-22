@@ -22,6 +22,7 @@ import {
 import type { ProcessingController } from "../plane/processing.js";
 import { anchoredReplyThreadId } from "../reply-anchor.js";
 import type { ChannelStreamingProducer, StreamingFinalizeTransport } from "../streaming/index.js";
+import { deliverRelayPost, type OutputKind } from "./delivery.js";
 
 /**
  * The relay knobs of a scope: root gates on `sync`, subagents on
@@ -478,100 +479,34 @@ export class RelayEngine {
     turn: TurnState,
     text: string,
     finalAnswer: boolean,
-    outputKind: "assistant" | "progress" | "tool",
+    outputKind: OutputKind,
     transport?: StreamingFinalizeTransport | undefined,
   ) {
     const context = stream.context;
-    const sync = context.route.defaults.sync;
-    const eventTurnId = ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId);
     // One post per recorded sequence, in order; the final answer is the turn's
     // last relay post.
     const sequence = turn.nextSequence;
     turn.nextSequence += 1;
-    const fullText = appendThreadLink(
-      text,
-      sync.threadLink,
-      finalAnswer,
-      this.relay,
-      context.agentId,
-    );
-    const recorded = await this.relay.store.recordDelivery({
-      organizationId: this.relay.organizationId,
-      channel: context.channel,
-      accountId: context.accountId,
-      externalConversationId: context.externalConversationId,
-      externalThreadId: context.externalThreadId,
-      eventTurnId,
-      sequence,
-    });
-    if (!recorded.created) return; // replay/restart: already posted (or posted elsewhere)
-    const outputAttemptId = await context.outputDelivery?.begin();
-    if (context.outputDelivery !== undefined && outputAttemptId === undefined) {
-      await this.relay.store.failDelivery({
+    await deliverRelayPost(this.relay, {
+      context,
+      key: {
         organizationId: this.relay.organizationId,
         accountId: context.accountId,
         externalConversationId: context.externalConversationId,
         externalThreadId: context.externalThreadId,
-        eventTurnId,
+        eventTurnId: ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId),
         sequence,
-        failureReason: "workflow output limit reached",
-      });
-      return;
-    }
-    const location = replyLocationFor(context);
-    this.relay.logger.info?.("relay post started", {
-      channel: context.channel,
-      accountId: context.accountId,
-      agentId: context.agentId,
-      eventTurnId,
-      sequence,
+      },
+      location: replyLocationFor(context),
+      text: appendThreadLink(
+        text,
+        context.route.defaults.sync.threadLink,
+        finalAnswer,
+        this.relay,
+        context.agentId,
+      ),
       outputKind,
-    });
-    const result = await (transport ?? this.relay.post)({
-      channel: context.channel,
-      accountId: context.accountId,
-      to: location.to,
-      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
-      text: fullText,
-    });
-    if (result.ok) {
-      await this.relay.store.confirmDelivery({
-        organizationId: this.relay.organizationId,
-        accountId: context.accountId,
-        externalConversationId: context.externalConversationId,
-        externalThreadId: context.externalThreadId,
-        eventTurnId,
-        sequence,
-        externalMessageId: result.externalMessageId ?? "",
-        postedAt: new Date(),
-      });
-      if (outputAttemptId !== undefined) await context.outputDelivery?.complete(outputAttemptId);
-      this.relay.logger.info?.("relay post completed", {
-        channel: context.channel,
-        accountId: context.accountId,
-        agentId: context.agentId,
-        eventTurnId,
-        sequence,
-        outputKind,
-        externalMessageId: result.externalMessageId ?? "",
-      });
-      return;
-    }
-    if (outputAttemptId !== undefined) await context.outputDelivery?.fail(outputAttemptId);
-    await this.relay.store.failDelivery({
-      organizationId: this.relay.organizationId,
-      accountId: context.accountId,
-      externalConversationId: context.externalConversationId,
-      externalThreadId: context.externalThreadId,
-      eventTurnId,
-      sequence,
-      failureReason: result.error ?? "channel post failed",
-    });
-    this.relay.logger.warn("relay post failed; the ledger row stays recoverable", {
-      agentId: context.agentId,
-      eventTurnId,
-      sequence,
-      error: result.error,
+      transport,
     });
   }
 

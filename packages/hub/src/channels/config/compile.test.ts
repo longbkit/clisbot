@@ -6,6 +6,7 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
+import { conversationSettings } from "./conversation.js";
 import { openRouteWarnings, routeWarnings } from "../configuration-warnings.js";
 
 const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
@@ -846,6 +847,82 @@ ${route}
       { [".paseo/channels/slack/main.yml"]: account("    questions: always") },
       /questions/u,
     );
+  });
+
+  it("folds the conversation leaves per leaf, absent when unauthored", () => {
+    const account = (route: string, defaults = "") => `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+${defaults}
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+${route}
+`;
+    const compiled = (yaml: string) =>
+      compileChannelControlPlane(input({ [".paseo/channels/slack/main.yml"]: yaml })).accounts[0]!
+        .routes[0]!.defaults;
+    const window = { pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 };
+    const accountOn = `defaults:
+  interaction: { whenBusy: queue }
+  context: { unmentioned: allowed-senders, maxMessages: 5 }
+  batching: { pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 }`;
+    const inherited = compiled(account("", accountOn));
+    assert.equal(inherited.whenBusy, "queue");
+    assert.deepEqual(inherited.context, { unmentioned: "allowed-senders", maxMessages: 5 });
+    assert.deepEqual(inherited.batching, window);
+    assert.deepEqual(conversationSettings(inherited).batching, window);
+    // The account turns batching on; the Route turns it off and keeps the rest.
+    const routeOff = compiled(
+      account("    batching: off\n    context: { maxMessages: 2 }", accountOn),
+    );
+    assert.equal(routeOff.batching, "off");
+    assert.equal(conversationSettings(routeOff).batching, undefined);
+    assert.deepEqual(routeOff.context, { unmentioned: "allowed-senders", maxMessages: 2 });
+    // Unauthored anywhere: absent, so every route fingerprint holds, and the
+    // floors apply where the leaves are read.
+    const untouched = compiled(account(""));
+    for (const key of ["whenBusy", "context", "batching"]) assert.equal(key in untouched, false);
+    assert.deepEqual(conversationSettings(untouched), {
+      whenBusy: "steer",
+      context: { unmentioned: "everyone", maxMessages: 20 },
+      batching: undefined,
+    });
+  });
+
+  it("refuses conversation leaves it cannot run, saying which", () => {
+    const account = (route: string) => ({
+      [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+${route}
+`,
+    });
+    expectCompileError(
+      account("    batching: { pauseSeconds: 0, maxWaitSeconds: 10, maxMessages: 5 }"),
+      /pauseSeconds must be greater than 0/u,
+    );
+    expectCompileError(
+      account("    batching: { pauseSeconds: 5, maxWaitSeconds: 5, maxMessages: 5 }"),
+      /maxWaitSeconds must be greater than batching.pauseSeconds/u,
+    );
+    expectCompileError(
+      account("    batching: { pauseSeconds: 1, maxWaitSeconds: 5, maxMessages: 0 }"),
+      /maxMessages must be at least 1/u,
+    );
+    expectCompileError(account("    batching: on"), /batching must be `off` or/u);
+    expectCompileError(account("    interaction: { whenBusy: wait }"), /whenBusy/u);
+    expectCompileError(account("    context: { unmentioned: some }"), /unmentioned/u);
+    expectCompileError(account("    context: { maxMessages: 1000 }"), /at most 200/u);
   });
 
   it("warns once, on any Route, when every permission request is accepted", () => {

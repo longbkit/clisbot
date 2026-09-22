@@ -172,6 +172,37 @@ something the sender could start themselves. Only the route being changed is
 checked against the sender's access; the organization's other routes are not. Running sessions keep their setup; the next
 session on the route uses the new default, and no account restarts.
 
+## What the agent receives
+
+Every message reaches the agent with its sender, on every route:
+
+```
+Minh Dương (slack:U018WR2K090, @minh.duong): Create a CS card for QR tickets
+```
+
+Messages in the same conversation that did not wake the agent (no mention, or
+the follow-up window had closed) are kept and sent before the next message that
+does, marked as quoted context rather than instructions. Each is sent once. A
+message the Hub could not deliver (its session failed to start) is kept the same
+way, and the sender is asked to write again. `/new` and `/fork` start without
+the earlier context.
+
+```yaml
+defaults:
+  interaction:
+    whenBusy: steer # steer | queue: add to the running turn, or wait for it to end
+  context:
+    unmentioned: everyone # everyone | allowed-senders | none
+    maxMessages: 20 # 0–200
+  batching: off # or { pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 }
+```
+
+`batching` holds a message until no new one has arrived for `pauseSeconds`, the
+first has waited `maxWaitSeconds`, or `maxMessages` are waiting, then sends them
+as one prompt. `maxWaitSeconds` must be greater than `pauseSeconds`. Write
+`batching: off` on a route to turn off what its account turned on. Every leaf is
+inherited organization → account → route.
+
 ## Where a conversation's work lands
 
 Each conversation gets its own workspace on the daemon, named from the first

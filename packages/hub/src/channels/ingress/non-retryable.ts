@@ -26,6 +26,9 @@ const NON_RETRYABLE_BY_ERROR_NAME: ReadonlyMap<string, string> = new Map([
   ["ChannelWorkflowTargetError", "missing-agent-harness"],
   ["ChannelCompilationError", "invalid-account-config"],
   ["ChannelsDisabledError", "channels-disabled"],
+  // The daemon holds a receipt for this message and answers a replay the same
+  // way every time (`daemon/agent-request-refusal.ts`).
+  ["AgentRequestRefusedError", "agent-request-refused"],
 ]);
 
 function errorCandidates(error: unknown): unknown[] {

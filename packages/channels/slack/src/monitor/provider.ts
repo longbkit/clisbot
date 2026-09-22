@@ -26,6 +26,7 @@
 import type { App, Receiver } from "@slack/bolt";
 import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
 import { foldInboundSlackMedia } from "../transport/media.js";
+import { SlackSenderDirectory, type SlackUsersClient } from "../transport/sender-directory.js";
 import {
   buildSlackInboundEvent,
   buildSlackSlashCommandEvent,
@@ -94,6 +95,9 @@ export interface SlackBoltProviderOptions {
   abortSignal: AbortSignal;
   logger?: HostChildLogger;
   clientOptions?: Record<string, unknown>;
+  /** Names senders and mentioned people (`sender-directory.ts`); the default
+   * asks Slack through a per-account cache. Test seam. */
+  senders?: Pick<SlackSenderDirectory, "name">;
   /** Test seam: the Bolt exports. Defaults to a dynamic `@slack/bolt` import so
    * the module stays importable without the dep resolved. */
   interop?: SlackBoltResolvedExports;
@@ -107,6 +111,8 @@ export interface SlackBoltProvider {
 type SlackListenerArgs = {
   event: Record<string, unknown>;
   body: Record<string, unknown>;
+  /** Bolt's Web API client for this event; names senders (`sender-directory.ts`). */
+  client?: SlackUsersClient;
 };
 
 /** Upstream's interop resolution over a dynamic `@slack/bolt` import, so the
@@ -146,6 +152,9 @@ function eventTimestampMs(event: Record<string, unknown>): number | undefined {
  */
 export function createSlackBoltProvider(options: SlackBoltProviderOptions): SlackBoltProvider {
   const { identity, onInbound, logger, abortSignal } = options;
+  /** The account's people by name, cached for the account's life. */
+  const senders =
+    options.senders ?? new SlackSenderDirectory(logger === undefined ? {} : { logger });
 
   // --------------------------------------------------------------- admission
 
@@ -194,8 +203,9 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
       await admitSystemFacts(buildSlackMessageSubtypeFacts({ event }), args, event.channel_type);
       return;
     }
-    const inbound = buildSlackInboundEvent(event, source, identity, options.botId);
-    if (inbound === undefined) return;
+    const built = buildSlackInboundEvent(event, source, identity, options.botId);
+    if (built === undefined) return;
+    const inbound = await senders.name(args.client, built);
     let admitted: ChannelInboundEvent | null = inbound;
     if (options.media !== undefined) {
       admitted = await foldInboundSlackMedia(
@@ -219,13 +229,13 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
 
   const registerListeners = (app: App): void => {
     app.event("message", async (args: unknown) => {
-      const { event, body } = args as SlackListenerArgs;
+      const { event, body, client } = args as SlackListenerArgs;
       if (!matchesIdentity(body)) return;
-      await admitMessageEvent(event as SlackMessageEvent, "message", { event, body });
+      await admitMessageEvent(event as SlackMessageEvent, "message", { event, body, client });
     });
 
     app.event("app_mention", async (args: unknown) => {
-      const { event, body } = args as SlackListenerArgs;
+      const { event, body, client } = args as SlackListenerArgs;
       if (!matchesIdentity(body)) return;
       // Upstream: app_mention in im/mpim duplicates the `message` event.
       const channelType = normalizeSlackChannelType(
@@ -233,7 +243,7 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
         typeof event["channel"] === "string" ? (event["channel"] as string) : undefined,
       );
       if (channelType === "im" || channelType === "mpim") return;
-      await admitMessageEvent(event as SlackMessageEvent, "app_mention", { event, body });
+      await admitMessageEvent(event as SlackMessageEvent, "app_mention", { event, body, client });
     });
 
     for (const action of ["added", "removed"] as const) {
@@ -314,9 +324,10 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
     // and the plane's work (binding, agent turn) is far longer, so Slack shows
     // no ephemeral response and the plane's own thread posts everything.
     app.command(/.*/, async (args: unknown) => {
-      const { ack, body } = args as {
+      const { ack, body, client } = args as {
         ack: (response?: unknown) => Promise<void>;
         body: Record<string, unknown>;
+        client?: SlackUsersClient;
       };
       await ack();
       if (!matchesIdentity(body)) return;
@@ -326,7 +337,8 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
       );
       if (inbound === undefined) return;
       try {
-        await admit(inbound);
+        // The body's `<@USER>` is the invoker marker the command parser reads.
+        await admit(await senders.name(client, inbound, { mentions: false }));
       } catch (error) {
         logger?.warn?.("slack slash-command handoff fault (kept socket alive)", {
           error: error instanceof Error ? error.message : String(error),

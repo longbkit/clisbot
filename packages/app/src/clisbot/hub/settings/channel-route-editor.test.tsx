@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { AutomationInputDraftContext } from "./automation-input-draft";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubApiError } from "../api-client";
@@ -105,6 +105,7 @@ vi.mock("@/components/ui/form-field", () => ({
     editable?: boolean;
     placeholder?: string;
     multiline?: boolean;
+    accessibilityLabel?: string;
   }) {
     const change = React.useCallback(
       (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -121,6 +122,7 @@ vi.mock("@/components/ui/form-field", () => ({
       );
     return (
       <input
+        aria-label={props.accessibilityLabel}
         defaultValue={props.initialValue}
         onChange={change}
         disabled={props.editable === false}
@@ -1271,7 +1273,13 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       agents: ["triage"],
       models: ["gpt-5"],
       questions: "recommended",
-      interaction: { requireMention: true, followUp: { mode: "auto", ttlMinutes: 30 } },
+      interaction: {
+        requireMention: true,
+        followUp: { mode: "auto", ttlMinutes: 30 },
+        whenBusy: "queue",
+      },
+      context: { unmentioned: "allowed-senders", maxMessages: 8 },
+      batching: { pauseSeconds: 2, maxWaitSeconds: 6, maxMessages: 12 },
       reply: { anchor: "default" },
       outbound: { path: "relay", template: "support-reply" },
       limits: { messagesPerMinute: 5 },
@@ -1285,6 +1293,38 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0]).toMatchObject(fullRoute);
+  });
+
+  it("edits Conversation context and saves only the leaves the owner set", async () => {
+    await openEditor();
+    expect(screen.getByText("Conversation context")).toBeTruthy();
+    // An inherited Route shows the defaults, with Advanced folded.
+    expect((screen.getByLabelText("Earlier messages to include") as HTMLInputElement).value).toBe(
+      "20",
+    );
+    expect(screen.getByText("No batching · When busy: add to the current turn")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Allowed senders only" }));
+    fireEvent.click(
+      within(screen.getByText("Advanced").parentElement!).getByRole("button", { name: "Show" }),
+    );
+    const batch = screen.getByLabelText("Batch messages") as HTMLInputElement;
+    expect(batch.checked).toBe(false);
+    fireEvent.click(batch);
+    expect(
+      (screen.getByLabelText("Send after no new messages for") as HTMLInputElement).value,
+    ).toBe("3");
+    fireEvent.change(screen.getByLabelText("Send anyway after"), { target: { value: "3" } });
+    expect(screen.getByText("Must be longer than the pause.")).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Send anyway after"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Wait for turn" }));
+    fireEvent.click(save);
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const saved = adapters.put.mock.calls[0]![1].accounts[0].routes[0];
+    expect(saved.context).toEqual({ unmentioned: "allowed-senders" });
+    expect(saved.batching).toEqual({ pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 });
+    expect(saved.interaction.whenBusy).toBe("queue");
   });
 
   it("keeps a Route that stored Text forward on the relay path the owner chose", async () => {

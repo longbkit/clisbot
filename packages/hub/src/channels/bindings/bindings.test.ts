@@ -31,6 +31,8 @@ import {
 } from "./index.js";
 import { PENDING_MARKER_TTL_MS } from "./pending-marker.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
+import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
+import { channelMessageId } from "../daemon/session-operation.js";
 
 const ORGANIZATION_ID = "channel-org";
 const ACCOUNT_ID = "work";
@@ -69,6 +71,23 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
   const responses: { agentId: string; requestId: string; response: AgentPermissionResponse }[] = [];
   const subscriptions: string[][] = [];
   const sources: (InboundMessage | undefined)[] = [];
+  // The daemon's per-message receipt: a message id names one request, and a
+  // replay that asks for anything else is refused for good.
+  const receipts = new Map<string, string>();
+  const takeReceipt: DaemonConnection["sendAgentMessage"] = async (agentId, text, options) => {
+    if (options?.source === undefined) return;
+    const key = options.messageId ?? channelMessageId(options.source);
+    const request = JSON.stringify([
+      agentId,
+      text,
+      options.steer === false ? "interrupt" : "steer",
+    ]);
+    const held = receipts.get(key);
+    if (held !== undefined && held !== request) {
+      throw new AgentRequestRefusedError("agent_request_key_conflict");
+    }
+    receipts.set(key, request);
+  };
   let seq = 0;
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
@@ -96,6 +115,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
       };
     },
     sendAgentMessage: async (agentId, text, options) => {
+      await takeReceipt(agentId, text, options);
       sources.push(options?.source);
       messages.push({ agentId, text, steer: options?.steer ?? null });
     },
@@ -109,7 +129,16 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
     },
     stop: () => undefined,
   };
-  return { daemon, created, workspaces, messages, responses, subscriptions, sources };
+  return {
+    daemon,
+    created,
+    workspaces,
+    messages,
+    responses,
+    subscriptions,
+    sources,
+    takeReceipt,
+  };
 }
 
 const DEFAULTS = {
@@ -421,12 +450,12 @@ describe("bind (first mention)", () => {
     assert.equal(outcome.kind === "bound" ? outcome.newSession : false, true);
     assert.equal(created.length, 1, "exactly one agent created");
     assert.equal(messages.length, 1, "the first message is the session's first prompt");
-    assert.equal(messages[0]?.text, "start the build");
+    assert.equal(messages[0]?.text, "slack:U0ALICE: start the build", "the sender line");
     assert.deepEqual(
       sources.map((source) => source?.senderIdentity),
       [INITIATOR, INITIATOR],
     );
-    assert.equal(messages[0]?.steer, false, "the first prompt does not steer");
+    assert.equal(messages[0]?.steer, true, "a first prompt is the request its retry repeats");
 
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, null);
     assert.equal(binding?.status, "bound");
@@ -454,9 +483,10 @@ describe("bind (first mention)", () => {
 
     assert.deepEqual(workspaces, [{ cwd: "/tmp/repo", prompt: "start the build" }]);
     assert.equal(created[0]?.workspaceId, "workspace-0", "the session lands in that workspace");
-    // The daemon names the session from its first message; the execution id
-    // rides on a label for orphan recovery.
-    assert.equal(created[0]?.title, null);
+    // The session is named from the trigger's own text, not from the rendered
+    // prompt (a sender line or the context header); the execution id rides on
+    // a label for orphan recovery.
+    assert.equal(created[0]?.title, "start the build");
     assert.match(created[0]?.labels[CHANNEL_EXECUTION_ID_LABEL] ?? "", /^[0-9a-f-]{36}$/u);
   });
 
@@ -734,7 +764,7 @@ describe("follow-up (resume / steer)", () => {
     );
     assert.equal(outcome.kind, "steered");
     const last = fake.messages.at(-1);
-    assert.equal(last?.text, "and run the tests");
+    assert.equal(last?.text, "slack:U0ALICE: and run the tests");
     assert.equal(last?.steer, true, "a follow-up steers the existing turn");
   });
 
@@ -1231,18 +1261,24 @@ describe("orphan recovery (restart / resume)", () => {
 
   it("a first prompt the Agent did not take is retried into the bound session", async () => {
     const conversation = { ...CHANNEL_CONVERSATION, id: "C0DROP", rootConversationId: "C0DROP" };
-    const { daemon, messages, created } = makeFakeDaemon();
+    const { daemon, messages, created, takeReceipt } = makeFakeDaemon();
     const send = daemon.sendAgentMessage;
     let sends = 0;
     daemon.sendAgentMessage = async (agentId, text, options) => {
       sends += 1;
-      if (sends === 1) throw new Error("host_not_connected");
-      return send(agentId, text, options);
+      if (sends > 1) return send(agentId, text, options);
+      // The daemon wrote its receipt and the answer never came back: the
+      // retry is a replay of this same message id.
+      await takeReceipt(agentId, text, options);
+      throw new Error("rpc timed out");
     };
     const engine = makeEngine(store, daemon);
+    const opener = message({ conversation, externalMessageId: "1700000000.000900" });
 
-    await assert.rejects(engine.bindOrSteer(message({ conversation }), ...routed()));
-    const retried = await engine.bindOrSteer(message({ conversation }), ...routed());
+    await assert.rejects(engine.bindOrSteer(opener, ...routed()));
+    // The session is bound now, so the retry arrives as a follow-up; it must be
+    // the same request, or the daemon refuses the message id for good.
+    const retried = await engine.bindOrSteer(opener, ...routed());
     assert.equal(retried.kind, "steered");
     assert.equal(created.length, 1, "one session, not one per attempt");
     assert.equal(messages.length, 1);

@@ -285,6 +285,37 @@ describe("slack web client config", () => {
     expect(options.retryConfig).toEqual(SLACK_WRITE_RETRY_OPTIONS);
   });
 
+  it("ends a 429 whose wait would outlast the write deadline as a 429, not a timeout", async () => {
+    let calls = 0;
+    const rateLimited = (async () => {
+      calls += 1;
+      return new Response(null, { status: 429, headers: { "retry-after": "5" } });
+    }) as never;
+    const options = resolveSlackWriteClientOptions({ fetch: rateLimited, timeout: 1000 });
+    const response = await options.fetch!("https://slack.com/api/chat.postMessage", {});
+    expect(response.status).toBe(429);
+    expect(calls).toBe(1);
+  });
+
+  it("still waits out a 429 that fits inside the write deadline", async () => {
+    let calls = 0;
+    const flaky = (async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response(null, { status: 429, headers: { "retry-after": "0" } })
+        : new Response("{}", { status: 200 });
+    }) as never;
+    const options = resolveSlackWriteClientOptions({ fetch: flaky, timeout: 1000 });
+    const response = await options.fetch!("https://slack.com/api/chat.postMessage", {});
+    expect(response.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+
+  it("gives every write a 30-second deadline unless the caller sets one", () => {
+    expect(resolveSlackWriteClientOptions().timeout).toBe(30_000);
+    expect(resolveSlackWriteClientOptions({ timeout: 4321 }).timeout).toBe(4321);
+  });
+
   it("passes the bounded lookup policy into WebClient", () => {
     const customFetch = vi.fn() as never;
 
@@ -329,6 +360,7 @@ describe("slack web client config", () => {
         fetch: expect.any(Function),
         rejectRateLimitedCalls: true,
         retryConfig: SLACK_WRITE_RETRY_OPTIONS,
+        timeout: 30_000,
       });
     } finally {
       restoreProxyEnvForTest();
@@ -364,12 +396,14 @@ describe("slack web client config", () => {
         rejectRateLimitedCalls: true,
         retryConfig: SLACK_WRITE_RETRY_OPTIONS,
         teamId: "T1",
+        timeout: 30_000,
       });
       expect(WebClient).toHaveBeenNthCalledWith(2, "xoxb-org", {
         fetch: expect.any(Function),
         rejectRateLimitedCalls: true,
         retryConfig: SLACK_WRITE_RETRY_OPTIONS,
         teamId: "T2",
+        timeout: 30_000,
       });
     } finally {
       restoreProxyEnvForTest();

@@ -6,6 +6,7 @@
 
 import { formatErrorMessage } from "@getpaseo/channels-core/infra/errors";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { OutboundFailure } from "./plane/outbound-failure.js";
 
 export function toolSuccess(text: string, structuredContent?: Record<string, unknown>) {
   return {
@@ -25,6 +26,30 @@ export function unsupportedAction(action: string, reason: string): CallToolResul
     structuredContent: { status: "unsupported_action", action, reason },
     isError: true,
   };
+}
+
+/**
+ * A failed `message` send, as the line the model reads: the reason, then
+ * whether sending again can help. The same facts are in `structuredContent.failure`.
+ */
+export function failedSendText(reason: string, failure: OutboundFailure | undefined): string {
+  const text = `message post failed: ${reason}`;
+  if (failure === undefined) return text;
+  return `${text} (${failure.kind}: ${retryAdvice(failure)})`;
+}
+
+function retryAdvice(failure: OutboundFailure): string {
+  if (failure.kind === "partially_posted") {
+    return "part of the message is already in the conversation; send only what is missing";
+  }
+  if (failure.mayHavePosted) {
+    return "the message may already be in the conversation; check before sending it again";
+  }
+  if (!failure.retryable) return "sending it again will not help";
+  if (failure.retryAfterSeconds !== undefined) {
+    return `sending it again after ${failure.retryAfterSeconds}s can succeed`;
+  }
+  return "sending it again later can succeed";
 }
 
 /**

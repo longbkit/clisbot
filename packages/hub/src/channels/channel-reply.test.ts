@@ -34,6 +34,7 @@ import {
 } from "./channel-message-tool.js";
 import { clearChannelMessageActions, registerChannelMessageActions } from "./message-actions.js";
 import { redeemChannelCommandButton } from "./command-buttons.js";
+import { outboundFailure, type OutboundFailure } from "./plane/outbound-failure.js";
 import {
   type ChannelReplyBindingRef,
   type OutboundPostParams,
@@ -430,6 +431,56 @@ describe("channel-reply MCP endpoint", () => {
     assert.equal(fixture.posts.length, 0);
     assert.equal(fixture.failures.length, 1);
     assert.match(String(fixture.failures[0]?.failureReason), /chat_not_found/);
+  });
+
+  describe("tells the Agent whether sending again can help", () => {
+    const FailedSendSchema = z.object({
+      content: z.array(z.object({ text: z.string() })),
+      structuredContent: z.object({ failure: z.record(z.string(), z.unknown()).optional() }),
+    });
+    async function failedSend(failure: OutboundFailure, idempotencyKey = "k") {
+      const fixture = makeFixture({
+        post: async () => ({ ok: false, error: `post failed: ${failure.kind}`, failure }),
+      });
+      const body = await fixture.call("tools/call", {
+        name: "message",
+        arguments: { text: "hello", idempotencyKey },
+      });
+      return { fixture, result: FailedSendSchema.parse(body.result) };
+    }
+
+    it("rate limited: retryable, with the wait", async () => {
+      const { result } = await failedSend(
+        outboundFailure("rate_limited", { retryAfterSeconds: 12 }),
+      );
+      assert.deepEqual(result.structuredContent.failure, {
+        kind: "rate_limited",
+        retryable: true,
+        mayHavePosted: false,
+        retryAfterSeconds: 12,
+      });
+      assert.match(result.content[0]?.text ?? "", /rate_limited: sending it again after 12s/);
+    });
+
+    it("channel not found: not retryable", async () => {
+      const failure = outboundFailure("channel_not_found", { code: "channel_not_found" });
+      const { result, fixture } = await failedSend(failure);
+      assert.equal(result.structuredContent.failure?.["retryable"], false);
+      assert.match(result.content[0]?.text ?? "", /will not help/);
+      assert.equal(fixture.failures.length, 1, "a decided refusal releases the key");
+    });
+
+    it("timeout: may already be posted, so the key stays claimed", async () => {
+      const { result, fixture } = await failedSend(outboundFailure("timeout"), "t-1");
+      assert.equal(result.structuredContent.failure?.["mayHavePosted"], true);
+      assert.match(result.content[0]?.text ?? "", /check before sending it again/);
+      assert.equal(fixture.failures.length, 0);
+      const again = await fixture.call("tools/call", {
+        name: "message",
+        arguments: { text: "hello", idempotencyKey: "t-1" },
+      });
+      assert.match(JSON.stringify(again.result), /unknown outcome; not re-posting/);
+    });
   });
 
   it("sends text and two attachments as one send, one ledger row per message", async () => {

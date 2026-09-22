@@ -92,7 +92,12 @@ function resolveTarget(args: { to: string; threadId?: string }): string {
 export const sendText: SendTextFn = async (args) =>
   await withAccountRuntime(args, async () => {
     const to = resolveTarget(toTargetArgs(args));
-    const result = await sendMessageDiscord(to, String(args.text), baseSendOpts(args));
+    // Reported per 2000-character chunk that landed, so the Hub can tell a
+    // partly posted answer from a failed one.
+    const result = await sendMessageDiscord(to, String(args.text), {
+      ...baseSendOpts(args),
+      ...(args.onDeliveryResult === undefined ? {} : { onDeliveryResult: args.onDeliveryResult }),
+    });
     return { messageId: result.messageId, channelId: result.channelId, ...result.receipt };
   });
 

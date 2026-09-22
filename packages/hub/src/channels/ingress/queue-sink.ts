@@ -53,6 +53,24 @@ export interface ChannelIngressQueueSinkOptions {
   /** Fired when a release ended the row instead of returning it. The drain
    * counts it as a deferral — it asked for one — so the log is here. */
   onReleaseBudgetExhausted?: (record: ChannelIngressQueueRecord) => void;
+  /** Fired once per settle that left the row dead-lettered, whichever rule
+   * ended it: a non-retryable failure, the retry ceiling, or the release budget. */
+  onDeadLettered?: (record: ChannelIngressQueueRecord) => void;
+  /** The lane of the session a payload will reach (`session-lane.ts`);
+   * undefined, or a throw, keeps the lane the transport chose. */
+  sessionLaneKey?: (payload: unknown) => string | undefined;
+}
+
+/** Admission must not fail over a lane: the transport's key always works. */
+function admittedLaneKey(
+  options: ChannelIngressQueueSinkOptions,
+  params: { laneKey: string; payload: unknown },
+): string {
+  try {
+    return options.sessionLaneKey?.(params.payload) ?? params.laneKey;
+  } catch {
+    return params.laneKey;
+  }
 }
 
 export function createChannelIngressQueueSink(
@@ -72,7 +90,7 @@ export function createChannelIngressQueueSink(
         ...(params.externalThreadId === undefined
           ? {}
           : { externalThreadId: params.externalThreadId }),
-        laneKey: params.laneKey,
+        laneKey: admittedLaneKey(options, params),
         payload: params.payload,
       });
       options.onAdmitted?.();
@@ -114,9 +132,9 @@ export function createChannelIngressQueueSink(
         ...(params.reason === undefined ? {} : { reason: params.reason }),
         ...(params.retryAt === undefined ? {} : { retryAt: params.retryAt }),
       });
-      if (disposition === "release" && record.status === "dead_letter") {
-        options.onReleaseBudgetExhausted?.(record);
-      }
+      if (record.status !== "dead_letter") return;
+      if (disposition === "release") options.onReleaseBudgetExhausted?.(record);
+      options.onDeadLettered?.(record);
     },
     recover: async (scope) => {
       if (scope.organizationId !== organizationId) {

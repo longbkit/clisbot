@@ -55,6 +55,8 @@ DATABASE_URL=postgres://paseo:password@localhost:5432/paseo_hub \
 
 Use PostgreSQL for a durable server deployment, more than one Hub process, or an existing database backup and operations setup. Migrations run automatically at startup. Hub does not start listening when a migration fails.
 
+Hub holds up to 30 connections to PostgreSQL. Set `PASEO_HUB_DATABASE_POOL_SIZE` to change that; keep every Hub process's pool, added together, under the server's `max_connections`.
+
 The database also stores Hub's generated authentication secret. Set `PASEO_HUB_AUTH_SECRET` only when the deployment must supply that secret from a platform secret store. While the override is set, Hub uses it without replacing the stored secret. Changing the effective secret signs everyone out of the dashboard; execution credentials already issued remain valid until their execution ends.
 
 ## App configuration

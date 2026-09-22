@@ -3,6 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { writeJsonFileAtomic } from "../../atomic-file.js";
+import { isPromptNotDeliveredError } from "../prompt-not-delivered-error.js";
 
 const ReceiptSchema = z.object({
   fingerprint: z.string(),
@@ -45,6 +46,8 @@ export class AgentRequests {
       recover: async () => false,
       run: input.send,
       prepare: input.prepare,
+      // Only a failure that proves the provider never received the prompt frees the key.
+      retrySafe: async (_agentId, error) => isPromptNotDeliveredError(error),
     });
   }
 
@@ -56,7 +59,7 @@ export class AgentRequests {
       recover: (agentId: string) => Promise<boolean>;
       run: (agentId: string) => Promise<void>;
       prepare?: (() => Promise<void>) | undefined;
-      retrySafe?: (agentId: string) => Promise<boolean>;
+      retrySafe?: (agentId: string, error: unknown) => Promise<boolean>;
     },
   ): Promise<string> {
     const key = digest(identity);
@@ -83,7 +86,7 @@ export class AgentRequests {
       recover: (agentId: string) => Promise<boolean>;
       run: (agentId: string) => Promise<void>;
       prepare?: (() => Promise<void>) | undefined;
-      retrySafe?: (agentId: string) => Promise<boolean>;
+      retrySafe?: (agentId: string, error: unknown) => Promise<boolean>;
     },
   ): Promise<string> {
     const file = path.join(this.directory, `${key}.json`);
@@ -105,7 +108,7 @@ export class AgentRequests {
     } catch (error) {
       // Keyed creation has no initial prompt. Once its normal cleanup finished,
       // absence of an agent confirms that retrying cannot duplicate one.
-      if (await operation.retrySafe?.(receipt.agentId)) await rm(file, { force: true });
+      if (await operation.retrySafe?.(receipt.agentId, error)) await rm(file, { force: true });
       throw error;
     }
     await writeJsonFileAtomic(file, { ...receipt, state: "completed" });

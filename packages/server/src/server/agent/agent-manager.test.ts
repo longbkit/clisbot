@@ -23,6 +23,7 @@ import { projectTimelineRows } from "./timeline-projection.js";
 import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { formatSystemNotificationPrompt, startAgentRun } from "./agent-prompt.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
+import { PromptNotDeliveredError } from "./prompt-not-delivered-error.js";
 import { ensureAgentLoaded, ensureUnarchivedAgentLoaded } from "./agent-loading.js";
 import type { StoredAgentRecord } from "./agent-storage.js";
 import type {
@@ -11389,6 +11390,62 @@ test("trusted operation identity snapshots creator and immutable messages before
       ),
     ).rejects.toThrow("immutable");
     expect(providerCalls).toBe(1);
+    await manager.closeAgent(agent.id);
+  } finally {
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}, 20_000);
+
+test("a prompt the provider never received frees its logical message for a retry", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-undelivered-"));
+  const registry = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await registry.initialize();
+  const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+  let providerCalls = 0;
+  class UnreachableOnceClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      const session = new TestAgentSession(config);
+      const start = session.startTurn.bind(session);
+      session.startTurn = async () => {
+        providerCalls += 1;
+        if (providerCalls === 1) throw new PromptNotDeliveredError("your message was not sent");
+        return start();
+      };
+      return session;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new UnreachableOnceClient() },
+    registry,
+    durableTimelineStore: store,
+    agentSessionStorage: true,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    const dispatch = () =>
+      startAgentRun(manager, agent.id, "hello", logger, {
+        runOptions: { clientMessageId: "delivery" },
+      });
+
+    await dispatch();
+    await expect(manager.waitForAgentRunStart(agent.id)).rejects.toBeInstanceOf(
+      PromptNotDeliveredError,
+    );
+    await dispatch();
+
+    await vi.waitFor(async () => {
+      const rows = await store.getCommittedRows(agent.id);
+      expect(rows.map((row) => row.item)).toContainEqual(
+        expect.objectContaining({ type: "user_message", clientMessageId: "delivery" }),
+      );
+    });
+    expect(providerCalls).toBe(2);
+
+    expect(providerCalls).toBe(2);
     await manager.closeAgent(agent.id);
   } finally {
     await manager.flush();

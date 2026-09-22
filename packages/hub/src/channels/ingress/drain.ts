@@ -11,13 +11,14 @@
  * ceiling, dead-letter minimum age and the non-retryable hook. This module owns
  * only the loop: recover, claim, keep the lease alive, dispatch, settle.
  *
- * Lifecycle: `start()` drains once immediately (the restart drain), then on a
+ * Lifecycle: `start()` drains at once (the restart drain), then wakes on a
  * timer; `requestDrain()` wakes it when an event is admitted; `stop()` clears
- * every timer and awaits the in-flight pump, so a test can end with no handles
- * left behind.
+ * every timer and awaits the workers still settling a claim, so a test can end
+ * with no handles left behind.
  *
  * One claim's trouble stays one claim's trouble: a lost lease or a lost fencing
- * race abandons that row and the pass moves on to the rest of the backlog.
+ * race abandons that row, and a slow dispatch holds only its own worker — the
+ * others keep claiming the rest of the backlog.
  */
 import type { InboundQueueClaim, InboundQueueSink } from "@getpaseo/channels-shared";
 import {
@@ -32,7 +33,7 @@ import { ChannelIngressQueueClaimConflictError } from "../../db/channels.js";
 export const DEFAULT_INGRESS_CLAIM_LEASE_MS = 30_000;
 /** Timer wake. Picks up retry-due rows and claims another process abandoned. */
 export const DEFAULT_INGRESS_DRAIN_INTERVAL_MS = 15_000;
-/** Claims one pass will start before yielding, so one lane cannot hog a pump. */
+/** Claims one `drainOnce` pass starts before it returns. */
 export const DEFAULT_INGRESS_DRAIN_BATCH = 32;
 /**
  * Claims one account dispatches at once. The claim statement already keeps a
@@ -43,6 +44,21 @@ export const DEFAULT_INGRESS_DRAIN_BATCH = 32;
  * workers free for follow-ups and commands while a Host is starting sessions.
  */
 export const DEFAULT_INGRESS_DRAIN_CONCURRENCY = 12;
+
+/**
+ * One account's worker cap under a database pool of `connectionLimit`: half
+ * the pool, at most the default. A worker's dispatch holds at most one
+ * connection at a time, and only for its short queries (a daemon wait holds
+ * none), so a busy account keeps at most half the pool and every other account
+ * (and the rest of the Hub) still gets a connection. PGlite has a single
+ * in-process connection that queues its callers, so there is no pool to share
+ * (`undefined`) and the default stands.
+ */
+export function accountDrainConcurrency(connectionLimit: number | undefined): number {
+  if (connectionLimit === undefined) return DEFAULT_INGRESS_DRAIN_CONCURRENCY;
+  const share = Math.floor(connectionLimit / 2);
+  return Math.max(1, Math.min(DEFAULT_INGRESS_DRAIN_CONCURRENCY, share));
+}
 
 /**
  * The plane refused this event for now — a route concurrency or rate ceiling,
@@ -110,9 +126,9 @@ export interface ChannelIngressDrain {
   start(): void;
   /** Wake the loop (called right after a durable admission). */
   requestDrain(): void;
-  /** One pass, awaited. The seam tests and `start()` share it. */
+  /** One bounded pass, awaited, apart from the running pool. The test seam. */
   drainOnce(): Promise<ChannelIngressDrainPass>;
-  /** Clear the timer and await the in-flight pass. Safe to call twice. */
+  /** Clear the timers and await the workers still settling. Safe to call twice. */
   stop(): Promise<void>;
 }
 
@@ -353,9 +369,39 @@ async function processClaim(
   await settleCompleted(options, claim, pass);
 }
 
+/** The scope every queue call of one account's drain is pinned to. */
+function queueScope(options: ChannelIngressDrainOptions) {
+  return {
+    organizationId: options.organizationId,
+    channel: options.channel,
+    accountId: options.accountId,
+  };
+}
+
 /**
- * One pass: recover, then let `concurrency` workers claim and dispatch until
- * the queue has nothing claimable or the batch is spent.
+ * Recover first: a claim whose owner died holds its lane until its lease
+ * expires, and only recovery makes it claimable again.
+ */
+async function recoverStaleClaims(options: ChannelIngressDrainOptions): Promise<void> {
+  await options.queue.recover?.(queueScope(options));
+}
+
+/** The oldest claimable row whose lane is free, or nothing. */
+function claimNext(options: ChannelIngressDrainOptions): Promise<InboundQueueClaim | undefined> {
+  return options.queue.claim({
+    ...queueScope(options),
+    workerId: options.workerId,
+    leaseMs: options.leaseMs ?? DEFAULT_INGRESS_CLAIM_LEASE_MS,
+  });
+}
+
+function workerCount(options: ChannelIngressDrainOptions): number {
+  return Math.max(1, options.concurrency ?? DEFAULT_INGRESS_DRAIN_CONCURRENCY);
+}
+
+/**
+ * One bounded pass (`drainOnce`): recover, then let `concurrency` workers claim
+ * and dispatch until the queue has nothing claimable or the batch is spent.
  */
 async function runDrainPass(
   options: DrainRun,
@@ -363,43 +409,36 @@ async function runDrainPass(
   isStopped: () => boolean,
 ): Promise<ChannelIngressDrainPass> {
   const pass = emptyPass();
-  const scope = {
-    organizationId: options.organizationId,
-    channel: options.channel,
-    accountId: options.accountId,
-  };
-  // Recover first: a claim whose owner died holds its lane until its lease
-  // expires, and only recovery makes it claimable again.
-  await options.queue.recover?.(scope);
+  await recoverStaleClaims(options);
   // Workers may overshoot the batch by one claim each; an empty claim must not
   // count, or a pass over a full backlog would never look full.
   const work = async (): Promise<void> => {
     while (pass.claimed < batchLimit && !isStopped()) {
-      const claim = await options.queue.claim({
-        ...scope,
-        workerId: options.workerId,
-        leaseMs: options.leaseMs ?? DEFAULT_INGRESS_CLAIM_LEASE_MS,
-      });
+      const claim = await claimNext(options);
       if (claim === undefined) return;
       pass.claimed += 1;
       await processClaim(options, claim, pass);
     }
   };
-  const workers = Math.max(1, options.concurrency ?? DEFAULT_INGRESS_DRAIN_CONCURRENCY);
   // A queue fault in one worker ends the pass only after the others settle: a
   // claim in flight is never left without its settle write.
-  const settled = await Promise.allSettled(Array.from({ length: workers }, work));
+  const settled = await Promise.allSettled(Array.from({ length: workerCount(options) }, work));
   const fault = settled.find((entry) => entry.status === "rejected");
   if (fault !== undefined) throw fault.reason;
   return pass;
 }
 
 /**
- * The account-scoped drain. `running` is cleared in the same synchronous step
- * as the last `requested` read: clearing it from a `.finally()` on the pump
- * promise would leave a microtask-wide window in which `requestDrain()` sets
- * `requested` on a pump that has already stopped reading it, and the wake would
- * be lost until the interval timer came round.
+ * The account-scoped drain: a pool of up to `concurrency` workers, each of
+ * which claims, dispatches and settles one row at a time and goes straight on
+ * to the next. Nothing waits for the slowest dispatch: a worker that finishes
+ * takes whatever is claimable now, and a wake starts an idle worker at once.
+ *
+ * A worker leaves when a claim comes back empty and no wake arrived while it
+ * was looking; `active` drops in the same synchronous step as that decision.
+ * Counting workers by their promises instead would leave a microtask-wide
+ * window in which a wake sees a full pool that is in fact draining away, and
+ * the wake would be lost until the interval timer came round.
  */
 class IngressDrain implements ChannelIngressDrain {
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -407,23 +446,22 @@ class IngressDrain implements ChannelIngressDrain {
   private dueTimer: ReturnType<typeof setTimeout> | undefined;
   /** When `dueTimer` fires; a later due time never replaces an earlier one. */
   private dueAt: number | undefined;
-  /** The earliest due time the passes since the last arm handed back. */
-  private nextDueAt: number | undefined;
-  private pumping: Promise<void> | undefined;
-  private running = false;
-  private requested = false;
+  private readonly workers = new Set<Promise<void>>();
+  private active = 0;
+  /** Bumped by every wake, so a worker can tell a wake landed while it looked. */
+  private wakes = 0;
+  /** A wake asked for recovery; the next claim runs it, once for the pool. */
+  private recoveryDue = false;
+  private recovering: Promise<void> | undefined;
   private stopped = false;
   private readonly batchSize: number;
   private readonly run: DrainRun;
+  /** Lifetime counts of the pool's settles; the per-pass counts are `drainOnce`'s. */
+  private readonly settled = emptyPass();
 
   constructor(private readonly options: ChannelIngressDrainOptions) {
     this.batchSize = options.batchLimit ?? DEFAULT_INGRESS_DRAIN_BATCH;
-    this.run = {
-      ...options,
-      handedBack: (retryAt) => {
-        this.nextDueAt = Math.min(this.nextDueAt ?? Infinity, retryAt.getTime());
-      },
-    };
+    this.run = { ...options, handedBack: (retryAt) => this.armDueTimer(retryAt.getTime()) };
   }
 
   start(): void {
@@ -439,12 +477,9 @@ class IngressDrain implements ChannelIngressDrain {
 
   readonly requestDrain = (): void => {
     if (this.isStopped()) return;
-    if (this.running) {
-      this.requested = true;
-      return;
-    }
-    this.running = true;
-    this.pumping = this.pump();
+    this.wakes += 1;
+    this.recoveryDue = true;
+    this.spawnWorker();
   };
 
   readonly drainOnce = (): Promise<ChannelIngressDrainPass> =>
@@ -452,40 +487,60 @@ class IngressDrain implements ChannelIngressDrain {
 
   async stop(): Promise<void> {
     this.stopped = true;
-    this.requested = false;
     if (this.timer !== undefined) clearInterval(this.timer);
     if (this.dueTimer !== undefined) clearTimeout(this.dueTimer);
     this.timer = undefined;
     this.dueTimer = undefined;
-    await this.pumping?.catch(() => undefined);
+    // Workers stop claiming at once; each one still in a dispatch writes its
+    // settle before it ends.
+    await Promise.allSettled(this.workers);
   }
 
   private readonly isStopped = (): boolean => this.stopped || this.options.abortSignal.aborted;
 
-  private async pump(): Promise<void> {
+  private spawnWorker(): void {
+    if (this.isStopped() || this.active >= workerCount(this.options)) return;
+    this.active += 1;
+    const worker: Promise<void> = this.work().finally(() => this.workers.delete(worker));
+    this.workers.add(worker);
+  }
+
+  private async work(): Promise<void> {
     try {
-      do {
-        this.requested = false;
-        if (this.isStopped()) return;
-        const pass = await this.drainOnce();
-        this.armDueTimer();
-        // A full pass means the backlog is longer than one batch: keep going
-        // rather than leaving the rest to the interval timer.
-        if (pass.claimed >= this.batchSize) this.requested = true;
-      } while (this.requested);
+      while (!this.isStopped()) {
+        const wakesSeen = this.wakes;
+        await this.recoverIfDue();
+        const claim = await claimNext(this.run);
+        if (claim === undefined) {
+          if (this.wakes === wakesSeen) return;
+          continue;
+        }
+        // There may be more behind this one: bring up a sibling, up to the cap.
+        this.spawnWorker();
+        await processClaim(this.run, claim, this.settled);
+      }
     } catch (error) {
-      // A queue fault must not kill the loop: the timer retries the pass.
+      // A queue fault ends this worker, not the pool: the timer brings one back.
       this.options.log?.faulted?.(error);
     } finally {
-      this.running = false;
+      this.active -= 1;
     }
   }
 
-  /** Wake for the earliest row a pass handed back, instead of the next tick. */
-  private armDueTimer(): void {
-    const dueAt = this.nextDueAt;
-    this.nextDueAt = undefined;
-    if (dueAt === undefined || this.isStopped()) return;
+  private recoverIfDue(): Promise<void> {
+    if (this.recovering === undefined && this.recoveryDue) {
+      this.recoveryDue = false;
+      this.recovering = recoverStaleClaims(this.run).finally(() => {
+        this.recovering = undefined;
+      });
+    }
+    return this.recovering ?? Promise.resolve();
+  }
+
+  /** Wake for the earliest row handed back, instead of the next tick. A
+   * `drainOnce` without `start()` arms nothing: no pool runs behind it. */
+  private armDueTimer(dueAt: number): void {
+    if (this.isStopped() || this.timer === undefined) return;
     if (this.dueAt !== undefined && this.dueAt <= dueAt) return;
     if (this.dueTimer !== undefined) clearTimeout(this.dueTimer);
     this.dueAt = dueAt;

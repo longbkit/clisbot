@@ -97,6 +97,7 @@ import {
 import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
 import { isSystemInjectedEnvelope } from "./agent-prompt.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
+import { isPromptNotDeliveredError } from "./prompt-not-delivered-error.js";
 import { stripInternalPaseoMcpServer, withRuntimePaseoMcpServer } from "./runtime-mcp-config.js";
 import { resolveCreateAgentTitles } from "./create-agent-title.js";
 import type { PaseoToolCatalogFactory } from "./tools/types.js";
@@ -2768,6 +2769,8 @@ export class AgentManager {
       }
       return result.turnId;
     } catch (error) {
+      // Before the failure is observable, so a caller that retries finds the message free.
+      await this.withdrawUndeliveredSubmission(agentId, options, error);
       if (pendingRun.settled) {
         throw error;
       }
@@ -2780,7 +2783,10 @@ export class AgentManager {
       }
       agent.pendingReplacement = false;
       const errorMsg = error instanceof Error ? error.message : "Failed to start turn";
-      pendingRun.start = { status: "failed", error: errorMsg };
+      pendingRun.start = { status: "failed", error: errorMsg, cause: error };
+      // The turn_failed below settles the run before its state reaches start waiters, so they
+      // would only see a finished run. Publish the failed start while the run still carries it.
+      if (isPromptNotDeliveredError(error)) this.emitState(agent);
       await this.handleStreamEvent(agent, {
         type: "turn_failed",
         provider: agent.provider,
@@ -2790,6 +2796,24 @@ export class AgentManager {
       this.runs.settleForegroundRun(agentId, pendingRun.token);
       throw error;
     }
+  }
+
+  /** A prompt the provider provably never received frees its logical message for a retry. */
+  private async withdrawUndeliveredSubmission(
+    agentId: string,
+    options: AgentRunOptions | undefined,
+    error: unknown,
+  ): Promise<void> {
+    const submission = options?.sessionSubmission;
+    if (!submission || !isPromptNotDeliveredError(error)) return;
+    await this.durableTimelineStore
+      ?.writeMessageSubmission?.(agentId, { ...submission, status: "pending", withdrawn: true })
+      .catch((writeError: unknown) => {
+        this.logger.warn(
+          { err: writeError, agentId, messageId: submission.id },
+          "Failed to withdraw an undelivered message submission",
+        );
+      });
   }
 
   streamAgent(
@@ -3336,7 +3360,9 @@ export class AgentManager {
         }
 
         if (currentPendingRun?.start.status === "failed") {
-          finishErr(new Error(currentPendingRun.start.error));
+          const { cause, error } = currentPendingRun.start;
+          // Keep the not-delivered type: it is what lets a keyed request be retried.
+          finishErr(isPromptNotDeliveredError(cause) ? cause : new Error(error));
           return true;
         }
 

@@ -67,6 +67,25 @@ test("the Slack manifest asks for the verified scopes plus the soft ones", () =>
   assert.ok(!required.includes("assistant:write"));
 });
 
+test("the Slack manifest subscribes to messages that do not mention the bot", () => {
+  const events = z
+    .object({
+      settings: z.object({ event_subscriptions: z.object({ bot_events: z.array(z.string()) }) }),
+    })
+    .parse(load(slackManifest(LOCAL, "socket"))).settings.event_subscriptions.bot_events;
+  // app_mention alone never delivers an unmentioned message, so conversation
+  // context, unmentioned follow-ups and DMs would silently never arrive.
+  assert.deepEqual(events, [
+    "app_mention",
+    "message.channels",
+    "message.groups",
+    "message.im",
+    "message.mpim",
+  ]);
+  const optional = new Set<string>(SLACK_OPTIONAL_BOT_SCOPES);
+  assert.ok(optional.has("im:history") && optional.has("mpim:history"));
+});
+
 test("generated URLs are built from the resolved callback origin", () => {
   const github = guideFor("github");
   assert.deepEqual(

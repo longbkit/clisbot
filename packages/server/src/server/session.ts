@@ -741,6 +741,9 @@ export class Session {
   private isCleanedUp = false;
   private viewedTimelineAgentIds = new Set<string>();
   private readonly viewedTimelineAgentIdsBySource = new Map<object, Set<string>>();
+  /** Subscribed agents whose idle runtimes a subscriber keeps loaded; excludes background listeners. */
+  private residentTimelineAgentIds = new Set<string>();
+  private readonly nonResidentTimelineSources = new Set<object>();
   private readonly clientCapabilitiesBySource = new Map<object, ReadonlySet<ClientCapability>>();
   private readonly defaultTimelineSubscriptionSource = {};
   private unsubscribeTerminalWorkspaceContributionEvents: (() => void) | null = null;
@@ -1242,35 +1245,52 @@ export class Session {
     if (!source && !this.supports(CLIENT_CAPS.selectiveAgentTimeline)) {
       this.viewedTimelineAgentIdsBySource.clear();
       this.viewedTimelineAgentIds.clear();
+      this.residentTimelineAgentIds.clear();
     }
   }
 
   clearAgentTimelineSubscription(source: object): void {
     this.clientCapabilitiesBySource.delete(source);
     this.eventSubscriptions.delete(source);
+    this.nonResidentTimelineSources.delete(source);
     if (this.viewedTimelineAgentIdsBySource.delete(source)) {
       this.rebuildViewedTimelineAgentIds();
     }
   }
 
-  private replaceAgentTimelineSubscription(source: object | undefined, agentIds: string[]): void {
+  private replaceAgentTimelineSubscription(
+    source: object | undefined,
+    agentIds: string[],
+    keepsAgentsResident = true,
+  ): void {
     const subscriptionSource = source ?? this.defaultTimelineSubscriptionSource;
     if (agentIds.length === 0) this.viewedTimelineAgentIdsBySource.delete(subscriptionSource);
     else this.viewedTimelineAgentIdsBySource.set(subscriptionSource, new Set(agentIds));
+    if (keepsAgentsResident) this.nonResidentTimelineSources.delete(subscriptionSource);
+    else this.nonResidentTimelineSources.add(subscriptionSource);
     this.rebuildViewedTimelineAgentIds();
   }
 
-  /** Whether a client of this session has the agent's timeline subscribed (selective clients only). */
+  /**
+   * Whether a client of this session keeps the agent's timeline open (selective clients only).
+   * Background listeners still receive its events but do not count, so an idle agent can close.
+   */
   public isViewingAgentTimeline(agentId: string): boolean {
-    return this.viewedTimelineAgentIds.has(agentId);
+    return this.residentTimelineAgentIds.has(agentId);
   }
 
   private rebuildViewedTimelineAgentIds(): void {
     const viewedAgentIds = new Set<string>();
-    for (const agentIds of this.viewedTimelineAgentIdsBySource.values()) {
-      for (const agentId of agentIds) viewedAgentIds.add(agentId);
+    const residentAgentIds = new Set<string>();
+    for (const [source, agentIds] of this.viewedTimelineAgentIdsBySource) {
+      const resident = !this.nonResidentTimelineSources.has(source);
+      for (const agentId of agentIds) {
+        viewedAgentIds.add(agentId);
+        if (resident) residentAgentIds.add(agentId);
+      }
     }
     this.viewedTimelineAgentIds = viewedAgentIds;
+    this.residentTimelineAgentIds = residentAgentIds;
   }
 
   private usesSelectiveTimelineDelivery(): boolean {
@@ -2603,7 +2623,7 @@ export class Session {
             ? this.supportsForSource(CLIENT_CAPS.selectiveAgentTimeline, source)
             : this.supports(CLIENT_CAPS.selectiveAgentTimeline)
         ) {
-          this.replaceAgentTimelineSubscription(source, agentIds);
+          this.replaceAgentTimelineSubscription(source, agentIds, msg.keepsAgentsResident);
         }
         const response: SessionOutboundMessage = {
           type: "agent.timeline.set_subscription.response",

@@ -561,3 +561,32 @@ describe("sendSlackText — native presentation", () => {
     expect(posts[0]?.args.text).toBe("W6TEXT-ONLY");
   });
 });
+
+describe("sendSlackText — a long answer split into several messages", () => {
+  it("reports each message that landed before a later chunk fails", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    const client = installedFakeClient!;
+    const accepted = client.chat.postMessage.bind(client.chat);
+    let calls = 0;
+    client.chat.postMessage = (async (args: RecordedPost["args"]) => {
+      calls += 1;
+      if (calls === 2) throw new Error("chunk 2 refused");
+      return await accepted(args);
+    }) as never;
+    let delivered = 0;
+    await expect(
+      postText({
+        cfg: CFG,
+        accountId: "work",
+        to: "C1",
+        text: `${"a".repeat(7000)}\n\n${"b".repeat(7000)}`,
+        onDeliveryResult: () => {
+          delivered += 1;
+        },
+      }),
+    ).rejects.toThrow(/chunk 2 refused/);
+    expect(posts.length).toBe(1);
+    expect(delivered).toBe(1);
+  });
+});

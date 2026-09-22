@@ -32,6 +32,7 @@ import { loadChannelControlPlane, type ChannelControlPlaneSnapshot } from "../co
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { ChannelStore } from "../../db/channels.js";
 import { ChannelReplyCapabilityStore } from "../../db/channel-reply-capabilities.js";
+import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import {
   connectChannelDaemon,
   connectEnrolledChannelDaemon,
@@ -51,6 +52,7 @@ import { ProvisionError } from "../install/provision-main.js";
 import { loadChannelPins, type ChannelPinEntry } from "../install/pins.js";
 import { isChannelsEnabled } from "../loader/channel-gate.js";
 import {
+  accountDrainConcurrency,
   createChannelIngressDrain,
   type ChannelIngressDeferral,
   type ChannelIngressDrain,
@@ -62,6 +64,8 @@ import {
   type ChannelIngressRetentionSweep,
 } from "../ingress/retention.js";
 import { createChannelIngressQueueSink } from "../ingress/queue-sink.js";
+import { claimedInbound } from "../ingress/claimed-inbound.js";
+import { dispatchIfHeldFlush, heldFlushAdmitter } from "../bindings/held-flush.js";
 import {
   createHostRuntime,
   type HostRuntime,
@@ -96,6 +100,8 @@ import type {
 } from "../plane/types.js";
 import { planeInboundDeferral } from "../plane/types.js";
 import { OutboundPacer } from "../plane/outbound-pacer.js";
+import { trackDeliveredParts } from "../plane/outbound-failure.js";
+import { FinalAnswerRetrier } from "../relay/final-retry.js";
 import type { StagedChannelMedia } from "../media/outbound-stager.js";
 
 /**
@@ -171,6 +177,7 @@ export function flatInboundNormalizer(params: InboundReplyParams): InboundMessag
   if (rawSenderId === null) return null;
   const conversationLabel = confirmedString(ctx["ConversationLabel"]);
   const senderName = confirmedString(ctx["SenderName"]);
+  const senderUsername = confirmedString(ctx["SenderUsername"]);
   // The marker's native message id (Slack `ts`): the only durable anchor the
   // relay can mint a new reply thread on when `reply.anchor` is `thread` and
   // the marker itself arrived at the conversation root.
@@ -183,6 +190,7 @@ export function flatInboundNormalizer(params: InboundReplyParams): InboundMessag
       ? { ingressId: String(ctx["ClisbotInboundOperationId"]) }
       : {}),
     ...(senderName !== null ? { senderName } : {}),
+    ...(senderUsername !== null ? { senderUsername } : {}),
     text,
     mentionedBot: ctx["WasMentioned"] === true,
     conversation,
@@ -275,6 +283,7 @@ function postFor(
     });
   }
   return async (params) => {
+    const parts = trackDeliveredParts();
     try {
       const result = await (
         send as (args: Record<string, unknown>) => Promise<{
@@ -287,6 +296,7 @@ function postFor(
         to: params.to,
         text: params.text,
         accountId: handle.accountId,
+        onDeliveryResult: parts.onDeliveryResult,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
         // COMPAT(clisbot-control-plane): the native card payload (the approval
         // card's `blocks` / `reply_markup`) — posted with the text (the text
@@ -318,7 +328,7 @@ function postFor(
         to: params.to,
         error: errorMessage(error),
       });
-      return { ok: false, error: errorMessage(error) };
+      return { ok: false, error: errorMessage(error), failure: parts.failureOf(error) };
     }
   };
 }
@@ -326,19 +336,24 @@ function postFor(
 /**
  * `messagesSentPerMinute` (Bot, Conversation, Route): every new message the
  * account posts, including the tool-path MCP reply that posts through
- * `handle.post`, waits its turn here. Delayed, never dropped.
+ * `handle.post`, waits its turn here, in order per destination thread. Answers
+ * are delayed, never dropped. Every write, paced or not, runs under the Hub's
+ * write deadline (`CHANNEL_WRITE_TIMEOUT_MS`).
  */
 function pacedAccountSends(
   account: CompiledChannelAccount,
+  handle: AccountHandle,
   logger: PlaneLogger,
-  post: PostFn,
-  media: ChannelMediaPostFn | undefined,
+  sends: { post: PostFn; media: ChannelMediaPostFn | undefined },
 ): { pacer: OutboundPacer; post: PostFn; media: ChannelMediaPostFn | undefined } {
-  const pacer = new OutboundPacer({ account, logger });
+  // Stops with the account: waiting writes fail as `canceled`, never going out
+  // later through a vertical that was replaced.
+  const pacer = new OutboundPacer({ account, logger, abortSignal: handle.abortController.signal });
+  const { post, media } = sends;
   return {
     pacer,
     post: pacer.paced(post),
-    media: media === undefined ? undefined : pacer.paced(media),
+    media: media === undefined ? undefined : pacer.pacedMedia(media),
   };
 }
 
@@ -364,6 +379,7 @@ function mediaPostFor(
   const send = handle.vertical?.plugin?.outbound?.["sendMedia"];
   if (typeof send !== "function") return undefined;
   return async (params) => {
+    const parts = trackDeliveredParts();
     try {
       const result = await (
         send as (args: Record<string, unknown>) => Promise<{
@@ -376,6 +392,7 @@ function mediaPostFor(
         to: params.to,
         filePath: params.filePath,
         accountId: handle.accountId,
+        onDeliveryResult: parts.onDeliveryResult,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
         // The staged facts a `message` attachment carries. The relay's one-file
         // path leaves them undefined and the vertical falls back to the path,
@@ -402,7 +419,7 @@ function mediaPostFor(
         to: params.to,
         error: errorMessage(error),
       });
-      return { ok: false, error: errorMessage(error) };
+      return { ok: false, error: errorMessage(error), failure: parts.failureOf(error) };
     }
   };
 }
@@ -569,6 +586,8 @@ interface AccountHandle {
    * plane and kept for the tool-path MCP endpoint (`channelReplyPost`). */
   post?: PostFn;
   media?: ChannelMediaPostFn | undefined;
+  /** Re-posts the account's failed final answers; stopped with the account. */
+  finalAnswerRetrier?: FinalAnswerRetrier;
   releaseSlackInbound?: (() => Promise<void>) | undefined;
   /** Observed gateway lifetime; teardown waits for it so a replacement never
    * overlaps the old account's socket/poll handlers. */
@@ -1338,12 +1357,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       pacer,
       post: planePost,
       media: planeMediaPost,
-    } = pacedAccountSends(
-      compiled,
-      this.logger,
-      postFor(handle, cfg, loaded.hostRuntime, this.logger),
-      mediaPostFor(handle, cfg, loaded.hostRuntime, this.logger),
-    );
+    } = pacedAccountSends(compiled, handle, this.logger, {
+      post: postFor(handle, cfg, loaded.hostRuntime, this.logger),
+      media: mediaPostFor(handle, cfg, loaded.hostRuntime, this.logger),
+    });
     // The turn-lifecycle surface (the plugin's optional outbound.typing);
     // undefined leaves the seam unmounted — an absent capability, not a fault.
     const planeTyping = typingFor(handle, cfg, loaded.hostRuntime);
@@ -1367,6 +1384,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         accountId: compiled.accountId,
       },
       normalizeInbound: flatInboundNormalizer,
+      admitHeldFlush: heldFlushAdmitter(loaded.hostRuntime.inboundQueue, handle),
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
       ...commandPlaneOptions(this.options, this.routeDefaults),
@@ -1465,7 +1483,31 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // account-scoped and uses transactional claim leases from ChannelStore;
     // start it only after the plane is ready to receive events.
     this.startInboundDrain(handle, loaded.hostRuntime);
+    this.startFinalAnswerRetrier(handle, planePost);
     this.drive(handle, { account, cfg }, loaded.hostRuntime);
+  }
+
+  /**
+   * Re-post the account's failed final answers from the delivery ledger
+   * (relay/final-retry.ts). It looks at once, so answers that failed before a
+   * restart resume their schedule, then on its own timer; it stops with the
+   * account. Retries go through the paced post like any other answer.
+   */
+  private startFinalAnswerRetrier(handle: AccountHandle, post: PostFn): void {
+    const organizationId = handle.organizationId;
+    if (organizationId === undefined) return;
+    handle.finalAnswerRetrier = new FinalAnswerRetrier({
+      store: this.store,
+      scope: {
+        organizationId,
+        channel: supportedChannel(handle.channel),
+        accountId: handle.accountId,
+      },
+      post,
+      logger: this.logger,
+      abortSignal: handle.abortController.signal,
+    });
+    handle.finalAnswerRetrier.start();
   }
 
   /**
@@ -1746,6 +1788,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       case "deferred":
         this.logger.info?.("channel inbound deferred", { ...base, reason: outcome.reason });
         break;
+      case "held":
+        this.logger.info?.("channel inbound held", { ...base, reason: outcome.reason });
+        break;
       case "ignored":
         // The message never reached the agent: the reason is the operator's
         // only lead (route miss, kill switch, mention policy, permissions).
@@ -1997,6 +2042,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       this.drains.delete(handleKey(handle.channel, handle.accountId));
       await drain.stop();
     }
+    await handle.finalAnswerRetrier?.stop();
     if (handle.plane !== undefined) await handle.plane.stop(options);
     else if (handle.daemon !== undefined) handle.daemon.stop();
     // Bounded: a gateway that ignores its abort must not spend the process's
@@ -2150,6 +2196,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       workerId: `${handle.channel}:${handle.accountId}:drain`,
       abortSignal: handle.abortController.signal,
       resolveNonRetryableFailure: resolveHubIngressNonRetryableFailure,
+      concurrency: accountDrainConcurrency(this.options.databaseRuntime.connectionLimit),
       dispatch: (payload, claim) => this.dispatchInbound(handle, hostRuntime, payload, claim.id),
       log: this.inboundDrainLog(handle),
     });
@@ -2170,11 +2217,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     payload: unknown,
     ingressId: string,
   ): Promise<ChannelIngressDeferral | undefined> {
-    const stored = payload as InboundReplyParams;
-    const params: InboundReplyParams = {
-      ...stored,
-      ctxPayload: { ...stored.ctxPayload, ClisbotInboundOperationId: ingressId },
-    };
+    const flush = dispatchIfHeldFlush(handle.plane, payload, ingressId);
+    if (flush !== undefined) return flush;
+    const params = claimedInbound(payload, ingressId);
     const result = await hostRuntime.onInboundReply(params);
     if (!result.dispatched) {
       const deferral = planeInboundDeferral(result);
@@ -2263,6 +2308,21 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       channel,
       accountId,
       onAdmitted: () => this.drains.get(handleKey(channel, accountId))?.requestDrain(),
+      sessionLaneKey: (payload) =>
+        this.handles
+          .get(handleKey(channel, accountId))
+          ?.plane?.ingressLaneKey(payload as InboundReplyParams),
+      // Never awaited: the settle that dead-lettered the row must not wait on a post.
+      onDeadLettered: (record) => {
+        void this.noticeUnprocessed(channel, accountId, record).catch((error: unknown) => {
+          this.logger.warn("channel unprocessed-message notice failed", {
+            channel,
+            account: accountId,
+            event: record.id,
+            error: errorMessage(error),
+          });
+        });
+      },
       // A release that ended the row is not back-pressure any more, it is a
       // stuck message an operator has to resubmit or drop.
       onReleaseBudgetExhausted: (record) => {
@@ -2276,6 +2336,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         });
       },
     });
+  }
+
+  /** Tell the sender, in their conversation, that the queue gave up on a message. */
+  private async noticeUnprocessed(
+    channel: string,
+    accountId: string,
+    record: ChannelIngressQueueRecord,
+  ): Promise<void> {
+    const plane = this.handles.get(handleKey(channel, accountId))?.plane;
+    await plane?.onDeadLettered(record);
   }
 
   /**

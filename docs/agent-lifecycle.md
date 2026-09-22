@@ -32,13 +32,21 @@ and it may do so only when every kind of work its runtime can keep between turns
 the daemon is not certain, the agent stays resident: losing parked work or failing a message costs
 more than a resident process.
 
-No built-in provider certifies today, so idle closing never fires in practice:
+OpenCode is the only built-in provider that certifies. It reports idle only while its session has
+no foreground or autonomous run, stop, steer, pending permission or question, running tool call, or
+running child session (the child sessions it links through `task` tool calls and hydrates on
+subscribe). A session driven by another runtime's server never certifies: closing it frees no
+process and its abort could cut the parent's work. Closing releases the dedicated `opencode serve`
+the session held; the next load resumes the same OpenCode session on a fresh server. A session
+whose first turn failed before dispatch (`PromptNotDeliveredError`) is idle, so the reaper reclaims
+its server too.
+
+The other providers do not certify:
 
 | Provider                                                  | Why it does not certify                                                                                                                                                                                                                                                                                            |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Claude                                                    | Background shells, Task subagents and workflows arrive as SDK tasks, but the adapter tracks status only for subagents and workflows, `Monitor` watches are not verified on the wire, and session crons (`CronCreate`, `ScheduleWakeup`, `/loop`) are reported in `session_crons`, which the adapter does not read. |
 | Codex app-server                                          | Background terminals can outlive the turn that started them, and the provider adapter does not observe them.                                                                                                                                                                                                       |
-| OpenCode                                                  | `session.status` reports the foreground session only; the adapter has no signal that no child task session is still working.                                                                                                                                                                                       |
 | ACP providers (Grok, Copilot, Cursor, Kimi, custom `acp`) | The ACP protocol has no background-work signal.                                                                                                                                                                                                                                                                    |
 | Pi, OMP                                                   | Not assessed; they do not implement the check.                                                                                                                                                                                                                                                                     |
 
@@ -48,7 +56,9 @@ provider. Windows under a minute are raised to a minute. Both are read at startu
 same close as daemon shutdown: the record lands in `closed` and the next prompt, Hub execution, or
 load resumes it. An agent counts as idle only while it has no run, no pending permission or
 permission response, no in-flight lifecycle or foreground mutation, no queued session events or
-steer, no running provider subagent, and no client subscribed to its timeline. Any of those, and
+steer, no running provider subagent, and no client subscribed to its timeline. A background listener
+that subscribes with `keepsAgentsResident: false` (the Hub channel plane) still receives events,
+including after the agent is closed and resumed, but does not count. Any of those, and
 every `ensureAgentLoaded()` call, restarts its idle clock, and the close checks again after
 draining events with nothing awaited before the agent is removed. A prompt that loads the agent
 therefore either keeps it resident or waits for a close already past that check and then resumes

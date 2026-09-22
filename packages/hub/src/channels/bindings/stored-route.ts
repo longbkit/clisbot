@@ -208,6 +208,20 @@ export interface ThreadKey {
 }
 
 /**
+ * Does this Route open a thread per root-level message here (the minted-thread
+ * key of `deriveBindingKey`)? Then no message binds the conversation root:
+ * every root message binds its own thread.
+ */
+export function rootMessagesOpenThreads(message: InboundMessage, route: CompiledRoute): boolean {
+  return (
+    route.defaults.bindingKey === "thread" &&
+    route.defaults.replyAnchor === "thread" &&
+    message.channel === "slack" &&
+    message.conversation.kind !== "dm"
+  );
+}
+
+/**
  * Derive the thread key a message binds to, per `binding.key` (§4.3.4).
  * `thread`: the native thread/topic is the unit — conversation + thread id (a
  * top-level channel message has no thread id and falls to the conversation
@@ -227,10 +241,7 @@ export function deriveBindingKey(message: InboundMessage, route: CompiledRoute):
   let externalThreadId = route.defaults.bindingKey === "thread" ? conversation.threadId : null;
   if (
     externalThreadId === null &&
-    route.defaults.bindingKey === "thread" &&
-    route.defaults.replyAnchor === "thread" &&
-    message.channel === "slack" &&
-    conversation.kind !== "dm" &&
+    rootMessagesOpenThreads(message, route) &&
     message.externalMessageId !== undefined &&
     SLACK_THREAD_TS_PATTERN.test(message.externalMessageId)
   ) {

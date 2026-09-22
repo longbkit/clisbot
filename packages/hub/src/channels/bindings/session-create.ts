@@ -34,6 +34,7 @@ import type {
   SupportedChannelName,
 } from "../plane/types.js";
 import { routeFingerprint, routePosition, type ThreadKey } from "./stored-route.js";
+import { sessionTitle } from "./prompt.js";
 
 /** What minting a session needs from the plane; `BindingEngineContext` extends it. */
 export interface SessionCreateContext {
@@ -225,7 +226,7 @@ export async function createRouteSession(
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
     const created = await context.daemon
       .createAgent(config, {
-        labels: channelExecutionLabels(executionId),
+        ...createIdentity(executionId, requester),
         source: requester,
         ...(workspaceId === undefined ? {} : { workspaceId }),
       })
@@ -275,4 +276,14 @@ async function resolveSessionWorkspace(
     source: requester,
     logger: context.logger,
   });
+}
+
+/** The created Agent's labels (orphan recovery) and title: the trigger's own
+ * first line, never the rendered prompt the daemon would otherwise name it from. */
+function createIdentity(
+  executionId: string,
+  requester: InboundMessage,
+): { labels: Record<string, string>; title?: string } {
+  const title = sessionTitle(requester.text);
+  return { labels: channelExecutionLabels(executionId), ...(title === undefined ? {} : { title }) };
 }

@@ -2190,11 +2190,26 @@ export const CHANNEL_INGRESS_QUEUE_STATUSES = [
 
 export type ThreadBindingStatus = (typeof THREAD_BINDING_STATUSES)[number];
 export type DeliveryLedgerStatus = (typeof DELIVERY_LEDGER_STATUSES)[number];
+
+/** A failed final answer, kept on its ledger row for the relay's retry: where
+ * it goes, what it says, and the Activity facts recorded if it never lands. */
+export interface DeliveryRetryPayload {
+  to: string;
+  threadId: string | null;
+  text: string;
+  routePosition: number;
+  routeFingerprint: string;
+  senderIdentity: string;
+}
+
 /** The ledger's direction (blueprint §2.4): `out` rows are the outbound relay's
  * record-before-post; `in` rows are the shared L3 monitor's inbound
  * record-before-handoff (status flow `recorded → consumed`). */
 export type ChannelLedgerDirection = (typeof CHANNEL_LEDGER_DIRECTIONS)[number];
 export type ChannelIngressQueueStatus = (typeof CHANNEL_INGRESS_QUEUE_STATUSES)[number];
+
+export const CHANNEL_INBOX_STATES = ["context", "held", "delivered"] as const;
+export type ChannelInboxState = (typeof CHANNEL_INBOX_STATES)[number];
 
 /** Immutable, organization-owned Channel configuration revisions. Channel
  * authoring deliberately does not use the legacy user-facing Project model. */
@@ -2534,8 +2549,17 @@ export const deliveryLedger = pgTable(
     // increments it before the retry posts under the same row.
     attempts: integer().notNull().default(1),
     failureReason: text("failure_reason"),
+    // Outbound final answers only: what the relay posts again, and when, while
+    // a failed answer is inside its bounded retry. Cleared once the row is
+    // posted or given up on, so message text does not outlive the retry.
+    retryPayload: jsonb("retry_payload").$type<DeliveryRetryPayload>(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
   },
   (table) => [
+    // The retrier's due scan: only rows waiting for another attempt.
+    index("delivery_ledger_retry_due_idx")
+      .on(table.organizationId, table.channel, table.accountId, table.nextAttemptAt)
+      .where(sql`${table.nextAttemptAt} is not null`),
     // `out` dedupe: one row per (account, external thread, event/turn id, seq).
     // The inbound rows' constant (`''`, 0) keys keep this index usable for
     // lookups but never unique across inbound rows — that is the partial
@@ -2628,6 +2652,20 @@ export const channelIngressQueue = pgTable(
      * age budget. */
     resubmittedAt: timestamp("resubmitted_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** The binding (session scope) the message was decided for, as
+     * `JSON.stringify([conversationId, threadId])` of `deriveBindingKey`; null
+     * until the plane files the message in the binding's inbox. */
+    bindingKey: text("binding_key"),
+    /** The message's place in its binding's inbox
+     * (docs/features/channels/conversation-flow.md): `context` waits to ride
+     * along with the next trigger, `held` waits for a batch or for the running
+     * turn to end, `delivered` has entered the session. */
+    inboxState: text("inbox_state").$type<ChannelInboxState>(),
+    /** The daemon message id of the first prompt that carried this row, set
+     * before the send. A carried row is never sent again as context (its
+     * outcome may be unknown), and a replay of that prompt re-reads exactly
+     * the rows it carried (docs/features/channels/conversation-flow.md). */
+    sentIn: text("sent_in"),
   },
   (table) => [
     uniqueIndex("channel_ingress_queue_event_unique").on(
@@ -2650,6 +2688,23 @@ export const channelIngressQueue = pgTable(
     ),
     check("channel_ingress_queue_attempts_check", sql`${table.attempts} >= 0`),
     check("channel_ingress_queue_releases_check", sql`${table.releases} >= 0`),
+    index("channel_ingress_queue_inbox_idx")
+      .on(
+        table.organizationId,
+        table.channel,
+        table.accountId,
+        table.bindingKey,
+        table.inboxState,
+        table.createdAt,
+      )
+      .where(sql`${table.inboxState} is not null`),
+    index("channel_ingress_queue_sent_in_idx")
+      .on(table.organizationId, table.sentIn)
+      .where(sql`${table.sentIn} is not null`),
+    check(
+      "channel_ingress_queue_inbox_state_check",
+      sql`${table.inboxState} is null or ${table.inboxState} in ('context', 'held', 'delivered')`,
+    ),
   ],
 );
 

@@ -698,6 +698,10 @@ export function guideUrl(origin: string, path: string): string {
  * integration checks installations against, so a manifest the operator pastes can never ask for
  * less than Hub needs. The optional ones ride along (a degraded surface beats a missing one) but
  * stay out of verification — see SLACK_OPTIONAL_BOT_SCOPES.
+ *
+ * The `message.*` events are how a message that does not mention the bot reaches the Hub at all:
+ * with `app_mention` alone, conversation context, unmentioned follow-ups and DMs never arrive
+ * (docs/features/channels/conversation-flow.md).
  */
 export function slackManifest(origin: string, transport: "socket" | "webhook" = "socket"): string {
   const scopes = [...SLACK_REQUIRED_BOT_SCOPES, ...SLACK_OPTIONAL_BOT_SCOPES]
@@ -724,6 +728,10 @@ settings:
   event_subscriptions:
 ${requestUrl}    bot_events:
       - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
   interactivity:
     is_enabled: ${transport === "socket" ? "true" : "false"}
   org_deploy_enabled: false

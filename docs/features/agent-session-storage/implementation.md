@@ -363,7 +363,10 @@ Two halves on one substrate. The durable timeline and fast jump are described be
 half makes **tool approval survive a mid-flight daemon restart** — a response is journalled
 `pending` before it reaches the agent tool, `PermissionResponseAdmission` refuses to forward an
 id that already has a record, the submission ledger refuses to re-run a `clientMessageId` that
-was already admitted, and a status change keeps the original responder, timestamp and order.
+was already admitted (unless the provider provably never received it: a `PromptNotDeliveredError`
+appends it as `pending` with `withdrawn: true`, and the next admission of that id re-opens it;
+a flag rather than a status, so a daemon rolled back to before it still reads `pending` and
+refuses the replay), and a status change keeps the original responder, timestamp and order.
 Both halves share one `events.jsonl`, one writer lock and one `operationOrder`, which is what
 keeps message and approval ordering correct after recovery.
 

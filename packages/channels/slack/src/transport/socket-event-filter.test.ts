@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { buildSlackInboundEvent, withoutAddressingMention } from "./socket-event-filter.js";
+import {
+  buildSlackInboundEvent,
+  withBotMentionNamed,
+  withoutAddressingMention,
+} from "./socket-event-filter.js";
 
 const IDENTITY = { botUserId: "U0BOT" };
 
@@ -30,5 +34,30 @@ describe("buildSlackInboundEvent", () => {
     );
     assert.equal(event?.body, "2+2");
     assert.equal(event?.wasMentioned, true);
+  });
+});
+
+describe("withBotMentionNamed", () => {
+  const NAMED = { botUserId: "U0BOT", botName: "clisbot" };
+
+  it("renders the bot's mentions left in the body as its name", () => {
+    assert.equal(withBotMentionNamed("ask <@U0BOT> or <@u0bot>", NAMED), "ask @clisbot or @clisbot");
+    assert.equal(withBotMentionNamed("<@U0ALICE> look", NAMED), "<@U0ALICE> look");
+    assert.equal(withBotMentionNamed("ask <@U0BOT>", IDENTITY), "ask <@U0BOT>");
+  });
+
+  it("names the bot inside the body the agent reads, after the addressing mention goes", () => {
+    const event = buildSlackInboundEvent(
+      {
+        type: "message",
+        channel: "C0ROOM",
+        ts: "1.2",
+        user: "U0ALICE",
+        text: "<@U0BOT> tell <@U0BOT> hi",
+      },
+      "message",
+      NAMED,
+    );
+    assert.equal(event?.body, "tell @clisbot hi");
   });
 });

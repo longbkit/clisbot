@@ -16,6 +16,9 @@ export interface FollowUpAdmission {
   /** The message was for the bot (mention and follow-up gates passed) and the
    * Route's audience refused the sender. */
   audienceRefused?: boolean;
+  /** Refused by the mention or follow-up gate: the message was not for the
+   * bot, and it is kept as the binding's context. */
+  unaddressed?: boolean;
 }
 
 /** The key a conversation's `/followup` override is stored against: its binding key. */
@@ -85,10 +88,18 @@ export function admitFollowUp(
 ): FollowUpAdmission {
   if (message.mentionedBot || !defaults.requireMention) return { allowed: true };
   if (mode === "mention-only") {
-    return { allowed: false, reason: "a mention is required for every message here" };
+    return {
+      allowed: false,
+      reason: "a mention is required for every message here",
+      unaddressed: true,
+    };
   }
   if (idle) {
-    return { allowed: false, reason: "follow-up window ended; mention the bot to continue" };
+    return {
+      allowed: false,
+      reason: "follow-up window ended; mention the bot to continue",
+      unaddressed: true,
+    };
   }
   return { allowed: true };
 }

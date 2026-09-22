@@ -4,11 +4,14 @@ import type { Logger } from "pino";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
+  OpenCodeConnectionDeadline,
   OpenCodeEventConsumer,
+  raceStopped,
   type OpenCodeEventConsumerTiming,
   type OpenCodeEventSourceInput,
 } from "./event-consumer.js";
 
+const EXPECTED_FIRST_RECORD_DEADLINE_MS = 5_000;
 const EXPECTED_STREAM_WATCHDOG_MS = 30_000;
 
 describe("OpenCodeEventConsumer", () => {
@@ -107,7 +110,7 @@ describe("OpenCodeEventConsumer", () => {
 
     timing.expireWatchdog();
     expect(timing.watchdogDelays).toEqual([
-      EXPECTED_STREAM_WATCHDOG_MS,
+      EXPECTED_FIRST_RECORD_DEADLINE_MS,
       EXPECTED_STREAM_WATCHDOG_MS,
     ]);
     await timing.waiting();
@@ -157,6 +160,103 @@ describe("OpenCodeEventConsumer", () => {
     upstream.send(1, connectedRecord("/recovered"));
     await consumer.ready();
     expect(consumer.diagnostics()).toMatchObject({ attempt: 2, phase: "stream" });
+  });
+
+  test("abandons a first read that ignores its abort and connects on the next attempt", async () => {
+    const hungReturn = vi.fn(() => new Promise<IteratorResult<unknown>>(() => undefined));
+    const upstream = createScriptedEventClient([
+      { stream: { [Symbol.asyncIterator]: () => hungIterator(hungReturn) } },
+      { stream: recordStream([connectedRecord("/recovered")]) },
+    ]);
+    const timing = new ControlledTiming();
+    const consumer = new OpenCodeEventConsumer({
+      serverUrl: "http://127.0.0.1:1",
+      processExit: new Promise<Error>(() => undefined),
+      logger: createRecordingLogger(),
+      createClient: () => upstream.client,
+      timing,
+    });
+    cleanups.push(() => consumer.close());
+
+    await eventually(() => expect(upstream.signals).toHaveLength(1));
+    expect(timing.watchdogDelays).toEqual([EXPECTED_FIRST_RECORD_DEADLINE_MS]);
+    timing.expireWatchdog();
+    await timing.waiting();
+    expect(upstream.signals[0]?.aborted).toBe(true);
+    expect(hungReturn).toHaveBeenCalledTimes(1);
+    expect(consumer.diagnostics()).toMatchObject({
+      attempt: 1,
+      phase: "first-record",
+      lastOutcome: "watchdog",
+      lastError: "OpenCode event stream first-record watchdog expired",
+    });
+
+    timing.advanceWait();
+    await consumer.ready();
+    expect(consumer.diagnostics()).toMatchObject({ attempt: 2, phase: "stream" });
+  });
+
+  test("bounds an attempt whose request never opens a stream", async () => {
+    const upstream = createScriptedEventClient([
+      "never",
+      { stream: recordStream([connectedRecord("/recovered")]) },
+    ]);
+    const timing = new ControlledTiming();
+    const consumer = new OpenCodeEventConsumer({
+      serverUrl: "http://127.0.0.1:1",
+      processExit: new Promise<Error>(() => undefined),
+      logger: createRecordingLogger(),
+      createClient: () => upstream.client,
+      timing,
+    });
+    cleanups.push(() => consumer.close());
+
+    await eventually(() => expect(upstream.signals).toHaveLength(1));
+    timing.expireWatchdog();
+    await timing.waiting();
+    timing.advanceWait();
+    await consumer.ready();
+    expect(upstream.signals).toHaveLength(2);
+  });
+
+  test("close settles while an attempt is hung", async () => {
+    const upstream = createScriptedEventClient([
+      { stream: { [Symbol.asyncIterator]: () => hungIterator() } },
+    ]);
+    const consumer = new OpenCodeEventConsumer({
+      serverUrl: "http://127.0.0.1:1",
+      processExit: new Promise<Error>(() => undefined),
+      logger: createRecordingLogger(),
+      createClient: () => upstream.client,
+      timing: new ControlledTiming(),
+    });
+    await eventually(() => expect(upstream.signals).toHaveLength(1));
+
+    await expect(consumer.close()).resolves.toBeUndefined();
+  });
+
+  test("keeps the transport cause in the diagnostic error", async () => {
+    const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:1"), {
+      code: "ECONNREFUSED",
+    });
+    const upstream = createScriptedEventClient([
+      { stream: recordStream([], new TypeError("fetch failed", { cause: refused })) },
+    ]);
+    const timing = new ControlledTiming();
+    const consumer = new OpenCodeEventConsumer({
+      serverUrl: "http://127.0.0.1:1",
+      processExit: new Promise<Error>(() => undefined),
+      logger: createRecordingLogger(),
+      createClient: () => upstream.client,
+      timing,
+    });
+    cleanups.push(() => consumer.close());
+
+    await timing.waiting();
+    expect(consumer.diagnostics()).toMatchObject({
+      lastOutcome: "error",
+      lastError: "fetch failed (ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:1)",
+    });
   });
 
   test("publishes one terminal and stops reconnecting on process exit", async () => {
@@ -425,6 +525,44 @@ describe("OpenCodeEventConsumer", () => {
   });
 });
 
+describe("OpenCode connection deadline reads", () => {
+  test("hold no stop listener once each read settles", async () => {
+    const deadline = new OpenCodeConnectionDeadline(new ControlledTiming(), () => undefined);
+    deadline.arm(EXPECTED_STREAM_WATCHDOG_MS, "stream");
+    for (let read = 0; read < 1_000; read += 1) {
+      await expect(raceStopped(Promise.resolve(read), deadline)).resolves.toEqual({
+        settled: true,
+        value: read,
+      });
+    }
+    await expect(raceStopped(Promise.reject(new Error("read failed")), deadline)).rejects.toThrow(
+      "read failed",
+    );
+
+    expect(deadline.pendingStopListeners).toBe(0);
+  });
+
+  test("end a hung read on expiry and release its listener", async () => {
+    const timing = new ControlledTiming();
+    const expired: Error[] = [];
+    const deadline = new OpenCodeConnectionDeadline(timing, (error) => expired.push(error));
+    deadline.arm(EXPECTED_FIRST_RECORD_DEADLINE_MS, "first-record");
+    const read = raceStopped(new Promise<never>(() => undefined), deadline);
+    expect(deadline.pendingStopListeners).toBe(1);
+
+    timing.expireWatchdog();
+
+    await expect(read).resolves.toEqual({ settled: false });
+    expect(deadline.pendingStopListeners).toBe(0);
+    expect(expired.map((error) => error.message)).toEqual([
+      "OpenCode event stream first-record watchdog expired",
+    ]);
+    await expect(raceStopped(new Promise<never>(() => undefined), deadline)).resolves.toEqual({
+      settled: false,
+    });
+  });
+});
+
 class ControlledTiming implements OpenCodeEventConsumerTiming {
   private waits: Array<() => void> = [];
   private watchdog: (() => void) | null = null;
@@ -457,6 +595,35 @@ class ControlledTiming implements OpenCodeEventConsumerTiming {
     if (!watchdog) throw new Error("No watchdog is armed");
     watchdog();
   }
+}
+
+type ScriptedEventResponse = "never" | { stream: AsyncIterable<unknown> };
+
+/** A client whose requests ignore their abort signal, like a fetch that never observes it. */
+function createScriptedEventClient(responses: ScriptedEventResponse[]) {
+  const signals: AbortSignal[] = [];
+  const client = {
+    global: {
+      event: (options: { signal: AbortSignal }) => {
+        signals.push(options.signal);
+        const response = responses.shift() ?? "never";
+        if (response === "never") return new Promise(() => undefined);
+        return Promise.resolve(response);
+      },
+    },
+  } as unknown as OpencodeClient;
+  return { client, signals };
+}
+
+function hungIterator(
+  returnFn: () => Promise<IteratorResult<unknown>> = () => new Promise(() => undefined),
+): AsyncIterator<unknown> {
+  return { next: () => new Promise(() => undefined), return: returnFn };
+}
+
+async function* recordStream(records: unknown[], error?: Error): AsyncGenerator<unknown> {
+  for (const record of records) yield record;
+  if (error) throw error;
 }
 
 function connectedRecord(directory: string) {

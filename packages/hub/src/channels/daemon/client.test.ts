@@ -5,6 +5,7 @@ import { WebSocketServer } from "ws";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { connectChannelDaemon, type DaemonConnection } from "./client.js";
 import type { AgentSnapshot } from "./types.js";
+import { AgentRequestRefusedError } from "./agent-request-refusal.js";
 
 // A minimal fake daemon speaking the stock local-client wire: hello ->
 // server_info, then the four trusted-client RPCs plus the selective timeline
@@ -190,7 +191,9 @@ class FakeDaemon {
           );
           return;
         }
-        if (message["text"] === "decline-me") {
+        const declined =
+          message["text"] === "decline-me" || String(message["text"]).startsWith("agent_request_");
+        if (declined) {
           client.send(
             JSON.stringify({
               type: "session",
@@ -200,7 +203,8 @@ class FakeDaemon {
                   requestId: message["requestId"],
                   agentId: "agent-1",
                   accepted: false,
-                  error: "agent message rejected",
+                  error:
+                    message["text"] === "decline-me" ? "agent message rejected" : message["text"],
                 },
               },
             }),
@@ -498,6 +502,16 @@ describe("channel trusted-client daemon connection", () => {
       client.sendAgentMessage("agent-missing", "decline-me"),
       /agent message rejected/,
     );
+  });
+
+  it("names the daemon's receipt refusals so the ingress can stop replaying them", async () => {
+    for (const code of ["agent_request_key_conflict", "agent_request_outcome_unknown"]) {
+      await assert.rejects(client.sendAgentMessage("agent-1", code), (error: unknown) => {
+        assert.ok(error instanceof AgentRequestRefusedError);
+        assert.equal(error.code, code);
+        return true;
+      });
+    }
   });
 
   it("keeps the trusted session alive past the hello-watchdog window", async () => {

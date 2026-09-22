@@ -23,6 +23,10 @@ export type SendTextFn = (args: {
   to: string;
   threadId?: string;
   text: string;
+  /** Called once per platform message that landed. A vertical that splits one
+   * send into several messages must call it for each, so the Hub reads a later
+   * part's failure as "partly posted" and never sends the whole text again. */
+  onDeliveryResult?: () => void;
   [key: string]: unknown;
 }) => Promise<{ messageId: string; [key: string]: unknown }>;
 
@@ -43,6 +47,8 @@ export type SendMediaFn = (args: {
   threadId?: string;
   /** The local media file's absolute path (under the agent's home). */
   filePath: string;
+  /** As on `SendTextFn`: called once per platform message that landed. */
+  onDeliveryResult?: () => void;
   [key: string]: unknown;
 }) => Promise<{ messageId: string; mediaPosted: boolean; [key: string]: unknown }>;
 

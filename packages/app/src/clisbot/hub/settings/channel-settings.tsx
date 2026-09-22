@@ -98,6 +98,11 @@ import {
   type ChannelRouteQuestions,
   type ChannelRouteTarget,
 } from "../channel-configuration";
+import { inheritedChannelRouteConversation } from "../channel-route-conversation";
+import {
+  RouteConversationSection,
+  useRouteConversationDraft,
+} from "./channel-route-conversation-fields";
 import {
   ChannelAccountLimitsPanel,
   ChannelLimitsFields,
@@ -1314,6 +1319,7 @@ function ChannelManagementSection({
           daemons={daemons.daemons}
           teams={teams.teams}
           resource={channels.resource ?? EMPTY_RECORD}
+          policy={channels.policy}
           existingAccounts={channels.accounts}
           editing={editing}
           initialAccountKey={accountKey}
@@ -2309,6 +2315,7 @@ function ChannelAccountForm({
   daemons,
   teams,
   resource,
+  policy,
   existingAccounts,
   editing,
   initialAccountKey,
@@ -2334,6 +2341,8 @@ function ChannelAccountForm({
   daemons: HubDaemon[];
   teams: HubTeam[];
   resource: RecordValue;
+  /** The organization's `policy.yml`: its `defaults:` are what a Route inherits last. */
+  policy: RecordValue;
   existingAccounts: RecordValue[];
   editing: EditingRoute | null;
   initialAccountKey: string | null;
@@ -2465,6 +2474,15 @@ function ChannelAccountForm({
     observedAccountChannel,
     observedAccountId,
   } = selection;
+  const inheritedConversation = useMemo(
+    () =>
+      inheritedChannelRouteConversation([
+        objectField(policy, "defaults") ?? undefined,
+        objectField(selectedAccount ?? EMPTY_RECORD, "defaults") ?? undefined,
+      ]),
+    [policy, selectedAccount],
+  );
+  const conversation = useRouteConversationDraft(editedRoute, inheritedConversation);
   const observedConversations = useObservedConversations(
     observedAccountChannel,
     observedAccountId,
@@ -2512,6 +2530,7 @@ function ChannelAccountForm({
   );
   const canSave = canSaveChannelRoute({
     followUpTtlValid,
+    conversationValid: conversation.parsed.valid,
     selectedConnection,
     effectiveAccountId,
     configurationKind,
@@ -2678,6 +2697,7 @@ function ChannelAccountForm({
         ...(routeCondition === "contains" ? { contains } : {}),
         ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
         behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
+        ...(conversation.parsed.valid ? { conversation: conversation.parsed.value } : {}),
         target: routeTarget,
         resource,
       },
@@ -2726,6 +2746,7 @@ function ChannelAccountForm({
     confirmDialog,
     configurationKind,
     contains,
+    conversation.parsed,
     cwd,
     daemonId,
     duplicateAccount,
@@ -2868,6 +2889,15 @@ function ChannelAccountForm({
       ) : null}
     </RouteFormSection>
   );
+  const renderConversation = () => (
+    <RouteConversationSection
+      draft={conversation.draft}
+      parsed={conversation.parsed}
+      commands={conversation.commands}
+      showUnmentioned={!dmOnly && behavior.requireMention}
+      pending={pending}
+    />
+  );
   const renderLimits = () => (
     <FoldedRouteFormSection
       title="Limits"
@@ -3008,6 +3038,7 @@ function ChannelAccountForm({
       {renderConnection()}
       {renderAudience()}
       {renderTrigger()}
+      {renderConversation()}
       {renderTarget()}
       {renderReplies()}
       {renderLimits()}
@@ -4071,6 +4102,7 @@ function isFollowUpTtlDraftValid(input: {
 
 function canSaveChannelRoute(input: {
   followUpTtlValid: boolean;
+  conversationValid: boolean;
   selectedConnection: { id: string } | undefined;
   effectiveAccountId: string;
   configurationKind: ConfigurationKind;
@@ -4095,6 +4127,7 @@ function canSaveChannelRoute(input: {
   if (input.configurationKind === "account" && input.selectedConnection === undefined) return false;
   if (!input.parsedRouteLimits.valid) return false;
   if (!input.followUpTtlValid || !input.audienceComplete) return false;
+  if (!input.conversationValid) return false;
   if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
   if (input.existingTarget !== null) return true;
   if (input.target === "automation") return input.automationName !== null;

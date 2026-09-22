@@ -99,6 +99,7 @@ import {
   toDiagnosticErrorMessage,
 } from "./diagnostic-utils.js";
 import { runProviderTurn } from "./provider-runner.js";
+import { PromptNotDeliveredError } from "../prompt-not-delivered-error.js";
 import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { normalizeProviderReplayTimestamp } from "../provider-history-timestamps.js";
@@ -3929,16 +3930,16 @@ class OpenCodeAgentSession implements AgentSession {
       );
     } catch (error) {
       if (this.abortController === turnAbortController) this.abortController = null;
-      if (!(error instanceof Error) || error.message !== "OpenCode server.connected event") {
-        throw error;
-      }
-      const diagnostics = this.events.diagnostics?.();
-      if (!diagnostics) throw error;
-      throw new Error(
-        `${error.message}; your message was not sent. ${formatOpenCodeEventStreamDiagnostics(diagnostics)}`,
-        { cause: error },
-      );
+      // Nothing was dispatched yet, so every failure here leaves the prompt undelivered.
+      throw new PromptNotDeliveredError(this.describeEventStreamFailure(error), { cause: error });
     }
+  }
+
+  private describeEventStreamFailure(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    const diagnostics = this.events.diagnostics?.();
+    if (message !== "OpenCode server.connected event" || !diagnostics) return message;
+    return `${message}; your message was not sent. ${formatOpenCodeEventStreamDiagnostics(diagnostics)}`;
   }
 
   private rethrowRunnerWaitError(error: unknown): never {
@@ -4896,6 +4897,23 @@ class OpenCodeAgentSession implements AgentSession {
         ...(this.config.model ? { model: this.config.model } : {}),
       },
     };
+  }
+
+  /**
+   * Idle once no run, stop, prompt, permission, question, or child session is in flight. An
+   * externally driven session shares another runtime's server, so closing it reclaims nothing and
+   * its abort could cut work that runtime drives; it stays resident.
+   */
+  isIdleForRelease(): boolean {
+    return (
+      !this.closed &&
+      !this.externallyDriven &&
+      this.turnState.status === "idle" &&
+      this.pendingPermissions.size === 0 &&
+      this.pendingSteerSubmissions.length === 0 &&
+      this.runningToolCalls.size === 0 &&
+      !Array.from(this.childStatuses.values()).some((child) => child.status === "running")
+    );
   }
 
   async close(): Promise<void> {

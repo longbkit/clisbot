@@ -1898,6 +1898,11 @@ export const SetAgentTimelineSubscriptionRequestMessageSchema = z.object({
   type: z.literal("agent.timeline.set_subscription.request"),
   agentIds: z.array(z.string()),
   requestId: z.string(),
+  /**
+   * False for a background listener (such as a Hub channel binding): it still receives the
+   * agents' events, but does not keep their idle runtimes loaded. Absent means true.
+   */
+  keepsAgentsResident: z.boolean().optional(),
 });
 
 export const AgentForkContextRequestMessageSchema = z.object({

@@ -107,6 +107,20 @@ describe("mention facts", () => {
   });
 });
 
+describe("sender name", () => {
+  it("is the first and last name, else the username, with the username as handle", () => {
+    const named = (from: Record<string, unknown>) =>
+      buildTelegramMessageEvent([message({ from: { id: 42, is_bot: false, ...from } })], 7, PARAMS)
+        ?.event;
+    expect(named({ first_name: "Minh", last_name: "Dương", username: "minh" })).toMatchObject({
+      senderName: "Minh Dương",
+      senderUsername: "minh",
+    });
+    expect(named({ first_name: "Minh" })?.senderName).toBe("Minh");
+    expect(named({ first_name: " ", username: "minh" })?.senderName).toBe("minh");
+  });
+});
+
 describe("message events", () => {
   it("normalizes a group message and flags own messages by bot id", () => {
     const build = buildTelegramMessageEvent([message()], 5, PARAMS);

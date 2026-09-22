@@ -182,11 +182,15 @@ async function deliverSlackText(
   // the open drive-surface args so a test can post through a fake WebClient
   // without reaching into the write-client cache.
   const client = args["client"] as SlackSendClient | undefined;
+  // Every Slack message this send posts (text chunks, presentation messages)
+  // is reported, so the Hub can tell a partly posted answer from a failed one.
+  const onDeliveryResult = args.onDeliveryResult;
   const post = (message: string, opts: Partial<SlackSendOptions>) =>
     sendMessageSlack(to, message, {
       cfg: cfg as unknown as SlackSendCfg,
       accountId,
       ...(client === undefined ? {} : { client }),
+      ...(onDeliveryResult === undefined ? {} : { onDeliveryResult }),
       ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
       ...opts,
     });

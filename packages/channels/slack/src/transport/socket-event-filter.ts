@@ -15,6 +15,8 @@ import { decodeSlackEntities } from "../fusion/slack-entities.js";
  * bot user id + app/team ids this account's tokens belong to. */
 export interface SlackTransportIdentity {
   botUserId?: string;
+  /** The bot's display name (auth.test `user`); renders its own mentions. */
+  botName?: string;
   botId?: string;
   teamId?: string;
   apiAppId?: string;
@@ -178,6 +180,19 @@ export function withoutAddressingMention(text: string, identity: SlackTransportI
   return stripped === "" ? text : stripped;
 }
 
+/**
+ * The bot's mentions left in the text, as its name: `<@U0B451X32UU>` reads
+ * `@clisbot`. The Agent sees who was addressed instead of an opaque id. Without
+ * a known name the mention stays as written.
+ */
+export function withBotMentionNamed(text: string, identity: SlackTransportIdentity): string {
+  const botUserId = identity.botUserId?.trim();
+  const botName = identity.botName?.trim();
+  if (!botUserId || !botName) return text;
+  const escaped = botUserId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`<@${escaped}>`, "gi"), `@${botName}`);
+}
+
 /** One normalized inbound event from a raw `message` / `app_mention` payload,
  * or undefined when the payload lacks the ids the L3 needs. */
 export function buildSlackInboundEvent(
@@ -198,7 +213,10 @@ export function buildSlackInboundEvent(
   // Slack's API delivers `text` with its own entity escaping (`=&gt;`,
   // `&lt;@U…&gt;` outside link tokens). Decode at the boundary so the agent
   // reads what the user typed; the outbound render re-escapes idempotently.
-  const text = withoutAddressingMention(decodeSlackEntities(event.text ?? ""), identity);
+  const text = withBotMentionNamed(
+    withoutAddressingMention(decodeSlackEntities(event.text ?? ""), identity),
+    identity,
+  );
   const timestampMs =
     resolveSlackTimestampMs(typeof event.event_ts === "string" ? event.event_ts : undefined) ??
     resolveSlackTimestampMs(ts) ??

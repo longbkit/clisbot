@@ -1,4 +1,8 @@
 import { parse, stringify } from "yaml";
+import {
+  withChannelRouteConversation,
+  type ChannelRouteConversation,
+} from "./channel-route-conversation";
 import type { HubAudienceRule } from "./contracts";
 import type { WorktreeTarget } from "./workspace-configuration";
 
@@ -119,6 +123,8 @@ interface ChannelRouteCandidateInput {
   contains?: string;
   limits?: ChannelLimits;
   behavior?: ChannelRouteBehavior;
+  /** The conversation leaves the Route authors (`channel-route-conversation.ts`). */
+  conversation?: ChannelRouteConversation;
   target: ChannelRouteTarget;
   resource: ChannelConfigurationRecord;
   preferredResourceName?: string;
@@ -176,6 +182,7 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
     ...(input.contains === undefined ? {} : { contains: input.contains }),
     ...(input.limits === undefined ? {} : { limits: input.limits }),
     ...(input.behavior === undefined ? {} : { behavior: input.behavior }),
+    ...(input.conversation === undefined ? {} : { conversation: input.conversation }),
     target: input.target,
     resource: input.resource,
   });
@@ -201,10 +208,12 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   const audience = input.audience.map(audienceRuleRecord);
   const openAudience = audience.some((rule) => rule.who.anyone === true);
   const limits = authoredLimits(input.limits);
-  const behavior =
+  const behavior = withChannelRouteConversation(
     input.behavior === undefined
       ? {}
-      : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience));
+      : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience)),
+    input.conversation,
+  );
   const audiencePolicy = {
     audience,
     ...(contains ? { contains } : {}),
@@ -518,7 +527,7 @@ function preserveRouteSettings(
     }
     return merged;
   }
-  for (const key of ["interaction", "reply", "outbound"] as const) {
+  for (const key of ["interaction", "reply", "outbound", "context", "batching"] as const) {
     if (isRecord(current[key]) && isRecord(replacement[key])) {
       merged[key] = { ...current[key], ...replacement[key] };
     }

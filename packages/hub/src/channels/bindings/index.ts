@@ -47,6 +47,8 @@ import {
   type FollowUpAdmission,
 } from "./follow-up.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
+import { messagesOf, type BindingInbox, type Delivery, type PreparedDelivery } from "./inbox.js";
+import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { processingSurfaceFor } from "../plane/processing.js";
 import type {
@@ -130,6 +132,9 @@ interface BindingEngineContext extends SessionStartContext {
    * sends the prompt before the daemon reports anything. Absent = no surface.
    */
   processing?: ProcessingController | undefined;
+  /** The binding's inbox (`inbox.ts`): the context a prompt carries. Absent =
+   * each prompt is its sender line alone. */
+  inbox?: BindingInbox | undefined;
 }
 
 /**
@@ -168,7 +173,7 @@ export class BindingEngine {
       );
       if (!followUp.allowed) return followUp;
     } else if (route.defaults.requireMention && !message.mentionedBot) {
-      return { allowed: false, reason: "not mentioned; requireMention is on" };
+      return { allowed: false, reason: "not mentioned; requireMention is on", unaddressed: true };
     }
     const decision = await this.mayUse(message, account, route);
     return decision.allowed ? decision : { ...decision, audienceRefused: true };
@@ -185,35 +190,55 @@ export class BindingEngine {
    * the prompt goes out, and the subscription is only registered after the
    * whole exchange (which is why a channel turn's `turn_started` never arrived).
    */
-  async bindOrSteer(
+  bindOrSteer(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const outcome = await this.dispatch(message, account, route, subscribe);
+    return this.deliver({ message }, account, route, subscribe);
+  }
+
+  /** `bindOrSteer` for any delivery: one message, or a held batch sent as one prompt. */
+  async deliver(
+    delivery: Delivery,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    subscribe?: (agentId: string) => Promise<void> | void,
+  ): Promise<InboundOutcome> {
+    // A replay of a delivery its session already took (the queue lost the
+    // completion) is done: sending again would be a second prompt.
+    if (await this.context.inbox?.delivered(delivery, route)) {
+      return { kind: "ignored", reason: "already delivered to its session" };
+    }
+    const outcome = await this.dispatch(delivery, account, route, subscribe);
     if (outcome.kind === "bound" || outcome.kind === "steered") {
-      await endFollowUpPause(this.context.store, this.context.organizationId, message, route);
+      await endFollowUpPause(
+        this.context.store,
+        this.context.organizationId,
+        delivery.message,
+        route,
+      );
     }
     return outcome;
   }
 
   private async dispatch(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const key = deriveBindingKey(message, route);
+    const key = deriveBindingKey(delivery.message, route);
     const binding = await this.context.store.findThreadBinding(
       this.context.organizationId,
       account.accountId,
       key.externalConversationId,
       key.externalThreadId,
     );
-    if (binding === undefined) return this.firstMention(message, account, route, key, subscribe);
+    if (binding === undefined) return this.firstMention(delivery, account, route, key, subscribe);
     if (binding.status === "pending") {
-      return this.recoverPending(message, account, route, binding, subscribe);
+      return this.recoverPending(delivery, account, route, binding, subscribe);
     }
     // Abandonment is an explicit operator act (the plane never abandons); the
     // key is permanently held, so steering back needs operator recovery.
@@ -225,15 +250,15 @@ export class BindingEngine {
     // thread starts a session at the new one — but only for an inbound that may
     // start one, so an unadmitted message never retires a running session.
     if (!keepsTarget(binding, route)) {
-      const refusal = await this.admitUnbound(message, account, route);
+      const refusal = await this.admitUnbound(delivery, account, route);
       if (refusal !== undefined) return refusal;
       await this.retireRetargeted(binding);
-      return this.firstMention(message, account, route, key, subscribe);
+      return this.firstMention(delivery, account, route, key, subscribe);
     }
     if (this.lostReplyCapability(binding.agentId, route)) {
-      return this.replaceSilencedSession(message, account, route, binding, key, subscribe);
+      return this.replaceSilencedSession(delivery, account, route, binding, key, subscribe);
     }
-    return this.followUp(message, account, route, binding.agentId, subscribe);
+    return this.followUp(delivery, account, route, binding.agentId, subscribe);
   }
 
   /** The start-time half of orphan recovery; the inline half is `recoverPending`. */
@@ -248,15 +273,15 @@ export class BindingEngine {
 
   /** First mention in an unbound thread: gate on `bot.interact`, then create. */
   private async firstMention(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     key: ThreadKey,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const refusal = await this.admitUnbound(message, account, route);
+    const refusal = await this.admitUnbound(delivery, account, route);
     if (refusal !== undefined) return refusal;
-    return this.startSession(message, account, route, key, subscribe);
+    return this.startSession(delivery, account, route, key, subscribe);
   }
 
   /**
@@ -267,7 +292,7 @@ export class BindingEngine {
    * message that could have steered the old session does not need a new mention.
    */
   private async replaceSilencedSession(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     binding: ThreadBindingRecord,
@@ -275,19 +300,19 @@ export class BindingEngine {
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
     const agentId = binding.agentId ?? "";
-    const refusal = await this.admitBound(message, account, route, agentId);
+    const refusal = await this.admitBound(delivery, account, route, agentId);
     if (refusal !== undefined) return refusal;
     this.context.logger.warn(
       "bound session lost its channel reply capability; starting a new one",
       {
         channel: account.channel,
         accountId: account.accountId,
-        ...labelOf(message),
+        ...labelOf(delivery.message),
         agentId,
       },
     );
     await this.retireRetargeted(binding);
-    return this.startSession(message, account, route, key, subscribe);
+    return this.startSession(delivery, account, route, key, subscribe);
   }
 
   /** A `tool`-path route whose bound session can no longer post its reply. */
@@ -302,12 +327,13 @@ export class BindingEngine {
 
   /** Mint and bind a session for an admitted inbound, then deliver its prompt. */
   private async startSession(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     key: ThreadKey,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
+    const message = delivery.message;
     // The Host is already starting as many sessions as it runs at once. The
     // message goes back to the durable queue instead of waiting here, so the
     // worker it holds is free for conversations that need no new session.
@@ -330,10 +356,10 @@ export class BindingEngine {
     if (contested !== undefined) {
       // Another start owns this thread; its recovery raises its own surface.
       this.context.processing?.close(start.executionId);
-      return this.recoverPending(message, account, route, contested, subscribe);
+      return this.recoverPending(delivery, account, route, contested, subscribe);
     }
     const agentId = await createMarkedSession(this.context, start);
-    await this.deliverFirstPrompt(agentId, start.executionId, message, account, subscribe);
+    await this.deliverFirstPrompt(agentId, start.executionId, delivery, account, route, subscribe);
     this.context.logger.info?.("conversation bound to a new agent session", {
       channel: account.channel,
       accountId: account.accountId,
@@ -377,10 +403,12 @@ export class BindingEngine {
    * the same gates as a first mention. `undefined` = admitted.
    */
   private async admitUnbound(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<InboundOutcome | undefined> {
+    if (delivery.admitted === true) return undefined;
+    const message = delivery.message;
     if (route.defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
@@ -393,11 +421,13 @@ export class BindingEngine {
    * idle window) and then the route's `bot.interact` gate. `undefined` = admitted.
    */
   private async admitBound(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     agentId: string,
   ): Promise<InboundOutcome | undefined> {
+    if (delivery.admitted === true) return undefined;
+    const message = delivery.message;
     const admission = admitFollowUp(
       message,
       route.defaults,
@@ -420,18 +450,16 @@ export class BindingEngine {
   private async deliverFirstPrompt(
     agentId: string,
     executionId: string,
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
+    route: CompiledRoute,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<void> {
     this.markActive(agentId);
     this.context.processing?.bind(executionId, agentId);
     await subscribe?.(agentId);
     try {
-      await this.context.daemon.sendAgentMessage(agentId, message.text, {
-        steer: false,
-        source: message,
-      });
+      await this.deliverPrompt(agentId, delivery, route);
     } catch (error) {
       this.context.processing?.close(executionId);
       this.context.logger.warn("first prompt delivery failed; the message is retried", {
@@ -444,6 +472,43 @@ export class BindingEngine {
   }
 
   /**
+   * Hand a delivery to the Agent. The daemon keys the send by the delivery's
+   * messages and refuses a replay whose request differs
+   * (`agent_request_key_conflict`), so the request is a function of the
+   * delivery alone, never of the path that sends it: the prompt that opened a
+   * session and its retry — which finds the session bound and arrives as a
+   * follow-up — must be the same request. The inbox renders it from rows that
+   * arrived before the delivery, which a replay reads the same way. Steering
+   * an Agent with no turn running starts one, so a first prompt loses nothing
+   * by steering.
+   */
+  private async deliverPrompt(
+    agentId: string,
+    delivery: Delivery,
+    route: CompiledRoute,
+  ): Promise<void> {
+    const prepared = await this.prepare(delivery, route);
+    await prepared.markSent();
+    await this.context.daemon.sendAgentMessage(agentId, prepared.prompt, {
+      steer: true,
+      source: delivery.message,
+      messageId: prepared.messageId,
+    });
+    await prepared.settle();
+  }
+
+  private prepare(delivery: Delivery, route: CompiledRoute): Promise<PreparedDelivery> {
+    if (this.context.inbox !== undefined) return this.context.inbox.prepare(delivery, route);
+    const messages = messagesOf(delivery);
+    return Promise.resolve({
+      prompt: renderConversationPrompt({ context: [], messages }),
+      messageId: deliveryMessageId(messages),
+      markSent: async () => undefined,
+      settle: async () => undefined,
+    });
+  }
+
+  /**
    * A pending marker already exists for this key. This is the inline half of
    * orphan recovery (the start-time scan is `recoverOrphans`): re-bind when the
    * Agent survived and deliver this message to it; start over once the marker
@@ -452,14 +517,15 @@ export class BindingEngine {
    * same admission as a first mention.
    */
   private async recoverPending(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     marker: ThreadBindingRecord,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const refusal = await this.admitUnbound(message, account, route);
+    const refusal = await this.admitUnbound(delivery, account, route);
     if (refusal !== undefined) return refusal;
+    const message = delivery.message;
     const key = deriveBindingKey(message, route);
     const executionId = marker.pendingExecutionId ?? "";
     const agents = await this.context.daemon.listAgents();
@@ -469,7 +535,7 @@ export class BindingEngine {
         throw new ChannelAgentCreatePendingError();
       }
       await releasePendingMarker(this.context, account, key, executionId);
-      return this.startSession(message, account, route, key, subscribe);
+      return this.startSession(delivery, account, route, key, subscribe);
     }
     // The Agent was launched with the capability its create issued; bind it now
     // that the Agent is known. Without one (a Hub restart forgot the turn) a
@@ -478,7 +544,7 @@ export class BindingEngine {
     if (this.lostReplyCapability(surviving.id, route)) {
       await this.context.daemon.cancelAgent(surviving.id).catch(() => undefined);
       await releasePendingMarker(this.context, account, key, executionId);
-      return this.startSession(message, account, route, key, subscribe);
+      return this.startSession(delivery, account, route, key, subscribe);
     }
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
@@ -489,7 +555,7 @@ export class BindingEngine {
       resolvedAt: new Date(),
     });
     this.openSurface(executionId, message, account, route, key);
-    await this.deliverFirstPrompt(surviving.id, executionId, message, account, subscribe);
+    await this.deliverFirstPrompt(surviving.id, executionId, delivery, account, route, subscribe);
     this.context.logger.info?.("inbound re-bound a pending marker", {
       channel: account.channel,
       accountId: account.accountId,
@@ -501,14 +567,15 @@ export class BindingEngine {
 
   /** A bound thread: admit the follow-up and steer the existing session. */
   private async followUp(
-    message: InboundMessage,
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     agentId: string,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const refusal = await this.admitBound(message, account, route, agentId);
+    const refusal = await this.admitBound(delivery, account, route, agentId);
     if (refusal !== undefined) return refusal;
+    const message = delivery.message;
     const leaseId = randomUUID();
     this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
     this.context.processing?.bind(leaseId, agentId);
@@ -517,10 +584,7 @@ export class BindingEngine {
     this.context.replyCapabilities?.noteTurn(agentId, leaseId, message.externalMessageId);
     await subscribe?.(agentId);
     try {
-      await this.context.daemon.sendAgentMessage(agentId, message.text, {
-        steer: true,
-        source: message,
-      });
+      await this.deliverPrompt(agentId, delivery, route);
     } catch (error) {
       this.context.processing?.close(leaseId);
       throw error;

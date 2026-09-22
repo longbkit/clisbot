@@ -9,7 +9,7 @@ Tags: **V** read in code, **I** inferred, not measured.
 | Finding                      | State                                                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | 1 silent drop, wedged thread | Fixed — retry, marker release/TTL, sender notice                                                                   |
-| 2 serial pump                | Fixed — concurrent workers, backlog loop, due-time wake                                                            |
+| 2 serial pump                | Fixed — continuous worker pool (no pass barrier), due-time wake; lanes scoped to the session                       |
 | 3 dead transport             | Fixed in the supervisor (`account-restart.ts`). Telegram's 30 s poll backoff is a verbatim upstream file and stays |
 | 4 Host socket                | In-flight calls fail on drop (`7d551b304`); create/send RPC timeout is 90 s. No Hub-side ping yet                  |
 | 5 config save bounces bots   | Fixed — per-account `revisionSignature`                                                                            |
@@ -17,7 +17,8 @@ Tags: **V** read in code, **I** inferred, not measured.
 | 7 create throttle            | Fixed — per-Host gate, defer when full. Pre-warmed sessions open                                                   |
 | 8 lease leak                 | Fixed — reconcile against running agents when a scope is full                                                      |
 | 9 output order               | Per-agent ordering fixed. Durable retry of a failed relay post open                                                |
-| 10–15                        | Open                                                                                                               |
+| 10, 12–15                    | Open                                                                                                               |
+| 11 poison message            | Partly — daemon receipt refusals dead-letter at once and the sender is told; other errors keep the 24 h policy     |
 
 How the fixed parts fit together is in [the channel platform](../features/channels/README.md#starting-a-session-without-losing-the-message).
 

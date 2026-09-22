@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { compileAudienceRule } from "../config/audience.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-channels): targeted tests for the execution plane facade
@@ -1413,12 +1414,79 @@ describe("first-mention bind (flag on)", () => {
     const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
     assert.equal(fake.created.length, 1, "one agent created");
     assert.equal(fake.messages.length, 1, "the first prompt delivered");
-    assert.equal(fake.messages[0]?.text, "start the build");
-    assert.equal(fake.messages[0]?.steer, false, "the first prompt does not steer");
+    assert.equal(fake.messages[0]?.text, "slack:U0ALICE: start the build", "the sender line");
+    assert.equal(fake.messages[0]?.steer, true, "a first prompt is the request its retry repeats");
 
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0BIND", null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, agentId);
+  });
+});
+
+describe("unprocessed inbound (dead-lettered)", () => {
+  const OPENER_TS = "1712000000.000700";
+  const params = { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} };
+
+  it("tells the sender once, in the thread the message opened", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ externalMessageId: OPENER_TS });
+
+    // No prompt ever carried it: it stays as context, and the notice says so.
+    const record = { id: randomUUID(), payload: params, sentIn: null };
+    await harness.plane.onDeadLettered(record);
+    await harness.plane.onDeadLettered(record);
+
+    assert.deepEqual(harness.posted, [
+      "This message could not be processed. Send another message to retry, and this one will be included.",
+    ]);
+    assert.deepEqual(harness.postedThreads, [OPENER_TS], "never at the root, never in a DM");
+  });
+
+  it("asks for a resend when a prompt already carried the message (outcome unknown)", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ externalMessageId: "1712000000.000702" });
+
+    await harness.plane.onDeadLettered({
+      id: randomUUID(),
+      payload: params,
+      sentIn: "an-earlier-prompt",
+    });
+
+    assert.deepEqual(harness.posted, ["This message could not be processed. Send it again."]);
+  });
+
+  it("says nothing about an event that was not a message", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ externalMessageId: "1712000000.000701" });
+
+    await harness.plane.onDeadLettered({
+      id: randomUUID(),
+      payload: { ...params, ctxPayload: { EventKind: "reaction" } },
+      sentIn: null,
+    });
+
+    assert.deepEqual(harness.posted, []);
+  });
+
+  it("admits a thread-anchored opener and its replies to one lane of their own", () => {
+    const harness = makeHarness();
+    harness.next.message = message({ externalMessageId: OPENER_TS });
+    const opener = harness.plane.ingressLaneKey(params);
+    harness.next.message = message({
+      externalMessageId: "1712000000.000800",
+      conversation: {
+        kind: "thread",
+        id: OPENER_TS,
+        rootConversationId: "C0APP",
+        threadId: OPENER_TS,
+      },
+    });
+
+    assert.equal(opener, `slack:${ACCOUNT_ID}:C0APP:${OPENER_TS}`);
+    assert.equal(harness.plane.ingressLaneKey(params), opener);
   });
 });
 

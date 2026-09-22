@@ -161,14 +161,17 @@ One consequence worth knowing before you read the drain: a Fusion claim consumes
 
 ### Starting a session without losing the message
 
-A first message costs a session create, and a create is the slowest call on the path: the daemon spawns a provider process and waits for it. Four rules follow from that, and they hold together:
+A first message costs a session create, and a create is the slowest call on the path: the daemon spawns a provider process and waits for it. These rules follow from that, and they hold together:
 
 - **A message is completed only when it was handled.** A create or first prompt that fails throws, so the drain retries the row. Returning `ignored` there completed the row and the sender heard nothing.
 - **The pending marker is given up on a known outcome or a timeout, never on a guess.** A call refused before it was written (`HostNotReachedError`) releases the marker at once. A create that was issued and did not confirm keeps it, because the daemon may hold the Agent; the retried message finds that Agent by its execution-id label, binds the reply capability the create issued (`bindTurn`), and delivers the prompt. After `PENDING_MARKER_TTL_MS` with no Agent the marker is released and the thread starts over (`bindings/pending-marker.ts`, `bindings/session-start.ts`).
 - **A create never waits while holding a worker.** A Host runs `MAX_CONCURRENT_CREATES_PER_HOST` creates at once (`daemon/create-gate.ts`). Past that, `startSession` returns `deferred` before it records a marker, and the row goes back to the queue. The drain runs more workers per account than the gate has slots, so follow-ups and commands keep moving while a Host is busy starting sessions. The release budget (50) bounds how long a message waits for a slot.
 - **A slow create is visible.** While it runs, the typing surface is extended every 20 s (it has no agent yet, so the TTL sweep would drop it) and the sender is told once.
+- **A message is one request.** The daemon keys every prompt by the message and keeps a receipt, so a replay has to ask for exactly what the first attempt asked. The prompt that opens a session and its retry — which finds the session bound and arrives as a follow-up — go through one `deliverPrompt` (`bindings/index.ts`) and both steer. A first prompt that interrupted and a retry that steered was refused as `agent_request_key_conflict` on every attempt.
+- **A receipt refusal is final.** `agent_request_key_conflict` and `agent_request_outcome_unknown` become `AgentRequestRefusedError` (`daemon/agent-request-refusal.ts`), which the drain dead-letters at once instead of retrying for a day with its lane blocked. `outcome_unknown` is not resent under a new key: the Agent may already have the message.
+- **A dead-letter is told.** Whatever ended the row — a refusal, the retry ceiling, the release budget — the sender gets one line in the conversation the message came from, asking them to send it again (`noticeUnprocessed` in `execution.ts`).
 
-Lanes keep one conversation in order while conversations run in parallel. Arrival order is `(created_at, id)` with a random id, so two rows of one lane stamped in the same instant have no defined order.
+What waits for what once a message is admitted (lane = binding), what the Agent is given, and how replies are ordered and retried is [conversation flow](conversation-flow.md). Two queue facts stay here: a row keeps the lane it was admitted with, so rows admitted under an older lane rule cannot deadlock newer ones; and arrival order is `(created_at, id)` with a random id, so two rows of one lane stamped in the same instant have no defined order.
 
 ## The `fusion/*` pattern
 
@@ -367,12 +370,26 @@ Two places enforce them, and each has a reason to be where it is:
   MCP reply posts through `handle.post` and never passes the plane, so pacing
   anywhere higher would miss it. The pacer learns which Route serves a
   conversation from the plane's routing (`noteOutboundRoute`), because a post
-  carries only the conversation id.
+  carries only the conversation id. The same wrapper puts the 30 s write
+  deadline on every post, limited or not, which is why it also runs when no
+  limit is set.
 
 Both read their scopes from `plane/limit-scopes.ts`, so the two count the same
 Bot, Conversation and Route. Counters are in memory, per Hub process. A restart
 starts every window empty and drops outbound sends still waiting. Replacing a
 configuration cancels only open-audience runs (`cancelOnReplace`).
+
+The database pool is the other shared limit. It holds 30 connections by
+default (`PASEO_HUB_DATABASE_POOL_SIZE`, alias `CLISBOT_HUB_DATABASE_POOL_SIZE`;
+`pg`'s own default of 10 is fewer than one busy account's drain workers). Each
+account's drain runs at most half the pool, capped at 12 workers
+(`accountDrainConcurrency` in `ingress/drain.ts`). There is no Hub-wide cap on
+dispatches: a dispatch spends most of its time waiting on the daemon (a session
+create, a prompt) and holds a connection only for its short queries, so a cap
+on whole dispatches let two accounts stuck in slow creates block every other
+account. Connection waits queue in arrival order in the `pg` pool itself. The
+relay's ledger writes are retried briefly and logged as errors when they still
+fail. PGlite has one in-process connection and keeps the 12.
 
 ## What is still open
 

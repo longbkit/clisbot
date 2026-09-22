@@ -9,6 +9,7 @@ import type { SyncProgress, SyncProgressGroup, SyncStreaming } from "./schema.js
 import type { DmPolicy, GroupPolicy, QuestionsMode } from "./enums.js";
 import { issue } from "./compile-support.js";
 import type { AgentControls } from "./agent-controls.js";
+import { foldConversationDefaults, type EffectiveConversationDefaults } from "./conversation.js";
 
 export interface EffectiveAccess {
   dmPolicy?: DmPolicy | undefined;
@@ -19,7 +20,9 @@ export interface EffectiveAccess {
   deniedReply?: string | undefined;
 }
 
-export interface EffectiveDefaults {
+/** The conversation leaves (`whenBusy`, `context`, `batching`) come from
+ * `EffectiveConversationDefaults`: each ABSENT until a layer authors it. */
+export interface EffectiveDefaults extends EffectiveConversationDefaults {
   requireMention: boolean;
   followUp: { mode: "auto" | "mention-only"; ttlMinutes: number };
   bindingKey: "thread" | "channel" | "dm";
@@ -136,6 +139,7 @@ export function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): 
       "questions",
       pick((layer) => layer?.questions),
     ),
+    ...foldConversationDefaults(pick),
     sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
   };
 }

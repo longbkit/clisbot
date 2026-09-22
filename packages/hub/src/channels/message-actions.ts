@@ -23,6 +23,7 @@
 // answers "send plus whatever the registered adapter handles", and the tool
 // refuses everything else with a structured `unsupported_action` result.
 
+import type { OutboundFailure } from "./plane/outbound-failure.js";
 import {
   runWithChannelMessageToolPlugins,
   type PreparedMessageToolCatalog,
@@ -289,6 +290,8 @@ export interface HubOutboundSendResult {
   error?: string | undefined;
   /** The vertical's G11 fact: false when it posted the oversize notice instead. */
   mediaPosted?: boolean | undefined;
+  /** What a failed write means for sending again (plane/outbound-failure.ts). */
+  failure?: OutboundFailure | undefined;
 }
 
 /** The Hub's outbound seam, expressed as core's durable sender. */

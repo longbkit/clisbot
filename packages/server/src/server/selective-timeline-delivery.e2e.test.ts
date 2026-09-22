@@ -403,6 +403,62 @@ test("rewind routes replacement completion by source capability and subscription
   expect(unrelated.hasTimeline(agent.id)).toBe(false);
 }, 30_000);
 
+test("a background timeline listener does not keep an agent resident and still follows its reload", async () => {
+  await daemon.close();
+  daemon = await createTestPaseoDaemon({
+    isDev: true,
+    agentClients: { mock: new MockLoadTestAgentClient() },
+  });
+  const viewer = await connect({ clientId: "resident-viewer", selective: true });
+  const listener = await connect({ clientId: "background-listener", selective: true });
+  const agent = await viewer.client.createAgent({
+    provider: "mock",
+    cwd: "/tmp",
+    title: "Background listener",
+    model: "ten-second-stream",
+  });
+  const manager = daemon.daemon.agentManager as unknown as {
+    isAgentTimelineViewed(agentId: string): boolean;
+  };
+  await setBackgroundTimelineSubscription(listener, [agent.id]);
+  expect(manager.isAgentTimelineViewed(agent.id)).toBe(false);
+
+  await viewer.client.setAgentTimelineSubscription([agent.id]);
+  expect(manager.isAgentTimelineViewed(agent.id)).toBe(true);
+  await viewer.client.setAgentTimelineSubscription([]);
+  expect(manager.isAgentTimelineViewed(agent.id)).toBe(false);
+
+  await daemon.daemon.agentManager.closeAgent(agent.id);
+  listener.clear();
+  await viewer.client.sendMessage(agent.id, "wake after idle close");
+
+  await listener.next(isAgentStream(agent.id), "background delivery after reload");
+  expect(daemon.daemon.agentManager.getAgent(agent.id)).not.toBeNull();
+}, 30_000);
+
+async function setBackgroundTimelineSubscription(
+  connected: ConnectedClient,
+  agentIds: string[],
+): Promise<void> {
+  const requestId = `background-${agentIds.join(",")}`;
+  // The Hub channel plane sends this frame directly; DaemonClient has no option for it.
+  const client = connected.client as unknown as {
+    sendSessionMessage(message: Record<string, unknown>): void;
+  };
+  client.sendSessionMessage({
+    type: "agent.timeline.set_subscription.request",
+    agentIds,
+    requestId,
+    keepsAgentsResident: false,
+  });
+  await connected.next(
+    (message) =>
+      message.type === "agent.timeline.set_subscription.response" &&
+      message.payload.requestId === requestId,
+    "background subscription acknowledgement",
+  );
+}
+
 test("subscription acknowledgements stay on the requesting socket of a retained session", async () => {
   const legacy = await connect({ clientId: "shared-client", selective: false });
   const capable = await connect({ clientId: "shared-client", selective: true });

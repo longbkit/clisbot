@@ -94,6 +94,24 @@ describe("database migrations", () => {
   });
 });
 
+/** One `out` ledger row in the columns every schema since the channel port has. */
+async function seedDeliveryRow(
+  runtime: DatabaseRuntime,
+  values: readonly unknown[],
+): Promise<string> {
+  const inserted = await runtime.query<{ id: string }>(
+    `insert into delivery_ledger (organization_id, channel, account_id, direction,
+       external_conversation_id, external_thread_id, event_turn_id, sequence, status,
+       external_message_id, posted_at)
+     values ($1, $2, $3, 'out', $4, $5, $6, 0, $7, $8, $9)
+     returning id::text`,
+    values,
+  );
+  const id = inserted.rows[0]?.id;
+  assert.ok(id !== undefined);
+  return id;
+}
+
 // COMPAT(clisbot-channels): forward-migration safety for a Hub that already
 // ran channels before the port. `0065` opened the durable ingress queue and
 // everything after it reshaped the channel plane's tables — the two channel
@@ -215,34 +233,30 @@ describe("a pre-0065 channel database migrates to latest", () => {
       initiator: "telegram:11111",
       route: ROUTE,
     });
-    const slackDelivery = await store.recordDelivery({
-      organizationId: ORGANIZATION_ID,
-      channel: "slack",
-      accountId: SLACK_ACCOUNT,
-      externalConversationId: SLACK_CONVERSATION,
-      externalThreadId: SLACK_THREAD,
-      eventTurnId: "turn-slack",
-      sequence: 0,
-    });
-    await store.confirmDelivery({
-      organizationId: ORGANIZATION_ID,
-      accountId: SLACK_ACCOUNT,
-      externalConversationId: SLACK_CONVERSATION,
-      externalThreadId: SLACK_THREAD,
-      eventTurnId: "turn-slack",
-      sequence: 0,
-      externalMessageId: "1720000000.000200",
-      postedAt: POSTED_AT,
-    });
-    const telegramDelivery = await store.recordDelivery({
-      organizationId: ORGANIZATION_ID,
-      channel: "telegram",
-      accountId: TELEGRAM_ACCOUNT,
-      externalConversationId: TELEGRAM_CONVERSATION,
-      externalThreadId: TELEGRAM_TOPIC,
-      eventTurnId: "turn-telegram",
-      sequence: 0,
-    });
+    // Ledger rows are seeded in SQL: the store writes today's columns, which a
+    // pre-0065 table does not have yet.
+    const slackDeliveryId = await seedDeliveryRow(bundle.runtime, [
+      ORGANIZATION_ID,
+      "slack",
+      SLACK_ACCOUNT,
+      SLACK_CONVERSATION,
+      SLACK_THREAD,
+      "turn-slack",
+      "posted",
+      "1720000000.000200",
+      POSTED_AT,
+    ]);
+    const telegramDeliveryId = await seedDeliveryRow(bundle.runtime, [
+      ORGANIZATION_ID,
+      "telegram",
+      TELEGRAM_ACCOUNT,
+      TELEGRAM_CONVERSATION,
+      TELEGRAM_TOPIC,
+      "turn-telegram",
+      "recorded",
+      null,
+      null,
+    ]);
     const revision = await database.saveChannelConfiguration({
       organizationId: ORGANIZATION_ID,
       files: [{ path: ".paseo/channels/slack/work.yml", content: "channel: slack\n" }],
@@ -285,7 +299,7 @@ describe("a pre-0065 channel database migrates to latest", () => {
       "turn-slack",
       0,
     );
-    assert.equal(slackLedger?.id, slackDelivery.record.id);
+    assert.equal(slackLedger?.id, slackDeliveryId);
     assert.equal(slackLedger?.status, "posted");
     assert.equal(slackLedger?.externalMessageId, "1720000000.000200");
     assert.equal(slackLedger?.postedAt?.getTime(), POSTED_AT.getTime());
@@ -298,7 +312,7 @@ describe("a pre-0065 channel database migrates to latest", () => {
       "turn-telegram",
       0,
     );
-    assert.equal(telegramLedger?.id, telegramDelivery.record.id);
+    assert.equal(telegramLedger?.id, telegramDeliveryId);
 
     const active = await database.findActiveChannelConfiguration(ORGANIZATION_ID);
     assert.equal(active?.id, revision.id);

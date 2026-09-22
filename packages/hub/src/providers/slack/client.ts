@@ -20,8 +20,12 @@ export const SLACK_REQUIRED_BOT_SCOPES = [
  * status (`sync.progress.typingIndicator` — `channels/slack/src/typing.ts`);
  * `assistant.threads.setStatus` is also served by `chat:write`, which is
  * already required, so an app without it still shows the indicator.
+ *
+ * `im:history` and `mpim:history` back the `message.im` / `message.mpim`
+ * events: without them a DM or group DM reaches the bot only when it mentions
+ * it, so a DM Route and unmentioned conversation context lose those rooms.
  */
-export const SLACK_OPTIONAL_BOT_SCOPES = ["assistant:write"] as const;
+export const SLACK_OPTIONAL_BOT_SCOPES = ["assistant:write", "im:history", "mpim:history"] as const;
 
 const SlackOAuthResponseSchema = z
   .object({

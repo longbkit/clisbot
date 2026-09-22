@@ -64,6 +64,9 @@ import {
   routePosition,
 } from "./bindings/index.js";
 import { conversationFollowUpMode, endFollowUpPause } from "./bindings/follow-up.js";
+import { ConversationFlow, type DeadLetteredRow } from "./bindings/conversation-flow.js";
+import { isHeldFlushPayload, type HeldFlushPayload } from "./bindings/held-flush.js";
+import type { Delivery } from "./bindings/inbox.js";
 import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./relay/index.js";
 import { ChannelStreamingProducer } from "./streaming/index.js";
 import { realClock } from "./plane/clock.js";
@@ -78,6 +81,8 @@ import {
 } from "./plane/inbound-kinds.js";
 import { ChannelExecutionLimiter, type ExecutionLease } from "./plane/execution-limiter.js";
 import { OnceMemory } from "./plane/once-memory.js";
+import { sessionLaneKey } from "./ingress/session-lane.js";
+import { WAIT_NOTICE_TEXT } from "./plane/wait-notices.js";
 import {
   asPermissionRequest,
   asPermissionResolved,
@@ -91,6 +96,7 @@ import type {
   InboundMessage,
   InboundOutcome,
   SupportedChannelName,
+  PlaneInboundDeferral,
   PlaneInboundResult,
   PlaneLogger,
   StreamContext,
@@ -129,6 +135,16 @@ type CommandReply = (text: string) => Promise<boolean>;
 export interface ChannelPlane {
   /** Drive one normalized inbound channel event (the loader seam's callback). */
   onInbound(params: InboundReplyParams): Promise<PlaneInboundResult>;
+  /**
+   * The durable ingress lane for an inbound about to be admitted: the session
+   * it will reach (`ingress/session-lane.ts`). Undefined = keep the lane the
+   * transport chose.
+   */
+  ingressLaneKey(params: InboundReplyParams): string | undefined;
+  /** The durable ingress gave up on this row (`ConversationFlow.onDeadLettered`). */
+  onDeadLettered(record: DeadLetteredRow): Promise<void>;
+  /** A flush row came due (`ConversationFlow.deliverHeld`). */
+  deliverHeld(payload: HeldFlushPayload, id: string): Promise<PlaneInboundDeferral | undefined>;
   /**
    * One agent stream event from the daemon connection (`onStream` delivery):
    * the single shared consumer that routes `permission_requested` /
@@ -203,14 +219,6 @@ const NOT_ADMITTED_TEXT =
   "You can't use this bot here yet. Link your account with /link, or ask an admin for access. /me shows what you have.";
 
 /** The refusal inside a thread another Route owns; Routes are named by position, as in the app. */
-const WAIT_NOTICE_TEXT = {
-  queued: "Busy right now. Your message is queued and runs when there is room.",
-  "too-long": "This message is longer than this bot accepts. Shorten it and send it again.",
-  starting: "Starting a session for you. This can take a minute.",
-  "host-away":
-    "The machine that runs this bot is not connected right now. Your message is queued and runs when it is back.",
-} as const;
-
 function boundThreadRefusalText(account: CompiledChannelAccount, route: CompiledRoute): string {
   const position = account.routes.indexOf(route) + 1;
   return `This conversation belongs to Route ${String(position)}, and you are not allowed to use it. Send a new message outside this thread to start your own conversation.`;
@@ -288,9 +296,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   let approvals: ApprovalEngine | undefined;
   /** The turn-lifecycle surfaces opened by accepted inbounds (plane/processing.ts). */
   let processing: ProcessingController | undefined;
+  /** Context, held messages, running turns (`bindings/conversation-flow.ts`). */
+  let conversationFlow: ConversationFlow | undefined;
   let executionLimiter: ChannelExecutionLimiter | undefined;
   /** Messages already told they are waiting for a limit, so a retry is not announced again. */
   const waitingNotices = new OnceMemory(1_000);
+  /** Messages already told they were given up on; apart, since a waiting one may end there. */
+  const unprocessedNotices = new OnceMemory(1_000);
   const agentEventOrder = new AgentEventOrder();
   /** Senders already told today that this bot does not admit them. */
   const notAdmittedNotices = new OnceMemory(1_000);
@@ -358,6 +370,18 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       }
       return dispatchInboundText(message, account, inbound);
     },
+
+    ingressLaneKey(params) {
+      if (isHeldFlushPayload(params)) return undefined;
+      const message = deps.normalizeInbound(params);
+      const account = message === null ? undefined : admitAccount(message).account;
+      if (message === null || account === undefined) return undefined;
+      const command = resolveTextCommand(message.text, readInboundKind(params.ctxPayload));
+      return sessionLaneKey(account, message, command?.name);
+    },
+
+    onDeadLettered: async (record) => conversationFlow?.onDeadLettered(record),
+    deliverHeld: async (payload, id) => conversationFlow?.deliverHeld(payload, id),
 
     async onApprovalCallback(params) {
       // The native card's button click: the SAME two-authority path as a typed
@@ -448,6 +472,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         await lifecycleCommands?.onStream(agentId, event);
         if (isTerminalStreamEvent(event)) {
           executionLimiter?.completeAgent(agentId);
+          await conversationFlow?.turnEnded(agentId);
         }
       });
     },
@@ -636,7 +661,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             )
           ).dispatched,
       });
+      conversationFlow = new ConversationFlow({ ...deps, store: channelStore, plane: seams() });
       bindings = new BindingEngine({
+        inbox: conversationFlow.inbox,
         organizationId: deps.organizationId,
         get channelRevisionId() {
           return deps.channelRevisionId ?? null;
@@ -729,6 +756,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           );
         }
         if (bound.length > 0) await resubscribe();
+        await conversationFlow?.recover();
         logger.info?.("channel plane started", {
           rebound: recovered.rebound,
           leftPending: recovered.leftPending,
@@ -798,6 +826,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       approvals = undefined;
       processing?.stopAll();
       processing = undefined;
+      conversationFlow?.stop();
+      conversationFlow = undefined;
       executionLimiter = undefined;
       subscribed.clear();
       workflowExecutionAgents.clear();
@@ -1097,8 +1127,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     notice: keyof typeof WAIT_NOTICE_TEXT,
   ): Promise<void> {
     const key = message.externalMessageId ?? message.ingressId;
-    const waiting = notice !== "too-long";
-    if (waiting && (key === undefined || !waitingNotices.remember(key))) return;
+    const once = notice === "unprocessed" ? unprocessedNotices : waitingNotices;
+    if (notice !== "too-long" && (key === undefined || !once.remember(key))) return;
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
@@ -1107,25 +1137,19 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     });
   }
 
+  /** `plain` = the stored inbound as written (no command expansion): only such a
+   * message is kept as context or held, since both send the stored row later. */
   async function handleAgentMessage(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    plain = false,
   ): Promise<PlaneInboundResult> {
     const sender =
       route.target.kind === "workflow"
         ? await admitWorkflowMessage(message, account, route)
         : await bindingsEngine().admit(message, account, route);
-    if (!sender.allowed) {
-      await postNotAdmittedNotice(message, account, route, sender);
-      return recordChannelActivity(message, account, route, {
-        result: result(false, {
-          kind: "ignored",
-          reason: sender.reason ?? "message not admitted",
-        }),
-        limitDecision: "not_evaluated",
-      });
-    }
+    if (!sender.allowed) return refuseAgentMessage(message, account, route, sender, plain);
     // The conversation is routed to a Workflow now, and a Workflow mints no
     // binding: any session still bound here answers for a target the
     // configuration no longer names, so it is retired rather than left to post
@@ -1149,7 +1173,46 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         executionLease,
       );
     }
-    return dispatchDirectAgentMessage(message, account, route, executionLease);
+    const held = plain ? await conversationFlow?.hold(message, route) : undefined;
+    if (held === undefined)
+      return dispatchDirectAgentMessage({ message }, account, route, executionLease);
+    executionLimiter?.complete(executionLease);
+    const heldOutcome = result(false, { kind: "held", reason: held });
+    return recordChannelActivity(message, account, route, {
+      result: heldOutcome,
+      outcomeDetail: held,
+      limitDecision: "allowed",
+    });
+  }
+
+  async function refuseAgentMessage(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    sender: FollowUpAdmission,
+    plain: boolean,
+  ): Promise<PlaneInboundResult> {
+    if (plain && sender.unaddressed) await conversationFlow?.keepAsContext(message, account, route);
+    await postNotAdmittedNotice(message, account, route, sender);
+    const reason = sender.reason ?? "message not admitted";
+    return recordChannelActivity(message, account, route, {
+      result: result(false, { kind: "ignored", reason }),
+      limitDecision: "not_evaluated",
+    });
+  }
+
+  /** What the conversation flow borrows from the plane (`ConversationPlaneSeams`). */
+  function seams(): ConstructorParameters<typeof ConversationFlow>[0]["plane"] {
+    return {
+      engine: bindingsEngine,
+      accountFor: (message) => admitAccount(message).account,
+      resolveRoute: resolveInboundRoute,
+      notice: (message, account, route, kind) => postWaitNotice(message, account, route, kind),
+      mayUse: async (message, account, route) =>
+        (await mayUseChannel(message, account, route)).allowed,
+      dispatch: (delivery, account, route) =>
+        dispatchDirectAgentMessage(delivery, account, route, undefined),
+    };
   }
 
   async function dispatchWorkflowMessage(
@@ -1228,37 +1291,46 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     });
   }
 
-  async function dispatchDirectAgentMessage(
+  /**
+   * The stream is subscribed from inside the dispatch, after the agent is
+   * known and BEFORE its prompt is delivered — attaching afterwards is what
+   * made a new session's first turn invisible (its events, including
+   * `turn_started`, landed before anyone was listening).
+   */
+  async function subscribeStream(
+    agentId: string,
     message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<void> {
+    const key = deriveBindingKey(message, route);
+    const binding = await store?.findThreadBinding(
+      deps.organizationId,
+      account.accountId,
+      key.externalConversationId,
+      key.externalThreadId,
+    );
+    if (binding === undefined || binding.status !== "bound" || binding.agentId !== agentId) {
+      return;
+    }
+    plane.attachStreamFor(binding, route, account, {
+      threadId: message.conversation.threadId,
+      ...(message.externalMessageId !== undefined ? { messageId: message.externalMessageId } : {}),
+    });
+  }
+
+  async function dispatchDirectAgentMessage(
+    delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     executionLease: ExecutionLease | undefined,
   ): Promise<PlaneInboundResult> {
-    // The stream is subscribed from inside the dispatch, after the agent is
-    // known and BEFORE its prompt is delivered — attaching afterwards is what
-    // made a new session's first turn invisible (its events, including
-    // `turn_started`, landed before anyone was listening).
-    const subscribe = async (agentId: string): Promise<void> => {
-      const key = deriveBindingKey(message, route);
-      const binding = await store?.findThreadBinding(
-        deps.organizationId,
-        account.accountId,
-        key.externalConversationId,
-        key.externalThreadId,
-      );
-      if (binding === undefined || binding.status !== "bound" || binding.agentId !== agentId) {
-        return;
-      }
-      plane.attachStreamFor(binding, route, account, {
-        threadId: message.conversation.threadId,
-        ...(message.externalMessageId !== undefined
-          ? { messageId: message.externalMessageId }
-          : {}),
-      });
-    };
+    const message = delivery.message;
     let outcome: InboundOutcome;
     try {
-      outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
+      outcome = await conversationFlow!.deliver(delivery, account, route, (agentId) =>
+        subscribeStream(agentId, message, account, route),
+      );
     } catch (error) {
       executionLimiter?.complete(executionLease);
       // The message is retried; a Host that is away can stay away, so say so.
@@ -1476,6 +1548,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     // follow-up policy do not gate them: `commandAddressesThisBot` already
     // required this bot to be named outside a DM.
     if (textCommand !== null) {
+      await conversationFlow?.beforeCommand(textCommand.name, message, route);
       return await handleTextCommand(message, account, route, textCommand);
     }
     return dispatchUnknownCommandOrPrompt(message, account, route, inbound);
@@ -1536,7 +1609,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           .trim(),
       });
     }
-    return handleAgentMessage(message, account, route);
+    return handleAgentMessage(message, account, route, true);
   }
 
   async function handleTextCommand(
@@ -1916,6 +1989,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     approvals?.detach(agentId);
     processing?.closeAgent(agentId);
     executionLimiter?.completeAgent(agentId);
+    await conversationFlow?.turnEnded(agentId);
     if (subscribed.delete(agentId)) await resubscribe();
   }
 

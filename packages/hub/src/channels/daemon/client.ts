@@ -9,6 +9,7 @@ import {
 import { TrustedDaemonClient } from "./ws-client.js";
 import { EnrolledDaemonClient } from "./enrolled-client.js";
 import { hostHasCreateSlot, withHostCreateSlot } from "./create-gate.js";
+import { agentMessageRejection } from "./agent-request-refusal.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
@@ -368,8 +369,10 @@ function createFacade(
         PROVIDER_START_RPC_TIMEOUT_MS,
       );
       const result = asRecord(payload);
-      if (result?.["accepted"] === false)
-        throw new Error((result["error"] as string | undefined) ?? "agent message rejected");
+      if (result?.["accepted"] === false) {
+        const error = result["error"];
+        throw agentMessageRejection(typeof error === "string" ? error : undefined);
+      }
     },
     cancelAgent: (agentId) =>
       socket.call("cancel_agent_request", { agentId }).then((payload) => {
@@ -442,6 +445,9 @@ function createFacade(
       socket
         .call("agent.timeline.set_subscription.request", {
           agentIds: [...agentIds],
+          // The plane only relays output; an idle channel agent may be closed
+          // and is resumed by the next message.
+          keepsAgentsResident: false,
         })
         .then(() => undefined),
     stop: () => socket.stop(),
