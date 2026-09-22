@@ -32,6 +32,7 @@ import {
 } from "./commands-follow-up-arguments.js";
 import { promoteRouteDefault, routeDefaultText } from "./commands-route-default.js";
 import type { AgentControls } from "./config/agent-controls.js";
+import { outboundAttachesTool } from "./config/enums.js";
 
 export interface CommandDispatcherDependencies {
   plane: ChannelPlaneDeps;
@@ -183,7 +184,7 @@ export class ChannelCommandDispatcher {
     const defaults = {
       ...(override === undefined ? route.defaults : routeDefaults),
       ...(override?.agentControls === undefined ? {} : { agentControls: override.agentControls }),
-      ...(capability === undefined && route.defaults.outbound.path === "tool"
+      ...(capability === undefined && outboundAttachesTool(route.defaults.outbound.path)
         ? { outbound: { ...route.defaults.outbound, path: "relay" as const } }
         : {}),
     };

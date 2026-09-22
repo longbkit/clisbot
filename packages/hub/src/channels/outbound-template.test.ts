@@ -65,4 +65,28 @@ describe("composeMessageToolPrompt", () => {
       composeMessageToolPrompt(null, { channel: "slack" }),
     );
   });
+
+  it("asks for paced progress updates on the tool path", () => {
+    const prompt = composeMessageToolPrompt(null, { channel: "slack" });
+    assert.ok(prompt.includes("at most about once a minute"));
+  });
+
+  describe("hybrid", () => {
+    const prompt = composeMessageToolPrompt(null, { channel: "slack", path: "hybrid" });
+
+    it("says the final message IS delivered, the opposite of the tool path", () => {
+      assert.ok(prompt.includes("final assistant message is delivered to them as text"));
+      assert.equal(prompt.includes("is not delivered"), false);
+    });
+
+    it("keeps the tool name and the authorization, and forbids repeating the answer", () => {
+      assert.ok(prompt.includes("`mcp__channel_reply__message`"));
+      assert.ok(prompt.includes("already authorized"));
+      assert.ok(prompt.includes("Never repeat your answer text through the tool"));
+    });
+
+    it("drops the progress instruction, since the relay already shows progress", () => {
+      assert.equal(prompt.includes("final=false"), false);
+    });
+  });
 });

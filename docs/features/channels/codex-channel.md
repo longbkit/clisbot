@@ -6,11 +6,14 @@ platform](README.md) first for the pipeline that carries a message this far.
 ## The setup
 
 On a route with `outbound.path: tool`, the relay does not post the agent's
-answer. `toolPathSyncFold` (`channels/config/inheritance.ts:247`) folds
-`sync.finalAnswers` off and the relay's post gate returns early
-(`channels/relay/index.ts:385`). The only thing that reaches the channel is the
-agent calling the hub-attached `message` tool. A turn that ends without that
-call shows the user nothing — no answer, no error.
+answer. `toolPathSyncFold` (`channels/config/inheritance.ts`) folds
+`sync.finalAnswers` off and the relay's post gate returns early. What reaches
+the channel is the agent calling the hub-attached `message` tool. A turn that
+ends without that call used to show the user nothing; the relay now forwards
+its last message instead ([Reply method](conversation-flow.md#reply-method)).
+The fallback sends no file and depends on the turn being marked as a channel
+turn, so the block below still has to work. On `hybrid` the relay carries the answer and the block says so, so none
+of this applies there.
 
 So `createChannelAgentSpecResolver` (`channels/control-plane.ts:468`) adds three
 fields to `create_agent`:
@@ -90,7 +93,8 @@ curl -s -X POST "$HUB_ORIGIN/mcp/channel/$TOKEN" \
 
 ## What still breaks
 
-Compliance is a probability, and nothing downstream compensates. A turn that
-fails before any model runs — a provider `at capacity` error, for one — reaches
-the agent timeline and goes no further, because there is no model left to obey
-anything. There is no host-side fallback yet.
+Compliance is a probability. What the Hub compensates is the end of the turn: a
+failed turn — a provider `at capacity` error before any model runs, for one —
+posts one notice with the error, and a completed turn that never called the
+tool has its last message forwarded ([Reply method](conversation-flow.md#reply-method)).
+Neither sends a file the agent meant to attach.

@@ -2,6 +2,15 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ChannelReplyBindingRef } from "./plane/types.js";
 import type { ChannelAccountScope } from "./message-actions.js";
 import { isSupportedChannel } from "./catalog.js";
+import {
+  emptyToolTurn,
+  mergeToolTurns,
+  progressAllowed,
+  recordToolDelivery,
+  type ToolDelivery,
+  type ToolTurnDeliveries,
+  type ToolTurnRecord,
+} from "./channel-reply-turn-record.js";
 
 /**
  * A server-owned Channel reply capability. The opaque token is the only value
@@ -112,6 +121,8 @@ interface PendingChannelReplyCapability extends Omit<ChannelReplyCapability, "ag
   agentId: string | null;
   /** Channel-path output accounting for `turnId`, reset when the turn changes. */
   turn: { posted: number; inFlight: number; max: number };
+  /** What the tool delivered since the relay last took it (process state). */
+  delivered?: ToolTurnRecord | undefined;
   /** The `expiresAt` the durable row holds, so the sliding TTL writes rarely. */
   persistedExpiresAt: number;
 }
@@ -208,6 +219,24 @@ export interface ChannelReplyCapabilityService {
   /** Revoke what a create that never produced an Agent was launched with. */
   revokeUnboundTurn(turnId: string): void;
   revokeAccount(organizationId: string, channel: string, accountId: string): void;
+  /** Record one tool call that landed, against the Agent's running turn. */
+  noteDelivery(token: string, delivery: ToolDelivery): void;
+  /**
+   * Whether a `final=false` send may go out: `false` within
+   * `TOOL_PROGRESS_MIN_INTERVAL_MS` of the turn's last progress send that landed.
+   */
+  admitProgress(token: string): boolean;
+  /**
+   * What the tool delivered for the Agent's turn, reset for the next one.
+   * `keepChannelTurn` carries the channel mark over: a canceled turn owed the
+   * conversation nothing, and the message that replaced it is still owed.
+   */
+  takeTurnDeliveries(
+    agentId: string,
+    options?: { keepChannelTurn?: boolean },
+  ): ToolTurnDeliveries | undefined;
+  /** The same record without resetting it (the mid-turn duplicate check). */
+  peekTurnDeliveries(agentId: string): ToolTurnDeliveries | undefined;
   /** Load the durable capabilities this process must keep answering. */
   hydrate?(): Promise<void>;
   /** Await every queued durable write; rethrows the first failure. */
@@ -296,6 +325,11 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
       ...(input.outputBudget === undefined ? {} : { outputBudget: { ...input.outputBudget } }),
       agentId: null,
       turn: { posted: 0, inFlight: 0, max: input.turnOutputMax ?? this.turnOutputMax },
+      // A capability minted with a turn is minted by the channel for the
+      // prompt it is about to send: a session's first message, or `/fork`.
+      ...(input.turnId === undefined
+        ? {}
+        : { delivered: { ...emptyToolTurn(), channelTurn: true } }),
       expiresAt,
       persistedExpiresAt: expiresAt,
     };
@@ -334,7 +368,12 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
       return undefined;
     }
     this.slide(hash, capability);
-    const { turn: _turn, persistedExpiresAt: _persisted, ...snapshot } = capability;
+    const {
+      turn: _turn,
+      persistedExpiresAt: _persisted,
+      delivered: _delivered,
+      ...snapshot
+    } = capability;
     return {
       ...snapshot,
       ref: { ...capability.ref },
@@ -353,7 +392,11 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
   noteTurn(agentId: string, turnId: string, requesterMessageId?: string): void {
     if (agentId === "" || turnId === "") return;
     for (const capability of this.capabilities.values()) {
-      if (capability.agentId !== agentId || capability.turnId === turnId) continue;
+      if (capability.agentId !== agentId) continue;
+      // Whatever turn ends next answers this message, so its end is owed to
+      // the conversation, including a turn the message steered into.
+      (capability.delivered ??= emptyToolTurn()).channelTurn = true;
+      if (capability.turnId === turnId) continue;
       capability.turnId = turnId;
       // The current message moves with the turn: the tool's `react` default and
       // the current-message mutation shortcut both read it.
@@ -376,6 +419,40 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
       if (posted) turn.posted += 1;
     };
     return { complete: () => settle(true), fail: () => settle(false) };
+  }
+
+  noteDelivery(token: string, delivery: ToolDelivery): void {
+    const capability = this.active(channelReplyCapabilityHash(token));
+    if (capability === undefined) return;
+    recordToolDelivery((capability.delivered ??= emptyToolTurn()), delivery, this.now());
+  }
+
+  admitProgress(token: string): boolean {
+    const capability = this.active(channelReplyCapabilityHash(token));
+    return progressAllowed(capability?.delivered, this.now());
+  }
+
+  takeTurnDeliveries(
+    agentId: string,
+    options: { keepChannelTurn?: boolean } = {},
+  ): ToolTurnDeliveries | undefined {
+    const merged = this.peekTurnDeliveries(agentId);
+    for (const capability of this.capabilities.values()) {
+      if (capability.agentId !== agentId) continue;
+      const keep = options.keepChannelTurn === true && capability.delivered?.channelTurn === true;
+      capability.delivered = keep ? { ...emptyToolTurn(), channelTurn: true } : undefined;
+    }
+    return merged;
+  }
+
+  peekTurnDeliveries(agentId: string): ToolTurnDeliveries | undefined {
+    const records: ToolTurnRecord[] = [];
+    for (const capability of this.capabilities.values()) {
+      if (capability.agentId === agentId && capability.delivered !== undefined) {
+        records.push(capability.delivered);
+      }
+    }
+    return mergeToolTurns(records);
   }
 
   holdsAgentCapability(agentId: string): boolean {

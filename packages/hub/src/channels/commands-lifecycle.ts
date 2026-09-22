@@ -8,6 +8,7 @@ import {
   routePosition,
 } from "./bindings/index.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
+import { outboundAttachesTool } from "./config/enums.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
 import type { ChannelReplyAgentCapability, InboundMessage } from "./plane/types.js";
@@ -139,7 +140,7 @@ export class ChannelLifecycleCommands {
     const change = await this.prepareRebind(
       agent.id,
       context,
-      context.route.defaults.outbound.path === "tool",
+      outboundAttachesTool(context.route.defaults.outbound.path),
     );
     try {
       await this.deps.attach(change.binding, change.context);
@@ -252,7 +253,7 @@ export class ChannelLifecycleCommands {
   }
 
   private capabilityFor(context: LifecycleCommandContext): ChannelReplyAgentCapability | undefined {
-    if (context.route.defaults.outbound.path !== "tool") return undefined;
+    if (!outboundAttachesTool(context.route.defaults.outbound.path)) return undefined;
     if (!this.deps.issueCapability || !this.deps.bindCapability || !this.deps.revokeCapability) {
       throw new Error("Channel reply capability is unavailable.");
     }

@@ -6,7 +6,7 @@
 
 import { ORG_DEFAULTS, type ApprovalRule, type ChannelDefaults } from "./schema.js";
 import type { SyncProgress, SyncProgressGroup, SyncStreaming } from "./schema.js";
-import type { DmPolicy, GroupPolicy, QuestionsMode } from "./enums.js";
+import type { DmPolicy, GroupPolicy, OutboundPath, QuestionsMode } from "./enums.js";
 import { issue } from "./compile-support.js";
 import type { AgentControls } from "./agent-controls.js";
 import { foldConversationDefaults, type EffectiveConversationDefaults } from "./conversation.js";
@@ -33,7 +33,7 @@ export interface EffectiveDefaults extends EffectiveConversationDefaults {
   workspace?: { organize: boolean } | undefined;
   /** The reply-path toggle (E4/E6), folded like every other default leaf;
    * `template` stays null at the org floor (= the default injection block). */
-  outbound: { path: "relay" | "tool"; template: string | null };
+  outbound: { path: OutboundPath; template: string | null };
   /** What the plane does with the non-message inbound families
    * (`plane/inbound-kinds.ts` owns the routing table; these are its knobs). */
   inbound: {
@@ -263,10 +263,11 @@ function foldStreamingDefaults(pick: LeafPicker): { streaming?: SyncStreaming } 
  * (Task tool) output relayed into the thread would be a second user-visible
  * answer on a tool turn. `threadLink` keeps its folded value — it has no
  * effect while the relay is silent and still applies if the path flips back
- * to `relay` on the next revision.
+ * to `relay` on the next revision. `hybrid` keeps the relay's knobs: its text
+ * is the answer and the tool only carries what text cannot.
  */
 function toolPathSyncFold(
-  path: "relay" | "tool",
+  path: OutboundPath,
   sync: EffectiveDefaults["sync"],
 ): EffectiveDefaults["sync"] {
   if (path !== "tool") return sync;

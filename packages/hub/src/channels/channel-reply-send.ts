@@ -94,6 +94,12 @@ function validateSendArgs(args: Record<string, unknown>): CallToolResult | undef
   return undefined;
 }
 
+/** The text a valid send posts: `message`, or its `text` alias. */
+export function sendText(args: Record<string, unknown>): string | undefined {
+  const text = readSendText(args, hasSendMedia(args));
+  return typeof text === "string" ? text : undefined;
+}
+
 function readIdempotencyKey(args: Record<string, unknown>): string | undefined {
   const value = args["idempotencyKey"];
   return typeof value === "string" ? value : undefined;

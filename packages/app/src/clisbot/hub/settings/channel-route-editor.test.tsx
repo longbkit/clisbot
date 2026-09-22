@@ -1023,8 +1023,13 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Experimental")).toBeNull();
     expect((screen.getByLabelText("Reply in a thread") as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("button", { name: "Text forward" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Use Channel tool" })).toBeTruthy();
-    // Use Channel tool is the default, so the Agent owns replies without extra relay switches.
+    expect(screen.getByRole("button", { name: "Channel tool only" })).toBeTruthy();
+    // Hybrid is the default: the answer is relayed as text, so the relay
+    // switches stay, and the tool is attached for files and actions.
+    expect(screen.getByRole("button", { name: "Hybrid" })).toBeTruthy();
+    expect(screen.getByText("Text answers, plus the Channel tool")).toBeTruthy();
+    expect(screen.getByLabelText("Send final answers")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Channel tool only" }));
     expect(screen.getByText("The Agent controls replies")).toBeTruthy();
     expect(screen.queryByLabelText("Send final answers")).toBeNull();
     // Limits and Advanced hold nothing yet, so they start folded to a summary.
@@ -1325,6 +1330,48 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(saved.context).toEqual({ unmentioned: "allowed-senders" });
     expect(saved.batching).toEqual({ pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 });
     expect(saved.interaction.whenBusy).toBe("queue");
+  });
+
+  it("keeps a Route that authors no Reply method inheriting it", async () => {
+    // The account runs `tool`; the Route authors nothing and must keep inheriting.
+    const inheritingAccount = { ...account, defaults: { outbound: { path: "tool" } } };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration"
+        ? { ...configuration, accounts: [inheritingAccount] }
+        : data[resource],
+    );
+    await openEditor();
+    // The form shows what the Route really runs, not the new-Route default.
+    expect(screen.getByText("The Agent controls replies")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].outbound).toBeUndefined();
+  });
+
+  it("writes the Reply method once the owner picks one on an inheriting Route", async () => {
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Text forward" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].outbound).toEqual({
+      path: "relay",
+    });
+  });
+
+  it("keeps a Route that stored Channel tool only on the tool path the owner chose", async () => {
+    const toolRoute = { ...route, outbound: { path: "tool" } };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration"
+        ? { ...configuration, accounts: [{ ...account, routes: [toolRoute] }] }
+        : data[resource],
+    );
+    await openEditor();
+    expect(screen.getByText("The Agent controls replies")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].outbound).toEqual({
+      path: "tool",
+    });
   });
 
   it("keeps a Route that stored Text forward on the relay path the owner chose", async () => {

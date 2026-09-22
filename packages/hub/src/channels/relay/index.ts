@@ -22,7 +22,15 @@ import {
 import type { ProcessingController } from "../plane/processing.js";
 import { anchoredReplyThreadId } from "../reply-anchor.js";
 import type { ChannelStreamingProducer, StreamingFinalizeTransport } from "../streaming/index.js";
+import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 import { deliverRelayPost, type OutputKind } from "./delivery.js";
+import {
+  failureNotice,
+  isSystemErrorText,
+  owesFailureNotice,
+  toolAlreadySent,
+  toolTurnFallback,
+} from "./turn-end.js";
 
 /**
  * The relay knobs of a scope: root gates on `sync`, subagents on
@@ -124,6 +132,11 @@ interface RelayContext {
    * in place. Absent (no `sync.streaming`, or a vertical with no drivable
    * streaming primitive) leaves this relay's final-only post path untouched. */
   streaming?: ChannelStreamingProducer | undefined;
+  /** What the `message` tool delivered per turn: the `tool` fallback and the
+   * `hybrid` duplicate check read it. Absent = no tool-attaching Route here. */
+  toolDeliveries?:
+    | Pick<ChannelReplyCapabilityService, "takeTurnDeliveries" | "peekTurnDeliveries">
+    | undefined;
 }
 
 /** One agent's relay state: its stream context, the subagent labels, and the
@@ -207,7 +220,7 @@ export class RelayEngine {
         return;
       case "turn_closed":
         this.relay.processing?.closeAgent(agentId);
-        this.onTurnClosed(stream, event.turnId);
+        await this.onTurnClosed(stream, event);
         return;
     }
   }
@@ -337,7 +350,7 @@ export class RelayEngine {
   ): Promise<void> {
     if (item.text === undefined) return;
     const text = stripAssistantBoundary(item.text);
-    if (text === "") return;
+    if (text === "" || isSystemErrorText(text)) return;
     const turn = this.turn(stream, key);
     const messageId = item.messageId;
     if (messageId !== undefined && turn.postedAssistantMessageIds.has(messageId)) return;
@@ -380,7 +393,7 @@ export class RelayEngine {
     turn.pendingAssistantMessageId = undefined;
     if (messageId !== undefined) turn.postedAssistantMessageIds.add(messageId);
     if (!sync.finalAnswers) return;
-    if (turn.postedAssistantTexts.has(text)) {
+    if (turn.postedAssistantTexts.has(text) || (prefix === "" && this.toolSent(stream, text))) {
       this.relay.streaming?.discard(stream.context, key);
       return;
     }
@@ -432,10 +445,14 @@ export class RelayEngine {
 
   private async onTurnCompleted(stream: RelayStream, turnId: string) {
     const turn = this.turn(stream, turnId);
+    // A replayed end must not answer the turn a second time.
+    if (turn.closed) return;
     turn.closed = true;
+    const finalText = turn.pendingAssistantText;
     // Turn completion closes the last in-flight assistant message (the stream
     // gives no other "this message ended" signal for it), as the turn's final
-    // answer (the threadLink `final-only` post).
+    // answer (the threadLink `final-only` post). It reads the tool's record
+    // for the `hybrid` duplicate check, so the record is taken after it.
     await this.postAssistantMessage(
       stream,
       turnId,
@@ -443,12 +460,59 @@ export class RelayEngine {
       "",
       true,
     );
+    const deliveries = this.takeToolDeliveries(stream);
+    if (stream.context.route.defaults.outbound.path !== "tool") return;
+    if (deliveries?.channelTurn !== true) return;
+    // The `tool` path relays no text, so a channel turn that never answered
+    // through the tool would end in silence: forward its last message instead.
+    const fallback = toolTurnFallback(deliveries, finalText);
+    if (fallback !== undefined) await this.post(stream, turnId, turn, fallback, true, "assistant");
   }
 
-  /** A turn that did not complete stops any further relay posts for it. */
-  private onTurnClosed(stream: RelayStream, turnId: string): void {
-    this.turn(stream, turnId).closed = true;
-    this.relay.streaming?.discard(stream.context, turnId);
+  /**
+   * A turn that did not complete stops any further relay posts for it. A
+   * failure is reported: the partial answer is flushed where text is relayed,
+   * then one notice when one is owed (`owesFailureNotice`). A cancel was
+   * deliberate (`/stop`, an interrupting message), so it stays quiet.
+   */
+  private async onTurnClosed(
+    stream: RelayStream,
+    event: Extract<RelayedStreamEvent, { kind: "turn_closed" }>,
+  ): Promise<void> {
+    const turn = this.turn(stream, event.turnId);
+    if (turn.closed) return;
+    const failed = event.reason === "failed";
+    if (failed) {
+      await this.postAssistantMessage(
+        stream,
+        event.turnId,
+        rootSyncKnobs(stream.context.route.defaults.sync),
+        "",
+        false,
+      );
+    }
+    turn.closed = true;
+    this.relay.streaming?.discard(stream.context, event.turnId);
+    // A cancel is usually a message replacing the turn: its mark belongs to
+    // the turn that message starts.
+    const deliveries = this.takeToolDeliveries(stream, !failed);
+    if (!failed || !owesFailureNotice(stream.context.route.defaults.outbound.path, deliveries)) {
+      return;
+    }
+    await this.post(stream, event.turnId, turn, failureNotice(event.error), true, "assistant");
+  }
+
+  /** On `hybrid`, text the tool already posted this turn is not relayed again. */
+  private toolSent(stream: RelayStream, text: string): boolean {
+    if (stream.context.route.defaults.outbound.path !== "hybrid") return false;
+    const deliveries = this.relay.toolDeliveries?.peekTurnDeliveries(stream.context.agentId);
+    return toolAlreadySent(text, deliveries);
+  }
+
+  private takeToolDeliveries(stream: RelayStream, keepChannelTurn = false) {
+    return this.relay.toolDeliveries?.takeTurnDeliveries(stream.context.agentId, {
+      keepChannelTurn,
+    });
   }
 
   // --- Progress snapshots --------------------------------------------------

@@ -19,7 +19,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import type { FollowUpMode } from "../config/enums.js";
+import { outboundAttachesTool, type FollowUpMode } from "../config/enums.js";
 import {
   bindingSummary,
   deriveBindingKey,
@@ -315,11 +315,11 @@ export class BindingEngine {
     return this.startSession(delivery, account, route, key, subscribe);
   }
 
-  /** A `tool`-path route whose bound session can no longer post its reply. */
+  /** A tool-attaching (`tool`/`hybrid`) route whose bound session can no longer post its reply. */
   private lostReplyCapability(agentId: string, route: CompiledRoute): boolean {
     const capabilities = this.context.replyCapabilities;
     return (
-      route.defaults.outbound.path === "tool" &&
+      outboundAttachesTool(route.defaults.outbound.path) &&
       capabilities !== undefined &&
       !capabilities.holdsAgentCapability(agentId)
     );

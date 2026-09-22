@@ -14,6 +14,7 @@
 
 import type { ChannelStore } from "../../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
+import { outboundAttachesTool } from "../config/enums.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import { resolveConversationConfiguration } from "../commands-config.js";
@@ -197,10 +198,9 @@ export async function createRouteSession(
     ...ref,
   });
   const target = routeTarget;
-  const issued =
-    route.defaults.outbound.path === "tool"
-      ? issueReplyCapability(context, { account, route, ref, executionId, requester, target })
-      : undefined;
+  const issued = outboundAttachesTool(route.defaults.outbound.path)
+    ? issueReplyCapability(context, { account, route, ref, executionId, requester, target })
+    : undefined;
   const capabilityToken = issued?.token;
   const canSendFiles = issued?.canSendFiles === true;
   try {

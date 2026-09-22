@@ -400,6 +400,26 @@ knowing it grants nothing.
 The requests belong to one organization and one account. Approving someone on
 one account does not admit them on another, and never on another organization's.
 
+## How the agent replies
+
+A Route's **Reply method** decides what reaches the conversation:
+
+| Reply method      | What the user sees                                                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hybrid            | The agent's answer as text, plus the files, reactions and edits it sends with its `message` tool. The default for a new Route open to members. |
+| Text forward      | The agent's answer as text. The agent cannot send files or act on messages.                                                                    |
+| Channel tool only | Only what the agent sends with its `message` tool, including short progress updates on long work.                                              |
+
+The Paseo app shows the same answer the conversation got on the first two. On
+**Channel tool only**, the agent's own messages stay in the app and the
+conversation sees the tool's posts; if the agent finishes without sending a
+reply, its last message is sent instead. A turn started in the Paseo app is not
+sent to the conversation on this method. Progress updates are limited to one
+every 30 seconds.
+
+If a turn fails, the conversation gets one notice with the error. A turn you
+stop on purpose (`/stop`, or a message that interrupts it) posts nothing.
+
 ## Files the agent sends
 
 One tool sends both. The agent's `message` tool takes attachments alongside the

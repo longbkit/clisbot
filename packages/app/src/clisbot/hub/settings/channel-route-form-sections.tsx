@@ -15,10 +15,11 @@ import { ChoiceRow, RouteBehaviorSwitch, RouteFollowUpFields } from "./channel-r
 
 export type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 
-const OUTBOUND_PATH_VALUES = ["tool", "relay"];
+const OUTBOUND_PATH_VALUES = ["hybrid", "relay", "tool"];
 const OUTBOUND_PATH_LABELS = {
-  tool: "Use Channel tool",
+  hybrid: "Hybrid",
   relay: "Text forward",
+  tool: "Channel tool only",
 };
 const APPROVAL_VALUES = ["require", "auto-deny", "auto-allow"];
 const CUSTOM_APPROVAL_VALUES = ["custom", ...APPROVAL_VALUES];
@@ -217,7 +218,6 @@ export function RouteReplyFields(props: RouteReplyFieldsProps) {
         values={OUTBOUND_PATH_VALUES}
         selected={behavior.outboundPath}
         labels={OUTBOUND_PATH_LABELS}
-        layout="row"
         onChange={props.changeOutboundPath}
         disabled={pending}
       />
@@ -228,17 +228,24 @@ export function RouteReplyFields(props: RouteReplyFieldsProps) {
 
 function RelayBehaviorFields(props: RouteReplyFieldsProps) {
   const { behavior, pending } = props;
-  if (behavior.outboundPath !== "relay") {
+  if (behavior.outboundPath === "tool") {
     return (
       <Alert
         variant="info"
         title="The Agent controls replies"
-        description="The Agent can send text and files from the selected Project to this conversation without a separate approval. File sending requires the Hub to access the Project folder. Text forward is disabled to avoid duplicate replies."
+        description="The Agent can send text and files from the selected Project to this conversation without a separate approval. File sending requires the Hub to access the Project folder. Text forward is disabled to avoid duplicate replies. If the Agent ends without replying, its last message is sent instead."
       />
     );
   }
   return (
     <>
+      {behavior.outboundPath === "hybrid" ? (
+        <Alert
+          variant="info"
+          title="Text answers, plus the Channel tool"
+          description="The Agent's answer is sent as text, as with Text forward. The Agent can also send files from the selected Project, react, or edit through the Channel tool without a separate approval."
+        />
+      ) : null}
       <RouteBehaviorSwitch
         label="Send final answers"
         value={behavior.finalAnswers}

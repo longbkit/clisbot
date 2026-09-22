@@ -99,10 +99,18 @@ export type MessageReaction = z.infer<typeof MessageReactionSchema>;
  * `outbound.path` — which channel surface carries the agent's reply. `relay`
  * (the org-floor default) posts the relay's sync-gated text; `tool` attaches
  * the hub's channel-reply MCP tool to the created agent and folds the route's
- * root `sync` knobs off, so the tool post is the only user-visible answer.
+ * root `sync` knobs off, so the tool post is the only user-visible answer;
+ * `hybrid` relays the text as `relay` does AND attaches the tool for what text
+ * cannot carry (files, reactions, edits). Decision:
+ * docs/audits/2026-09-22-channel-reply-hybrid-mode.md.
  */
-export const OutboundPathSchema = z.enum(["relay", "tool"]);
+export const OutboundPathSchema = z.enum(["relay", "tool", "hybrid"]);
 export type OutboundPath = z.infer<typeof OutboundPathSchema>;
+
+/** Whether a path attaches the channel-reply tool (and so needs a capability). */
+export function outboundAttachesTool(path: OutboundPath): boolean {
+  return path !== "relay";
+}
 
 /**
  * `defaults.inbound.reactionNotifications` — upstream's channel reaction

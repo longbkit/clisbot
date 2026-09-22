@@ -2165,6 +2165,7 @@ async function buildCreateAgentOptions(
         : `${intent.prompt}\n\n${composeMessageToolPrompt(channelTool.template, {
             channel: channelTool.channel,
             canSendFiles: channelTool.canSendFiles,
+            path: channelTool.path,
           })}`,
     env: buildAgentEnv(intent, materializedEnv),
     mcpServers: {
@@ -2218,6 +2219,7 @@ function workflowChannelTool(
       channel: SupportedChannelName;
       capabilityToken: string;
       canSendFiles: boolean;
+      path: "tool" | "hybrid";
     }
   | undefined {
   const context = channelReplyContext(intent.outputContext);
@@ -2276,10 +2278,13 @@ function workflowChannelTool(
     channel: name,
     capabilityToken,
     canSendFiles: projectRoot !== undefined,
+    path: context.path,
   };
 }
 
-function channelReplyContext(context: unknown): { channel: object; outbound: object } | undefined {
+function channelReplyContext(
+  context: unknown,
+): { channel: object; outbound: object; path: "tool" | "hybrid" } | undefined {
   if (
     typeof context !== "object" ||
     context === null ||
@@ -2294,14 +2299,10 @@ function channelReplyContext(context: unknown): { channel: object; outbound: obj
   const defaults = Reflect.get(route, "defaults");
   if (typeof defaults !== "object" || defaults === null) return undefined;
   const outbound = Reflect.get(defaults, "outbound");
-  if (
-    typeof outbound !== "object" ||
-    outbound === null ||
-    Reflect.get(outbound, "path") !== "tool"
-  ) {
-    return undefined;
-  }
-  return { channel, outbound };
+  if (typeof outbound !== "object" || outbound === null) return undefined;
+  const path = Reflect.get(outbound, "path");
+  if (path !== "tool" && path !== "hybrid") return undefined;
+  return { channel, outbound, path };
 }
 
 function allowsChannelReply(execution: AgentExecutionRecord): boolean {
@@ -2318,7 +2319,7 @@ function allowsChannelReply(execution: AgentExecutionRecord): boolean {
   if (
     typeof outbound !== "object" ||
     outbound === null ||
-    Reflect.get(outbound, "path") !== "relay"
+    (Reflect.get(outbound, "path") !== "relay" && Reflect.get(outbound, "path") !== "hybrid")
   ) {
     return false;
   }

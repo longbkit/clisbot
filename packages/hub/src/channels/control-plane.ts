@@ -32,6 +32,7 @@ import {
 } from "./config/compile.js";
 import { TriggerDocumentError } from "../triggers/configuration/index.js";
 import { applyAgentControls } from "./config/agent-controls.js";
+import { outboundAttachesTool } from "./config/enums.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
@@ -319,7 +320,7 @@ export function createChannelAgentSpecResolver(
         : { featureValues: structuredClone(agent.featureValues) }),
       ...(agent.options === undefined ? {} : { providerOptions: agent.options }),
     };
-    if (defaults.outbound.path !== "tool") return config;
+    if (!outboundAttachesTool(defaults.outbound.path)) return config;
     if (capability === undefined) {
       throw new ChannelAgentSpecError("Channel reply capability is unavailable");
     }
@@ -345,6 +346,7 @@ export function createChannelAgentSpecResolver(
         // which Channel the reply leaves through.
         channel: bindingRef.channel,
         canSendFiles: capability.canSendFiles,
+        path: defaults.outbound.path === "hybrid" ? "hybrid" : "tool",
       }),
     };
   };

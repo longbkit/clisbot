@@ -35,13 +35,22 @@ import {
 } from "./plane/types.js";
 import type { StagedChannelMedia } from "./media/outbound-stager.js";
 import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { executeChannelSend, type ChannelReplyOutputAttempt } from "./channel-reply-send.js";
+import {
+  executeChannelSend,
+  sendText,
+  type ChannelReplyOutputAttempt,
+} from "./channel-reply-send.js";
 import { errorText, toolFailure, unsupportedAction } from "./channel-reply-results.js";
 import {
   accountScope,
   type ChannelReplyCapability,
   type ChannelReplyTurnOutput,
 } from "./channel-reply-capabilities.js";
+import {
+  actionDelivery,
+  TOOL_PROGRESS_MIN_INTERVAL_MS,
+  type ToolDelivery,
+} from "./channel-reply-turn-record.js";
 import {
   agentToolContext,
   channelToolCall,
@@ -99,6 +108,10 @@ export interface ChannelReplyMcp {
   /** The per-turn output ceiling for a capability with no durable budget (the
    * channel binding path). Absent = that path posts unbounded. */
   reserveTurnOutput?(token: string): ChannelReplyTurnOutput | undefined;
+  /** Record a call that landed, so the relay knows what the turn already said. */
+  noteDelivery?(token: string, delivery: ToolDelivery): void;
+  /** Pace `final=false` sends; `false` = too soon after the previous one. */
+  admitProgress?(token: string): boolean;
   /** Operator surface for a capability the Hub cannot answer. A dead
    * capability used to be silent on both verbs, so a whole Agent could talk to
    * nobody without a single line in `hub.log` (D-W4-01). */
@@ -260,14 +273,34 @@ async function messageCall(
   const actionError = checkMessageAction(accountScope(capability), action);
   if (actionError !== undefined) return actionError;
   if (action !== "send") {
-    return await channelActionCall(mcp, capability, token, action as string, args);
+    const result = await channelActionCall(mcp, capability, token, action as string, args);
+    const delivery = actionDelivery(action as string);
+    if (result.isError !== true && delivery !== undefined) mcp.noteDelivery?.(token, delivery);
+    return result;
   }
-  return await executeChannelSend({
+  const final = args["final"] !== false;
+  if (!final && mcp.admitProgress?.(token) === false) return progressThrottled();
+  const result = await executeChannelSend({
     mcp,
     capability,
     args,
     reserveOutput: () => reserveOutput(mcp, capability, token),
   });
+  if (result.isError !== true) {
+    mcp.noteDelivery?.(token, { kind: "send", final, text: sendText(args) });
+  }
+  return result;
+}
+
+/** A progress send refused by the Hub's pacing floor. */
+function progressThrottled(): CallToolResult {
+  const seconds = TOOL_PROGRESS_MIN_INTERVAL_MS / 1_000;
+  const reason = `progress updates are limited to one every ${seconds} seconds; this one was not posted`;
+  return {
+    content: [{ type: "text" as const, text: `throttled: ${reason}` }],
+    structuredContent: { ok: false, status: "throttled", reason },
+    isError: true,
+  };
 }
 
 /**

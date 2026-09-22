@@ -14,7 +14,13 @@ export type RelayedStreamEvent =
   | { kind: "turn_started"; turnId: string }
   | { kind: "timeline"; item: AgentStreamTimelineItem; turnId: string }
   | { kind: "turn_completed"; turnId: string }
-  | { kind: "turn_closed"; turnId: string };
+  | {
+      kind: "turn_closed";
+      turnId: string;
+      /** `failed` carries the provider's error; `canceled` was deliberate. */
+      reason: "failed" | "canceled";
+      error?: string | undefined;
+    };
 
 /**
  * The relay scope of a timeline item: the root agent's own timeline, or one of
@@ -141,9 +147,17 @@ export function asRelayedEvent(event: unknown): RelayedStreamEvent | undefined {
     }
     case "turn_completed":
       return { kind: "turn_completed", turnId };
-    case "turn_failed":
+    case "turn_failed": {
+      const error = event["error"];
+      return {
+        kind: "turn_closed",
+        turnId,
+        reason: "failed",
+        ...(typeof error === "string" ? { error } : {}),
+      };
+    }
     case "turn_canceled":
-      return { kind: "turn_closed", turnId };
+      return { kind: "turn_closed", turnId, reason: "canceled" };
     default:
       return undefined;
   }

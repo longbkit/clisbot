@@ -83,7 +83,9 @@ import {
   buildChannelAccountCandidate,
   buildChannelRouteCandidate,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+  channelOutboundPath,
   channelRouteFollowUp,
+  inheritedChannelOutboundPath,
   parseChannelFollowUpTtlMinutes,
   DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
   DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
@@ -2483,6 +2485,15 @@ function ChannelAccountForm({
     [policy, selectedAccount],
   );
   const conversation = useRouteConversationDraft(editedRoute, inheritedConversation);
+  // A Route that authors no Reply method shows the one it inherits.
+  const replyBehavior = useMemo(() => {
+    if (behavior.outboundPathInherited !== true) return behavior;
+    const outboundPath = inheritedChannelOutboundPath([
+      objectField(policy, "defaults") ?? undefined,
+      objectField(selectedAccount ?? EMPTY_RECORD, "defaults") ?? undefined,
+    ]);
+    return { ...behavior, outboundPath };
+  }, [behavior, policy, selectedAccount]);
   const observedConversations = useObservedConversations(
     observedAccountChannel,
     observedAccountId,
@@ -2610,7 +2621,8 @@ function ChannelAccountForm({
     (value: string) =>
       setBehavior((current) => ({
         ...current,
-        outboundPath: value as "relay" | "tool",
+        outboundPath: value as ChannelRouteBehavior["outboundPath"],
+        outboundPathInherited: false,
       })),
     [],
   );
@@ -2922,7 +2934,7 @@ function ChannelAccountForm({
     <RouteFormSection title="Replies">
       <RouteReplyFields
         dmOnly={dmOnly}
-        behavior={behavior}
+        behavior={replyBehavior}
         pending={pending}
         changeReplyThread={changeReplyThread}
         changeOutboundPath={changeOutboundPath}
@@ -3637,7 +3649,7 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
       ),
       ...channelRouteFollowUp(interaction),
       replyAnchor: initialChannelReplyAnchor(route !== undefined, stringField(reply, "anchor")),
-      outboundPath: routeOutboundPath(stringField(outbound, "path")),
+      ...routeOutboundPath(route !== undefined, stringField(outbound, "path")),
       finalAnswers: booleanValue(sync["finalAnswers"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.finalAnswers),
       progressMessage: routeProgressMessage(progress, sync),
       typingIndicator: booleanValue(
@@ -3652,10 +3664,18 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
   };
 }
 
-/** Only an unsaved Route follows the current default; a stored path wins. */
-function routeOutboundPath(path: string | null): ChannelRouteBehavior["outboundPath"] {
-  if (path === "tool" || path === "relay") return path;
-  return DEFAULT_MEMBER_ROUTE_BEHAVIOR.outboundPath;
+/** Only an unsaved Route follows the current default; a stored path wins, and
+ * a stored Route without one keeps inheriting it. */
+function routeOutboundPath(
+  stored: boolean,
+  path: string | null,
+): Pick<ChannelRouteBehavior, "outboundPath" | "outboundPathInherited"> {
+  const authored = channelOutboundPath(path);
+  if (authored !== undefined) return { outboundPath: authored };
+  return {
+    outboundPath: DEFAULT_MEMBER_ROUTE_BEHAVIOR.outboundPath,
+    ...(stored ? { outboundPathInherited: true } : {}),
+  };
 }
 
 function routeApprovalChoice(
@@ -3694,10 +3714,16 @@ function behaviorWithApprovalChoice(
   return approvalChoice === "custom" ? settings : { ...settings, approvalMode: approvalChoice };
 }
 
+const ROUTE_REPLY_SUMMARIES: Record<ChannelRouteBehavior["outboundPath"], string> = {
+  hybrid: "Hybrid: text answers, plus the Channel tool for files and actions",
+  relay: "Text forward",
+  tool: "Channel tool only: text and Project files, preapproved",
+};
+
 function routeReplySummary(route: RecordValue): string {
-  return routeBehaviorDraft(route).behavior.outboundPath === "tool"
-    ? "Use Channel tool: text and Project files, preapproved"
-    : "Text forward";
+  const { outboundPath, outboundPathInherited } = routeBehaviorDraft(route).behavior;
+  if (outboundPathInherited === true) return "Inherited from the Connection or organization";
+  return ROUTE_REPLY_SUMMARIES[outboundPath];
 }
 
 function routeToolRequestSummary(route: RecordValue): string {

@@ -32,7 +32,7 @@ Commands follow the same rule: a command's lane is the session it acts on, so `/
 | Session lost (Agent archived or gone) | A new session with the context, and the sender is told it is new                               | No                                                                                             |
 | `/new`, `/fork`                       | A new binding from this message on; earlier messages belong to the old one                     | No                                                                                             |
 
-**A turn that fails is not an inbox failure.** Once the Agent accepted the prompt, the row is complete and the lane is free. The turn's error is posted in the thread, and the next message ("try again") continues the same session. Only `/new` or `/fork` leave it.
+**A turn that fails is not an inbox failure.** Once the Agent accepted the prompt, the row is complete and the lane is free. The Hub posts one notice with the error (see [Reply method](#reply-method)), and the next message ("try again") continues the same session. Only `/new` or `/fork` leave it.
 
 **A message enters a session once.** The daemon keys each prompt by the message and keeps a receipt. A batch carries every message id it contains. A failure the daemon knows happened before the prompt reached the provider (`PromptNotDeliveredError`) clears the receipt, so the same message can be sent again; any other failure stays "unknown" and is not resent.
 
@@ -83,6 +83,30 @@ On Slack, context needs the app to subscribe to `message.channels`, `message.gro
 **Batching** holds a trigger briefly so a burst becomes one prompt. It is off by default. On, the Hub sends once no new message has arrived for `pauseSeconds`, or once the first message has waited `maxWaitSeconds`, or at `maxMessages`, whichever comes first. It matters most at a busy shared root, where many people write at once. The pause counts from the newest message that would have been sent; a message kept only as context does not extend it.
 
 A held message (batching, or `whenBusy: queue`) is a completed ingress row filed `held`, so its lane moves on and a `/stop` behind it is not stuck. When the held messages are due, the Hub admits a flush row to their lane and the drain hands it to the plane like any message (`bindings/held-flush.ts`); no worker waits out a pause. The batch's receipt key is derived from its messages in order, and its membership is frozen at the first attempt (`sent_in`): a retry sends exactly that set, and a message filed held since waits for its own flush, admitted as soon as the batch is taken. A flush that reaches no session (the binding was abandoned, no Route serves the conversation) moves its messages to context rather than leaving them held. Under `whenBusy: queue` a message waits for the running turn at most 15 minutes, then steers into it: a lost turn-end event must not hold it forever. A running turn is known in memory only, so after a Hub restart held messages are sent at once. The stream does not name the turn a steer joined or started, so a send that overlaps a turn end counts as ended: the next message under `whenBusy: queue` then steers instead of waiting.
+
+## Reply method
+
+A Route's `outbound.path` decides what carries the answer. The decision and the options weighed are in [the 2026-09-22 hybrid-mode audit](../../audits/2026-09-22-channel-reply-hybrid-mode.md).
+
+| `outbound.path` (UI)       | Relay text              | `channel_reply` tool attached | Prompt block (`outbound-template.ts`)                                                      |
+| -------------------------- | ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `hybrid` (Hybrid)          | Yes                     | Yes                           | Final message is delivered; use the tool for files and actions, never to repeat the answer |
+| `relay` (Text forward)     | Yes                     | No                            | None                                                                                       |
+| `tool` (Channel tool only) | No (`toolPathSyncFold`) | Yes                           | Only the tool reaches the user; paced `final=false` progress                               |
+
+`hybrid` is the app's default for a new member Route; an open-audience Route starts on `relay`. A stored Route keeps its path, and one that authors none keeps inheriting it: the form shows the inherited path and saves without the key. The org floor is still `relay`. Anything that attaches the tool asks `outboundAttachesTool(path)` (`config/enums.ts`), so `hybrid` and `tool` issue the same capability, preapproval and delegated-access check.
+
+The relay decides what a turn's end still owes the user (`relay/turn-end.ts`). It reads what the tool delivered this turn from the capability registry (`takeTurnDeliveries`, `channel-reply-turn-record.ts`), which records successful calls only. A `send` with `final` true or omitted, or an action that posts new content (`upload-file`, `reply`, `poll`, …), is an answer; an action on something already there (react, edit, pin, kick, …) is an act; a read (`search`, `download-file`, …) counts for nothing.
+
+- **Channel turn:** the record is marked when the channel starts the turn (a capability minted for a first prompt or `/fork`, or `noteTurn` on a follow-up or a steer). A turn started in the Paseo app, or by the Agent itself, is not marked, and `tool` posts nothing for it. A canceled turn passes the mark on, because the usual cancel is a message replacing the turn on a provider without native steering. A message that lands after the daemon ended a turn but before the relay handled that end is counted for the ended turn, so the turn it starts is silent on `tool`.
+- **Failed turn:** the partial answer is flushed where text is relayed, then one notice with the error from `turn_failed`. `relay` and `hybrid` report every failure, since they relay every turn's text. `tool` reports a channel turn the tool did not answer. The daemon's own `[System Error]` assistant message carries no turn id and is never relayed.
+- **Canceled turn:** nothing. A cancel is `/stop` or an interrupting message.
+- **Completed `tool` channel turn:** nothing if it answered, or if it acted with no progress sends. Otherwise the last assistant message is forwarded as text, or `The agent finished without sending a reply.` when there is none. The fallback never sends a file.
+- **Completed `hybrid` turn:** an assistant message whose text the tool already posted (whitespace-normalized) is not relayed. Text the Agent wrote before calling the tool with the same text still goes out twice; the prompt forbids it.
+- **Replayed end:** a turn that is already closed is not answered again.
+- **Progress pacing:** a `final=false` send within 30 s of the last one that landed is refused with `status: "throttled"` and not posted. Two progress sends in flight at once both go out. Answers are never paced.
+
+The per-Agent record is process memory, reset when a turn ends. A Hub restart mid-turn forgets it, and that turn's end posts nothing extra on `tool`.
 
 ## Outbound
 

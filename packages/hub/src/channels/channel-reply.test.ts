@@ -984,6 +984,43 @@ describe("channel-reply send idempotency", () => {
     assert.equal(fixture.posts.length, 0);
   });
 
+  it("paces progress sends and records what landed for the relay", async () => {
+    const fixture = makeFixture({ turnId: "turn-1" });
+    const send = async (args: Record<string, unknown>) =>
+      ToolResultSchema.parse(
+        (await fixture.call("tools/call", { name: "message", arguments: args })).result,
+      );
+    assert.equal((await send({ message: "Looking", final: false })).isError, undefined);
+    const throttled = await send({ message: "Still looking", final: false });
+    assert.equal(throttled.isError, true);
+    assert.equal(
+      (throttled as { structuredContent?: Record<string, unknown> }).structuredContent?.["status"],
+      "throttled",
+    );
+    // An answer is never paced.
+    assert.equal((await send({ message: "Done" })).isError, undefined);
+    assert.deepEqual(
+      fixture.posts.map((post) => post.text),
+      ["Looking", "Done"],
+    );
+    assert.deepEqual(fixture.registry.takeTurnDeliveries("agent-1"), {
+      channelTurn: true,
+      answered: true,
+      progress: true,
+      acted: false,
+      texts: ["Looking", "Done"],
+    });
+  });
+
+  it("records nothing for a send that did not land", async () => {
+    const fixture = makeFixture({
+      turnId: "turn-1",
+      post: async () => ({ ok: false, error: "channel_not_found" }),
+    });
+    await fixture.call("tools/call", { name: "message", arguments: { message: "lost" } });
+    assert.deepEqual(fixture.registry.takeTurnDeliveries("agent-1")?.answered, false);
+  });
+
   // The channel binding path: ONE capability, one Agent, many turns. The
   // capability carries no durable output budget, so before the turn scope
   // existed the key fell back to the agent id and turn 2's "reply-1" read turn
@@ -1235,6 +1272,8 @@ function makeFixture(
     store,
     resolveCapability: (candidate) => registry.resolve(candidate, "org-1"),
     reserveTurnOutput: (candidate) => registry.reserveTurnOutput(candidate),
+    noteDelivery: (candidate, delivery) => registry.noteDelivery(candidate, delivery),
+    admitProgress: (candidate) => registry.admitProgress(candidate),
     ...(options.outputStore === undefined ? {} : { outputStore: options.outputStore }),
     post,
     ...(options.mediaPost === undefined ? {} : { mediaPost: options.mediaPost }),

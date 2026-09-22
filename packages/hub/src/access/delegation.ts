@@ -15,6 +15,7 @@ import type {
 import type { ApprovalRule } from "../channels/config/schema.js";
 import { applyAgentControls, type AgentControls } from "../channels/config/agent-controls.js";
 import { privilegeCovers } from "../channels/config/privileges.js";
+import { outboundAttachesTool } from "../channels/config/enums.js";
 import { APPROVAL_PRIVILEGES, type AccessPrivilege } from "./contract.js";
 import { AccessPolicyError, type AccessStore, type DelegatedAgentExecution } from "./store.js";
 
@@ -115,7 +116,7 @@ export async function assertChannelConfigurationDelegation(input: {
       await appendTarget(
         route.target,
         route.approval,
-        route.defaults.outbound.path === "tool",
+        outboundAttachesTool(route.defaults.outbound.path),
         route.defaults.agentControls,
       );
     }
@@ -157,7 +158,7 @@ function delegatedRouteParts(route: CompiledRoute): string {
   return JSON.stringify([
     route.target,
     route.approval,
-    route.defaults.outbound.path === "tool",
+    outboundAttachesTool(route.defaults.outbound.path),
     route.defaults.agentControls ?? null,
   ]);
 }

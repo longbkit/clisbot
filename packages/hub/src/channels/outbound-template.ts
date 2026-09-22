@@ -31,25 +31,43 @@ const FILE_INSTRUCTION =
   '- To send files (documents, images, video, voice notes), add `attachments` — e.g. `attachments:[{media:"/abs/path/a.png"},{media:"/abs/path/b.pdf"}]`, ABSOLUTE paths, one or many per message. Never write a file path as a link in message text; the user cannot open local links.';
 
 /**
- * Compose the tool-path prompt block: the route's `template` override when set
- * (trimmed), otherwise the default. Pure string mapping — the callers decide
- * when this runs (only `tool` paths) and where the result goes.
+ * Compose the prompt block for a tool-attaching path: the route's `template`
+ * override when set (trimmed), otherwise the default for the path. `tool`
+ * makes the tool the only reply channel; `hybrid` delivers the final message
+ * as text and keeps the tool for what text cannot carry, so its block says
+ * the opposite about the final message. Pure string mapping — the callers
+ * decide when this runs and where the result goes.
  */
 export function composeMessageToolPrompt(
   template: string | null,
-  options: { channel: SupportedChannelName; canSendFiles?: boolean | undefined },
+  options: {
+    channel: SupportedChannelName;
+    canSendFiles?: boolean | undefined;
+    path?: "tool" | "hybrid" | undefined;
+  },
 ): string {
   if (template !== null) {
     const trimmed = template.trim();
     if (trimmed !== "") return trimmed;
   }
   const label = getChannelCatalogEntry(options.channel)?.label ?? options.channel;
+  const files = options.canSendFiles === false ? [] : [FILE_INSTRUCTION];
+  if (options.path === "hybrid") {
+    return [
+      "## Messaging",
+      `The user is asking from ${label}. Your final assistant message is delivered to them as text — write your answer there as usual.`,
+      `For what text cannot carry — files, images, reactions, edits — call the \`${MESSAGE_TOOL}\` tool. Posting into this one conversation is already authorized: the tool takes no target, and the host fixes the destination.`,
+      "- Never repeat your answer text through the tool; it would reach the user twice.",
+      ...files,
+    ].join("\n");
+  }
   return [
     "## Messaging",
     `The user is asking from ${label}. Reply by calling the \`${MESSAGE_TOOL}\` tool with \`action="send"\` — that call is the only thing the user sees. Your final assistant message is not delivered, so a turn that ends without calling the tool shows the user nothing.`,
     "Posting into this one conversation is already authorized: the tool takes no target, and the host fixes the destination.",
     "- Put the visible reply text in `message`.",
     "- Set `final=false` for a progress update; set `final=true`, or omit it, for the completed reply.",
-    ...(options.canSendFiles === false ? [] : [FILE_INSTRUCTION]),
+    "- On longer work, send a short `final=false` update when you start and at major steps — at most about once a minute.",
+    ...files,
   ].join("\n");
 }

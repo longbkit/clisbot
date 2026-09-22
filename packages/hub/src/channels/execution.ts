@@ -715,6 +715,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         // resolution (the agent's recorded cwd, else the shared home root).
         sessionLink: deps.sessionLink,
         progressThrottleMs: deps.progressThrottleMs ?? DEFAULT_PROGRESS_THROTTLE_MS,
+        ...(deps.replyCapabilities === undefined ? {} : { toolDeliveries: deps.replyCapabilities }),
         // COMPAT(clisbot-control-plane): the surface is OPENED by the inbound
         // path (plane/processing.ts), not here; the relay keeps it alive on
         // stream events and releases it on the terminal one.

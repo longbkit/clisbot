@@ -1235,7 +1235,7 @@ describe("relay processing wiring", () => {
     const ctx = liveRouteCtx("off");
     engine.attach(ctx);
     openLease(controller, ctx, "off");
-    await engine.onStream(AGENT_ID, { kind: "turn_closed", turnId: "turn-a" });
+    await engine.onStream(AGENT_ID, { kind: "turn_closed", turnId: "turn-a", reason: "failed" });
     await Promise.resolve();
     assert.deepEqual(
       driven.map((d) => d.action),

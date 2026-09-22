@@ -24,13 +24,16 @@ describe("asRelayedEvent", () => {
       kind: "turn_completed",
       turnId: "t1",
     });
-    assert.deepEqual(asRelayedEvent({ type: "turn_failed", turnId: "t1" }), {
+    assert.deepEqual(asRelayedEvent({ type: "turn_failed", turnId: "t1", error: "boom" }), {
       kind: "turn_closed",
       turnId: "t1",
+      reason: "failed",
+      error: "boom",
     });
     assert.deepEqual(asRelayedEvent({ type: "turn_canceled", turnId: "t1" }), {
       kind: "turn_closed",
       turnId: "t1",
+      reason: "canceled",
     });
   });
 

@@ -864,7 +864,8 @@ async function createChannelReplyServerAtComposition(
   options: ApplicationCompositionOptions,
   supervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
 ): Promise<ChannelReplyServer | null> {
-  if (supervisor?.channelReplyCapabilities === undefined) return null;
+  const capabilities = supervisor?.channelReplyCapabilities;
+  if (supervisor === null || capabilities === undefined) return null;
   if (options.database === null || options.databaseRuntime === undefined) {
     return null;
   }
@@ -876,9 +877,10 @@ async function createChannelReplyServerAtComposition(
       organizationId: organizations[0]!.id,
       store: new ChannelStore(options.databaseRuntime),
       outputStore: options.database,
-      resolveCapability: (token) =>
-        supervisor.channelReplyCapabilities?.resolve(token, organizations[0]!.id),
-      reserveTurnOutput: (token) => supervisor.channelReplyCapabilities?.reserveTurnOutput(token),
+      resolveCapability: (token) => capabilities.resolve(token, organizations[0]!.id),
+      reserveTurnOutput: (token) => capabilities.reserveTurnOutput(token),
+      noteDelivery: (token, delivery) => capabilities.noteDelivery(token, delivery),
+      admitProgress: (token) => capabilities.admitProgress(token),
       log: channelLogger,
       post: (ref, text, postOptions) => supervisor.channelReplyPost(ref, text, postOptions),
       mediaPost: (ref, file) => supervisor.channelReplyMediaPost(ref, file),

@@ -68,7 +68,13 @@ export interface ChannelRouteBehavior {
   /** `followUpTtlMinutes` came from the Route or the user, not the default. */
   followUpTtlAuthored?: boolean;
   replyAnchor: "default" | "thread";
-  outboundPath: "relay" | "tool";
+  /** Mirrors the Hub's `outbound.path`. `hybrid` relays text and attaches the
+   * Channel tool for files and actions (the default for a member Route). */
+  outboundPath: ChannelOutboundPath;
+  /** A stored Route that authors no `outbound.path`: it inherits one from its
+   * account or organization, and a save leaves the key out until the user
+   * picks a Reply method. */
+  outboundPathInherited?: boolean;
   finalAnswers: boolean;
   progressMessage: boolean;
   typingIndicator: boolean;
@@ -79,6 +85,27 @@ export interface ChannelRouteBehavior {
   questions?: ChannelRouteQuestions;
 }
 
+export type ChannelOutboundPath = "hybrid" | "relay" | "tool";
+
+const OUTBOUND_PATHS: readonly ChannelOutboundPath[] = ["hybrid", "relay", "tool"];
+
+/** A stored `outbound.path`, or undefined when the value authors none. */
+export function channelOutboundPath(value: unknown): ChannelOutboundPath | undefined {
+  return OUTBOUND_PATHS.find((path) => path === value);
+}
+
+/** The path a Route that authors none runs: the last layer that sets one
+ * (organization `defaults:`, then the account's), else the Hub's `relay` floor. */
+export function inheritedChannelOutboundPath(
+  layers: readonly (ChannelConfigurationRecord | undefined)[],
+): ChannelOutboundPath {
+  let path: ChannelOutboundPath = "relay";
+  for (const layer of layers) {
+    path = channelOutboundPath(recordField(layer ?? {}, "outbound")["path"]) ?? path;
+  }
+  return path;
+}
+
 /** Mirrors the Hub's `questions:` defaults leaf. */
 export type ChannelRouteQuestions = "ask" | "recommended" | "agent-decides";
 
@@ -87,7 +114,7 @@ export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   followUpMode: "mention-only",
   followUpTtlMinutes: DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES,
   replyAnchor: "thread",
-  outboundPath: "tool",
+  outboundPath: "hybrid",
   finalAnswers: true,
   progressMessage: true,
   typingIndicator: true,
@@ -397,7 +424,9 @@ function routeBehaviorSettings(
       ...(followUp === undefined ? {} : { followUp }),
     },
     reply: { anchor: behavior.replyAnchor },
-    outbound: { path: behavior.outboundPath },
+    ...(behavior.outboundPathInherited === true
+      ? {}
+      : { outbound: { path: behavior.outboundPath } }),
     sync: {
       finalAnswers: behavior.finalAnswers,
       progress: {

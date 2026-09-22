@@ -744,6 +744,10 @@ routes:
     agent: worker-app
     environment: repo-app
     outbound: { path: relay }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0HYBRID] } }]
+    agent: worker-app
+    environment: repo-app
+    outbound: { path: hybrid }
 `,
       }),
     );
@@ -770,6 +774,9 @@ routes:
     assert.equal(routes[1]!.defaults.outbound.path, "relay");
     assert.equal(routes[1]!.defaults.sync.finalAnswers, true);
     assert.equal(routes[1]!.defaults.sync.threadLink, "full");
+    // Hybrid relays its text like relay does: the tool only adds what text cannot carry.
+    assert.equal(routes[2]!.defaults.outbound.path, "hybrid");
+    assert.equal(routes[2]!.defaults.sync.finalAnswers, true);
   });
 
   it("folds workspace.organize like every other default leaf (A6)", () => {

@@ -525,6 +525,26 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
     });
   });
 
+  it("attaches the channel-reply tool on a hybrid route, with the hybrid block", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const config = snapshot.resolveAgentSpec(
+      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      { ...RELAY_DEFAULTS, outbound: { path: "hybrid", template: null } },
+      BINDING_REF,
+      REPLY_CAPABILITY,
+    );
+    assert.equal(channelReplyServerEntry(config).type, "http");
+    assert.equal(config.toolPolicy?.preapproved?.length, 1);
+    assert.equal(
+      config.systemPrompt,
+      composeMessageToolPrompt(null, {
+        channel: BINDING_REF.channel,
+        canSendFiles: true,
+        path: "hybrid",
+      }),
+    );
+  });
+
   it("attaches the channel-reply MCP server + grant + default injection on a tool route", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     const config = snapshot.resolveAgentSpec(
