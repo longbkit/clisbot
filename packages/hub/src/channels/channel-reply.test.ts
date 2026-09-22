@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, describe, it } from "vitest";
-import { mkdtemp, truncate, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, truncate, writeFile } from "node:fs/promises";
 import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -268,7 +268,8 @@ describe("channel-reply MCP endpoint", () => {
   });
 
   it("sends a local file and confirms its native id", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "channel-reply-file-"));
+    // The endpoint resolves symlinks (macOS tmpdir is /var -> /private/var), so compare real paths.
+    const directory = await realpath(await mkdtemp(join(tmpdir(), "channel-reply-file-")));
     const filePath = join(directory, "report.md");
     await writeFile(filePath, "report");
     const fixture = makeFixture({

@@ -58,7 +58,9 @@ async function rejectsStoredReplacement(bundle: DatabaseRuntimeBundle, provider:
   const database = createDatabase(bundle.runtime, bundle.locks, cipher);
   const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const first = application(provider, "A");
-  const replacement = application(provider, "B");
+  // Each application is versioned on its own; replacing its stored configuration (a rotated
+  // secret) must invalidate callbacks started against the previous version.
+  const replacement = rotated(first);
   await store.save({
     provider,
     configuration: first.configuration,
@@ -104,7 +106,7 @@ async function serializesReplacementRace(bundle: DatabaseRuntimeBundle, provider
   const database = createDatabase(bundle.runtime, bundle.locks, cipher);
   const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const first = application(provider, "RACE-A");
-  const replacement = application(provider, "RACE-B");
+  const replacement = rotated(first);
   await store.save({
     provider,
     configuration: first.configuration,
@@ -125,19 +127,16 @@ async function serializesReplacementRace(bundle: DatabaseRuntimeBundle, provider
     bind(database, provider, state, first.identity.id),
   ]);
 
-  assert.equal([saved, bound].filter((result) => result.status === "fulfilled").length, 1);
-  if (saved.status === "fulfilled") {
-    assert.equal(await connectionApplicationId(bundle, provider), undefined);
-    assert.equal(
-      (await store.read(provider, replacement.identity.id))?.identity.id,
-      replacement.identity.id,
-    );
-    await assertAttemptConsumed(bundle, state, false);
-  } else {
-    assert.equal(bound.status, "fulfilled");
+  // A rotation never waits on a callback, but a callback must never bind against the version the
+  // rotation replaced: either it bound first, or it rolled back and left its attempt unconsumed.
+  assert.equal(saved.status, "fulfilled");
+  assert.equal((await store.read(provider, first.identity.id))?.version, 2);
+  if (bound.status === "fulfilled") {
     assert.equal(await connectionApplicationId(bundle, provider), first.identity.id);
-    assert.equal((await store.read(provider, first.identity.id))?.identity.id, first.identity.id);
     await assertAttemptConsumed(bundle, state, true);
+  } else {
+    assert.equal(await connectionApplicationId(bundle, provider), undefined);
+    await assertAttemptConsumed(bundle, state, false);
   }
 }
 
@@ -409,6 +408,15 @@ function application(provider: Provider, suffix: string) {
       botToken: `discord-token-${suffix}`,
     };
   }
+  return { configuration, identity: identity(configuration) };
+}
+
+/** The same application (same identity) with rotated secrets. */
+function rotated(original: ReturnType<typeof application>) {
+  const configuration = {
+    ...original.configuration,
+    clientSecret: `${original.configuration.clientSecret}-rotated`,
+  } as ProviderApplicationConfiguration;
   return { configuration, identity: identity(configuration) };
 }
 

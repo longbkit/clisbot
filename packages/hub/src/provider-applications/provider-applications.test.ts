@@ -841,6 +841,10 @@ class MemoryStore implements ProviderApplicationStore {
     return Promise.resolve();
   }
 
+  retainActivations(_provider: Provider, _applicationIds: readonly string[]) {
+    return Promise.resolve();
+  }
+
   async completeSlackInstallation(
     input: Parameters<ProviderApplicationStore["completeSlackInstallation"]>[0],
   ) {

@@ -1409,6 +1409,7 @@ test("config actions delegate to existing daemon config RPCs", async () => {
       autoArchiveAfterMerge: false,
       enableTerminalAgentHooks: false,
       appendSystemPrompt: "",
+      managedAccess: { mode: "off" },
     },
   });
 
@@ -1464,6 +1465,7 @@ test("config actions delegate to existing daemon config RPCs", async () => {
       autoArchiveAfterMerge: false,
       enableTerminalAgentHooks: false,
       appendSystemPrompt: "",
+      managedAccess: { mode: "off" },
     },
   });
 

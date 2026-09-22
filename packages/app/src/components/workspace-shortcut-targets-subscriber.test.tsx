@@ -18,6 +18,13 @@ import { WorkspaceShortcutTargetsSubscriber } from "./workspace-shortcut-targets
 import { SidebarModelProvider } from "./sidebar/sidebar-model";
 import { defaultHostAppearance } from "@/hosts/appearance";
 
+// The sidebar lists only connected Hosts (a disconnected Host's cached directory is not shown), and
+// these fixtures have no live connection, so every registered Host counts as connected here.
+vi.mock("@/runtime/host-runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/runtime/host-runtime")>()),
+  useHostRuntimeConnectedServerIds: (serverIds: readonly string[]) => [...serverIds],
+}));
+
 vi.hoisted(() => {
   (globalThis as unknown as { __DEV__: boolean }).__DEV__ = false;
 });

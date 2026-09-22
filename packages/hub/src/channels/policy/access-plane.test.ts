@@ -669,7 +669,7 @@ describe("org Access command authority and live configuration", () => {
 });
 
 describe("mention mode", () => {
-  it("runs a native command without a mention, but never a plain message", async () => {
+  it("runs a native command, but never an unaddressed typed command or plain message", async () => {
     const harness = makeHarness({
       accountId: "mention",
       route: makeRoute({ where: { dm: false, groups: ["all"], conversations: [] } }),
@@ -688,11 +688,19 @@ describe("mention mode", () => {
     );
     assert.equal(harness.created.length, 0);
 
-    // A `command`-family event carries no mention at all; an admitted sender's
-    // command runs anyway — `requireMention` gates waking the agent, not control.
+    // Several bots share a group, so a typed command answers only from the bot it names.
+    const typed = await deliver(harness, { ...unmentioned, text: "/help" });
+    assert.equal(
+      typed.outcome?.kind === "ignored" ? typed.outcome.reason : "",
+      "command not addressed to this bot",
+    );
+
+    // A native slash command reaches one app, and the vertical reports it as a mention
+    // (`WasMentioned`); it runs without typing one — `requireMention` gates waking the
+    // agent, not control.
     const commanded = await deliver(
       harness,
-      { ...unmentioned, text: "" },
+      { ...unmentioned, text: "", mentionedBot: true },
       { EventKind: "command", EventFacts: { command: { name: "help" } } },
     );
     assert.equal(commanded.outcome?.kind === "command" && commanded.outcome.handled, true);

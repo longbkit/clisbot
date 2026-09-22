@@ -97,6 +97,11 @@ export interface ProviderApplicationStore {
     identity: ProviderApplicationIdentity;
     configurationVersion: number;
   }): Promise<void>;
+  /**
+   * Drops the activation of every application of `provider` outside `applicationIds`, so an OAuth
+   * callback started against an application that is no longer configured can no longer bind.
+   */
+  retainActivations(provider: Provider, applicationIds: readonly string[]): Promise<void>;
   completeSlackInstallation(input: {
     configuration: SlackProviderApplicationConfiguration;
     identity: Extract<ProviderApplicationIdentity, { provider: "slack" }>;
@@ -1011,6 +1016,9 @@ export async function activateProviderApplicationsAtStartup(options: {
             stored,
           }))
         : [{ configuration: environmentConfiguration, stored: undefined }];
+    // An application configured neither in the environment nor in the store (e.g. its environment
+    // variables were removed) keeps no activation.
+    const configuredIds = new Set<string>(persisted.map((stored) => stored.identity.id));
     for (const application of applications) {
       try {
         const identity = await startupIdentity(
@@ -1041,9 +1049,15 @@ export async function activateProviderApplicationsAtStartup(options: {
           await closeCandidate(candidate, provider, "activate_at_startup");
           throw error;
         }
+        configuredIds.add(identity.id);
       } catch (error) {
         failures.push({ provider, error });
       }
+    }
+    try {
+      await options.store.retainActivations(provider, [...configuredIds]);
+    } catch (error) {
+      failures.push({ provider, error });
     }
   }
   return failures;

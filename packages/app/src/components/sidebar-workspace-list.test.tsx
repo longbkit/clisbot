@@ -18,6 +18,13 @@ const pathnameState = vi.hoisted(() => ({
   value: "/",
 }));
 
+// The sidebar lists only connected Hosts (a disconnected Host's cached directory is not shown), and
+// these fixtures have no live connection, so every registered Host counts as connected here.
+vi.mock("@/runtime/host-runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/runtime/host-runtime")>()),
+  useHostRuntimeConnectedServerIds: (serverIds: readonly string[]) => [...serverIds],
+}));
+
 vi.mock("expo-router", () => ({
   router: {
     dismissTo: vi.fn(),

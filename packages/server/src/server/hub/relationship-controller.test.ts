@@ -119,7 +119,8 @@ describe("Hub relationship", () => {
       payload: {
         requestId: "registered-execution",
         requestType: "hub.execution.agent.create.request",
-        error: "Session is not authorized for hub.execution.agent.create.request",
+        error:
+          "You do not have permission to perform this action. Ask your administrator for access.",
         code: "access_denied",
       },
     });
@@ -146,7 +147,8 @@ describe("Hub relationship", () => {
       payload: {
         requestId: "revoked-execution",
         requestType: "hub.execution.agent.create.request",
-        error: "Session is not authorized for hub.execution.agent.create.request",
+        error:
+          "You do not have permission to perform this action. Ask your administrator for access.",
         code: "access_denied",
       },
     });
@@ -675,7 +677,8 @@ describe("Hub relationship", () => {
       payload: {
         requestId: "still-current",
         requestType: "daemon.get_status.request",
-        error: "Session is not authorized for daemon.get_status.request",
+        error:
+          "You do not have permission to perform this action. Ask your administrator for access.",
         code: "access_denied",
       },
     });

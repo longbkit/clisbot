@@ -213,6 +213,13 @@ export function createProviderApplicationStore(
         }),
       );
     },
+    async retainActivations(provider, applicationIds) {
+      await database.query(
+        `delete from runtime_provider_activation
+         where provider = $1 and not (provider_application_id = any($2::text[]))`,
+        [provider, [...applicationIds]],
+      );
+    },
     completeSlackInstallation(input) {
       if (connections === undefined) throw new Error("Slack application persistence unavailable");
       return connections.completeSlackProviderApplication({
