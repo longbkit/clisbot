@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import { useFetchQuery } from "@/data/query";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
+import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
 import type { HubHostManagement } from "@/types/host-connection";
 import { useHubAccount } from "./account-provider";
@@ -13,6 +14,11 @@ import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
 } from "./host-synchronization-status";
+
+const HOST_READD_BASE_DELAY_MS = 1_000;
+const HOST_READD_MAX_DELAY_MS = 60_000;
+/** A Host registered this long counts as recovered; the next removal backs off from the start. */
+const HOST_READD_STABLE_MS = 120_000;
 
 let managedHostMutationTail: Promise<void> = Promise.resolve();
 
@@ -74,7 +80,9 @@ export function HubHostSynchronization() {
       organizationId,
     })) {
       void enqueueManagedHostMutation(() =>
-        store.removeManagedHost(management).then(() => undefined),
+        store
+          .removeManagedHost(management, "Hub no longer lists this Host with a connection offer")
+          .then(() => undefined),
       );
     }
   }, [
@@ -294,9 +302,41 @@ function HubHostBinding({
     };
     return () => {
       void enqueueManagedHostMutation(() =>
-        store.removeManagedHost(management).then(() => undefined),
+        store.removeManagedHost(management, "Hub Host binding unmounted").then(() => undefined),
       );
     };
   }, [daemonId, hubOrigin, organizationId]);
+
+  // The Hub still lists this daemon, so a Host that left the registry while this binding is
+  // mounted (a revocation during a Hub blip) is added back rather than left "Registering" until a
+  // reload. Repeated removals back off, so a real denial does not turn into a tight loop.
+  const hosts = useHosts();
+  const registered = hosts.some((host) => host.serverId === synchronizedOffer.serverId);
+  const wasRegisteredRef = useRef(false);
+  const readdCountRef = useRef(0);
+  const registeredSinceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (registered) {
+      wasRegisteredRef.current = true;
+      registeredSinceRef.current = Date.now();
+      return;
+    }
+    if (!wasRegisteredRef.current) return;
+    wasRegisteredRef.current = false;
+    const stableFor = Date.now() - (registeredSinceRef.current ?? 0);
+    if (stableFor >= HOST_READD_STABLE_MS) readdCountRef.current = 0;
+    const delay = Math.min(
+      HOST_READD_MAX_DELAY_MS,
+      HOST_READD_BASE_DELAY_MS * 2 ** readdCountRef.current,
+    );
+    readdCountRef.current += 1;
+    recordHostDiagnostic("managed-host-readd-scheduled", {
+      serverId: synchronizedOffer.serverId,
+      daemonId,
+      delayMs: delay,
+    });
+    const timer = setTimeout(retry, delay);
+    return () => clearTimeout(timer);
+  }, [daemonId, registered, retry, synchronizedOffer.serverId]);
   return null;
 }

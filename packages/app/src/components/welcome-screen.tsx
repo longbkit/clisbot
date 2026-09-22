@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useResumeHostReturnTo, withHostReturnTo } from "@/navigation/host-return-to";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   QrCode,
@@ -192,12 +193,16 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
   const params = useLocalSearchParams<{ [WELCOME_STAY_PARAM]?: string }>();
   const stayOnWelcome = isDeliberateWelcomeVisit(params);
 
+  // Someone sent here because their Host briefly left the registry goes straight back to it.
+  const returnTo = useResumeHostReturnTo({ enabled: !stayOnWelcome });
+  const returnToPath = returnTo?.path ?? null;
+
   // Onboarding ends the moment a Host answers. Someone who opened Welcome to add another Host
   // stays: there is nothing to finish, and leaving would hide the screen they asked for.
   useEffect(() => {
-    if (!anyOnlineServerId || stayOnWelcome) return;
-    router.replace(buildOpenProjectRoute());
-  }, [anyOnlineServerId, router, stayOnWelcome]);
+    if (!anyOnlineServerId || stayOnWelcome || returnTo?.available) return;
+    router.replace(withHostReturnTo(buildOpenProjectRoute(), returnToPath) as never);
+  }, [anyOnlineServerId, returnTo?.available, returnToPath, router, stayOnWelcome]);
 
   const finishOnboarding = useCallback(() => {
     router.replace(buildOpenProjectRoute());

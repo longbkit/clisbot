@@ -640,6 +640,8 @@ export function resolveConfigFromPersisted(
     relayPublicUseTls: relay.publicUseTls,
     directEndpoint,
     directUseTls,
+    hubSocketPingIntervalMs: parsePositiveIntegerEnv(env.PASEO_HUB_SOCKET_PING_INTERVAL_MS),
+    hubSocketStaleTimeoutMs: parsePositiveIntegerEnv(env.PASEO_HUB_SOCKET_STALE_TIMEOUT_MS),
     serviceProxy,
     webUi,
     appBaseUrl,

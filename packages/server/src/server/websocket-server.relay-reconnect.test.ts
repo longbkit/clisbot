@@ -649,6 +649,37 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
+  test.each([
+    { failure: new Error("Hub request timed out"), code: 4503 },
+    { failure: Object.assign(new Error("Hub failed"), { statusCode: 502 }), code: 4503 },
+    { failure: Object.assign(new Error("Too many"), { statusCode: 429 }), code: 4503 },
+    { failure: Object.assign(new Error("Denied"), { statusCode: 403 }), code: 4401 },
+  ])(
+    "a Hub admission failure closes with $code so only definitive denials revoke",
+    async ({ failure, code }) => {
+      const server = createServer({
+        managedAccess: {
+          mode: "external",
+          resolver: { resolve: vi.fn().mockRejectedValue(failure) },
+        },
+      });
+      const socket = new MockSocket();
+      const closed = vi.fn();
+      socket.on("close", closed);
+      await server.attachExternalSocket(
+        socket,
+        { transport: "relay" },
+        undefined,
+        createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+      );
+
+      await vi.waitFor(() => expect(closed).toHaveBeenCalledTimes(1));
+      expect(closed.mock.calls[0]?.[0]).toBe(code);
+      expect(sessionMock.instances).toHaveLength(0);
+      await server.close();
+    },
+  );
+
   test("enabling external mode closes unticketed TCP sessions but keeps local IPC recovery", async () => {
     const server = createServer({
       managedAccess: {

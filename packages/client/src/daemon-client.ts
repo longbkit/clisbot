@@ -8,6 +8,7 @@ import {
 import type { z } from "zod";
 import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
 import {
+  isDefinitiveAdmissionDenial,
   MANAGED_ACCESS_REBIND_CLOSE_CODE,
   MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
 } from "@getpaseo/protocol/managed-access";
@@ -5992,8 +5993,12 @@ export class DaemonClient {
           ? await this.config.resolveAccessTicket()
           : undefined;
       } catch (error) {
-        this.config.onAccessRevoked?.();
-        this.setReconnectEnabled(false);
+        // Only a definitive Hub answer (401/403/404…) revokes. A network error, timeout or 5xx
+        // while the Hub restarts falls through to an ordinary reconnect with a fresh ticket.
+        if (isDefinitiveAdmissionDenial(error)) {
+          this.config.onAccessRevoked?.();
+          this.setReconnectEnabled(false);
+        }
         throw error;
       }
       if (this.transport !== openTransport || this.connectionState.status !== "connecting") {

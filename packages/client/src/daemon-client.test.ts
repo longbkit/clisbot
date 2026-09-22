@@ -422,6 +422,71 @@ test("reports revocation when the daemon withdraws managed access", async () => 
   expect(onAccessRevoked).toHaveBeenCalledOnce();
 });
 
+test.each([
+  { name: "a network error", failure: new TypeError("Failed to fetch"), revoked: false },
+  {
+    name: "a Hub 503",
+    failure: Object.assign(new Error("Hub request failed (503)."), { status: 503 }),
+    revoked: false,
+  },
+  {
+    name: "a missing Hub binding",
+    failure: new Error("Sign in to the Hub managing this Host to connect."),
+    revoked: false,
+  },
+  {
+    name: "a Hub 403",
+    failure: Object.assign(new Error("Forbidden"), { status: 403 }),
+    revoked: true,
+  },
+])(
+  "revokes on $name while issuing a ticket only when it is definitive",
+  async ({ failure, revoked }) => {
+    const mock = createMockTransport();
+    const onAccessRevoked = vi.fn();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "managed_access_ticket_failure_test",
+      transportFactory: () => mock.transport,
+      reconnect: { enabled: false },
+      resolveAccessTicket: async () => {
+        throw failure;
+      },
+      onAccessRevoked,
+    });
+    clients.push(client);
+
+    const connecting = client.connect().catch(() => undefined);
+    mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+    await vi.waitFor(() => expect(client.lastError).toBe(failure.message));
+    await connecting;
+
+    expect(onAccessRevoked).toHaveBeenCalledTimes(revoked ? 1 : 0);
+  },
+);
+
+test("keeps Hub access when the daemon could not reach the Hub to admit it", async () => {
+  const mock = createMockTransport();
+  const onAccessRevoked = vi.fn();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "managed_access_unavailable_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+    resolveAccessTicket: async () => "paseo_dat_ticket",
+    onAccessRevoked,
+  });
+  clients.push(client);
+
+  const connecting = client.connect().catch(() => undefined);
+  mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+  await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+  mock.triggerClose({ code: 4503, reason: "Hub admission temporarily unavailable" });
+  await connecting;
+
+  expect(onAccessRevoked).not.toHaveBeenCalled();
+});
+
 test("sends an unticketed hello when admission resolves to undefined", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

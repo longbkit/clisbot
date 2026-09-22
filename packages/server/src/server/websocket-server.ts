@@ -1,6 +1,9 @@
 import {
+  isDefinitiveAdmissionDenial,
   MANAGED_ACCESS_REBIND_CLOSE_CODE,
   MANAGED_ACCESS_REBIND_REASON,
+  MANAGED_ACCESS_UNAVAILABLE_CLOSE_CODE,
+  MANAGED_ACCESS_UNAVAILABLE_REASON,
   MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
   MANAGED_SESSION_SUPERSEDED_REASON,
 } from "@getpaseo/protocol/managed-access";
@@ -1833,6 +1836,19 @@ export class VoiceAssistantWebSocketServer {
         : admission;
       return true;
     } catch (error) {
+      if (!isDefinitiveAdmissionDenial(error)) {
+        pending.connectionLogger.warn(
+          { err: error },
+          "Deferred hello because the Hub could not admit it; the client retries",
+        );
+        this.clearPendingConnection(ws);
+        try {
+          ws.close(MANAGED_ACCESS_UNAVAILABLE_CLOSE_CODE, MANAGED_ACCESS_UNAVAILABLE_REASON);
+        } catch {
+          // ignore close errors
+        }
+        return false;
+      }
       pending.connectionLogger.warn(
         { err: error },
         "Rejected hello because managed access admission failed",

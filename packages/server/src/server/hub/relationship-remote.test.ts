@@ -310,6 +310,77 @@ test.each([
   },
 );
 
+async function startSocketHub(options: { autoPong: boolean }) {
+  const server = createServer();
+  const webSockets = new WebSocketServer({ noServer: true, autoPong: options.autoPong });
+  let pings = 0;
+  server.on("upgrade", (request, socket, head) => {
+    webSockets.handleUpgrade(request, socket, head, (webSocket) => {
+      webSocket.on("ping", () => {
+        pings += 1;
+      });
+    });
+  });
+  openServers.push(server);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  return {
+    webSocketUrl: `ws://127.0.0.1:${address.port}/daemon`,
+    pings: () => pings,
+    close: () => {
+      for (const client of webSockets.clients) client.terminate();
+      webSockets.close();
+    },
+  };
+}
+
+test("an idle Hub socket is kept alive with protocol pings", async () => {
+  const hub = await startSocketHub({ autoPong: true });
+  const outcomes: string[] = [];
+  const socket = new DirectHubRelationshipRemote({
+    socketPingIntervalMs: 20,
+    socketStaleTimeoutMs: 200,
+  }).openSocket(
+    { daemonId: "daemon-1", credential: "credential", webSocketUrl: hub.webSocketUrl },
+    {
+      connected: () => outcomes.push("connected"),
+      rejected: () => outcomes.push("rejected"),
+      closed: (code) => outcomes.push(`closed:${code}`),
+      failed: () => outcomes.push("failed"),
+    },
+  );
+
+  await expect.poll(() => hub.pings(), { timeout: 2_000 }).toBeGreaterThanOrEqual(3);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(outcomes).toEqual(["connected"]);
+  socket.close();
+  hub.close();
+});
+
+test("a Hub socket that stops answering pings is terminated and reported as lost", async () => {
+  const hub = await startSocketHub({ autoPong: false });
+  const closed = deferred<number>();
+  new DirectHubRelationshipRemote({
+    socketPingIntervalMs: 20,
+    socketStaleTimeoutMs: 100,
+  }).openSocket(
+    { daemonId: "daemon-1", credential: "credential", webSocketUrl: hub.webSocketUrl },
+    {
+      connected: () => undefined,
+      rejected: () => undefined,
+      closed: (code) => closed.resolve(code),
+      failed: () => undefined,
+    },
+  );
+
+  await expect(closed.promise).resolves.toBe(1006);
+  expect(hub.pings()).toBeGreaterThan(0);
+  hub.close();
+});
+
 test.each([408, 429])("transient enrollment status %s remains retryable", async (status) => {
   const hubOrigin = await startHubReturning(status);
   const remote = new DirectHubRelationshipRemote();

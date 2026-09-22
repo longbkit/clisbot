@@ -3,6 +3,7 @@ import {
   SessionOperationIdentitySchema,
   type VerifiedSessionOperationIdentity,
 } from "@getpaseo/protocol/session-operation";
+import type { Logger } from "pino";
 import { WebSocket } from "ws";
 import { z } from "zod";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
@@ -190,11 +191,37 @@ function ensureWebSocketMatchesHubOrigin(hubOrigin: string, webSocketUrl: string
   }
 }
 
+/**
+ * Idle proxies on the path cut a silent Host socket: the UAT edge proxy drops it at
+ * exactly 300s with no close frame, so every idle Host reconnected every 5 minutes.
+ * A protocol ping keeps the socket busy, and a missing pong detects a half-open
+ * socket that `ws` would otherwise never report as closed.
+ */
+export const DEFAULT_HUB_SOCKET_PING_INTERVAL_MS = 15_000;
+export const DEFAULT_HUB_SOCKET_STALE_TIMEOUT_MS = 45_000;
+
+export interface DirectHubRelationshipRemoteOptions {
+  requestTimeoutMs?: number;
+  socketPingIntervalMs?: number;
+  /** No frame (pong included) from the Hub for this long terminates the socket. */
+  socketStaleTimeoutMs?: number;
+  logger?: Pick<Logger, "warn">;
+}
+
 export class DirectHubRelationshipRemote implements HubRelationshipRemote {
   private readonly requestTimeoutMs: number;
+  private readonly socketPingIntervalMs: number;
+  private readonly socketStaleTimeoutMs: number;
+  private readonly logger: Pick<Logger, "warn"> | undefined;
 
-  constructor(options: { requestTimeoutMs?: number } = {}) {
+  constructor(options: DirectHubRelationshipRemoteOptions = {}) {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 15_000;
+    this.socketPingIntervalMs = options.socketPingIntervalMs ?? DEFAULT_HUB_SOCKET_PING_INTERVAL_MS;
+    this.socketStaleTimeoutMs = Math.max(
+      options.socketStaleTimeoutMs ?? DEFAULT_HUB_SOCKET_STALE_TIMEOUT_MS,
+      this.socketPingIntervalMs,
+    );
+    this.logger = options.logger;
   }
 
   async enroll(input: HubEnrollment): Promise<HubEnrollmentResult> {
@@ -393,7 +420,9 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       }
     });
     socket.once("open", () => {
-      if (!settled) events.connected(socket as WebSocketLike, sessionProtocol);
+      if (settled) return;
+      this.keepSocketAlive(socket, input.daemonId);
+      events.connected(socket as WebSocketLike, sessionProtocol);
     });
     socket.once("unexpected-response", (_request, response) => {
       if (settled) {
@@ -421,6 +450,35 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       events.failed(error);
     });
     return socket;
+  }
+
+  private keepSocketAlive(socket: WebSocket, daemonId: string): void {
+    let lastSeenAt = Date.now();
+    const seen = () => {
+      lastSeenAt = Date.now();
+    };
+    socket.on("pong", seen);
+    socket.on("ping", seen);
+    socket.on("message", seen);
+    const interval = setInterval(() => {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      const staleForMs = Date.now() - lastSeenAt;
+      if (staleForMs > this.socketStaleTimeoutMs) {
+        this.logger?.warn(
+          { daemonId, staleForMs, staleTimeoutMs: this.socketStaleTimeoutMs },
+          "Hub socket stale; terminating to reconnect",
+        );
+        socket.terminate();
+        return;
+      }
+      try {
+        socket.ping();
+      } catch {
+        socket.terminate();
+      }
+    }, this.socketPingIntervalMs);
+    interval.unref?.();
+    socket.once("close", () => clearInterval(interval));
   }
 
   private async withRequestTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {

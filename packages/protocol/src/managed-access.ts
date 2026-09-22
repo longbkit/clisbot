@@ -25,3 +25,22 @@ export const MANAGED_SESSION_SUPERSEDED_REASON = "Session continued in another c
  */
 export const MANAGED_ACCESS_REBIND_CLOSE_CODE = 4410;
 export const MANAGED_ACCESS_REBIND_REASON = "Session continued with updated admission";
+
+/**
+ * Close code for a hello the Host could not admit because the Hub was unreachable or failed (network
+ * error, timeout, 5xx, 408, 429). Not a revocation: the client keeps the Host and reconnects with a
+ * fresh ticket. Reason text avoids the client's revoke matcher so older clients also redial.
+ */
+export const MANAGED_ACCESS_UNAVAILABLE_CLOSE_CODE = 4503;
+export const MANAGED_ACCESS_UNAVAILABLE_REASON = "Hub admission temporarily unavailable";
+
+/**
+ * A Hub answer that settles admission (a 4xx other than 408/429, read from `statusCode` or
+ * `status`). Network errors, timeouts and 5xx carry no such status and are worth a retry.
+ */
+export function isDefinitiveAdmissionDenial(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { statusCode, status } = error as { statusCode?: unknown; status?: unknown };
+  const code = typeof statusCode === "number" ? statusCode : status;
+  return typeof code === "number" && code >= 400 && code < 500 && code !== 408 && code !== 429;
+}

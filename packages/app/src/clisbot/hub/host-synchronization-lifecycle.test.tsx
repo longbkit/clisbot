@@ -122,9 +122,13 @@ it("evicts a Hub-managed Host whose daemon is no longer projected", async () => 
   await waitFor(() =>
     expect(adapters.remove).toHaveBeenCalledWith(
       expect.objectContaining({ daemonId: "old-daemon" }),
+      expect.any(String),
     ),
   );
-  expect(adapters.remove).not.toHaveBeenCalledWith(expect.objectContaining({ daemonId: "daemon" }));
+  expect(adapters.remove).not.toHaveBeenCalledWith(
+    expect.objectContaining({ daemonId: "daemon" }),
+    expect.any(String),
+  );
 });
 
 it("reconnects a saved Host when Hub management is attached to it", async () => {
@@ -134,4 +138,22 @@ it("reconnects a saved Host when Hub management is attached to it", async () => 
   render(<HubHostSynchronization />);
   await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
   await waitFor(() => expect(adapters.restart).toHaveBeenCalledWith("server"));
+});
+
+it("adds a Host back when it leaves the registry while the Hub still lists its daemon", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+
+  // A revocation removed the Host; the binding is still mounted.
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+  expect(adapters.upsert).toHaveBeenLastCalledWith(
+    expect.objectContaining({ offer: expect.objectContaining({ serverId: "server" }) }),
+  );
 });

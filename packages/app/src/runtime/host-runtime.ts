@@ -72,6 +72,7 @@ import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
+import { diagnosticStack, recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { ReplicaCache } from "@/runtime/replica-cache";
 import type { ReplicaRowStore } from "@/runtime/replica-cache/row-store";
 import { createReplicaRowStore } from "@/runtime/replica-cache/row-store-factory";
@@ -1530,7 +1531,7 @@ export class HostRuntimeStore {
     this.deps =
       input?.deps ??
       createDefaultDeps((management) => {
-        void this.removeManagedHost(management);
+        void this.removeManagedHost(management, "access revoked by the Host or Hub");
       });
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
@@ -2136,12 +2137,19 @@ export class HostRuntimeStore {
     await this.persistHosts();
   }
 
-  async removeManagedHost(management: HubHostManagement): Promise<boolean> {
+  async removeManagedHost(management: HubHostManagement, reason = "unspecified"): Promise<boolean> {
     const host = this.hosts.find(
       (candidate) =>
         candidate.management?.kind === "hub" && sameHubManagement(candidate.management, management),
     );
     if (!host) return false;
+    recordHostDiagnostic("managed-host-removed", {
+      reason,
+      serverId: host.serverId,
+      daemonId: management.daemonId,
+      label: host.label,
+      stack: diagnosticStack(),
+    });
     const manualConnectionIds = host.management?.manualConnectionIds;
     if (manualConnectionIds === undefined) {
       await this.removeHost(host.serverId);

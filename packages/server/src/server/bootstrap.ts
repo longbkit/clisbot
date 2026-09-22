@@ -457,6 +457,9 @@ export interface PaseoDaemonConfig {
   providerCatalogRefreshTimeoutMs?: number;
   /** Default idle window before an agent's certified-idle provider session closes; 0 disables. */
   closeIdleSessionsAfterMs?: number;
+  /** Hub socket keepalive; env `PASEO_HUB_SOCKET_PING_INTERVAL_MS` / `..._STALE_TIMEOUT_MS`. */
+  hubSocketPingIntervalMs?: number;
+  hubSocketStaleTimeoutMs?: number;
   metadataGeneration?: {
     providers?: Array<{
       provider: string;
@@ -1357,7 +1360,13 @@ export async function createPaseoDaemon(
     serverId,
     daemonPublicKey: daemonKeyPair.publicKeyB64,
     logger,
-    remote: dependencies.hubRelationshipRemote ?? new DirectHubRelationshipRemote(),
+    remote:
+      dependencies.hubRelationshipRemote ??
+      new DirectHubRelationshipRemote({
+        socketPingIntervalMs: config.hubSocketPingIntervalMs,
+        socketStaleTimeoutMs: config.hubSocketStaleTimeoutMs,
+        logger,
+      }),
     clock: dependencies.hubRelationshipClock,
     retryPolicy: dependencies.hubRelationshipRetryPolicy,
     createDaemonId: dependencies.createHubDaemonId,

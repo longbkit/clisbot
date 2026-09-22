@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
+import { useResumeHostReturnTo } from "@/navigation/host-return-to";
 import { FolderOpen, Inbox, Plug, Server, Smartphone } from "lucide-react-native";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { CommunityLinks } from "@/components/community-links";
@@ -25,6 +26,7 @@ import { buildSettingsHostSectionRoute, buildWelcomeRoute } from "@/utils/host-r
 export function OpenProjectScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  useResumeHostReturnTo();
   const openDesktopAgentList = usePanelStore((s) => s.openDesktopAgentList);
   const openProjectPicker = useOpenAddProject();
   const importSession = useImportSession();
