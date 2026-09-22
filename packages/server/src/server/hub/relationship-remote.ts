@@ -197,8 +197,8 @@ function ensureWebSocketMatchesHubOrigin(hubOrigin: string, webSocketUrl: string
  * A protocol ping keeps the socket busy, and a missing pong detects a half-open
  * socket that `ws` would otherwise never report as closed.
  */
-export const DEFAULT_HUB_SOCKET_PING_INTERVAL_MS = 15_000;
-export const DEFAULT_HUB_SOCKET_STALE_TIMEOUT_MS = 45_000;
+export const DEFAULT_HUB_SOCKET_PING_INTERVAL_MS = 30_000;
+export const DEFAULT_HUB_SOCKET_STALE_TIMEOUT_MS = 90_000;
 
 export interface DirectHubRelationshipRemoteOptions {
   requestTimeoutMs?: number;
