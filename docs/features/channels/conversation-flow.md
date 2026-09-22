@@ -171,7 +171,7 @@ The Route form shows these in a **Conversation context** section between _When i
 │     Send anyway after              [ 10 ] seconds    │
 │     Max messages per batch         [ 20 ]            │
 │   When the Agent is busy                             │
-│     ( Add to the current turn ● | Wait for turn )    │
+│     ( Steer ● | Queue )                              │
 └──────────────────────────────────────────────────────┘
 ```
 

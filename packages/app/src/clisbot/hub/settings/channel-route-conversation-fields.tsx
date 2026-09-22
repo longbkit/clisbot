@@ -33,9 +33,11 @@ const UNMENTIONED_LABELS: Record<ChannelRouteUnmentioned, string> = {
   "allowed-senders": "Allowed senders only",
   none: "None",
 };
+// The app's own words for the same choice (Settings → General, "Default
+// send"): Enter steers the running turn, Command/Ctrl+Enter queues it.
 const WHEN_BUSY_LABELS: Record<ChannelRouteWhenBusy, string> = {
-  steer: "Add to the current turn",
-  queue: "Wait for turn",
+  steer: "Steer",
+  queue: "Queue",
 };
 const BATCHING_ROWS: { name: BatchingFieldName; label: string; unit?: string }[] = [
   { name: "pauseSeconds", label: "Send after no new messages for", unit: "seconds" },
@@ -134,6 +136,7 @@ export function RouteConversationSection({
         <RouteBatchingFields shown={shown} parsed={parsed} commands={commands} pending={pending} />
         <ChoiceRow
           label="When the Agent is busy"
+          note="Steer sends the message into the work already running. Queue holds it until that work finishes."
           values={WHEN_BUSY_VALUES}
           selected={shown.whenBusy}
           labels={WHEN_BUSY_LABELS}

@@ -1307,7 +1307,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByLabelText("Earlier messages to include") as HTMLInputElement).value).toBe(
       "20",
     );
-    expect(screen.getByText("No batching · When busy: add to the current turn")).toBeTruthy();
+    expect(screen.getByText("No batching · When busy: steer")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Allowed senders only" }));
     fireEvent.click(
       within(screen.getByText("Advanced").parentElement!).getByRole("button", { name: "Show" }),
@@ -1323,7 +1323,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     const save = screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Send anyway after"), { target: { value: "10" } });
-    fireEvent.click(screen.getByRole("button", { name: "Wait for turn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
     fireEvent.click(save);
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     const saved = adapters.put.mock.calls[0]![1].accounts[0].routes[0];
