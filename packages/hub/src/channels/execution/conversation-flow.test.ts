@@ -202,6 +202,7 @@ function makePlane(
 ) {
   const flushes: { admission: HeldFlushAdmission; id: string }[] = [];
   const posted: string[] = [];
+  const postedThreads: (string | undefined)[] = [];
   const plane = createChannelPlane({
     organizationId: ORGANIZATION_ID,
     accountScope: { channel: "slack", accountId: ACCOUNT_ID },
@@ -238,6 +239,7 @@ function makePlane(
     logger: SILENT,
     post: async (post) => {
       posted.push(post.text);
+      postedThreads.push(post.threadId);
       return { ok: true, externalMessageId: "1720000000.000001" };
     },
     resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
@@ -266,7 +268,7 @@ function makePlane(
     assert.ok(newest !== undefined, "a flush row was admitted");
     return plane.deliverHeld(newest.admission.payload, newest.id);
   };
-  return { plane, send, flush, flushes, posted, sends: daemon.sends };
+  return { plane, send, flush, flushes, posted, postedThreads, sends: daemon.sends };
 }
 
 const lines = (...rows: string[]) => rows.join("\n");
@@ -847,5 +849,66 @@ describe("second review regressions", () => {
     assert.equal((await rowOf(late.id)).inboxState, "held", "left for its own flush");
     assert.equal(flow.flushes.length, flushesBefore + 1, "which is admitted at once");
     await flow.plane.stop();
+  });
+});
+
+const HOST_LOST_NOTICE =
+  "The machine that runs this bot went away while it was working on this message, so an answer may never come. Send it again if you do not get one.";
+
+describe("a Host that goes away mid-turn", () => {
+  it("tells each conversation whose turn it took, once, and retries nothing", async () => {
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const first = conversation();
+    const second = conversation();
+    const running = await flow.send(first("thả like trên tin này"));
+    await flow.send(second("3+3"));
+    // A third conversation whose turn ended before the drop hears nothing.
+    const done = conversation();
+    const ended = await flow.send(done("done already"));
+    const endedAgent = ended.result.outcome?.kind === "bound" ? ended.result.outcome.agentId : "";
+    await flow.plane.onStreamEvent(endedAgent, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "t",
+    });
+
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, [HOST_LOST_NOTICE, HOST_LOST_NOTICE], "one notice per turn");
+    assert.deepEqual(
+      flow.postedThreads.toSorted(),
+      [first("probe").conversation.threadId, second("probe").conversation.threadId].toSorted(),
+    );
+
+    // The Host came back and the turn had finished after all: its late
+    // terminal event adds no second word (the relay posts the answer itself).
+    const runningAgent =
+      running.result.outcome?.kind === "bound" ? running.result.outcome.agentId : "";
+    await flow.plane.onStreamEvent(runningAgent, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "late",
+    });
+    assert.equal(flow.posted.length, 2);
+    // A second drop after the reconnect says nothing about the old turns.
+    await flow.plane.onHostLost();
+    assert.equal(flow.posted.length, 2);
+    // The message was delivered: its row stays completed, never retried.
+    assert.equal((await rowOf(running.record.id)).inboxState, "delivered");
+    assert.equal(daemon.sends.length, 3);
+    await flow.plane.stop();
+  });
+
+  it("says nothing when the Hub itself stops the plane", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(say("still running"));
+
+    await flow.plane.stop();
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, []);
   });
 });

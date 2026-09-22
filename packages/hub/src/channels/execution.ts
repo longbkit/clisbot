@@ -143,6 +143,9 @@ export interface ChannelPlane {
   ingressLaneKey(params: InboundReplyParams): string | undefined;
   /** The durable ingress gave up on this row (`ConversationFlow.onDeadLettered`). */
   onDeadLettered(record: DeadLetteredRow): Promise<void>;
+  /** The Host is gone: tell every conversation whose turn it took with it
+   * (`ConversationFlow.hostLost`). */
+  onHostLost(): Promise<void>;
   /** A flush row came due (`ConversationFlow.deliverHeld`). */
   deliverHeld(payload: HeldFlushPayload, id: string): Promise<PlaneInboundDeferral | undefined>;
   /**
@@ -381,6 +384,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     },
 
     onDeadLettered: async (record) => conversationFlow?.onDeadLettered(record),
+    onHostLost: async () => conversationFlow?.hostLost(),
     deliverHeld: async (payload, id) => conversationFlow?.deliverHeld(payload, id),
 
     async onApprovalCallback(params) {
@@ -808,6 +812,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     },
 
     async stop(options) {
+      // Before the socket: a stop the Hub asked for is not a Host that left.
+      conversationFlow?.stop();
       await lifecycleCommands?.stop();
       lifecycleCommands = undefined;
       commandDispatcher = undefined;
@@ -827,7 +833,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       approvals = undefined;
       processing?.stopAll();
       processing = undefined;
-      conversationFlow?.stop();
       conversationFlow = undefined;
       executionLimiter = undefined;
       subscribed.clear();
@@ -1129,7 +1134,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   ): Promise<void> {
     const key = message.externalMessageId ?? message.ingressId;
     const once = notice === "unprocessed" ? unprocessedNotices : waitingNotices;
-    if (notice !== "too-long" && (key === undefined || !once.remember(key))) return;
+    // `too-long` and `host-lost` are said once per message by construction.
+    const repeatable = notice === "too-long" || notice === "host-lost";
+    if (!repeatable && (key === undefined || !once.remember(key))) return;
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,

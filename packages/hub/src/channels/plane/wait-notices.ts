@@ -9,4 +9,7 @@ export const WAIT_NOTICE_TEXT = {
   unprocessed:
     "This message could not be processed. Send another message to retry, and this one will be included.",
   refused: "This message could not be processed. Send it again.",
+  // A turn the Host took with it: its terminal event never comes.
+  "host-lost":
+    "The machine that runs this bot went away while it was working on this message, so an answer may never come. Send it again if you do not get one.",
 } as const;

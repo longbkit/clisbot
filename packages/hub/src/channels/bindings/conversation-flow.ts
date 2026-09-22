@@ -48,7 +48,7 @@ export interface ConversationPlaneSeams {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    kind: "unprocessed" | "refused",
+    kind: "unprocessed" | "refused" | "host-lost",
   ): Promise<void>;
   mayUse(
     message: InboundMessage,
@@ -86,6 +86,13 @@ export interface HeldBatch {
 /** A dead-lettered row: what the plane reads off it. */
 export type DeadLetteredRow = Pick<ChannelIngressQueueRecord, "id" | "payload" | "sentIn">;
 
+/** Where a running turn answers: the message it answers, and its Route. */
+interface TurnAddress {
+  message: InboundMessage;
+  account: CompiledChannelAccount;
+  route: CompiledRoute;
+}
+
 interface DeadLetter {
   message: InboundMessage;
   account: CompiledChannelAccount;
@@ -96,9 +103,11 @@ interface DeadLetter {
 export class ConversationFlow {
   readonly inbox: BindingInbox;
   private readonly scheduler: HeldFlushScheduler;
-  /** Agents whose turn the plane started and has not yet seen end. In memory:
-   * after a restart no turn is known to run, and a queued message steers. */
-  private readonly runningTurns = new Set<string>();
+  /** Agents whose turn the plane started and has not yet seen end, with where
+   * that turn answers. In memory: after a restart no turn is known to run, a
+   * queued message steers, and nobody is told about a Host that went away
+   * while this process was down. */
+  private readonly runningTurns = new Map<string, TurnAddress>();
   /** Orders sends against turn ends: a turn can end (a fast finish, a failed
    * start) before the send that started it returns. */
   private sequence = 0;
@@ -137,7 +146,7 @@ export class ConversationFlow {
     const outcome = await this.deps.plane.engine().deliver(delivery, account, route, subscribe);
     const started = outcome.kind === "bound" || outcome.kind === "steered";
     if (started && (this.turnEndedAt.get(outcome.agentId) ?? 0) < sentAt) {
-      this.runningTurns.add(outcome.agentId);
+      this.runningTurns.set(outcome.agentId, { message: delivery.message, account, route });
     }
     return outcome;
   }
@@ -148,6 +157,31 @@ export class ConversationFlow {
     this.turnEndedAt.set(agentId, this.sequence);
     if (!this.runningTurns.delete(agentId)) return;
     await this.scheduler.turnEnded(agentId);
+  }
+
+  /**
+   * The Host is gone (socket drop, daemon stop, lost lease). Every turn that
+   * was running dies with it and its terminal event never comes, so each
+   * conversation that had one is told, once. The prompt is never sent again:
+   * the Agent may have acted on it, and an unknown outcome is not resent.
+   */
+  async hostLost(): Promise<void> {
+    const interrupted = [...this.runningTurns];
+    this.runningTurns.clear();
+    for (const [agentId, at] of interrupted) {
+      this.sequence += 1;
+      this.turnEndedAt.set(agentId, this.sequence);
+      await this.deps.plane
+        .notice(at.message, at.account, at.route, "host-lost")
+        .catch((error: unknown) => {
+          this.deps.logger.warn("channel interrupted-turn notice failed", {
+            agentId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      // Whatever waited for this turn is free: it will never end on its own.
+      await this.scheduler.turnEnded(agentId);
+    }
   }
 
   /** A message that was not for the bot waits as its binding's context. */

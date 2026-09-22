@@ -1466,6 +1466,15 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
             channel: handle.channel,
             account: handle.accountId,
           });
+          // A turn the Host was running dies with it and its terminal event
+          // never comes: the conversations that had one are told, once.
+          void plane.onHostLost().catch((error: unknown) => {
+            this.logger.warn("channel interrupted-turn notices failed", {
+              channel: handle.channel,
+              account: handle.accountId,
+              error: errorMessage(error),
+            });
+          });
         }
       },
     };
