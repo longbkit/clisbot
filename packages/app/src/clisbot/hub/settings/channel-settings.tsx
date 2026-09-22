@@ -16,7 +16,7 @@ import {
   audienceRuleSentence,
   audienceRulesComplete,
   isOpenAudienceDraft,
-  membersEverywhereRule,
+  newRouteRule,
   routeAudienceDraft,
   type AudienceNames,
   type AudienceRuleDraft,
@@ -3887,7 +3887,7 @@ function initialAudience(editedRoute: RecordValue | undefined): {
   rules: AudienceRuleDraft[];
   contains: string;
 } {
-  if (editedRoute === undefined) return { rules: [membersEverywhereRule()], contains: "" };
+  if (editedRoute === undefined) return { rules: [newRouteRule()], contains: "" };
   return routeAudienceDraft(editedRoute);
 }
 

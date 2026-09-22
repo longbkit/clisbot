@@ -174,6 +174,22 @@ describe("who × where", () => {
     assert.equal(audienceRulesAdmit(open, conversation, sender), true);
     assert.equal(audienceRulesAdmit(open, conversation, sender, { membersOnly: true }), false);
   });
+
+  it("narrows DMs to the named Members under Member-grade admission too", () => {
+    const named = route(
+      [{ who: { roles: ["member"] }, where: { dmMembers: ["m-lead"] } }],
+      "named",
+    );
+    const dm = { kind: "dm" as const, id: "D1" };
+    const sender = (membershipId: string) => ({
+      identity: `slack:${membershipId}`,
+      member: { membershipId, role: "member", teamIds: [] },
+    });
+    for (const options of [{}, { membersOnly: true }]) {
+      assert.equal(audienceRulesAdmit(named, dm, sender("m-lead"), options), true);
+      assert.equal(audienceRulesAdmit(named, dm, sender("m-other"), options), false);
+    }
+  });
 });
 
 describe("ordered routes", () => {

@@ -212,11 +212,12 @@ only **Connection Admin**.
 - **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,
   Anyone (unlinked senders included), or senders outside the Hub, picked from
   the people who already messaged the bot (or typed as channel user ids).
-- **Where**: DM, Group chat (every room, group or space — on Slack and Telegram
-  optionally public or private only), and specific conversations picked from
-  one search box that lists every conversation the bot has seen, on every
-  channel. The parts add up. A rule that covers group chats does not cover DMs
-  unless it says DM.
+- **Where**: two switches, both off on a new route. **Direct messages** is
+  either all of them or only named senders (`dmTeams`, `dmMembers`, and
+  `dmIdentities` for Guests: of the Who, only these may DM). **Group chats** is exactly one of all group chats, public only,
+  private only (Slack and Telegram), or specific conversations picked from one
+  search box that lists every conversation the bot has seen. A rule that covers
+  group chats does not cover DMs unless its Direct messages switch is on.
 
 Public or private is what the platform says on the message: a Slack channel's
 type, and on Telegram a group with a public @username is public, any other
@@ -229,7 +230,9 @@ routes:
       - who: { roles: [owner, admin] }
         where: { dm: true, groups: all }
       - who: { teams: [team-qc] }
-        where: { groups: public, conversations: [C0QCPRIVATE] }
+        where: { groups: public }
+      - who: { teams: [team-qc] }
+        where: { dmMembers: [membership-id-of-the-lead], conversations: [C0QCPRIVATE] }
       - who: { anyone: true }
         where: { conversations: [C0HELP] }
     contains: deploy # optional text filter, route-level

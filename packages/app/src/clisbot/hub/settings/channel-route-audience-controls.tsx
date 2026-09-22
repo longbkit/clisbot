@@ -1,7 +1,7 @@
 // Small controls the audience-rule editor is built from: labelled rows, a row
 // folded to its count, and toggle chips.
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,11 @@ import { settingsStyles } from "@/styles/settings";
 export interface AudienceOption {
   id: string;
   name: string;
+}
+
+/** Rows that belong to the control above them, indented under it. */
+export function NestedRows({ children }: { children: React.ReactNode }) {
+  return <View style={styles.nested}>{children}</View>;
 }
 
 /** A labelled row whose control sits under the label. */
@@ -27,44 +32,6 @@ export function PickerRow({
       <Text style={styles.rowLabel}>{label}</Text>
       {hint === undefined ? null : <Text style={styles.rowHint}>{hint}</Text>}
       {children}
-    </View>
-  );
-}
-
-/** A labelled row folded to its count; it opens on its own when it holds a value. */
-export function DisclosureRow({
-  label,
-  hint,
-  count,
-  disabled,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  count: number;
-  disabled: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(count > 0);
-  const toggle = useCallback(() => setOpen((value) => !value), []);
-  const state = useMemo(() => ({ expanded: open }), [open]);
-  return (
-    <View style={styles.part}>
-      <View style={styles.disclosureHeader}>
-        <Text style={styles.rowLabel}>{count > 0 ? `${label} (${String(count)})` : label}</Text>
-        <Button
-          size="xs"
-          variant="ghost"
-          disabled={disabled}
-          onPress={toggle}
-          accessibilityState={state}
-          accessibilityLabel={`${open ? "Hide" : "Choose"} ${label}`}
-        >
-          {open ? "Hide" : "Choose"}
-        </Button>
-      </View>
-      {hint === undefined ? null : <Text style={styles.rowHint}>{hint}</Text>}
-      {open ? children : null}
     </View>
   );
 }
@@ -133,11 +100,7 @@ export function toggled<T>(list: readonly T[], value: T): T[] {
 
 const styles = StyleSheet.create((theme) => ({
   part: { gap: theme.spacing[2] },
-  disclosureHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
   // The same label treatment as every Select and text field in this form, so no
   // row looks more important than the picker beside it.
   rowLabel: {

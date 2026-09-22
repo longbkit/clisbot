@@ -468,6 +468,44 @@ describe("provider applications", () => {
     assert.notEqual(fixture.runtime.active("slack"), undefined);
   });
 
+  it("adds a Socket Mode Connection again for an app that already runs with the same app token", async () => {
+    const fixture = createFixture();
+    const tokens = { appToken: "xapp-secret", botToken: "xoxb-secret" };
+    await fixture.applications.configureSlackSocket(request("POST"), tokens);
+
+    // The Channels screen names no version: the app is unchanged, so the save continues.
+    const again = await fixture.applications.configureSlackSocket(request("POST"), tokens);
+
+    assert.equal(again.configurationVersion, 2);
+    assert.equal(fixture.store.values.get("slack")?.version, 2);
+    assert.equal(fixture.runtime.prepareCount("slack"), 2);
+  });
+
+  it("refuses a different app token without a version, and says where to change it", async () => {
+    const fixture = createFixture();
+    await fixture.applications.configureSlackSocket(request("POST"), {
+      appToken: "xapp-secret",
+      botToken: "xoxb-secret",
+    });
+
+    await assert.rejects(
+      fixture.applications.configureSlackSocket(request("POST"), {
+        appToken: "xapp-rotated",
+        botToken: "xoxb-secret",
+      }),
+      (error: unknown) =>
+        error instanceof ProviderApplicationError &&
+        error.code === "configurationConflict" &&
+        error.safeContext?.includes("Provider applications") === true,
+    );
+    assert.equal(fixture.store.values.get("slack")?.configuration.provider, "slack");
+    assert.equal(
+      Reflect.get(fixture.store.values.get("slack")!.configuration, "appToken"),
+      "xapp-secret",
+    );
+    assert.equal(fixture.runtime.prepareCount("slack"), 1);
+  });
+
   it("does not start a separate account connection for Slack Socket Mode", async () => {
     const fixture = createFixture();
     await fixture.applications.configureSlackSocket(request("POST"), {

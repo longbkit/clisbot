@@ -118,7 +118,10 @@ export async function audienceSenderFor(input: {
   resolveChannelSender?: ChannelSenderResolver | undefined;
 }): Promise<AudienceSender> {
   const identity = input.message.senderIdentity;
-  if (input.resolveChannelSender === undefined || !needsSenderFacts(input.route.audienceRules)) {
+  if (
+    input.resolveChannelSender === undefined ||
+    !needsSenderFacts(input.route.audienceRules, input.message.conversation)
+  ) {
     return { identity, member: null };
   }
   return {

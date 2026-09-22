@@ -784,6 +784,12 @@ export const HubAudienceRuleSchema = z.object({
   }),
   where: z.object({
     dm: z.boolean().optional(),
+    /** Membership ids: of the Who, only these people may DM. Unused when `dm` is true. */
+    dmMembers: z.array(z.string().min(1)).optional(),
+    /** Team ids: of the Who, only Members of these Teams may DM. Unused when `dm` is true. */
+    dmTeams: z.array(z.string().min(1)).optional(),
+    /** Channel identities: of the Who, only these Guests may DM. Unused when `dm` is true. */
+    dmIdentities: z.array(z.string().min(1)).optional(),
     groups: z.enum(["off", "all", "public", "private"]).optional(),
     conversations: z.array(z.union([z.string(), z.number()])).optional(),
   }),

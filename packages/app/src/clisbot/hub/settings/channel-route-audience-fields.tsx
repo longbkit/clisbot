@@ -11,8 +11,7 @@ import { settingsStyles } from "@/styles/settings";
 import { channelCatalogEntry, channelCatalogLabel } from "../channel-catalog";
 import { HUB_AUDIENCE_ROLES, type HubAudienceRole } from "../contracts";
 import { useChannelCatalog } from "./channel-catalog-queries";
-import { ChoiceRow, RouteBehaviorSwitch } from "./channel-route-behavior-rows";
-import { splitConversationIds } from "../conversation-picker";
+import { ChoiceRow } from "./channel-route-behavior-rows";
 import {
   AUDIENCE_ROLE_CHIP_LABELS,
   audienceRuleSentence,
@@ -20,25 +19,20 @@ import {
   audienceWhoLabel,
   channelReportsVisibility,
   emptyAudienceRule,
-  hasWherePart,
-  hasWhoPart,
-  visibilityFilterMatchesNothing,
-  type AudienceGroups,
+  audienceRuleProblem,
   type AudienceNames,
   type AudienceRuleDraft,
 } from "./channel-route-audience";
 import { ChannelActionsMenu } from "./channel-actions-menu";
-import { ConversationSelectionFields, SenderSelectionFields } from "./conversation-picker-field";
+import { AudienceWhereFields, type AudienceWherePlace } from "./channel-route-audience-where";
 import {
-  DisclosureRow,
+  NestedRows,
   OptionChips,
   PickerRow,
-  ToggleChip,
   toggled,
   type AudienceOption,
 } from "./channel-route-audience-controls";
-import { MultiSelectField, type MultiSelection } from "./multi-select-field";
-import type { SelectFieldOption } from "@/components/ui/select-field";
+import { GuestsField, TeamsOrMembersField } from "./channel-route-audience-people";
 
 export type { AudienceOption };
 
@@ -144,12 +138,8 @@ export function AudienceRulesEditor({
 }
 
 /** What the rows need to know about the account the Route belongs to. */
-interface AudiencePlace {
+interface AudiencePlace extends AudienceWherePlace {
   channel: string | null;
-  channelName: string;
-  reportsVisibility: boolean;
-  observedChannel: string | null;
-  accountId: string | null;
 }
 
 /**
@@ -198,6 +188,7 @@ function AudienceRuleRow({
   );
   const removeRow = useCallback(() => remove(index), [index, remove]);
   const label = `Rule ${String(index + 1)}`;
+  const problem = audienceRuleProblem(rule);
   const state = useMemo(() => ({ expanded: open }), [open]);
   return (
     <View style={styles.rule} accessibilityLabel={label}>
@@ -236,7 +227,11 @@ function AudienceRuleRow({
           />
           <AudienceWhereFields
             where={rule.where}
+            who={rule.who}
+            teams={teams}
             place={place}
+            members={members}
+            names={names}
             disabled={disabled}
             setWhere={setWhere}
           />
@@ -244,6 +239,7 @@ function AudienceRuleRow({
       ) : (
         <AudienceRuleSummary rule={rule} names={names} />
       )}
+      {problem === null ? null : <Text style={styles.errorText}>{problem}</Text>}
       {error === null ? null : <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
@@ -251,14 +247,10 @@ function AudienceRuleRow({
 
 /** A folded rule: the same Who and Where, one line each. */
 function AudienceRuleSummary({ rule, names }: { rule: AudienceRuleDraft; names: AudienceNames }) {
-  const complete = hasWhoPart(rule.who) && hasWherePart(rule.where);
   return (
     <View style={styles.summary}>
       <SummaryLine label="Who" value={audienceWhoLabel(rule.who, names)} />
       <SummaryLine label="Where" value={audienceWhereLabel(rule.where, names)} />
-      {complete ? null : (
-        <Text style={styles.errorText}>Choose both a Who and a Where to save.</Text>
-      )}
     </View>
   );
 }
@@ -332,30 +324,6 @@ function AudienceWhoFields({
   );
 }
 
-const TEAM_PREFIX = "team:";
-const MEMBER_PREFIX = "member:";
-
-/** Teams, then Members, in one list: the same picker Access uses for a grant. */
-function teamAndMemberOptions(
-  teams: readonly AudienceOption[],
-  members: readonly AudienceOption[],
-): SelectFieldOption<string>[] {
-  return [
-    ...teams.map((team) => ({
-      id: `${TEAM_PREFIX}${team.id}`,
-      value: `${TEAM_PREFIX}${team.id}`,
-      label: team.name,
-      group: "Teams",
-    })),
-    ...members.map((member) => ({
-      id: `${MEMBER_PREFIX}${member.id}`,
-      value: `${MEMBER_PREFIX}${member.id}`,
-      label: member.name,
-      group: "Members",
-    })),
-  ];
-}
-
 /**
  * The people a rule names: by role, by Team or Member, or by their channel id
  * when they have no Hub account to match on.
@@ -387,26 +355,8 @@ function AudiencePeopleFields({
   );
   // Naming people is only a choice while the roles do not already cover them all.
   const everyMember = who.roles.includes("member");
-  const peopleOptions = useMemo(() => teamAndMemberOptions(teams, members), [members, teams]);
-  const people = useMemo(
-    () => [
-      ...who.teams.map((id) => `${TEAM_PREFIX}${id}`),
-      ...who.members.map((id) => `${MEMBER_PREFIX}${id}`),
-    ],
-    [who.members, who.teams],
-  );
   const changePeople = useCallback(
-    (value: MultiSelection) => {
-      const ids = value === "*" ? [] : value;
-      setWho({
-        teams: ids
-          .filter((id) => id.startsWith(TEAM_PREFIX))
-          .map((id) => id.slice(TEAM_PREFIX.length)),
-        members: ids
-          .filter((id) => id.startsWith(MEMBER_PREFIX))
-          .map((id) => id.slice(MEMBER_PREFIX.length)),
-      });
-    },
+    (picked: { teams: string[]; members: string[] }) => setWho(picked),
     [setWho],
   );
   const changeIdentities = useCallback((identities: string) => setWho({ identities }), [setWho]);
@@ -415,11 +365,8 @@ function AudiencePeopleFields({
     [],
   );
   return (
-    <View style={styles.nested}>
-      <PickerRow
-        label="By role"
-        hint="People with a Hub account in this organization, by the role they hold now or later."
-      >
+    <NestedRows>
+      <PickerRow label="By role" hint="Everyone who holds the role, now or later.">
         <OptionChips
           options={roleOptions}
           selected={who.roles}
@@ -429,123 +376,26 @@ function AudiencePeopleFields({
         />
       </PickerRow>
       {everyMember ? null : (
-        <MultiSelectField
-          label="Specific Teams or Members"
-          hint="Only the people and Teams you pick; a Team covers whoever is in it."
-          options={peopleOptions}
-          value={people}
+        <TeamsOrMembersField
+          hint="Only the Teams and Members you pick."
+          teams={teams}
+          members={members}
+          selectedTeams={who.teams}
+          selectedMembers={who.members}
           onChange={changePeople}
           disabled={disabled}
-          placeholder="Choose Teams or Members"
-          searchPlaceholder="Search Teams and Members"
         />
       )}
-      <DisclosureRow
-        label="Specific Guests"
-        hint={`${place.channelName} senders with no Hub account linked. They run with the access granted to Guest in People & access.`}
-        count={splitConversationIds(who.identities).length}
+      <GuestsField
+        hint="People without a Hub account, by their channel user ID. They get the Guest access from People & access."
+        channel={place.observedChannel}
+        accountId={place.accountId}
+        among={null}
+        value={who.identities}
+        onChange={changeIdentities}
         disabled={disabled}
-      >
-        <SenderSelectionFields
-          channel={place.observedChannel}
-          accountId={place.accountId}
-          value={who.identities}
-          onChange={changeIdentities}
-          disabled={disabled}
-        />
-      </DisclosureRow>
-    </View>
-  );
-}
-
-const GROUP_FILTER_VALUES: readonly Exclude<AudienceGroups, "off">[] = ["all", "public", "private"];
-const GROUP_FILTER_LABELS: Record<Exclude<AudienceGroups, "off">, string> = {
-  all: "All",
-  public: "Public only",
-  private: "Private only",
-};
-
-/** Where, as three places of the same kind: DMs, group chats, named conversations. */
-function AudienceWhereFields({
-  where,
-  place,
-  disabled,
-  setWhere,
-}: {
-  where: AudienceRuleDraft["where"];
-  place: AudiencePlace;
-  disabled: boolean;
-  setWhere(patch: Partial<AudienceRuleDraft["where"]>): void;
-}) {
-  const changeDm = useCallback((dm: boolean) => setWhere({ dm }), [setWhere]);
-  const changeGroups = useCallback(
-    (on: boolean) => setWhere({ groups: on ? "all" : "off" }),
-    [setWhere],
-  );
-  const changeFilter = useCallback(
-    (value: string) => setWhere({ groups: value as AudienceGroups }),
-    [setWhere],
-  );
-  const changeConversations = useCallback(
-    (conversations: string) => setWhere({ conversations }),
-    [setWhere],
-  );
-  // A stored public/private filter stays editable where it matches nothing.
-  const filtered = where.groups === "public" || where.groups === "private";
-  return (
-    <View style={styles.part}>
-      <Text style={styles.label}>Where</Text>
-      <View style={styles.nested}>
-        <RouteBehaviorSwitch
-          label="Direct messages"
-          value={where.dm}
-          onChange={changeDm}
-          disabled={disabled}
-        />
-        <RouteBehaviorSwitch
-          label="Group chats"
-          value={where.groups !== "off"}
-          onChange={changeGroups}
-          disabled={disabled}
-        />
-        {where.groups !== "off" && (place.reportsVisibility || filtered) ? (
-          <View style={styles.chips}>
-            {GROUP_FILTER_VALUES.map((value) => (
-              <ToggleChip
-                key={value}
-                value={value}
-                label={GROUP_FILTER_LABELS[value]}
-                selected={where.groups === value}
-                disabled={disabled}
-                onToggle={changeFilter}
-              />
-            ))}
-          </View>
-        ) : null}
-        {visibilityFilterMatchesNothing(where, place.reportsVisibility) ? (
-          <Alert
-            variant="warning"
-            title={`${place.channelName} does not report whether a group chat is public or private`}
-            description="This filter matches no group chat here. Choose All, or name the conversations under Specific conversations."
-          />
-        ) : null}
-        <DisclosureRow
-          label="Specific conversations"
-          count={splitConversationIds(where.conversations).length}
-          disabled={disabled}
-        >
-          <ConversationSelectionFields
-            channel={place.observedChannel}
-            accountId={place.accountId}
-            value={where.conversations}
-            onChange={changeConversations}
-            disabled={disabled}
-            hint="Named rooms, groups, threads or topics, whatever their visibility. A thread or topic narrows to it."
-            placeholder="C0123, C0456"
-          />
-        </DisclosureRow>
-      </View>
-    </View>
+      />
+    </NestedRows>
   );
 }
 
@@ -576,23 +426,12 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     fontSize: theme.fontSize.base,
   },
-  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
   ruleTitle: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.semibold,
   },
   part: { gap: theme.spacing[2] },
-  label: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.normal,
-  },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[2],
-  },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",

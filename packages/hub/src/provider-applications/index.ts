@@ -454,6 +454,7 @@ export function createProviderApplications(
           cause: error,
         });
       }
+      const expectedVersion = await socketExpectedVersion(options.store, installation.appId, input);
       const configuration = {
         provider: "slack" as const,
         transport: "socket" as const,
@@ -472,13 +473,13 @@ export function createProviderApplications(
           configuration,
           localOrigin ?? (await safeCallbackOrigin(options, request)),
           identity,
-          (input.expectedVersion ?? 0) + 1,
+          (expectedVersion ?? 0) + 1,
         );
         await candidate.start();
         const saved = await options.store.completeSlackSocketApplication({
           configuration,
           identity,
-          expectedVersion: input.expectedVersion,
+          expectedVersion,
           updatedByUserId: actor.userId,
           organizationId,
           installation,
@@ -795,6 +796,35 @@ async function requireAccount(
     });
   }
   return account;
+}
+
+/**
+ * The version a Socket Mode save continues from. Adding a Connection from the Channels
+ * screen names no version: its operator does not edit the app, only verifies tokens.
+ * When the app already runs here with the same app token, nothing about it changes, so
+ * the save continues from the stored version; that is how a second workspace, or one
+ * added again after its Connection was removed, gets in. A different app token replaces
+ * the app's credential, so it must come from the Provider application form, which names
+ * the version it edited.
+ */
+async function socketExpectedVersion(
+  store: ProviderApplicationStore,
+  appId: string,
+  input: { appToken: string; expectedVersion?: number },
+): Promise<number | undefined> {
+  if (input.expectedVersion !== undefined) return input.expectedVersion;
+  const stored = await store.read("slack", appId);
+  if (stored === undefined) return undefined;
+  const { configuration } = stored;
+  const sameToken =
+    configuration.provider === "slack" &&
+    configuration.transport === "socket" &&
+    configuration.appToken === input.appToken;
+  if (sameToken) return stored.version;
+  throw new ProviderApplicationError(
+    "configurationConflict",
+    "This Slack app already runs on this Hub with a different app token. Update the token under Provider applications, then add the Connection.",
+  );
 }
 
 async function safeCallbackOrigin(

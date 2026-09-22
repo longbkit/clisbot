@@ -51,16 +51,18 @@ The queue keeps every inbound message, admitted or refused, until retention
 Specific search reads the same queue beside bindings and Workflow receipts, so
 it lists every conversation a bot has seen on every channel.
 
-**Where** — the parts add up:
+**Where** — two places, each a switch that starts **off**. Turning one on asks one exclusive question (revised 2026-09-21):
 
-| Part       | Meaning                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| DM         | Every 1:1 conversation with the bot                                                                                                                                      |
-| Group chat | Every conversation with two or more people: channel, group, space, group DM. Optional filter: all / public only / private only, shown only where the platform reports it |
-| Specific   | Named conversations from one search box. The configurator does not need to know whether a room is public, private, a group, or a topic                                   |
+| Place           | Options (exactly one)                                                                                                                                                                                                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Direct messages | **All direct messages**, or **Specific people**: of the Who, only the named Teams and Members (`where.dmTeams`, `where.dmMembers`) and Guests (`where.dmIdentities`) may DM, picked from the same lists Who uses. The lists narrow the Who and never add to it; the Guest list offers only the Guests under Who (every Guest seen, under Anyone) |
+| Group chats     | **All group chats**, **Public only**, **Private only** (both only where the platform reports visibility), or **Specific conversations** from one search box                                                                                                                                                                                      |
 
-DM is a Where like any other: a rule that covers channels does not cover DMs unless its Where includes DM, so talking in a channel never implies DM access. "Only these people may DM the bot" is its own rule: Who = those people, Where = DM. Threads and topics belong
-to their room; pick one under Specific only to narrow to it.
+A new Route names Members and opens no place, so it cannot save until the configurator opens one. Turning either switch on starts at its Specific option; All is a deliberate pick. A place that is on must name something: a Specific option with an empty list blocks the save, because saving would drop the place and the switch would read off again. A list the Who can never reach lets nobody in, so the editor and the Hub schema both refuse it: Teams or Members named for DMs need a Who that names Members (or Anyone), Guests named for DMs need a Who that names Guests (or Anyone). A Route counts as open (open-Route limits, warnings) only when Anyone gets in somewhere un-narrowed; Anyone limited to named DM senders is not open. A DM listed under Specific conversations stays open to the whole Who, threads included.
+
+Why the revision: the first editor offered a Group chats switch **and** a Specific conversations list at once. The switch meant "every group chat", but read as "group chats are an allowed kind", so a configurator left it on, named two channels, and had opened all of them. New Routes also started with both switches on. Exclusive options remove that reading; "public plus one private room" is now two rules. Rules stored with a filter **and** conversations keep both until the configurator picks an option again (the editor says so).
+
+DM is a Where like any other: a rule that covers channels does not cover DMs unless its Direct messages switch is on, so talking in a channel never implies DM access. Threads and topics belong to their room; pick one under Specific conversations only to narrow to it.
 
 Who uses Hub Members and Teams, and each person links their Slack, Telegram, Zalo, and other accounts through Channel identities, so one Who works on every channel. Where uses the generic names below; a channel that lacks a kind hides it, and the layout reads the same everywhere.
 
@@ -192,7 +194,7 @@ has run on both.
 ```
 audience:
   - who:   { roles: [owner, admin, member], teams: [], members: [], anyone: false, identities: [] }
-    where: { dm: true, groups: off | all | public | private, conversations: [] }
+    where: { dm: true, dmTeams: [], dmMembers: [], dmIdentities: [], groups: off | all | public | private, conversations: [] }
 ```
 
 This extends `RouteAudienceSchema` (`packages/hub/src/channels/config/schema.ts`)

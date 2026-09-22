@@ -18,6 +18,7 @@ const adapters = vi.hoisted(() => ({
   scrollToTop: vi.fn(),
   canManage: true,
   accountId: "owner",
+  teamMembers: [] as { id: string; name: string }[],
 }));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
@@ -33,6 +34,7 @@ vi.mock("../account-provider", () => ({
       organization: { id: "org" },
       membership: { id: "member", role: "owner" },
       capabilities: { manageResources: adapters.canManage },
+      team: { members: adapters.teamMembers },
     },
     api: () => ({ get: adapters.get, post: adapters.post, put: adapters.put }),
   }),
@@ -209,7 +211,26 @@ vi.mock("./multi-select-field", () => ({
   },
 }));
 vi.mock("./conversation-picker-field", () => ({
-  SenderSelectionFields: () => null,
+  SenderSelectionFields: function TestSenders(props: {
+    value: string;
+    disabled: boolean;
+    among?: readonly string[] | null;
+    onChange(value: string): void;
+  }) {
+    const change = React.useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => props.onChange(event.target.value),
+      [props],
+    );
+    return (
+      <input
+        aria-label="Sender IDs"
+        data-among={props.among == null ? "any" : props.among.join(",")}
+        value={props.value}
+        disabled={props.disabled}
+        onChange={change}
+      />
+    );
+  },
   ConversationSelectionFields: function TestConversations(props: {
     value: string;
     disabled: boolean;
@@ -365,6 +386,7 @@ beforeEach(() => {
   adapters.scrollToTop.mockReset();
   adapters.canManage = true;
   adapters.accountId = "owner";
+  adapters.teamMembers = [];
 });
 afterEach(() => {
   cleanup();
@@ -522,7 +544,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     );
   });
 
-  it("needs a Where on every rule: emptying the conversations blocks saving until Group chat is on", async () => {
+  it("needs a Where on every rule: emptying the conversations blocks saving until All group chats is chosen", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -535,7 +557,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       true,
     );
     expect(adapters.put).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("Group chats"));
+    // Named conversations mean Group chats is on at Specific; All is its own, exclusive pick.
+    expect((screen.getByLabelText("Group chats") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "All group chats" }));
+    expect(screen.queryByLabelText("Conversation IDs")).toBeNull();
     expect(screen.getByText("Members may talk in every group chat")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalled());
@@ -598,6 +623,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     // Anyone covers everyone, so that rule no longer offers people to pick.
     expect(screen.queryByText("By role")).toBeNull();
     fireEvent.click(screen.getByLabelText("Direct messages"));
+    fireEvent.click(screen.getByRole("button", { name: "All direct messages" }));
     expect(screen.getByText("Anyone may talk in DMs")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement).disabled).toBe(
       false,
@@ -646,6 +672,74 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].audience[0].who).toEqual({
       teams: ["team-qc"],
     });
+  });
+
+  it("keeps a place that is on but names nothing from saving, then saves the named DMs", async () => {
+    adapters.teamMembers = [
+      { id: "m-aitran", name: "aitran" },
+      { id: "m-nam", name: "nam" },
+    ];
+    await openEditor();
+    const save = () => screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement;
+    expect(save().disabled).toBe(false);
+    // Direct messages starts at Specific people with nobody named: the conversations alone
+    // would let the rule save, and the switch would silently read off afterwards.
+    fireEvent.click(screen.getByLabelText("Direct messages"));
+    expect(screen.getByText("Pick who may DM, or choose All direct messages.")).toBeTruthy();
+    expect(save().disabled).toBe(true);
+    const people = screen.getByLabelText("Specific Teams or Members") as HTMLSelectElement;
+    // The same one list Who offers: Teams, then Members.
+    expect(Array.from(people.options, ({ value }) => value).slice(-2)).toEqual([
+      "member:m-aitran",
+      "member:m-nam",
+    ]);
+    people.options[people.options.length - 2]!.selected = true;
+    fireEvent.change(people);
+    expect(
+      screen.getByText("Members may talk in DMs (only aitran) and #support (C1)"),
+    ).toBeTruthy();
+    expect(save().disabled).toBe(false);
+    fireEvent.click(save());
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].audience).toEqual([
+      { who: { roles: ["member"] }, where: { dmMembers: ["m-aitran"], conversations: ["C1"] } },
+    ]);
+  });
+
+  it("picks Guests with the same picker in Who and in DMs, and DMs offer only the Guests under Who", async () => {
+    await openEditor();
+    fireEvent.click(screen.getByLabelText("Direct messages"));
+    // Who names only Members so far: its own Guests picker is the only one.
+    expect(screen.getAllByLabelText("Sender IDs")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Sender IDs"), {
+      target: { value: "U0GUEST, U0OTHER" },
+    });
+    const [whoGuests, dmGuests] = screen.getAllByLabelText("Sender IDs");
+    // Who picks among everyone; the DM list narrows the Who, so it offers exactly its Guests.
+    expect(whoGuests!.dataset["among"]).toBe("any");
+    expect(dmGuests!.dataset["among"]).toBe("U0GUEST,U0OTHER");
+    fireEvent.change(dmGuests!, { target: { value: "U0GUEST" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].audience).toEqual([
+      {
+        who: { roles: ["member"], identities: ["U0GUEST", "U0OTHER"] },
+        where: { dmIdentities: ["U0GUEST"], conversations: ["C1"] },
+      },
+    ]);
+  });
+
+  it("lets a DM list under Anyone name any Guest, since no Who list bounds it", async () => {
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Anyone in the conversation" }));
+    fireEvent.click(screen.getByLabelText("Direct messages"));
+    // Anyone replaces Who's people rows, so the only Guests picker is the DM one.
+    const guests = screen.getByLabelText("Sender IDs");
+    expect(guests.dataset["among"]).toBe("any");
+    fireEvent.change(guests, { target: { value: "U0GUEST" } });
+    expect(
+      screen.getByText("Anyone may talk in DMs (only Guest U0GUEST) and #support (C1)"),
+    ).toBeTruthy();
   });
 
   it("lands the Hub's rule-level refusal on the rule it names", async () => {
@@ -899,11 +993,24 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
     expect(screen.queryByLabelText("Name")).toBeNull();
     expect(screen.getByText("Slack · support")).toBeTruthy();
-    // A new Route starts as Members everywhere: one rule, DM and Group chat on.
+    // A new Route names Members and opens no place: both switches start off, and
+    // turning one on asks which of them, never assuming all.
     expect(screen.getByText("Who can talk, and where")).toBeTruthy();
-    expect(screen.getByText("Members may talk in DMs and every group chat")).toBeTruthy();
-    expect((screen.getByLabelText("Direct messages") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("Group chats") as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText("Members may talk in nowhere yet")).toBeTruthy();
+    expect((screen.getByLabelText("Direct messages") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("Group chats") as HTMLInputElement).checked).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: "Activate Route" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByLabelText("Group chats"));
+    expect(screen.getByLabelText("Conversation IDs")).toBeTruthy();
+    // Direct messages starts narrow too: named people, until All is picked on purpose.
+    fireEvent.click(screen.getByLabelText("Direct messages"));
+    expect(screen.getByLabelText("Specific Teams or Members")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "All direct messages" }));
+    expect(screen.queryByLabelText("Specific Teams or Members")).toBeNull();
+    // A group chat in the rule brings the thread settings back.
+    fireEvent.change(screen.getByLabelText("Conversation IDs"), { target: { value: "C9" } });
     // A new Route starts an Agent; Automation is still experimental and says so.
     expect(screen.queryByLabelText("Automation")).toBeNull();
     expect(screen.queryByText("Experimental")).toBeNull();
@@ -1010,6 +1117,9 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("new-bot");
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "new-account" } });
     expect((screen.getByLabelText("Automation") as HTMLSelectElement).value).toBe("support");
+    // A new Route opens no place on its own; the configurator picks one before it can activate.
+    fireEvent.click(screen.getByLabelText("Direct messages"));
+    fireEvent.click(screen.getByRole("button", { name: "All direct messages" }));
     fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
     await waitFor(() =>

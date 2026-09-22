@@ -561,6 +561,12 @@ export type AudienceWho = z.infer<typeof AudienceWhoSchema>;
 export const AudienceWhereSchema = z
   .object({
     dm: z.boolean().optional(),
+    /** Membership ids: of the Who, only these people may DM. Ignored when `dm` is true. */
+    dmMembers: z.array(z.string().min(1)).optional(),
+    /** Team ids: of the Who, only Members of these Teams may DM. Ignored when `dm` is true. */
+    dmTeams: z.array(z.string().min(1)).optional(),
+    /** Channel identities: of the Who, only these Guests may DM. Ignored when `dm` is true. */
+    dmIdentities: z.array(z.string().min(1)).optional(),
     groups: z.enum(["off", "all", "public", "private"]).optional(),
     /** Native conversation ids (numbers in YAML are normalized to strings). */
     conversations: z.array(z.union([z.string().min(1), z.number()])).optional(),
@@ -569,6 +575,9 @@ export const AudienceWhereSchema = z
   .refine(
     (where) =>
       where.dm === true ||
+      named(where.dmMembers) ||
+      named(where.dmTeams) ||
+      named(where.dmIdentities) ||
       (where.groups !== undefined && where.groups !== "off") ||
       (where.conversations !== undefined && where.conversations.length > 0),
     { message: "an audience rule needs at least one Where part" },
@@ -578,8 +587,34 @@ export type AudienceWhere = z.infer<typeof AudienceWhereSchema>;
 /** One "[who] may talk in [where]" sentence; a sender is admitted when any rule matches. */
 export const AudienceRuleSchema = z
   .object({ who: AudienceWhoSchema, where: AudienceWhereSchema })
-  .strict();
+  .strict()
+  // The DM lists narrow the Who, so a list the Who can never reach admits nobody.
+  .refine(
+    ({ who, where }) =>
+      where.dm === true || !(named(where.dmMembers) || named(where.dmTeams)) || namesMembers(who),
+    {
+      path: ["where", "dmMembers"],
+      message: "dmMembers and dmTeams narrow the Who to Members, and this Who names no Member",
+    },
+  )
+  .refine(({ who, where }) => where.dm === true || !named(where.dmIdentities) || namesGuests(who), {
+    path: ["where", "dmIdentities"],
+    message: "dmIdentities narrows the Who to Guests, and this Who names no Guest",
+  });
 export type AudienceRule = z.infer<typeof AudienceRuleSchema>;
+
+function named(list: readonly unknown[] | undefined): boolean {
+  return list !== undefined && list.length > 0;
+}
+
+/** `identities` are senders without a Hub Member, so they can never be on `dmMembers`. */
+function namesMembers(who: AudienceWho): boolean {
+  return who.anyone === true || [who.roles, who.teams, who.members].some(named);
+}
+
+function namesGuests(who: AudienceWho): boolean {
+  return who.anyone === true || named(who.identities);
+}
 
 /** Every limit a Bot, a Conversation or a Route can carry, in display order. */
 export const CHANNEL_LIMIT_NAMES = [

@@ -235,33 +235,46 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
 /** The wire shape of one rule: only the parts that are set, ids as strings. */
 function audienceRuleRecord(rule: HubAudienceRule): HubAudienceRule {
   const { who, where } = rule;
+  const allDms = where.dm === true;
   return {
     who: {
-      ...(who.roles !== undefined && who.roles.length > 0 ? { roles: [...who.roles] } : {}),
-      ...(who.teams !== undefined && who.teams.length > 0 ? { teams: [...who.teams] } : {}),
-      ...(who.members !== undefined && who.members.length > 0 ? { members: [...who.members] } : {}),
+      ...listKey("roles", who.roles),
+      ...listKey("teams", who.teams),
+      ...listKey("members", who.members),
       ...(who.anyone === true ? { anyone: true } : {}),
-      ...(who.identities !== undefined && who.identities.length > 0
-        ? { identities: [...who.identities] }
-        : {}),
+      ...listKey("identities", who.identities),
     },
     where: {
-      ...(where.dm === true ? { dm: true } : {}),
+      ...(allDms ? { dm: true } : {}),
+      // Every DM is already open, so the lists that narrow DMs carry nothing.
+      ...(allDms ? {} : listKey("dmMembers", where.dmMembers)),
+      ...(allDms ? {} : listKey("dmTeams", where.dmTeams)),
+      ...(allDms ? {} : listKey("dmIdentities", where.dmIdentities)),
       ...(where.groups !== undefined && where.groups !== "off" ? { groups: where.groups } : {}),
-      ...(where.conversations !== undefined && where.conversations.length > 0
-        ? { conversations: where.conversations.map(String) }
-        : {}),
+      ...listKey("conversations", where.conversations?.map(String)),
     },
   };
 }
 
+/** `{ key: list }` for a list that names something; an empty list is left out of the file. */
+function listKey<Key extends string, Item>(
+  key: Key,
+  list: readonly Item[] | undefined,
+): { [K in Key]?: Item[] } {
+  if (list === undefined || list.length === 0) return {};
+  return { [key]: [...list] } as { [K in Key]?: Item[] };
+}
+
 /** True when every rule covers DMs and nothing else: mention and thread settings do not apply. */
 export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean {
+  const coversDms = (where: HubAudienceRule["where"]) =>
+    where.dm === true ||
+    [where.dmMembers, where.dmTeams, where.dmIdentities].some((list) => (list ?? []).length > 0);
   return (
     rules.length > 0 &&
     rules.every(
       ({ where }) =>
-        where.dm === true &&
+        coversDms(where) &&
         (where.groups === undefined || where.groups === "off") &&
         (where.conversations === undefined || where.conversations.length === 0),
     )
@@ -293,13 +306,26 @@ export function routeEffectiveAgent(
   };
 }
 
+/**
+ * Anyone gets in somewhere un-narrowed. DMs limited to named senders admit those
+ * senders alone, so they do not make a rule open (the Hub's `isOpenAudience`).
+ */
+function isOpenRule(rule: ChannelConfigurationRecord): boolean {
+  if (recordField(rule, "who")["anyone"] !== true) return false;
+  const where = recordField(rule, "where");
+  const groups = where["groups"];
+  const conversations = where["conversations"];
+  return (
+    where["dm"] === true ||
+    (typeof groups === "string" && groups !== "off") ||
+    (Array.isArray(conversations) && conversations.length > 0)
+  );
+}
+
 /** Whether a stored Route admits everyone somewhere. */
 export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean {
   const audience = route["audience"];
-  return (
-    Array.isArray(audience) &&
-    audience.some((rule) => isRecord(rule) && recordField(rule, "who")["anyone"] === true)
-  );
+  return Array.isArray(audience) && audience.some((rule) => isRecord(rule) && isOpenRule(rule));
 }
 
 /** What names a Route's target, kept verbatim when the target is not rebuilt. */

@@ -145,17 +145,27 @@ export function ConversationSelectionFields({
   );
 }
 
-/** People who messaged this bot and are not linked to a Member: a Route's
- * "senders outside the Hub". Manual ids stay available for someone new. */
+const SENDERS_HINT = "People without a Hub account, by their channel user ID.";
+
+/**
+ * People who messaged this bot and are not linked to a Member: a Route's
+ * "senders outside the Hub". Manual ids stay available for someone new.
+ * `among` limits the choice to those ids and drops manual entry: the list the
+ * caller narrows already names everyone who could pass.
+ */
 export function SenderSelectionFields({
   channel,
   accountId,
+  among = null,
+  hint = SENDERS_HINT,
   value,
   onChange,
   disabled,
 }: {
   channel: string | null;
   accountId: string | null;
+  among?: readonly string[] | null;
+  hint?: string;
   value: string;
   onChange(value: string): void;
   disabled: boolean;
@@ -166,18 +176,22 @@ export function SenderSelectionFields({
     accountId,
     HubObservedChannelSendersSchema,
   );
-  const options = useMemo<ConversationOption[]>(
-    () =>
-      (senders.data?.senders ?? []).map((sender) => ({
-        id: sender.identity,
-        conversationId: sender.identity,
-        label: sender.name ?? sender.username ?? sender.id,
-        description: [sender.username ? `@${sender.username}` : null, sender.id]
-          .filter(Boolean)
-          .join(" · "),
-      })),
-    [senders.data?.senders],
-  );
+  const options = useMemo<ConversationOption[]>(() => {
+    const observed = (senders.data?.senders ?? []).map((sender) => ({
+      id: sender.identity,
+      conversationId: sender.identity,
+      label: sender.name ?? sender.username ?? sender.id,
+      description: [sender.username ? `@${sender.username}` : null, sender.id]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+    if (among === null) return observed;
+    // An id the bot has not seen yet still lists, under the id itself.
+    const named = new Map(observed.map((option) => [option.id, option]));
+    return among.map(
+      (id) => named.get(id) ?? { id, conversationId: id, label: id, description: "" },
+    );
+  }, [among, senders.data?.senders]);
   return (
     <IdSelectionFields
       pickerKey={`${channel}:${accountId}:senders`}
@@ -187,8 +201,9 @@ export function SenderSelectionFields({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      hint="People who message this bot but have no Hub account (or have not linked this channel to it), matched by their channel user id. Picked from those who already messaged the bot."
+      hint={hint}
       placeholder="U0ALICE, U0BOB"
+      manualIds={among === null}
     />
   );
 }
@@ -204,6 +219,7 @@ function IdSelectionFields({
   disabled,
   hint,
   placeholder,
+  manualIds = true,
 }: {
   pickerKey: string;
   options: readonly ConversationOption[];
@@ -214,6 +230,8 @@ function IdSelectionFields({
   disabled: boolean;
   hint: string;
   placeholder: string;
+  /** False where the options already name every id that could be chosen. */
+  manualIds?: boolean;
 }) {
   const hub = useHubAccount();
   const [manualEntry, setManualEntry] = useState(false);
@@ -247,6 +265,8 @@ function IdSelectionFields({
     // The choice above already names this group, so a Field label here would
     // only repeat the selected button's own text.
     <View style={styles.selection}>
+      {/* The explanation reads before the control, like a Field's hint under its label. */}
+      <Text style={settingsStyles.rowHint}>{hint}</Text>
       {selectedIds.length === 0 ? (
         <Text style={settingsStyles.rowHint}>{labels.none}</Text>
       ) : (
@@ -272,9 +292,11 @@ function IdSelectionFields({
             disabled={disabled}
           />
         ) : null}
-        <Button size="sm" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
-          {manualEntry ? "Hide ID entry" : "Enter IDs"}
-        </Button>
+        {manualIds ? (
+          <Button size="sm" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
+            {manualEntry ? "Hide ID entry" : "Enter IDs"}
+          </Button>
+        ) : null}
       </View>
       {manualEntry ? (
         <Field label={labels.manualField} hint={labels.manualHint}>
@@ -291,7 +313,6 @@ function IdSelectionFields({
         </Field>
       ) : null}
       {loadFailed ? <Text style={settingsStyles.rowHint}>{labels.unavailable}</Text> : null}
-      <Text style={settingsStyles.rowHint}>{hint}</Text>
     </View>
   );
 }

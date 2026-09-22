@@ -293,6 +293,7 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: "Start or continue an Agent" })).toBeNull();
     expect(screen.getByText("Team QC may talk in C1")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Direct messages"));
+    fireEvent.click(screen.getByRole("button", { name: "All direct messages" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     const [resource, body] = adapters.put.mock.calls[0]!;

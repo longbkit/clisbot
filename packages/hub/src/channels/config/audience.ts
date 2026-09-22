@@ -11,7 +11,14 @@ export type GroupFilter = "all" | "public" | "private";
 
 /** A Where with ids normalized to strings and `groups: off` dropped. */
 export interface CompiledWhere {
+  /** Every DM with someone the Who names. */
   dm: boolean;
+  /** When `dm` is false: the Members (membership ids) of the Who who may still DM. */
+  dmMembers: readonly string[];
+  /** When `dm` is false: the Teams of the Who whose Members may still DM. */
+  dmTeams: readonly string[];
+  /** When `dm` is false: the Guests (channel identities) of the Who who may still DM. */
+  dmIdentities: readonly string[];
   /** Absent = the rule covers no group chat by kind (only `conversations`). */
   groups?: GroupFilter;
   conversations: readonly string[];
@@ -68,6 +75,9 @@ export function compileAudienceRule(rule: AudienceRule): CompiledAudienceRule {
     },
     where: {
       dm: rule.where.dm === true,
+      dmMembers: rule.where.dm === true ? [] : (rule.where.dmMembers ?? []),
+      dmTeams: rule.where.dm === true ? [] : (rule.where.dmTeams ?? []),
+      dmIdentities: rule.where.dm === true ? [] : (rule.where.dmIdentities ?? []),
       ...(groups === undefined || groups === "off" ? {} : { groups }),
       conversations: (rule.where.conversations ?? []).map(String),
     },
@@ -79,7 +89,7 @@ export function deriveRouteWhere(rules: readonly CompiledAudienceRule[]): RouteW
   const conversations = new Set<string>();
   let dm = false;
   for (const { where } of rules) {
-    dm ||= where.dm;
+    dm ||= where.dm || namesDmSenders(where);
     if (where.groups !== undefined) groups.add(where.groups);
     for (const id of where.conversations) conversations.add(id);
   }
@@ -90,22 +100,42 @@ export function deriveRouteWhere(rules: readonly CompiledAudienceRule[]): RouteW
 export function whereCovers(
   where: {
     dm: boolean;
+    dmMembers?: readonly string[] | undefined;
+    dmTeams?: readonly string[] | undefined;
+    dmIdentities?: readonly string[] | undefined;
     groups?: GroupFilter | readonly GroupFilter[] | undefined;
     conversations: readonly string[];
   },
   conversation: AudienceConversation,
 ): boolean {
-  const room = conversation.rootConversationId ?? conversation.id;
-  if (where.conversations.includes(conversation.id) || where.conversations.includes(room)) {
-    return true;
-  }
-  if (conversation.kind === "dm") return where.dm;
+  if (namesConversation(where.conversations, conversation)) return true;
+  if (conversation.kind === "dm") return where.dm || namesDmSenders(where);
   const filters = groupFilters(where.groups);
   return filters.some(
     (filter) =>
       filter === "all" ||
       (conversation.visibility !== undefined && filter === conversation.visibility),
   );
+}
+
+/** Whether the Where narrows DMs to named senders: Members, Teams, Guests. */
+function namesDmSenders(where: {
+  dmMembers?: readonly string[] | undefined;
+  dmTeams?: readonly string[] | undefined;
+  dmIdentities?: readonly string[] | undefined;
+}): boolean {
+  return [where.dmMembers, where.dmTeams, where.dmIdentities].some(
+    (list) => list !== undefined && list.length > 0,
+  );
+}
+
+/** A listed id names the conversation itself, or the room its thread or topic belongs to. */
+function namesConversation(
+  conversations: readonly string[],
+  conversation: AudienceConversation,
+): boolean {
+  const room = conversation.rootConversationId ?? conversation.id;
+  return conversations.includes(conversation.id) || conversations.includes(room);
 }
 
 function groupFilters(
@@ -141,23 +171,59 @@ function identityNames(configured: string, identity: string): boolean {
   return separator > 0 && identity.slice(separator + 1) === configured;
 }
 
-/** The rules whose Where covers the conversation — the ones a sender is tested against. */
-export function rulesCovering(
+/**
+ * One rule's decision: its Where covers the conversation and its Who names the
+ * sender. A DM covered only through the `dm*` lists also needs the sender on one of them.
+ */
+export function ruleAdmits(
+  rule: CompiledAudienceRule,
+  conversation: AudienceConversation,
+  sender: AudienceSender,
+): boolean {
+  if (!whereCovers(rule.where, conversation) || !whoMatches(rule.who, sender)) return false;
+  const { where } = rule;
+  const namedDmOnly =
+    conversation.kind === "dm" &&
+    !where.dm &&
+    !namesConversation(where.conversations, conversation);
+  if (!namedDmOnly) return true;
+  return namedForDm(where, sender);
+}
+
+function namedForDm(where: CompiledWhere, sender: AudienceSender): boolean {
+  if (where.dmIdentities.some((identity) => identityNames(identity, sender.identity))) return true;
+  const member = sender.member;
+  if (member === null) return false;
+  return (
+    where.dmMembers.includes(member.membershipId) ||
+    where.dmTeams.some((team) => member.teamIds.includes(team))
+  );
+}
+
+/**
+ * True when some rule lets every sender in somewhere. An `anyone` rule whose only
+ * place is DMs narrowed to named senders admits those senders alone, so it is not open.
+ */
+export function isOpenAudience(rules: readonly CompiledAudienceRule[]): boolean {
+  return rules.some(
+    ({ who, where }) =>
+      who.anyone && (where.dm || where.groups !== undefined || where.conversations.length > 0),
+  );
+}
+
+/**
+ * Whether deciding this conversation needs the sender's Member facts. Only the
+ * rules that cover it count, so an `anyone` room never pays for a Member rule elsewhere.
+ */
+export function needsSenderFacts(
   rules: readonly CompiledAudienceRule[],
   conversation: AudienceConversation,
-): CompiledAudienceRule[] {
-  return rules.filter((rule) => whereCovers(rule.where, conversation));
-}
-
-/** True when any rule opens the Route to everyone somewhere. */
-export function isOpenAudience(rules: readonly CompiledAudienceRule[]): boolean {
-  return rules.some((rule) => rule.who.anyone);
-}
-
-/** Whether any covering rule needs the sender's Member facts to decide. */
-export function needsSenderFacts(rules: readonly CompiledAudienceRule[]): boolean {
-  return rules.some(
-    ({ who }) =>
-      !who.anyone && (who.roles.length > 0 || who.teams.length > 0 || who.members.length > 0),
-  );
+): boolean {
+  return rules
+    .filter((rule) => whereCovers(rule.where, conversation))
+    .some(
+      ({ who, where }) =>
+        (conversation.kind === "dm" && (where.dmMembers.length > 0 || where.dmTeams.length > 0)) ||
+        (!who.anyone && (who.roles.length > 0 || who.teams.length > 0 || who.members.length > 0)),
+    );
 }

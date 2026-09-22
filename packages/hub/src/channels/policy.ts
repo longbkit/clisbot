@@ -23,9 +23,8 @@ import { privilegeCovers, roleGrants, type CompiledRole } from "./config/privile
 import { PRIVILEGE_LEAVES } from "./config/enums.js";
 import {
   isOpenAudience,
-  rulesCovering,
+  ruleAdmits,
   whereCovers,
-  whoMatches,
   type AudienceConversation,
   type AudienceSender,
 } from "./config/audience.js";
@@ -402,8 +401,9 @@ export function audienceRulesAdmit(
   sender: AudienceSender,
   options: { membersOnly?: boolean } = {},
 ): boolean {
-  return rulesCovering(route.audienceRules, conversation).some(
-    (rule) => !(options.membersOnly === true && rule.who.anyone) && whoMatches(rule.who, sender),
+  return route.audienceRules.some(
+    (rule) =>
+      !(options.membersOnly === true && rule.who.anyone) && ruleAdmits(rule, conversation, sender),
   );
 }
 
