@@ -1,12 +1,10 @@
-import { Redirect, Stack, useLocalSearchParams, usePathname } from "expo-router";
-import { useEffect } from "react";
+import { Redirect, Stack, useLocalSearchParams } from "expo-router";
 import { useHostRuntimeBootstrapState } from "@/app/_layout";
-import { withHostReturnTo } from "@/navigation/host-return-to";
 import { HostRouteProvider } from "@/navigation/host-route-context";
 import { resolveStartupRoute } from "@/navigation/host-runtime-bootstrap";
 import { ThemedStack } from "@/navigation/themed-stack";
-import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { useHostRegistryStatus, useHosts } from "@/runtime/host-runtime";
+import { HostUnavailableScreen } from "@/screens/host-unavailable-screen";
 
 const HOST_STACK_SCREEN_OPTIONS = {
   headerShown: false,
@@ -32,23 +30,11 @@ function KnownHostRoute() {
     hosts,
   });
 
-  const pathname = usePathname();
-  const redirectHref =
-    startupRoute.kind === "redirect" ? withHostReturnTo(String(startupRoute.href), pathname) : null;
-  useEffect(() => {
-    if (redirectHref === null) return;
-    recordHostDiagnostic("host-route-redirect", {
-      reason: "host not in registry",
-      serverId: routeServerId,
-      to: redirectHref,
-      registeredHosts: hosts.map((host) => host.serverId),
-    });
-    // Record once per redirect, not on every registry change while it is pending.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [redirectHref]);
-
-  if (redirectHref !== null) {
-    return <Redirect href={redirectHref as never} />;
+  if (startupRoute.kind === "redirect") {
+    // A Host route never navigates away on its own: a missing Host is shown where the reader is,
+    // with the choices, and the route renders it again once it is registered.
+    if (routeServerId !== null) return <HostUnavailableScreen serverId={routeServerId} />;
+    return <Redirect href={startupRoute.href} />;
   }
 
   const stack = (

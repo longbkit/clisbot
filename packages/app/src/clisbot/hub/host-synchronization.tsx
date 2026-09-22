@@ -28,15 +28,15 @@ function enqueueManagedHostMutation(operation: () => Promise<void>): Promise<voi
   return next;
 }
 
-export function HubHostSynchronization() {
+/** The Hub's daemon list for the signed-in account; one cached query shared by every reader. */
+function useHubDaemonsQuery() {
   const hub = useHubAccount();
   const signedIn = hub.signedIn;
-  const hubOrigin = hub.origin;
   const organizationId = signedIn?.organization.id ?? null;
-  const daemons = useFetchQuery({
+  return useFetchQuery({
     queryKey: hubResourceQueryKey(
       {
-        origin: hubOrigin,
+        origin: hub.origin,
         organizationId,
         accountId: signedIn?.account.id ?? null,
       },
@@ -49,6 +49,25 @@ export function HubHostSynchronization() {
     refetchInterval: 60_000,
     staleTimeMs: 0,
   });
+}
+
+/**
+ * Whether the Hub still lists a connectable daemon for `serverId`: `true` while it does (its Host
+ * is being registered again), `false` when it does not, `undefined` before the list is known or
+ * without a Hub account.
+ */
+export function useHubListsHost(serverId: string | null): boolean | undefined {
+  const daemons = useHubDaemonsQuery();
+  if (serverId === null || daemons.data === undefined) return undefined;
+  return daemons.data.daemons.some((daemon) => daemon.connectionOffer?.serverId === serverId);
+}
+
+export function HubHostSynchronization() {
+  const hub = useHubAccount();
+  const signedIn = hub.signedIn;
+  const hubOrigin = hub.origin;
+  const organizationId = signedIn?.organization.id ?? null;
+  const daemons = useHubDaemonsQuery();
   const hosts = useHosts();
   const projectedDaemonIds = useMemo(
     () =>

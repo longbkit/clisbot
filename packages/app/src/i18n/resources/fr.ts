@@ -1474,6 +1474,15 @@ export const fr: TranslationResources = {
     body: "Réessayez pour recharger l'application. Si cela continue, joignez les détails ci-dessous au signalement.",
     details: "Détails",
   },
+  hostUnavailable: {
+    reconnectingTitle: "Reconnexion à cet hôte…",
+    reconnectingBody:
+      "Paseo rajoute cet hôte. Cette page reprendra là où vous en étiez dès qu'il sera prêt.",
+    title: "Cet hôte n'est pas disponible",
+    body: "Il a été supprimé ou votre accès a changé. Vous pouvez rester ici, ouvrir un autre hôte ou en ajouter un.",
+    openOtherHost: "Ouvrir un autre hôte",
+    addHost: "Ajouter un hôte",
+  },
   startup: {
     errorTitle: "Quelque chose s'est mal passé",
     errorDescription:

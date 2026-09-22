@@ -1457,6 +1457,15 @@ export const ptBR: TranslationResources = {
     body: "Tente novamente para recarregar o app. Se isso continuar acontecendo, inclua os detalhes abaixo ao relatar o problema.",
     details: "Detalhes",
   },
+  hostUnavailable: {
+    reconnectingTitle: "Reconectando a este Host…",
+    reconnectingBody:
+      "O Paseo está adicionando este Host de novo. Esta página continua de onde você parou assim que ele estiver pronto.",
+    title: "Este Host não está disponível",
+    body: "Ele foi removido ou seu acesso mudou. Você pode ficar aqui, abrir outro Host ou adicionar um.",
+    openOtherHost: "Abrir outro Host",
+    addHost: "Adicionar um Host",
+  },
   startup: {
     errorTitle: "Algo deu errado",
     errorDescription:

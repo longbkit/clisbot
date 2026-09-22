@@ -1412,6 +1412,14 @@ export const zhCN: TranslationResources = {
     body: "请重试以重新加载应用。如果问题持续发生，请在报告时附上下面的详细信息。",
     details: "详情",
   },
+  hostUnavailable: {
+    reconnectingTitle: "正在重新连接此主机…",
+    reconnectingBody: "Paseo 正在重新添加此主机。准备就绪后，此页面会从你离开的地方继续。",
+    title: "此主机不可用",
+    body: "它已被移除，或你的访问权限已更改。你可以留在此处、打开其他主机或添加主机。",
+    openOtherHost: "打开其他主机",
+    addHost: "添加主机",
+  },
   startup: {
     errorTitle: "出现问题",
     errorDescription: "本地服务器启动失败。如果持续发生，请在 GitHub 报告问题并附上下方日志。",

@@ -874,6 +874,60 @@ describe("relay external socket reconnect behavior", () => {
     }
   });
 
+  test.each([
+    {
+      name: "an unreachable Hub lets the lease lapse with a retryable close",
+      failure: new Error("Hub request timed out"),
+      code: 4503,
+      advanceMs: 3_000,
+    },
+    {
+      name: "a Hub that refuses the renewal revokes the lease at once",
+      failure: Object.assign(new Error("Hub enrollment failed (403)"), { statusCode: 403 }),
+      code: 4403,
+      advanceMs: 1_000,
+    },
+  ])("$name", async ({ failure, code, advanceMs }) => {
+    vi.useFakeTimers();
+    try {
+      const leaseId = "00000000-0000-4000-8000-000000000020";
+      const admission = {
+        principalId: "member:user-1",
+        permissions: ["workspace.read" as const],
+        resourceMode: "projects" as const,
+        projects: new Map<string, never>(),
+        leaseId,
+        leaseExpiresAt: Date.now() + 1_500,
+      };
+      const server = createServer({
+        managedAccess: {
+          mode: "external",
+          resolver: {
+            resolve: async () => admission,
+            refresh: vi.fn().mockRejectedValue(failure),
+          },
+        },
+      });
+      const socket = new MockSocket();
+      const closed = vi.fn();
+      socket.on("close", closed);
+      await server.attachExternalSocket(
+        socket,
+        { transport: "relay" },
+        undefined,
+        createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+      );
+
+      await vi.advanceTimersByTimeAsync(advanceMs);
+
+      expect(closed).toHaveBeenCalledTimes(1);
+      expect(closed.mock.calls[0]?.[0]).toBe(code);
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("asks the client to rebind when refreshed authority no longer matches", async () => {
     vi.useFakeTimers();
     try {

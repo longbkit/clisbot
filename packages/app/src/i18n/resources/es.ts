@@ -1471,6 +1471,15 @@ export const es: TranslationResources = {
     body: "Vuelve a intentarlo para recargar la app. Si sigue ocurriendo, incluye los detalles de abajo al reportarlo.",
     details: "Detalles",
   },
+  hostUnavailable: {
+    reconnectingTitle: "Reconectando con este Host…",
+    reconnectingBody:
+      "Paseo está volviendo a añadir este Host. Esta página continuará donde la dejaste en cuanto esté listo.",
+    title: "Este Host no está disponible",
+    body: "Se eliminó o cambió tu acceso. Puedes quedarte aquí, abrir otro Host o añadir uno.",
+    openOtherHost: "Abrir otro Host",
+    addHost: "Añadir un Host",
+  },
   startup: {
     errorTitle: "algo salió mal",
     errorDescription:

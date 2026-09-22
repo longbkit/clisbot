@@ -1437,6 +1437,15 @@ export const en = {
     body: "Try again to reload the app. If this keeps happening, include the details below when you report it.",
     details: "Details",
   },
+  hostUnavailable: {
+    reconnectingTitle: "Reconnecting to this Host…",
+    reconnectingBody:
+      "Paseo is adding this Host back. This page picks up where you left off once it is ready.",
+    title: "This Host is not available",
+    body: "It was removed, or your access to it changed. You can stay here, open another Host, or add one.",
+    openOtherHost: "Open another Host",
+    addHost: "Add a Host",
+  },
   startup: {
     errorTitle: "Something went wrong",
     errorDescription:

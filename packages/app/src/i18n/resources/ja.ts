@@ -1442,6 +1442,15 @@ export const ja: TranslationResources = {
     body: "アプリを再読み込みするにはもう一度お試しください。繰り返し発生する場合は、以下の詳細を添えて報告してください。",
     details: "詳細",
   },
+  hostUnavailable: {
+    reconnectingTitle: "このホストに再接続しています…",
+    reconnectingBody:
+      "Paseo がこのホストを再追加しています。準備ができると、このページは中断したところから再開します。",
+    title: "このホストは利用できません",
+    body: "削除されたか、アクセス権が変更されました。このままにするか、別のホストを開くか、ホストを追加できます。",
+    openOtherHost: "別のホストを開く",
+    addHost: "ホストを追加",
+  },
   startup: {
     errorTitle: "問題が発生しました",
     errorDescription:

@@ -1428,6 +1428,15 @@ export const ar: TranslationResources = {
     body: "جرّب مرة أخرى لإعادة تحميل التطبيق. إذا استمر حدوث ذلك، فأرفق التفاصيل أدناه عند الإبلاغ عنه.",
     details: "التفاصيل",
   },
+  hostUnavailable: {
+    reconnectingTitle: "جارٍ إعادة الاتصال بهذا المضيف…",
+    reconnectingBody:
+      "يعيد Paseo إضافة هذا المضيف. ستتابع هذه الصفحة من حيث توقفت بمجرد أن يصبح جاهزًا.",
+    title: "هذا المضيف غير متاح",
+    body: "تمت إزالته أو تغيّر وصولك إليه. يمكنك البقاء هنا أو فتح مضيف آخر أو إضافة مضيف.",
+    openOtherHost: "فتح مضيف آخر",
+    addHost: "إضافة مضيف",
+  },
   startup: {
     errorTitle: "حدث خطأ ما",
     errorDescription:

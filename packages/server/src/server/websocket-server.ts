@@ -537,6 +537,8 @@ interface SessionConnectionBase {
   managedAuthoritySignature: string | null;
   managedLeaseExpiryTimeout: ReturnType<typeof setTimeout> | null;
   managedLeaseRefreshTimeout: ReturnType<typeof setTimeout> | null;
+  /** The last lease refresh could not reach the Hub (network, timeout, 5xx), as opposed to a denial. */
+  managedLeaseRefreshUnreachable: boolean;
   requiresManagedAccessInExternalMode: boolean;
 }
 
@@ -1514,6 +1516,7 @@ export class VoiceAssistantWebSocketServer {
         admission.leaseId === undefined ? null : managedAuthoritySignature(admission),
       managedLeaseExpiryTimeout: null,
       managedLeaseRefreshTimeout: null,
+      managedLeaseRefreshUnreachable: false,
       requiresManagedAccessInExternalMode,
     };
     connection =
@@ -2372,6 +2375,14 @@ export class VoiceAssistantWebSocketServer {
     const expiryTimeout = setTimeout(() => {
       if (connection.managedLeaseExpiryTimeout !== expiryTimeout) return;
       connection.managedLeaseExpiryTimeout = null;
+      if (connection.managedLeaseRefreshUnreachable) {
+        // The Hub never answered the renewal; nothing was revoked. The client keeps the Host and
+        // reconnects with a fresh ticket once the Hub is reachable again.
+        void this.closeManagedConnection(connection, MANAGED_ACCESS_UNAVAILABLE_REASON, {
+          code: MANAGED_ACCESS_UNAVAILABLE_CLOSE_CODE,
+        });
+        return;
+      }
       void this.closeManagedConnection(connection, "Managed access lease expired");
     }, remainingMs);
     expiryTimeout.unref?.();
@@ -2397,6 +2408,7 @@ export class VoiceAssistantWebSocketServer {
     if (leaseId === null || refresh === undefined) return;
     try {
       const admission = await refresh(leaseId);
+      connection.managedLeaseRefreshUnreachable = false;
       if (connection.managedLeaseExpiryTimeout === null) return;
       if (
         admission.leaseId !== leaseId ||
@@ -2418,6 +2430,12 @@ export class VoiceAssistantWebSocketServer {
       }
       this.scheduleManagedLease(connection, admission.leaseExpiresAt);
     } catch (error) {
+      if (isDefinitiveAdmissionDenial(error)) {
+        connection.connectionLogger.warn({ err: error, leaseId }, "Hub refused the lease renewal");
+        void this.closeManagedConnection(connection, "Managed access lease revoked");
+        return;
+      }
+      connection.managedLeaseRefreshUnreachable = true;
       const remainingMs = currentLeaseExpiresAt - Date.now();
       connection.connectionLogger.warn({ err: error, leaseId }, "Managed access refresh failed");
       if (remainingMs <= 1_000 || connection.managedLeaseExpiryTimeout === null) return;

@@ -1437,6 +1437,15 @@ export const ko: TranslationResources = {
     body: "앱을 다시 로드해 보세요. 이런 일이 계속 발생하면 신고할 때 아래 세부정보를 포함하세요.",
     details: "세부",
   },
+  hostUnavailable: {
+    reconnectingTitle: "이 호스트에 다시 연결하는 중…",
+    reconnectingBody:
+      "Paseo가 이 호스트를 다시 추가하고 있습니다. 준비되면 이 페이지가 중단한 곳에서 이어집니다.",
+    title: "이 호스트를 사용할 수 없습니다",
+    body: "삭제되었거나 접근 권한이 변경되었습니다. 여기 머무르거나 다른 호스트를 열거나 호스트를 추가할 수 있습니다.",
+    openOtherHost: "다른 호스트 열기",
+    addHost: "호스트 추가",
+  },
   startup: {
     errorTitle: "문제가 발생했습니다",
     errorDescription:
