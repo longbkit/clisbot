@@ -342,7 +342,7 @@ routes:
 A message must fit the bot, its conversation and its route. Each field is a
 positive number, `off`, or left out. Left out means no limit, except on an
 open-audience route, which defaults to 8000 characters, 10 messages per sender
-and 60 per minute, 2 concurrent runs and 900 seconds. There is no ceiling: set
+and 60 per minute, 8 concurrent runs and 900 seconds. There is no ceiling: set
 any number or turn a default off.
 
 Over a limit, an incoming message waits in the ingress queue and runs when there

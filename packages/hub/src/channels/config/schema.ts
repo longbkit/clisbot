@@ -637,12 +637,18 @@ export type ChannelLimitName = (typeof CHANNEL_LIMIT_NAMES)[number];
  * What an open-audience Route gets for a leaf it leaves unset. Only a default:
  * the configurator may raise any of them or turn it `off`. Every other scope
  * defaults to no limit.
+ *
+ * `maxConcurrentRuns` is the Host's own create gate (`MAX_CONCURRENT_CREATES_PER_HOST`):
+ * below it the Route refuses work the Host would have taken, and a busy channel reads as
+ * a bot answering one person at a time (verified live 2026-09-23 at 2: four people in one
+ * channel were served ~25 s apart). Above it the Host's gate is the one that pushes back,
+ * which is where the decision belongs — it knows the machine.
  */
 export const OPEN_AUDIENCE_ROUTE_LIMITS: Readonly<Partial<Record<ChannelLimitName, number>>> = {
   maxInputCharacters: 8_000,
   messagesPerMinutePerSender: 10,
   messagesPerMinute: 60,
-  maxConcurrentRuns: 2,
+  maxConcurrentRuns: 8,
   maxRuntimeSeconds: 15 * 60,
 };
 
