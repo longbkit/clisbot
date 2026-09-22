@@ -7906,6 +7906,27 @@ export class Session {
     }
   }
 
+  private async resolveTimelineAgent(
+    agentId: string,
+  ): Promise<{ snapshot: { provider: string }; agentPayload: AgentSnapshotPayload }> {
+    const storedRecord = await this.agentStorage.get(agentId);
+    if (storedRecord && (await this.agentManager.hasStoredTimeline(agentId))) {
+      // The stored record has no live permission requests or runtime state; a loaded agent
+      // answers with its live snapshot so a timeline page never hides a pending question.
+      const liveAgent = this.agentManager.getAgent(agentId);
+      const agentPayload = liveAgent
+        ? await this.buildAgentPayload(liveAgent)
+        : this.buildStoredAgentPayload(storedRecord);
+      return { snapshot: storedRecord, agentPayload };
+    }
+    const snapshot = await ensureAgentLoaded(agentId, {
+      agentManager: this.agentManager,
+      agentStorage: this.agentStorage,
+      logger: this.sessionLogger,
+    });
+    return { snapshot, agentPayload: await this.buildAgentPayload(snapshot) };
+  }
+
   private async handleFetchAgentTimelineRequest(
     msg: Extract<SessionInboundMessage, { type: "fetch_agent_timeline_request" }>,
     source?: object,
@@ -7922,20 +7943,7 @@ export class Session {
       : undefined;
 
     try {
-      const storedRecord = await this.agentStorage.get(msg.agentId);
-      const canReadStored = await this.agentManager.hasStoredTimeline(msg.agentId);
-      const snapshot =
-        canReadStored && storedRecord
-          ? storedRecord
-          : await ensureAgentLoaded(msg.agentId, {
-              agentManager: this.agentManager,
-              agentStorage: this.agentStorage,
-              logger: this.sessionLogger,
-            });
-      const agentPayload =
-        canReadStored && storedRecord
-          ? this.buildStoredAgentPayload(storedRecord)
-          : await this.buildAgentPayload(snapshot as ManagedAgent);
+      const { snapshot, agentPayload } = await this.resolveTimelineAgent(msg.agentId);
 
       const { fetchedControlTimeline, selectedTimeline } = await this.fetchTimelineProjection({
         agentId: msg.agentId,

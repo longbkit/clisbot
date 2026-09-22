@@ -76,13 +76,16 @@ export class AgentDirectoryReplica {
       serverId: this.serverId,
       agent: normalizeAgentSnapshot(payload, this.serverId),
     });
+    // A timeline page may carry the stored record, which never holds live permission requests.
+    // Once the agent is known, pending requests stay owned by agent updates and permission events.
     const normalized: Agent = {
       ...timelineAgent,
       projectPlacement: timelineAgent.projectPlacement ?? existing?.projectPlacement,
+      pendingPermissions: existing?.pendingPermissions ?? timelineAgent.pendingPermissions,
     };
     const accepted = this.storeProjection.accept(normalized);
     this.members.add(accepted.id);
-    this.storeProjection.replacePendingPermissions(accepted);
+    if (!existing) this.storeProjection.replacePendingPermissions(accepted);
     this.storeProjection.publishActivity(accepted);
     if (accepted.archivedAt) {
       clearArchiveAgentPending({ queryClient, serverId: this.serverId, agentId: accepted.id });

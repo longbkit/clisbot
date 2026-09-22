@@ -95,6 +95,64 @@ describe("AgentDirectoryReplica", () => {
     store.clearSession(serverId);
   });
 
+  it("keeps pending questions when a timeline page carries the stored agent record", () => {
+    const serverId = "agent-replica-timeline-pending";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null as unknown as DaemonClient);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const question = {
+      id: "question-1",
+      provider: "codex",
+      name: "request_user_input",
+      kind: "question" as const,
+      input: { questions: [] },
+    };
+    replica.commitSnapshot([entry({ ...payload("live"), pendingPermissions: [question] })], []);
+    const pendingKeys = () =>
+      Array.from(store.getSession(serverId)?.pendingPermissions.keys() ?? []);
+    expect(pendingKeys()).toHaveLength(1);
+
+    // Same updatedAt as the live agent, but read from storage: no pending requests.
+    expect(replica.submitTimelineAgent(replica.captureTimeline("agent"), payload("stored"))).toBe(
+      true,
+    );
+
+    expect(pendingKeys()).toHaveLength(1);
+    expect(store.getSession(serverId)?.agents.get("agent")?.pendingPermissions).toEqual([question]);
+    expect(store.getSession(serverId)?.agents.get("agent")?.title).toBe("stored");
+    store.clearSession(serverId);
+  });
+
+  it("takes pending questions from the timeline agent on a cache miss", () => {
+    const serverId = "agent-replica-timeline-pending-miss";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null as unknown as DaemonClient);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const question = {
+      id: "question-1",
+      provider: "codex",
+      name: "request_user_input",
+      kind: "question" as const,
+      input: { questions: [] },
+    };
+
+    replica.submitTimelineAgent(replica.captureTimeline("agent"), {
+      ...payload("network"),
+      pendingPermissions: [question],
+    });
+
+    expect(store.getSession(serverId)?.pendingPermissions.size).toBe(1);
+    store.clearSession(serverId);
+  });
+
   it("persists stream-only turn transitions through the agent owner", () => {
     const serverId = "agent-replica-stream-turn";
     const store = useSessionStore.getState();

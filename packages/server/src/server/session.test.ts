@@ -6473,3 +6473,106 @@ test("provider snapshots preserve versionless visibility while capabilities upda
   ]);
   expect(references.compactSnapshot!.entries[0]!.modes![0]!.icon).toBe("ShieldCheck");
 });
+
+describe("fetch agent timeline agent snapshot", () => {
+  const question = {
+    id: "question-1",
+    provider: "codex",
+    name: "request_user_input",
+    kind: "question",
+    input: { questions: [] },
+  };
+
+  function createTimelineSession(liveAgent: Record<string, unknown> | null) {
+    const messages: unknown[] = [];
+    const storedRecord = createStoredAgentRecord({
+      id: "agent-q",
+      cwd: "/tmp/repo",
+      updatedAt: "2026-09-22T07:09:53.175Z",
+    });
+    const markAgentInUse = vi.fn();
+    const session = createSessionForTest({
+      messages,
+      agentManager: {
+        getAgent: vi.fn(() => liveAgent),
+        markAgentInUse,
+        hasStoredTimeline: vi.fn().mockResolvedValue(true),
+        fetchProjectedTimelineForRead: vi.fn().mockResolvedValue(null),
+        fetchTimelineForRead: vi.fn().mockResolvedValue({
+          epoch: "epoch-1",
+          direction: "tail",
+          reset: false,
+          staleCursor: false,
+          gap: false,
+          window: { minSeq: 0, maxSeq: 0, nextSeq: 1 },
+          hasOlder: false,
+          hasNewer: false,
+          rows: [],
+        }),
+      },
+      agentStorage: { get: vi.fn().mockResolvedValue(storedRecord) },
+    });
+    return { session, messages, markAgentInUse };
+  }
+
+  async function fetchTimelineAgent(session: Session, messages: unknown[]) {
+    await session.handleMessage({
+      type: "fetch_agent_timeline_request",
+      requestId: "timeline-1",
+      agentId: "agent-q",
+      projection: "canonical",
+    });
+    const response = messages.find(
+      (
+        message,
+      ): message is Extract<SessionOutboundMessage, { type: "fetch_agent_timeline_response" }> =>
+        (message as { type?: string }).type === "fetch_agent_timeline_response",
+    );
+    expect(response?.payload.error).toBeNull();
+    return response?.payload.agent;
+  }
+
+  test("a loaded agent answers with its live snapshot, keeping pending questions", async () => {
+    const { session, messages, markAgentInUse } = createTimelineSession({
+      id: "agent-q",
+      provider: "codex",
+      cwd: "/tmp/repo",
+      config: {},
+      createdAt: new Date("2026-09-22T07:00:00.000Z"),
+      updatedAt: new Date("2026-09-22T07:09:53.175Z"),
+      lastUserMessageAt: null,
+      lifecycle: "idle",
+      capabilities: {
+        supportsStreaming: true,
+        supportsSessionPersistence: true,
+        supportsDynamicModes: true,
+        supportsMcpServers: true,
+        supportsReasoningStream: true,
+        supportsToolInvocations: true,
+      },
+      currentModeId: null,
+      availableModes: [],
+      features: [],
+      pendingPermissions: new Map([[question.id, question]]),
+      persistence: null,
+      labels: {},
+      attention: { requiresAttention: false },
+    });
+
+    const agent = await fetchTimelineAgent(session, messages);
+
+    expect(agent?.pendingPermissions).toEqual([expect.objectContaining({ id: "question-1" })]);
+    expect(agent?.capabilities.supportsStreaming).toBe(true);
+    expect(markAgentInUse).not.toHaveBeenCalled();
+  });
+
+  test("an unloaded agent is answered from storage without loading it", async () => {
+    const { session, messages, markAgentInUse } = createTimelineSession(null);
+
+    const agent = await fetchTimelineAgent(session, messages);
+
+    expect(agent?.id).toBe("agent-q");
+    expect(agent?.pendingPermissions).toEqual([]);
+    expect(markAgentInUse).not.toHaveBeenCalled();
+  });
+});
