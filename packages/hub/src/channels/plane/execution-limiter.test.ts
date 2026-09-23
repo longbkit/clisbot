@@ -6,7 +6,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import { ChannelExecutionLimiter } from "./execution-limiter.js";
 
 const defaults: EffectiveDefaults = {
@@ -23,7 +22,7 @@ const defaults: EffectiveDefaults = {
       typingIndicator: false,
       messageReaction: "off",
     },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "none",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },
@@ -340,6 +339,11 @@ describe("ChannelExecutionLimiter", () => {
   it("admits without a lease when no scope limits anything", () => {
     const f = fixture();
     delete f.route.limits;
+    // A member Route: the open-audience defaults are the only thing a Route
+    // gets without authoring limits, and they are not for this one.
+    f.route.audienceRules = [
+      compileAudienceRule({ who: { roles: ["member"] }, where: { conversations: ["C_PUBLIC"] } }),
+    ];
     const admitted = f.limiter.admit({
       account: f.account,
       route: f.route,

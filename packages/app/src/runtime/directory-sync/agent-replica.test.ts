@@ -127,6 +127,36 @@ describe("AgentDirectoryReplica", () => {
     store.clearSession(serverId);
   });
 
+  it("takes pending questions from a timeline page that carries them for a known agent", () => {
+    const serverId = "agent-replica-timeline-pending-known";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null as unknown as DaemonClient);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const question = {
+      id: "question-1",
+      provider: "codex",
+      name: "request_user_input",
+      kind: "question" as const,
+      input: { questions: [] },
+    };
+    replica.commitSnapshot([entry(payload("live"))], []);
+    expect(store.getSession(serverId)?.pendingPermissions.size).toBe(0);
+
+    // The page carries a live request the replica has not seen: it is the fresher one.
+    replica.submitTimelineAgent(replica.captureTimeline("agent"), {
+      ...payload("page"),
+      pendingPermissions: [question],
+    });
+
+    expect(store.getSession(serverId)?.agents.get("agent")?.pendingPermissions).toEqual([question]);
+    expect(store.getSession(serverId)?.pendingPermissions.size).toBe(1);
+    store.clearSession(serverId);
+  });
+
   it("takes pending questions from the timeline agent on a cache miss", () => {
     const serverId = "agent-replica-timeline-pending-miss";
     const store = useSessionStore.getState();

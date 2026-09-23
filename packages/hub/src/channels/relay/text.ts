@@ -47,7 +47,13 @@ export function appendThreadLink(
   return `${text}\n\n${link}`;
 }
 
-/** The ledger event-turn id: the agent + stream turn id (stable across replay). */
-export function ledgerTurnId(scopeId: string, turnId: string): string {
-  return `${scopeId}:${turnId}`;
+/**
+ * The ledger event-turn id: the agent + stream turn id (stable across replay),
+ * and a suffix for everything that is not the answer. Status lines get their
+ * own id so their sequence counter cannot shift the answer's key — how many
+ * of them went out depends on the clock, and a shifted key is a second post
+ * of the same answer after a replay.
+ */
+export function ledgerTurnId(scopeId: string, turnId: string, outputKind: string): string {
+  return outputKind === "assistant" ? `${scopeId}:${turnId}` : `${scopeId}:${turnId}:${outputKind}`;
 }

@@ -186,6 +186,20 @@ export type SyncToolCallsGroup = z.infer<typeof SyncToolCallsGroupSchema>;
 export const SyncToolCallsSchema = z.union([z.boolean(), SyncToolCallsGroupSchema]).optional();
 export type SyncToolCalls = z.infer<typeof SyncToolCallsSchema>;
 
+/**
+ * What a tool-activity leaf resolves to when no layer authored it. Applied
+ * where the leaves are READ (`toolActivity`), never compiled into a Route:
+ * a Route's compiled block is hashed into `routeFingerprint`, and a floor
+ * value there would rewrite every fingerprint on upgrade (the same rule as
+ * the conversation leaves — `config/conversation.ts`).
+ */
+export const TOOL_ACTIVITY_FLOOR = {
+  enabled: false,
+  detail: "short",
+  throttleSeconds: 30,
+  whenThrottled: "update",
+} as const;
+
 export const SyncDefaultsSchema = z
   .object({
     finalAnswers: z.boolean().optional(),
@@ -293,14 +307,10 @@ export const ORG_DEFAULTS = {
       typingIndicator: true,
       messageReaction: "off",
     },
-    // Tool activity is off at the floor; the other three leaves are what it
-    // resolves to the moment a layer turns it on.
-    toolCalls: {
-      enabled: false,
-      detail: "short",
-      throttleSeconds: 30,
-      whenThrottled: "update",
-    },
+    // The bare boolean IS the compiled shape when no layer authors a rendering
+    // leaf (`TOOL_ACTIVITY_FLOOR` holds those), so a revision written before
+    // the group existed keeps the `routeFingerprint` it always had.
+    toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

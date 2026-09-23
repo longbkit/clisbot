@@ -4,7 +4,6 @@
 // cannot reliably observe because it sends the prompt before subscribing.
 import { describe, expect, it } from "vitest";
 import type { EffectiveDefaults } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import {
   createProcessingController,
   processingSurfaceFor,
@@ -64,7 +63,7 @@ describe("processingSurfaceFor", () => {
     ({
       finalAnswers: true,
       progress: { progressMessage: true, typingIndicator: true, messageReaction: "off" },
-      toolCalls: toolActivityDefaults(false),
+      toolCalls: false,
       threadLink: "full",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
       ...over,

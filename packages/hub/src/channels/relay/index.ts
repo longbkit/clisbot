@@ -9,7 +9,7 @@
 // approvals are two handlers on one stream path, never two consumers.
 import type { ChannelStore } from "../../db/channels.js";
 import { isHubFinishExecutionToolName } from "../../hub/protocol.js";
-import type { EffectiveDefaults } from "../config/compile.js";
+import { toolActivity, type EffectiveDefaults } from "../config/compile.js";
 import type { AgentStreamTimelineItem } from "../daemon/types.js";
 import type { RelayedStreamEvent, SubagentStreamEvent } from "../plane/stream.js";
 import {
@@ -27,7 +27,7 @@ import type {
   StreamingFinalizeTransport,
 } from "../streaming/index.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
-import { deliverRelayPost, type OutputKind } from "./delivery.js";
+import { deliverRelayPost, type OutputKind, type RelayPostOutcome } from "./delivery.js";
 import {
   failureNotice,
   isSystemErrorText,
@@ -39,6 +39,7 @@ import { appendThreadLink, ledgerTurnId, stripAssistantBoundary } from "./text.j
 import {
   relayToolCall,
   toolActivityLine,
+  type ToolActivity,
   type ToolActivityTurn,
   type ToolLineWriter,
 } from "./tool-activity.js";
@@ -47,15 +48,18 @@ export { appendThreadLink } from "./text.js";
 
 /**
  * The relay knobs of a scope: root gates on `sync`, subagents on
- * `sync.subagents`. `progress` is the group's TEXT leaf only — the typing
- * indicator and the reaction are turn-level surfaces driven from the turn
- * lifecycle, not per-item relay gates, so they never enter this type. It gates
- * the separate progress MESSAGE (`sync.streaming.mode: progress`); the tool
- * lines in the thread are gated by `toolCalls` alone.
+ * `sync.subagents`. The typing indicator and the reaction are turn-level
+ * surfaces driven from the turn lifecycle, not per-item relay gates, so they
+ * never enter this type.
  */
-type SyncKnobs = Pick<EffectiveDefaults["sync"], "finalAnswers" | "toolCalls"> & {
-  progress: EffectiveDefaults["sync"]["progress"]["progressMessage"];
-};
+interface SyncKnobs {
+  finalAnswers: boolean;
+  /** The separate progress MESSAGE (`sync.streaming.mode: progress`): its own
+   * surface, with its own switch. The tool lines in the thread are gated by
+   * `toolCalls`, so turning one off never silences the other. */
+  progress: boolean;
+  toolCalls: ToolActivity;
+}
 
 /** Edit a message this relay already posted — the vertical's own edit verb,
  * the one the streaming drafts drive. Absent = the channel cannot edit. */
@@ -68,7 +72,7 @@ function rootSyncKnobs(sync: EffectiveDefaults["sync"]): SyncKnobs {
   return {
     finalAnswers: sync.finalAnswers,
     progress: sync.progress.progressMessage,
-    toolCalls: sync.toolCalls,
+    toolCalls: toolActivity(sync.toolCalls),
   };
 }
 
@@ -79,7 +83,7 @@ function subagentSyncKnobs(sync: EffectiveDefaults["sync"]): SyncKnobs {
   return {
     finalAnswers: sync.subagents.finalAnswers,
     progress: sync.subagents.progress,
-    toolCalls: { ...sync.toolCalls, enabled: sync.subagents.toolCalls },
+    toolCalls: { ...toolActivity(sync.toolCalls), enabled: sync.subagents.toolCalls },
   };
 }
 
@@ -132,8 +136,16 @@ interface TurnState extends ToolActivityTurn {
   postedAssistantMessageIds: Set<string>;
   /** Exact assistant payloads already closed in this turn (guards id drift/replay). */
   postedAssistantTexts: Set<string>;
-  /** Ledger sequence counter for this turn's relay posts, in order. */
+  /**
+   * Ledger sequence counter for this turn's ANSWER posts, in order. Status
+   * lines count in their own space (`nextToolSequence`) under their own ledger
+   * turn id: how many of them went out depends on the clock, and the answer's
+   * ledger key must not move with it — a shifted key is a second post of the
+   * same answer after a replay.
+   */
   nextSequence: number;
+  /** Ledger sequence counter for this turn's tool lines. */
+  nextToolSequence: number;
   /** True once the turn closed (no further relay posts for it). */
   closed: boolean;
 }
@@ -437,10 +449,9 @@ export class RelayEngine {
   }
 
   /**
-   * One tool call. `sync.toolCalls` is the ONE gate: a Route with tool
-   * activity off says nothing about tools, whatever the progress knobs say.
-   * The tool-activity surface owns the line and the message it lives on; this
-   * only hands it the writer that keeps the ledger and the thread link here.
+   * One tool call. The two surfaces it feeds have separate switches: the
+   * thread's tool lines are gated by `sync.toolCalls`, the turn's progress
+   * message by `sync.progress`. Turning one off never silences the other.
    */
   private async onToolCall(
     stream: RelayStream,
@@ -450,12 +461,12 @@ export class RelayEngine {
     prefix: string,
   ): Promise<void> {
     // `finish_execution` is Workflow control-plane plumbing, not work the
-    // user asked the Agent to perform. Keep it out of the tool surface
-    // without muting useful tool visibility.
+    // user asked the Agent to perform. Keep it out of both surfaces without
+    // muting useful tool visibility.
     if (item.name !== undefined && isHubFinishExecutionToolName(item.name)) return;
+    await this.raiseProgressCard(stream, key, sync, item, prefix);
     if (!sync.toolCalls.enabled) return;
     const turn = this.turn(stream, key);
-    await this.raiseProgressCard(stream, key, sync, item, prefix);
     await relayToolCall(
       { clock: this.relay.clock, writer: this.toolLineWriter(stream, key, turn) },
       turn,
@@ -469,6 +480,7 @@ export class RelayEngine {
    * channel's edit verb with this relay's thread link on it. */
   private toolLineWriter(stream: RelayStream, key: string, turn: TurnState): ToolLineWriter {
     return {
+      canEdit: this.relay.editPost !== undefined,
       post: async (line) => await this.post(stream, key, turn, line, false, "tool"),
       edit: async (externalMessageId, line) =>
         await this.editPosted(stream, externalMessageId, line),
@@ -509,8 +521,9 @@ export class RelayEngine {
     return true;
   }
 
-  /** Feed the separate progress MESSAGE (`sync.streaming.mode: progress`) —
-   * the one surface `sync.progress` still gates on this path. */
+  /** Feed the turn's progress MESSAGE (`sync.streaming.mode: progress`), which
+   * `sync.progress` gates. It shows the running tool, so it is rendered at the
+   * Route's tool detail even when the thread's own tool lines are off. */
   private async raiseProgressCard(
     stream: RelayStream,
     key: string,
@@ -602,8 +615,8 @@ export class RelayEngine {
 
   // --- Delivery (record-before-post) ----------------------------------------
 
-  /** One relay post; returns the delivered message's native id when the
-   * channel reported one (a tool line keeps it, to edit the line later). */
+  /** One relay post; says whether it reached the channel and, when it did,
+   * the message's native id (a tool line keeps it, to rewrite it later). */
   private async post(
     stream: RelayStream,
     turnId: string,
@@ -612,12 +625,14 @@ export class RelayEngine {
     finalAnswer: boolean,
     outputKind: OutputKind,
     transport?: StreamingFinalizeTransport | undefined,
-  ): Promise<string | undefined> {
+  ): Promise<RelayPostOutcome> {
     const context = stream.context;
     // One post per recorded sequence, in order; the final answer is the turn's
-    // last relay post.
-    const sequence = turn.nextSequence;
-    turn.nextSequence += 1;
+    // last ANSWER post. Status lines count in their own space, so the answer's
+    // key does not move with how many of them the clock let through.
+    const sequence = outputKind === "assistant" ? turn.nextSequence : turn.nextToolSequence;
+    if (outputKind === "assistant") turn.nextSequence += 1;
+    else turn.nextToolSequence += 1;
     return await deliverRelayPost(this.relay, {
       context,
       key: {
@@ -625,7 +640,7 @@ export class RelayEngine {
         accountId: context.accountId,
         externalConversationId: context.externalConversationId,
         externalThreadId: context.externalThreadId,
-        eventTurnId: ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId),
+        eventTurnId: ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId, outputKind),
         sequence,
       },
       location: replyLocationFor(context),
@@ -649,9 +664,11 @@ export class RelayEngine {
         pendingAssistantMessageId: undefined,
         postedAssistantMessageIds: new Set(),
         postedAssistantTexts: new Set(),
-        toolLine: undefined,
+        toolLines: new Map(),
+        liveToolCall: undefined,
         lastToolPostAt: null,
         nextSequence: 0,
+        nextToolSequence: 0,
         closed: false,
       };
       stream.turns.set(turnId, turn);

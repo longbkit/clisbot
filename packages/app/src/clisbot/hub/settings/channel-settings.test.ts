@@ -7,11 +7,11 @@ import {
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
-  routeEffectiveAgent,
   channelRouteFollowUp,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
   parseChannelFollowUpTtlMinutes,
 } from "../channel-configuration";
+import { routeEffectiveAgent } from "../channel-route-target";
 
 describe("buildChannelAccountCandidate", () => {
   it("round-trips the one Advanced YAML candidate without creating another store", () => {

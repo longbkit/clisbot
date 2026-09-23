@@ -94,12 +94,11 @@ import {
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
   routeContainsText,
-  routeEffectiveAgent,
   type ChannelConfigurationRecord,
   type ChannelRouteBehavior,
   type ChannelRouteQuestions,
-  type ChannelRouteTarget,
 } from "../channel-configuration";
+import { routeEffectiveAgent, type ChannelRouteTarget } from "../channel-route-target";
 import { inheritedChannelRouteConversation } from "../channel-route-conversation";
 import { inheritedChannelRouteToolActivity } from "../channel-route-tool-activity";
 import {

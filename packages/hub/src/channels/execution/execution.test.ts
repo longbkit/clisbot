@@ -30,7 +30,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "../config/schema.js";
 import type {
   ChannelPlaneDeps,
@@ -71,7 +70,7 @@ const DEFAULTS: EffectiveDefaults = {
       typingIndicator: false,
       messageReaction: "off",
     },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

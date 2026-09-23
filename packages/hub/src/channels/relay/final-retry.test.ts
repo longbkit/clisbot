@@ -13,7 +13,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import { ManualClock } from "../plane/clock.js";
 import { outboundFailure, type OutboundFailureKind } from "../plane/outbound-failure.js";
 import type { OutboundPostResult, PlaneLogger, PostFn, StreamContext } from "../plane/types.js";
@@ -40,7 +39,7 @@ function defaults(toolActivity: boolean): EffectiveDefaults {
     sync: {
       finalAnswers: true,
       progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-      toolCalls: toolActivityDefaults(toolActivity),
+      toolCalls: toolActivity,
       threadLink: "none",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },
@@ -155,17 +154,19 @@ function retrierFor(post: PostFn, clock: ManualClock, accountId: string): FinalA
   });
 }
 
-async function ledgerRow(accountId: string, turnId: string) {
+async function ledgerRow(accountId: string, turnId: string, outputKind = "assistant") {
   const record = await store.findDeliveryLedgerRecord(
     ORGANIZATION_ID,
     accountId,
     "out",
     "C1",
     "1.0",
-    `${AGENT_ID}:${turnId}`,
+    // Status lines carry their own event-turn id, so their sequence counter
+    // can never shift the answer's ledger key (`relay/text.ts`).
+    outputKind === "assistant" ? `${AGENT_ID}:${turnId}` : `${AGENT_ID}:${turnId}:${outputKind}`,
     0,
   );
-  assert.ok(record, "the answer's ledger row exists");
+  assert.ok(record, "the ledger row exists");
   return record;
 }
 
@@ -270,7 +271,12 @@ describe("final answer retry", () => {
       assert.match(row.failureReason ?? "", new RegExp(kind));
     }
     // A tool line that may have landed is not re-posted on replay either.
-    const running = { type: "tool_call" as const, name: "shell", status: "running" };
+    const running = {
+      type: "tool_call" as const,
+      callId: "c-uncertain",
+      name: "shell",
+      status: "completed",
+    };
     const first = scriptedPost([failed("timeout")]);
     await engineFor(first.post, clock, ctx).onStream(AGENT_ID, {
       kind: "timeline",
@@ -391,13 +397,14 @@ describe("final answer retry", () => {
     const clock = new ManualClock(START);
     const script = scriptedPost([failed("unavailable")]);
     const engine = engineFor(script.post, clock, context("progress", { toolActivity: true }));
+    // This channel has no edit verb, so a call says nothing until it ends.
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
       turnId: "turn-p",
-      item: { type: "tool_call", name: "shell", status: "running" },
+      item: { type: "tool_call", callId: "c1", name: "shell", status: "completed" },
     });
-    assert.deepEqual(script.posted, ["Running shell…"]);
-    const row = await ledgerRow("progress", "turn-p");
+    assert.deepEqual(script.posted, ["Finished shell"]);
+    const row = await ledgerRow("progress", "turn-p", "tool");
     assert.equal(row.status, "failed");
     assert.equal(row.nextAttemptAt, null);
     assert.equal((await outboundFailures("progress")).length, 0);

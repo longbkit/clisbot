@@ -79,6 +79,7 @@ import { loadChannelVertical, type LoadedChannelVertical } from "../loader/load-
 import { runAsChannelAccount } from "../loader/hooks.js";
 import { setChannelSeamLogger } from "../loader/seam-logger.js";
 import { createStreamingDriver } from "../streaming/index.js";
+import { HostLossNotifier } from "./host-loss.js";
 import { isEnabled } from "../policy.js";
 import { isSupportedChannel } from "../catalog.js";
 import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
@@ -573,6 +574,8 @@ interface AccountHandle {
   abortController: AbortController;
   plane?: ChannelPlane;
   daemon?: DaemonConnection;
+  /** Decides when a dropped socket counts as the Host going away. */
+  hostLoss?: HostLossNotifier;
   vertical?: LoadedChannelVertical;
   install?: ChannelInstallResult;
   pin?: string;
@@ -1424,6 +1427,19 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       this.logPlaneOutcome(handle, result);
       return result;
     });
+    // Most "disconnected" here is a socket flap the client reconnects through
+    // with the turn still running, so a drop waits out a grace first.
+    const hostLoss = (handle.hostLoss = new HostLossNotifier({
+      notify: async () => {
+        await plane.onHostLost().catch((error: unknown) => {
+          this.logger.warn("channel interrupted-turn notices failed", {
+            channel: handle.channel,
+            account: handle.accountId,
+            error: errorMessage(error),
+          });
+        });
+      },
+    }));
     const daemonOptions: ChannelDaemonClientOptions = {
       ...this.options.daemon,
       onStream: (payload) => {
@@ -1461,21 +1477,18 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
             channel: handle.channel,
             account: handle.accountId,
           });
-        } else {
-          this.logger.warn("channel daemon disconnected", {
-            channel: handle.channel,
-            account: handle.accountId,
-          });
-          // A turn the Host was running dies with it and its terminal event
-          // never comes: the conversations that had one are told, once.
-          void plane.onHostLost().catch((error: unknown) => {
-            this.logger.warn("channel interrupted-turn notices failed", {
-              channel: handle.channel,
-              account: handle.accountId,
-              error: errorMessage(error),
-            });
-          });
+          hostLoss.connected();
+          return;
         }
+        this.logger.warn("channel daemon disconnected", {
+          channel: handle.channel,
+          account: handle.accountId,
+        });
+        // A turn the Host was running dies with it and its terminal event
+        // never comes: the conversations that had one are told, once — but
+        // only after the grace, because most drops here are a flap the client
+        // reconnects through with the turn still running.
+        hostLoss.disconnected();
       },
     };
     // The daemon password defaults to the same env var the stock CLI client
@@ -2046,6 +2059,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       );
     }
     handle.abortController.abort();
+    handle.hostLoss?.stop();
     const drain = this.drains.get(handleKey(handle.channel, handle.accountId));
     if (drain !== undefined) {
       this.drains.delete(handleKey(handle.channel, handle.accountId));

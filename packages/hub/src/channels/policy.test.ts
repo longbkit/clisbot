@@ -8,7 +8,6 @@ import type {
   CompiledUser,
   EffectiveDefaults,
 } from "./config/compile.js";
-import { toolActivityDefaults } from "./config/compile.js";
 import type { RoleAssignment } from "./config/schema.js";
 import {
   approvalDecisionFor,
@@ -48,7 +47,7 @@ const DEFAULTS: EffectiveDefaults = {
       typingIndicator: false,
       messageReaction: "off",
     },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

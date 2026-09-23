@@ -17,7 +17,6 @@ import type {
   CompiledChannelAccount,
   CompiledRoute,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import { ManualClock } from "../plane/clock.js";
@@ -152,7 +151,7 @@ const DEFAULTS = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "final-only" as const,
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

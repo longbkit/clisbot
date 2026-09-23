@@ -18,7 +18,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import type { SyncStreaming } from "../config/schema.js";
 import { ManualClock } from "../plane/clock.js";
 import type {
@@ -59,7 +58,7 @@ function defaults(streaming: SyncStreaming | undefined, toolActivity = false): E
     sync: {
       finalAnswers: true,
       progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
-      toolCalls: toolActivityDefaults(toolActivity),
+      toolCalls: toolActivity,
       threadLink: "none",
       ...(streaming === undefined ? {} : { streaming }),
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
@@ -73,8 +72,8 @@ function context(params: {
   /** The reply anchor; Telegram's is a numeric forum topic id. */
   threadId?: string;
   streaming: SyncStreaming | undefined;
-  /** `sync.toolCalls`: the gate on every tool surface, the progress card
-   * included — the card is built from the turn's running tool calls. */
+  /** `sync.toolCalls`: the thread's own tool lines. The progress card is a
+   * separate surface with a separate switch (`sync.progress`). */
   toolActivity?: boolean;
 }): StreamContext {
   const route: CompiledRoute = {
@@ -725,9 +724,9 @@ describe("progress mode", () => {
   it("renders a running tool call through the vertical's progress blocks", async () => {
     const calls: Call[] = [];
     const { engine, posts } = harness({ outbound: slackOutbound(calls) });
-    engine.attach(
-      context({ conversation: "C0PROG", streaming: { mode: "progress" }, toolActivity: true }),
-    );
+    // The progress card has its own switch (`sync.progress`): a Route that
+    // never touched tool activity still gets it.
+    engine.attach(context({ conversation: "C0PROG", streaming: { mode: "progress" } }));
 
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
@@ -764,9 +763,7 @@ describe("progress mode", () => {
         return { ok: true, externalMessageId: "1720000000.000700" };
       },
     });
-    engine.attach(
-      context({ conversation: "C0PROG3", streaming: { mode: "progress" }, toolActivity: true }),
-    );
+    engine.attach(context({ conversation: "C0PROG3", streaming: { mode: "progress" } }));
 
     const running = (name: string) =>
       engine.onStream(AGENT_ID, {
@@ -785,6 +782,32 @@ describe("progress mode", () => {
       posts.filter((post) => post.blocks !== undefined).length,
       1,
       "the turn keeps one progress message",
+    );
+  });
+
+  it("keeps the progress card when the thread's tool lines are off", async () => {
+    const calls: Call[] = [];
+    const { engine, posts } = harness({ outbound: slackOutbound(calls) });
+    engine.attach(
+      context({
+        conversation: "C0PROG-OFF",
+        streaming: { mode: "progress" },
+        toolActivity: false,
+      }),
+    );
+
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-progress-off",
+      item: { type: "tool_call", callId: "c1", name: "bash", status: "running" },
+    });
+
+    const progressPost = posts.find((post) => post.blocks !== undefined);
+    assert.ok(progressPost, "the progress card is posted");
+    assert.deepEqual(
+      posts.filter((post) => post.blocks === undefined),
+      [],
+      "and no tool line goes into the thread",
     );
   });
 

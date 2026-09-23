@@ -13,6 +13,7 @@ import {
   editableAutomationYaml,
 } from "../triggers/configuration/workflow-document.js";
 import { applyAgentControls } from "./config/agent-controls.js";
+import { toolActivity } from "./config/compile.js";
 import type { ChannelControlPlane, CompiledRoute, EffectiveDefaults } from "./config/compile.js";
 import type { ApprovalRule } from "./config/schema.js";
 import { privilegeCovers } from "./config/privileges.js";
@@ -178,7 +179,7 @@ function sendsFinalAnswerOnly(defaults: EffectiveDefaults): boolean {
     defaults.outbound.path === "relay" &&
     sync.finalAnswers &&
     !sync.progress.progressMessage &&
-    !sync.toolCalls.enabled &&
+    !toolActivity(sync.toolCalls).enabled &&
     sync.threadLink === "none" &&
     (sync.streaming?.mode ?? "off") === "off" &&
     !sync.subagents.finalAnswers &&

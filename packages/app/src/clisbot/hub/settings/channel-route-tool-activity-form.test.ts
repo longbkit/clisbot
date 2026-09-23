@@ -52,12 +52,8 @@ describe("Show tool activity form model", () => {
       on: true,
       fields: { detail: "full", throttleSeconds: "5", whenThrottled: "update" },
     });
-    // The options were shown, so turning the switch on writes them.
-    expect(saved(open({ sync: { toolCalls: true } }, accountDefaults))).toEqual({
-      detail: "full",
-      throttleSeconds: 5,
-      whenThrottled: "update",
-    });
+    // The options stay the account's: a save writes the switch back as it was.
+    expect(saved(open({ sync: { toolCalls: true } }, accountDefaults))).toBe(true);
     expect(routeToolActivityDisplay(open({ sync: { toolCalls: false } }, accountDefaults)).on).toBe(
       false,
     );
@@ -74,7 +70,8 @@ describe("Show tool activity form model", () => {
       throttleSeconds: "5",
       whenThrottled: "skip",
     });
-    expect(saved(draft)).toEqual({ detail: "full", throttleSeconds: 5, whenThrottled: "skip" });
+    // Only the leaf the Route itself authors is written back.
+    expect(saved(draft)).toEqual({ detail: "full" });
   });
 
   it("falls back to what it inherits for an option written wrong", () => {
@@ -102,32 +99,42 @@ describe("Show tool activity form model", () => {
     expect(saved(inherited)).toBeUndefined();
   });
 
-  it("turns tool activity on from short / 30 / update and off as an explicit off", () => {
+  it("saves every stored spelling back as it was when nothing is edited", () => {
+    // The old form could only write `true`, and an account may set the options
+    // under it. A save that pins what was inherited takes the Route off them.
+    const accountDefaults = { sync: { toolCalls: { detail: "full", throttleSeconds: 5 } } };
+    const stored = [
+      true,
+      false,
+      { detail: "full" },
+      { throttleSeconds: 0 },
+      { detail: "name", throttleSeconds: 5, whenThrottled: "skip" },
+    ];
+    for (const toolCalls of stored) {
+      expect(saved(open({ sync: { toolCalls } }, accountDefaults))).toEqual(toolCalls);
+    }
+  });
+
+  it("writes only the option the owner changes", () => {
+    const inheritedOn = open({}, { sync: { toolCalls: { detail: "full", throttleSeconds: 5 } } });
+    expect(saved(setRouteToolActivityField(inheritedOn, "whenThrottled", "skip"))).toEqual({
+      whenThrottled: "skip",
+    });
+    // What the Route already authored stays beside the option just changed.
+    const authored = open({ sync: { toolCalls: { detail: "full" } } });
+    expect(saved(setRouteToolActivityField(authored, "throttleSeconds", "45"))).toEqual({
+      detail: "full",
+      throttleSeconds: 45,
+    });
+  });
+
+  it("turns tool activity on as a bare switch and off as an explicit off", () => {
     const on = setRouteToolActivityOn(open({}), true);
-    expect(saved(on)).toEqual({ detail: "short", throttleSeconds: 30, whenThrottled: "update" });
+    expect(saved(on)).toBe(true);
     expect(saved(setRouteToolActivityOn(on, false))).toBe(false);
     // A Route can turn off what its account turned on, and keeps no options when it does.
     const inheritedOn = open({}, { sync: { toolCalls: { detail: "full" } } });
     expect(saved(setRouteToolActivityOn(inheritedOn, false))).toBe(false);
-  });
-
-  it("writes each option the owner sets, over what the Route inherits", () => {
-    const inheritedOn = open({}, { sync: { toolCalls: { detail: "name", throttleSeconds: 5 } } });
-    expect(saved(setRouteToolActivityField(inheritedOn, "detail", "full"))).toEqual({
-      detail: "full",
-      throttleSeconds: 5,
-      whenThrottled: "update",
-    });
-    expect(saved(setRouteToolActivityField(inheritedOn, "throttleSeconds", "45"))).toEqual({
-      detail: "name",
-      throttleSeconds: 45,
-      whenThrottled: "update",
-    });
-    expect(saved(setRouteToolActivityField(inheritedOn, "whenThrottled", "skip"))).toEqual({
-      detail: "name",
-      throttleSeconds: 5,
-      whenThrottled: "skip",
-    });
   });
 
   it("refuses a throttle that is not a whole number of seconds", () => {
@@ -149,8 +156,7 @@ describe("Show tool activity form model", () => {
       "0",
     );
     expect(routeToolActivityDisplay(none).throttled).toBe(false);
-    // The choice is still written: it applies again the moment a throttle is set.
-    expect(saved(none)).toEqual({ detail: "short", throttleSeconds: 0, whenThrottled: "update" });
+    expect(saved(none)).toEqual({ throttleSeconds: 0 });
   });
 });
 

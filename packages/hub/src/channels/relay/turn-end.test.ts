@@ -15,7 +15,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import type { OutboundPath } from "../config/enums.js";
 import { ManualClock } from "../plane/clock.js";
 import type { StreamContext } from "../plane/types.js";
@@ -60,7 +59,7 @@ function defaults(path: OutboundPath): EffectiveDefaults {
     sync: {
       finalAnswers: relaysText,
       progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-      toolCalls: toolActivityDefaults(false),
+      toolCalls: false,
       threadLink: "none",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },

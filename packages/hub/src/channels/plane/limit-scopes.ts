@@ -4,7 +4,7 @@
 
 import { routeFingerprint } from "../bindings/index.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
-import type { ResolvedLimits } from "../config/limits.js";
+import { routeLimits, type ResolvedLimits } from "../config/limits.js";
 
 export const RATE_WINDOW_MS = 60_000;
 
@@ -36,8 +36,11 @@ export function limitScopes(target: {
       limits: account.limits.perConversation,
     });
   }
-  if (route?.limits !== undefined) {
-    scopes.push({ label: "Route", key: routeScopeKey(account, route), limits: route.limits });
+  // The open-audience defaults are applied HERE, not compiled into the Route:
+  // a default in the compiled block would rewrite its `routeFingerprint`.
+  const limits = route === undefined ? undefined : routeLimits(route);
+  if (route !== undefined && limits !== undefined) {
+    scopes.push({ label: "Route", key: routeScopeKey(account, route), limits });
   }
   return scopes;
 }

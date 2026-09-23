@@ -14,7 +14,6 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import { ManualClock } from "../plane/clock.js";
@@ -40,7 +39,7 @@ const DEFAULTS: EffectiveDefaults = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

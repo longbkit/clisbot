@@ -40,31 +40,49 @@ export interface RelayPostRequest {
   transport?: StreamingFinalizeTransport | undefined;
 }
 
+/** What one relay post did. `posted` is false only when the message never
+ * reached the channel; a replayed ledger row is true, because an earlier
+ * attempt already delivered it. */
+export interface RelayPostOutcome {
+  posted: boolean;
+  externalMessageId?: string | undefined;
+}
+
+const NOT_POSTED: RelayPostOutcome = { posted: false };
+
 /**
  * Record, post, and confirm or settle one relay post. Returns the delivered
  * message's native id when the channel reported one — a tool-activity line
- * keeps it so the same message can be rewritten as the call goes on.
+ * keeps it so the same message can be rewritten as the call goes on, and a
+ * replayed row answers with the id the first attempt recorded, so a replay
+ * takes the same decisions the first pass did.
  */
 export async function deliverRelayPost(
   deps: RelayDeliveryDeps,
   request: RelayPostRequest,
-): Promise<string | undefined> {
+): Promise<RelayPostOutcome> {
   const { context, key } = request;
   const recorded = await recordRow(deps, request);
-  if (recorded === undefined || !recorded.created) return undefined; // replay/restart: already handled
+  if (recorded === undefined) return NOT_POSTED;
+  if (!recorded.created) return replayedOutcome(recorded.record); // already handled
   const outputAttemptId = await context.outputDelivery?.begin();
   if (context.outputDelivery !== undefined && outputAttemptId === undefined) {
     await ledgerWrite(deps, request, "settle", () =>
       deps.store.failDelivery({ ...key, failureReason: "workflow output limit reached" }),
     );
-    return undefined;
+    return NOT_POSTED;
   }
   deps.logger.info?.("relay post started", { ...logFields(request) });
   const result = await (request.transport ?? deps.post)(postParams(request));
   if (result.ok) {
     await confirmPosted(deps, request, result);
     if (outputAttemptId !== undefined) await context.outputDelivery?.complete(outputAttemptId);
-    return result.externalMessageId;
+    return {
+      posted: true,
+      ...(result.externalMessageId === undefined
+        ? {}
+        : { externalMessageId: result.externalMessageId }),
+    };
   }
   if (outputAttemptId !== undefined) await context.outputDelivery?.fail(outputAttemptId);
   const next = await ledgerWrite(deps, request, "settle", () =>
@@ -76,7 +94,17 @@ export async function deliverRelayPost(
     failure: result.failure?.kind,
     next,
   });
-  return undefined;
+  return NOT_POSTED;
+}
+
+/** A row that was already handled: an earlier attempt posted it (or settled it
+ * as certainly lost). Its recorded message id is what a tool line needs to go
+ * on rewriting the same message after a stream replay. */
+function replayedOutcome(record: { externalMessageId: string | null }): RelayPostOutcome {
+  return {
+    posted: true,
+    ...(record.externalMessageId === null ? {} : { externalMessageId: record.externalMessageId }),
+  };
 }
 
 /**

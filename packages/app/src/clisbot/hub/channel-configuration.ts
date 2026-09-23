@@ -7,31 +7,17 @@ import {
   withChannelRouteToolActivity,
   type ChannelRouteToolActivity,
 } from "./channel-route-tool-activity";
+import {
+  buildDirectAgentTarget,
+  removeUnusedPreviousTargets,
+  reusableResourceName,
+  routeTargetKeys,
+  type ChannelRouteTarget,
+} from "./channel-route-target";
 import type { HubAudienceRule } from "./contracts";
-import type { WorktreeTarget } from "./workspace-configuration";
 
 export type ChannelConfigurationRecord = Record<string, unknown>;
 export type ChannelRouteMatchKind = "dm" | "channel" | "thread" | "group" | "topic";
-
-export type ChannelRouteTarget =
-  | { kind: "automation"; automationName: string }
-  /** Keep the target the Route already has (`agent`/`environment`/`workflow`,
-   * `agentControls`): what a Connection Admin saves, since the shared
-   * resource file that defines an Agent is not theirs to change. */
-  | { kind: "existing"; route: ChannelConfigurationRecord }
-  | {
-      kind: "agent";
-      daemonId: string;
-      projectId: string;
-      cwd: string;
-      worktree?: WorktreeTarget;
-      provider: string;
-      model?: string;
-      mode?: string;
-      thinkingOptionId?: string;
-      featureValues?: Record<string, unknown>;
-      options?: Record<string, unknown>;
-    };
 
 /** Mirrors `CHANNEL_LIMIT_NAMES` in packages/hub/src/channels/config/schema.ts. */
 export const CHANNEL_LIMIT_NAMES = [
@@ -326,31 +312,6 @@ export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean 
 }
 
 /**
- * The agent a Route starts: its named `hub.yml` agent with the Route's
- * `agentControls` applied. Mirrors the Hub's `applyAgentControls`: controls
- * that name a provider are a whole configuration (the agent's provider
- * `options` survive only under the same provider); controls without one
- * override the named agent field by field.
- */
-export function routeEffectiveAgent(
-  agent: ChannelConfigurationRecord | null,
-  route: ChannelConfigurationRecord | undefined,
-): ChannelConfigurationRecord | null {
-  const controls = route?.["agentControls"];
-  if (!isRecord(controls)) return agent;
-  const named = agent ?? {};
-  const provider = stringValue(controls["provider"]);
-  if (provider === null) return { ...named, ...controls, provider: named["provider"] };
-  return {
-    ...controls,
-    provider,
-    ...(provider === named["provider"] && named["options"] !== undefined
-      ? { options: named["options"] }
-      : {}),
-  };
-}
-
-/**
  * Anyone gets in somewhere un-narrowed. DMs limited to named senders admit those
  * senders alone, so they do not make a rule open (the Hub's `isOpenAudience`).
  */
@@ -370,55 +331,6 @@ function isOpenRule(rule: ChannelConfigurationRecord): boolean {
 export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean {
   const audience = route["audience"];
   return Array.isArray(audience) && audience.some((rule) => isRecord(rule) && isOpenRule(rule));
-}
-
-/** What names a Route's target, kept verbatim when the target is not rebuilt. */
-function routeTargetKeys(route: ChannelConfigurationRecord): ChannelConfigurationRecord {
-  const keys = ["agent", "environment", "workflow", "agents", "models", "agentControls"];
-  return Object.fromEntries(
-    keys.flatMap((key) => (Object.hasOwn(route, key) ? [[key, route[key]]] : [])),
-  );
-}
-
-function buildDirectAgentTarget(
-  input: ChannelRouteCandidateInput,
-  target: Extract<ChannelRouteTarget, { kind: "agent" }>,
-): { resourceName: string; resource: ChannelConfigurationRecord } {
-  const featureValues = { ...target.featureValues };
-  const resourceName =
-    input.preferredResourceName?.trim() ||
-    uniqueResourceName(input.accountId.trim(), input.resource);
-  return {
-    resourceName,
-    resource: {
-      ...input.resource,
-      agents: {
-        ...recordField(input.resource, "agents"),
-        [resourceName]: {
-          provider: target.provider.trim(),
-          ...(target.model?.trim() ? { model: target.model.trim() } : {}),
-          ...(target.mode?.trim() ? { mode: target.mode.trim() } : {}),
-          ...(target.thinkingOptionId?.trim()
-            ? { thinkingOptionId: target.thinkingOptionId.trim() }
-            : {}),
-          ...(Object.keys(featureValues).length > 0 ? { featureValues } : {}),
-          ...(target.options !== undefined && Object.keys(target.options).length > 0
-            ? { options: target.options }
-            : {}),
-        },
-      },
-      environments: {
-        ...recordField(input.resource, "environments"),
-        [resourceName]: {
-          kind: "daemon",
-          daemon: target.daemonId,
-          projectId: target.projectId,
-          cwd: target.cwd.trim(),
-          ...(target.worktree === undefined ? {} : { worktree: target.worktree }),
-        },
-      },
-    },
-  };
 }
 
 function routeBehaviorSettings(
@@ -508,16 +420,11 @@ export function replaceChannelRouteCandidate(
   route: ChannelConfigurationRecord;
   resource: ChannelConfigurationRecord;
 } {
-  const currentAgent = stringValue(input.currentRoute["agent"]);
-  const currentEnvironment = stringValue(input.currentRoute["environment"]);
-  const reusableName =
-    input.target.kind === "agent" &&
-    currentAgent !== null &&
-    currentAgent === currentEnvironment &&
-    countTargetReferences(input.accounts, "agent", currentAgent) === 1 &&
-    countTargetReferences(input.accounts, "environment", currentAgent) === 1
-      ? currentAgent
-      : undefined;
+  const reusableName = reusableResourceName({
+    target: input.target,
+    currentRoute: input.currentRoute,
+    accounts: input.accounts,
+  });
   const candidate = buildChannelRouteCandidate({
     ...input,
     ...(reusableName === undefined ? {} : { preferredResourceName: reusableName }),
@@ -618,48 +525,6 @@ export function authoredLimits(limits: ChannelLimits | undefined): ChannelLimits
   return Object.keys(authored).length === 0 ? undefined : authored;
 }
 
-function removeUnusedPreviousTargets(input: {
-  resource: ChannelConfigurationRecord;
-  accounts: readonly ChannelConfigurationRecord[];
-  currentRoute: ChannelConfigurationRecord;
-  nextRoute: ChannelConfigurationRecord;
-}): ChannelConfigurationRecord {
-  const resource = { ...input.resource };
-  for (const key of ["agent", "environment"] as const) {
-    const previousName = stringValue(input.currentRoute[key]);
-    const nextName = stringValue(input.nextRoute[key]);
-    if (
-      previousName === null ||
-      previousName === nextName ||
-      countTargetReferences(input.accounts, key, previousName) !== 1
-    ) {
-      continue;
-    }
-    const collectionKey = key === "agent" ? "agents" : "environments";
-    const collection = { ...recordField(resource, collectionKey) };
-    delete collection[previousName];
-    resource[collectionKey] = collection;
-  }
-  return resource;
-}
-
-function countTargetReferences(
-  accounts: readonly ChannelConfigurationRecord[],
-  key: "agent" | "environment",
-  name: string,
-): number {
-  let count = 0;
-  for (const account of accounts) {
-    const routes = Array.isArray(account["routes"]) ? (account["routes"] as unknown[]) : [];
-    count += routes.filter((route) => isRecord(route) && route[key] === name).length;
-  }
-  return count;
-}
-
-function stringValue(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 function isRecord(value: unknown): value is ChannelConfigurationRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -687,22 +552,6 @@ function recordField(record: ChannelConfigurationRecord, key: string): ChannelCo
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as ChannelConfigurationRecord)
     : {};
-}
-
-function uniqueResourceName(accountId: string, resource: ChannelConfigurationRecord): string {
-  const normalized = accountId
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
-  const base = `channel-${normalized || "account"}`;
-  const agents = recordField(resource, "agents");
-  const environments = recordField(resource, "environments");
-  if (!(base in agents) && !(base in environments)) return base;
-  let ordinal = 2;
-  while (`${base}-${String(ordinal)}` in agents || `${base}-${String(ordinal)}` in environments) {
-    ordinal += 1;
-  }
-  return `${base}-${String(ordinal)}`;
 }
 
 export function channelAccountResourceId(channel: string, accountId: string): string {

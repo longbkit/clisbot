@@ -19,8 +19,11 @@ export interface ChannelRouteToolActivityOptions {
   whenThrottled: ChannelRouteWhenThrottled;
 }
 
-/** What the form writes: `false` for no tool line at all, or every option. */
-export type ChannelRouteToolActivity = false | ChannelRouteToolActivityOptions;
+/**
+ * What one layer writes: `false` for no tool line at all, `true` to turn the
+ * lines on and leave every option to the layer below, or the options it sets.
+ */
+export type ChannelRouteToolActivity = boolean | Partial<ChannelRouteToolActivityOptions>;
 
 /** What one layer authors. An absent leaf inherits from the layer below. */
 export interface ChannelRouteToolActivityLeaves extends Partial<ChannelRouteToolActivityOptions> {
@@ -39,7 +42,8 @@ export const DEFAULT_TOOL_ACTIVITY: ChannelRouteToolActivityOptions = {
   whenThrottled: "update",
 };
 
-/** The organization floor the Hub applies when no layer authors a leaf. */
+/** The organization floor the Hub applies when no layer authors a leaf. Mirrors
+ * `ORG_DEFAULTS.sync.toolCalls` (packages/hub/src/channels/config/schema.ts). */
 export const ORG_TOOL_ACTIVITY: EffectiveChannelRouteToolActivity = {
   enabled: false,
   ...DEFAULT_TOOL_ACTIVITY,
@@ -53,7 +57,7 @@ export const ORG_TOOL_ACTIVITY: EffectiveChannelRouteToolActivity = {
 export function readChannelRouteToolActivity(
   layer: ConfigurationRecord | undefined,
 ): ChannelRouteToolActivityLeaves {
-  const toolCalls = recordOf(layer?.["sync"])["toolCalls"];
+  const toolCalls = toolCallsValue(layer);
   if (typeof toolCalls === "boolean") return { enabled: toolCalls };
   if (!isRecord(toolCalls)) return {};
   const detail = TOOL_DETAIL_VALUES.find((value) => value === toolCalls["detail"]);
@@ -67,6 +71,14 @@ export function readChannelRouteToolActivity(
   };
 }
 
+/**
+ * Whether a layer spells the leaf as options rather than a bare switch. A save
+ * keeps the spelling, so a key the form does not show survives under it.
+ */
+export function authorsToolActivityOptions(layer: ConfigurationRecord | undefined): boolean {
+  return isRecord(toolCallsValue(layer));
+}
+
 /** What a Route inherits: the organization floor under each `defaults:` layer, lowest first. */
 export function inheritedChannelRouteToolActivity(
   layers: readonly (ConfigurationRecord | undefined)[],
@@ -78,8 +90,8 @@ export function inheritedChannelRouteToolActivity(
 
 /**
  * The `sync.toolCalls` a save writes, merged into the Route's other settings.
- * An inherited leaf writes nothing, so the layer below still applies. Turning
- * the switch on pins every option, which is what the form showed.
+ * An inherited leaf writes nothing, so the layer below still applies, and an
+ * option the Route does not set is left out rather than pinned.
  */
 export function withChannelRouteToolActivity(
   settings: ConfigurationRecord,
@@ -92,10 +104,18 @@ export function withChannelRouteToolActivity(
   };
 }
 
-function toolActivityRecord(toolActivity: ChannelRouteToolActivity): false | ConfigurationRecord {
-  if (toolActivity === false) return false;
+function toolActivityRecord(toolActivity: ChannelRouteToolActivity): boolean | ConfigurationRecord {
+  if (typeof toolActivity === "boolean") return toolActivity;
   const { detail, throttleSeconds, whenThrottled } = toolActivity;
-  return { detail, throttleSeconds, whenThrottled };
+  return {
+    ...(detail === undefined ? {} : { detail }),
+    ...(throttleSeconds === undefined ? {} : { throttleSeconds }),
+    ...(whenThrottled === undefined ? {} : { whenThrottled }),
+  };
+}
+
+function toolCallsValue(layer: ConfigurationRecord | undefined): unknown {
+  return recordOf(layer?.["sync"])["toolCalls"];
 }
 
 /** `throttleSeconds`: whole seconds, 0 posting every tool call. */

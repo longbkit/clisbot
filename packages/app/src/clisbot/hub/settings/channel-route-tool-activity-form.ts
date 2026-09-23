@@ -1,4 +1,5 @@
 import {
+  authorsToolActivityOptions,
   readChannelRouteToolActivity,
   type ChannelRouteToolActivity,
   type ChannelRouteToolDetail,
@@ -9,9 +10,9 @@ import {
 // The Route form's Show tool activity switch and its options as a plain model:
 // the draft opens from the stored Route and what it inherits, commands return
 // the next draft, and `parseRouteToolActivityDraft` gives the leaf a save
-// writes. A leaf the Route does not author shows the inherited value and
-// writes nothing until the user turns the switch on, like the Reply method
-// above it. Turning it on pins every option, since that is what was shown.
+// writes. A leaf the Route does not author shows the inherited value and is
+// left out of a save, like the Reply method above it: turning the switch on
+// writes `true`, and only an option the user changes is written beside it.
 
 export interface RouteToolActivityFieldsDraft {
   detail: ChannelRouteToolDetail;
@@ -26,7 +27,10 @@ export interface RouteToolActivityDraft {
   inherited: EffectiveChannelRouteToolActivity;
   /** The Route's own switch; absent inherits. */
   toolCalls?: "off" | "on";
-  /** The options the Route authors or the user typed; an absent one inherits. */
+  /**
+   * The options the Route authors or the user typed; an absent one inherits.
+   * Absent altogether means the leaf is a bare switch, written as a boolean.
+   */
   fields?: Partial<RouteToolActivityFieldsDraft>;
 }
 
@@ -50,7 +54,7 @@ export function openRouteToolActivityDraft(
   return {
     inherited,
     ...(enabled === undefined ? {} : { toolCalls: enabled ? ("on" as const) : ("off" as const) }),
-    ...(Object.keys(fields).length === 0 ? {} : { fields }),
+    ...(authorsToolActivityOptions(route) ? { fields } : {}),
   };
 }
 
@@ -87,14 +91,21 @@ export function parseRouteToolActivityDraft(
 ): ParsedRouteToolActivity {
   if (draft.toolCalls === undefined) return { valid: true, value: undefined };
   if (draft.toolCalls === "off") return { valid: true, value: false };
-  const fields = shownFields(draft);
-  const seconds = parseThrottleSeconds(fields.throttleSeconds);
-  if (seconds === undefined) return { valid: false, error: THROTTLE_ERROR };
-  // `whenThrottled` is written even at 0, where the row is hidden: the choice
-  // is still the Route's, and it applies again the moment a throttle is set.
+  const { fields } = draft;
+  // On with nothing of its own: the options stay the layer below's to decide.
+  if (fields === undefined) return { valid: true, value: true };
+  const typed = fields.throttleSeconds;
+  const seconds = typed === undefined ? undefined : parseThrottleSeconds(typed);
+  if (typed !== undefined && seconds === undefined) return { valid: false, error: THROTTLE_ERROR };
   return {
     valid: true,
-    value: { detail: fields.detail, throttleSeconds: seconds, whenThrottled: fields.whenThrottled },
+    value: {
+      ...(fields.detail === undefined ? {} : { detail: fields.detail }),
+      ...(seconds === undefined ? {} : { throttleSeconds: seconds }),
+      // Written even at a throttle of 0, where the row is hidden: the choice is
+      // the Route's, and it applies again the moment a throttle is set.
+      ...(fields.whenThrottled === undefined ? {} : { whenThrottled: fields.whenThrottled }),
+    },
   };
 }
 

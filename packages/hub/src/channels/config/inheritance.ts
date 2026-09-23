@@ -4,14 +4,13 @@
 // same layers. `compile.ts` owns the snapshot shape and the composition; this
 // file owns what a leaf resolves to.
 
-import { ORG_DEFAULTS, type ApprovalRule, type ChannelDefaults } from "./schema.js";
-import type {
-  SyncProgress,
-  SyncProgressGroup,
-  SyncStreaming,
-  SyncToolCalls,
-  SyncToolCallsGroup,
+import {
+  ORG_DEFAULTS,
+  TOOL_ACTIVITY_FLOOR,
+  type ApprovalRule,
+  type ChannelDefaults,
 } from "./schema.js";
+import type { SyncProgress, SyncProgressGroup, SyncStreaming, SyncToolCalls } from "./schema.js";
 import type {
   DmPolicy,
   GroupPolicy,
@@ -80,16 +79,9 @@ export interface EffectiveDefaults extends EffectiveConversationDefaults {
       /** Resolved: the reserved `"off"`, or the emoji name to react with. */
       messageReaction: string;
     };
-    /** The tool-activity surface: whether a tool call is announced at all, how
-     * much of it the line says, and how often a starting tool may post a new
-     * line. Folded per leaf; an authored bare boolean is the switch only. */
-    toolCalls: {
-      enabled: boolean;
-      detail: ToolActivityDetail;
-      /** Seconds between tool-START lines in one turn; 0 posts every one. */
-      throttleSeconds: number;
-      whenThrottled: WhenThrottled;
-    };
+    /** The tool-activity surface, as the fold leaves it. Read it through
+     * `toolActivity()`, which applies `TOOL_ACTIVITY_FLOOR`. */
+    toolCalls: EffectiveToolCalls;
     threadLink: "full" | "final-only" | "none";
     /** The live-draft surface for a running turn (`sync.streaming`). ABSENT is
      * the org floor and means off: nothing streams and the turn's answer is
@@ -245,33 +237,60 @@ function foldSyncDefaults(pick: LeafPicker, floor: (typeof ORG_DEFAULTS)["sync"]
  * inheriting. The OBJECT spelling is the "on" spelling: authoring any leaf of
  * it turns the surface on, which is why it carries no `enabled` key.
  */
-function toolCallsLeaf(layer: SyncToolCalls | undefined): SyncToolCallsGroup & {
-  enabled?: boolean;
-} {
+function toolCallsLeaf(layer: SyncToolCalls | undefined): Partial<ToolActivityLeaves> {
   if (layer === undefined) return {};
   if (typeof layer === "boolean") return { enabled: layer };
   return { enabled: true, ...layer };
 }
 
-/** The effective tool-activity block at the org floor, switched on or off —
- * what the compiler folds a bare `toolCalls: <boolean>` to. */
-export function toolActivityDefaults(enabled: boolean): EffectiveDefaults["sync"]["toolCalls"] {
-  return { ...ORG_DEFAULTS.sync.toolCalls, enabled };
+/**
+ * `sync.toolCalls` as the fold leaves it. A bare boolean is the shape every
+ * revision compiled to before the group existed, and is what the fold emits
+ * whenever no layer authored a rendering leaf — so a Route that never touched
+ * tool activity keeps the `routeFingerprint` it always had. The rendering
+ * leaves stay ABSENT until authored, for the same reason; `toolActivity()`
+ * applies their floor where they are read.
+ */
+export type EffectiveToolCalls = boolean | ToolActivityLeaves;
+
+export interface ToolActivityLeaves {
+  enabled: boolean;
+  detail?: ToolActivityDetail | undefined;
+  throttleSeconds?: number | undefined;
+  whenThrottled?: WhenThrottled | undefined;
 }
 
-/** Fold the four `sync.toolCalls` leaves; each one inherits on its own. */
-function foldToolCallsDefaults(
-  pick: LeafPicker,
-  floor: (typeof ORG_DEFAULTS)["sync"]["toolCalls"],
-): EffectiveDefaults["sync"]["toolCalls"] {
-  const leaf = <K extends keyof ReturnType<typeof toolCallsLeaf>>(key: K) =>
-    pick((layer) => toolCallsLeaf(layer?.sync?.toolCalls)[key]);
+/** The tool-activity leaves with their floors applied: what the relay reads. */
+export interface ToolActivitySettings {
+  enabled: boolean;
+  detail: ToolActivityDetail;
+  /** Seconds between tool-START lines in one scope; 0 posts every one. */
+  throttleSeconds: number;
+  whenThrottled: WhenThrottled;
+}
+
+/** The tool-activity settings a Route runs with: authored leaves over the floor. */
+export function toolActivity(leaves: EffectiveToolCalls): ToolActivitySettings {
+  if (typeof leaves === "boolean") return { ...TOOL_ACTIVITY_FLOOR, enabled: leaves };
   return {
-    enabled: leaf("enabled") ?? floor.enabled,
-    detail: leaf("detail") ?? floor.detail,
-    throttleSeconds: leaf("throttleSeconds") ?? floor.throttleSeconds,
-    whenThrottled: leaf("whenThrottled") ?? floor.whenThrottled,
+    enabled: leaves.enabled,
+    detail: leaves.detail ?? TOOL_ACTIVITY_FLOOR.detail,
+    throttleSeconds: leaves.throttleSeconds ?? TOOL_ACTIVITY_FLOOR.throttleSeconds,
+    whenThrottled: leaves.whenThrottled ?? TOOL_ACTIVITY_FLOOR.whenThrottled,
   };
+}
+
+/** Fold the `sync.toolCalls` leaves; each one inherits on its own. */
+function foldToolCallsDefaults(pick: LeafPicker, floor: boolean): EffectiveToolCalls {
+  const leaf = <K extends keyof ToolActivityLeaves>(key: K) =>
+    pick((layer) => toolCallsLeaf(layer?.sync?.toolCalls)[key]);
+  const enabled = leaf("enabled") ?? floor;
+  const rendering = {
+    ...optional("detail", leaf("detail")),
+    ...optional("throttleSeconds", leaf("throttleSeconds")),
+    ...optional("whenThrottled", leaf("whenThrottled")),
+  };
+  return Object.keys(rendering).length === 0 ? enabled : { enabled, ...rendering };
 }
 
 /** Fold the three `sync.progress` leaves; each one inherits on its own. */
@@ -342,9 +361,15 @@ function toolPathSyncFold(
     // remove the only sign of work. The group shape is what makes this
     // distinction expressible; the old single boolean could not.
     progress: { ...sync.progress, progressMessage: false },
-    toolCalls: { ...sync.toolCalls, enabled: false },
+    toolCalls: toolCallsOff(sync.toolCalls),
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   };
+}
+
+/** The same tool-activity leaves with the switch off — the shape is kept so a
+ * tool-path Route's fingerprint changes only by the switch. */
+function toolCallsOff(leaves: EffectiveToolCalls): EffectiveToolCalls {
+  return typeof leaves === "boolean" ? false : { ...leaves, enabled: false };
 }
 
 /** Approval rules merge by prepending: the most specific layer matches first.

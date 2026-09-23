@@ -35,17 +35,12 @@ import type { CompiledRole } from "./privileges.js";
 import {
   compileAudienceRule,
   deriveRouteWhere,
-  isOpenAudience,
   type CompiledAudienceRule,
   type RouteWhere,
 } from "./audience.js";
 import { foldDefaults, mergeApproval, requireStarFallback } from "./inheritance.js";
-import {
-  compileAccountLimits,
-  compileRouteLimits,
-  type CompiledAccountLimits,
-  type ResolvedLimits,
-} from "./limits.js";
+import { compileAccountLimits, compileRouteLimits, type CompiledAccountLimits } from "./limits.js";
+import type { ChannelLimits } from "./schema.js";
 import type { EffectiveDefaults } from "./inheritance.js";
 import {
   compileRoles,
@@ -75,7 +70,12 @@ type OrgPolicy = z.infer<typeof OrgPolicySchema>;
 // the fold and re-exported here: `config/compile.js` stays the one import for
 // the compiled snapshot.
 export type { EffectiveAccess, EffectiveDefaults } from "./inheritance.js";
-export { toolActivityDefaults } from "./inheritance.js";
+export { toolActivity } from "./inheritance.js";
+export type {
+  EffectiveToolCalls,
+  ToolActivityLeaves,
+  ToolActivitySettings,
+} from "./inheritance.js";
 
 /**
  * One route's folded `access:` block. Leaves stay optional: the ported
@@ -105,8 +105,11 @@ export interface CompiledRoute {
   defaults: EffectiveDefaults;
   /** Merged, most-specific-first (route → account → org). */
   approval: readonly ApprovalRule[];
-  /** The Route scope's limits; absent = none apply. */
-  limits?: ResolvedLimits;
+  /** The Route scope's limits AS AUTHORED; absent = the configurator set none.
+   * Read them through `routeLimits`, which applies the open-audience defaults
+   * — a default compiled in here would rewrite every open-audience Route's
+   * `routeFingerprint` the day it moves. */
+  limits?: ChannelLimits;
   /** What `/agent <name>` and `/model <name>` may switch to. Omitted when the
    * route authored neither list — switching is then refused, not silent. */
   selectable?: RouteSelectable;
@@ -348,7 +351,7 @@ function compileRoute(
     assignments: context.assignments,
     defaults: context.defaults,
     approval: context.approval,
-    ...compileRouteLimits(route.limits, isOpenAudience(audienceRules)),
+    ...compileRouteLimits(route.limits),
     ...compileRouteSelectable(route, context),
   };
 }

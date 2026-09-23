@@ -21,7 +21,6 @@ import type {
   EffectiveAccess,
   EffectiveDefaults,
 } from "../config/compile.js";
-import { toolActivityDefaults } from "../config/compile.js";
 import type {
   ChannelPlaneDeps,
   InboundMessage,
@@ -47,7 +46,7 @@ const DEFAULTS: EffectiveDefaults = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: toolActivityDefaults(false),
+    toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

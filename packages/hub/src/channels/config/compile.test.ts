@@ -5,8 +5,10 @@ import {
   compileChannelControlPlane,
   type ChannelCompileInput,
 } from "./compile.js";
-import { toolActivityDefaults } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
+import { routeLimits } from "./limits.js";
+import { routeFingerprint } from "../bindings/stored-route.js";
+import { toolActivity } from "./inheritance.js";
 import { conversationSettings } from "./conversation.js";
 import { openRouteWarnings, routeWarnings } from "../configuration-warnings.js";
 
@@ -228,7 +230,10 @@ routes:
       groups: [],
       conversations: ["C_CUSTOMER"],
     });
-    assert.deepEqual(safe.accounts[0]?.routes[0]?.limits, OPEN_AUDIENCE_ROUTE_LIMITS);
+    // The open-audience defaults are NOT compiled in — they are applied where
+    // the limits are read, so moving a default never rewrites a fingerprint.
+    assert.equal(safe.accounts[0]?.routes[0]?.limits, undefined);
+    assert.deepEqual(routeLimits(safe.accounts[0]!.routes[0]!), OPEN_AUDIENCE_ROUTE_LIMITS);
 
     expectRouteWarning(
       {
@@ -335,13 +340,21 @@ routes:
       bot: { maxConcurrentRuns: 40, messagesSentPerMinute: 120 },
       perConversation: { messagesPerMinute: 20 },
     });
+    // The compiled Route carries what was AUTHORED, `off` included.
     assert.deepEqual(account.routes[0]?.limits, {
+      maxConcurrentRuns: 25,
+      maxInputCharacters: "off",
+    });
+    // Read, the open-audience defaults fill the rest and `off` still wins.
+    assert.deepEqual(routeLimits(account.routes[0]!), {
       messagesPerMinutePerSender: 10,
       messagesPerMinute: 60,
       maxConcurrentRuns: 25,
       maxRuntimeSeconds: 900,
     });
     assert.equal(account.routes[1]?.limits, undefined);
+    // A member Route gets no defaults at all.
+    assert.equal(routeLimits(account.routes[1]!), undefined);
   });
 
   it("defaults the account config block to empty when omitted", () => {
@@ -708,6 +721,49 @@ routes:
     });
   });
 
+  it("keeps a Route that authors nothing on the fingerprint it always had", () => {
+    // `routeFingerprint` is a hash of the compiled Route, and a binding row
+    // records it. A floor value compiled into the block rewrites every hash on
+    // upgrade, and each of those bindings then falls back to matching by
+    // POSITION — inserting a Route at index 0 would silently re-bind live
+    // conversations to another Agent. So: no floor in the compiled block.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+  - audience: [{ who: { anyone: true }, where: { conversations: [C0OPEN] } }]
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const [member, open] = plane.accounts[0]!.routes;
+    // The compiled block is the frozen expectation: a leaf added here, or a
+    // default moved into it, changes the hash of every Route in the field.
+    assert.deepEqual(member!.defaults.sync, {
+      finalAnswers: true,
+      progress: { progressMessage: true, typingIndicator: true, messageReaction: "off" },
+      toolCalls: false,
+      threadLink: "final-only",
+      subagents: { finalAnswers: false, progress: false, toolCalls: false },
+    });
+    assert.equal("limits" in member!, false, "an unauthored limits block is absent");
+    assert.equal("limits" in open!, false, "an open-audience Route's defaults are not compiled in");
+    // Taken from 9a89404ff, the revision before tool activity grew options.
+    assert.equal(
+      routeFingerprint(member!),
+      "lGGM00BFmZRUDaRUlUXb8gsBIR2ksOSycQXM0tA__gE",
+      "a Route that authors nothing keeps the fingerprint it had",
+    );
+  });
+
   it("keeps a stored boolean sync.toolCalls meaning the switch only", () => {
     // Every revision authored before the group existed writes
     // `toolCalls: true|false`. It must keep compiling, and it must speak about
@@ -733,13 +789,14 @@ routes:
 `,
       }),
     );
+    // The rendering leaves the org authored ride along; `whenThrottled` was
+    // never authored, so it stays absent and its floor is applied on read.
     assert.deepEqual(plane.accounts[0]!.defaults.sync.toolCalls, {
       enabled: false,
       detail: "full",
       throttleSeconds: 0,
-      whenThrottled: "update",
     });
-    assert.deepEqual(plane.accounts[0]!.routes[0]!.defaults.sync.toolCalls, {
+    assert.deepEqual(toolActivity(plane.accounts[0]!.routes[0]!.defaults.sync.toolCalls), {
       enabled: true,
       detail: "full",
       throttleSeconds: 0,
@@ -772,13 +829,18 @@ routes:
       }),
     );
     const routes = plane.accounts[0]!.routes;
-    assert.deepEqual(routes[0]!.defaults.sync.toolCalls, {
+    assert.deepEqual(toolActivity(routes[0]!.defaults.sync.toolCalls), {
       enabled: true,
       detail: "name",
       throttleSeconds: 10,
       whenThrottled: "skip",
     });
-    assert.equal(routes[1]!.defaults.sync.toolCalls.enabled, false);
+    // The account's rendering leaves still ride along; the switch is off.
+    assert.deepEqual(routes[1]!.defaults.sync.toolCalls, {
+      enabled: false,
+      detail: "name",
+      throttleSeconds: 10,
+    });
   });
 
   it("rejects a malformed messageReaction emoji name", () => {
@@ -840,7 +902,7 @@ routes:
         typingIndicator: true,
         messageReaction: "off",
       },
-      toolCalls: toolActivityDefaults(false),
+      toolCalls: false,
       threadLink: "full",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     });
