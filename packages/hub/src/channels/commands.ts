@@ -239,6 +239,15 @@ export const CHANNEL_COMMANDS = [
     description: "one-off question in a fresh session",
   },
   {
+    name: "project",
+    aliases: [],
+    args: true,
+    access: "channel.manage",
+    directOnly: true,
+    usage: "/project [list|<id-or-name>|clear]",
+    description: "route this conversation's next session to a Project",
+  },
+  {
     name: "routedefault",
     aliases: [],
     args: false,

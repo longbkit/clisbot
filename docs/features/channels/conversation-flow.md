@@ -16,6 +16,19 @@ The ingress lane is how the queue enforces the first two rules: **lane = binding
 
 Commands follow the same rule: a command's lane is the session it acts on, so `/stop` or `/new` stays in order with that session's messages, and a command typed as a message in a thread ("@bot /status") is a message of that thread. A command that acts on no session runs in a lane of its own, keyed by its event id, so concurrent ones never wait for each other: on a Route that opens a thread per root message no message binds the root, and a root-level native slash command (Slack's carry a `trigger_id`, no message ts) that only reads — `/help`, `/me`, `/status` — takes its own lane. A root command that can start or change a session there (`/new <prompt>`, `/fork`, `/stop`, …) keeps the root binding's lane, because it acts on the root session it would create (the binding key of a root slash command on such a Route is the conversation, `deriveBindingKey`). `ingress/session-lane.ts` owns this rule.
 
+A conversation may also carry a **Project** choice (`/project`). It is stored
+against the same binding key as the conversation's other selections, so it is
+one thread, one topic, or one channel as the Route's `binding.key` decides, and
+it is read when the next session is minted (`resolveConfig`,
+`commands-dispatch.ts`). It does not move a session that is already bound: `/new`
+(or `/fork`) is what starts a session in the selected Project. The serving Route
+carries it by being narrowed to the conversation (`dynamicProjectRoute`,
+`bindings/stored-route.ts`) — the target gains the Project's id and root and the
+Route's Where is restricted to that conversation, while its audience rules stay
+as authored. So the choice changes where the next session runs and never who can
+talk. The selection is tied to the serving Route's fingerprint and Host; after
+an edit, reorder, or Host change, it is ignored until an admin selects again.
+
 ## Inbound, by binding state
 
 | State                                 | A new message                                                                                  | Blocks the binding?                                                                            |

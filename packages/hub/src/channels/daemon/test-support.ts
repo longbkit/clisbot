@@ -9,6 +9,7 @@ export function configurationDaemonStub(): Pick<
   | "listProviderModes"
   | "listAgentProfiles"
   | "listCommands"
+  | "listProjects"
   | "setAgentModel"
   | "setAgentThinkingOption"
   | "setAgentMode"
@@ -39,6 +40,7 @@ export function configurationDaemonStub(): Pick<
     createWorkspace: async () => ({ workspaceId: "workspace-stub" }),
     listAgentProfiles: async () => [],
     listCommands: async () => [],
+    listProjects: async () => [],
     setAgentModel: async () => undefined,
     setAgentThinkingOption: async () => undefined,
     setAgentMode: async () => undefined,

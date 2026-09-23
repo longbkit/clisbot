@@ -18,6 +18,7 @@ import type {
   CreateAgentConfig,
   CreateAgentOptions,
   CreateWorkspaceInput,
+  DaemonProject,
   DaemonServerInfo,
   ProviderModel,
   ProviderMode,
@@ -129,6 +130,7 @@ export interface DaemonConnection {
   listAgents(): Promise<AgentSnapshot[]>;
   isAgentInProject(agent: AgentSnapshot, projectId: string): Promise<boolean>;
   getServerInfo(): DaemonServerInfo | undefined;
+  listProjects(): Promise<DaemonProject[]>;
   listAvailableProviders(): Promise<{ provider: string; available: boolean }[]>;
   listProviderModels(provider: string, cwd?: string): Promise<ProviderModel[]>;
   listProviderModes(provider: string, cwd?: string): Promise<ProviderMode[]>;
@@ -397,6 +399,29 @@ function createFacade(
         )),
       }),
     listAgents: () => fetchAllAgents(socket),
+    listProjects: async () => {
+      const payload = checkedPayload(await socket.call("project.list.request", {}));
+      const projects = payload["projects"];
+      if (!Array.isArray(projects)) {
+        throw new Error("Invalid project.list.response: `projects` must be an array.");
+      }
+      return projects.map((entry: unknown): DaemonProject => {
+        const project = asRecord(entry);
+        const projectId = project?.["projectId"];
+        const name = project?.["projectCustomName"] ?? project?.["projectDisplayName"];
+        const rootPath = project?.["projectRootPath"];
+        const kind = project?.["projectKind"];
+        if (
+          typeof projectId !== "string" ||
+          typeof name !== "string" ||
+          typeof rootPath !== "string" ||
+          (kind !== "git" && kind !== "non_git" && kind !== "directory")
+        ) {
+          throw new Error("Invalid project.list.response: malformed Project descriptor.");
+        }
+        return { projectId, name, rootPath, kind };
+      });
+    },
     isAgentInProject: (agent, projectId) => isAgentInProject(socket, agent, projectId),
     getServerInfo: () => socket.serverInfo as DaemonServerInfo | undefined,
     listAvailableProviders: () =>

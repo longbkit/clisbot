@@ -23,7 +23,7 @@ export interface ChannelPairingRecord {
   createdAt: Date;
 }
 
-/** The conversation's `/agent` + `/model` choice; absent = the route's own. */
+/** The conversation's `/agent`, `/model` and `/project` choice; absent = route default. */
 export interface ChannelConversationSelectionRecord {
   selectedAgent: string | null;
   selectedModel: string | null;
@@ -31,6 +31,11 @@ export interface ChannelConversationSelectionRecord {
   selectedThinkingOption: string | null;
   selectedMode: string | null;
   selectedFeatureValues: Record<string, unknown> | null;
+  selectedProjectId: string | null;
+  selectedProjectRoot: string | null;
+  selectedRoutePosition: number | null;
+  selectedRouteFingerprint: string | null;
+  selectedDaemonReference: string | null;
   selectedBy: string;
   updatedAt: Date;
 }
@@ -187,13 +192,10 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
   }
 
   /**
-   * Set (or clear, with two nulls) the conversation's agent/model choice.
+   * Set (or clear, with nulls) the conversation's agent/model/Project choice.
    *
-   * One statement per outcome and no read first: `/agent` and `/model` land in
-   * the same row and used to race — both read the row, both wrote their merge,
-   * and the second write dropped the first one's field. A field the caller
-   * leaves `undefined` is simply absent from the update, so the stored value
-   * survives, and the returned record is the row the database now holds.
+   * One statement per outcome and no read first: concurrent `/agent`, `/model`
+   * and `/project` commands merge into the same row without dropping fields.
    */
   async setConversationSelection(
     key: ChannelConversationKey,
@@ -203,11 +205,7 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
   ): Promise<ChannelConversationSelectionRecord> {
     const updatedAt = new Date();
     const { selectedBy, ...fields } = selection;
-    const changed = {
-      ...fields,
-      selectedBy,
-      updatedAt,
-    };
+    const changed = { ...fields, selectedBy, updatedAt };
     const [inserted] = await this.database
       .insert(schema.channelConversationSelections)
       .values({
@@ -222,6 +220,11 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
         selectedThinkingOption: selection.selectedThinkingOption ?? null,
         selectedMode: selection.selectedMode ?? null,
         selectedFeatureValues: selection.selectedFeatureValues ?? null,
+        selectedProjectId: selection.selectedProjectId ?? null,
+        selectedProjectRoot: selection.selectedProjectRoot ?? null,
+        selectedRoutePosition: selection.selectedRoutePosition ?? null,
+        selectedRouteFingerprint: selection.selectedRouteFingerprint ?? null,
+        selectedDaemonReference: selection.selectedDaemonReference ?? null,
         selectedBy: selection.selectedBy,
         updatedAt,
       })
@@ -257,6 +260,11 @@ function toSelection(
     selectedThinkingOption: row.selectedThinkingOption,
     selectedMode: row.selectedMode,
     selectedFeatureValues: row.selectedFeatureValues,
+    selectedProjectId: row.selectedProjectId,
+    selectedProjectRoot: row.selectedProjectRoot,
+    selectedRoutePosition: row.selectedRoutePosition,
+    selectedRouteFingerprint: row.selectedRouteFingerprint,
+    selectedDaemonReference: row.selectedDaemonReference,
     selectedBy: row.selectedBy,
     updatedAt: row.updatedAt,
   };

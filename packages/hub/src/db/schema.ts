@@ -2057,6 +2057,14 @@ export const channelConversationSelections = pgTable(
     selectedThinkingOption: text("selected_thinking_option"),
     selectedMode: text("selected_mode"),
     selectedFeatureValues: jsonb("selected_feature_values").$type<Record<string, unknown>>(),
+    /** Host-local Project selected for the next session in this conversation. */
+    selectedProjectId: text("selected_project_id"),
+    /** Root captured with the Project catalog; refreshed on the next selection. */
+    selectedProjectRoot: text("selected_project_root"),
+    /** Account Route whose Agent/defaults serve as the dynamic template. */
+    selectedRoutePosition: integer("selected_route_position"),
+    selectedRouteFingerprint: text("selected_route_fingerprint"),
+    selectedDaemonReference: text("selected_daemon_reference"),
     /** Who switched, for the activity trail. */
     selectedBy: text("selected_by").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

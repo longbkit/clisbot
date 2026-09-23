@@ -64,6 +64,7 @@ import type {
 export {
   bindingSummary,
   deriveBindingKey,
+  dynamicProjectRoute,
   parseStoredRouteSelection,
   parseStoredRouteSummary,
   parseStoredRouteTarget,
@@ -94,20 +95,20 @@ function bindingBlock(binding: ThreadBindingRecord | undefined): string | undefi
   return undefined;
 }
 
-/**
- * Does the bound session still run at the target the route names? Comparing
- * targets — not the route's content — is what lets an operator edit a route
- * without disturbing the conversations it already owns. A row written before
- * targets were summarized states nothing, so it keeps its session.
- */
+/** Does the bound session still run at the target the route names? Comparing
+ * agent name and environment deliberately ignores a dynamic Project override:
+ * an existing session remains bound until `/new` releases it. */
 function keepsTarget(binding: ThreadBindingRecord, route: CompiledRoute): boolean {
   const bound = parseStoredRouteTarget(binding.route);
   if (bound === undefined) return true;
-  if (bound.kind !== route.target.kind) return false;
-  return bound.kind === "workflow"
-    ? bound.workflow === (route.target as { workflow: string }).workflow
-    : bound.agent === (route.target as { agent: string }).agent &&
-        bound.environment === (route.target as { environment: string }).environment;
+  if (bound.kind === "workflow") {
+    return route.target.kind === "workflow" && bound.workflow === route.target.workflow;
+  }
+  return (
+    route.target.kind === "agent" &&
+    bound.agent === route.target.agent &&
+    bound.environment === route.target.environment
+  );
 }
 
 /** The optional conversation label, in the one spelling every outcome uses. */

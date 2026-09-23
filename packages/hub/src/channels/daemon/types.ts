@@ -26,6 +26,12 @@ export interface AgentSnapshot {
   activeTurn?: unknown;
   pendingPermissions?: unknown;
 }
+export interface DaemonProject {
+  projectId: string;
+  name: string;
+  rootPath: string;
+  kind: "git" | "non_git" | "directory";
+}
 
 export interface AgentStreamTimelineItem {
   type: string;

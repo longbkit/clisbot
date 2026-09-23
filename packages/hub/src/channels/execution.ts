@@ -56,6 +56,7 @@ import {
   admitFollowUp,
   BindingEngine,
   deriveBindingKey,
+  dynamicProjectRoute,
   parseStoredRouteSummary,
   recordedRoute,
   storedRouteOwner,
@@ -1537,6 +1538,23 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (textCommand !== null && workflowCommandRoute !== undefined) {
       return await handleWorkflowTextCommand(message, account, workflowCommandRoute, textCommand);
     }
+    if (textCommand?.name === "project") {
+      const template = account.routes.find((candidate) => candidate.target.kind === "agent");
+      if (template === undefined) {
+        const delivered = await commandReplyFor(
+          message,
+          account,
+          textCommand.name,
+        )("No Agent Route is configured for this account. Ask an admin to configure one first.");
+        return result(delivered, {
+          kind: "command",
+          handled: delivered,
+          detail: "no Agent Route is configured for this account",
+        });
+      }
+      await conversationFlow?.beforeCommand(textCommand.name, message, template);
+      return await handleTextCommand(message, account, template, textCommand);
+    }
     const resolved = await resolveInboundRoute(message, account);
     if (resolved.kind !== "selected") {
       return replyWithoutRoute(message, account, textCommand);
@@ -1630,6 +1648,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (
       command.name !== "help" &&
       command.name !== "me" &&
+      command.name !== "project" &&
       !(await mayUseChannel(message, account, route)).allowed
     ) {
       await post("Sender may not control this conversation.");
@@ -2057,14 +2076,52 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // decides which Routes still cover it, the binding decides which of
       // those owns it, and the sender never moves it to another one.
       const route = routeForBinding(binding, message.conversation);
-      // No route owns this conversation any more: the account stopped serving
-      // it, which is the same silence it had before it was ever bound. Whether
-      // the bound session is still the right one to answer with is the binding
-      // engine's call, after admission.
-      return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
+      if (route === undefined) return { kind: "unmatched" };
+      return { kind: "selected", route: await applyProjectSelection(message, account, route) };
     }
     const route = await resolveNewRoute(message, account);
-    return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
+    if (route !== undefined) {
+      return { kind: "selected", route: await applyProjectSelection(message, account, route) };
+    }
+    const selectedRoute = await selectedProjectRoute(message, account);
+    return selectedRoute === undefined
+      ? { kind: "unmatched" }
+      : { kind: "selected", route: selectedRoute };
+  }
+
+  async function selectedProjectRoute(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+  ): Promise<CompiledRoute | undefined> {
+    if (store === undefined) return undefined;
+    for (const route of account.routes) {
+      if (route.target.kind !== "agent") continue;
+      const selection = await store.access.findConversationSelection({
+        organizationId: deps.organizationId,
+        channel: message.channel,
+        accountId: account.accountId,
+        ...deriveBindingKey(message, route),
+      });
+      if (
+        selection?.selectedProjectId !== null &&
+        selection?.selectedProjectId !== undefined &&
+        selection.selectedProjectRoot !== null &&
+        selection.selectedProjectRoot !== undefined &&
+        selection.selectedRoutePosition === routePosition(account, route) &&
+        selection.selectedRouteFingerprint === routeFingerprint(route) &&
+        selection.selectedDaemonReference ===
+          deps.resolveAgentAccessTarget(route.target).daemonReference
+      ) {
+        return dynamicProjectRoute(
+          route,
+          message.conversation,
+          selection.selectedProjectId,
+          selection.selectedProjectRoot,
+          selection.selectedDaemonReference,
+        );
+      }
+    }
+    return undefined;
   }
 
   /** Find the most-specific binding key that can own this inbound. */
@@ -2117,6 +2174,39 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       async (route) => (await mayUseChannel(message, account, route)).allowed,
     );
     return selection.route ?? undefined;
+  }
+
+  async function applyProjectSelection(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<CompiledRoute> {
+    if (store === undefined || route.target.kind !== "agent") return route;
+    const selection = await store.access.findConversationSelection({
+      organizationId: deps.organizationId,
+      channel: message.channel,
+      accountId: account.accountId,
+      ...deriveBindingKey(message, route),
+    });
+    if (
+      selection?.selectedProjectId === null ||
+      selection?.selectedProjectId === undefined ||
+      selection.selectedProjectRoot === null ||
+      selection.selectedProjectRoot === undefined ||
+      selection.selectedRoutePosition !== routePosition(account, route) ||
+      selection.selectedRouteFingerprint !== routeFingerprint(route) ||
+      selection.selectedDaemonReference !==
+        deps.resolveAgentAccessTarget(route.target).daemonReference
+    ) {
+      return route;
+    }
+    return dynamicProjectRoute(
+      route,
+      message.conversation,
+      selection.selectedProjectId,
+      selection.selectedProjectRoot,
+      selection.selectedDaemonReference,
+    );
   }
 
   function streamContextFor(
