@@ -719,4 +719,114 @@ describe("createChannelAgentSpecResolver", () => {
     assert.equal(sameProvider.model, "gpt-5.6-luna");
     assert.deepEqual(sameProvider.featureValues, { fast_mode: true });
   });
+
+  it("moves the Agent into a runtime-selected Project and drops the environment worktree", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    const config = resolver(
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+        projectId: "project-9",
+        projectRoot: "/srv/project-9",
+      },
+      RELAY_DEFAULTS,
+      BINDING_REF,
+    );
+    assert.equal(config.cwd, "/srv/project-9");
+    assert.equal(config.projectId, "project-9");
+    assert.equal(config.worktree, undefined);
+  });
+
+  it("rejects a Project selection recorded for another Host", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    assert.throws(
+      () =>
+        resolver(
+          {
+            kind: "agent",
+            agent: "codex-safe",
+            environment: "work",
+            template: null,
+            projectId: "project-9",
+            projectRoot: "/srv/project-9",
+            projectDaemonReference: "daemon-other",
+          },
+          RELAY_DEFAULTS,
+          BINDING_REF,
+        ),
+      (error: unknown) =>
+        error instanceof ChannelAgentSpecError &&
+        /another Host|belongs to Host/u.test(error.message),
+    );
+  });
+
+  it("keeps the environment cwd when only the Project id is overridden", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    const config = resolver(
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+        projectId: "project-9",
+      },
+      RELAY_DEFAULTS,
+      BINDING_REF,
+    );
+    assert.equal(config.cwd, "/workspace/app");
+    assert.equal(config.projectId, "project-9");
+    assert.equal(config.worktree, undefined);
+  });
+
+  it("drops the environment worktree when only the Project root is overridden", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    const config = resolver(
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+        projectRoot: "/srv/project-9",
+      },
+      RELAY_DEFAULTS,
+      BINDING_REF,
+    );
+    assert.equal(config.cwd, "/srv/project-9");
+    assert.equal(config.projectId, undefined);
+    assert.equal(config.worktree, undefined);
+  });
+
+  it("lets the conversation's model override win over the agent's model", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      publicBaseUrl: snapshot.publicBaseUrl,
+    });
+    const config = resolver(
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+      },
+      RELAY_DEFAULTS,
+      BINDING_REF,
+      undefined,
+      { model: "gpt-5.6-luna" },
+    );
+    assert.equal(config.model, "gpt-5.6-luna");
+  });
 });

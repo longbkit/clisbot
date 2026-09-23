@@ -222,10 +222,13 @@ function createChannelAgentAccessTargetResolver(bundle: CompiledHubBundle) {
         `route target environment "${target.environment}" is not a daemon environment`,
       );
     }
+    const projectId = target.projectId ?? environment.projectId;
+    const projectRoot =
+      target.projectRoot ?? (environment.cwd.startsWith("/") ? environment.cwd : undefined);
     return {
       daemonReference: environment.daemonId ?? environment.daemon,
-      ...(environment.projectId === undefined ? {} : { projectId: environment.projectId }),
-      ...(environment.cwd.startsWith("/") ? { projectRoot: environment.cwd } : {}),
+      ...(projectId === undefined ? {} : { projectId }),
+      ...(projectRoot === undefined ? {} : { projectRoot }),
     };
   };
 }
@@ -301,17 +304,25 @@ export function createChannelAgentSpecResolver(
         `route target environment "${target.environment}" is not a daemon environment`,
       );
     }
+    assertProjectDaemonReference(target, environment);
     // `/model` wins over the agent definition's model: it is the
     // conversation's explicit choice from the route's own menu
     // (`policy/selection.ts`), made by an owner or admin — never free text.
     const model = overrides?.model ?? agent.model;
+    const projectId = target.projectId ?? environment.projectId;
+    const projectRoot = target.projectRoot ?? environment.cwd;
+    // A runtime Project override moves the Agent into that Project's folder.
+    // The environment's worktree belongs to the configured Project, not the
+    // one the conversation selected, so it must not follow the Agent there.
+    const worktree =
+      target.projectId === undefined && target.projectRoot === undefined
+        ? environment.worktree
+        : undefined;
     const config: CreateAgentConfig = {
       provider: agent.provider,
-      cwd: environment.cwd,
-      ...(environment.projectId === undefined ? {} : { projectId: environment.projectId }),
-      ...(environment.worktree === undefined
-        ? {}
-        : { worktree: createAgentWorktree(environment.worktree) }),
+      cwd: projectRoot,
+      ...(projectId === undefined ? {} : { projectId }),
+      ...(worktree === undefined ? {} : { worktree: createAgentWorktree(worktree) }),
       ...(model === undefined ? {} : { model }),
       ...(agent.mode === undefined ? {} : { modeId: agent.mode }),
       ...(agent.thinkingOptionId === undefined ? {} : { thinkingOptionId: agent.thinkingOptionId }),
@@ -370,4 +381,19 @@ function createAgentWorktree(
     };
   }
   return structuredClone(worktree);
+}
+
+function assertProjectDaemonReference(
+  target: Extract<RouteTarget, { kind: "agent" }>,
+  environment: Extract<
+    CompiledHubBundle["configuration"]["environments"][number],
+    { kind: "daemon" }
+  >,
+): void {
+  if (target.projectDaemonReference === undefined) return;
+  const daemonReference = environment.daemonId ?? environment.daemon;
+  if (target.projectDaemonReference === daemonReference) return;
+  throw new ChannelAgentSpecError(
+    `selected Project belongs to Host "${target.projectDaemonReference}", not "${daemonReference}"`,
+  );
 }

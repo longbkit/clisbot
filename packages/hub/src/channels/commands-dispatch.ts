@@ -1,12 +1,17 @@
 import { runExtensionCommand } from "./commands-extension.js";
 import { runFollowUpCommand } from "./commands-follow-up.js";
+import { runProjectCommand } from "./commands-project.js";
 import { APPROVAL_PRIVILEGES } from "../access/contract.js";
 import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
-import type { ChannelPlaneDeps, InboundMessage } from "./plane/types.js";
-import { deriveBindingKey } from "./bindings/index.js";
+import type {
+  ChannelPlaneDeps,
+  ChannelReplyAgentCapability,
+  InboundMessage,
+} from "./plane/types.js";
+import { deriveBindingKey, routeFingerprint, routePosition } from "./bindings/index.js";
 import {
   channelCommandAccess,
   commandRefusalText,
@@ -110,6 +115,29 @@ export class ChannelCommandDispatcher {
       if (lifecycle) return lifecycle;
       if (command.name === "routedefault" || command.name === "promoteroutedefault")
         return this.routeDefault(command, context);
+      if (command.name === "project")
+        return runProjectCommand(
+          {
+            plane: this.deps.plane,
+            daemon: this.deps.daemon,
+            store: this.deps.store,
+            authorizeConfiguration: async (projectContext, target) => {
+              const routedContext = {
+                ...projectContext,
+                route: { ...projectContext.route, target },
+              };
+              return this.authorizeConfiguration({
+                message: routedContext.message,
+                account: routedContext.account,
+                route: routedContext.route,
+                accessTarget: this.deps.plane.resolveAgentAccessTarget(target),
+                config: await this.resolveConfig(routedContext, undefined, target),
+              });
+            },
+          },
+          command.value,
+          context,
+        );
       if (["agent", "provider", "model", "effort", "permission"].includes(command.name)) {
         return this.configuration(
           command as Parameters<typeof runConfigurationCommand>[0]["command"],
@@ -153,21 +181,42 @@ export class ChannelCommandDispatcher {
     if (!allowed) return commandRefusalText(`/${command.name}`, privilege);
     return undefined;
   }
-
-  /**
-   * What a new session in this conversation runs: the Route's configuration
-   * with the conversation's selection folded on. Neither is re-checked against
-   * the sender — the publisher and the selector were checked when they chose it.
-   */
   async resolveConfig(
     context: LifecycleCommandContext,
-    capability?: import("./plane/types.js").ChannelReplyAgentCapability,
+    capability?: ChannelReplyAgentCapability,
+    targetOverride?: Extract<CompiledRoute["target"], { kind: "agent" }>,
   ): Promise<CreateAgentConfig> {
     const selection = await this.deps.store.access.findConversationSelection(
       this.selectionKey(context),
     );
+    const selectedProjectId = selection?.selectedProjectId;
+    const selectedProjectRoot = selection?.selectedProjectRoot;
+    const projectSelected =
+      context.route.target.kind === "agent" &&
+      selectedProjectId !== null &&
+      selectedProjectId !== undefined &&
+      selectedProjectRoot !== null &&
+      selectedProjectRoot !== undefined &&
+      selection?.selectedRoutePosition === routePosition(context.account, context.route) &&
+      selection.selectedRouteFingerprint === routeFingerprint(context.route) &&
+      selection.selectedDaemonReference ===
+        this.deps.plane.resolveAgentAccessTarget(context.route.target).daemonReference;
+    const target =
+      targetOverride ??
+      (projectSelected && context.route.target.kind === "agent"
+        ? {
+            ...context.route.target,
+            projectId: selectedProjectId,
+            projectRoot: selectedProjectRoot,
+            ...(selection?.selectedDaemonReference === null ||
+            selection?.selectedDaemonReference === undefined
+              ? {}
+              : { projectDaemonReference: selection.selectedDaemonReference }),
+          }
+        : undefined);
+    const routedContext = target ? { ...context, route: { ...context.route, target } } : context;
     return resolveConversationConfiguration(
-      this.routeConfig(context, undefined, capability),
+      this.routeConfig(routedContext, undefined, capability, target),
       selection,
     );
   }
@@ -176,7 +225,8 @@ export class ChannelCommandDispatcher {
   routeConfig(
     context: LifecycleCommandContext,
     override?: { agentControls: AgentControls | undefined },
-    capability?: import("./plane/types.js").ChannelReplyAgentCapability,
+    capability?: ChannelReplyAgentCapability,
+    targetOverride?: Extract<CompiledRoute["target"], { kind: "agent" }>,
   ): CreateAgentConfig {
     const { message, account, route } = context;
     if (route.target.kind !== "agent") throw new Error("A direct route is required.");
@@ -189,7 +239,7 @@ export class ChannelCommandDispatcher {
         : {}),
     };
     return this.deps.plane.resolveAgentSpec(
-      route.target,
+      targetOverride ?? route.target,
       defaults,
       {
         channel: message.channel,
@@ -205,6 +255,7 @@ export class ChannelCommandDispatcher {
     account: CompiledChannelAccount;
     route: CompiledRoute;
     config: CreateAgentConfig;
+    accessTarget?: ReturnType<ChannelPlaneDeps["resolveAgentAccessTarget"]>;
   }): Promise<{ allowed: boolean; reason?: string }> {
     const request = commandAccessRequest(
       this.deps.plane,
@@ -212,6 +263,7 @@ export class ChannelCommandDispatcher {
       input.account,
       input.route,
       "agent.create",
+      input.accessTarget,
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) return { allowed: false, reason: "Agent configuration access is unavailable." };

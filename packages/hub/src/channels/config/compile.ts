@@ -88,6 +88,12 @@ export type RouteTarget =
       agent: string;
       environment: string;
       template: string | null;
+      /** Runtime-only Project override selected from a Channel conversation. */
+      projectId?: string;
+      /** Runtime-only root for the selected Project. */
+      projectRoot?: string;
+      /** Runtime-only Host identity captured with the Project selection. */
+      projectDaemonReference?: string;
     }
   | { kind: "workflow"; workflow: string };
 

@@ -281,6 +281,8 @@ function makeHarness(
     channelRevisionId?: string;
     commandAccess?: ChannelPlaneDeps["commandAccess"];
     readWorkflowRuns?: ChannelPlaneDeps["readWorkflowRuns"];
+    resolveAgentSpec?: ChannelPlaneDeps["resolveAgentSpec"];
+    resolveAgentAccessTarget?: ChannelPlaneDeps["resolveAgentAccessTarget"];
     logger?: PlaneLogger;
   } = {},
 ): FacadeHarness {
@@ -381,14 +383,18 @@ function makeHarness(
           }
         : undefined,
     homeRoot: opts.media?.homeRoot,
-    resolveAgentSpec: () => ({
-      provider: "codex",
-      cwd: opts.media?.agentCwd ?? "/tmp/repo",
-    }),
-    resolveAgentAccessTarget: () => ({
-      daemonReference: "daemon-1",
-      projectId: "project-1",
-    }),
+    resolveAgentSpec:
+      opts.resolveAgentSpec ??
+      (() => ({
+        provider: "codex",
+        cwd: opts.media?.agentCwd ?? "/tmp/repo",
+      })),
+    resolveAgentAccessTarget:
+      opts.resolveAgentAccessTarget ??
+      (() => ({
+        daemonReference: "daemon-1",
+        projectId: "project-1",
+      })),
   });
   return {
     plane,
@@ -3476,6 +3482,82 @@ describe("inbound event kinds", () => {
     assert.equal(harness.fake.created.length, 1);
     assert.match(harness.fake.messages[0]!.text, /initial work/);
     assert.match(harness.fake.messages[1]!.text, /Review the code\n\ncarefully/);
+  });
+
+  it("lets an account admin select a Project on an otherwise unmatched topic", async () => {
+    const route = { ...makeRoute(), where: { dm: false, groups: [], conversations: [] } };
+    let accountManagementCalls = 0;
+    const harness = makeHarness({
+      account: makeAccount(route),
+      commandAccess: {
+        authorizeChannelAccountManagement: async () => {
+          accountManagementCalls += 1;
+          return { membershipId: "membership-1", userId: "user-1" };
+        },
+        authorizeChannelPrivilege: async () => ({ allowed: true }),
+        resolveChannelAgentConfigurations: async () => ({
+          unrestricted: true,
+          agentConfigurations: [],
+        }),
+        resolveChannelMember: async () => undefined,
+      },
+      resolveAgentSpec: (target) => ({
+        provider: "codex",
+        cwd: target.projectRoot ?? "/tmp/repo",
+        ...(target.projectId === undefined ? {} : { projectId: target.projectId }),
+      }),
+    });
+    harness.fake.daemon.listProjects = async () => [
+      { projectId: "project-1", name: "Payments", rootPath: "/work/payments", kind: "git" },
+    ];
+    await harness.plane.start(harness.fake.daemon, store);
+    const topic = {
+      kind: "topic" as const,
+      id: "topic-7",
+      rootConversationId: "group-1",
+      threadId: "topic-7",
+    };
+    harness.next.message = message({
+      text: "/project project-1",
+      externalMessageId: "1720000020.000001",
+      conversation: topic,
+    });
+    const selected = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(selected.dispatched, true);
+    assert.match(harness.posted.at(-1) ?? "", /Payments/);
+
+    harness.next.message = message({
+      text: "start work in the selected Project",
+      externalMessageId: "1720000020.000002",
+      conversation: topic,
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(result.dispatched, true);
+    assert.equal(accountManagementCalls, 1);
+    assert.equal(harness.fake.created[0]?.config.projectId, "project-1");
+    assert.equal(harness.fake.created[0]?.config.cwd, "/work/payments");
+    harness.next.message = message({
+      text: "continue in the selected Project",
+      externalMessageId: "1720000020.000003",
+      conversation: topic,
+    });
+    const followUp = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(followUp.dispatched, true);
+    assert.equal(harness.fake.messages.length, 2);
+    await harness.plane.stop();
   });
 
   it("stages a provider change without losing the conversation that can be forked", async () => {

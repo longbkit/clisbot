@@ -43,6 +43,36 @@ requires your own access to the Host — but anyone reading the channel sees the
 `<id>` is the agent id shown by `/status` or in the app's URL. `/resume` replaces
 whatever session was bound here before, after checking your access to the target. A session already bound to another conversation cannot be resumed here. Bare `/new` clears the binding; your next message starts the new session.
 
+## Choose the Project a session runs in
+
+A **Project** is where a session's work happens on the Host the bot runs on. By
+default a new session opens in the Project the Route names; `/project` points
+this conversation's next session at a different one.
+
+| You want                          | Type              |
+| --------------------------------- | ----------------- |
+| See the Projects you may use here | `/project`        |
+| Run the next session in a Project | `/project <name>` |
+| Go back to the Route's default    | `/project clear`  |
+
+The choice is remembered for this conversation only — the thread or topic you
+typed it in — and it leaves a session that is already running exactly where it
+is. Type `/new` to start a session in the Project you picked; the session bound
+here keeps running where it was.
+
+You only see Projects you're allowed to start a session in, so one you can't
+reach never appears. If two Projects share a name, use the id that `/project`
+shows. Choosing a Project never lets anyone into the conversation who wasn't
+already allowed by the Route — it changes where the work runs, not who can talk.
+If an administrator edits or moves the serving Route to another Host, select
+the Project again; the previous choice is ignored.
+
+This needs `channel.manage`, the same permission as changing a Route, because it
+decides where the conversation's work happens. It also needs an Agent Route in
+the account to provide the agent and Host defaults. That Route does not have to
+already match the topic: `/project` can bootstrap an otherwise unconfigured
+topic, then the next message starts in the selected Project.
+
 ## Guide a running turn
 
 - `/steer <message>` slips a message into the turn the agent is already running —

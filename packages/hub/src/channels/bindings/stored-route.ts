@@ -25,9 +25,9 @@ import {
 } from "../plane/types.js";
 
 export interface StoredRouteSummary {
-  /** The conversation the route was matched on: its own level (`kind` +
-   * native id), the room it belongs to, and the visibility the vertical
-   * reported — everything a Route's Where is decided on. */
+  /** The conversation the route was matched on: its own level (`kind` + native id),
+   * the room it belongs to, and the visibility the vertical reported —
+   * everything a Route's Where is decided on. */
   match: {
     kind: InboundConversationDetail["kind"];
     id: string;
@@ -46,6 +46,30 @@ export interface StoredRouteSummary {
     revisionId: string | null;
     position: number;
     fingerprint: string;
+  };
+}
+
+/** Make an existing Agent Route serve one explicitly selected conversation. */
+export function dynamicProjectRoute(
+  route: CompiledRoute,
+  conversation: InboundConversation,
+  projectId: string,
+  projectRoot: string,
+  projectDaemonReference?: string | null,
+): CompiledRoute {
+  const conversations = [conversation.id, conversation.rootConversationId ?? conversation.id];
+  return {
+    ...route,
+    where: { ...route.where, conversations },
+    target:
+      route.target.kind === "agent"
+        ? {
+            ...route.target,
+            projectId,
+            projectRoot,
+            ...(projectDaemonReference == null ? {} : { projectDaemonReference }),
+          }
+        : route.target,
   };
 }
 
@@ -80,11 +104,23 @@ export function bindingSummary(
   };
 }
 
-/** Internal position of a compiled route inside one immutable account revision. */
+/** Internal position of a compiled Route, or its dynamic template. */
 export function routePosition(account: CompiledChannelAccount, route: CompiledRoute): number {
-  const position = account.routes.indexOf(route);
-  if (position < 0) throw new Error("route is not one of this account's routes");
-  return position;
+  const direct = account.routes.indexOf(route);
+  if (direct >= 0) return direct;
+  const target = route.target;
+  if (target.kind === "agent" && target.projectId !== undefined) {
+    const template = account.routes.findIndex((candidate) => {
+      const candidateTarget = candidate.target;
+      return (
+        candidateTarget.kind === "agent" &&
+        candidateTarget.agent === target.agent &&
+        candidateTarget.environment === target.environment
+      );
+    });
+    if (template >= 0) return template;
+  }
+  throw new Error("route is not one of this account's routes");
 }
 
 /** Content hash of a compiled route: provenance on a binding row, and the
@@ -104,19 +140,12 @@ export function parseStoredRouteSelection(
   const position = (selection as { position?: unknown }).position;
   const fingerprint = (selection as { fingerprint?: unknown }).fingerprint;
   if (revisionId !== null && typeof revisionId !== "string") return undefined;
-  if (typeof position !== "number" || !Number.isInteger(position) || position < 0) {
-    return undefined;
-  }
+  if (typeof position !== "number" || !Number.isInteger(position) || position < 0) return undefined;
   if (typeof fingerprint !== "string" || fingerprint.length === 0) return undefined;
   return { revisionId: revisionId as string | null, position, fingerprint };
 }
 
-/**
- * The target the bound session was minted at. The plane compares it with the
- * target of the route that owns the conversation now: same target = keep the
- * session, different target = the conversation goes somewhere else and needs a
- * new one. `undefined` for a row written before targets were summarized.
- */
+/** The target the bound session was minted at, including a dynamic Project. */
 export function parseStoredRouteTarget(stored: unknown): CompiledRoute["target"] | undefined {
   if (typeof stored !== "object" || stored === null) return undefined;
   const target = (stored as { target?: unknown }).target;
@@ -130,12 +159,19 @@ export function parseStoredRouteTarget(stored: unknown): CompiledRoute["target"]
   const agent = (target as { agent?: unknown }).agent;
   const environment = (target as { environment?: unknown }).environment;
   const template = (target as { template?: unknown }).template;
+  const projectId = (target as { projectId?: unknown }).projectId;
+  const projectRoot = (target as { projectRoot?: unknown }).projectRoot;
+  const projectDaemonReference = (target as { projectDaemonReference?: unknown })
+    .projectDaemonReference;
   if (typeof agent !== "string" || typeof environment !== "string") return undefined;
   return {
     kind: "agent",
     agent,
     environment,
     template: typeof template === "string" ? template : null,
+    ...(typeof projectId === "string" ? { projectId } : {}),
+    ...(typeof projectRoot === "string" ? { projectRoot } : {}),
+    ...(typeof projectDaemonReference === "string" ? { projectDaemonReference } : {}),
   };
 }
 
@@ -177,7 +213,31 @@ export function storedRouteOwner(
       kind: "channel" as const,
       id: binding.externalConversationId,
     };
-  return recordedRoute(account, conversation, parseStoredRouteSelection(binding.route));
+  const recorded = recordedRoute(account, conversation, parseStoredRouteSelection(binding.route));
+  if (recorded !== undefined) return recorded;
+  const target = parseStoredRouteTarget(binding.route);
+  if (
+    target?.kind !== "agent" ||
+    target.projectId === undefined ||
+    target.projectRoot === undefined
+  ) {
+    return undefined;
+  }
+  const template = account.routes.find(
+    (route) =>
+      route.target.kind === "agent" &&
+      route.target.agent === target.agent &&
+      route.target.environment === target.environment,
+  );
+  return template === undefined
+    ? undefined
+    : dynamicProjectRoute(
+        template,
+        conversation,
+        target.projectId,
+        target.projectRoot,
+        target.projectDaemonReference,
+      );
 }
 
 /**

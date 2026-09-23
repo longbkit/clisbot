@@ -36,15 +36,15 @@ changing the configuration or reaching outside it
 Each privilege, and what it unlocks — grant these to a Member, Team, or the Guest
 group:
 
-| Privilege         | What it unlocks                                            | Commands                                                                                                                                                             |
-| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _public_          | anyone, even an unlinked guest                             | `/help`, `/me`                                                                                                                                                       |
-| `channel.use`     | chat with the Route's Agent — the baseline to give a Guest | `/status`, `/stop`, `/new`, `/followup` (this conversation), `/steer`, `/queue`, `/skill`, `/command` (list/search/run), `/fork`, `/side`, `/quick`, `/routedefault` |
-| `agent.interact`  | change or leave the Route's configuration                  | `/cowork`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`                                                                                                 |
-| `agent.create`    | bring a session from elsewhere                             | `/resume`                                                                                                                                                            |
-| `approval.config` | manage dynamic commands                                    | `/command add`, `/command remove`                                                                                                                                    |
-| `approval.*`      | answer or suppress prompts                                 | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
-| `channel.manage`  | change a Connection's Route defaults³                      | `/promoteroutedefault`                                                                                                                                               |
+| Privilege         | What it unlocks                                                    | Commands                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _public_          | anyone, even an unlinked guest                                     | `/help`, `/me`                                                                                                                                                       |
+| `channel.use`     | chat with the Route's Agent — the baseline to give a Guest         | `/status`, `/stop`, `/new`, `/followup` (this conversation), `/steer`, `/queue`, `/skill`, `/command` (list/search/run), `/fork`, `/side`, `/quick`, `/routedefault` |
+| `agent.interact`  | change or leave the Route's configuration                          | `/cowork`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`                                                                                                 |
+| `agent.create`    | bring a session from elsewhere                                     | `/resume`                                                                                                                                                            |
+| `approval.config` | manage dynamic commands                                            | `/command add`, `/command remove`                                                                                                                                    |
+| `approval.*`      | answer or suppress prompts                                         | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
+| `channel.manage`  | change a Connection's Route defaults³, or a conversation's Project | `/promoteroutedefault`, `/project`                                                                                                                                   |
 
 The per-command **Requires** columns below repeat this at the row level.
 
@@ -74,8 +74,8 @@ creation privileges do not imply Fast mode access.
 `authorizeChannelPrivilege`: an organization owner or admin holds it, and so does
 a Member or Team assigned the **Manage** level on that Connection. The Manage
 level requires the All conversations constraint, because a Route can match
-conversations outside a narrower list. A Guest never holds it. See
-[Route defaults](#route-defaults).
+conversations outside a narrower list. A Guest never holds it. See:
+[Route defaults](#route-defaults) and [Project selection](#project-selection).
 
 ### Discovery, configuration, and additional session controls
 
@@ -102,6 +102,7 @@ Implementation and verification notes are in [implementation-plan.md](implementa
 | `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                             | channel.use                                      |   •    |     —      |
 | `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | channel.use                                      |   •    |     —      |
 | `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                  |   •    |     —      |
+| `/project [list\|<id-or-name>\|clear]`                                                                    | Show or set the Project this conversation's next session lands in ([below](#project-selection)).               | channel.manage³                                  |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -222,7 +223,8 @@ Names are the contract users learn; these are chosen against
   fork + one-off, `/quick` = fresh + one-off. See [Starting sessions](#starting-sessions).
 - **Commands covered by this feature** — `/cowork`, `/me`, `/resume`, `/steer`,
   `/queue`, `/provider`, `/effort`, `/permission`, `/skill`, `/command`, `/fork`,
-  `/side`, `/quick`, `/routedefault`, `/promoteroutedefault`, plus `list`/`search`
+  `/side`, `/quick`, `/routedefault`, `/promoteroutedefault`, `/project`, plus
+  `list`/`search`
   on `/model`. `/status`, `/stop`, `/new`,
   `/agent`, `/model`, `/help`, `/approve`, `/deny` already ship.
 
@@ -420,6 +422,56 @@ served this message. That Route is the one changed, and `/routedefault` shows it
 
 Replies are English, like every other command reply, until the Hub has locale
 support.
+
+## Project selection
+
+A conversation can be pointed at one **Project** on the account's Host, so the
+next session it starts lands there instead of at the Route's own Project.
+`/project` is the control. It needs `channel.manage` — the authority that changes
+a Route — because it decides where this conversation's work runs, and it also
+checks `agent.create` on each Project it offers.
+
+| Form                         | Does                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/project` · `/project list` | List the Projects on the account's Host you may start a session in, and name the one this conversation is set to. |
+| `/project <id-or-name>`      | Point this conversation's next session at that Project.                                                           |
+| `/project clear`             | Drop the choice; the next session follows the Route default again.                                                |
+
+- **Per conversation.** The choice is stored against this conversation's binding
+  key (`bindings/stored-route.ts`), so it is one thread, one topic, or one
+  channel exactly as the Route's `binding.key` decides — the same unit
+  `/followup` and `/model` use. Another conversation on the same Route keeps its
+  own choice.
+- **The next session, not the running one.** An existing session stays where it
+  is; `/new` (or `/fork`) is what starts a session in the selected Project. A
+  conversation with a session already bound keeps it until then.
+- **Only what you may use.** A Project is offered and accepted only when the
+  caller holds `agent.create` against that Project, so a Project you cannot
+  reach is never listed. A name matching more than one Project is refused rather
+  than guessed — use the id from `/project list`.
+- **No audience is broadened.** The choice is carried by narrowing the serving
+  Route to this conversation (`dynamicProjectRoute`,
+  `bindings/stored-route.ts`): the target gains the Project's id and root, and
+  the Route's Where is restricted to the selected conversation. Its audience
+  rules stay as authored, so a Project choice applies the Route's audience to the
+  selected conversation and never admits a sender the Route did not already
+  admit.
+- **An Agent Route is required.** The account needs at least one direct (Agent)
+  Route to provide the Agent and Host defaults. The Route does not need to
+  cover the topic yet: `/project` can bootstrap an otherwise unconfigured
+  topic, then the selected Project narrows that Route to the conversation. An
+  automation-only account has no Agent template, so configure one first.
+- **Host scope.** The list is the **configured account's Host** (the account's
+  daemon connection). Projects on another Host are not offered; select on the
+  account that serves the conversation. The selection also records the serving
+  Route's position and fingerprint plus its Host reference; if the Route is
+  edited, reordered, or moved to another Host, the old choice is ignored and
+  the conversation follows normal routing until an admin selects a Project
+  again.
+
+The command writes only the conversation's selection row; it never rewrites the
+immutable Channel revision, and `clear` needs no Host query — it just drops the
+row so the next session follows the Route default.
 
 ## Agent profiles and the route menu
 

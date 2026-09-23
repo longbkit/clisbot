@@ -25,6 +25,18 @@ class FakeDaemon {
   readonly hellos: RecordedMessage[] = [];
   clients: Set<import("ws").WebSocket>;
   port = 0;
+  /** The `project.list.request` reply; tests override it to exercise malformed catalogs. */
+  projectListPayload: Record<string, unknown> = {
+    projects: [
+      {
+        projectId: "project-1",
+        projectCustomName: null,
+        projectDisplayName: "Workspace",
+        projectRootPath: "/srv/workspace",
+        projectKind: "git",
+      },
+    ],
+  };
 
   constructor() {
     this.wss = new WebSocketServer({ noServer: true });
@@ -111,6 +123,7 @@ class FakeDaemon {
       list_commands_request: {
         commands: [{ name: "review", description: "Review", argumentHint: "", kind: "skill" }],
       },
+      "project.list.request": this.projectListPayload,
       "workspace.create.request":
         (message["source"] as { path?: string } | undefined)?.path === "/missing"
           ? { workspace: null, setupTerminalId: null, error: "Directory not found: /missing" }
@@ -626,6 +639,47 @@ describe("channel trusted-client daemon connection", () => {
       (await client.buildAgentForkContext("agent-1")).attachment?.contextKind,
       "chat_history",
     );
+  });
+
+  it("maps the daemon's Project catalog into DaemonProject", async () => {
+    assert.deepEqual(await client.listProjects(), [
+      { projectId: "project-1", name: "Workspace", rootPath: "/srv/workspace", kind: "git" },
+    ]);
+    const frame = daemon.messages.find((message) => message.type === "project.list.request");
+    assert.ok(frame !== undefined, "project.list.request was not sent");
+  });
+
+  it("prefers a custom Project name and fails loudly on a malformed catalog", async () => {
+    daemon.projectListPayload = {
+      projects: [
+        {
+          projectId: "project-2",
+          projectCustomName: "Renamed",
+          projectDisplayName: "Workspace",
+          projectRootPath: "/srv/renamed",
+          projectKind: "non_git",
+        },
+      ],
+    };
+    assert.deepEqual(await client.listProjects(), [
+      { projectId: "project-2", name: "Renamed", rootPath: "/srv/renamed", kind: "non_git" },
+    ]);
+
+    daemon.projectListPayload = { projects: "not-an-array" };
+    await assert.rejects(client.listProjects(), /`projects` must be an array/u);
+    daemon.projectListPayload = { projects: [{ projectId: "project-3" }] };
+    await assert.rejects(client.listProjects(), /malformed Project descriptor/u);
+
+    daemon.projectListPayload = {
+      projects: [
+        {
+          projectId: "project-1",
+          projectDisplayName: "Workspace",
+          projectRootPath: "/srv/workspace",
+          projectKind: "git",
+        },
+      ],
+    };
   });
 
   it("writes live config and rejects negative daemon acknowledgements", async () => {
