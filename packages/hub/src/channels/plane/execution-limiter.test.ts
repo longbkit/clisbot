@@ -6,6 +6,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import { ChannelExecutionLimiter } from "./execution-limiter.js";
 
 const defaults: EffectiveDefaults = {
@@ -22,7 +23,7 @@ const defaults: EffectiveDefaults = {
       typingIndicator: false,
       messageReaction: "off",
     },
-    toolCalls: false,
+    toolCalls: toolActivityDefaults(false),
     threadLink: "none",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

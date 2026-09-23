@@ -5,8 +5,21 @@
 // file owns what a leaf resolves to.
 
 import { ORG_DEFAULTS, type ApprovalRule, type ChannelDefaults } from "./schema.js";
-import type { SyncProgress, SyncProgressGroup, SyncStreaming } from "./schema.js";
-import type { DmPolicy, GroupPolicy, OutboundPath, QuestionsMode } from "./enums.js";
+import type {
+  SyncProgress,
+  SyncProgressGroup,
+  SyncStreaming,
+  SyncToolCalls,
+  SyncToolCallsGroup,
+} from "./schema.js";
+import type {
+  DmPolicy,
+  GroupPolicy,
+  OutboundPath,
+  QuestionsMode,
+  ToolActivityDetail,
+  WhenThrottled,
+} from "./enums.js";
 import { issue } from "./compile-support.js";
 import type { AgentControls } from "./agent-controls.js";
 import { foldConversationDefaults, type EffectiveConversationDefaults } from "./conversation.js";
@@ -67,7 +80,16 @@ export interface EffectiveDefaults extends EffectiveConversationDefaults {
       /** Resolved: the reserved `"off"`, or the emoji name to react with. */
       messageReaction: string;
     };
-    toolCalls: boolean;
+    /** The tool-activity surface: whether a tool call is announced at all, how
+     * much of it the line says, and how often a starting tool may post a new
+     * line. Folded per leaf; an authored bare boolean is the switch only. */
+    toolCalls: {
+      enabled: boolean;
+      detail: ToolActivityDetail;
+      /** Seconds between tool-START lines in one turn; 0 posts every one. */
+      throttleSeconds: number;
+      whenThrottled: WhenThrottled;
+    };
     threadLink: "full" | "final-only" | "none";
     /** The live-draft surface for a running turn (`sync.streaming`). ABSENT is
      * the org floor and means off: nothing streams and the turn's answer is
@@ -205,7 +227,7 @@ function foldSyncDefaults(pick: LeafPicker, floor: (typeof ORG_DEFAULTS)["sync"]
   return {
     finalAnswers: pick((layer) => layer?.sync?.finalAnswers) ?? floor.finalAnswers,
     progress: foldProgressDefaults(pick, floor.progress),
-    toolCalls: pick((layer) => layer?.sync?.toolCalls) ?? floor.toolCalls,
+    toolCalls: foldToolCallsDefaults(pick, floor.toolCalls),
     threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.threadLink,
     ...foldStreamingDefaults(pick),
     subagents: {
@@ -214,6 +236,41 @@ function foldSyncDefaults(pick: LeafPicker, floor: (typeof ORG_DEFAULTS)["sync"]
       progress: pick((layer) => layer?.sync?.subagents?.progress) ?? floor.subagents.progress,
       toolCalls: pick((layer) => layer?.sync?.subagents?.toolCalls) ?? floor.subagents.toolCalls,
     },
+  };
+}
+
+/**
+ * Normalize one authored `sync.toolCalls` layer to leaves. A bare boolean is
+ * the switch and speaks about nothing else, so the rendering leaves keep
+ * inheriting. The OBJECT spelling is the "on" spelling: authoring any leaf of
+ * it turns the surface on, which is why it carries no `enabled` key.
+ */
+function toolCallsLeaf(layer: SyncToolCalls | undefined): SyncToolCallsGroup & {
+  enabled?: boolean;
+} {
+  if (layer === undefined) return {};
+  if (typeof layer === "boolean") return { enabled: layer };
+  return { enabled: true, ...layer };
+}
+
+/** The effective tool-activity block at the org floor, switched on or off —
+ * what the compiler folds a bare `toolCalls: <boolean>` to. */
+export function toolActivityDefaults(enabled: boolean): EffectiveDefaults["sync"]["toolCalls"] {
+  return { ...ORG_DEFAULTS.sync.toolCalls, enabled };
+}
+
+/** Fold the four `sync.toolCalls` leaves; each one inherits on its own. */
+function foldToolCallsDefaults(
+  pick: LeafPicker,
+  floor: (typeof ORG_DEFAULTS)["sync"]["toolCalls"],
+): EffectiveDefaults["sync"]["toolCalls"] {
+  const leaf = <K extends keyof ReturnType<typeof toolCallsLeaf>>(key: K) =>
+    pick((layer) => toolCallsLeaf(layer?.sync?.toolCalls)[key]);
+  return {
+    enabled: leaf("enabled") ?? floor.enabled,
+    detail: leaf("detail") ?? floor.detail,
+    throttleSeconds: leaf("throttleSeconds") ?? floor.throttleSeconds,
+    whenThrottled: leaf("whenThrottled") ?? floor.whenThrottled,
   };
 }
 
@@ -285,7 +342,7 @@ function toolPathSyncFold(
     // remove the only sign of work. The group shape is what makes this
     // distinction expressible; the old single boolean could not.
     progress: { ...sync.progress, progressMessage: false },
-    toolCalls: false,
+    toolCalls: { ...sync.toolCalls, enabled: false },
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   };
 }

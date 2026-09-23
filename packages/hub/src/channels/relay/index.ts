@@ -1,7 +1,7 @@
 // The outbound relay + delivery ledger (plan §4-S5, §4-S3 one-code-path). One
 // consumer over the bound agents' `agent_stream` events: the relay mapper picks
-// the event kinds a route's `sync` policy admits (final answers, throttled
-// progress snapshots, tool-call lines — reasoning off at P0) and the delivery
+// the event kinds a route's `sync` policy admits (final answers and tool
+// activity — reasoning off at P0) and the delivery
 // ledger records BEFORE every post, so a replayed stream event or a Hub restart
 // can never double-post (`recordDelivery` → post → `confirmDelivery` /
 // `failDelivery`; `created: false` skips the post). `permission_requested`
@@ -21,7 +21,11 @@ import {
 } from "../plane/types.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { anchoredReplyThreadId } from "../reply-anchor.js";
-import type { ChannelStreamingProducer, StreamingFinalizeTransport } from "../streaming/index.js";
+import type {
+  ChannelStreamingDriver,
+  ChannelStreamingProducer,
+  StreamingFinalizeTransport,
+} from "../streaming/index.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 import { deliverRelayPost, type OutputKind } from "./delivery.js";
 import {
@@ -31,19 +35,31 @@ import {
   toolAlreadySent,
   toolTurnFallback,
 } from "./turn-end.js";
+import { appendThreadLink, ledgerTurnId, stripAssistantBoundary } from "./text.js";
+import {
+  relayToolCall,
+  toolActivityLine,
+  type ToolActivityTurn,
+  type ToolLineWriter,
+} from "./tool-activity.js";
+
+export { appendThreadLink } from "./text.js";
 
 /**
  * The relay knobs of a scope: root gates on `sync`, subagents on
  * `sync.subagents`. `progress` is the group's TEXT leaf only — the typing
  * indicator and the reaction are turn-level surfaces driven from the turn
- * lifecycle, not per-item relay gates, so they never enter this type.
+ * lifecycle, not per-item relay gates, so they never enter this type. It gates
+ * the separate progress MESSAGE (`sync.streaming.mode: progress`); the tool
+ * lines in the thread are gated by `toolCalls` alone.
  */
 type SyncKnobs = Pick<EffectiveDefaults["sync"], "finalAnswers" | "toolCalls"> & {
   progress: EffectiveDefaults["sync"]["progress"]["progressMessage"];
 };
 
-/** The throttle window (ms) between progress snapshots when unset by deps. */
-export const DEFAULT_PROGRESS_THROTTLE_MS = 30_000;
+/** Edit a message this relay already posted — the vertical's own edit verb,
+ * the one the streaming drafts drive. Absent = the channel cannot edit. */
+type RelayEditFn = NonNullable<ChannelStreamingDriver["edit"]>;
 
 /** The root scope's relay knobs: the `sync.progress` group's TEXT leaf is what
  * gates a relayed line, so the group collapses to `progress` here. The
@@ -53,6 +69,17 @@ function rootSyncKnobs(sync: EffectiveDefaults["sync"]): SyncKnobs {
     finalAnswers: sync.finalAnswers,
     progress: sync.progress.progressMessage,
     toolCalls: sync.toolCalls,
+  };
+}
+
+/** A subagent scope's relay knobs. `sync.subagents` carries its own on/off
+ * switches; how a tool line READS and how often it posts are the route's one
+ * answer for the whole turn, so the rendering leaves come from the root. */
+function subagentSyncKnobs(sync: EffectiveDefaults["sync"]): SyncKnobs {
+  return {
+    finalAnswers: sync.subagents.finalAnswers,
+    progress: sync.subagents.progress,
+    toolCalls: { ...sync.toolCalls, enabled: sync.subagents.toolCalls },
   };
 }
 
@@ -89,7 +116,7 @@ export function replyLocationFor(context: StreamContext): {
   };
 }
 
-interface TurnState {
+interface TurnState extends ToolActivityTurn {
   /**
    * The in-flight assistant message's text. A logical assistant message reaches
    * the relay as several coalesced `assistant_message` items sharing one
@@ -105,8 +132,6 @@ interface TurnState {
   postedAssistantMessageIds: Set<string>;
   /** Exact assistant payloads already closed in this turn (guards id drift/replay). */
   postedAssistantTexts: Set<string>;
-  /** Clock time of the last posted progress snapshot (the throttle cursor). */
-  lastProgressAt: number | null;
   /** Ledger sequence counter for this turn's relay posts, in order. */
   nextSequence: number;
   /** True once the turn closed (no further relay posts for it). */
@@ -120,7 +145,10 @@ interface RelayContext {
   store: ChannelStore;
   post: PostFn;
   sessionLink?: SessionLinkRenderer | undefined;
-  progressThrottleMs: number;
+  /** The channel's edit-in-place verb, when the loaded vertical publishes one.
+   * `sync.toolCalls.whenThrottled: update` and the one-line-per-tool-call
+   * terminal state both need it; without it both fall back to posting. */
+  editPost?: RelayEditFn | undefined;
   /** COMPAT(clisbot-control-plane): the turn-lifecycle surface owner, opened
    * by the inbound path (the plane accepted a message that will run a turn)
    * not by this relay. The relay only keeps it alive and releases it. Absent
@@ -243,7 +271,7 @@ export class RelayEngine {
         await this.onTimeline(
           stream,
           key,
-          stream.context.route.defaults.sync.subagents,
+          subagentSyncKnobs(stream.context.route.defaults.sync),
           event.item,
           this.subagentPrefix(stream, event.subagentId),
         );
@@ -260,7 +288,7 @@ export class RelayEngine {
         await this.postAssistantMessage(
           stream,
           key,
-          stream.context.route.defaults.sync.subagents,
+          subagentSyncKnobs(stream.context.route.defaults.sync),
           this.subagentPrefix(stream, event.subagentId),
           false,
         );
@@ -408,6 +436,12 @@ export class RelayEngine {
     await this.post(stream, key, turn, caption, finalAnswer, "assistant", transport);
   }
 
+  /**
+   * One tool call. `sync.toolCalls` is the ONE gate: a Route with tool
+   * activity off says nothing about tools, whatever the progress knobs say.
+   * The tool-activity surface owns the line and the message it lives on; this
+   * only hands it the writer that keeps the ledger and the thread link here.
+   */
   private async onToolCall(
     stream: RelayStream,
     key: string,
@@ -416,31 +450,82 @@ export class RelayEngine {
     prefix: string,
   ): Promise<void> {
     // `finish_execution` is Workflow control-plane plumbing, not work the
-    // user asked the Agent to perform. Keep it out of both the progress and
-    // terminal tool-call surfaces without muting useful tool visibility.
+    // user asked the Agent to perform. Keep it out of the tool surface
+    // without muting useful tool visibility.
     if (item.name !== undefined && isHubFinishExecutionToolName(item.name)) return;
+    if (!sync.toolCalls.enabled) return;
     const turn = this.turn(stream, key);
-    if (item.status === "running") {
-      if (!sync.progress || item.name === undefined) return;
-      const line = `${prefix}Running ${item.name}…`;
-      await this.relay.streaming?.onProgress(
-        stream.context,
-        key,
-        replyLocationFor(stream.context),
-        {
-          kind: "tool",
-          text: line,
-          label: item.name,
-          toolName: item.name,
-          status: "running",
-        },
-      );
-      await this.postProgressSnapshot(stream, key, turn, line);
-      return;
+    await this.raiseProgressCard(stream, key, sync, item, prefix);
+    await relayToolCall(
+      { clock: this.relay.clock, writer: this.toolLineWriter(stream, key, turn) },
+      turn,
+      sync.toolCalls,
+      item,
+      prefix,
+    );
+  }
+
+  /** The relay's verbs for one scope's tool line: a ledgered post, and the
+   * channel's edit verb with this relay's thread link on it. */
+  private toolLineWriter(stream: RelayStream, key: string, turn: TurnState): ToolLineWriter {
+    return {
+      post: async (line) => await this.post(stream, key, turn, line, false, "tool"),
+      edit: async (externalMessageId, line) =>
+        await this.editPosted(stream, externalMessageId, line),
+    };
+  }
+
+  /** Rewrite a message this relay posted. False = the channel has no edit verb
+   * or refused the edit; the tool surface then posts instead of updating. */
+  private async editPosted(
+    stream: RelayStream,
+    externalMessageId: string,
+    line: string,
+  ): Promise<boolean> {
+    const edit = this.relay.editPost;
+    if (edit === undefined) return false;
+    const context = stream.context;
+    try {
+      await edit({
+        ...replyLocationFor(context),
+        externalMessageId,
+        text: appendThreadLink(
+          line,
+          context.route.defaults.sync.threadLink,
+          false,
+          this.relay,
+          context.agentId,
+        ),
+      });
+    } catch (error) {
+      this.relay.logger.warn("relay message edit failed", {
+        channel: context.channel,
+        accountId: context.accountId,
+        agentId: context.agentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
     }
-    if (!isTerminalToolStatus(item.status)) return;
-    if (!sync.toolCalls) return;
-    await this.post(stream, key, turn, `${prefix}${toolCallLine(item)}`, false, "tool");
+    return true;
+  }
+
+  /** Feed the separate progress MESSAGE (`sync.streaming.mode: progress`) —
+   * the one surface `sync.progress` still gates on this path. */
+  private async raiseProgressCard(
+    stream: RelayStream,
+    key: string,
+    sync: SyncKnobs,
+    item: AgentStreamTimelineItem,
+    prefix: string,
+  ): Promise<void> {
+    if (!sync.progress || item.status !== "running") return;
+    await this.relay.streaming?.onProgress(stream.context, key, replyLocationFor(stream.context), {
+      kind: "tool",
+      text: `${prefix}${toolActivityLine(item, sync.toolCalls.detail)}`,
+      label: item.name ?? item.type,
+      ...(item.name === undefined ? {} : { toolName: item.name }),
+      status: "running",
+    });
   }
 
   private async onTurnCompleted(stream: RelayStream, turnId: string) {
@@ -515,28 +600,10 @@ export class RelayEngine {
     });
   }
 
-  // --- Progress snapshots --------------------------------------------------
-
-  /**
-   * Post a progress snapshot when the throttle window has elapsed since the
-   * last one; otherwise hold it — the next eligible event re-checks the clock.
-   * A progress line and a tool-call line share the scope's sequence counter.
-   */
-  private async postProgressSnapshot(
-    stream: RelayStream,
-    key: string,
-    turn: TurnState,
-    line: string,
-  ) {
-    const now = this.relay.clock.now();
-    const lastAt = turn.lastProgressAt;
-    if (lastAt !== null && now - lastAt < this.relay.progressThrottleMs) return;
-    await this.post(stream, key, turn, line, false, "progress");
-    turn.lastProgressAt = this.relay.clock.now();
-  }
-
   // --- Delivery (record-before-post) ----------------------------------------
 
+  /** One relay post; returns the delivered message's native id when the
+   * channel reported one (a tool line keeps it, to edit the line later). */
   private async post(
     stream: RelayStream,
     turnId: string,
@@ -545,13 +612,13 @@ export class RelayEngine {
     finalAnswer: boolean,
     outputKind: OutputKind,
     transport?: StreamingFinalizeTransport | undefined,
-  ) {
+  ): Promise<string | undefined> {
     const context = stream.context;
     // One post per recorded sequence, in order; the final answer is the turn's
     // last relay post.
     const sequence = turn.nextSequence;
     turn.nextSequence += 1;
-    await deliverRelayPost(this.relay, {
+    return await deliverRelayPost(this.relay, {
       context,
       key: {
         organizationId: this.relay.organizationId,
@@ -582,7 +649,8 @@ export class RelayEngine {
         pendingAssistantMessageId: undefined,
         postedAssistantMessageIds: new Set(),
         postedAssistantTexts: new Set(),
-        lastProgressAt: null,
+        toolLine: undefined,
+        lastToolPostAt: null,
         nextSequence: 0,
         closed: false,
       };
@@ -590,69 +658,6 @@ export class RelayEngine {
     }
     return turn;
   }
-}
-
-// --- Mappers (pure) ----------------------------------------------------------
-
-/**
- * The provider's assistant-message boundary marker (`---` between messages),
- * prepended by the Codex provider to the first delta of each new assistant
- * message. It is an app UI cue, not content: the daemon strips it only on the
- * app-client's reduce path, so the stream path (the relay) must strip it too.
- * Mirrors `ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN` (server
- * `providers/codex-app-server-agent.ts`).
- */
-const ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN = "\n\n---\n\n";
-
-/**
- * Strip the boundary marker from one assistant-message chunk. The marker only
- * ever prefixes a chunk (the provider prepends it to the first delta of a new
- * message), and at most once.
- */
-function stripAssistantBoundary(text: string): string {
-  if (!text.startsWith(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN)) return text;
-  let result = text.slice(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN.length);
-  while (result.startsWith(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN)) {
-    result = result.slice(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN.length);
-  }
-  return result;
-}
-
-function isTerminalToolStatus(status: string | undefined): boolean {
-  return status === "completed" || status === "failed" || status === "canceled";
-}
-
-/** One tool-call line (`name: status`), gated by `sync.toolCalls`. */
-function toolCallLine(item: AgentStreamTimelineItem): string {
-  const name = item.name ?? item.type;
-  const status = item.status ?? "completed";
-  return `Tool ${name}: ${status}`;
-}
-
-/**
- * Append the back-link to the live session, per `sync.threadLink`. `full`: on
- * every relay post; `final-only`: on the final answer; `none` (or no
- * renderer): never.
- */
-export function appendThreadLink(
-  text: string,
-  threadLink: "full" | "final-only" | "none",
-  finalAnswer: boolean,
-  relay: { sessionLink?: SessionLinkRenderer | undefined },
-  agentId: string,
-): string {
-  if (threadLink === "none") return text;
-  if (threadLink === "final-only" && !finalAnswer) return text;
-  const renderer = relay.sessionLink;
-  if (renderer === undefined) return text;
-  const link = renderer(agentId);
-  if (link === "") return text;
-  return `${text}\n\n${link}`;
-}
-
-/** The ledger event-turn id: the agent + stream turn id (stable across replay). */
-function ledgerTurnId(scopeId: string, turnId: string): string {
-  return `${scopeId}:${turnId}`;
 }
 
 // Media is sent only through the Hub's `message` MCP tool (`attachments`/`media`/`buffer`).

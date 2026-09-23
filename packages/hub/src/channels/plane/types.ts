@@ -522,8 +522,6 @@ export interface ChannelPlaneDeps {
   >;
   /** Back-link renderer for `sync.threadLink`; absent posts no link. */
   sessionLink?: SessionLinkRenderer | undefined;
-  /** Progress-snapshot throttle window (ms); default `DEFAULT_PROGRESS_THROTTLE_MS`. */
-  progressThrottleMs?: number | undefined;
   /** Processing-surface TTL (ms): how long a turn may go without a single
    * stream event before the Hub releases its surface; default
    * `PROCESSING_TTL_MS`. The provider's own expiry is the vertical's. */

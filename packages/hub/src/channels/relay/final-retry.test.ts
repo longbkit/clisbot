@@ -13,6 +13,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import { ManualClock } from "../plane/clock.js";
 import { outboundFailure, type OutboundFailureKind } from "../plane/outbound-failure.js";
 import type { OutboundPostResult, PlaneLogger, PostFn, StreamContext } from "../plane/types.js";
@@ -28,7 +29,7 @@ const AGENT_ID = "agent-retry";
 const SILENT: PlaneLogger = { warn: () => undefined, info: () => undefined };
 const START = Date.UTC(2026, 8, 22, 12);
 
-function defaults(progress: boolean): EffectiveDefaults {
+function defaults(toolActivity: boolean): EffectiveDefaults {
   return {
     requireMention: true,
     followUp: { mode: "auto", ttlMinutes: 60 },
@@ -38,8 +39,8 @@ function defaults(progress: boolean): EffectiveDefaults {
     inbound: { reactionNotifications: "off", editNotifications: "off" },
     sync: {
       finalAnswers: true,
-      progress: { progressMessage: progress, typingIndicator: false, messageReaction: "off" },
-      toolCalls: false,
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+      toolCalls: toolActivityDefaults(toolActivity),
       threadLink: "none",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },
@@ -47,14 +48,14 @@ function defaults(progress: boolean): EffectiveDefaults {
 }
 
 /** A stream context on its own account, so each test's due scan sees only its rows. */
-function context(accountId: string, options: { progress?: boolean } = {}): StreamContext {
+function context(accountId: string, options: { toolActivity?: boolean } = {}): StreamContext {
   const route: CompiledRoute = {
     audienceRules: [],
     where: { dm: false, groups: [], conversations: ["C1"] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [],
-    defaults: defaults(options.progress ?? false),
+    defaults: defaults(options.toolActivity ?? false),
     approval: [],
   };
   const account: CompiledChannelAccount = {
@@ -138,7 +139,6 @@ function engineFor(post: PostFn, clock: ManualClock, ctx: StreamContext): RelayE
     clock,
     store,
     post,
-    progressThrottleMs: 0,
   });
   engine.attach(ctx);
   return engine;
@@ -257,7 +257,7 @@ describe("final answer retry", () => {
 
   it("never re-posts a post that may have landed when the stream replays", async () => {
     const clock = new ManualClock(START);
-    const ctx = context("replay-uncertain", { progress: true });
+    const ctx = context("replay-uncertain", { toolActivity: true });
     for (const kind of ["timeout", "partially_posted", "server_error"] as const) {
       const turnId = `turn-${kind}`;
       const first = scriptedPost([failed(kind)]);
@@ -269,7 +269,7 @@ describe("final answer retry", () => {
       assert.equal(row.status, "recorded");
       assert.match(row.failureReason ?? "", new RegExp(kind));
     }
-    // A progress line that may have landed is not re-posted on replay either.
+    // A tool line that may have landed is not re-posted on replay either.
     const running = { type: "tool_call" as const, name: "shell", status: "running" };
     const first = scriptedPost([failed("timeout")]);
     await engineFor(first.post, clock, ctx).onStream(AGENT_ID, {
@@ -344,7 +344,6 @@ describe("final answer retry", () => {
         clock,
         store: flaky,
         post: script.post,
-        progressThrottleMs: 0,
       });
       engine.attach(ctx);
       return engine;
@@ -381,7 +380,6 @@ describe("final answer retry", () => {
       clock,
       store: new LostReplyStore(bundle.runtime),
       post: script.post,
-      progressThrottleMs: 0,
     });
     engine.attach(context("lost-reply"));
     await answer(engine, "turn-lost", "reply lost after commit");
@@ -389,10 +387,10 @@ describe("final answer retry", () => {
     assert.match(JSON.stringify(errors), /may have committed/);
   });
 
-  it("does not retry a failed progress line", async () => {
+  it("does not retry a failed tool line", async () => {
     const clock = new ManualClock(START);
     const script = scriptedPost([failed("unavailable")]);
-    const engine = engineFor(script.post, clock, context("progress", { progress: true }));
+    const engine = engineFor(script.post, clock, context("progress", { toolActivity: true }));
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
       turnId: "turn-p",

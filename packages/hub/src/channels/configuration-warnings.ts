@@ -178,7 +178,7 @@ function sendsFinalAnswerOnly(defaults: EffectiveDefaults): boolean {
     defaults.outbound.path === "relay" &&
     sync.finalAnswers &&
     !sync.progress.progressMessage &&
-    !sync.toolCalls &&
+    !sync.toolCalls.enabled &&
     sync.threadLink === "none" &&
     (sync.streaming?.mode ?? "off") === "off" &&
     !sync.subagents.finalAnswers &&

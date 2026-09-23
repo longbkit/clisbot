@@ -16,6 +16,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
@@ -46,7 +47,7 @@ const DEFAULTS: EffectiveDefaults = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: false,
+    toolCalls: toolActivityDefaults(false),
     threadLink: "none",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

@@ -67,7 +67,7 @@ import { conversationFollowUpMode, endFollowUpPause } from "./bindings/follow-up
 import { ConversationFlow, type DeadLetteredRow } from "./bindings/conversation-flow.js";
 import { isHeldFlushPayload, type HeldFlushPayload } from "./bindings/held-flush.js";
 import type { Delivery } from "./bindings/inbox.js";
-import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./relay/index.js";
+import { RelayEngine } from "./relay/index.js";
 import { ChannelStreamingProducer } from "./streaming/index.js";
 import { realClock } from "./plane/clock.js";
 import { createProcessingController, type ProcessingController } from "./plane/processing.js";
@@ -718,7 +718,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         // COMPAT(clisbot-control-plane): the native-media post + media home
         // resolution (the agent's recorded cwd, else the shared home root).
         sessionLink: deps.sessionLink,
-        progressThrottleMs: deps.progressThrottleMs ?? DEFAULT_PROGRESS_THROTTLE_MS,
+        // The vertical's edit verb, when it publishes one: the tool-activity
+        // line rewrites its own message rather than posting a second one.
+        ...(deps.streaming?.edit === undefined ? {} : { editPost: deps.streaming.edit }),
         ...(deps.replyCapabilities === undefined ? {} : { toolDeliveries: deps.replyCapabilities }),
         // COMPAT(clisbot-control-plane): the surface is OPENED by the inbound
         // path (plane/processing.ts), not here; the relay keeps it alive on

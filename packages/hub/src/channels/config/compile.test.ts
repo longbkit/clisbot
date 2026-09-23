@@ -5,6 +5,7 @@ import {
   compileChannelControlPlane,
   type ChannelCompileInput,
 } from "./compile.js";
+import { toolActivityDefaults } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
 import { conversationSettings } from "./conversation.js";
 import { openRouteWarnings, routeWarnings } from "../configuration-warnings.js";
@@ -707,6 +708,79 @@ routes:
     });
   });
 
+  it("keeps a stored boolean sync.toolCalls meaning the switch only", () => {
+    // Every revision authored before the group existed writes
+    // `toolCalls: true|false`. It must keep compiling, and it must speak about
+    // the switch ALONE — the rendering leaves come from the layer below.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/policy.yml"]: `
+defaults:
+  sync: { toolCalls: { detail: full, throttleSeconds: 0 } }
+`,
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+defaults:
+  sync: { toolCalls: false }
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+    sync: { toolCalls: true }
+`,
+      }),
+    );
+    assert.deepEqual(plane.accounts[0]!.defaults.sync.toolCalls, {
+      enabled: false,
+      detail: "full",
+      throttleSeconds: 0,
+      whenThrottled: "update",
+    });
+    assert.deepEqual(plane.accounts[0]!.routes[0]!.defaults.sync.toolCalls, {
+      enabled: true,
+      detail: "full",
+      throttleSeconds: 0,
+      whenThrottled: "update",
+    });
+  });
+
+  it("folds the sync.toolCalls group per leaf across the layers", () => {
+    // An account object turns tool activity on and sets how its lines read; a
+    // route narrows one leaf and inherits the rest.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+defaults:
+  sync: { toolCalls: { detail: name, throttleSeconds: 10 } }
+routes:
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
+    agent: worker-app
+    environment: repo-app
+    sync: { toolCalls: { whenThrottled: skip } }
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0QUIET] } }]
+    agent: worker-app
+    environment: repo-app
+    sync: { toolCalls: false }
+`,
+      }),
+    );
+    const routes = plane.accounts[0]!.routes;
+    assert.deepEqual(routes[0]!.defaults.sync.toolCalls, {
+      enabled: true,
+      detail: "name",
+      throttleSeconds: 10,
+      whenThrottled: "skip",
+    });
+    assert.equal(routes[1]!.defaults.sync.toolCalls.enabled, false);
+  });
+
   it("rejects a malformed messageReaction emoji name", () => {
     // The value is open (custom emoji are user-created), so the guard is the
     // name shape: a typo fails at compile, not as a bad_emoji on every turn.
@@ -766,7 +840,7 @@ routes:
         typingIndicator: true,
         messageReaction: "off",
       },
-      toolCalls: false,
+      toolCalls: toolActivityDefaults(false),
       threadLink: "full",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     });

@@ -87,6 +87,43 @@ export function RouteFollowUpFields({
   );
 }
 
+export interface RouteNumberRowProps {
+  label: string;
+  unit?: string;
+  value: string;
+  error?: string;
+  onChange(text: string): void;
+  disabled: boolean;
+}
+
+/** Label left, a short number field and its unit right, an error under the row. */
+export function RouteNumberRow({
+  label,
+  unit,
+  value,
+  error,
+  onChange,
+  disabled,
+}: RouteNumberRowProps) {
+  return (
+    <View>
+      <SettingRow label={label}>
+        <View style={styles.numberInput}>
+          <FormTextInput
+            initialValue={value}
+            onChangeText={onChange}
+            keyboardType="number-pad"
+            accessibilityLabel={label}
+            editable={!disabled}
+          />
+        </View>
+        {unit === undefined ? null : <Text style={styles.unit}>{unit}</Text>}
+      </SettingRow>
+      {error === undefined ? null : <Text style={settingsStyles.rowError}>{error}</Text>}
+    </View>
+  );
+}
+
 /** A small set of choices shown as buttons, beside the label (`row`) or under it. */
 export function ChoiceRow({
   label,
@@ -182,5 +219,12 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.normal,
+  },
+  numberInput: {
+    width: 80,
+  },
+  unit: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
 }));

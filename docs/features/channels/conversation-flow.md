@@ -111,6 +111,20 @@ The relay decides what a turn's end still owes the user (`relay/turn-end.ts`). I
 
 The per-Agent record is process memory, reset when a turn ends. A Hub restart mid-turn forgets it, and that turn's end posts nothing extra on `tool`.
 
+## Tool activity
+
+`sync.toolCalls` is the only gate on what a conversation hears about the tools an Agent runs (`relay/tool-activity.ts`). Off, nothing is said — no running line and no finished one — whatever `sync.progress` says. Its leaves are under [Configuration](#configuration).
+
+- **One line per tool call.** The line is posted when the call starts and rewritten in place to `Finished …`, `Failed …` or `Canceled …` when it ends, so a reader follows one message instead of two. A call the provider only ever reported as finished (Codex reports a silent shell command that way) still gets its one line.
+- **The line names what the call acted on.** `name` says the tool alone (`Running shell…`); `short` adds the call's target on one line, cut at 160 characters (`Running shell: npm test`); `full` sends the target whole and lets the outbound chunker split it. The target is the command, the file path, the query or the URL the provider's tool-call detail carries. A detail that carries none falls back to an ACP provider's `metadata.title`, because ACP names a call by its kind — without it a Grok call reads `Running use_tool…`.
+- **Only a tool that STARTS is throttled.** `throttleSeconds` (0 posts every one) is counted per turn from the last line POSTED; an update does not move that cursor.
+- **A throttled start updates the live line, or is skipped.** `update` rewrites it, so the newest tool is always the one on screen. `skip` drops it — which is what a Route used to do to three shell commands in one turn: Slack showed one `Running shell…` while the app timeline showed all three, including the one that failed.
+- **A failure is never throttled and never overwritten.** A call that failed posts or updates at once, and closes the turn's live line, so the next tool opens its own message instead of writing over it.
+- **A channel with no edit verb posts instead.** `update` then behaves as `skip`, and a call that ended posts its terminal line when the throttle allows. Slack, Telegram and Discord publish the verb; Google Chat, Feishu, Zalo and Zalo Personal do not (`streaming/driver.ts`).
+- **`sync.subagents.toolCalls` is the switch for a subagent's calls.** How they read and how often they post is the Route's one `sync.toolCalls` answer.
+
+`sync.progress.progressMessage` decides none of this any more. It gates the separate progress message of `sync.streaming.mode: progress`.
+
 ## Outbound
 
 Replies leave through the outbound pacer (`plane/outbound-pacer.ts`) and the delivery ledger (`relay/index.ts`).
@@ -119,7 +133,7 @@ Replies leave through the outbound pacer (`plane/outbound-pacer.ts`) and the del
 - **Rate is per scope.** `messagesSentPerMinute` still counts every thread of a conversation together in the Conversation scope, and the whole bot in the Bot scope. Ordering and counting are separate: a thread waits for its own previous post and for room in its scopes, never for another thread's post to finish.
 - **Every platform write has a timeout.** Each vertical's own write deadline is 30 s (Slack's write client carries it, 429 retries included; a 429 whose `Retry-After` would outlast it ends as `rate_limited`). The Hub gives up at 40 s, after the vertical, so a certain outcome reported at the vertical's deadline is not misread as a timeout. A write that times out fails like any other and releases its turn. Zalo Personal (zca-js) has no write timeout of its own and relies on the Hub's.
 - **Final answers are retried; progress is not.** A final answer whose post certainly did not land (`rate_limited`, platform `unavailable`, `canceled` because the account stopped while it waited) is retried from the delivery ledger: 5 attempts in all, 30 s after the first failure and doubling (the last goes about 7.5 minutes after the first). The message and its next attempt time live on the ledger row, so a Hub restart resumes the schedule (`relay/final-retry.ts`). When the attempts run out, or the failure is one retrying cannot fix, the answer is recorded in Activity as an `error`. A post that may have landed is never posted again, by the retrier or by a stream replay: `timeout`, `connection_lost`, `server_error` (Slack `internal_error`/`fatal_error`, HTTP 500/502/504) and `partially_posted` (a long answer split into several messages that failed after the first landed; verticals report each landed part through `onDeliveryResult`, or throw upstream's partial-delivery error). Such a row stays `recorded`, the state a replay never re-arms, and Activity records the answer as possibly not posted. Every assistant message counts as an answer, including one posted before a tool call. A Workflow's output is not retried, because its output budget counts each post once.
-- **Only the newest status line waits.** Progress and tool-call lines are status lines: one that cannot go out is dropped, and while a thread waits behind the rate limit only its newest status line is kept. A queued answer goes out ahead of it.
+- **Only the newest status line waits.** A tool-activity line is a status line: one that cannot go out is dropped, and while a thread waits behind the rate limit only its newest status line is kept. A queued answer goes out ahead of it.
 - **The Agent is told what a failed send means.** A tool-path send failure carries `structuredContent.failure` (`kind`, `retryable`, `mayHavePosted`, `retryAfterSeconds`, `code`) and says in its text whether retrying can help (`rate_limited` with its wait, `unavailable`) or cannot (`channel_not_found`, `not_in_channel`, `missing_scope`, `not_authorized`, `rejected`). After a `timeout` the idempotency key stays claimed, so sending again under it refuses instead of double-posting. Tool-path posts are not retried by the Hub; the Agent decides.
 - **Nothing is retried forever.** The Slack write client retries only HTTP 429, three times, honouring `Retry-After`.
 
@@ -176,6 +190,37 @@ The Route form shows these in a **Conversation context** section between _When i
 ```
 
 The three batching rows show only while _Batch messages_ is on. A pause of 0 is not a value: off is the switch.
+
+`sync.toolCalls` is a leaf of the same kind: off, or the options its lines run with.
+
+```yaml
+defaults:
+  sync:
+    toolCalls: false # or:
+    # toolCalls:
+    #   detail: short          # name | short | full
+    #   throttleSeconds: 30    # 0 posts every tool call
+    #   whenThrottled: update  # update | skip
+```
+
+Off posts no tool line at all, neither a running nor a finished one; what the lines say and when they go out is in [Tool activity](#tool-activity). Each leaf inherits on its own: `toolCalls: true` turns the lines on and says nothing else, so `detail`, `throttleSeconds` and `whenThrottled` keep coming from the layer below. The Route form carries them under the switch in _Replies_:
+
+```
+┌ Replies ─────────────────────────────────────────────┐
+│ …                                                    │
+│ Show tool activity                       [ ● on ]    │
+│   Tool detail                                        │
+│     ( Tool name only | Tool and short command ● |    │
+│       Tool and full command )                        │
+│     How much of each tool line lands in the          │
+│     conversation.                                    │
+│   At most one line every            [ 30 ] seconds   │
+│   When throttled                                     │
+│     ( Update the last line ● | Skip it )             │
+└──────────────────────────────────────────────────────┘
+```
+
+The three rows show only while the switch is on, and _When throttled_ only while the throttle is above 0. A row the Route does not author shows what it inherits; turning the switch on writes all three, the values the form showed, and turning it off writes `false` and keeps none of them.
 
 ## Deploying
 

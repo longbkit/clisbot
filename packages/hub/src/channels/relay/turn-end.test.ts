@@ -15,10 +15,11 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import type { OutboundPath } from "../config/enums.js";
 import { ManualClock } from "../plane/clock.js";
 import type { StreamContext } from "../plane/types.js";
-import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./index.js";
+import { RelayEngine } from "./index.js";
 import { actionDelivery } from "../channel-reply-turn-record.js";
 import { NO_REPLY_NOTICE } from "./turn-end.js";
 
@@ -59,7 +60,7 @@ function defaults(path: OutboundPath): EffectiveDefaults {
     sync: {
       finalAnswers: relaysText,
       progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-      toolCalls: false,
+      toolCalls: toolActivityDefaults(false),
       threadLink: "none",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },
@@ -165,7 +166,6 @@ beforeEach(() => {
       posted.push(params.text);
       return { ok: true, externalMessageId: `m${posted.length}` };
     },
-    progressThrottleMs: DEFAULT_PROGRESS_THROTTLE_MS,
     toolDeliveries: capabilities,
   });
 });

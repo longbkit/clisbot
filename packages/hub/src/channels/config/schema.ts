@@ -27,7 +27,9 @@ import {
   TelegramTransportModeSchema,
   StreamingModeSchema,
   ThreadLinkSchema,
+  ToolActivityDetailSchema,
   WhenBusySchema,
+  WhenThrottledSchema,
 } from "./enums.js";
 import { AgentControlsSchema } from "./agent-controls.js";
 import { BatchingSchema, ContextDefaultsSchema } from "./conversation.js";
@@ -162,11 +164,33 @@ export const SyncSubagentsSchema = z
   .strict();
 export type SyncSubagents = z.infer<typeof SyncSubagentsSchema>;
 
+/**
+ * `sync.toolCalls` — the tool-activity surface: the line a channel posts for a
+ * tool call the Agent runs. A bare boolean is the on/off switch and speaks
+ * about nothing else, so `toolCalls: true` keeps inheriting `detail`,
+ * `throttleSeconds` and `whenThrottled` from the layer below; authoring the
+ * OBJECT turns the surface on and sets the leaves it names.
+ *
+ * `throttleSeconds` bounds how often a tool that STARTS posts a new line (0 =
+ * every one). A tool that ends, and any tool that failed, is never throttled.
+ */
+export const SyncToolCallsGroupSchema = z
+  .object({
+    detail: ToolActivityDetailSchema.optional(),
+    throttleSeconds: z.number().int().min(0).optional(),
+    whenThrottled: WhenThrottledSchema.optional(),
+  })
+  .strict();
+export type SyncToolCallsGroup = z.infer<typeof SyncToolCallsGroupSchema>;
+
+export const SyncToolCallsSchema = z.union([z.boolean(), SyncToolCallsGroupSchema]).optional();
+export type SyncToolCalls = z.infer<typeof SyncToolCallsSchema>;
+
 export const SyncDefaultsSchema = z
   .object({
     finalAnswers: z.boolean().optional(),
     progress: SyncProgressSchema,
-    toolCalls: z.boolean().optional(),
+    toolCalls: SyncToolCallsSchema,
     threadLink: ThreadLinkSchema.optional(),
     streaming: SyncStreamingSchema.optional(),
     subagents: SyncSubagentsSchema.optional(),
@@ -269,7 +293,14 @@ export const ORG_DEFAULTS = {
       typingIndicator: true,
       messageReaction: "off",
     },
-    toolCalls: false,
+    // Tool activity is off at the floor; the other three leaves are what it
+    // resolves to the moment a layer turns it on.
+    toolCalls: {
+      enabled: false,
+      detail: "short",
+      throttleSeconds: 30,
+      whenThrottled: "update",
+    },
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

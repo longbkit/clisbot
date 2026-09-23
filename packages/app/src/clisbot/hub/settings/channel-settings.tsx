@@ -101,10 +101,12 @@ import {
   type ChannelRouteTarget,
 } from "../channel-configuration";
 import { inheritedChannelRouteConversation } from "../channel-route-conversation";
+import { inheritedChannelRouteToolActivity } from "../channel-route-tool-activity";
 import {
   RouteConversationSection,
   useRouteConversationDraft,
 } from "./channel-route-conversation-fields";
+import { useRouteToolActivityDraft } from "./channel-route-tool-activity-fields";
 import {
   ChannelAccountLimitsPanel,
   ChannelLimitsFields,
@@ -2485,6 +2487,15 @@ function ChannelAccountForm({
     [policy, selectedAccount],
   );
   const conversation = useRouteConversationDraft(editedRoute, inheritedConversation);
+  const inheritedToolActivity = useMemo(
+    () =>
+      inheritedChannelRouteToolActivity([
+        objectField(policy, "defaults") ?? undefined,
+        objectField(selectedAccount ?? EMPTY_RECORD, "defaults") ?? undefined,
+      ]),
+    [policy, selectedAccount],
+  );
+  const toolActivity = useRouteToolActivityDraft(editedRoute, inheritedToolActivity);
   // A Route that authors no Reply method shows the one it inherits.
   const replyBehavior = useMemo(() => {
     if (behavior.outboundPathInherited !== true) return behavior;
@@ -2542,6 +2553,7 @@ function ChannelAccountForm({
   const canSave = canSaveChannelRoute({
     followUpTtlValid,
     conversationValid: conversation.parsed.valid,
+    toolActivityValid: toolActivity.parsed.valid,
     selectedConnection,
     effectiveAccountId,
     configurationKind,
@@ -2638,10 +2650,6 @@ function ChannelAccountForm({
     (typingIndicator: boolean) => setBehavior((current) => ({ ...current, typingIndicator })),
     [],
   );
-  const changeToolCalls = useCallback(
-    (toolCalls: boolean) => setBehavior((current) => ({ ...current, toolCalls })),
-    [],
-  );
   const changeApprovalChoice = useCallback(
     (value: string) => setApprovalChoice(value as RouteApprovalChoice),
     [],
@@ -2710,6 +2718,9 @@ function ChannelAccountForm({
         ...(parsedRouteLimits.valid ? { limits: parsedRouteLimits.value } : {}),
         behavior: behaviorWithApprovalChoice(behavior, approvalChoice),
         ...(conversation.parsed.valid ? { conversation: conversation.parsed.value } : {}),
+        ...(toolActivity.parsed.valid && toolActivity.parsed.value !== undefined
+          ? { toolActivity: toolActivity.parsed.value }
+          : {}),
         target: routeTarget,
         resource,
       },
@@ -2759,6 +2770,7 @@ function ChannelAccountForm({
     configurationKind,
     contains,
     conversation.parsed,
+    toolActivity.parsed,
     cwd,
     daemonId,
     duplicateAccount,
@@ -2941,7 +2953,7 @@ function ChannelAccountForm({
         changeFinalAnswers={changeFinalAnswers}
         changeProgressMessage={changeProgressMessage}
         changeTypingIndicator={changeTypingIndicator}
-        changeToolCalls={changeToolCalls}
+        toolActivity={toolActivity}
       />
     </RouteFormSection>
   );
@@ -3656,7 +3668,6 @@ function routeBehaviorDraft(route: RecordValue | undefined): {
         progress?.["typingIndicator"],
         DEFAULT_MEMBER_ROUTE_BEHAVIOR.typingIndicator,
       ),
-      toolCalls: booleanValue(sync["toolCalls"], DEFAULT_MEMBER_ROUTE_BEHAVIOR.toolCalls),
       ...(approvalChoice === "custom" ? {} : { approvalMode: approvalChoice }),
       ...routeQuestions(route),
     },
@@ -4129,6 +4140,7 @@ function isFollowUpTtlDraftValid(input: {
 function canSaveChannelRoute(input: {
   followUpTtlValid: boolean;
   conversationValid: boolean;
+  toolActivityValid: boolean;
   selectedConnection: { id: string } | undefined;
   effectiveAccountId: string;
   configurationKind: ConfigurationKind;
@@ -4153,7 +4165,7 @@ function canSaveChannelRoute(input: {
   if (input.configurationKind === "account" && input.selectedConnection === undefined) return false;
   if (!input.parsedRouteLimits.valid) return false;
   if (!input.followUpTtlValid || !input.audienceComplete) return false;
-  if (!input.conversationValid) return false;
+  if (!input.conversationValid || !input.toolActivityValid) return false;
   if (input.routeCondition === "contains" && input.contains.trim().length === 0) return false;
   if (input.existingTarget !== null) return true;
   if (input.target === "automation") return input.automationName !== null;

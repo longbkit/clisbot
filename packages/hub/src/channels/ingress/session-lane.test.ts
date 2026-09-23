@@ -5,6 +5,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import type { InboundMessage } from "../plane/types.js";
 import { sessionLaneKey } from "./session-lane.js";
 
@@ -20,7 +21,7 @@ const DEFAULTS: EffectiveDefaults = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: false,
+    toolCalls: toolActivityDefaults(false),
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

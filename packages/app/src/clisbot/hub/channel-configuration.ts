@@ -3,6 +3,10 @@ import {
   withChannelRouteConversation,
   type ChannelRouteConversation,
 } from "./channel-route-conversation";
+import {
+  withChannelRouteToolActivity,
+  type ChannelRouteToolActivity,
+} from "./channel-route-tool-activity";
 import type { HubAudienceRule } from "./contracts";
 import type { WorktreeTarget } from "./workspace-configuration";
 
@@ -78,7 +82,6 @@ export interface ChannelRouteBehavior {
   finalAnswers: boolean;
   progressMessage: boolean;
   typingIndicator: boolean;
-  toolCalls: boolean;
   approvalMode?: "auto-deny" | "require" | "auto-allow";
   /** How a question from the Agent is answered (the Route's `questions:` leaf);
    * absent leaves the Route's approval rules to decide. */
@@ -118,7 +121,6 @@ export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   finalAnswers: true,
   progressMessage: true,
   typingIndicator: true,
-  toolCalls: false,
   approvalMode: "require",
 };
 
@@ -139,7 +141,7 @@ export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: Partial<Record<ChannelLimitName
   maxInputCharacters: 8_000,
   messagesPerMinutePerSender: 10,
   messagesPerMinute: 60,
-  maxConcurrentRuns: 2,
+  maxConcurrentRuns: 8,
   maxRuntimeSeconds: 15 * 60,
 };
 
@@ -152,6 +154,8 @@ interface ChannelRouteCandidateInput {
   behavior?: ChannelRouteBehavior;
   /** The conversation leaves the Route authors (`channel-route-conversation.ts`). */
   conversation?: ChannelRouteConversation;
+  /** The Route's own `sync.toolCalls`; absent keeps inheriting it. */
+  toolActivity?: ChannelRouteToolActivity;
   target: ChannelRouteTarget;
   resource: ChannelConfigurationRecord;
   preferredResourceName?: string;
@@ -210,6 +214,7 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
     ...(input.limits === undefined ? {} : { limits: input.limits }),
     ...(input.behavior === undefined ? {} : { behavior: input.behavior }),
     ...(input.conversation === undefined ? {} : { conversation: input.conversation }),
+    ...(input.toolActivity === undefined ? {} : { toolActivity: input.toolActivity }),
     target: input.target,
     resource: input.resource,
   });
@@ -235,11 +240,14 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   const audience = input.audience.map(audienceRuleRecord);
   const openAudience = audience.some((rule) => rule.who.anyone === true);
   const limits = authoredLimits(input.limits);
-  const behavior = withChannelRouteConversation(
-    input.behavior === undefined
-      ? {}
-      : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience)),
-    input.conversation,
+  const behavior = withChannelRouteToolActivity(
+    withChannelRouteConversation(
+      input.behavior === undefined
+        ? {}
+        : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience)),
+      input.conversation,
+    ),
+    input.toolActivity,
   );
   const audiencePolicy = {
     audience,
@@ -433,7 +441,6 @@ function routeBehaviorSettings(
         progressMessage: behavior.progressMessage,
         typingIndicator: behavior.typingIndicator,
       },
-      toolCalls: behavior.toolCalls,
     },
     ...(behavior.approvalMode === undefined
       ? {}
@@ -562,15 +569,23 @@ function preserveRouteSettings(
     }
   }
   if (isRecord(current["sync"]) && isRecord(replacement["sync"])) {
-    const currentProgress = current["sync"]["progress"];
-    const replacementProgress = replacement["sync"]["progress"];
-    merged["sync"] = {
-      ...current["sync"],
-      ...replacement["sync"],
-      ...(isRecord(currentProgress) && isRecord(replacementProgress)
-        ? { progress: { ...currentProgress, ...replacementProgress } }
-        : {}),
-    };
+    merged["sync"] = mergedSync(current["sync"], replacement["sync"]);
+  }
+  return merged;
+}
+
+/** `sync` leaves the form writes as a record of their own keep the stored keys under them. */
+const NESTED_SYNC_KEYS = ["progress", "toolCalls"] as const;
+
+function mergedSync(
+  current: ChannelConfigurationRecord,
+  replacement: ChannelConfigurationRecord,
+): ChannelConfigurationRecord {
+  const merged: ChannelConfigurationRecord = { ...current, ...replacement };
+  for (const key of NESTED_SYNC_KEYS) {
+    if (isRecord(current[key]) && isRecord(replacement[key])) {
+      merged[key] = { ...current[key], ...replacement[key] };
+    }
   }
   return merged;
 }

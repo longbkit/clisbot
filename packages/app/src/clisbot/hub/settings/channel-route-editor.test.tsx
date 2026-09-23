@@ -1278,6 +1278,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
       agents: ["triage"],
       models: ["gpt-5"],
       questions: "recommended",
+      sync: {
+        subagents: { finalAnswers: true },
+        toolCalls: { detail: "full", throttleSeconds: 0, whenThrottled: "skip", futureLeaf: 1 },
+      },
       interaction: {
         requireMention: true,
         followUp: { mode: "auto", ttlMinutes: 30 },
@@ -1330,6 +1334,33 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(saved.context).toEqual({ unmentioned: "allowed-senders" });
     expect(saved.batching).toEqual({ pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 });
     expect(saved.interaction.whenBusy).toBe("queue");
+  });
+
+  it("reveals the tool activity options and saves them with the switch", async () => {
+    await openEditor();
+    // The Route authors no tool activity and its account turns none on.
+    const toolActivity = screen.getByLabelText("Show tool activity") as HTMLInputElement;
+    expect(toolActivity.checked).toBe(false);
+    expect(screen.queryByLabelText("At most one line every")).toBeNull();
+    fireEvent.click(toolActivity);
+    expect((screen.getByLabelText("At most one line every") as HTMLInputElement).value).toBe("30");
+    fireEvent.click(screen.getByRole("button", { name: "Tool and full command" }));
+    // Nothing is throttled at 0, so what to do when throttled no longer applies.
+    fireEvent.change(screen.getByLabelText("At most one line every"), { target: { value: "0" } });
+    expect(screen.queryByRole("button", { name: "Update the last line" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("At most one line every"), { target: { value: "-1" } });
+    expect(screen.getByText("Use a whole number of seconds, 0 or more.")).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Save Route" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("At most one line every"), { target: { value: "45" } });
+    fireEvent.click(screen.getByRole("button", { name: "Skip it" }));
+    fireEvent.click(save);
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0].sync.toolCalls).toEqual({
+      detail: "full",
+      throttleSeconds: 45,
+      whenThrottled: "skip",
+    });
   });
 
   it("keeps a Route that authors no Reply method inheriting it", async () => {

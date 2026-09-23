@@ -7,6 +7,10 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { settingsStyles } from "@/styles/settings";
 import type { ChannelRouteBehavior, ChannelRouteQuestions } from "../channel-configuration";
 import { ChoiceRow, RouteBehaviorSwitch, RouteFollowUpFields } from "./channel-route-behavior-rows";
+import {
+  RouteToolActivityFields,
+  type RouteToolActivityForm,
+} from "./channel-route-tool-activity-fields";
 
 // The Route form follows the Route's own model, a rule: conditions, then what
 // happens. Conditions: the Connection, who may talk and where, when the bot
@@ -197,7 +201,8 @@ export interface RouteReplyFieldsProps {
   changeFinalAnswers(value: boolean): void;
   changeProgressMessage(value: boolean): void;
   changeTypingIndicator(value: boolean): void;
-  changeToolCalls(value: boolean): void;
+  /** Show tool activity and its options, a leaf of its own (`sync.toolCalls`). */
+  toolActivity: RouteToolActivityForm;
 }
 
 /** How replies reach the conversation. */
@@ -264,12 +269,7 @@ function RelayBehaviorFields(props: RouteReplyFieldsProps) {
         onChange={props.changeTypingIndicator}
         disabled={pending}
       />
-      <RouteBehaviorSwitch
-        label="Show tool activity"
-        value={behavior.toolCalls}
-        onChange={props.changeToolCalls}
-        disabled={pending}
-      />
+      <RouteToolActivityFields {...props.toolActivity} pending={pending} />
     </>
   );
 }

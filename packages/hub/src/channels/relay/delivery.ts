@@ -18,8 +18,8 @@ import type {
 import type { StreamingFinalizeTransport } from "../streaming/index.js";
 import { closeUnretriedDelivery, settleFailedFinalAnswer } from "./final-retry.js";
 
-/** What a relay post carries: answer text, or a status line (progress / tool). */
-export type OutputKind = "assistant" | "progress" | "tool";
+/** What a relay post carries: answer text, or a tool-activity status line. */
+export type OutputKind = "assistant" | "tool";
 
 /** Waits before each ledger-write attempt: three tries within about a second. */
 const LEDGER_WRITE_DELAYS_MS = [0, 250, 1_000];
@@ -40,27 +40,31 @@ export interface RelayPostRequest {
   transport?: StreamingFinalizeTransport | undefined;
 }
 
-/** Record, post, and confirm or settle one relay post. */
+/**
+ * Record, post, and confirm or settle one relay post. Returns the delivered
+ * message's native id when the channel reported one — a tool-activity line
+ * keeps it so the same message can be rewritten as the call goes on.
+ */
 export async function deliverRelayPost(
   deps: RelayDeliveryDeps,
   request: RelayPostRequest,
-): Promise<void> {
+): Promise<string | undefined> {
   const { context, key } = request;
   const recorded = await recordRow(deps, request);
-  if (recorded === undefined || !recorded.created) return; // replay/restart: already handled
+  if (recorded === undefined || !recorded.created) return undefined; // replay/restart: already handled
   const outputAttemptId = await context.outputDelivery?.begin();
   if (context.outputDelivery !== undefined && outputAttemptId === undefined) {
     await ledgerWrite(deps, request, "settle", () =>
       deps.store.failDelivery({ ...key, failureReason: "workflow output limit reached" }),
     );
-    return;
+    return undefined;
   }
   deps.logger.info?.("relay post started", { ...logFields(request) });
   const result = await (request.transport ?? deps.post)(postParams(request));
   if (result.ok) {
     await confirmPosted(deps, request, result);
     if (outputAttemptId !== undefined) await context.outputDelivery?.complete(outputAttemptId);
-    return;
+    return result.externalMessageId;
   }
   if (outputAttemptId !== undefined) await context.outputDelivery?.fail(outputAttemptId);
   const next = await ledgerWrite(deps, request, "settle", () =>
@@ -72,6 +76,7 @@ export async function deliverRelayPost(
     failure: result.failure?.kind,
     next,
   });
+  return undefined;
 }
 
 /**

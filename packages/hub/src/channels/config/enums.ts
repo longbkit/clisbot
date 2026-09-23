@@ -67,6 +67,26 @@ export type ThreadLink = z.infer<typeof ThreadLinkSchema>;
 export const StreamingModeSchema = z.enum(["off", "partial", "block", "progress"]);
 export type StreamingMode = z.infer<typeof StreamingModeSchema>;
 
+/**
+ * `sync.toolCalls.detail` — how much of a tool call the channel line says.
+ * The tool's name alone answers nothing (`Running shell…`), so the floor is
+ * `short`: the name plus the call's own target — the command, the file, the
+ * query, the URL — cut to one readable line. `full` sends the target whole and
+ * lets the outbound layer chunk it per platform.
+ */
+export const ToolActivityDetailSchema = z.enum(["name", "short", "full"]);
+export type ToolActivityDetail = z.infer<typeof ToolActivityDetailSchema>;
+
+/**
+ * `sync.toolCalls.whenThrottled` — what a tool that starts inside the throttle
+ * window does. `update` rewrites the line already posted for this turn, so the
+ * newest tool is always the one on screen; `skip` drops it, which is how the
+ * channel used to show one `Running shell…` for three different commands.
+ * `update` needs the channel's edit verb and falls back to `skip` without one.
+ */
+export const WhenThrottledSchema = z.enum(["update", "skip"]);
+export type WhenThrottled = z.infer<typeof WhenThrottledSchema>;
+
 /** `sync.progress.messageReaction` — the reserved "never react" value. */
 export const MESSAGE_REACTION_OFF = "off";
 

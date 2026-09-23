@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { FormTextInput } from "@/components/ui/form-field";
 import { settingsStyles } from "@/styles/settings";
 import {
   UNMENTIONED_VALUES,
@@ -10,7 +9,12 @@ import {
   type ChannelRouteWhenBusy,
   type EffectiveChannelRouteConversation,
 } from "../channel-route-conversation";
-import { ChoiceRow, RouteBehaviorSwitch, SettingRow } from "./channel-route-behavior-rows";
+import {
+  ChoiceRow,
+  RouteBehaviorSwitch,
+  RouteNumberRow,
+  type RouteNumberRowProps,
+} from "./channel-route-behavior-rows";
 import {
   openRouteConversationDraft,
   parseRouteConversationDraft,
@@ -197,36 +201,6 @@ function BatchingRow({
   return <RouteNumberRow {...row} onChange={change} />;
 }
 
-interface RouteNumberRowProps {
-  label: string;
-  unit?: string;
-  value: string;
-  error?: string;
-  onChange(text: string): void;
-  disabled: boolean;
-}
-
-/** Label left, a short number field and its unit right, an error under the row. */
-function RouteNumberRow({ label, unit, value, error, onChange, disabled }: RouteNumberRowProps) {
-  return (
-    <View>
-      <SettingRow label={label}>
-        <View style={styles.numberInput}>
-          <FormTextInput
-            initialValue={value}
-            onChangeText={onChange}
-            keyboardType="number-pad"
-            accessibilityLabel={label}
-            editable={!disabled}
-          />
-        </View>
-        {unit === undefined ? null : <Text style={styles.unit}>{unit}</Text>}
-      </SettingRow>
-      {error === undefined ? null : <Text style={settingsStyles.rowError}>{error}</Text>}
-    </View>
-  );
-}
-
 function advancedSummary(batchingOn: boolean, whenBusy: ChannelRouteWhenBusy): string {
   const batching = batchingOn ? "Batch messages" : "No batching";
   return `${batching} · When busy: ${WHEN_BUSY_LABELS[whenBusy].toLowerCase()}`;
@@ -238,12 +212,5 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.sm,
     marginTop: theme.spacing[1],
-  },
-  numberInput: {
-    width: 80,
-  },
-  unit: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
   },
 }));

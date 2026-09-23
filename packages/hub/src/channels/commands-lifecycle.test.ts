@@ -10,6 +10,7 @@ import {
   type LifecycleCommandDependencies,
 } from "./commands-lifecycle.js";
 import type { CompiledChannelAccount, CompiledRoute, EffectiveDefaults } from "./config/compile.js";
+import { toolActivityDefaults } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot } from "./daemon/types.js";
 
@@ -40,7 +41,7 @@ const defaults: EffectiveDefaults = {
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-    toolCalls: false,
+    toolCalls: toolActivityDefaults(false),
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

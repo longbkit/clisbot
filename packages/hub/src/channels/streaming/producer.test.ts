@@ -18,6 +18,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import type { SyncStreaming } from "../config/schema.js";
 import { ManualClock } from "../plane/clock.js";
 import type {
@@ -27,7 +28,7 @@ import type {
   PlaneLogger,
   StreamContext,
 } from "../plane/types.js";
-import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "../relay/index.js";
+import { RelayEngine } from "../relay/index.js";
 import { ChannelStreamingProducer, createStreamingDriver } from "./index.js";
 // The BUILT vertical, not its source: the streaming drive path has to hold
 // against what the Hub actually loads at runtime.
@@ -47,7 +48,7 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-function defaults(streaming: SyncStreaming | undefined): EffectiveDefaults {
+function defaults(streaming: SyncStreaming | undefined, toolActivity = false): EffectiveDefaults {
   return {
     requireMention: true,
     followUp: { mode: "auto", ttlMinutes: 60 },
@@ -58,7 +59,7 @@ function defaults(streaming: SyncStreaming | undefined): EffectiveDefaults {
     sync: {
       finalAnswers: true,
       progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
-      toolCalls: false,
+      toolCalls: toolActivityDefaults(toolActivity),
       threadLink: "none",
       ...(streaming === undefined ? {} : { streaming }),
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
@@ -72,6 +73,9 @@ function context(params: {
   /** The reply anchor; Telegram's is a numeric forum topic id. */
   threadId?: string;
   streaming: SyncStreaming | undefined;
+  /** `sync.toolCalls`: the gate on every tool surface, the progress card
+   * included — the card is built from the turn's running tool calls. */
+  toolActivity?: boolean;
 }): StreamContext {
   const route: CompiledRoute = {
     audienceRules: [],
@@ -79,7 +83,7 @@ function context(params: {
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: [],
     assignments: [],
-    defaults: defaults(params.streaming),
+    defaults: defaults(params.streaming, params.toolActivity ?? false),
     approval: [],
   };
   const account: CompiledChannelAccount = {
@@ -203,7 +207,6 @@ function harness(params: {
     clock,
     store,
     post,
-    progressThrottleMs: DEFAULT_PROGRESS_THROTTLE_MS,
     ...(driver === undefined
       ? {}
       : {
@@ -722,7 +725,9 @@ describe("progress mode", () => {
   it("renders a running tool call through the vertical's progress blocks", async () => {
     const calls: Call[] = [];
     const { engine, posts } = harness({ outbound: slackOutbound(calls) });
-    engine.attach(context({ conversation: "C0PROG", streaming: { mode: "progress" } }));
+    engine.attach(
+      context({ conversation: "C0PROG", streaming: { mode: "progress" }, toolActivity: true }),
+    );
 
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
@@ -759,7 +764,9 @@ describe("progress mode", () => {
         return { ok: true, externalMessageId: "1720000000.000700" };
       },
     });
-    engine.attach(context({ conversation: "C0PROG3", streaming: { mode: "progress" } }));
+    engine.attach(
+      context({ conversation: "C0PROG3", streaming: { mode: "progress" }, toolActivity: true }),
+    );
 
     const running = (name: string) =>
       engine.onStream(AGENT_ID, {

@@ -139,6 +139,7 @@ describe("buildChannelAccountCandidate", () => {
       accountId: "support",
       audience: [{ who: { anyone: true }, where: { conversations: ["C_CUSTOMER"] } }],
       behavior: DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR,
+      toolActivity: false,
       limits: { maxConcurrentRuns: 10, messagesSentPerMinute: "off" },
       target: {
         kind: "agent",
@@ -187,9 +188,9 @@ describe("buildChannelAccountCandidate", () => {
         finalAnswers: true,
         progressMessage: false,
         typingIndicator: true,
-        toolCalls: true,
         approvalMode: "require",
       },
+      toolActivity: { detail: "full", throttleSeconds: 10, whenThrottled: "skip" },
       target: { kind: "automation", automationName: "triage" },
       resource: {},
     });
@@ -203,7 +204,7 @@ describe("buildChannelAccountCandidate", () => {
           progressMessage: false,
           typingIndicator: true,
         },
-        toolCalls: true,
+        toolCalls: { detail: "full", throttleSeconds: 10, whenThrottled: "skip" },
       },
       approval: [{ match: "*", mode: "require" }],
     });
@@ -220,9 +221,9 @@ describe("buildChannelAccountCandidate", () => {
         finalAnswers: false,
         progressMessage: true,
         typingIndicator: true,
-        toolCalls: true,
         approvalMode: "auto-allow",
       },
+      toolActivity: false,
       target: { kind: "automation", automationName: "triage" },
       resource: {},
     });
@@ -230,7 +231,7 @@ describe("buildChannelAccountCandidate", () => {
       audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
       interaction: { requireMention: false },
       outbound: { path: "tool" },
-      sync: { finalAnswers: false, toolCalls: true },
+      sync: { finalAnswers: false, toolCalls: false },
       approval: [{ match: "*", mode: "auto-allow" }],
     });
   });
@@ -306,7 +307,6 @@ describe("buildChannelAccountCandidate", () => {
         finalAnswers: true,
         progressMessage: false,
         typingIndicator: true,
-        toolCalls: false,
       },
       target: {
         kind: "agent",
@@ -340,7 +340,6 @@ describe("buildChannelAccountCandidate", () => {
           typingIndicator: true,
         },
         subagents: { finalAnswers: true },
-        toolCalls: false,
       },
       approval: [
         { match: "command.destructive", mode: "require" },

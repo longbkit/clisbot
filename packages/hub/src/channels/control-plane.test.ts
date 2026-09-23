@@ -28,6 +28,7 @@ import {
   type ChannelReplyBindingRef,
 } from "./plane/types.js";
 import type { EffectiveDefaults } from "./config/compile.js";
+import { toolActivityDefaults } from "./config/compile.js";
 
 /** The tool-path mcpServers entry the resolver composes (the daemon config's
  * `mcpServers` values are `unknown` on the wire; this narrows the one entry
@@ -113,7 +114,7 @@ const RELAY_DEFAULTS: EffectiveDefaults = {
       typingIndicator: false,
       messageReaction: "off",
     },
-    toolCalls: false,
+    toolCalls: toolActivityDefaults(false),
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },

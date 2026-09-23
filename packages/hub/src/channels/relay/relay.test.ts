@@ -16,6 +16,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { toolActivityDefaults } from "../config/compile.js";
 import type {
   MediaPostFn,
   OutboundPostParams,
@@ -28,12 +29,7 @@ import type {
 import type { ProcessingController } from "../plane/processing.js";
 import { ManualClock } from "../plane/clock.js";
 import { createProcessingController, processingSurfaceFor } from "../plane/processing.js";
-import {
-  DEFAULT_PROGRESS_THROTTLE_MS,
-  RelayEngine,
-  appendThreadLink,
-  replyLocationFor,
-} from "./index.js";
+import { RelayEngine, appendThreadLink, replyLocationFor } from "./index.js";
 
 const ORGANIZATION_ID = "channel-org";
 const AGENT_ID = "agent-1";
@@ -55,7 +51,7 @@ function defaults(overrides: Partial<EffectiveDefaults> = {}): EffectiveDefaults
     sync: {
       finalAnswers: true,
       progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-      toolCalls: false,
+      toolCalls: toolActivityDefaults(false),
       threadLink: "final-only",
       subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },
@@ -135,6 +131,7 @@ function makeEngine(
     homeRoot?: string | undefined;
     agentCwd?: ((agentId: string) => string | undefined) | undefined;
     processing?: ProcessingController | undefined;
+    editPost?: RelayEdit | undefined;
   } = {},
 ) {
   return new RelayEngine({
@@ -143,10 +140,18 @@ function makeEngine(
     clock,
     store,
     post,
-    progressThrottleMs: DEFAULT_PROGRESS_THROTTLE_MS,
     ...(media.processing !== undefined ? { processing: media.processing } : {}),
+    ...(media.editPost !== undefined ? { editPost: media.editPost } : {}),
   });
 }
+
+/** The channel's edit verb, as the relay takes it (the vertical's `updateText`). */
+type RelayEdit = (params: {
+  to: string;
+  threadId?: string | undefined;
+  externalMessageId: string;
+  text: string;
+}) => Promise<void>;
 
 // --- Harness ---------------------------------------------------------------
 
@@ -417,7 +422,7 @@ describe("relay final answer", () => {
           sync: {
             finalAnswers: false,
             progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-            toolCalls: false,
+            toolCalls: toolActivityDefaults(false),
             threadLink: "none",
             subagents: SUBAGENTS_OFF,
           },
@@ -435,30 +440,372 @@ describe("relay final answer", () => {
   });
 });
 
-describe("relay progress + tool calls", () => {
+describe("relay tool activity (sync.toolCalls)", () => {
+  /** A route whose tool-activity leaves are `overrides` over the org floor. */
+  function activityRoute(
+    overrides: Partial<EffectiveDefaults["sync"]["toolCalls"]>,
+    progressMessage = true,
+  ): CompiledRoute {
+    return {
+      ...context().route,
+      defaults: defaults({
+        sync: {
+          finalAnswers: true,
+          progress: { progressMessage, typingIndicator: false, messageReaction: "off" },
+          toolCalls: { ...toolActivityDefaults(true), ...overrides },
+          threadLink: "none",
+          subagents: SUBAGENTS_OFF,
+        },
+      }),
+    };
+  }
+
+  /** A channel that can edit: posts get ids, edits rewrite them in place. */
+  function editableChannel() {
+    const messages: string[] = [];
+    let next = 0;
+    const post = async (p: OutboundPostParams): Promise<OutboundPostResult> => {
+      messages.push(p.text);
+      next += 1;
+      return { ok: true, externalMessageId: `m${next}` };
+    };
+    const editPost: RelayEdit = async ({ externalMessageId, text }) => {
+      const index = Number(externalMessageId.slice(1)) - 1;
+      messages[index] = text;
+    };
+    return { messages, post, editPost };
+  }
+
+  const shell = (command: string, status: string, callId: string) => ({
+    type: "tool_call",
+    callId,
+    name: "shell",
+    status,
+    detail: { type: "shell", command },
+  });
+
+  it("says nothing about tools when tool activity is off, whatever progress says", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA1",
+        externalThreadId: "20.0",
+        route: activityRoute({ enabled: false }),
+      }),
+    );
+    for (const status of ["running", "completed", "failed"]) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-off",
+        item: shell("npm test", status, "c1"),
+      });
+    }
+    assert.deepEqual(posted, [], "neither a running nor a finished tool line");
+  });
+
+  it("renders the three detail levels", async () => {
+    const long = `npm run test -- ${"x".repeat(200)}`;
+    const cases: Array<[EffectiveDefaults["sync"]["toolCalls"]["detail"], (line: string) => void]> =
+      [
+        ["name", (line) => assert.equal(line, "Running shell…")],
+        [
+          "short",
+          (line) => {
+            assert.ok(line.startsWith("Running shell: npm run test -- xxx"), line);
+            assert.ok(line.endsWith("…"), line);
+            assert.ok(line.length < 200, `short line stays one line: ${line.length}`);
+          },
+        ],
+        ["full", (line) => assert.equal(line, `Running shell: ${long}`)],
+      ];
+    for (const [detail, check] of cases) {
+      const posted: string[] = [];
+      const engine = makeEngine(store, async (p) => {
+        posted.push(p.text);
+        return { ok: true };
+      });
+      engine.attach(
+        context({
+          externalConversationId: `C0TA-${detail}`,
+          externalThreadId: "21.0",
+          route: activityRoute({ detail }),
+        }),
+      );
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: `turn-${detail}`,
+        item: shell(long, "running", "c1"),
+      });
+      check(posted[0] ?? "");
+    }
+  });
+
+  it("names the file, the query and the ACP label as the tool's target", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA-TARGETS",
+        externalThreadId: "21.5",
+        route: activityRoute({ throttleSeconds: 0 }),
+      }),
+    );
+    const items = [
+      {
+        type: "tool_call",
+        callId: "t1",
+        name: "read_file",
+        status: "running",
+        detail: { type: "read", filePath: "src/app.ts" },
+      },
+      {
+        type: "tool_call",
+        callId: "t2",
+        name: "search",
+        status: "running",
+        detail: { type: "search", query: "channel reply" },
+      },
+      // An ACP provider names the call by its ACP *kind*; the readable label
+      // only exists in `metadata.title`.
+      {
+        type: "tool_call",
+        callId: "t3",
+        name: "use_tool",
+        status: "running",
+        detail: { type: "unknown", input: null, output: null },
+        metadata: { kind: "use_tool", title: "web_search" },
+      },
+    ];
+    for (const item of items) {
+      await engine.onStream(AGENT_ID, { kind: "timeline", turnId: "turn-targets", item });
+    }
+    assert.deepEqual(posted, [
+      "Running read_file: src/app.ts",
+      "Running search: channel reply",
+      "Running use_tool: web_search",
+    ]);
+  });
+
+  it("posts every tool that starts when the throttle is 0", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA2",
+        externalThreadId: "22.0",
+        route: activityRoute({ throttleSeconds: 0 }),
+      }),
+    );
+    for (const [index, command] of ["npm test", "npm run build", "git status"].entries()) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-unthrottled",
+        item: shell(command, "running", `c${index}`),
+      });
+      clock.advance(1_000);
+    }
+    assert.deepEqual(channel.messages, [
+      "Running shell: npm test",
+      "Running shell: npm run build",
+      "Running shell: git status",
+    ]);
+  });
+
+  it("updates one line to the newest tool inside the throttle window", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA3",
+        externalThreadId: "23.0",
+        route: activityRoute({ whenThrottled: "update" }),
+      }),
+    );
+    // Three commands in one turn, 5s apart: the live evidence that used to
+    // reach Slack as ONE `Running shell…`.
+    for (const [index, command] of ["npm test", "npm run build", "git status"].entries()) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-update",
+        item: shell(command, "running", `c${index}`),
+      });
+      clock.advance(5_000);
+    }
+    assert.equal(channel.messages.length, 1, "the window holds them to one message");
+    assert.deepEqual(channel.messages, ["Running shell: git status"], "the newest tool is visible");
+  });
+
+  it("drops a throttled tool under whenThrottled: skip", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA4",
+        externalThreadId: "24.0",
+        route: activityRoute({ whenThrottled: "skip" }),
+      }),
+    );
+    for (const [index, command] of ["npm test", "npm run build"].entries()) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-skip",
+        item: shell(command, "running", `c${index}`),
+      });
+      clock.advance(5_000);
+    }
+    assert.deepEqual(channel.messages, ["Running shell: npm test"]);
+  });
+
+  it("falls back to skip when the channel cannot edit", async () => {
+    const clock = new ManualClock(0);
+    const posted: string[] = [];
+    const engine = makeEngine(
+      store,
+      async (p) => {
+        posted.push(p.text);
+        return { ok: true, externalMessageId: "m1" };
+      },
+      clock,
+    );
+    engine.attach(
+      context({
+        externalConversationId: "C0TA5",
+        externalThreadId: "25.0",
+        route: activityRoute({ whenThrottled: "update" }),
+      }),
+    );
+    for (const [index, command] of ["npm test", "npm run build"].entries()) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-noedit",
+        item: shell(command, "running", `c${index}`),
+      });
+      clock.advance(5_000);
+    }
+    assert.deepEqual(posted, ["Running shell: npm test"]);
+  });
+
+  it("carries one line per call from Running to its terminal word", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA6",
+        externalThreadId: "26.0",
+        route: activityRoute({}),
+      }),
+    );
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-terminal",
+      item: shell("npm test", "running", "c1"),
+    });
+    clock.advance(2_000);
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-terminal",
+      item: shell("npm test", "completed", "c1"),
+    });
+    assert.deepEqual(channel.messages, ["Finished shell: npm test"]);
+  });
+
+  it("posts a failed tool whose start the throttle had skipped", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA7",
+        externalThreadId: "27.0",
+        route: activityRoute({ whenThrottled: "skip" }),
+      }),
+    );
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed",
+      item: shell("npm test", "running", "c1"),
+    });
+    clock.advance(1_000);
+    // Skipped by the window — so this call has no line of its own.
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed",
+      item: shell("npm run build", "running", "c2"),
+    });
+    clock.advance(1_000);
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed",
+      item: shell("npm run build", "failed", "c2"),
+    });
+    assert.deepEqual(channel.messages, ["Running shell: npm test", "Failed shell: npm run build"]);
+  });
+
+  it("keeps a failed line on screen and opens a new one for the next tool", async () => {
+    const clock = new ManualClock(0);
+    const channel = editableChannel();
+    const engine = makeEngine(store, channel.post, clock, { editPost: channel.editPost });
+    engine.attach(
+      context({
+        externalConversationId: "C0TA8",
+        externalThreadId: "28.0",
+        route: activityRoute({ whenThrottled: "update" }),
+      }),
+    );
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed-kept",
+      item: shell("npm test", "running", "c1"),
+    });
+    clock.advance(1_000);
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed-kept",
+      item: shell("npm test", "failed", "c1"),
+    });
+    clock.advance(1_000);
+    // Inside the window with nothing left to update: the failure is not
+    // overwritten, and nothing else is said.
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed-kept",
+      item: shell("git status", "running", "c2"),
+    });
+    assert.deepEqual(channel.messages, ["Failed shell: npm test"]);
+    // Past the window the next tool opens its own message.
+    clock.advance(30_000);
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-failed-kept",
+      item: shell("git log", "running", "c3"),
+    });
+    assert.deepEqual(channel.messages, ["Failed shell: npm test", "Running shell: git log"]);
+  });
+
   it("never exposes the Hub finish_execution control tool", async () => {
     const posted: string[] = [];
-    const ctx = context({
-      externalConversationId: "C0INTERNAL",
-      externalThreadId: "3.5",
-      route: {
-        ...context().route,
-        defaults: defaults({
-          sync: {
-            finalAnswers: true,
-            progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
-            toolCalls: true,
-            threadLink: "none",
-            subagents: SUBAGENTS_OFF,
-          },
-        }),
-      },
-    });
     const engine = makeEngine(store, async (post) => {
       posted.push(post.text);
       return { ok: true };
     });
-    engine.attach(ctx);
+    engine.attach(
+      context({
+        externalConversationId: "C0INTERNAL",
+        externalThreadId: "3.5",
+        route: activityRoute({ throttleSeconds: 0 }),
+      }),
+    );
 
     for (const name of ["hub.finish_execution", "mcp__hub__finish_execution"]) {
       await engine.onStream(AGENT_ID, {
@@ -476,89 +823,26 @@ describe("relay progress + tool calls", () => {
     assert.deepEqual(posted, []);
   });
 
-  it("posts a progress snapshot when sync.progress is on, throttled by the clock", async () => {
-    const clock = new ManualClock(0);
+  it("posts a tool the provider only ever reported as finished", async () => {
     const posted: string[] = [];
-    const ctx = context({
-      externalConversationId: "C0D",
-      externalThreadId: "4.0",
-      route: {
-        ...context().route,
-        defaults: defaults({
-          sync: {
-            finalAnswers: true,
-            progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
-            toolCalls: false,
-            threadLink: "none",
-            subagents: SUBAGENTS_OFF,
-          },
-        }),
-      },
-    });
-    const engine = makeEngine(
-      store,
-      async (p) => {
-        posted.push(p.text);
-        return { ok: true };
-      },
-      clock,
-    );
-    engine.attach(ctx);
-
-    await engine.onStream(AGENT_ID, {
-      kind: "timeline",
-      turnId: "turn-d",
-      item: { type: "tool_call", name: "Bash", status: "running" },
-    });
-    // Within the 30s throttle window: held.
-    clock.advance(10_000);
-    await engine.onStream(AGENT_ID, {
-      kind: "timeline",
-      turnId: "turn-d",
-      item: { type: "tool_call", name: "Bash", status: "running" },
-    });
-    // Past the window: the next eligible event posts.
-    clock.advance(25_000);
-    await engine.onStream(AGENT_ID, {
-      kind: "timeline",
-      turnId: "turn-d",
-      item: { type: "tool_call", name: "Bash", status: "running" },
-    });
-
-    assert.equal(posted.length, 2, "throttle lets one snapshot per window through");
-    assert.match(posted[0] ?? "", /Running Bash/u);
-  });
-
-  it("posts a terminal tool-call line when sync.toolCalls is on", async () => {
-    const posted: string[] = [];
-    const ctx = context({
-      externalConversationId: "C0E",
-      externalThreadId: "5.0",
-      route: {
-        ...context().route,
-        defaults: defaults({
-          sync: {
-            finalAnswers: true,
-            progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-            toolCalls: true,
-            threadLink: "none",
-            subagents: SUBAGENTS_OFF,
-          },
-        }),
-      },
-    });
     const engine = makeEngine(store, async (p) => {
       posted.push(p.text);
       return { ok: true };
     });
-    engine.attach(ctx);
+    engine.attach(
+      context({
+        externalConversationId: "C0E",
+        externalThreadId: "5.0",
+        route: activityRoute({}, false),
+      }),
+    );
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
       turnId: "turn-e",
-      item: { type: "tool_call", name: "Edit", status: "completed" },
+      item: { type: "tool_call", callId: "c1", name: "Edit", status: "completed" },
     });
     await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-e" });
-    assert.ok(posted.includes("Tool Edit: completed"), "terminal tool-call line posted");
+    assert.ok(posted.includes("Finished Edit"), "terminal tool-call line posted");
   });
 });
 
@@ -665,7 +949,7 @@ describe("ledger dedupe (restart / replay)", () => {
     assert.equal(calls, 2, "failure retries once; replay after success stays silent");
   });
 
-  it("does not re-post a progress snapshot on replay (dedupe by sequence)", async () => {
+  it("does not re-post a tool line on replay (dedupe by sequence)", async () => {
     let posts = 0;
     const post = async (): Promise<OutboundPostResult> => {
       posts += 1;
@@ -680,7 +964,7 @@ describe("ledger dedupe (restart / replay)", () => {
           sync: {
             finalAnswers: true,
             progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
-            toolCalls: false,
+            toolCalls: toolActivityDefaults(true),
             threadLink: "none",
             subagents: SUBAGENTS_OFF,
           },
@@ -703,7 +987,7 @@ describe("ledger dedupe (restart / replay)", () => {
       turnId: "turn-g",
       item: { type: "tool_call", name: "Bash", status: "running" },
     });
-    assert.equal(posts, 1, "the replayed progress snapshot does not re-post");
+    assert.equal(posts, 1, "the replayed tool line does not re-post");
   });
 });
 
@@ -718,7 +1002,7 @@ describe("relay subagent scope", () => {
         sync: {
           finalAnswers: true,
           progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
-          toolCalls: false,
+          toolCalls: toolActivityDefaults(false),
           threadLink: "none",
           subagents: { finalAnswers, progress: false, toolCalls: false, ...extra },
         },
@@ -985,7 +1269,7 @@ describe("relay subagent scope", () => {
       parentAgentId: AGENT_ID,
       subagentId: "sub-1",
     });
-    assert.deepEqual(posted, ["▶ Worker (subagent): Tool Bash: completed"]);
+    assert.deepEqual(posted, ["▶ Worker (subagent): Finished Bash"]);
   });
 });
 

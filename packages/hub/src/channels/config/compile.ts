@@ -75,6 +75,7 @@ type OrgPolicy = z.infer<typeof OrgPolicySchema>;
 // the fold and re-exported here: `config/compile.js` stays the one import for
 // the compiled snapshot.
 export type { EffectiveAccess, EffectiveDefaults } from "./inheritance.js";
+export { toolActivityDefaults } from "./inheritance.js";
 
 /**
  * One route's folded `access:` block. Leaves stay optional: the ported
