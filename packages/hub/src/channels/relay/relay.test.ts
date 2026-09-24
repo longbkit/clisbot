@@ -519,16 +519,16 @@ describe("relay tool activity (sync.toolCalls)", () => {
   it("renders the three detail levels", async () => {
     const long = `npm run test -- ${"x".repeat(200)}`;
     const cases: Array<[ToolActivitySettings["detail"], (line: string) => void]> = [
-      ["name", (line) => assert.equal(line, "Running shell…")],
+      ["name", (line) => assert.equal(line, "**Running shell…**")],
       [
         "short",
         (line) => {
-          assert.ok(line.startsWith("Running shell: npm run test -- xxx"), line);
-          assert.ok(line.endsWith("…"), line);
-          assert.ok(line.length < 200, `short line stays one line: ${line.length}`);
+          assert.ok(line.startsWith("**Running shell…**\n```\nnpm run test -- xxx"), line);
+          assert.ok(line.endsWith("…\n```"), line);
+          assert.ok(line.length < 200, `short target stays bounded: ${line.length}`);
         },
       ],
-      ["full", (line) => assert.equal(line, `Running shell: ${long}`)],
+      ["full", (line) => assert.equal(line, `**Running shell…**\n\`\`\`\n${long}\n\`\`\``)],
     ];
     for (const [detail, check] of cases) {
       const channel = editableChannel();
@@ -593,9 +593,9 @@ describe("relay tool activity (sync.toolCalls)", () => {
       await engine.onStream(AGENT_ID, { kind: "timeline", turnId: "turn-targets", item });
     }
     assert.deepEqual(channel.messages, [
-      "Running read_file: src/app.ts",
-      "Running search: channel reply",
-      "Running use_tool: web_search",
+      "**Running read\\_file…**\n```\nsrc/app.ts\n```",
+      "**Running search…**\n```\nchannel reply\n```",
+      "**Running use\\_tool…**\n```\nweb_search\n```",
     ]);
   });
 
@@ -626,7 +626,10 @@ describe("relay tool activity (sync.toolCalls)", () => {
       });
       clock.advance(1_000);
     }
-    assert.deepEqual(channel.messages, ["Finished shell: npm test", "Finished shell: git status"]);
+    assert.deepEqual(channel.messages, [
+      "**Finished shell**\n```\nnpm test\n```",
+      "**Finished shell**\n```\ngit status\n```",
+    ]);
   });
 
   it("updates one line to the newest tool inside the throttle window", async () => {
@@ -651,7 +654,11 @@ describe("relay tool activity (sync.toolCalls)", () => {
       clock.advance(5_000);
     }
     assert.equal(channel.messages.length, 1, "the window holds them to one message");
-    assert.deepEqual(channel.messages, ["Running shell: git status"], "the newest tool is visible");
+    assert.deepEqual(
+      channel.messages,
+      ["**Running shell…**\n```\ngit status\n```"],
+      "the newest tool is visible",
+    );
   });
 
   it("lets the newest tool resolve the line it took over", async () => {
@@ -681,7 +688,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       });
       clock.advance(1_000);
     }
-    assert.deepEqual(channel.messages, ["Finished shell: git status"]);
+    assert.deepEqual(channel.messages, ["**Finished shell**\n```\ngit status\n```"]);
   });
 
   it("drops a throttled tool under whenThrottled: skip", async () => {
@@ -703,7 +710,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       });
       clock.advance(5_000);
     }
-    assert.deepEqual(channel.messages, ["Running shell: npm test"]);
+    assert.deepEqual(channel.messages, ["**Running shell…**\n```\nnpm test\n```"]);
   });
 
   it("says nothing until a call ends on a channel that cannot edit", async () => {
@@ -733,7 +740,10 @@ describe("relay tool activity (sync.toolCalls)", () => {
       });
       clock.advance(1_000);
     }
-    assert.deepEqual(channel.messages, ["Finished shell: npm test", "Failed shell: git status"]);
+    assert.deepEqual(channel.messages, [
+      "**Finished shell**\n```\nnpm test\n```",
+      "**Failed shell**\n```\ngit status\n```",
+    ]);
   });
 
   it("carries one line per call from Running to its terminal word", async () => {
@@ -758,7 +768,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       turnId: "turn-terminal",
       item: shell("npm test", "completed", "c1"),
     });
-    assert.deepEqual(channel.messages, ["Finished shell: npm test"]);
+    assert.deepEqual(channel.messages, ["**Finished shell**\n```\nnpm test\n```"]);
   });
 
   it("posts a failed tool whose start the throttle had skipped", async () => {
@@ -790,7 +800,10 @@ describe("relay tool activity (sync.toolCalls)", () => {
       turnId: "turn-failed",
       item: shell("npm run build", "failed", "c2"),
     });
-    assert.deepEqual(channel.messages, ["Running shell: npm test", "Failed shell: npm run build"]);
+    assert.deepEqual(channel.messages, [
+      "**Running shell…**\n```\nnpm test\n```",
+      "**Failed shell**\n```\nnpm run build\n```",
+    ]);
   });
 
   it("keeps a failed line on screen and opens a new one for the next tool", async () => {
@@ -823,7 +836,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       turnId: "turn-failed-kept",
       item: shell("git status", "running", "c2"),
     });
-    assert.deepEqual(channel.messages, ["Failed shell: npm test"]);
+    assert.deepEqual(channel.messages, ["**Failed shell**\n```\nnpm test\n```"]);
     // Past the window the next tool opens its own message.
     clock.advance(30_000);
     await engine.onStream(AGENT_ID, {
@@ -831,7 +844,10 @@ describe("relay tool activity (sync.toolCalls)", () => {
       turnId: "turn-failed-kept",
       item: shell("git log", "running", "c3"),
     });
-    assert.deepEqual(channel.messages, ["Failed shell: npm test", "Running shell: git log"]);
+    assert.deepEqual(channel.messages, [
+      "**Failed shell**\n```\nnpm test\n```",
+      "**Running shell…**\n```\ngit log\n```",
+    ]);
   });
 
   it("does not start the throttle window on a line that never posted", async () => {
@@ -867,7 +883,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       });
       clock.advance(1_000);
     }
-    assert.deepEqual(posted, ["Finished shell: git status"]);
+    assert.deepEqual(posted, ["**Finished shell**\n```\ngit status\n```"]);
   });
 
   it("never exposes the Hub finish_execution control tool", async () => {
@@ -912,7 +928,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       item: { type: "tool_call", callId: "c1", name: "Edit", status: "completed" },
     });
     await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-e" });
-    assert.ok(channel.messages.includes("Finished Edit"), "terminal tool-call line posted");
+    assert.ok(channel.messages.includes("**Finished Edit**"), "terminal tool-call line posted");
   });
 
   it("keeps the answer's ledger key when a replay throttles tool lines differently", async () => {
@@ -948,7 +964,7 @@ describe("relay tool activity (sync.toolCalls)", () => {
       first.push(p.text);
       return { ok: true, externalMessageId: `s${first.length}` };
     }, 5_000);
-    assert.equal(first.filter((text) => text.startsWith("Finished")).length, 1);
+    assert.equal(first.filter((text) => text.startsWith("**Finished")).length, 1);
     assert.ok(first.includes("the answer"), "the first drive answered");
     // The replay runs slower, so MORE tool lines clear the window. On one
     // shared sequence counter that pushes the answer onto a key nothing has
@@ -1380,7 +1396,7 @@ describe("relay subagent scope", () => {
       parentAgentId: AGENT_ID,
       subagentId: "sub-1",
     });
-    assert.deepEqual(posted, ["▶ Worker (subagent): Finished Bash"]);
+    assert.deepEqual(posted, ["▶ Worker (subagent): **Finished Bash**"]);
   });
 });
 

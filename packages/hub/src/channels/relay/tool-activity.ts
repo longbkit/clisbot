@@ -236,9 +236,9 @@ export function isTerminalToolStatus(status: string | undefined): boolean {
 }
 
 /**
- * The line for one tool call in its current state. `name` says the tool only;
- * `short` adds the target on one line, cut at `SHORT_TARGET_CHARS`; `full`
- * adds it whole and lets the outbound layer chunk it per platform.
+ * A bold status/tool heading, with the target in a separate code block so
+ * commands and paths are read literally rather than as authored Markdown.
+ * `short` cuts the target at `SHORT_TARGET_CHARS`; `full` keeps it whole.
  */
 export function toolActivityLine(
   item: AgentStreamTimelineItem,
@@ -248,8 +248,14 @@ export function toolActivityLine(
   const status = item.status ?? "completed";
   const verb = STATUS_VERBS[status] ?? "Ran";
   const target = detail === "name" ? undefined : toolTarget(item, detail === "full");
-  if (target !== undefined) return `${verb} ${name}: ${target}`;
-  return status === "running" ? `${verb} ${name}…` : `${verb} ${name}`;
+  const label = name.replace(/\s+/gu, " ").replace(/([\\`*_{}[\]()<>!#|~])/gu, "\\$1");
+  const heading = `**${verb} ${label}${status === "running" ? "…" : ""}**`;
+  if (target === undefined) return heading;
+  // A command can itself contain Markdown fences (for example a heredoc).
+  const fence = "`".repeat(
+    Math.max(3, ...Array.from(target.matchAll(/`+/gu), (m) => m[0].length + 1)),
+  );
+  return `${heading}\n${fence}\n${target}\n${fence}`;
 }
 
 /** What the call acted on, rendered for the requested detail level. */
