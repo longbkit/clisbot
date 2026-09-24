@@ -14,10 +14,12 @@ import type { OpenClawConfig } from "./types.openclaw.js";
 /**
  * `messaging.defaultMarkdownTableMode` per channel, transcribed from the
  * upstream plugin definitions at 5d8067a4483. A channel that declares none
- * (Slack, Discord, Feishu, Google Chat, Zalo) falls through to "code", which is
- * upstream's registry fallback.
+ * (Discord, Feishu, Google Chat, Zalo) falls through to "code", which is
+ * upstream's registry fallback. Fusion overrides Slack to block for its native renderer.
  */
 const CHANNEL_DEFAULT_MARKDOWN_TABLE_MODES: ReadonlyMap<string, MarkdownTableMode> = new Map([
+  // Fusion's Slack text-forward adapter compiles Markdown tables into native blocks.
+  ["slack", "block"],
   // extensions/telegram/src/channel.ts:842
   ["telegram", "block"],
   // extensions/matrix/src/channel.ts:455

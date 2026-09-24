@@ -24,6 +24,11 @@ import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
 import { refreshSlackTypingAfterPost } from "./typing.js";
 import { getSlackHostRuntime } from "./runtime-store.js";
 import { normalizeSlackOutboundText } from "./format.js";
+import {
+  editSlackMarkdownTableMessage,
+  resolveSlackMarkdownTableMessages,
+} from "./markdown-tables.js";
+import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
 import { uploadSlackFile } from "./outbound-media.js";
 
 /** The upstream send's config and block argument types, named locally so the
@@ -176,26 +181,11 @@ export async function sendSlackText(args: Parameters<SendTextFn>[0]): Promise<{
 async function deliverSlackText(
   args: Parameters<SendTextFn>[0],
 ): Promise<{ result: SlackSendResult; cardPosted: boolean }> {
-  const { cfg, accountId, to, text, threadId } = args;
+  const { cfg, accountId, text } = args;
   const blocks = cardBlocksOf(args);
-  // Upstream's own client injection point (`SlackSendOpts.client`), surfaced on
-  // the open drive-surface args so a test can post through a fake WebClient
-  // without reaching into the write-client cache.
-  const client = args["client"] as SlackSendClient | undefined;
-  // Every Slack message this send posts (text chunks, presentation messages)
-  // is reported, so the Hub can tell a partly posted answer from a failed one.
-  const onDeliveryResult = args.onDeliveryResult;
   const post = (message: string, opts: Partial<SlackSendOptions>) =>
-    sendMessageSlack(to, message, {
-      cfg: cfg as unknown as SlackSendCfg,
-      accountId,
-      ...(client === undefined ? {} : { client }),
-      ...(onDeliveryResult === undefined ? {} : { onDeliveryResult }),
-      ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
-      ...opts,
-    });
-  // A portable `presentation` posts as native Block Kit — charts, tables and
-  // controls — instead of core's flattened fallback text.
+    postSlackText(args, message, opts);
+  // A portable presentation and inferred Markdown tables share the same delivery path.
   const presented = resolveSlackOutboundPresentationMessages({
     text,
     presentation: args["presentation"],
@@ -205,7 +195,11 @@ async function deliverSlackText(
     notes: presented.notes,
     hostRuntime: args["hostRuntime"] as HostRuntime | undefined,
   });
-  if (presented.messages.length === 0) {
+  const messages =
+    presented.messages.length > 0 || blocks !== undefined || args["presentation"] !== undefined
+      ? presented.messages
+      : resolveSlackMarkdownTableMessages({ text, cfg: cfg as SlackSendCfg, accountId });
+  if (messages.length === 0) {
     const result = await post(
       text,
       blocks === undefined ? {} : { blocks: blocks as unknown as SlackSendBlocks },
@@ -213,9 +207,33 @@ async function deliverSlackText(
     return { result, cardPosted: blocks !== undefined };
   }
   return {
-    result: await postPresentationMessages(presented.messages, post),
+    result: await postPresentationMessages(messages, post),
     cardPosted: presented.messages.some((message) => (message.blocks?.length ?? 0) > 0),
   };
+}
+
+/** Keep target, thread and per-message receipts identical across text and presentation sends. */
+function postSlackText(
+  args: Parameters<SendTextFn>[0],
+  message: string,
+  opts: Partial<SlackSendOptions>,
+): Promise<SlackSendResult> {
+  const { cfg, accountId, to, threadId } = args;
+  // Upstream's own client injection point (`SlackSendOpts.client`), surfaced on
+  // the open drive-surface args so a test can post through a fake WebClient
+  // without reaching into the write-client cache.
+  const client = args["client"] as SlackSendClient | undefined;
+  // Every Slack message this send posts (text chunks, presentation messages)
+  // is reported, so the Hub can tell a partly posted answer from a failed one.
+  const onDeliveryResult = args.onDeliveryResult;
+  return sendMessageSlack(to, message, {
+    cfg: cfg as unknown as SlackSendCfg,
+    accountId,
+    ...(client === undefined ? {} : { client }),
+    ...(onDeliveryResult === undefined ? {} : { onDeliveryResult }),
+    ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
+    ...opts,
+  });
 }
 
 /** D-W6-02: what admission repaired or refused is an operator fact — the tool
@@ -295,11 +313,29 @@ export async function updateSlackText(
     );
   }
   const client = await getSlackWriteClient(botToken);
+  if (
+    clearCard === false &&
+    (await editSlackMarkdownTableMessage({
+      text: finalText,
+      cfg: cfg as SlackSendCfg,
+      accountId,
+      client,
+      token: botToken,
+      channel: to,
+      messageId: externalMessageId,
+    }))
+  )
+    return { ok: true };
+  const tableMode = resolveMarkdownTableMode({
+    cfg: cfg as SlackSendCfg,
+    channel: "slack",
+    accountId,
+  });
   /* eslint-disable eslint-plugin-unicorn/require-post-message-target-origin */
   const result = await client.chat.update({
     channel: to,
     ts: externalMessageId,
-    text: normalizeSlackOutboundText(finalText),
+    text: normalizeSlackOutboundText(finalText, { tableMode }),
     // Strip the card's buttons (the prompt is decided — a stale click must
     // have no live markup; thread_ts is irrelevant to an update in place).
     ...(clearCard !== false ? { blocks: [] } : {}),

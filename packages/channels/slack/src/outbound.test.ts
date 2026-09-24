@@ -232,13 +232,24 @@ const MARKDOWN_SHOWCASE = [
 ].join("\n");
 
 describe("sendSlackText — markdown showcase", () => {
-  it("renders every construct as mrkdwn, with the table as a code block", async () => {
+  it("renders every construct as mrkdwn when code tables are selected", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    await postText({ cfg: CFG, accountId: "work", to: "C1", text: MARKDOWN_SHOWCASE });
+    await postText({
+      cfg: {
+        channels: {
+          slack: {
+            markdown: { tables: "code" },
+            accounts: { work: { botToken: "xoxb-test-outbound" } },
+          },
+        },
+      },
+      accountId: "work",
+      to: "C1",
+      text: MARKDOWN_SHOWCASE,
+    });
     // Slack mrkdwn has no heading, so upstream's renderer (`headingStyle:
-    // "rich"`) emits bold; the table rides the channel's default table mode
-    // ("code" — Slack declares no plugin default), NOT raw pipes.
+    // "rich"`) emits bold; the explicit code mode keeps the legacy table rendering.
     expect(posts[0]?.args.text).toBe(
       [
         "*Heading one*",

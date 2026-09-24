@@ -378,6 +378,11 @@
       "status": "verbatim"
     },
     {
+      "local": "src/markdown-tables.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-045"]
+    },
+    {
       "local": "src/native-data-blocks.ts",
       "upstream": "extensions/slack/src/native-data-blocks.ts",
       "status": "verbatim"
@@ -397,7 +402,7 @@
       "local": "src/outbound.ts",
       "upstream": "extensions/slack/src/outbound-adapter.ts",
       "status": "reimplemented",
-      "deviation": ["D-014", "D-001", "D-006", "D-026", "D-035", "D-044"]
+      "deviation": ["D-014", "D-001", "D-006", "D-026", "D-035", "D-044", "D-045"]
     },
     {
       "local": "src/plugin.ts",
@@ -863,6 +868,12 @@
       "file": "src/presentation-outbound.ts",
       "reason": "Upstream renders a portable presentation on core's delivery adapter: `slackOutbound.presentationCapabilities` + `slackOutbound.renderPresentation` (`extensions/slack/src/outbound-adapter.ts:259`, `channel.ts:466`), with core adapting the presentation to those capabilities first (`renderPresentationForDelivery`). Fusion's Hub drives `plugin.outbound.sendText` instead of core's delivery adapter, so the same two steps run in the vertical: `src/presentation-outbound.ts` adapts the presentation to `SLACK_PRESENTATION_CAPABILITIES` (now declared on `plugin.outbound`, upstream's spelling) and compiles it with the same `reply-blocks.ts` compiler the `message` tool's `handleAction` send uses, and `sendSlackText` posts the compiled messages. D-W6-01: without this the Hub's send reached Slack as core's flattened fallback text, so charts and tables never posted natively.",
       "tests": ["src/presentation-outbound.test.ts", "src/outbound.test.ts", "src/plugin.test.ts"]
+    },
+    {
+      "id": "D-045",
+      "file": "src/markdown-tables.ts",
+      "reason": "Fusion Text forward and channel_reply.message carry raw Markdown without a presentation. The Slack drive adapter parses table source ranges with markdown-core and compiles ordered prose/table blocks through the existing presentation sender, rendering the document together to preserve reference links and container context. Slack defaults to block only for capable renderers; markdown.tables code/bullets/off remain opt-outs, with account overrides taking precedence. The same compiler serves edit-based drafts, letting the edit owner derive fallback text once. Fenced examples are ignored; quoted/list, empty-cell and oversized tables retain a code fallback. The Hub and Paseo wire contracts are unchanged.",
+      "tests": ["src/markdown-tables.test.ts", "src/outbound.test.ts", "src/send.blocks.test.ts"]
     }
   ]
 }

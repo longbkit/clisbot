@@ -39,6 +39,36 @@ Commands follow the same rule: a command's lane is the session it acts on, so `/
 
 **A message enters a session once.** The daemon keys each prompt by the message and keeps a receipt. A batch carries every message id it contains. A failure the daemon knows happened before the prompt reached the provider (`PromptNotDeliveredError`) clears the receipt, so the same message can be sent again; any other failure stays "unknown" and is not resent.
 
+## Slack tables in replies
+
+Slack Text forward, Hybrid replies, and `channel_reply.message` sends with raw Markdown
+in `text` or `message` compile tables into native `data_table` blocks by default; the tool
+does not need a `presentation`. All three reach the same `sendText` seam. The Slack
+vertical owns the conversion: the Hub still forwards the
+agent's Markdown unchanged. Text before, between, and after tables keeps its order and
+formatting. Link labels in cells retain their destinations as text. Markdown is parsed
+as a whole document so reference-style links keep definitions located beyond a table.
+
+The existing `channels.slack.markdown.tables` setting controls this behavior; an account's
+`markdown.tables` overrides the channel setting. `block` enables native tables (the default),
+`code` restores code-block tables, `bullets` renders lists, and `off` leaves table syntax
+untouched. No new Route setting or protocol field is involved.
+
+Fenced examples remain code. Tables in quotes/lists, tables with empty cells, and tables
+outside the existing renderer's row, column, or character limits keep a code-block fallback.
+Slack rejecting native blocks also falls back through the existing presentation sender,
+preserving the data. Edit-based drafts use the same renderer when the result fits one
+message. Their blocks own the fallback text, so a rejected native table does not repeat
+its surrounding prose. Native Slack streams keep Slack's own Markdown rendering.
+
+Implementation: `packages/channels/slack/src/markdown-tables.ts` and `outbound.ts`.
+Regression coverage: `markdown-tables.test.ts`, `outbound.test.ts`, and `send.blocks.test.ts`.
+`packages/hub/src/channels/channel-reply-markdown-tables.test.ts` drives a raw-table resend
+from the actual MCP endpoint through the built Slack vertical, checking the thread,
+delivery confirmation, both text argument names, every row, and the code-table opt-out.
+The default change is isolated to the channel stack; non-block-capable callers still resolve
+Slack tables to `code`, and other channels keep their existing defaults.
+
 ## What the Agent receives
 
 Every message line names its sender, always, on every Route:

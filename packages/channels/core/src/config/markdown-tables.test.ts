@@ -9,6 +9,10 @@ import { resolveMarkdownTableMode } from "./markdown-tables.js";
 type Cfg = Parameters<typeof resolveMarkdownTableMode>[0]["cfg"];
 
 describe("resolveMarkdownTableMode default modes", () => {
+  it("slack enables native tables only for renderers that support them", () => {
+    expect(resolveMarkdownTableMode({ channel: "slack", supportsBlockTables: true })).toBe("block");
+    expect(resolveMarkdownTableMode({ channel: "slack" })).toBe("code");
+  });
   it("telegram defaults to block when the channel renders native tables", () => {
     expect(resolveMarkdownTableMode({ channel: "telegram", supportsBlockTables: true })).toBe(
       "block",
