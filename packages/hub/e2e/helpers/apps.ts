@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 import { DaemonHandoffSurface } from "./daemon-handoff.js";
 
 export type AppProvider = "GitHub" | "Slack" | "Discord" | "Linear";
@@ -78,7 +78,10 @@ export class AppSection {
   ) {}
 
   private get root(): Locator {
-    return this.page.locator(`[data-provider="${this.provider.toLowerCase()}"]`);
+    const provider = this.provider.toLowerCase();
+    return this.page
+      .locator(`[data-provider="${provider}"], [data-provider^="${provider}:"]`)
+      .first();
   }
 
   header(): Locator {
@@ -197,16 +200,18 @@ export class AppSection {
   }
 
   async save(): Promise<void> {
-    await this.body()
-      .getByRole("button", {
-        name:
-          this.provider === "Slack"
-            ? /^(?:Connect Slack|Save and continue to Slack)$/u
-            : this.provider === "Linear"
-              ? "Save and continue to Linear"
-              : "Verify and save",
-      })
-      .click();
+    let name: string | RegExp;
+    switch (this.provider) {
+      case "Slack":
+        name = /^(?:Connect Slack|Save and continue to Slack)$/u;
+        break;
+      case "Linear":
+        name = "Save and continue to Linear";
+        break;
+      default:
+        name = "Verify and save";
+    }
+    await this.body().getByRole("button", { name }).click();
   }
 
   async chooseSlackTransport(transport: "Socket Mode" | "Webhooks"): Promise<void> {
@@ -433,7 +438,7 @@ export class AppSection {
   }
 
   /** HTTPS exposes every user action needed to create and install the Slack app. */
-  async expectSlackSetupActionable(origin: string): Promise<void> {
+  async expectSlackSetupActionable(_origin: string): Promise<void> {
     await this.expectExpanded();
     await expect(this.body().getByRole("link", { name: "Create a Slack app" })).toBeVisible();
     await expect(this.body().getByRole("list")).toBeVisible();
@@ -630,7 +635,7 @@ export class AppSetupSurface {
         const element = node.parentElement;
         if (
           element !== null &&
-          element.closest('[data-provider="linear"]') === null &&
+          element.closest('[data-provider="linear"], [data-provider^="linear:"]') === null &&
           element.getClientRects().length > 0
         ) {
           visible.push(node.textContent ?? "");

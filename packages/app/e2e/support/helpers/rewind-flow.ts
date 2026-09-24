@@ -43,7 +43,7 @@ function fullAccessConfig(provider: RewindFlowProvider): ProviderLaunchConfig {
     case "codex":
       return {
         provider,
-        model: "gpt-5.4-mini",
+        model: process.env.E2E_CODEX_MODEL ?? "gpt-5.4-mini",
         thinkingOptionId: "low",
         modeId: "full-access",
       };

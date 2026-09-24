@@ -77,6 +77,22 @@ async function expectGolden(store: FileAgentTimelineStore, rows: AgentTimelineRo
   }
 }
 describe("durable projected timeline", () => {
+  it("returns an empty source-range page before the first timeline event", async () => {
+    const { store } = await fixture();
+    for (const direction of ["tail", "before", "after"] as const) {
+      const page = await store.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        direction,
+        limit: 40,
+      });
+      expect(page.entries).toEqual([]);
+      expect(page.contextEntries).toEqual([]);
+      expect(page.startSeq).toBeNull();
+      expect(page.endSeq).toBeNull();
+      expect(page.hasOlder).toBe(false);
+      expect(page.hasNewer).toBe(false);
+    }
+  });
   it("matches golden projection with chunk merges, overlapping tools, and repeated call IDs across turns", async () => {
     const { directory, store } = await fixture();
     const rows = [

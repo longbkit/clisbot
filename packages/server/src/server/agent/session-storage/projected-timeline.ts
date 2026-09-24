@@ -167,15 +167,16 @@ function selectSourceRanges(
     for (const range of entry.sourceSeqRanges)
       for (let seq = range.startSeq; seq <= range.endSeq; seq += 1) bySeq.set(seq, entry);
   const forward = direction === "after";
+  const minSeq = Math.max(1, state.minSeq);
   const boundary = forward
-    ? Math.max(state.minSeq, (cursor ?? state.minSeq - 1) + 1)
+    ? Math.max(minSeq, (cursor ?? state.minSeq - 1) + 1)
     : Math.min(
         state.maxSeq,
         direction === "before" ? (cursor ?? state.maxSeq + 1) - 1 : state.maxSeq,
       );
   let seq = boundary;
   const selected = new Map<number, TimelineProjectionEntry>();
-  while (seq >= state.minSeq && seq <= state.maxSeq && selected.size < limit) {
+  while (seq >= minSeq && seq <= state.maxSeq && selected.size < limit) {
     const entry = bySeq.get(seq);
     const range = entry ? containingRange(entry, seq) : undefined;
     if (!entry || !range) throw new Error("Invalid projected source reference");
