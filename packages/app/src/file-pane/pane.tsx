@@ -138,12 +138,8 @@ function FilePreviewBody({
 }: FilePreviewBodyProps) {
   const { t } = useTranslation();
   const filePath = location.path;
-  // A line target means the caller wants to land on that line, so fall back to
-  // the highlighted source view even for renderable files.
   const renderKind =
-    preview?.kind === "text" && !location.lineStart && mode !== "source"
-      ? filePreviewRenderKind(filePath)
-      : null;
+    preview?.kind === "text" && mode !== "source" ? filePreviewRenderKind(filePath) : null;
 
   const previewScrollRef = useRef<RNScrollView>(null);
 
@@ -232,7 +228,9 @@ export function FilePane({
 }) {
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
-  const [previewMode, setPreviewMode] = useState<"preview" | "source">("preview");
+  const [previewMode, setPreviewMode] = useState<"preview" | "source">(
+    location.lineStart ? "source" : "preview",
+  );
 
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   // COMPAT(workspaceFileEditing): added in v0.2.0, remove after 2027-01-18 once daemon floor >= v0.2.0.
@@ -276,7 +274,11 @@ export function FilePane({
     liveFileSnapshot: liveFile.snapshot,
   });
 
-  useEffect(() => setPreviewMode("preview"), [targetKey]);
+  // A new line navigation opens source at that line. The user can still switch
+  // to preview, and a repeated navigation to the same line returns to source.
+  useEffect(() => {
+    setPreviewMode(location.lineStart ? "source" : "preview");
+  }, [targetKey, location.lineStart, navigationRevision]);
 
   const { file: preview, imageAttachment } = resolveFilePreviewLifecycle(previewLifecycle);
   const imagePreviewUri = useAttachmentPreviewUrl(imageAttachment);
@@ -285,7 +287,7 @@ export function FilePane({
     preview,
     supportsEditing,
   });
-  const canTogglePreviewMode = isRenderable && !location.lineStart;
+  const canTogglePreviewMode = isRenderable;
   const lineCount =
     preview?.kind === "text" ? (preview.content ?? "").split("\n").length : undefined;
   const errorMessage = previewLifecycle.status === "error" ? previewLifecycle.message : null;

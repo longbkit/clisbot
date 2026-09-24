@@ -219,6 +219,43 @@ test.describe("CodeMirror workspace file editing", () => {
     }
   });
 
+  test("allows previewing Markdown opened at a referenced line", async ({ page }) => {
+    const target = "notes.md:7";
+    const session = await seedAgentWithFileLink({
+      target,
+      fileName: "notes.md",
+      content: ["# Notes", "", "One", "Two", "Three", "", "## Heading at line 7"].join("\n"),
+    });
+
+    try {
+      await openAgentRoute(page, session);
+      const fileLink = page.getByText(target, { exact: true });
+      await expect(fileLink).toBeVisible({ timeout: 15_000 });
+      await fileLink.click();
+
+      await expectFileTabOpen(page, "notes.md");
+      await expect(page.getByTestId("file-source-editor")).toBeVisible();
+      await expect(page.getByLabel("Line 7, column 1")).toBeVisible();
+      await expect(page.getByTestId("file-preview-mode")).toBeVisible();
+
+      await selectFileView(page, "Preview");
+      await expect(page.getByTestId("file-source-editor")).not.toBeVisible();
+      await expect(
+        page.getByTestId("workspace-file-pane").getByText("Heading at line 7"),
+      ).toBeVisible();
+
+      await page
+        .getByTestId(`workspace-tab-agent_${session.agentId}`)
+        .filter({ visible: true })
+        .click();
+      await fileLink.click();
+      await expect(page.getByTestId("file-source-editor")).toBeVisible();
+      await expect(page.getByLabel("Line 7, column 1")).toBeVisible();
+    } finally {
+      await session.cleanup();
+    }
+  });
+
   test("clicking the editor focuses its pane beside an agent", async ({ page }) => {
     await page.addInitScript((settingsKey) => {
       localStorage.setItem(
