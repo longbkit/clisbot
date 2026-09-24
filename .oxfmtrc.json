@@ -15,6 +15,7 @@
     "**/*.gen.ts",
     "**/*.gen.tsx",
     "packages/channels/*/src/__fixtures__/upstream-differential.json",
+    "packages/cli/src/commands/bot/templates/**",
     "*.lock",
     "packages/channels/core/src/**",
     "packages/channels/markdown-core/src/**",

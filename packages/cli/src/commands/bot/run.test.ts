@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readlink, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
@@ -36,9 +36,9 @@ async function fixture(overrides: Partial<BotStartDeps> = {}) {
       calls.push("workspace");
       return { id: "ws-1", projectId: "prj-1", directory };
     },
-    seedTemplate: async (cwd, type, overwrite) => {
+    seedTemplate: async (cwd, type, overwrite, provider) => {
       calls.push("seed");
-      return seedWorkspaceTemplate(cwd, type, overwrite);
+      return seedWorkspaceTemplate(cwd, type, overwrite, provider);
     },
     createIdleAgent: async () => {
       calls.push("agent");
@@ -127,6 +127,22 @@ describe("API-first bot onboarding", () => {
     }
   });
 
+  it("selects the team template and Claude discovery link from the onboarding plan", async () => {
+    const f = await fixture();
+    try {
+      const report = await runBotStart(
+        { ...f.input, options: { ...f.input.options, provider: "claude", botType: "team" } },
+        f.deps,
+      );
+      expect(await readlink(path.join(report.workspacePath, "CLAUDE.md"))).toBe("AGENTS.md");
+      expect(await readFile(path.join(report.workspacePath, "MEMORY.md"), "utf8")).toContain(
+        "Team Long-Term Memory",
+      );
+    } finally {
+      await f.cleanup();
+    }
+  });
+
   it("retains the seeded assistant when the owner has not finished Account setup", async () => {
     const f = await fixture();
     try {
@@ -199,7 +215,7 @@ describe("API-first bot onboarding", () => {
         f.deps,
       );
       expect(report.workspacePath).toBe(directory);
-      expect(report.template?.directory).toBe(directory);
+      expect(report.template?.directory).toBe(await realpath(directory));
       expect(f.inputs[0]?.setup?.cwd).toBe(directory);
       expect((await readBotManifest(f.home, "personal-assistant"))?.sourcePath).toBe(
         path.join(f.home, "workspaces", "default"),

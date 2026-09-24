@@ -126,6 +126,7 @@ export interface BotStartDeps {
     directory: string,
     type: BotStartPlan["botType"],
     overwrite?: boolean,
+    provider?: string,
   ): Promise<WorkspaceTemplateResult>;
   findWorkspace(
     client: DaemonClient,
@@ -232,7 +233,12 @@ async function resolveAssistantResources(
       "The bot workspace is missing or archived. Restore it before restarting the bot.",
     );
   const template = isOnboardingEnabled(env)
-    ? await deps.seedTemplate(workspace.directory, plan.botType, plan.overwriteTemplate)
+    ? await deps.seedTemplate(
+        workspace.directory,
+        plan.botType,
+        plan.overwriteTemplate,
+        plan.provider,
+      )
     : undefined;
   return {
     ...existing,

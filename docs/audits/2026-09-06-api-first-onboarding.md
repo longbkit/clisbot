@@ -21,6 +21,17 @@ Existing files, including symlinks, are preserved and reported. There is no
 implicit template upgrade or overwrite of user context. Explicit `--overwrite-template`
 backs up existing regular template files before replacing them.
 
+2026-09-24 follow-up: the bundled Markdown files come from `clisbot main`:
+`templates/default`, `templates/customized/default`, and the selected
+personal/team variant. The one intentional content difference is `BOOTSTRAP.md`:
+the agent checks available context/tools for the user's timezone and confirms it
+before saving, instead of calling the unavailable `clisbot routes get-timezone`.
+The CLI package copies these assets into `dist`, including
+`LOOP.md` and `README.md`. Claude/Gemini discovery files are symlinks to the
+canonical `AGENTS.md`, as in main. A deleted `BOOTSTRAP.md` stays deleted on
+ordinary restart after initial seeding; explicit overwrite can restore it.
+Existing workspaces are still preserved unless overwrite is requested.
+
 CLI composes daemon workspace/agent operations and Hub resource APIs. The Hub
 owns encrypted Connections, Channel configuration revisions and Member identity
 verification. The existing direct Channel–Agent execution model creates and

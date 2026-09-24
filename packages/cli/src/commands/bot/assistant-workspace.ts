@@ -45,7 +45,7 @@ export async function provisionAssistant(
   const workspace = await deps.createWorkspace(client, source, plan.name);
   const directory = workspace.directory ?? plan.workspacePath;
   const template = isOnboardingEnabled(env)
-    ? await deps.seedTemplate(directory, plan.botType, plan.overwriteTemplate)
+    ? await deps.seedTemplate(directory, plan.botType, plan.overwriteTemplate, plan.provider)
     : undefined;
   const agent = await deps.createIdleAgent(client, {
     provider: plan.provider,

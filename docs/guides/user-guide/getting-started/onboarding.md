@@ -73,7 +73,7 @@ Nếu đã biết chắc Slack Member ID của owner, có thể thêm `--owner-i
 
 **Không seed vào thư mục đang đứng (`cwd`) hay thẳng OS `$HOME`.** Project/Workspace ở đây do **daemon** quản lý; Hub không có “Hub Project”. Worktree được seed vào đường dẫn thực tế do daemon trả về. Nhiều bot personal cùng home mặc định dùng chung workspace; chọn `--workspace` riêng nếu cần tách ngữ cảnh.
 
-Template gồm `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `IDENTITY.md`, `BOOTSTRAP.md`, `TOOLS.md`. Mặc định chỉ tạo file thiếu, giữ nguyên file đã có. Các cuộc trò chuyện tạo/resume session riêng trong workspace, không dùng chung tất cả vào agent ban đầu.
+Onboarding dùng bộ Markdown từ `clisbot main`: lớp `default`, `customized/default` và biến thể `personal-assistant` hoặc `team-assistant`. Riêng `BOOTSTRAP.md` hướng dẫn agent tự tìm timezone từ ngữ cảnh/công cụ sẵn có, hỏi người dùng xác nhận trước khi lưu; không yêu cầu CLI Clisbot. Workspace mới có `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, `LOOP.md`, `MEMORY.md`, `README.md`, `SOUL.md`, `TOOLS.md`, `USER.md`. Provider Claude có thêm symlink `CLAUDE.md → AGENTS.md`; Gemini có `GEMINI.md → AGENTS.md`. Template hướng dẫn bot xóa `BOOTSTRAP.md` sau lần trò chuyện đầu; chạy lại onboarding không tạo lại file đã xóa này. Mặc định chỉ tạo file thiếu và giữ nguyên file đã có, kể cả template cũ. Muốn thay các file hiện có, dùng `--overwrite-template` để sao lưu trước khi thay. Các cuộc trò chuyện tạo/resume session riêng trong workspace, không dùng chung tất cả vào agent ban đầu.
 
 ## Chạy lại, kiểm tra, dừng
 
