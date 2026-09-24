@@ -45,6 +45,7 @@ class ScriptedSession implements AgentSession {
   /** Background work the provider can see, such as a shell left running after a turn. */
   backgroundWork = false;
   heldClose: Promise<void> | null = null;
+  closeStarted = false;
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
   private turns = 0;
 
@@ -54,7 +55,7 @@ class ScriptedSession implements AgentSession {
 
   async startTurn(prompt: unknown): Promise<{ turnId: string }> {
     this.prompts.push(String(prompt));
-    const turnId = `turn-${++this.turns}`;
+    const turnId = `${this.id}-turn-${++this.turns}`;
     setTimeout(() => {
       this.push({ type: "turn_started", provider: this.provider, turnId });
       this.push({
@@ -100,6 +101,7 @@ class ScriptedSession implements AgentSession {
     return !this.backgroundWork;
   }
   async close(): Promise<void> {
+    this.closeStarted = true;
     await this.heldClose;
     this.closed = true;
   }
@@ -389,7 +391,7 @@ describe("idle session release", () => {
       releaseClose = resolve;
     });
     fixture.clock.advance(IDLE_MS);
-    await vi.waitFor(() => expect(fixture.manager.getAgent(created.id)).toBeNull());
+    await vi.waitFor(() => expect(original.closeStarted).toBe(true));
 
     const sending = sendPrompt(fixture, created.id, "during close");
     releaseClose();

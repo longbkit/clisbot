@@ -9,13 +9,19 @@ import {
 /** Metadata is a snapshot, not the current viewer, socket owner, or authorization. */
 export function copySessionAuthorship(source: SessionAuthorship): SessionAuthorship {
   return {
-    authorshipStatus: source.authorshipStatus,
-    createdBy: source.createdBy,
-    lastMessageBy: source.lastMessageBy,
-    lastInteractionBy: source.lastInteractionBy,
-    lastInteractionAt: source.lastInteractionAt,
-    participantActors: source.participantActors,
-    channels: source.channels,
+    ...(source.authorshipStatus !== undefined ? { authorshipStatus: source.authorshipStatus } : {}),
+    ...(source.createdBy !== undefined ? { createdBy: source.createdBy } : {}),
+    ...(source.lastMessageBy !== undefined ? { lastMessageBy: source.lastMessageBy } : {}),
+    ...(source.lastInteractionBy !== undefined
+      ? { lastInteractionBy: source.lastInteractionBy }
+      : {}),
+    ...(source.lastInteractionAt !== undefined
+      ? { lastInteractionAt: source.lastInteractionAt }
+      : {}),
+    ...(source.participantActors !== undefined
+      ? { participantActors: source.participantActors }
+      : {}),
+    ...(source.channels !== undefined ? { channels: source.channels } : {}),
   };
 }
 

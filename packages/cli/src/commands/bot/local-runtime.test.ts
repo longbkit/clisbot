@@ -41,17 +41,19 @@ it("rejects managed TCP onboarding before connection while preserving policy and
     daemon: { listen: "127.0.0.1:6767", managedAccess: { mode: "external" } },
   });
   await writeFile(configPath, config);
-  expect(() => assertLocalOnboardingAccess(directory, {})).toThrow("select an empty --home");
-  expect(() =>
+  await expect(assertLocalOnboardingAccess(directory, {})).rejects.toThrow(
+    "select an empty --home",
+  );
+  await expect(
     assertLocalOnboardingAccess(directory, { PASEO_LISTEN: "unix:///tmp/recovery.sock" }),
-  ).not.toThrow();
-  expect(() => assertLocalOnboardingAccess(directory, {})).toThrow("Hub-managed access");
+  ).resolves.toBeUndefined();
+  await expect(assertLocalOnboardingAccess(directory, {})).rejects.toThrow("Hub-managed access");
   expect(await readFile(configPath, "utf8")).toBe(config);
 });
 
 it("allows fresh standalone onboarding without a managed ticket", async () => {
   const directory = await createHome();
-  expect(() => assertLocalOnboardingAccess(directory, {})).not.toThrow();
+  await expect(assertLocalOnboardingAccess(directory, {})).resolves.toBeUndefined();
 });
 
 async function listen(instanceId = "other-home") {
@@ -90,9 +92,15 @@ it("does not treat a live supervisor without a listener as a ready daemon", asyn
   const directory = await createHome();
   await writeFile(
     path.join(directory, "paseo.pid"),
-    JSON.stringify({ pid: process.pid, listen: null }),
+    JSON.stringify({
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+      hostname: os.hostname(),
+      uid: process.getuid?.() ?? 0,
+      listen: null,
+    }),
   );
-  expect(() => recordedDaemonHost(directory)).toThrow("no ready listener");
+  await expect(recordedDaemonHost(directory)).rejects.toThrow("no ready listener");
 });
 
 it("closes a connection to another daemon before any onboarding mutation", async () => {

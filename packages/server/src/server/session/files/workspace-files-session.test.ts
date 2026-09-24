@@ -1,3 +1,4 @@
+import { SessionDelivery } from "../owned-subscriptions/index.js";
 import {
   existsSync,
   mkdtempSync,
@@ -566,14 +567,22 @@ describe("WorkspaceFilesSession", () => {
   test("round-trips an upload through transfer frames", async () => {
     const { subsystem, emitted, paseoHome } = makeSubsystem();
 
-    subsystem.handleFileUploadRequest({
+    const source = {};
+    const ownership = new SessionDelivery((_source, message) => {
+      emitted.push(message);
+    });
+    ownership.attach(source, true);
+    const request = {
       type: "file.upload.request",
       fileName: "notes.txt",
       mimeType: "text/plain",
       size: 11,
       modifiedAt: "2026-05-02T00:00:00.000Z",
       requestId: "req-upload",
-    });
+    } as const;
+    await ownership.request(source, request, async () =>
+      subsystem.handleFileUploadRequest(request, ownership),
+    );
     await subsystem.handleFileTransferFrame(
       uploadFrame({
         opcode: FileTransferOpcode.FileBegin,
@@ -586,6 +595,7 @@ describe("WorkspaceFilesSession", () => {
           fileName: "notes.txt",
         },
       }),
+      source,
     );
     await subsystem.handleFileTransferFrame(
       uploadFrame({
@@ -593,12 +603,14 @@ describe("WorkspaceFilesSession", () => {
         requestId: "req-upload",
         payload: new TextEncoder().encode("hello world"),
       }),
+      source,
     );
     await subsystem.handleFileTransferFrame(
       uploadFrame({
         opcode: FileTransferOpcode.FileEnd,
         requestId: "req-upload",
       }),
+      source,
     );
 
     const message = emitted.find((entry) => entry.type === "file.upload.response");
@@ -612,8 +624,10 @@ describe("WorkspaceFilesSession", () => {
     expect(makeSubsystem().subsystem.ownsUploadedFileAttachments([message.payload.file])).toBe(
       false,
     );
-    expect(readFileSync(join(paseoHome, "uploads", "upload_req-upload", "notes.txt"), "utf8")).toBe(
-      "hello world",
-    );
+    const file = message.payload.file;
+    if (!file) throw new Error("Expected uploaded file");
+    expect(file.path.startsWith(join(paseoHome, "uploads"))).toBe(true);
+    expect(readFileSync(file.path, "utf8")).toBe("hello world");
+    await ownership.close();
   });
 });

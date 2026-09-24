@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, it } from "vitest";
 import { replaceDaemonProjects } from "../access/daemon-projects.js";
+import { RESOURCE_ACCESS_LEVELS } from "../access/contract.js";
 import { replaceDaemonConnectionOffer } from "../daemons/registration.js";
 import { AccessStore } from "../access/store.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -1504,6 +1505,7 @@ it("stores provider credentials in the Connection owner and never returns them",
   assert.deepEqual(await ownerEffectiveAccess.json(), {
     owner: true,
     grants: [],
+    accessLevels: RESOURCE_ACCESS_LEVELS,
   });
   const challengeResponse = await memberApi.handle(
     request("/channel-identities/challenges", "POST", {

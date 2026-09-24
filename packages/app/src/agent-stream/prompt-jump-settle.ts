@@ -5,7 +5,7 @@ interface PromptJumpScrollMetrics {
 }
 
 export interface PromptJumpSettleViewport {
-  findTargetTop(itemId: string): number | null;
+  findTargetTop(messageId: string): number | null;
   getContainerTop(): number;
   getScrollMetrics(): PromptJumpScrollMetrics;
   setScrollTop(scrollTop: number): void;
@@ -13,7 +13,7 @@ export interface PromptJumpSettleViewport {
 }
 
 export interface PromptJumpSettleController {
-  start(itemId: string, topInset?: number): void;
+  start(messageId: string, topInset?: number): void;
   cancel(): void;
   isActive(): boolean;
 }
@@ -36,7 +36,7 @@ export function createPromptJumpSettleController(input: {
   requestFrame: (callback: () => void) => number;
   cancelFrame: (frameId: number) => void;
 }): PromptJumpSettleController {
-  let activeItemId: string | null = null;
+  let activeMessageId: string | null = null;
   let activeTopInset = PROMPT_JUMP_TOP_INSET_PX;
   let frameId: number | null = null;
   let sampledFrames = 0;
@@ -46,7 +46,7 @@ export function createPromptJumpSettleController(input: {
   function finish(): void {
     if (frameId !== null) input.cancelFrame(frameId);
     unsubscribeFromUserIntent?.();
-    activeItemId = null;
+    activeMessageId = null;
     frameId = null;
     sampledFrames = 0;
     stableFrames = 0;
@@ -59,11 +59,11 @@ export function createPromptJumpSettleController(input: {
 
   function tick(): void {
     frameId = null;
-    const itemId = activeItemId;
-    if (itemId === null) return;
+    const messageId = activeMessageId;
+    if (messageId === null) return;
 
     sampledFrames += 1;
-    const targetTop = input.viewport.findTargetTop(itemId);
+    const targetTop = input.viewport.findTargetTop(messageId);
     if (targetTop !== null) {
       const delta = distanceFromLandingPosition(
         targetTop,
@@ -81,7 +81,7 @@ export function createPromptJumpSettleController(input: {
         const before = input.viewport.getScrollMetrics();
         input.viewport.setScrollTop(before.scrollTop + delta);
         const after = input.viewport.getScrollMetrics();
-        const adjustedTargetTop = input.viewport.findTargetTop(itemId);
+        const adjustedTargetTop = input.viewport.findTargetTop(messageId);
         let remainingDelta = 0;
         if (adjustedTargetTop !== null) {
           remainingDelta = distanceFromLandingPosition(
@@ -107,16 +107,16 @@ export function createPromptJumpSettleController(input: {
   }
 
   return {
-    start(itemId, topInset = PROMPT_JUMP_TOP_INSET_PX) {
+    start(messageId, topInset = PROMPT_JUMP_TOP_INSET_PX) {
       finish();
       activeTopInset = topInset;
-      activeItemId = itemId;
+      activeMessageId = messageId;
       unsubscribeFromUserIntent = input.viewport.subscribeToUserIntent(finish);
       scheduleNextFrame();
     },
     cancel: finish,
     isActive() {
-      return activeItemId !== null;
+      return activeMessageId !== null;
     },
   };
 }

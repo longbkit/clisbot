@@ -2,7 +2,7 @@ import { appendFile, mkdir, rm, writeFile, open } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createDurableDirectory, writeDurableJson } from "../agent/session-storage/durable-file.js";
 import { registerSessionUpload } from "./session-files.js";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 
 import { FileTransferOpcode, type FileTransferFrame } from "@getpaseo/protocol/binary-frames/index";
 import { getErrorMessage } from "@getpaseo/protocol/error-utils";
@@ -20,7 +20,9 @@ interface FileUploadStoreOptions {
 interface PendingUpload {
   requestId: string;
   id: string;
-  attempt: number;
+  source: object;
+  completed: boolean;
+  finished(response: FileUploadResponse | null): void;
   fileName: string;
   mimeType: string;
   size: number;
@@ -34,6 +36,7 @@ interface PendingUpload {
   sessionDirectory?: string;
   durable: boolean;
   queuedFrames: number;
+  cleanup?: Promise<void>;
 }
 
 let globalQueuedUploadBytes = 0;
@@ -47,7 +50,8 @@ export class FileUploadStore {
 
   private readonly paseoHome: string;
   private readonly staleUploadTimeoutMs: number;
-  private readonly pending = new Map<string, PendingUpload>();
+  private readonly defaultSource = {};
+  private readonly pending = new Map<object, Map<string, PendingUpload>>();
   private readonly completed = new Map<string, UploadedFileAttachment>();
 
   constructor(private readonly options: FileUploadStoreOptions) {
@@ -56,31 +60,33 @@ export class FileUploadStore {
       options.staleUploadTimeoutMs ?? FileUploadStore.defaultStaleUploadTimeoutMs;
   }
 
-  beginUpload(request: FileUploadRequest): void {
-    if (this.pending.size >= MAX_PENDING_UPLOADS || this.completed.size >= MAX_COMPLETED_UPLOADS)
+  beginUpload(
+    request: FileUploadRequest,
+    source: object = this.defaultSource,
+    finished: (response: FileUploadResponse | null) => void = () => {},
+  ): () => Promise<void> {
+    const count = [...this.pending.values()].reduce((total, uploads) => total + uploads.size, 0);
+    if (count >= MAX_PENDING_UPLOADS || this.completed.size >= MAX_COMPLETED_UPLOADS)
       throw new Error("Upload storage overloaded: too many unfinished drafts");
-    const existingUpload = this.pending.get(request.requestId);
-    if (existingUpload) {
-      this.clearPendingUpload(existingUpload);
-      void existingUpload.queue.then(() => this.removeUploadDirectory(existingUpload));
-    }
-
+    const existingUpload = this.pending.get(source)?.get(request.requestId);
+    if (existingUpload) void this.cancel(existingUpload).catch(() => {});
     const fileName = sanitizeFileName(request.fileName);
-    const attempt = existingUpload ? existingUpload.attempt + 1 : 1;
     const durable = this.options.sessionStorageEnabled?.() === true;
-    const id = durable ? `upload_${randomUUID()}` : buildUploadId(request.requestId, attempt);
+    const id = `upload_${randomUUID()}`;
     const uploadDir = join(this.paseoHome, "uploads", id);
     const upload: PendingUpload = {
       requestId: request.requestId,
       id,
-      attempt,
+      source,
+      completed: false,
+      finished,
       fileName,
       mimeType: request.mimeType,
       size: request.size,
       path: join(uploadDir, fileName),
       receivedBytes: 0,
       started: false,
-      staleTimeout: this.createStaleUploadTimeout(request.requestId),
+      staleTimeout: this.createStaleUploadTimeout(source, request.requestId),
       queue: Promise.resolve(),
       durable,
       queuedFrames: 0,
@@ -88,14 +94,19 @@ export class FileUploadStore {
         ? { destination: this.options.resolveAgentDirectory(request.agentId) }
         : {}),
     };
-    // The binary stream may immediately follow this request. Reserve synchronously; resolve access
-    // and the destination inside the queued FileBegin before touching the filesystem.
+    // Reserve synchronously; the binary stream may immediately follow this request.
     upload.destination?.catch(() => undefined);
-    this.pending.set(request.requestId, upload);
+    const uploads = this.pending.get(source) ?? new Map<string, PendingUpload>();
+    uploads.set(request.requestId, upload);
+    this.pending.set(source, uploads);
+    return () => this.cancel(upload);
   }
 
-  async receiveFrame(frame: FileTransferFrame): Promise<FileUploadResponse | null> {
-    const upload = this.pending.get(frame.requestId);
+  async receiveFrame(
+    frame: FileTransferFrame,
+    source: object = this.defaultSource,
+  ): Promise<FileUploadResponse | null> {
+    const upload = this.pending.get(source)?.get(frame.requestId);
     if (!upload) {
       return null;
     }
@@ -107,13 +118,12 @@ export class FileUploadStore {
       globalQueuedUploadFrames >= 512 ||
       upload.queuedFrames >= 64
     ) {
-      this.clearPendingUpload(upload);
-      await upload.queue;
-      await this.removeUploadDirectory(upload);
-      return buildUploadResponse(
+      const response = buildUploadResponse(
         upload,
         "Upload storage overloaded: pending frame/byte limit exceeded",
       );
+      await this.cancel(upload, response);
+      return response;
     }
     globalQueuedUploadBytes += bytes;
     globalQueuedUploadFrames += 1;
@@ -125,6 +135,16 @@ export class FileUploadStore {
         globalQueuedUploadFrames -= 1;
         upload.queuedFrames -= 1;
       });
+    void operation.then(
+      (response) => {
+        if (response) upload.finished(response);
+        return undefined;
+      },
+      () => {
+        upload.finished(null);
+        return undefined;
+      },
+    );
     upload.queue = operation.then(
       () => undefined,
       () => undefined,
@@ -154,7 +174,8 @@ export class FileUploadStore {
   }
 
   async dispose(): Promise<void> {
-    const pending = [...this.pending.values()];
+    const pending: PendingUpload[] = [];
+    for (const uploads of this.pending.values()) pending.push(...uploads.values());
     for (const upload of pending) this.clearPendingUpload(upload);
     await Promise.all(
       pending.map(async (upload) => {
@@ -169,7 +190,7 @@ export class FileUploadStore {
     upload: PendingUpload,
     frame: FileTransferFrame,
   ): Promise<FileUploadResponse | null> {
-    if (this.pending.get(upload.requestId) !== upload) {
+    if (this.pending.get(upload.source)?.get(upload.requestId) !== upload) {
       return null;
     }
 
@@ -204,7 +225,7 @@ export class FileUploadStore {
           await this.removeUploadDirectory(upload);
         },
       );
-      if (this.pending.get(upload.requestId) !== upload) {
+      if (this.pending.get(upload.source)?.get(upload.requestId) !== upload) {
         upload.unregister();
         upload.unregister = undefined;
         throw new Error("Upload was canceled before writing began");
@@ -257,15 +278,20 @@ export class FileUploadStore {
         mimeType: upload.mimeType,
       });
     }
+    upload.completed = true;
     this.clearPendingUpload(upload);
     const response = buildUploadResponse(upload, null);
     if (response.payload.file) this.completed.set(upload.id, response.payload.file);
     return response;
   }
 
-  private createStaleUploadTimeout(requestId: string): ReturnType<typeof setTimeout> {
+  private createStaleUploadTimeout(
+    source: object,
+    requestId: string,
+  ): ReturnType<typeof setTimeout> {
     const timeout = setTimeout(() => {
-      this.expireStaleUpload(requestId);
+      const upload = this.pending.get(source)?.get(requestId);
+      if (upload) void this.cancel(upload).catch(() => {});
     }, this.staleUploadTimeoutMs);
     timeout.unref?.();
     return timeout;
@@ -273,34 +299,28 @@ export class FileUploadStore {
 
   private refreshStaleUploadTimeout(upload: PendingUpload): void {
     clearTimeout(upload.staleTimeout);
-    upload.staleTimeout = this.createStaleUploadTimeout(upload.requestId);
+    upload.staleTimeout = this.createStaleUploadTimeout(upload.source, upload.requestId);
   }
 
-  private expireStaleUpload(requestId: string): void {
-    const upload = this.pending.get(requestId);
-    if (!upload) {
-      return;
-    }
+  private cancel(upload: PendingUpload, response: FileUploadResponse | null = null): Promise<void> {
+    if (upload.cleanup) return upload.cleanup;
     this.clearPendingUpload(upload);
-    const cleanup = upload.queue.then(
-      () => this.removeUploadDirectory(upload),
-      () => this.removeUploadDirectory(upload),
-    );
-    upload.queue = cleanup.then(
-      () => undefined,
-      () => undefined,
-    );
+    upload.cleanup = upload.queue.then(async () => {
+      if (!upload.completed) await this.removeUploadDirectory(upload);
+      return undefined;
+    });
+    upload.finished(response);
+    return upload.cleanup;
   }
 
   private clearPendingUpload(upload: PendingUpload): void {
     clearTimeout(upload.staleTimeout);
     const unregister = upload.unregister;
     upload.unregister = undefined;
-    // Keep deletion ownership until frames already admitted to this transfer have drained.
     if (unregister) void upload.queue.then(unregister, unregister);
-    if (this.pending.get(upload.requestId) === upload) {
-      this.pending.delete(upload.requestId);
-    }
+    const uploads = this.pending.get(upload.source);
+    if (uploads?.get(upload.requestId) === upload) uploads.delete(upload.requestId);
+    if (uploads?.size === 0) this.pending.delete(upload.source);
   }
 
   private async removeFailedUpload(upload: PendingUpload): Promise<void> {
@@ -309,10 +329,7 @@ export class FileUploadStore {
   }
 
   private async removeUploadDirectory(upload: PendingUpload): Promise<void> {
-    await rm(dirname(upload.path), {
-      recursive: true,
-      force: true,
-    }).catch(() => undefined);
+    await rm(dirname(upload.path), { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
@@ -336,18 +353,26 @@ function buildUploadResponse(upload: PendingUpload, error: string | null): FileU
   };
 }
 
-function sanitizeUploadId(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
-}
+// Most file systems cap a single file name at 255 bytes.
+const MAX_FILE_NAME_BYTES = 255;
 
-function buildUploadId(requestId: string, attempt: number): string {
-  const baseId = `upload_${sanitizeUploadId(requestId)}`;
-  return attempt === 1 ? baseId : `${baseId}_${attempt}`;
-}
-
+// Keeps the client's file name, replacing only what cannot appear in a single
+// file name on Linux, macOS, or Windows.
 function sanitizeFileName(value: string): string {
   const name = basename(value)
-    .replace(/[^a-zA-Z0-9._ -]/g, "_")
+    .replace(/[\p{Cc}\\/:*?"<>|]/gu, "_")
     .trim();
-  return name.length > 0 && name !== "." && name !== ".." ? name : "upload";
+  return fitFileNameLength(name.length > 0 && name !== "." && name !== ".." ? name : "upload");
+}
+
+function fitFileNameLength(name: string): string {
+  if (Buffer.byteLength(name) <= MAX_FILE_NAME_BYTES) return name;
+  const extension = extname(name);
+  const keptExtension = Buffer.byteLength(extension) < MAX_FILE_NAME_BYTES ? extension : "";
+  let stem = "";
+  for (const char of name.slice(0, name.length - keptExtension.length)) {
+    if (Buffer.byteLength(stem + char + keptExtension) > MAX_FILE_NAME_BYTES) break;
+    stem += char;
+  }
+  return stem + keptExtension;
 }

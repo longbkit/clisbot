@@ -1,6 +1,6 @@
+import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import { Command } from "commander";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { connectToDaemon, getDaemonHost, resolveAgentId } from "../../utils/client.js";
+import { connectToDaemon, resolveAgentId } from "../../utils/client.js";
 import type {
   CommandOptions,
   SingleResult,
@@ -44,8 +44,6 @@ export async function runArchiveCommand(
   options: AgentArchiveOptions,
   _command: Command,
 ): Promise<AgentArchiveCommandResult> {
-  const host = getDaemonHost({ host: options.host });
-
   // Validate arguments
   if (!agentIdArg || agentIdArg.trim().length === 0) {
     const error: CommandError = {
@@ -56,22 +54,13 @@ export async function runArchiveCommand(
     throw error;
   }
 
-  let client: DaemonClient;
-  try {
-    client = await connectToDaemon({ host: options.host });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const error: CommandError = {
-      code: "DAEMON_NOT_RUNNING",
-      message: `Cannot connect to daemon at ${host}: ${message}`,
-      details: "Start the daemon with: paseo daemon start",
-    };
-    throw error;
-  }
+  const client = await connectToDaemon({ target: options.daemonTarget });
 
   try {
     const agentsPayload = await client.fetchAgents({ filter: { includeArchived: true } });
-    const agents = agentsPayload.entries.map((entry) => entry.agent);
+    const agents = agentsPayload.entries.map(
+      (entry: { agent: AgentSnapshotPayload }) => entry.agent,
+    );
     const agentId = resolveAgentId(agentIdArg, agents);
     if (!agentId) {
       const error: CommandError = {

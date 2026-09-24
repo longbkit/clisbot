@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   AgentTimelineFetchOptions,
   AgentTimelineFetchResult,
+  AgentTimelineRow,
   TimelineDocumentReadOptions,
 } from "../agent-timeline-store-types.js";
 import { FileAgentTimelineStore } from "../session-storage/file-agent-timeline-store.js";
@@ -149,7 +150,7 @@ export class ProviderSubagentPersistence {
     parentAgentId: string,
     subagentId: string,
     options?: AgentTimelineFetchOptions,
-  ): Promise<AgentTimelineFetchResult> {
+  ): Promise<AgentTimelineFetchResult<AgentTimelineRow>> {
     return this.withParentLease(parentAgentId, () =>
       this.timelines.fetchCommitted(this.key(parentAgentId, subagentId), options),
     );

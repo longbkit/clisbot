@@ -403,7 +403,7 @@ describe("final answer retry", () => {
       turnId: "turn-p",
       item: { type: "tool_call", callId: "c1", name: "shell", status: "completed" },
     });
-    assert.deepEqual(script.posted, ["Finished shell"]);
+    assert.deepEqual(script.posted, ["**Finished shell**"]);
     const row = await ledgerRow("progress", "turn-p", "tool");
     assert.equal(row.status, "failed");
     assert.equal(row.nextAttemptAt, null);

@@ -29,7 +29,7 @@ A pairing invitation is neither. It is an expiring, single-use exchange that cre
 | `workspace.write`   | Prompts, agent control, files, terminals, git operations, and scripts      |
 | `workspace.manage`  | Create, rename, archive, and remove projects and workspaces                |
 | `automation.manage` | Schedules, heartbeats, and loops                                           |
-| `hub.execute`       | Agent lifecycle, agent/workspace observation, and workspace recovery       |
+| `hub.execute`       | Agent lifecycle, workspace titling, observation, and recovery              |
 
 Connecting a daemon to a Hub asks for `hub.execute`, `daemon.read`, `workspace.read`,
 `workspace.write` and `workspace.manage` (`DEFAULT_HUB_CONNECTION_PERMISSIONS`, `packages/cli/src/commands/hub/permissions.ts`).

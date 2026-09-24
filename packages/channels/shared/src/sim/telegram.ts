@@ -101,6 +101,36 @@ function telegramFaultResponse(fault: SimResponseFault): { status: number; body:
   return { status, body: { ok: false, error_code: status, description: "Internal Server Error" } };
 }
 
+function richText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(richText).join("");
+  if (typeof value !== "object" || value === null) return "";
+  const entry = value as Record<string, unknown>;
+  if (entry["type"] === "custom_emoji") return String(entry["alternative_text"] ?? "");
+  if (entry["type"] === "mathematical_expression") return String(entry["expression"] ?? "");
+  return richText(entry["text"]);
+}
+
+function outboundText(args: Record<string, unknown>): string {
+  if (args["rich_message"] && typeof args["rich_message"] === "object") {
+    const blocks = (args["rich_message"] as Record<string, unknown>)["blocks"];
+    if (Array.isArray(blocks)) {
+      return blocks
+        .map((block: unknown) => {
+          if (typeof block !== "object" || block === null) return "";
+          const entry = block as Record<string, unknown>;
+          if (Array.isArray(entry["blocks"])) {
+            return outboundText({ rich_message: { blocks: entry["blocks"] } });
+          }
+          return richText(entry["text"] ?? entry["expression"] ?? entry["caption"]);
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+  }
+  return String(args["text"] ?? args["caption"] ?? args["question"] ?? "");
+}
+
 export async function startTelegramSim(options: SimTelegramOptions = {}): Promise<SimTelegram> {
   const token = options.token ?? "1111111:SIM-TOKEN";
   const botId = options.botId ?? Number(token.split(":")[0] ?? 1_111_111);
@@ -130,7 +160,7 @@ export async function startTelegramSim(options: SimTelegramOptions = {}): Promis
     const message: SimTelegramMessage = {
       message_id: messageCounter,
       chat_id: (args["chat_id"] as number | string | undefined) ?? 0,
-      text: String(args["text"] ?? args["caption"] ?? args["question"] ?? ""),
+      text: outboundText(args),
       ...(threadId === undefined ? {} : { message_thread_id: Number(threadId) }),
       edits: [],
       method,
@@ -208,6 +238,7 @@ export async function startTelegramSim(options: SimTelegramOptions = {}): Promis
       case "getWebhookInfo":
         return { ok: true, result: { url: "", pending_update_count: 0 } };
       case "sendMessage":
+      case "sendRichMessage":
       case "sendDocument":
       case "sendPhoto":
       case "sendVideo":
@@ -226,7 +257,7 @@ export async function startTelegramSim(options: SimTelegramOptions = {}): Promis
             description: "Bad Request: message to edit not found",
           };
         }
-        const next = String(args["text"] ?? "");
+        const next = outboundText(args);
         if (next === target.text) {
           return {
             ok: false,

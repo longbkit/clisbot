@@ -43,11 +43,8 @@ import {
   resolveLocalHubState,
   startLocalHubDetached,
 } from "../hub/local-hub.js";
-import {
-  resolveLocalDaemonState,
-  resolveTcpHostFromListen,
-  startLocalDaemonDetached,
-} from "../daemon/local-daemon.js";
+import { resolveTcpHostFromListen, startLocalDaemonDetached } from "../daemon/local-daemon.js";
+import { readDaemonInstance, daemonLogPath } from "@getpaseo/server/daemon-control";
 import { assertBotName, readBotManifest, writeBotManifest, type BotManifest } from "./manifest.js";
 import {
   buildBotManifest,
@@ -112,7 +109,10 @@ export interface BotStartDeps {
   /** Wait until the daemon has recorded its pid file + listen (a just-spawned
    * daemon writes them shortly after boot). */
   waitDaemonUp(home: string): Promise<void>;
-  daemonHost(home: string, env: NodeJS.ProcessEnv): string | undefined;
+  daemonHost(
+    home: string,
+    env: NodeJS.ProcessEnv,
+  ): Promise<string | undefined> | string | undefined;
   /** The daemon's WS-auth password from `<home>/.daemon-password` (a
    * password-protected local daemon otherwise rejects the CLI at the WS upgrade). */
   daemonPassword(home: string): string | undefined;
@@ -179,7 +179,7 @@ export async function runBotStart(
   input = { ...input, env: ownerBootstrapEnvironment(options, input.env) };
   const infrastructure = await ensureInfrastructure(input, deps);
   const client = await deps.openDaemon(
-    deps.daemonHost(input.home, input.env),
+    await deps.daemonHost(input.home, input.env),
     deps.daemonPassword(input.home),
   );
   try {
@@ -394,7 +394,7 @@ async function ensureInfrastructure(
     hubPid,
     daemon: daemon.daemon,
     url: hub.url,
-    daemonHost: deps.daemonHost(input.home, input.env) ?? "unknown",
+    daemonHost: (await deps.daemonHost(input.home, input.env)) ?? "unknown",
   };
 }
 
@@ -528,9 +528,9 @@ export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotSta
     },
     waitHubReady: (url) => waitForOnboardingHub(url, home),
     ensureDaemonUp: async () => {
-      if (isOnboardingEnabled(env)) assertLocalOnboardingAccess(home, env);
-      const state = resolveLocalDaemonState({ home });
-      if (state.running) return { daemon: "already-running" };
+      if (isOnboardingEnabled(env)) await assertLocalOnboardingAccess(home, env);
+      const state = await readDaemonInstance(home);
+      if (state) return { daemon: "already-running" };
       const listen = isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined;
       await startLocalDaemonDetached({ home, ...(listen ? { listen } : {}) });
       return { daemon: "started" };
@@ -574,8 +574,8 @@ function resolveHubPid(home: string): number | null {
   return readHubStateFile(home)?.pid ?? null;
 }
 
-function daemonHostFor(home: string): string | undefined {
-  const listen = recordedDaemonHost(home);
+async function daemonHostFor(home: string): Promise<string | undefined> {
+  const listen = await recordedDaemonHost(home);
   const tcp = resolveTcpHostFromListen(listen);
   if (tcp !== null) return tcp;
   if (listen.startsWith("/") || listen.startsWith("unix://")) return listen;
@@ -594,12 +594,12 @@ const DAEMON_READY_POLL_MS = 250;
 async function waitDaemonUp(home: string): Promise<void> {
   const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
   while (true) {
-    const state = resolveLocalDaemonState({ home });
-    if (state.running && state.pidInfo?.listen) return;
+    const state = await readDaemonInstance(home);
+    if (state?.listen) return;
     if (Date.now() >= deadline) {
       throw {
         code: "DAEMON_NOT_READY",
-        message: `The daemon did not record a ready listener. Check ${home}/daemon.log for startup or port conflicts.`,
+        message: `The daemon did not record a ready listener. Check ${daemonLogPath(home)} for startup or port conflicts.`,
       } satisfies CommandError;
     }
     await sleep(DAEMON_READY_POLL_MS);
@@ -614,12 +614,13 @@ async function waitDaemonUp(home: string): Promise<void> {
  * a password-protected local daemon at the WS upgrade.
  */
 async function openVerifiedDaemon(home: string, host: string | undefined, password?: string) {
-  const client = await openDaemonWithRetry(host, password);
+  const client = await openDaemonWithRetry(home, host, password);
   await verifyOnboardingDaemon(client, home);
   return client;
 }
 
 async function openDaemonWithRetry(
+  home: string,
   host: string | undefined,
   password?: string,
 ): Promise<DaemonClient> {
@@ -628,7 +629,10 @@ async function openDaemonWithRetry(
   const target = daemonHostWithPassword(host, password);
   for (;;) {
     try {
-      return await connectToDaemon(target === undefined ? undefined : { host: target });
+      return await connectToDaemon({
+        target:
+          target === undefined ? { kind: "instance", home } : { kind: "endpoint", host: target },
+      });
     } catch (error) {
       lastError = error;
       if (Date.now() >= deadline) break;

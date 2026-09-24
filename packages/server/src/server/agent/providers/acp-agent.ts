@@ -149,6 +149,10 @@ function isACPError(value: unknown): value is ACPError {
   return isRecord(value) && typeof value.message === "string" && typeof value.code === "number";
 }
 
+function isACPInvalidParams(error: unknown): boolean {
+  return isACPError(error) && error.code === -32602;
+}
+
 function extractACPErrorDataMessage(data: unknown): string | null {
   if (!isRecord(data)) {
     return null;
@@ -414,7 +418,7 @@ export type ACPExtensionCommandsParser = (
  * the catalog plumbing.
  */
 export interface ACPCatalogModelResolverContext {
-  connection: ClientSideConnection;
+  connection: Pick<ClientSideConnection, "setSessionConfigOption" | "extMethod">;
   sessionId: string;
   models: AgentModelDefinition[];
   configOptions: SessionConfigOption[] | null | undefined;
@@ -425,10 +429,9 @@ export interface ACPCatalogModelResolverContext {
 }
 
 /**
- * Optional hook that refines the catalog's model list using the live probe session.
- * The base client ships no resolver — catalog discovery derives models from the initial
- * session response and never mutates the probe. Providers that need per-model data (Kimi)
- * inject a resolver so the extra round trips stay off every other ACP.
+ * Providers own model discovery through this hook, including extension RPCs. Without a
+ * resolver, the base client derives models from the initial session response. The client
+ * owns the probe lifetime and refresh deadline; resolvers return the complete model list.
  */
 export type ACPCatalogModelResolver = (
   context: ACPCatalogModelResolverContext,
@@ -2373,7 +2376,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
 
     const option = findSelectConfigFeatureOption(this.configOptions, featureOption);
     if (!option) {
-      throw new Error(`${this.provider} does not expose ACP feature '${featureId}'`);
+      throw new Error(this.featureUnavailableMessage(featureId));
     }
 
     const requestedValue = normalizeConfigFeatureValue(value);
@@ -2830,8 +2833,13 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       (params.env ?? []).map((entry: EnvVariable) => [entry.name, entry.value]),
     );
     const terminalCommand = resolveTerminalCommand(params.command, params.args);
+    // The terminal is a sibling of the agent process, not a child, so it inherits
+    // nothing from it. Carry the agent's launch environment the way spawnProcess
+    // does, keeping the requested terminal environment on top.
     const commandEnvOverlays =
-      terminalCommand.shell === false ? [env, createStringCommandShellEnvOverlay()] : [env];
+      terminalCommand.shell === false
+        ? [this.launchEnv, env, createStringCommandShellEnvOverlay()]
+        : [this.launchEnv, env];
     const child = spawnProcess(terminalCommand.command, terminalCommand.args, {
       cwd: params.cwd ?? this.config.cwd,
       ...createProviderEnvSpec({
@@ -3054,6 +3062,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       await this.setModeWithSelection({ modeId: configuredModeId, selection });
     }
     const configuredModelId = this.config.model;
+    let switchedModel = false;
     if (configuredModelId && configuredModelId !== this.currentModel) {
       const selection = resolveACPModelSelection({
         modelId: configuredModelId,
@@ -3062,6 +3071,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       });
       try {
         await this.setModelWithSelection({ modelId: configuredModelId, selection });
+        switchedModel = true;
       } catch (error) {
         if (!this.isModelSelectionUnavailableError(error)) {
           throw error;
@@ -3080,8 +3090,37 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       if (!Object.prototype.hasOwnProperty.call(configuredFeatureValues, featureOption.id)) {
         continue;
       }
-      await this.setFeature(featureOption.id, configuredFeatureValues[featureOption.id]);
+      try {
+        await this.setFeature(featureOption.id, configuredFeatureValues[featureOption.id]);
+      } catch (error) {
+        if (!this.isStaleFeatureValueError(error, featureOption.id, switchedModel)) {
+          throw error;
+        }
+        this.logger.warn(
+          { err: error, featureId: featureOption.id, model: this.currentModel },
+          `${this.provider} cannot apply ACP feature '${featureOption.id}' to the current model; using the provider default`,
+        );
+      }
     }
+  }
+
+  /**
+   * A stored feature value is a preference carried over from whichever model the user
+   * last configured, so the session it lands on may have no such option. Paseo's own
+   * guard says so when the session's options are accurate. A model switch answers with
+   * an empty response, leaving Paseo holding the previous model's options, and then the
+   * provider is the one that rejects the write as invalid params. Outside those two
+   * cases the write failed for a reason the user needs to see.
+   */
+  private isStaleFeatureValueError(
+    error: unknown,
+    featureId: string,
+    switchedModel: boolean,
+  ): boolean {
+    if (this.isFeatureUnavailableError(error, featureId)) {
+      return true;
+    }
+    return switchedModel && isACPInvalidParams(error);
   }
 
   private warnInvalidSelection(value: string, message: string): void {
@@ -3094,6 +3133,14 @@ export class ACPAgentSession implements AgentSession, ACPClient {
 
   private isModelSelectionUnavailableError(error: unknown): boolean {
     return error instanceof Error && error.message === this.modelSelectionUnavailableMessage();
+  }
+
+  private featureUnavailableMessage(featureId: string): string {
+    return `${this.provider} does not expose ACP feature '${featureId}'`;
+  }
+
+  private isFeatureUnavailableError(error: unknown, featureId: string): boolean {
+    return error instanceof Error && error.message === this.featureUnavailableMessage(featureId);
   }
 
   private translateSessionUpdate(update: SessionUpdate): AgentStreamEvent[] {

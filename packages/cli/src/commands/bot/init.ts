@@ -78,7 +78,7 @@ export async function initializeAssistantWorkspace(
   assertBotName(plan.name);
   await deps.ensureDaemonUp(home, env);
   await deps.waitDaemonUp(home);
-  const client = await deps.openDaemon(deps.daemonHost(home, env), deps.daemonPassword(home));
+  const client = await deps.openDaemon(await deps.daemonHost(home, env), deps.daemonPassword(home));
   try {
     const assistant = await provisionAssistant(client, deps, plan, env);
     const hub = await deps.ensureHubUp(home, env);

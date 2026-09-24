@@ -13,9 +13,9 @@ function home(): string {
 }
 
 describe("paseo daemon reset-identity", () => {
-  it("removes the identity files and keeps the rest of the Paseo home", () => {
+  it("removes the identity files and keeps the rest of the Paseo home", async () => {
     const directory = home();
-    const result = resetDaemonIdentity({ home: directory, env: {} });
+    const result = await resetDaemonIdentity({ home: directory, env: {} });
 
     expect(result.removed).toBe("server-id, daemon-keypair.json, hub-relationship.json");
     expect(existsSync(path.join(directory, "server-id"))).toBe(false);
@@ -23,11 +23,11 @@ describe("paseo daemon reset-identity", () => {
     expect(result.nextSteps).toContain("paseo hub login");
   });
 
-  it("refuses while PASEO_SERVER_ID would recreate the same identity", () => {
+  it("refuses while PASEO_SERVER_ID would recreate the same identity", async () => {
     const directory = home();
-    expect(() =>
+    await expect(
       resetDaemonIdentity({ home: directory, env: { PASEO_SERVER_ID: "srv_x" } }),
-    ).toThrow();
+    ).rejects.toThrow();
     expect(existsSync(path.join(directory, "server-id"))).toBe(true);
   });
 });

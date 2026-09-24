@@ -139,8 +139,7 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
     kind: z.literal("assistant_message"),
     messageId: z.string().optional(),
     text: z.string(),
-    blockGroupId: z.string().optional(),
-    blockIndex: z.number().int().nonnegative().optional(),
+    // Reject old caches containing display fragments; refetch the complete source text.
   }),
   z.strictObject({
     ...TimelineItemBaseShape,
@@ -454,8 +453,6 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         kind: item.kind,
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,
-        ...(item.blockGroupId ? { blockGroupId: item.blockGroupId } : {}),
-        ...(item.blockIndex !== undefined ? { blockIndex: item.blockIndex } : {}),
       };
     case "thought":
       return { ...base, kind: item.kind, text: item.text, status: item.status };
@@ -547,8 +544,6 @@ function deserializeBuiltinTimelineItem(
         kind: item.kind,
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,
-        ...(item.blockGroupId ? { blockGroupId: item.blockGroupId } : {}),
-        ...(item.blockIndex !== undefined ? { blockIndex: item.blockIndex } : {}),
       };
     case "thought":
       return { ...base, kind: item.kind, text: item.text, status: item.status };
@@ -1011,7 +1006,11 @@ export class ReplicaCache {
     try {
       await this.prepareStore();
       while (this.activeServerIds.has(serverId)) {
-        await this.flush();
+        // A read may only answer from rows the store already holds, so it waits for this host's
+        // accepted commits to land. A store that rejects them will keep rejecting them: fail closed
+        // rather than re-attempt the write on every pass. A write rejected for another host leaves
+        // this host's stored rows readable.
+        if (!(await this.syncPending()) && this.hasPendingHostChanges(serverId)) return [];
         const revision = this.hostRevisions.get(serverId) ?? 0;
         const rows = await this.rowStore.read(serverId, kinds, ids);
         if (this.canReadHostRevision(serverId, revision)) return rows;
@@ -1201,20 +1200,26 @@ export class ReplicaCache {
   }
 
   async flush(): Promise<void> {
-    await this.persist();
+    await this.syncPending();
+  }
+
+  /** Resolves to whether every pending change reached the store. */
+  private async syncPending(): Promise<boolean> {
+    const persisted = await this.persist();
     await this.writeQueue.catch(() => undefined);
+    return persisted;
   }
 
   private async flushPending(): Promise<void> {
     await this.persist();
   }
 
-  private async persist(): Promise<void> {
+  private async persist(): Promise<boolean> {
     if (this.persistTimer) {
       clearTimeout(this.persistTimer);
       this.persistTimer = null;
     }
-    if (!this.hasPendingChanges()) return;
+    if (!this.hasPendingChanges()) return true;
     const write = this.writeQueue
       .catch(() => undefined)
       .then(async () => {
@@ -1234,11 +1239,16 @@ export class ReplicaCache {
         } catch {
           this.restorePendingChanges(pending);
           if (this.hasPendingChanges()) this.schedulePersist();
+          return false;
         }
-        return undefined;
+        return true;
       });
-    this.writeQueue = write;
-    await write;
+    // The queue only sequences writes; every consumer decides for itself what a failure means.
+    this.writeQueue = write.then(
+      () => undefined,
+      () => undefined,
+    );
+    return write;
   }
 
   private queueEntityDelete(serverId: string, kind: ReplicaRowKind, id: string): void {

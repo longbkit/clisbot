@@ -279,7 +279,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   private async fetchPage(
     timeline: TimelineStream,
     options?: AgentTimelineFetchOptions,
-  ): Promise<AgentTimelineFetchResult> {
+  ): Promise<AgentTimelineFetchResult<AgentTimelineRow>> {
     const state = await timeline.state();
     const direction = options?.direction ?? "tail";
     const staleCursor = options?.cursor !== undefined && options.cursor.epoch !== state.epoch;
@@ -304,6 +304,8 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
       window: { minSeq: state.minSeq, maxSeq: state.maxSeq, nextSeq: state.maxSeq + 1 },
       hasOlder: rows.length > 0 && start > state.minSeq,
       hasNewer: rows.length > 0 && end < state.maxSeq,
+      startSeq: rows[0]?.seq ?? null,
+      endSeq: rows.at(-1)?.seq ?? null,
       rows,
     };
   }
@@ -311,7 +313,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   async fetchCommitted(
     agentId: string,
     options?: AgentTimelineFetchOptions,
-  ): Promise<AgentTimelineFetchResult> {
+  ): Promise<AgentTimelineFetchResult<AgentTimelineRow>> {
     return this.run(
       agentId,
       async () => this.fetchPage(await this.timeline(agentId), options),

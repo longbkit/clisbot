@@ -1,4 +1,5 @@
 import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { ProjectedTimelineRow } from "./timeline-projection.js";
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
 import type { ProjectedTimelinePageSelection } from "./timeline-projection.js";
 import type { TimelinePromptIndex } from "./timeline-prompt-index.js";
@@ -24,7 +25,7 @@ export interface AgentTimelineFetchOptions {
   direction?: AgentTimelineFetchDirection;
   cursor?: AgentTimelineCursor;
   /**
-   * Number of canonical rows to return.
+   * Number of projected items to return.
    * - undefined: store default
    * - 0: all rows in the selected window
    */
@@ -54,7 +55,7 @@ export interface TimelineSourceRangePage {
   totalCount: number;
 }
 
-export interface AgentTimelineFetchResult {
+export interface AgentTimelineFetchResult<Row extends AgentTimelineRow = ProjectedTimelineRow> {
   epoch: string;
   direction: AgentTimelineFetchDirection;
   reset: boolean;
@@ -63,7 +64,9 @@ export interface AgentTimelineFetchResult {
   window: AgentTimelineWindow;
   hasOlder: boolean;
   hasNewer: boolean;
-  rows: AgentTimelineRow[];
+  startSeq: number | null;
+  endSeq: number | null;
+  rows: Row[];
 }
 
 export interface AgentTimelineStore {
@@ -127,7 +130,7 @@ export interface AgentTimelineStore {
   fetchCommitted(
     agentId: string,
     options?: AgentTimelineFetchOptions,
-  ): Promise<AgentTimelineFetchResult>;
+  ): Promise<AgentTimelineFetchResult<AgentTimelineRow>>;
   getLatestCommittedSeq(agentId: string): Promise<number>;
   getCommittedRows(agentId: string): Promise<AgentTimelineRow[]>;
   getLastItem(agentId: string): Promise<AgentTimelineItem | null>;

@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
+import { readDaemonInstance, resolvePaseoHome } from "@getpaseo/server/daemon-control";
 import type { Command } from "commander";
 import type {
   CommandError,
@@ -7,7 +8,6 @@ import type {
   OutputSchema,
   SingleResult,
 } from "../../output/index.js";
-import { resolveLocalDaemonState } from "./local-daemon.js";
 
 /**
  * The files that make a daemon one particular daemon. Copying a Paseo home copies them, so two
@@ -35,12 +35,12 @@ const schema: OutputSchema<ResetIdentityResult> = {
   },
 };
 
-export function resetDaemonIdentity(
+export async function resetDaemonIdentity(
   options: { home?: string; env?: NodeJS.ProcessEnv } = {},
-): ResetIdentityResult {
+): Promise<ResetIdentityResult> {
   const env = options.env ?? process.env;
-  const state = resolveLocalDaemonState({ home: options.home });
-  if (state.running) {
+  const home = resolvePaseoHome({ PASEO_HOME: options.home ?? env.PASEO_HOME });
+  if (await readDaemonInstance(home)) {
     throw commandError(
       "DAEMON_RUNNING",
       "Stop the daemon before resetting its identity.",
@@ -54,11 +54,11 @@ export function resetDaemonIdentity(
       "Remove PASEO_SERVER_ID from the environment, then run this command again.",
     );
   }
-  const removed = IDENTITY_FILES.filter((file) => existsSync(path.join(state.home, file)));
-  for (const file of removed) rmSync(path.join(state.home, file), { force: true });
+  const removed = IDENTITY_FILES.filter((file) => existsSync(path.join(home, file)));
+  for (const file of removed) rmSync(path.join(home, file), { force: true });
   return {
     action: "identity_reset",
-    home: state.home,
+    home,
     removed: removed.join(", ") || "none",
     nextSteps: [
       "Next:",
@@ -73,7 +73,7 @@ export async function runResetIdentityCommand(
   options: CommandOptions,
   _command: Command,
 ): Promise<SingleResult<ResetIdentityResult>> {
-  const data = resetDaemonIdentity({
+  const data = await resetDaemonIdentity({
     home: typeof options.home === "string" ? options.home : undefined,
   });
   return { type: "single", data, schema };

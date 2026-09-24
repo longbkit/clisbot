@@ -737,10 +737,10 @@ describe("progress mode", () => {
     const rendered = calls.filter((call) => call.name === "progressBlocks");
     assert.equal(rendered.length, 1);
     assert.equal(rendered[0]?.args["state"], "working");
-    assert.equal(rendered[0]?.args["title"], "Running bash…");
+    assert.equal(rendered[0]?.args["title"], "**Running bash…**");
     const progressPost = posts.find((post) => post.blocks !== undefined);
     assert.ok(progressPost, "the progress card is posted with native blocks");
-    assert.equal(progressPost?.text, "Running bash…");
+    assert.equal(progressPost?.text, "**Running bash…**");
   });
 
   // The first progress event's POST is on the wire before the message has an

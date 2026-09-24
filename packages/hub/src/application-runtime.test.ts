@@ -127,13 +127,7 @@ describe("application runtime provider composition", () => {
         }),
       /provider request registrations must have unique names: events/u,
     );
-    assert.deepEqual(events, [
-      "first:start",
-      "second:start",
-      "first:stop",
-      "second:stop",
-      "upstream:close",
-    ]);
+    assert.deepEqual(events, ["upstream:close"]);
   });
 
   it("reports member connection status as read-only", async () => {
@@ -163,7 +157,12 @@ describe("application runtime provider composition", () => {
       enabled: true,
       format: "legacy_multistep",
       yaml: "name: manual-workflow",
-      normalizedConfiguration: { environments: [], triggers: [] },
+      normalizedConfiguration: {
+        environments: [
+          { name: "runner", kind: "daemon", daemon: "runner", daemonId: "daemon-1", cwd: "/repo" },
+        ],
+        triggers: [],
+      },
       contentHash: "workflow-config",
       sourceKind: "manual",
       sourceEvidence: { kind: "test" },

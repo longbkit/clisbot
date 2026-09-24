@@ -8,7 +8,6 @@ import type {
   AgentTimelineRow,
   TimelineDocumentReadOptions,
 } from "../agent-timeline-store-types.js";
-import { selectTimelineWindowByProjectedLimit } from "../timeline-projection.js";
 import { pendingSessionEvents } from "../session-storage/pending-event-budget.js";
 import { descriptorBytes, SUBAGENT_METADATA_LIMITS } from "./metadata-limits.js";
 
@@ -221,7 +220,7 @@ export class ProviderSubagentStore {
     parentAgentId: string,
     subagentId: string,
     options?: AgentTimelineFetchOptions,
-  ): Promise<AgentTimelineFetchResult> {
+  ): Promise<AgentTimelineFetchResult<AgentTimelineRow>> {
     await this.operations.get(parentAgentId);
     return this.persistence
       ? this.persistence.fetch(parentAgentId, subagentId, options)
@@ -375,30 +374,7 @@ export class ProviderSubagentStore {
     subagentId: string,
     options?: AgentTimelineFetchOptions,
   ): AgentTimelineFetchResult {
-    const direction = options?.direction ?? "tail";
-    const limit = options?.limit === undefined ? 200 : Math.max(0, Math.floor(options.limit));
-    const timeline = this.timelines.fetch(storeKey(parentAgentId, subagentId), {
-      ...options,
-      limit: 0,
-    });
-    if (limit === 0 || timeline.rows.length === 0) {
-      return timeline;
-    }
-    const selected = selectTimelineWindowByProjectedLimit({
-      rows: timeline.rows,
-      direction: timeline.reset ? "tail" : direction,
-      limit,
-    });
-    const firstRow = selected.selectedRows[0];
-    const lastRow = selected.selectedRows[selected.selectedRows.length - 1];
-    return {
-      ...timeline,
-      rows: selected.selectedRows,
-      hasOlder:
-        timeline.hasOlder || (firstRow !== undefined && firstRow.seq > timeline.window.minSeq),
-      hasNewer:
-        timeline.hasNewer || (lastRow !== undefined && lastRow.seq < timeline.window.maxSeq),
-    };
+    return this.timelines.fetch(storeKey(parentAgentId, subagentId), options);
   }
 
   deleteParent(parentAgentId: string): ProviderSubagentStoreEvent[] {

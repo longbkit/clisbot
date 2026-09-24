@@ -81,6 +81,13 @@ function recentLogs(count = 20): string[] {
     .map((entry) => `${entry.level} ${entry.message} ${JSON.stringify(entry.meta)}`);
 }
 
+function recentTelegramMethods(): string[] {
+  return boot.telegram
+    .requests()
+    .slice(-20)
+    .map((request) => request.path);
+}
+
 /** True once a marker reached the daemon in any turn frame. */
 function daemonSawMarker(marker: string): boolean {
   return daemonPrompts().some((frame) => frame.includes(marker));
@@ -243,21 +250,22 @@ describe.runIf(ENABLED)("channel plane against simulated platforms", () => {
 
   // D-W4-04: `/help` was handled and never delivered. The only assertion that
   // catches that is the platform transcript, not the Hub's `handled: true`.
-  it("delivers /help into the Telegram chat", async () => {
+  it("delivers an addressed /help into the Telegram group", async () => {
     const before = boot.telegram.transcript(SIM_TELEGRAM_CHAT).length;
 
     boot.telegram.deliverMessage({
       chatId: SIM_TELEGRAM_CHAT,
-      text: "/help",
+      text: `/help@${boot.telegram.botUsername}`,
       fromId: SIM_TELEGRAM_SENDER,
       chatType: "supergroup",
     });
 
-    await expect
-      .poll(() => boot.telegram.transcript(SIM_TELEGRAM_CHAT).length > before, { timeout: 30_000 })
-      .toBe(true);
+    await waitFor(
+      () => boot.telegram.transcript(SIM_TELEGRAM_CHAT).length > before,
+      () => `Telegram methods: ${JSON.stringify(recentTelegramMethods())}`,
+    );
     const posted = boot.telegram.transcript(SIM_TELEGRAM_CHAT).slice(before);
-    expect(posted.map((message) => message.method)).toContain("sendMessage");
+    expect(posted.map((message) => message.method)).toContain("sendRichMessage");
   }, 60_000);
 
   // D-W4-02: the schema advertised react/edit/pin and the live tool refused
@@ -350,7 +358,7 @@ describe.runIf(ENABLED)("channel plane against simulated platforms", () => {
     expect(
       posted.map((message) => message.method),
       recentLogs().join(" | "),
-    ).toEqual(["sendMessage"]);
+    ).toEqual(["sendRichMessage"]);
     // The draft was edited in place before the final text landed on it.
     expect(posted[0]?.edits.length).toBeGreaterThan(0);
   }, 120_000);

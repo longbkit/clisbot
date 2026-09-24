@@ -99,3 +99,5 @@ app.json
 
 # Agent working notes: lessons land in docs/, the tooling in scripts/.
 .writer-progress/
+# Heap snapshots dumped by --heapsnapshot-near-heap-limit; keep them for debugging.
+*.heapsnapshot

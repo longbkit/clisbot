@@ -2,17 +2,21 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { loadConfig } from "@getpaseo/server";
-import { resolveLocalDaemonState, resolveTcpHostFromListen } from "../daemon/local-daemon.js";
+import { readDaemonInstance, daemonLogPath } from "@getpaseo/server/daemon-control";
+import { resolveTcpHostFromListen } from "../daemon/local-daemon.js";
 import { resolveLocalHubState } from "../hub/local-hub.js";
 import { selectLocalPort } from "../hub/local-port.js";
 import { HubCommandError } from "../hub/error.js";
 
 /** Existing managed homes require a ticket or authenticated local IPC recovery. */
-export function assertLocalOnboardingAccess(home: string, env: NodeJS.ProcessEnv): void {
+export async function assertLocalOnboardingAccess(
+  home: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   const config = loadConfig(home, { env: { PASEO_HOME: home } });
   if (config.managedAccessMode !== "external") return;
-  const state = resolveLocalDaemonState({ home });
-  const listen = state.running ? state.listen : (env.PASEO_LISTEN ?? config.listen);
+  const state = await readDaemonInstance(home);
+  const listen = state?.listen ?? env.PASEO_LISTEN ?? config.listen;
   if (resolveTcpHostFromListen(listen) === null) return;
   throw new HubCommandError(
     "ONBOARDING_MANAGED_HOME",
@@ -27,7 +31,7 @@ export async function onboardingDaemonListen(
   home: string,
   env: NodeJS.ProcessEnv,
 ): Promise<string> {
-  const listen = env.PASEO_LISTEN ?? resolveLocalDaemonState({ home }).listen;
+  const listen = env.PASEO_LISTEN ?? loadConfig(home, { env: { PASEO_HOME: home } }).listen;
   const loopback = /^(?:127\.0\.0\.1|localhost):(\d+)$/.exec(listen);
   if (!loopback) return listen;
   const port = await selectLocalPort(Number(loopback[1]), !env.PASEO_LISTEN);
@@ -35,11 +39,11 @@ export async function onboardingDaemonListen(
 }
 
 /** A live supervisor without a listener is still booting (or repeatedly failing). */
-export function recordedDaemonHost(home: string): string {
-  const state = resolveLocalDaemonState({ home });
-  if (!state.running || !state.pidInfo?.listen)
-    throw new Error(`The daemon for ${home} has no ready listener. Check ${state.logPath}.`);
-  return state.pidInfo.listen;
+export async function recordedDaemonHost(home: string): Promise<string> {
+  const state = await readDaemonInstance(home);
+  if (!state?.listen)
+    throw new Error(`The daemon for ${home} has no ready listener. Check ${daemonLogPath(home)}.`);
+  return state.listen;
 }
 
 /** Verify the server identity before any workspace, agent, or enrollment mutation. */

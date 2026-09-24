@@ -3,9 +3,13 @@ import type {
   ProviderSubagentDescriptorPayload,
   SessionOutboundMessage,
 } from "@getpaseo/protocol/messages";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError, type DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { create } from "zustand";
-import { processAgentStreamEvent, type TimelineCursor } from "@/timeline/session-stream-reducers";
+import {
+  processTimelineResponse,
+  processAgentStreamEvent,
+  type TimelineCursor,
+} from "@/timeline/session-stream-reducers";
 import {
   applyProjectedSubagentPage,
   type ProviderSubagentTimelinePage,
@@ -39,6 +43,7 @@ export interface ProviderSubagentTimelineState {
   lastSeq: number;
   hasOlder: boolean;
   rows: Map<number, ProviderSubagentTimelineRow>;
+  needsRefresh: boolean;
 }
 
 interface ProviderSubagentState {
@@ -127,6 +132,7 @@ const EMPTY_TIMELINE: ProviderSubagentTimelineState = {
   lastSeq: 0,
   hasOlder: false,
   rows: new Map(),
+  needsRefresh: false,
 };
 
 function providerSubagentTerminalEvent(
@@ -142,69 +148,6 @@ function providerSubagentTerminalEvent(
     return { type: "turn_canceled", provider: subagent.provider, reason: "canceled" };
   }
   return { type: "turn_completed", provider: subagent.provider };
-}
-
-function buildTimelineState(
-  rows: ProviderSubagentTimelineState["rows"],
-  epoch: string | null,
-  descriptor?: ProviderSubagentDescriptorPayload,
-  hasOlder = false,
-): ProviderSubagentTimelineState {
-  let timeline = { tail: [] as StreamItem[], head: [] as StreamItem[] };
-  for (const [, row] of [...rows].sort(([left], [right]) => left - right)) {
-    timeline = applyStreamEvent({
-      ...timeline,
-      event: { type: "timeline", provider: row.provider, item: row.item },
-      timestamp: new Date(row.timestamp),
-    });
-  }
-  const terminalEvent = descriptor ? providerSubagentTerminalEvent(descriptor) : null;
-  if (terminalEvent && descriptor) {
-    timeline = applyStreamEvent({
-      ...timeline,
-      event: terminalEvent,
-      timestamp: new Date(descriptor.updatedAt),
-    });
-  }
-  return {
-    ...timeline,
-    epoch,
-    lastSeq: rows.size ? Math.max(...rows.keys()) : 0,
-    historyReady: true,
-    hasOlder,
-    rows,
-  };
-}
-
-function buildTimelineResponseRows(
-  existing: ProviderSubagentTimelineState | undefined,
-  payload: Extract<
-    SessionOutboundMessage,
-    { type: "agent.provider_subagents.timeline.get.response" }
-  >["payload"],
-  provider: ProviderSubagentDescriptorPayload["provider"],
-): ProviderSubagentTimelineState["rows"] {
-  const rows = new Map<number, ProviderSubagentTimelineRow>();
-  for (const row of payload.rows) {
-    rows.set(row.seq, { provider, item: row.item, timestamp: row.timestamp });
-  }
-  if (payload.reset || existing?.epoch !== payload.epoch) {
-    return rows;
-  }
-  if (payload.direction !== "tail") {
-    return new Map([...existing.rows, ...rows]);
-  }
-
-  let nextSeq = payload.rows.length
-    ? Math.max(...payload.rows.map((row) => row.seq)) + 1
-    : payload.window.maxSeq + 1;
-  for (const [seq, row] of [...existing.rows].sort(([left], [right]) => left - right)) {
-    if (seq < nextSeq) continue;
-    if (seq !== nextSeq) break;
-    rows.set(seq, row);
-    nextSeq += 1;
-  }
-  return rows;
 }
 
 export const useProviderSubagentStore = create<ProviderSubagentState>((set) => ({
@@ -293,37 +236,42 @@ export const useProviderSubagentStore = create<ProviderSubagentState>((set) => (
       ) {
         return state;
       }
-      if (!subagentTimelineRetention.isVisible(key)) return state;
       const current = existing ?? EMPTY_TIMELINE;
-      if (current.pagingMode === "source_ranges")
+      if (current.pagingMode === "source_ranges") {
+        if (!subagentTimelineRetention.isVisible(key)) return state;
         return applySourceRangeSubagentUpdate(serverId, key, current, payload);
+      }
       if (payload.seq <= current.lastSeq) {
         return state;
       }
-      const rows = new Map(current.rows);
-      rows.set(payload.seq, {
-        provider: payload.provider,
-        item: payload.item,
-        timestamp: payload.timestamp,
-      });
-      const descriptor = state.descriptors.get(key);
-      const next =
-        descriptor && descriptor.status !== "running"
-          ? buildTimelineState(rows, payload.epoch, descriptor, current.hasOlder)
-          : applyStreamEvent({
-              tail: current.tail,
-              head: current.head,
-              event: { type: "timeline", provider: payload.provider, item: payload.item },
-              timestamp: new Date(payload.timestamp),
-            });
-      const updated = admitSubagentTimeline(serverId, payload.parentAgentId, key, {
-        ...next,
+      const next = processAgentStreamEvent({
+        currentTail: current.tail,
+        currentHead: current.head,
+        currentCursor: current.cursor ?? undefined,
+        hasAuthoritativeBaseline: current.cursor != null,
+        event: { type: "timeline", provider: payload.provider, item: payload.item },
+        timestamp: new Date(payload.timestamp),
+        seq: payload.seq,
         epoch: payload.epoch,
-        lastSeq: payload.seq,
-        hasOlder: current.hasOlder,
-        historyReady: current.historyReady ?? false,
-        rows,
       });
+      const updated = admitSubagentTimeline(
+        serverId,
+        payload.parentAgentId,
+        key,
+        settleSubagentTimeline(
+          {
+            ...current,
+            tail: next.tail,
+            head: next.head,
+            epoch: payload.epoch,
+            lastSeq: payload.seq,
+            cursor: next.cursor ?? current.cursor,
+            needsRefresh:
+              current.needsRefresh || next.sideEffects.some((effect) => effect.type === "catch_up"),
+          },
+          state.descriptors.get(key)!,
+        ),
+      );
       const timelines = new Map(useProviderSubagentStore.getState().timelines);
       timelines.set(key, updated);
       return { timelines };
@@ -349,13 +297,57 @@ export const useProviderSubagentStore = create<ProviderSubagentState>((set) => (
         timelines.set(key, updated);
         return { timelines };
       }
-      const rows = buildTimelineResponseRows(existing, payload, provider);
-      const descriptor = state.descriptors.get(key);
+      const current = existing ?? EMPTY_TIMELINE;
+      const entries = payload.rows.map((row) => ({
+        ...row,
+        provider,
+        seqStart: row.seqStart ?? row.seq,
+        seqEnd: row.seqEnd ?? row.seq,
+      }));
+      const result = processTimelineResponse({
+        payload: {
+          ...payload,
+          agentId: payload.subagentId,
+          projection: "projected",
+          startCursor:
+            payload.startCursor ??
+            (entries.length ? { seq: Math.min(...entries.map((entry) => entry.seqStart)) } : null),
+          endCursor:
+            payload.endCursor ??
+            (entries.length ? { seq: Math.max(...entries.map((entry) => entry.seqEnd)) } : null),
+          entries,
+        },
+        currentTail: current.tail,
+        currentHead: current.head,
+        currentCursor: current.cursor ?? undefined,
+        isInitializing: current.cursor == null,
+        hasActiveInitDeferred: current.cursor == null,
+        initRequestDirection: "tail",
+        sendingClientMessageIds: [],
+      });
       const updated = admitSubagentTimeline(
         serverId,
         payload.parentAgentId,
         key,
-        buildTimelineState(rows, payload.epoch, descriptor, payload.hasOlder),
+        settleSubagentTimeline(
+          {
+            ...current,
+            tail: result.tail,
+            head: result.head,
+            epoch: payload.epoch,
+            lastSeq:
+              payload.reset || current.epoch !== payload.epoch
+                ? (result.cursor?.endSeq ?? 0)
+                : Math.max(current.lastSeq, result.cursor?.endSeq ?? 0),
+            cursor: result.cursor ?? undefined,
+            hasOlder:
+              result.older === "unchanged" ? current.hasOlder : result.older === "available",
+            needsRefresh:
+              result.sideEffects.some((effect) => effect.type === "catch_up") &&
+              (payload.hasNewer || current.lastSeq > (result.cursor?.endSeq ?? 0)),
+          },
+          state.descriptors.get(key)!,
+        ),
       );
       const timelines = new Map(useProviderSubagentStore.getState().timelines);
       timelines.set(key, updated);
@@ -399,14 +391,9 @@ function admitSubagentTimeline(
 
 function settleSubagentTimeline(
   current: ProviderSubagentTimelineState,
-  descriptor: ProviderSubagentDescriptorPayload,
+  descriptor?: ProviderSubagentDescriptorPayload,
 ): ProviderSubagentTimelineState {
-  if (current.pagingMode !== "source_ranges")
-    return {
-      ...buildTimelineState(current.rows, current.epoch, descriptor, current.hasOlder),
-      historyReady: current.historyReady,
-    };
-  const event = providerSubagentTerminalEvent(descriptor);
+  const event = descriptor ? providerSubagentTerminalEvent(descriptor) : null;
   return event
     ? {
         ...current,
@@ -414,7 +401,7 @@ function settleSubagentTimeline(
           tail: current.tail,
           head: current.head,
           event,
-          timestamp: new Date(descriptor.updatedAt),
+          timestamp: new Date(descriptor!.updatedAt),
         }),
       }
     : current;
@@ -526,4 +513,60 @@ function applyProjectedSubagentUpdate(
     error: null,
   };
   return admitSubagentTimeline(serverId, payload.parentAgentId, key, next, page);
+}
+
+/** Owns child history bootstrap and recovery while a pane observes the child. */
+export function observeProviderSubagentTimeline({
+  client,
+  serverId,
+  parentAgentId,
+  subagentId,
+  limit,
+  reportError,
+}: {
+  client: Pick<DaemonClient, "fetchProviderSubagentTimeline">;
+  serverId: string;
+  parentAgentId: string;
+  subagentId: string;
+  limit: number;
+  reportError: (error: unknown) => void;
+}): () => void {
+  const key = providerSubagentKey(serverId, parentAgentId, subagentId);
+  let active = true;
+  let fetching = false;
+  const refresh = async () => {
+    if (!active || fetching) return;
+    fetching = true;
+    let succeeded = false;
+    try {
+      const payload = await client.fetchProviderSubagentTimeline(parentAgentId, subagentId, {
+        direction: "tail",
+        limit,
+      });
+      if (active) useProviderSubagentStore.getState().replaceTimeline(serverId, payload);
+      succeeded = true;
+    } catch (error) {
+      // A later stream update or reopening the pane retries a disconnected read.
+      if (!(error instanceof DaemonConnectionError)) throw error;
+    } finally {
+      fetching = false;
+      if (
+        succeeded &&
+        active &&
+        useProviderSubagentStore.getState().timelines.get(key)?.needsRefresh
+      )
+        requestRefresh();
+    }
+  };
+  const requestRefresh = () => {
+    void refresh().catch(reportError);
+  };
+  const unsubscribe = useProviderSubagentStore.subscribe((state) => {
+    if (state.timelines.get(key)?.needsRefresh) requestRefresh();
+  });
+  requestRefresh();
+  return () => {
+    active = false;
+    unsubscribe();
+  };
 }

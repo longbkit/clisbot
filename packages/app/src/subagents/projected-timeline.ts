@@ -68,5 +68,6 @@ export function applyProjectedSubagentPage(
         ? (current?.hasOlder ?? page.hasOlder)
         : result.older === "available",
     hasNewer: page.hasNewer || stillBehind,
+    needsRefresh: false,
   };
 }

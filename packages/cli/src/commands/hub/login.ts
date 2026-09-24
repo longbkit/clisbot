@@ -1,3 +1,5 @@
+import type { CommandOptions } from "../../output/index.js";
+import type { DaemonTarget } from "../../utils/daemon-target.js";
 import type { Command } from "commander";
 import { withOutput, type OutputSchema, type SingleResult } from "../../output/index.js";
 import { addJsonOption } from "../../utils/command-options.js";
@@ -37,15 +39,13 @@ interface HubLoginDependencies {
   hub: CredentialIdentityReader;
   reporter: HubReporter;
   isInteractive?(): boolean;
-  continueGuidedSetup?(origin: string): Promise<void>;
-  /** Asks the setup questions before the browser approval and returns what runs after it. Used
-   * instead of `continueGuidedSetup` when present. */
-  planGuidedSetup?(origin: string): Promise<() => Promise<void>>;
+  planGuidedSetup?(origin: string, daemonTarget: DaemonTarget): Promise<() => Promise<void>>;
+  continueGuidedSetup?(origin: string, daemonTarget: DaemonTarget): Promise<void>;
 }
 
 export async function runHubLogin(
   originInput: string | undefined,
-  options: { json?: boolean },
+  options: Pick<CommandOptions, "json" | "daemonTarget">,
   dependencies: HubLoginDependencies,
 ): Promise<SingleResult<HubLoginResult>> {
   const origin = resolveHubOrigin({
@@ -56,7 +56,7 @@ export async function runHubLogin(
   const guided = !options.json && dependencies.isInteractive?.() === true;
   const continueSetup =
     guided && dependencies.planGuidedSetup !== undefined
-      ? await dependencies.planGuidedSetup(origin)
+      ? await dependencies.planGuidedSetup(origin, options.daemonTarget)
       : undefined;
   reportHubProgress(dependencies.reporter, options, `Logging in to ${origin}`);
   const credential = await dependencies.flow.authorize(origin);
@@ -64,9 +64,13 @@ export async function runHubLogin(
   reportHubProgress(dependencies.reporter, options, "Logged in");
   const identity = await readCredentialIdentity(dependencies.hub, origin, credential);
   reportCredentialIdentity(dependencies.reporter, options, origin, identity);
-  if (continueSetup !== undefined) await continueSetup();
-  else if (guided && dependencies.continueGuidedSetup !== undefined) {
-    await dependencies.continueGuidedSetup(origin);
+  if (continueSetup) await continueSetup();
+  else if (
+    !options.json &&
+    dependencies.isInteractive?.() &&
+    dependencies.continueGuidedSetup !== undefined
+  ) {
+    await dependencies.continueGuidedSetup(origin, options.daemonTarget);
   }
   return {
     type: "single",
@@ -86,7 +90,7 @@ export function addHubLoginCommand(parent: Command, dependencies: HubLoginDepend
   ).action(
     withOutput(async (...args) => {
       const origin = args[0] as string | undefined;
-      const options = args.at(-2) as { json?: boolean };
+      const options = args.at(-2) as CommandOptions;
       return runHubLogin(origin, options, dependencies);
     }),
   );

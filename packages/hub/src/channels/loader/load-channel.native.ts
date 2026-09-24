@@ -15,7 +15,7 @@
 // relative `../runtime-store` import.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -112,7 +112,9 @@ function hostRuntime() {
 describe("loadChannelVertical (native ESM loader)", () => {
   let workDir: string;
   before(() => {
-    workDir = mkdtempSync(join(tmpdir(), "hub-loader-native-"));
+    // macOS resolves /var to /private/var in ESM file URLs. Keep the fixture
+    // roots canonical so the loader's parent-URL and allowlist checks agree.
+    workDir = realpathSync(mkdtempSync(join(tmpdir(), "hub-loader-native-")));
   });
   after(() => {
     rmSync(workDir, { recursive: true, force: true });

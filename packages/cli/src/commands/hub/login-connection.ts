@@ -22,7 +22,7 @@ export async function planHubLoginConnection(
   origin: string,
   environment: HubGuidedSetupEnvironment,
 ): Promise<() => Promise<void>> {
-  const status = await withHubDaemon(environment.daemon, undefined, async (daemon) =>
+  const status = await withHubDaemon(environment.daemon, environment.daemonTarget, async (daemon) =>
     daemon.getHubStatus().then((response) => response.status),
   ).catch(() => null);
   const later = `Connect later with: ${hubLoginResumeCommand("connect", origin)}`;

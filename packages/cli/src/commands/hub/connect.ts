@@ -18,6 +18,7 @@ import {
 interface HubConnectOptions {
   apiKey?: string;
   host?: string;
+  daemonTarget: import("../../utils/daemon-target.js").DaemonTarget;
   json?: boolean;
   permission?: readonly string[];
   permissions?: readonly string[];
@@ -49,7 +50,7 @@ export async function runHubConnect(
   reportCredentialIdentity(dependencies.reporter, options, origin, identity);
   const token = await dependencies.hub.issueEnrollmentToken(origin, credential);
   const permissions = options.permissions ?? options.permission ?? [];
-  return withHubDaemon(dependencies.daemon, options.host, async (daemon) => {
+  return withHubDaemon(dependencies.daemon, options.daemonTarget, async (daemon) => {
     const response = await daemon.connectHub(origin, token, permissions);
     if (
       response.status.hubOrigin !== null &&
