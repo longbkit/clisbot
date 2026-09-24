@@ -40,7 +40,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { hostConnectionPresentation } from "@/clisbot/hub/channel-host-connection";
 import { RouteHostProvider, useRouteHost } from "./route-host-context";
 import { ChannelActionsMenu } from "./channel-actions-menu";
-import { ConnectionSettingRow, ConnectionTestMessagePanel } from "./channel-connection-settings";
+import { ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
 import {
   FoldedRouteFormSection,
@@ -79,7 +79,6 @@ import {
 import { automationYamlChannelReplyGrant } from "../automation-configuration";
 import { createAutomation } from "../automation-management";
 import {
-  channelAccountResourceId,
   buildChannelAccountCandidate,
   buildChannelRouteCandidate,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
@@ -107,7 +106,6 @@ import {
 } from "./channel-route-conversation-fields";
 import { useRouteToolActivityDraft } from "./channel-route-tool-activity-fields";
 import {
-  ChannelAccountLimitsPanel,
   ChannelLimitsFields,
   NO_DEFAULTS,
   channelLimitsDraft,
@@ -117,7 +115,6 @@ import {
 } from "./channel-limits-fields";
 import {
   HubAutomationsSchema,
-  HubAccessAssignmentsSchema,
   HubChannelConfigurationSchema,
   HubChannelRevisionsSchema,
   HubChannelRuntimeRetrySchema,
@@ -137,7 +134,6 @@ import { channelConnectionDetail } from "../channel-identity-directory";
 import { ChannelActivity, initialChannelActivityState } from "./channel-activity";
 import { AddChannelConnection } from "./channel-connection-add";
 import { ChannelCatalogView } from "./channel-catalog-view";
-import { ChannelPairingPanel } from "./channel-pairing-panel";
 import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 import { ChannelOperationsView } from "./channel-operations-view";
@@ -170,8 +166,6 @@ type HubDaemon = z.infer<typeof HubDaemonsSchema>["daemons"][number];
 type HubDaemons = z.infer<typeof HubDaemonsSchema>;
 type HubTeam = z.infer<typeof HubTeamsSchema>["teams"][number];
 type HubTeams = z.infer<typeof HubTeamsSchema>;
-type HubAssignment = z.infer<typeof HubAccessAssignmentsSchema>["assignments"][number];
-type HubAssignments = z.infer<typeof HubAccessAssignmentsSchema>;
 type HubRuntimeAccount = z.infer<typeof HubChannelRuntimeStatusSchema>["accounts"][number];
 type HubRuntimeStatus = z.infer<typeof HubChannelRuntimeStatusSchema>;
 type HubRevision = z.infer<typeof HubChannelRevisionsSchema>["revisions"][number];
@@ -820,8 +814,6 @@ function ChannelSettingsContent({
           channels={channels.data}
           connections={connections.data}
           runtimeStatus={runtimeStatus.data}
-          teams={teams.data}
-          assignments={assignments.data}
           queries={sources.accountQueries}
           refreshing={statusRefreshing}
           mutationError={mutationError}
@@ -1107,8 +1099,6 @@ function ChannelAccountsSection({
   channels,
   connections,
   runtimeStatus,
-  teams,
-  assignments,
   queries,
   refreshing,
   mutationError,
@@ -1132,8 +1122,6 @@ function ChannelAccountsSection({
   channels: HubChannelConfiguration | undefined;
   connections: HubConnections | undefined;
   runtimeStatus: HubRuntimeStatus | undefined;
-  teams: HubTeams | undefined;
-  assignments: HubAssignments | undefined;
   queries: Array<{ isPending: boolean; error: Error | null }>;
   refreshing: boolean;
   mutationError: string | null;
@@ -1185,8 +1173,6 @@ function ChannelAccountsSection({
         runtimes={runtimeStatus?.accounts ?? []}
         runtimeAvailable={runtimeStatus?.runtimeAvailable}
         warnings={channels?.warnings}
-        assignments={assignments?.assignments}
-        teams={teams?.teams ?? []}
         revisionVersion={channels?.revision?.version}
         selectedAccountKey={selectedAccountKey}
         adminScoped={adminScoped}
@@ -1362,8 +1348,6 @@ function ChannelAccountList({
   runtimes,
   runtimeAvailable,
   warnings,
-  assignments,
-  teams,
   revisionVersion,
   selectedAccountKey,
   adminScoped,
@@ -1385,8 +1369,6 @@ function ChannelAccountList({
   runtimes: HubRuntimeAccount[];
   runtimeAvailable: boolean | undefined;
   warnings: HubChannelConfiguration["warnings"];
-  assignments: HubAssignment[] | undefined;
-  teams: HubTeam[];
   revisionVersion: number | undefined;
   selectedAccountKey: string | null;
   adminScoped: boolean;
@@ -1426,8 +1408,6 @@ function ChannelAccountList({
             runtimes={runtimes}
             runtimeAvailable={runtimeAvailable}
             warnings={warnings}
-            assignments={assignments}
-            teams={teams}
             revisionVersion={revisionVersion}
             selected={selectedAccountKey === channelAccountKey(account)}
             adminScoped={adminScoped}
@@ -1456,8 +1436,6 @@ function ChannelAccountRow({
   runtimes,
   runtimeAvailable,
   warnings,
-  assignments,
-  teams,
   revisionVersion,
   selected,
   adminScoped,
@@ -1480,8 +1458,6 @@ function ChannelAccountRow({
   runtimes: HubRuntimeAccount[];
   runtimeAvailable: boolean | undefined;
   warnings: HubChannelConfiguration["warnings"];
-  assignments: HubAssignment[] | undefined;
-  teams: HubTeam[];
   revisionVersion: number | undefined;
   selected: boolean;
   adminScoped: boolean;
@@ -1618,18 +1594,6 @@ function ChannelAccountRow({
         moveRoute={moveRoute}
         removeRoute={removeRoute}
       />
-      <ChannelAccountDetails
-        visible={selected}
-        account={account}
-        channel={channel}
-        accountId={accountId}
-        connection={connection}
-        assignments={assignments}
-        teams={teams}
-        adminScoped={adminScoped}
-        pending={pending}
-        updateAccount={updateAccount}
-      />
     </View>
   );
 }
@@ -1664,77 +1628,6 @@ function RoutesHeaderRow({ pending, addRoute }: { pending: boolean; addRoute(): 
 }
 
 /**
- * The Connection's settings, under its Routes: the two things this page decides,
- * each showing its value. Its status and credential are on the header line
- * already, so a row here would only repeat them.
- */
-function ChannelAccountDetails({
-  visible,
-  account,
-  channel,
-  accountId,
-  connection,
-  assignments,
-  teams,
-  adminScoped,
-  pending,
-  updateAccount,
-}: {
-  visible: boolean;
-  account: RecordValue;
-  channel: string;
-  accountId: string;
-  connection: HubConnection | undefined;
-  assignments: HubAssignment[] | undefined;
-  teams: HubTeam[];
-  adminScoped: boolean;
-  pending: boolean;
-  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
-}) {
-  if (!visible) return null;
-  const adminCount = connectionAdminCount(
-    assignments,
-    channelAccountResourceId(channel, accountId),
-  );
-  return (
-    <View style={settingsStyles.rowBorder}>
-      <View style={settingsStyles.row}>
-        <Text style={styles.formHeading}>Connection settings</Text>
-      </View>
-      <ConnectionSettingRow
-        title="Admins"
-        value={
-          adminCount === 0
-            ? "Only Organization Admins"
-            : `${String(adminCount)} Admin${adminCount === 1 ? "" : "s"}`
-        }
-      >
-        <ChannelRouteAdmins
-          channel={channel}
-          accountId={accountId}
-          connection={connection}
-          assignments={assignments}
-          teams={teams}
-          adminScoped={adminScoped}
-          pending={pending}
-        />
-      </ConnectionSettingRow>
-      <ConnectionSettingRow
-        title="Bot limits"
-        value={channelLimitsSummary(account["limits"])}
-        actionLabel="Change"
-      >
-        <ChannelAccountLimitsSection
-          account={account}
-          pending={pending}
-          updateAccount={updateAccount}
-        />
-      </ConnectionSettingRow>
-    </View>
-  );
-}
-
-/**
  * Asking the Host to start the account again can only change something when the
  * Hub holds a credential, the Connection is on, the runtime answers, and it is
  * not already up.
@@ -1751,19 +1644,6 @@ function canRetryRuntime(input: {
     input.runtimeAvailable !== false &&
     input.runtime?.transport !== "started"
   );
-}
-
-/** How many Members or Teams administer the Connection (Organization Admins aside). */
-function connectionAdminCount(
-  assignments: readonly HubAssignment[] | undefined,
-  resourceId: string,
-): number {
-  return (assignments ?? []).filter(
-    (assignment) =>
-      assignment.resourceKind === "channel_account" &&
-      assignment.resourceId === resourceId &&
-      assignment.privileges.includes("channel.manage"),
-  ).length;
 }
 
 /**
@@ -1849,22 +1729,6 @@ function ConnectionTestMessage({
   );
 }
 
-function ChannelAccountLimitsSection({
-  account,
-  pending,
-  updateAccount,
-}: {
-  account: RecordValue;
-  pending: boolean;
-  updateAccount(account: RecordValue, patch: RecordValue): Promise<void>;
-}) {
-  const save = useCallback(
-    (limits: RecordValue | undefined) => updateAccount(account, { limits }),
-    [account, updateAccount],
-  );
-  return <ChannelAccountLimitsPanel limits={account["limits"]} pending={pending} save={save} />;
-}
-
 function ChannelAccountQrLinking({ channel, accountId }: { channel: string; accountId: string }) {
   const verbs = useChannelQrVerbs({ channel, accountId });
   return (
@@ -1874,115 +1738,6 @@ function ChannelAccountQrLinking({ channel, accountId }: { channel: string; acco
       verbs={verbs}
     />
   );
-}
-
-/**
- * The Connection's Access tab: who administers it. Who may talk is decided
- * by each Route's audience rules, so no Use grant is offered here
- * (docs/features/access/scoped-admins.md).
- */
-function ChannelRouteAdmins({
-  channel,
-  accountId,
-  connection,
-  assignments,
-  teams,
-  adminScoped,
-  pending,
-}: {
-  channel: string;
-  accountId: string;
-  connection: HubConnection | undefined;
-  assignments: HubAssignment[] | undefined;
-  teams: HubTeam[];
-  adminScoped: boolean;
-  pending: boolean;
-}) {
-  const hub = useHubAccount();
-  const router = useRouter();
-  const resourceId = channelAccountResourceId(channel, accountId);
-  const openIdentity = useCallback(
-    () =>
-      router.push({
-        pathname: "/settings/hub/[hubSection]",
-        params: {
-          hubSection: "account",
-          ...(connection?.id ? { channelConnectionId: connection.id } : {}),
-        },
-      }),
-    [router, connection?.id],
-  );
-  // The Access page preselects the Route from these params.
-  const openAccess = useCallback(
-    () =>
-      router.push({
-        pathname: "/settings/hub/[hubSection]",
-        params: { hubSection: "team", view: "access", resourceKind: "channel_account", resourceId },
-      }),
-    [router, resourceId],
-  );
-  const members = hub.signedIn?.team?.members ?? [];
-  const subjectName = (assignment: HubAssignment): string => {
-    if (assignment.subjectKind === "team") {
-      const team = teams.find(({ id }) => id === assignment.subjectId);
-      return `Team ${team?.name ?? assignment.subjectId}`;
-    }
-    return members.find(({ id }) => id === assignment.subjectId)?.name ?? assignment.subjectId;
-  };
-  const admins = (assignments ?? [])
-    .filter(
-      (assignment) =>
-        assignment.resourceKind === "channel_account" &&
-        assignment.resourceId === resourceId &&
-        assignment.privileges.includes("channel.manage"),
-    )
-    .map((assignment) => ({
-      id: assignment.id,
-      subject: subjectName(assignment),
-      by: members.find(({ userId }) => userId === assignment.createdByUserId)?.name ?? null,
-    }));
-  return (
-    <View style={settingsStyles.row}>
-      <View style={settingsStyles.rowContent}>
-        {/* The row's title and value already say "Admins" and how many there are,
-            so the panel opens straight into the one thing they cannot: what an
-            Admin may do, and which subjects hold it. */}
-        <Text style={settingsStyles.rowHint}>
-          Admins edit this Connection’s Routes, audience rules, status and relink. Who may talk to
-          the bot is set on each Route.
-        </Text>
-        {adminLines(assignments === undefined, admins).map((line, index) => (
-          <Text key={admins[index]?.id ?? line} style={settingsStyles.rowHint}>
-            {line}
-          </Text>
-        ))}
-        {adminScoped ? null : (
-          <ChannelPairingPanel channel={channel} accountId={accountId} disabled={pending} />
-        )}
-        <View style={styles.actions}>
-          {connection?.canLinkIdentity === true ? (
-            <Button size="sm" variant="outline" disabled={pending} onPress={openIdentity}>
-              Your Channel identities
-            </Button>
-          ) : null}
-          <Button size="sm" variant="outline" disabled={pending} onPress={openAccess}>
-            Manage Admins in Access
-          </Button>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/** One line per Admin, or the one line that says why there are none. */
-function adminLines(
-  loading: boolean,
-  admins: readonly { subject: string; by: string | null }[],
-): string[] {
-  if (loading) return ["Admins are not loaded yet."];
-  // The row's value already reads "Only Organization Admins".
-  if (admins.length === 0) return [];
-  return admins.map(({ subject, by }) => (by === null ? subject : `${subject} · by ${by}`));
 }
 
 /** The conversations the bot has seen on one account, for naming stored ids. */
@@ -2068,14 +1823,8 @@ function ChannelAccountRouteList({
     visible,
   );
   if (!visible) return null;
-  const refusal = automationName === undefined ? <RouteRefusalRow /> : null;
   if (routes.length === 0) {
-    return (
-      <>
-        <EmptyRow message="No Routes yet: nobody can talk to this bot." />
-        {refusal}
-      </>
-    );
+    return <EmptyRow message="No Routes yet: nobody can talk to this bot." />;
   }
   const rows = routes.map((route, routeIndex) =>
     automationName !== undefined && route.workflow !== automationName ? null : (
@@ -2097,21 +1846,7 @@ function ChannelAccountRouteList({
       />
     ),
   );
-  return (
-    <>
-      {rows}
-      {refusal}
-    </>
-  );
-}
-
-/** There is no catch-all: a sender needs a Route whose audience rules admit them. */
-function RouteRefusalRow() {
-  return (
-    <View style={settingsStyles.row}>
-      <Text style={settingsStyles.rowHint}>Anyone no Route admits is refused.</Text>
-    </View>
-  );
+  return rows;
 }
 
 /** Collapsed to a count, so a Route configured wide on purpose does not shout forever. */
@@ -2182,62 +1917,51 @@ function ChannelRouteRow({
     routeIndex,
   );
   return (
-    <View
-      style={[
-        settingsStyles.row,
-        settingsStyles.rowBorder,
-        styles.routeRow,
-        compact && styles.stackedRow,
-      ]}
-    >
-      <View
-        style={[
-          settingsStyles.rowContent,
-          !compact && styles.routeContent,
-          compact && styles.stackedRowContent,
-        ]}
-      >
-        <Text style={settingsStyles.rowTitle}>
-          {`Route ${String(routeIndex + 1)} · ${routeTargetSummary(route)}`}
-        </Text>
-        <RouteHostLine route={route} />
-        <Text style={settingsStyles.rowHint}>{routeAudienceLine(route, names)}</Text>
-        <Text style={settingsStyles.rowHint}>{routeBehaviorSummary(route)}</Text>
-        <Text style={settingsStyles.rowHint}>{channelLimitsSummary(route["limits"])}</Text>
-        <RouteWarnings warnings={warnings} />
-      </View>
-      {canManage ? (
-        <View style={styles.actions}>
-          <Button size="xs" variant="outline" disabled={pending} onPress={edit}>
-            {automationScoped ? "Edit input and replies" : "Edit"}
-          </Button>
-          {!automationScoped ? (
-            <>
-              <Button
-                size={compact ? "md" : "sm"}
-                variant="ghost"
-                disabled={pending || routeIndex === 0}
-                onPress={moveUp}
-                leftIcon={ArrowUp}
-                accessibilityLabel={`Move Route ${routeIndex + 1} up`}
-              />
-              <Button
-                size={compact ? "md" : "sm"}
-                variant="ghost"
-                disabled={pending || routeIndex === routeCount - 1}
-                onPress={moveDown}
-                leftIcon={ArrowDown}
-                accessibilityLabel={`Move Route ${routeIndex + 1} down`}
-              />
-            </>
-          ) : null}
-          <ChannelActionsMenu
-            label={`Actions for Route ${routeIndex + 1}`}
-            disabled={pending}
-            remove={remove}
-          />
+    <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.routeRow]}>
+      <View style={styles.row}>
+        <View style={settingsStyles.rowContent}>
+          <Text style={settingsStyles.rowTitle}>
+            {`Route ${String(routeIndex + 1)} · ${routeTargetSummary(route)}`}
+          </Text>
         </View>
-      ) : null}
+        {canManage ? (
+          <View style={styles.actions}>
+            <Button size="xs" variant="outline" disabled={pending} onPress={edit}>
+              {automationScoped ? "Edit input and replies" : "Edit"}
+            </Button>
+            {!automationScoped && routeCount > 1 ? (
+              <>
+                <Button
+                  size={compact ? "md" : "sm"}
+                  variant="ghost"
+                  disabled={pending || routeIndex === 0}
+                  onPress={moveUp}
+                  leftIcon={ArrowUp}
+                  accessibilityLabel={`Move Route ${routeIndex + 1} up`}
+                />
+                <Button
+                  size={compact ? "md" : "sm"}
+                  variant="ghost"
+                  disabled={pending || routeIndex === routeCount - 1}
+                  onPress={moveDown}
+                  leftIcon={ArrowDown}
+                  accessibilityLabel={`Move Route ${routeIndex + 1} down`}
+                />
+              </>
+            ) : null}
+            <ChannelActionsMenu
+              label={`Actions for Route ${routeIndex + 1}`}
+              disabled={pending}
+              remove={remove}
+            />
+          </View>
+        ) : null}
+      </View>
+      <RouteHostLine route={route} />
+      <Text style={settingsStyles.rowHint}>{routeAudienceLine(route, names)}</Text>
+      <Text style={settingsStyles.rowHint}>{routeBehaviorSummary(route)}</Text>
+      <Text style={settingsStyles.rowHint}>{channelLimitsSummary(route["limits"])}</Text>
+      <RouteWarnings warnings={warnings} />
     </View>
   );
 }
@@ -4293,10 +4017,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   routeRow: {
     paddingLeft: theme.spacing[6],
-    flexWrap: "wrap",
-  },
-  routeContent: {
-    flexBasis: 256,
+    flexDirection: "column",
+    alignItems: "stretch",
   },
   // The Route's summary lines are a stretched column: anything that should size
   // to its own content says so here.

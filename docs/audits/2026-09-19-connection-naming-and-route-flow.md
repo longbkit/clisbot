@@ -54,6 +54,11 @@ Auto-accept:
 
 ## Decision
 
+- **Connection detail simplification (2026-09-24):** Route actions sit beside
+  the Route title. Ordering arrows appear only when the Connection has multiple
+  Routes. The refusal note below the Routes and the Connection settings block
+  (Admins and Bot limits) are removed from this page. This supersedes the
+  settings rows described below.
 - **Connection** is the UI name for a Connection and its Channel account. The
   tab, list, Route form picker, Access resource kind and Activity filter say
   Connection; the scoped Admin is **Connection Admin**. Code identifiers and the

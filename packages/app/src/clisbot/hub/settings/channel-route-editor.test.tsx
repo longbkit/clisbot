@@ -472,45 +472,17 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
   });
 
-  it("uses accessible ordering arrows with boundary controls disabled", async () => {
+  it("keeps a single Route concise without ordering or Connection settings", async () => {
     renderChannels();
     fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Move Route 1 up",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Move Route 1 down",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
-    expect(screen.queryByText("Up")).toBeNull();
-    expect(screen.queryByText("Down")).toBeNull();
-    expect(screen.queryByText("Connection and access")).toBeNull();
-    // Connection settings show their values; Admins opens in place.
-    expect(screen.getByText("Only Organization Admins")).toBeTruthy();
-    // The header already carries the status and the credential: no row repeats them.
-    expect(screen.queryByRole("button", { name: "Show Status" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show Credential" })).toBeNull();
-    // A Connection that loaded and runs has nothing to report beyond that line.
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Move Route 1 up" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Move Route 1 down" })).toBeNull();
+    expect(screen.queryByText("Connection settings")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show Admins" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Change Bot limits" })).toBeNull();
     expect(screen.queryByText(/Configuration revision/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show Admins" }));
-    // Admins only: no Use grant is offered anywhere.
-    expect(screen.getByText(/Admins edit this Connection/)).toBeTruthy();
-    // The panel does not repeat the row's own title or value.
-    expect(screen.queryByText("Connection Admins")).toBeNull();
-    expect(screen.queryByText("Only Organization Admins so far.")).toBeNull();
-    expect(screen.getByRole("button", { name: "Manage Admins in Access" })).toBeTruthy();
-    expect(screen.queryByText(/channel\.use/)).toBeNull();
-    // No catch-all: one fixed line under the Routes says what happens to everyone else.
-    expect(screen.queryByText(/catch-all/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Edit catch-all" })).toBeNull();
-    expect(screen.getByText("Anyone no Route admits is refused.")).toBeTruthy();
+    expect(screen.queryByText("Anyone no Route admits is refused.")).toBeNull();
   });
 
   it("offers Retry runtime from the Connection menu when the runtime is not up", async () => {
