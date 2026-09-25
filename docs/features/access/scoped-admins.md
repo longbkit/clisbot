@@ -38,11 +38,11 @@ The Host level keeps the name **Administrator**. Because it can share, it now ma
 
 ## Team, Connection, Automation: Admin
 
-| Scope      | Admin manages                                                                                                             | Excluded                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Team       | Who is in the Team: add, remove, invite into it, appoint another Team Admin; reads the Team's grants                      | Changing the Team's access grants                                                                                         |
-| Connection | Its Routes and Route defaults, status, relink, its own activity, its audience rules, granting Admin — in the app and chat | The bot token and every credential in the account's settings, creating or deleting the Connection, the shared policy file |
-| Automation | One Automation: edit, enable, grant Run or Admin (deleting is not offered yet)                                            | Every other Automation                                                                                                    |
+| Scope      | Admin manages                                                                                                                                         | Excluded                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Team       | Who is in the Team: add, remove, invite into it, appoint another Team Admin; reads the Team's grants                                                  | Changing the Team's access grants                                                                                         |
+| Connection | Its Routes and Route defaults, status, QR relink (QR-login channels only), its own activity, its audience rules, granting Admin — in the app and chat | The bot token and every credential in the account's settings, creating or deleting the Connection, the shared policy file |
+| Automation | One Automation: edit, enable, grant Run or Admin (deleting is not offered yet)                                                                        | Every other Automation                                                                                                    |
 
 Who may talk to the bot is decided only in the Route's audience rules ([2026-09-19](../../audits/2026-09-19-route-audience-rules.md)), which a Connection Admin edits. The Connection's Access tab keeps only Admin; Use is no longer granted there. Connection **Manage** is renamed **Admin**; the wire key `manage` stays. Only an Organization Admin deletes a Team or Connection.
 

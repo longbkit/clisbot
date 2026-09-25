@@ -20,7 +20,7 @@ import {
   shareableAgentConfigurationCatalog,
   type ViewerAuthority,
 } from "./access-grantor";
-import { AccessLevelSummary } from "./access-level-summary-view";
+import { AccessLevelSummary, useQrLoginConnection } from "./access-level-summary-view";
 import {
   assignmentResourceOptions,
   assignmentSubjectOptions,
@@ -121,6 +121,7 @@ function AccessAssignmentForm({
     agentConfigurations: draft.agentConfigurations,
   });
   const siblingOptions = useSiblingProjectOptions(catalog, selection.resource, editing);
+  const qrLogin = useQrLoginConnection(selection.resource);
   const submit = useCallback(
     () =>
       void submitAccessAssignment({
@@ -133,11 +134,24 @@ function AccessAssignmentForm({
         agentConfigurations: draft.agentConfigurations,
         fastMode: draft.fastMode,
         accessLevel: draft.accessLevel,
+        qrLogin,
         authority,
         catalogResources: catalog.resources,
         save,
       }),
-    [assignments, authority, catalog, draft, editing, isCurrent, members, save, selection, teams],
+    [
+      assignments,
+      authority,
+      catalog,
+      draft,
+      editing,
+      isCurrent,
+      members,
+      qrLogin,
+      save,
+      selection,
+      teams,
+    ],
   );
 
   return (
@@ -189,7 +203,13 @@ function AccessAssignmentForm({
           searchPlaceholder="Search Projects"
         />
       ) : null}
-      <AccessLevelFields selection={selection} draft={draft} editing={editing} pending={pending} />
+      <AccessLevelFields
+        selection={selection}
+        draft={draft}
+        editing={editing}
+        pending={pending}
+        qrLogin={qrLogin}
+      />
       {selection.needsAgentConfiguration ? (
         <AgentConfigurationSection
           catalog={shareableAgentConfigurationCatalog(
@@ -223,11 +243,13 @@ function AccessLevelFields({
   draft,
   editing,
   pending,
+  qrLogin,
 }: {
   selection: AssignmentSelection;
   draft: ReturnType<typeof useAccessAssignmentDraft>;
   editing: AccessAssignment | null;
   pending: boolean;
+  qrLogin: boolean;
 }) {
   return (
     <>
@@ -262,6 +284,7 @@ function AccessLevelFields({
           savedPrivileges={editing?.privileges}
           resourceKind={selection.resource.kind}
           subjectKind={selection.subject?.kind}
+          qrLogin={qrLogin}
         />
       ) : null}
     </>

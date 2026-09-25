@@ -76,6 +76,7 @@ async function submit(input: {
     agentConfigurations: [],
     fastMode: false,
     accessLevel: "office_worker",
+    qrLogin: false,
     save,
     ...input,
   });

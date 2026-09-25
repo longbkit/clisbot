@@ -27,6 +27,8 @@ export async function submitAccessAssignment(input: {
   agentConfigurations: AgentConfigurationDraft[];
   fastMode: boolean;
   accessLevel: string | null;
+  /** The Connection logs in by QR scan (`useQrLoginConnection`). */
+  qrLogin: boolean;
   authority: ViewerAuthority;
   /** The catalog's resources; a Host the viewer cannot share is absent from it. */
   catalogResources: AccessResource[];
@@ -69,6 +71,7 @@ export async function submitAccessAssignment(input: {
       summary: summarizeAccess({
         privileges: grantedPrivileges(selection, input.fastMode),
         resourceKind: selection.resource.kind,
+        qrLogin: input.qrLogin,
       }),
       configurationCount: selection.needsAgentConfiguration ? input.agentConfigurations.length : 0,
       addsHostConnect,

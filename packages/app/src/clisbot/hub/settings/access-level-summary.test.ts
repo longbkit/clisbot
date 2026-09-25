@@ -3,6 +3,7 @@ import {
   accessChanges,
   accessLevelDescription,
   canShareDescription,
+  connectionChannel,
   matchingAccessLevel,
   sharesAccess,
   summarizeAccess,
@@ -131,7 +132,7 @@ describe("level names", () => {
         privileges: ["channel.manage", "hub.access.manage"],
         resourceKind: "channel_account",
       }).allows,
-    ).toContain("Appoint another Admin on this Route");
+    ).toContain("Appoint another Admin on this Connection");
   });
 
   it("matches a Host or Project level with or without Can share, and keeps Admin whole", () => {
@@ -191,5 +192,31 @@ describe("Can share", () => {
     expect(summary.withholds).toEqual([
       "Cannot change the Team's access grants or delete the Team",
     ]);
+  });
+});
+
+describe("Connection Admin", () => {
+  const ADMIN = ["channel.manage", "hub.access.manage"];
+
+  it("offers QR relogin only on a QR-login channel", () => {
+    const relogin = "Log the account back in by QR scan when its session expires";
+    expect(
+      summarizeAccess({ privileges: ADMIN, resourceKind: "channel_account" }).allows,
+    ).not.toContain(relogin);
+    expect(
+      summarizeAccess({ privileges: ADMIN, resourceKind: "channel_account", qrLogin: true }).allows,
+    ).toContain(relogin);
+  });
+
+  it("states the delegation limit and what Admin does not include", () => {
+    const summary = summarizeAccess({ privileges: ADMIN, resourceKind: "channel_account" });
+    expect(summary.cautions.join("\n")).toContain("their own Host and Project access");
+    expect(summary.withholds.join("\n")).toContain("bot token");
+    expect(summary.withholds.join("\n")).toContain("audience rules decide who the bot answers");
+  });
+
+  it("reads the channel from a Connection resource id", () => {
+    expect(connectionChannel("zalouser/abc%2F1")).toBe("zalouser");
+    expect(connectionChannel("no-separator")).toBeUndefined();
   });
 });

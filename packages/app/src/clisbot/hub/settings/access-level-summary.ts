@@ -36,7 +36,7 @@ const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) =>
   administrator: "Operate this Host with any model. Always can share.",
   use: "Talk to the bot in the chosen conversations.",
   manage:
-    "Edit this Connection's audience rules and defaults, on the app and in chat, and appoint another Admin. Who may talk to the bot is set on the Route.",
+    "Manage this bot's Routes, defaults, and audience rules, on the app and in chat, and appoint other Admins.",
   run: "Run this Automation.",
   admin: (kind) =>
     kind === "team"
@@ -75,6 +75,8 @@ export function summarizeAccess(input: {
   privileges: readonly string[];
   resourceKind: AccessResourceKind;
   subjectKind?: SubjectKind | undefined;
+  /** A Connection whose channel logs in by QR scan, so its Admin can log it back in. */
+  qrLogin?: boolean;
 }): AccessSummary {
   const held = new Set(input.privileges);
   const summary: AccessSummary = { allows: [], withholds: [], cautions: [] };
@@ -86,7 +88,7 @@ export function summarizeAccess(input: {
     return summary;
   }
   if (input.resourceKind === "channel_account" || input.resourceKind === "automation") {
-    summarizeRoutes(held, summary);
+    summarizeRoutes(held, summary, input.qrLogin === true);
     return summary;
   }
   if (held.has("daemon.manage")) {
@@ -110,13 +112,30 @@ function summarizeTeamAdmin(held: ReadonlySet<string>, summary: AccessSummary): 
   summary.withholds.push("Cannot change the Team's access grants or delete the Team");
 }
 
-function summarizeRoutes(held: ReadonlySet<string>, summary: AccessSummary): void {
+function summarizeRoutes(
+  held: ReadonlySet<string>,
+  summary: AccessSummary,
+  qrLogin: boolean,
+): void {
   if (held.has("channel.manage")) {
-    summary.allows.push("Edit this Connection's audience rules, Routes, and defaults");
-    summary.allows.push("Relink the account and read its activity");
-    if (held.has(CAN_SHARE_PRIVILEGE)) summary.allows.push("Appoint another Admin on this Route");
-    summary.withholds.push("Who may talk to the bot is set in the Route's audience rules");
-    summary.withholds.push("The bot token stays with Organization Admins");
+    summary.allows.push(
+      "Edit this Connection's Routes, including each Route's audience rules (who the bot answers, and where)",
+    );
+    summary.allows.push("Change Route defaults, on the app or from chat with /promoteroutedefault");
+    summary.allows.push(
+      "Read the bot's activity: each incoming message, which Route took it, and why one was ignored or refused",
+    );
+    if (qrLogin) summary.allows.push("Log the account back in by QR scan when its session expires");
+    if (held.has(CAN_SHARE_PRIVILEGE))
+      summary.allows.push("Appoint another Admin on this Connection");
+    // Delegation: only a change to what a Route runs is checked, against the saver's own grants.
+    summary.cautions.push(
+      "When this Admin changes what a Route runs (its agent, model, or automatic approvals), the change must fit within their own Host and Project access",
+    );
+    summary.withholds.push(
+      "Talking to the bot. Being Admin does not add anyone to a Route's audience; the audience rules decide who the bot answers",
+    );
+    summary.withholds.push("Seeing or replacing the bot token (Organization Admins only)");
   }
   if (held.has("automation.run")) summary.allows.push("Run this Automation");
   if (held.has("automation.run") && held.has(CAN_SHARE_PRIVILEGE)) {
@@ -258,4 +277,15 @@ export function effectLines(title: string | null, effects: readonly string[]): s
   if (effects.length === 0) return null;
   const bullets = effects.map((effect) => `• ${effect}`);
   return (title === null ? bullets : [`${title}:`, ...bullets]).join("\n");
+}
+
+/** The channel of a Connection resource id: the Hub writes `<channel>/<accountId>`, URL-encoded. */
+export function connectionChannel(resourceId: string): string | undefined {
+  const separator = resourceId.indexOf("/");
+  if (separator <= 0) return undefined;
+  try {
+    return decodeURIComponent(resourceId.slice(0, separator));
+  } catch {
+    return undefined;
+  }
 }
