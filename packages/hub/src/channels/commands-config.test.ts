@@ -304,3 +304,68 @@ it("checks fast mode for final mint and resume authority, defaulting to refusal"
     validateAgentConfigurationAuthority(input.daemon, config, input.access, true, true),
   ).resolves.toBeUndefined();
 });
+it("provider switch picks the first model and effort the grant allows", async () => {
+  const input = fixture("provider", "claude");
+  input.access = {
+    unrestricted: false,
+    agentConfigurations: [
+      { providerId: "claude", modelIds: ["large"], thinkingOptionIds: ["high"] },
+    ],
+  };
+  const result = await runConfigurationCommand(input);
+  expect(result.selection).toMatchObject({
+    selectedProvider: "claude",
+    selectedModel: "large",
+    selectedThinkingOption: "high",
+  });
+});
+it("provider switch picks an allowed effort when the default model's effort is not granted", async () => {
+  const input = fixture("provider", "claude");
+  input.access = {
+    unrestricted: false,
+    agentConfigurations: [
+      { providerId: "claude", modelIds: ["small"], thinkingOptionIds: ["high"] },
+    ],
+  };
+  const result = await runConfigurationCommand(input);
+  expect(result.selection).toMatchObject({
+    selectedModel: "small",
+    selectedThinkingOption: "high",
+  });
+});
+it("provider without a default model picks an explicit allowed model for a restricted grant", async () => {
+  const input = fixture("provider", "claude");
+  vi.mocked(input.daemon.listProviderModels).mockImplementation(async (provider: string) => [
+    { provider, id: "a", label: "A" },
+    { provider, id: "b", label: "B" },
+  ]);
+  input.access = {
+    unrestricted: false,
+    agentConfigurations: [{ providerId: "claude", modelIds: ["b"], thinkingOptionIds: ["low"] }],
+  };
+  const result = await runConfigurationCommand(input);
+  expect(result.selection).toMatchObject({ selectedProvider: "claude", selectedModel: "b" });
+});
+it("provider without a default model keeps the provider's choice for an all-models grant", async () => {
+  const input = fixture("provider", "claude");
+  vi.mocked(input.daemon.listProviderModels).mockImplementation(async (provider: string) => [
+    { provider, id: "a", label: "A" },
+  ]);
+  input.access = {
+    unrestricted: false,
+    agentConfigurations: [{ providerId: "claude", modelIds: "*", thinkingOptionIds: "*" }],
+  };
+  const result = await runConfigurationCommand(input);
+  expect(result.selection).toMatchObject({ selectedProvider: "claude", selectedModel: null });
+});
+it("model switch picks an allowed effort instead of refusing the default", async () => {
+  const input = fixture("model", "small");
+  input.access = {
+    unrestricted: false,
+    agentConfigurations: [
+      { providerId: "codex", modelIds: ["small"], thinkingOptionIds: ["high"] },
+    ],
+  };
+  const result = await runConfigurationCommand(input);
+  expect(result.selection?.selectedThinkingOption).toBe("high");
+});

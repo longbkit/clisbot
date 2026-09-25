@@ -455,6 +455,13 @@ is never ambiguous:
   _"Provider: openai · Model: gpt-5.6-luna · Effort: medium"_ — so the config is
   always unambiguous, and a provider change (which resets model + effort to that
   provider's defaults) is obvious.
+- **Defaults fit your grant.** When a switch picks the model or effort for you
+  (`/provider X`, `/model X`, a profile without an effort), it takes the provider's
+  or model's default only if your grant covers it, otherwise the first model or
+  effort your grant allows. A provider that reports no default model (OpenCode)
+  keeps "provider decides" only under an all-models, all-efforts grant; a narrower
+  grant gets an explicit allowed model. Choosing a default must never refuse a
+  sender who holds a grant for that provider (`commands-config.ts`, `grantedModel`).
 
 `/agent <name>` sets all three at once by applying an agent profile; `/provider`,
 `/model`, `/effort` tune them one axis at a time. Both land in the same place ([Where a

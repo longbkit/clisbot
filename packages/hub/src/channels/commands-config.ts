@@ -126,11 +126,13 @@ function listQuery(value: string | undefined): string | undefined {
 function includesQuery(value: string, query: string): boolean {
   return value.toLowerCase().includes(query);
 }
+/** An unset model or effort means "the provider decides", which only an all-values grant covers. */
 function allows(
   access: ConfigurationAccess,
   provider: string,
   model?: string,
   thinking?: string,
+  modelHasEffort = true,
 ): boolean {
   if (access.unrestricted) return true;
   return access.agentConfigurations.some(
@@ -140,8 +142,33 @@ function allows(
         ? grant.modelIds === "*"
         : grant.modelIds === "*" || grant.modelIds.includes(model)) &&
       (thinking === undefined
-        ? grant.thinkingOptionIds === "*"
+        ? grant.thinkingOptionIds === "*" || !modelHasEffort
         : grant.thinkingOptionIds === "*" || grant.thinkingOptionIds.includes(thinking)),
+  );
+}
+function hasEffort(model: ProviderModel | undefined): boolean {
+  return model === undefined || (model.thinkingOptions?.length ?? 0) > 0;
+}
+/**
+ * The provider's default model when the sender may use it; otherwise the first model
+ * their grant allows, so a restricted grant never turns a default into a refusal.
+ */
+function grantedModel(
+  access: ConfigurationAccess,
+  provider: string,
+  catalog: ProviderModel[],
+): ProviderModel | undefined {
+  const preferred = catalog.find((model) => model.isDefault);
+  if (preferred ? allowsModel(access, preferred) : allows(access, provider)) return preferred;
+  return catalog.find((model) => allowsModel(access, model)) ?? preferred;
+}
+/** Same rule for effort: the model's default when allowed, else the first allowed option. */
+function grantedEffort(access: ConfigurationAccess, model: ProviderModel): string | undefined {
+  const preferred = model.defaultThinkingOptionId;
+  if (allows(access, model.provider, model.id, preferred, hasEffort(model))) return preferred;
+  return (
+    model.thinkingOptions?.find((option) => allows(access, model.provider, model.id, option.id))
+      ?.id ?? preferred
   );
 }
 function allowsModel(access: ConfigurationAccess, model: ProviderModel): boolean {
@@ -217,8 +244,8 @@ async function providerDefaults(
   input: ConfigurationCommandInput,
   provider: string,
 ): Promise<CreateAgentConfig> {
-  const catalog = await models(input, provider);
-  const model = catalog.find((entry) => entry.isDefault);
+  const model = grantedModel(input.access, provider, await models(input, provider));
+  const thinkingOptionId = model ? grantedEffort(input.access, model) : undefined;
   const modeId = AGENT_PROVIDER_DEFINITIONS.find((entry) => entry.id === provider)?.defaultModeId;
   const {
     model: _model,
@@ -232,7 +259,7 @@ async function providerDefaults(
     ...base,
     provider,
     ...(model ? { model: model.id } : {}),
-    ...(model?.defaultThinkingOptionId ? { thinkingOptionId: model.defaultThinkingOptionId } : {}),
+    ...(thinkingOptionId ? { thinkingOptionId } : {}),
     ...(modeId ? { modeId } : {}),
   };
 }
@@ -261,7 +288,8 @@ async function profileConfig(
       (model) => model.id === profile.model,
     );
     delete next.thinkingOptionId;
-    if (selected?.defaultThinkingOptionId) next.thinkingOptionId = selected.defaultThinkingOptionId;
+    const thinkingOptionId = selected ? grantedEffort(input.access, selected) : undefined;
+    if (thinkingOptionId) next.thinkingOptionId = thinkingOptionId;
   }
   return next;
 }
@@ -304,11 +332,8 @@ async function resolveTarget(input: ConfigurationCommandInput): Promise<CreateAg
     );
   const { thinkingOptionId: _thinking, ...base } = config;
   const model = matches[0]!;
-  return {
-    ...base,
-    model: model.id,
-    ...(model.defaultThinkingOptionId ? { thinkingOptionId: model.defaultThinkingOptionId } : {}),
-  };
+  const thinkingOptionId = grantedEffort(input.access, model);
+  return { ...base, model: model.id, ...(thinkingOptionId ? { thinkingOptionId } : {}) };
 }
 /** Validate the final concrete bundle for every caller, including mint and resume. */
 export async function validateAgentConfigurationAuthority(
@@ -336,6 +361,7 @@ export async function validateAgentConfigurationAuthority(
       next.provider,
       model?.id,
       next.thinkingOptionId ?? model?.defaultThinkingOptionId,
+      hasEffort(model),
     )
   )
     throw new Error("This configuration is outside your AgentConfigurationGrant.");
