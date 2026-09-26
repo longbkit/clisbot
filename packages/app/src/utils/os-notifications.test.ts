@@ -287,4 +287,53 @@ describe("sendOsNotification", () => {
       data: { serverId: "srv-1" },
     });
   });
+  it("returns false when mobile Chrome exposes a non-constructible Notification API", async () => {
+    class MobileNotification {
+      static permission = "granted";
+      constructor() {
+        throw new TypeError("Illegal constructor");
+      }
+    }
+    (globalThis as { Notification?: unknown }).Notification = MobileNotification;
+    const { sendOsNotification } = await loadModuleForPlatform("web");
+    await expect(sendOsNotification({ title: "Done" })).resolves.toBe(false);
+  });
+
+  it.each(["throw", "reject"])(
+    "recovers after requestPermission %s and permits another attempt",
+    async (failure) => {
+      const requestPermission = vi.fn((): Promise<string> => {
+        if (failure === "throw") throw new Error("Permission unavailable");
+        return Promise.reject(new Error("Permission unavailable"));
+      });
+      (globalThis as { Notification?: unknown }).Notification = {
+        permission: "default",
+        requestPermission,
+      };
+      const { ensureOsNotificationPermission, sendOsNotification } =
+        await loadModuleForPlatform("web");
+      await expect(sendOsNotification({ title: "Done" })).resolves.toBe(false);
+      requestPermission.mockImplementation(() => Promise.resolve("granted"));
+      await expect(ensureOsNotificationPermission()).resolves.toBe(true);
+      expect(requestPermission).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("returns false if the desktop bridge rejects delivery", async () => {
+    const { sendOsNotification } = await loadModuleForPlatform("web", {
+      desktopHost: {
+        notification: { sendNotification: vi.fn().mockRejectedValue(new Error("Unavailable")) },
+      },
+    });
+    await expect(sendOsNotification({ title: "Done" })).resolves.toBe(false);
+  });
+
+  it.each(["ios", "android"] as const)("keeps %s native delivery disabled", async (platform) => {
+    const sendNotification = vi.fn();
+    const { sendOsNotification } = await loadModuleForPlatform(platform, {
+      desktopHost: { notification: { sendNotification } },
+    });
+    await expect(sendOsNotification({ title: "Done" })).resolves.toBe(false);
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
 });

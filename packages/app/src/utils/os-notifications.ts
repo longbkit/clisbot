@@ -80,14 +80,15 @@ async function ensureNotificationPermission(): Promise<boolean> {
   if (permissionRequest) {
     return permissionRequest;
   }
-  permissionRequest = Promise.resolve(
-    NotificationConstructor.requestPermission
-      ? NotificationConstructor.requestPermission()
-      : "denied",
-  ).then((permission) => permission === "granted");
-  const result = await permissionRequest;
-  permissionRequest = null;
-  return result;
+  permissionRequest = Promise.resolve()
+    .then(() => NotificationConstructor.requestPermission?.() ?? "denied")
+    .then((permission) => permission === "granted")
+    .catch(() => false);
+  try {
+    return await permissionRequest;
+  } finally {
+    permissionRequest = null;
+  }
 }
 
 export async function ensureOsNotificationPermission(): Promise<boolean> {
@@ -165,30 +166,27 @@ function attachWebClickHandler(
 
 export async function sendOsNotification(payload: OsNotificationPayload): Promise<boolean> {
   // Mobile/native notifications should be remote push only.
-  if (isNative) {
-    return false;
-  }
-
-  const desktopNotificationSender = getDesktopNotificationSender();
-  if (desktopNotificationSender) {
-    return await desktopNotificationSender(payload);
-  }
-
-  const NotificationConstructor = getWebNotificationConstructor();
-  if (NotificationConstructor) {
-    const granted = await ensureNotificationPermission();
-    if (granted) {
-      const notification = new NotificationConstructor(payload.title, {
+  if (isNative) return false;
+  try {
+    const desktopNotificationSender = getDesktopNotificationSender();
+    if (desktopNotificationSender) return await desktopNotificationSender(payload);
+    const NotificationConstructor = getWebNotificationConstructor();
+    if (!NotificationConstructor || !(await ensureNotificationPermission())) return false;
+    let notification: WebNotificationInstance;
+    try {
+      notification = new NotificationConstructor(payload.title, {
         body: payload.body,
         data: payload.data,
         icon: getWebNotificationIconUrl(),
       }) as WebNotificationInstance;
-      if (hasNotificationClickTarget(payload.data)) {
-        attachWebClickHandler(notification, payload.data);
-      }
-      return true;
+    } catch {
+      // Mobile browsers may expose this API but require a service worker we do not register.
+      return false;
     }
+    if (hasNotificationClickTarget(payload.data)) attachWebClickHandler(notification, payload.data);
+    return true;
+  } catch {
+    // Notifications are best-effort; denied/rejected browser APIs must not interrupt the UI.
+    return false;
   }
-
-  return false;
 }
