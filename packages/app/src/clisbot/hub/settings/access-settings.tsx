@@ -8,19 +8,15 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
-import { HubApiError } from "../api-client";
 import { hubResourceQueryKey } from "../query-keys";
 import { buildHubSettingsRoute } from "../navigation";
+import { HubChannelConfigurationSchema } from "../contracts";
 import {
-  HUB_ACCESS_INCLUDE,
-  HubAccessAssignmentSchema,
-  HubAccessAssignmentsSchema,
-  HubAccessCatalogSchema,
-  HubEffectiveAccessSchema,
-  HubChannelConfigurationSchema,
-  HubMembersSchema,
-  HubTeamsSchema,
-} from "../contracts";
+  GRANTOR_ERROR_CODE,
+  useAccessMutation,
+  useEffectiveAccess,
+  useManagedAccessQueries,
+} from "./access-queries";
 import { publicAccessRoutes } from "./access-overview";
 import { useMountedAccessScope } from "./access-mounted-scope";
 import { AccessBrowser } from "./access-browser";
@@ -42,14 +38,6 @@ import {
   memberNamesByUserId,
 } from "./access-catalog";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
-
-/** A Hub refusal the form shows in place; anything else shows at the top of the page. */
-const GRANTOR_ERROR_CODE = "access_exceeds_grantor";
-
-interface MutationError {
-  code: string | null;
-  message: string;
-}
 
 /**
  * Access opens for Organization Owners and Admins, and for any Member whose
@@ -102,32 +90,6 @@ export function AccessSettings() {
   );
 }
 
-function useHubScope() {
-  const hub = useHubAccount();
-  return hub.signedIn
-    ? {
-        origin: hub.origin,
-        organizationId: hub.signedIn.organization.id,
-        accountId: hub.signedIn.account.id,
-      }
-    : { origin: hub.origin, organizationId: null, accountId: null };
-}
-
-/** The viewer's own grants, Team resources included; also what the form may hand on. */
-function useEffectiveAccess() {
-  const hub = useHubAccount();
-  const scope = useHubScope();
-  return useFetchQuery({
-    queryKey: hubResourceQueryKey(scope, "access-assignments/effective"),
-    queryFn: () =>
-      hub.api().get(`access-assignments/effective${HUB_ACCESS_INCLUDE}`, HubEffectiveAccessSchema),
-    dataShape: "value",
-    enabled: scope.organizationId !== null,
-    retry: false,
-    staleTimeMs: 0,
-  });
-}
-
 function ManagedAccessSettings({
   initialSubject,
   initialResource,
@@ -139,44 +101,7 @@ function ManagedAccessSettings({
 }) {
   const isCurrent = useMountedAccessScope();
   const hub = useHubAccount();
-  const queryScope = useHubScope();
-  const enabled = queryScope.organizationId !== null;
-  // Query keys keep the bare resource name so existing invalidations still match.
-  const assignments = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "access-assignments"),
-    queryFn: () =>
-      hub.api().get(`access-assignments${HUB_ACCESS_INCLUDE}`, HubAccessAssignmentsSchema),
-    dataShape: "value",
-    enabled,
-    retry: false,
-    staleTimeMs: 0,
-  });
-  const catalog = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "access-catalog"),
-    queryFn: () => hub.api().get(`access-catalog${HUB_ACCESS_INCLUDE}`, HubAccessCatalogSchema),
-    dataShape: "value",
-    enabled,
-    retry: false,
-    staleTimeMs: 0,
-  });
-  const members = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "members"),
-    queryFn: () => hub.api().get("members", HubMembersSchema),
-    dataShape: "value",
-    enabled,
-    retry: false,
-    staleTimeMs: 0,
-  });
-  const teams = useFetchQuery({
-    queryKey: hubResourceQueryKey(queryScope, "teams"),
-    queryFn: () => hub.api().get("teams", HubTeamsSchema),
-    dataShape: "value",
-    enabled,
-    retry: false,
-    staleTimeMs: 0,
-  });
-  const [pending, setPending] = useState(false);
-  const [mutationError, setMutationError] = useState<MutationError | null>(null);
+  const { assignments, catalog, members, teams } = useManagedAccessQueries();
   const [editing, setEditing] = useState<AccessAssignment | null>(null);
   // The grant sheet is open while granting (editing null) or editing a row.
   const [formOpen, setFormOpen] = useState(false);
@@ -188,22 +113,9 @@ function ManagedAccessSettings({
     setEditing(assignment);
     setFormOpen(true);
   }, []);
-  const runMutation = useCallback(
-    async (operation: () => Promise<void>) => {
-      setPending(true);
-      setMutationError(null);
-      try {
-        await operation();
-        await assignments.refetch();
-        setEditing(null);
-        setFormOpen(false);
-      } catch (error) {
-        setMutationError(describeMutationError(error));
-      } finally {
-        setPending(false);
-      }
-    },
-    [assignments],
+  const { pending, mutationError, runMutation, post } = useAccessMutation(
+    assignments.refetch,
+    cancelEdit,
   );
 
   const removeAssignment = useCallback(
@@ -224,18 +136,9 @@ function ManagedAccessSettings({
 
   const saveAssignment = useCallback(
     async (body: unknown, batch?: boolean) => {
-      if (!isCurrent()) return;
-      await runMutation(async () => {
-        await hub
-          .api()
-          .post(
-            batch ? "access-assignments/batch" : "access-assignments",
-            body,
-            batch ? HubAccessAssignmentsSchema : HubAccessAssignmentSchema,
-          );
-      });
+      if (isCurrent()) await post(body, batch);
     },
-    [hub, isCurrent, runMutation],
+    [isCurrent, post],
   );
 
   const queryFailed = [assignments, catalog, members, teams].some((query) => query.error !== null);
@@ -283,11 +186,6 @@ function ManagedAccessSettings({
       ) : null}
     </View>
   );
-}
-
-function describeMutationError(error: unknown): MutationError {
-  if (error instanceof HubApiError) return { code: error.code, message: error.message };
-  return { code: null, message: error instanceof Error ? error.message : "Hub request failed." };
 }
 
 function ManagedAccessContent({

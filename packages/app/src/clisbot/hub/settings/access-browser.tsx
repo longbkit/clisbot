@@ -30,6 +30,7 @@ import {
 } from "./access-browser-model";
 import type { GrantGrouping } from "./access-grant-rows";
 import { AccessGrantsTable, type GrantActions } from "./access-grants-table";
+import { resourceKey, subjectKey } from "./access-catalog";
 import { GrantAccessMenu } from "./access-grant-menu";
 import { AccessMemberTeams } from "./access-member-teams";
 import { BackLink } from "./back-link";
@@ -315,6 +316,22 @@ function EntryDetail({
       ),
     [actions.pending, entry, grant, grantTo, teams],
   );
+  const rowActions = useMemo<GrantActions>(
+    () => ({
+      ...actions,
+      openVia: onSelect,
+      // The same resource, to whoever is on screen, as their own grant.
+      grantDirect: (row) =>
+        grantTo({
+          ...entry,
+          target: {
+            subject: entry.target.subject ?? subjectKey(row.subject.kind, row.subject.id),
+            resource: entry.target.resource ?? resourceKey(row.resource),
+          },
+        }),
+    }),
+    [actions, entry, grantTo, onSelect],
+  );
   return (
     <View style={styles.stack}>
       {/* An Owner already reaches everything; a grant to them would change nothing. */}
@@ -331,7 +348,7 @@ function EntryDetail({
         rows={entry.rows}
         grouping={grouping}
         empty={emptyGrants(entry, grouping)}
-        actions={actions}
+        actions={rowActions}
       />
     </View>
   );

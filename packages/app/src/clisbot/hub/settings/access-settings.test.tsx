@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessSettings } from "./access-settings";
+import { GrantAccessSheet } from "./access-grant-sheet";
 import { assignmentResourceOptions } from "./access-catalog";
 
 const adapters = vi.hoisted(() => ({
@@ -293,6 +294,56 @@ describe("Grant access for a Member in Teams", () => {
     fireEvent.click(team);
     const subject = (await screen.findByLabelText("Team, Member or Guest")) as HTMLSelectElement;
     expect(subject.value).toBe("team\0qc");
+  });
+
+  it("edits a Team grant on the Team with a warning, or grants the Member directly instead", async () => {
+    const teamGrant = { ...assignment, id: "qc-host", subjectKind: "team", subjectId: "qc" };
+    const withTeamGrant = {
+      ...resources,
+      "access-assignments": { assignments: [teamGrant] },
+      teams: {
+        teams: [{ id: "qc", name: "QC", userIds: ["user"], createdAt: "now", updatedAt: null }],
+      },
+    };
+    adapters.get.mockImplementation(async (path: string) => withTeamGrant[resourceOf(path)]);
+    renderAccess();
+    fireEvent.click(await screen.findByRole("button", { name: /^Member One/u }));
+    expect(screen.getByText("Access via")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit on Team" }));
+    expect(await screen.findByText("This is Team QC's grant")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(await screen.findByText("Grant directly instead…"));
+    const subject = (await screen.findAllByLabelText("Team, Member or Guest")).at(-1);
+    expect((subject as HTMLSelectElement).value).toBe("member\0membership");
+    expect((screen.getByLabelText("Resource") as HTMLSelectElement).value).toBe("daemon\0host");
+  });
+
+  it("grants from a sheet opened outside Access, then tells its page and closes", async () => {
+    const withTeam = {
+      ...resources,
+      teams: {
+        teams: [{ id: "qc", name: "QC", userIds: ["user"], createdAt: "now", updatedAt: null }],
+      },
+    };
+    adapters.get.mockImplementation(async (path: string) => withTeam[resourceOf(path)]);
+    const close = vi.fn();
+    const onSaved = vi.fn();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <GrantAccessSheet subject={"team\0qc"} close={close} onSaved={onSaved} />
+      </QueryClientProvider>,
+    );
+    const subject = (await screen.findByLabelText("Team, Member or Guest")) as HTMLSelectElement;
+    expect(subject.value).toBe("team\0qc");
+    fireEvent.change(screen.getByLabelText("Resource"), { target: { value: "daemon\0host" } });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      subjectKind: "team",
+      subjectId: "qc",
+    });
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 });
 
@@ -1115,9 +1166,11 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     expect(screen.getByText("Above your own level, not offered: Developer")).toBeTruthy();
     // The Developer row on the same Project is above the viewer: no Edit, no Remove.
     expect(screen.getAllByText("Above your level")).toHaveLength(1);
-    // Opened on Member One: the Team grant shows under them, edited on the Team.
-    expect(screen.getByText("via Team QC")).toBeTruthy();
+    // Opened on Member One: the Team grant shows under them, from the Team, edited on the Team.
+    expect(screen.getByText("Access via")).toBeTruthy();
+    expect(screen.getByText("Direct")).toBeTruthy();
     expect(screen.queryAllByRole("button", { name: "Edit" })).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "Edit on Team" })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /^QC/u }));
     expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
   });

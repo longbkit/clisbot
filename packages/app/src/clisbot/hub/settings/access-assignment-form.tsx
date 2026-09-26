@@ -33,6 +33,7 @@ import {
   type HubTeam,
 } from "./access-catalog";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
+import { countLabel } from "./labels";
 import { MultiSelectField } from "./multi-select-field";
 import { ProjectFolderFields, TerminalAccessFields } from "./access-terminal-fields";
 import {
@@ -164,8 +165,17 @@ function AccessAssignmentForm({
     ],
   );
 
+  const sharedTeam =
+    editing?.subjectKind === "team" ? teams.find(({ id }) => id === editing.subjectId) : undefined;
   return (
     <View style={styles.sheetForm}>
+      {sharedTeam === undefined ? null : (
+        <Alert
+          variant="warning"
+          title={`This is Team ${sharedTeam.name}'s grant`}
+          description={`Saving changes it for everyone in the Team (${countLabel(sharedTeam.userIds.length, "Member")}). To change one person only, grant them directly instead.`}
+        />
+      )}
       {!draft.constraintsValid ? (
         <Alert
           variant="error"

@@ -89,6 +89,7 @@ export function SelectedMemberDetail({
             teams={teams}
             resources={resources}
             pending={pending}
+            run={actions.run}
             manageAccess={manageAccess}
           />
           <MemberChatAccounts

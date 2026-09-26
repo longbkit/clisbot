@@ -303,6 +303,8 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
     <span>{accessibilityLabel}</span>
   ),
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuLabel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuSeparator: () => <hr />,
   DropdownMenuItem: ({
     children,
     onSelect,
@@ -315,6 +317,24 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
     <button type="button" disabled={disabled} onClick={onSelect}>
       {children}
     </button>
+  ),
+}));
+// The grant sheet is the Access screen's form, tested there; here only what it opens on.
+vi.mock("./access-grant-sheet", () => ({
+  GrantAccessSheet: ({
+    subject,
+    resource,
+    editing,
+  }: {
+    subject: string | null;
+    resource?: string | null;
+    editing?: { id: string } | null;
+  }) => (
+    <div role="dialog" aria-label="Grant access">
+      {editing
+        ? `edit ${editing.id}`
+        : [subject, resource].filter(Boolean).join(" on ").replaceAll("\0", ":")}
+    </div>
   ),
 }));
 vi.mock("@/components/adaptive-modal-sheet", () => ({
@@ -946,7 +966,11 @@ describe("Member detail", () => {
     expect(within(access).getByText("Office worker")).toBeTruthy();
     expect(within(access).getAllByText("Alice").length).toBeGreaterThan(0);
     expect(within(access).getByText("Customer chat")).toBeTruthy();
-    expect(within(access).getByText("via Team Support")).toBeTruthy();
+    // Where each comes from has its own column: Direct, or the Team.
+    expect(within(access).getByText("Access via")).toBeTruthy();
+    // Also a choice in the (stubbed, always open) Grant access… menu.
+    expect(within(access).getAllByText("Team Support").length).toBeGreaterThan(1);
+    expect(within(access).getAllByText("Direct").length).toBeGreaterThan(0);
     // A grant matching no Level is counted, not listed.
     expect(within(access).getByText("Custom · 2 privileges")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Chat accounts" })).toBeTruthy();
@@ -1023,10 +1047,31 @@ describe("Invitations", () => {
 });
 
 describe("Team access navigation", () => {
-  it("preserves the Member context when managing access", () => {
+  it("grants from the Member's page, their Teams first, without leaving it", () => {
     render(<HubSettingsContent section="team" />);
     openMember("Alice");
-    fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Team Support" }));
+    expect(screen.getByRole("dialog", { name: "Grant access" }).textContent).toBe("team:team-1");
+    expect(screen.getByRole("button", { name: "Only Alice" })).toBeTruthy();
+    expect(route.params).not.toMatchObject({ view: "access" });
+  });
+  it("edits a Team row on the Team, or grants the Member directly, without leaving the page", () => {
+    render(<HubSettingsContent section="team" />);
+    openMember("Alice");
+    fireEvent.click(screen.getByRole("button", { name: "Edit on Team" }));
+    expect(screen.getByRole("dialog", { name: "Grant access" }).textContent).toBe("edit grant-1");
+    cleanup();
+    render(<HubSettingsContent section="team" />);
+    openMember("Alice");
+    fireEvent.click(screen.getByRole("button", { name: "Grant directly instead…" }));
+    expect(screen.getByRole("dialog", { name: "Grant access" }).textContent).toBe(
+      "member:membership-1 on channel_account:channel-1",
+    );
+  });
+  it("preserves the Member context when opening their grants in Access", () => {
+    render(<HubSettingsContent section="team" />);
+    openMember("Alice");
+    fireEvent.click(screen.getByRole("button", { name: "Open in Access" }));
     // Access is People's own tab: it opens there with this Member chosen.
     expect(route.params).toMatchObject({
       view: "access",

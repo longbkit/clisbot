@@ -67,16 +67,17 @@ describe("grantRows", () => {
 });
 
 describe("groupGrantRows", () => {
-  it("groups by people, Teams first, and lists a Member's Team grants under them, not editable", () => {
+  it("groups by people, Teams first, and lists a Member's Team grants under them, from the Team", () => {
     const groups = groupGrantRows(rows, "subject", directory);
     expect(groups.map(({ title, subtitle }) => [title, subtitle])).toEqual([
       ["QC", "Team · 1 Member"],
       ["Ai Tran", "Member"],
     ]);
     const ai = groups[1]!.rows;
-    expect(ai.map((row) => [row.resource.name, row.via, row.assignment === null])).toEqual([
-      ["LongPro2Max", null, false],
-      ["brain", "Team QC", true],
+    // A Team row keeps the Team's grant, so it can be opened and edited on the Team.
+    expect(ai.map((row) => [row.resource.name, row.via, row.viaKey, row.assignment?.id])).toEqual([
+      ["LongPro2Max", null, null, "ai-host"],
+      ["brain", "Team QC", "team:t-qc", "team-project"],
     ]);
   });
 
@@ -85,7 +86,7 @@ describe("groupGrantRows", () => {
     expect(groups.map(({ title }) => title)).toEqual(["LongPro2Max", "brain"]);
   });
 
-  it("lists a Host grant that carries Project use under each Project, not editable there", () => {
+  it("lists a Host grant that carries Project use under each Project, from the Host", () => {
     const hostGrant = grantRows({
       assignments: [
         grant({
@@ -111,9 +112,9 @@ describe("groupGrantRows", () => {
     expect(brain.map(({ title, subtitle }) => [title, subtitle])).toEqual([
       ["brain", "Project · LongPro2Max"],
     ]);
-    expect(brain[0]!.rows.map((row) => [row.subject.name, row.via, row.assignment])).toEqual([
-      ["Bao", "Host LongPro2Max", null],
-    ]);
+    expect(
+      brain[0]!.rows.map((row) => [row.subject.name, row.via, row.viaKey, row.assignment?.id]),
+    ).toEqual([["Bao", "Host LongPro2Max", "daemon:host", "bao-host"]]);
   });
 
   it("keeps Guest apart and drops Team grants from a Member who left the Team", () => {
@@ -153,7 +154,8 @@ describe("Team-only access", () => {
     });
     const groups = groupGrantRows(teamOnly, "subject", directory);
     expect(groups.map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
-    expect(groups[1]!.rows[0]).toMatchObject({ via: "Team QC", assignment: null });
+    expect(groups[1]!.rows[0]).toMatchObject({ via: "Team QC", viaKey: "team:t-qc" });
+    expect(groups[1]!.rows[0]!.assignment?.subjectKind).toBe("team");
   });
 });
 

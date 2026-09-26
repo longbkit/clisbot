@@ -12,7 +12,7 @@ import {
   type SubjectKind,
 } from "./access-catalog";
 import { grantRows, grantedAccessLabel, subjectGrantRows } from "./access-grant-rows";
-import { AccessGrantsTable } from "./access-grants-table";
+import { AccessGrantsTable, type GrantActions } from "./access-grants-table";
 import { sharesAccess } from "./access-level-summary";
 
 export function SubjectGrantsTable({
@@ -24,6 +24,7 @@ export function SubjectGrantsTable({
   members,
   teams,
   empty,
+  actions,
 }: {
   subjectKind: SubjectKind;
   subjectId: string;
@@ -33,6 +34,8 @@ export function SubjectGrantsTable({
   members: readonly HubMember[];
   teams: readonly HubTeam[];
   empty: string;
+  /** Absent: read-only. */
+  actions?: GrantActions;
 }) {
   const rows = useMemo(() => {
     const all = grantRows({
@@ -48,5 +51,5 @@ export function SubjectGrantsTable({
     const subject = { kind: subjectKind, id: subjectId };
     return subjectGrantRows(all, subject, { members, teams, resources });
   }, [accessLevels, assignments, members, resources, subjectId, subjectKind, teams]);
-  return <AccessGrantsTable rows={rows} grouping="subject" empty={empty} />;
+  return <AccessGrantsTable rows={rows} grouping="subject" empty={empty} actions={actions} />;
 }

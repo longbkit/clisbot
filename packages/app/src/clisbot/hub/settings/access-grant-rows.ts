@@ -35,7 +35,10 @@ export interface GrantRow {
   /** What this grant reaches the group through ("Team QC", "Host LongPro2Max");
    * such a row is edited where it is granted. */
   via: string | null;
-  /** The grant to edit or remove; null for a row shown through a Team. */
+  /** The Access entry the row comes through (`team:<id>`, `daemon:<id>`), to open it. */
+  viaKey: string | null;
+  /** The stored grant: this row's own, or the Team's or Host's it comes through.
+   * Null where the viewer only sees the effect (their own access). */
   assignment: AccessAssignment | null;
   /** Above the viewer's own level: shown, not changeable. */
   locked: boolean;
@@ -77,6 +80,7 @@ export function grantRows(input: GrantRowInput): GrantRow[] {
     details: grantDetails(assignment, input.sharesAccess(assignment)),
     grantedBy: grantorName(assignment, input.memberNameByUserId),
     via: null,
+    viaKey: null,
     assignment,
     locked: input.locked(assignment),
   }));
@@ -169,7 +173,9 @@ function addTeamRowsToMembers(
     const inherited = teams.flatMap((team) =>
       rows
         .filter((row) => row.subject.kind === "team" && row.subject.id === team.id)
-        .map((row) => reached(row, `${row.key}:${member.id}`, `Team ${team.name}`)),
+        .map((row) =>
+          reached(row, `${row.key}:${member.id}`, `Team ${team.name}`, `team:${team.id}`),
+        ),
     );
     if (inherited.length === 0 && !groups.has(key)) continue;
     const group = groups.get(key) ?? { key, title: member.name, subtitle: "Member", rows: [] };
@@ -197,9 +203,9 @@ function bySubjectOrder(left: GrantGroup, right: GrantGroup): number {
   return kind(left) - kind(right) || left.title.localeCompare(right.title);
 }
 
-/** A grant shown where it reaches, not where it is granted: not editable there. */
-function reached(row: GrantRow, key: string, via: string): GrantRow {
-  return Object.assign({}, row, { key, via, assignment: null });
+/** A grant shown where it reaches; its `assignment` is still the one granted on `viaKey`. */
+function reached(row: GrantRow, key: string, via: string, viaKey: string): GrantRow {
+  return Object.assign({}, row, { key, via, viaKey });
 }
 
 /**
@@ -223,7 +229,9 @@ function addHostRowsToProjects(
           row.resource.id === hostId &&
           row.assignment?.privileges.includes("project.use") === true,
       )
-      .map((row) => reached(row, `${row.key}:${project.id}`, `Host ${row.resource.name}`));
+      .map((row) =>
+        reached(row, `${row.key}:${project.id}`, `Host ${row.resource.name}`, `daemon:${hostId}`),
+      );
     if (reachedRows.length === 0 && !groups.has(key)) continue;
     const group = groups.get(key) ?? {
       key,
@@ -368,6 +376,7 @@ export function effectiveGrantRows(
       details: limits === null ? [] : [limits],
       grantedBy: null,
       via: grant.source.kind === "team" ? `Team ${grant.source.teamName}` : null,
+      viaKey: null,
       assignment: null,
       locked: false,
     };

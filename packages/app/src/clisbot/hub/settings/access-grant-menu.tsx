@@ -11,7 +11,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import type { MenuTriggerState } from "@/components/ui/menu";
-import type { AccessEntry } from "./access-browser-model";
+
+/** Someone a grant can go to: an Access entry, or a Team or Member from People. */
+export interface GrantChoice {
+  key: string;
+  title: string;
+}
 
 function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
   return [styles.trigger, (hovered || pressed || open) && styles.highlight];
@@ -21,17 +26,17 @@ function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
  * Grant access… for a Member in Teams. Access is easier to keep straight when it is granted to a
  * Team, so the menu offers the Member's Teams first and a grant to the Member alone last.
  */
-export function GrantAccessMenu({
+export function GrantAccessMenu<T extends GrantChoice>({
   member,
   teams,
   disabled,
   grantTo,
 }: {
-  member: AccessEntry;
+  member: T;
   /** The Member's Teams; at least one, or the plain Grant access… button is enough. */
-  teams: readonly AccessEntry[];
+  teams: readonly T[];
   disabled: boolean;
-  grantTo(entry: AccessEntry): void;
+  grantTo(choice: T): void;
 }) {
   return (
     <DropdownMenu compactMode="sheet">
@@ -66,16 +71,16 @@ export function GrantAccessMenu({
   );
 }
 
-function GrantItem({
+function GrantItem<T extends GrantChoice>({
   entry,
   label,
   description,
   grantTo,
 }: {
-  entry: AccessEntry;
+  entry: T;
   label: string;
   description: string;
-  grantTo(entry: AccessEntry): void;
+  grantTo(choice: T): void;
 }) {
   const select = useCallback(() => grantTo(entry), [entry, grantTo]);
   return (

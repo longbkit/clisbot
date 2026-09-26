@@ -80,10 +80,16 @@ View access by  [ People and Teams | Resources ]
   a direct grant. A Team grant covers people added later and is one row to
   review; a direct grant stays when the Member leaves their Teams. A Member in
   no Team gets the plain button.
-- **A Member's grants include their Teams'**, marked "via Team …", with no
-  actions: that grant is edited on the Team. A Project lists the Host grants
-  that reach it, marked "via Host …". Either way the entry counts as having
-  access.
+- **A Member's grants include their Teams'**, with an **Access via** column
+  (_Direct_ or the Team, which opens it). A Team row is the Team's grant, so
+  its action is **Edit on Team**: the sheet opens on the Team's grant with a
+  warning that saving changes it for everyone in the Team. Its **…** menu has
+  _Open Team …_ and _Grant directly instead…_, a new grant to this Member on
+  the same resource for when one person needs something the Team should not
+  get. This is the IAM "inherited from" pattern: you always see where access
+  comes from, and change it at its source. A Project lists the Host grants
+  that reach it the same way (_Edit on Host_). Either way the entry counts as
+  having access.
 - **Side by side only when both fit** (about 880px of Settings column);
   narrower, and on a phone, the list is one screen and the entry another, with
   a back link. On a phone a grant is a card with labelled lines.
@@ -94,18 +100,25 @@ View access by  [ People and Teams | Resources ]
 ## Interaction
 
 - **Grant access…** is on the open entry and opens the grant sheet pre-filled
-  with it. A link for one person or resource (a Member's _Manage access_, a
+  with it. A link for one person or resource (a Member's _Open in Access_, a
   Connection's _Manage Admins_) opens the screen on that entry.
-- **Edit** on a row opens the same sheet for that grant. **Remove** is in the
-  row's **…** menu, with a confirmation, so it is never next to Edit.
+- **Edit** on a row opens the same sheet for that grant, which is also where
+  its full detail is (every Agent configuration, Terminal profile, and
+  modifier). **Remove** is in the row's **…** menu, with a confirmation, so it
+  is never next to Edit. A Member's page in People has the same row actions,
+  in a sheet over the page.
 - A grant above the viewer's own level shows **Above your level** instead of
   actions: they can see it, not change it.
 - A Member who manages no one sees the same table, read-only, of their own
   access, with Levels named from the catalog the Hub sends with it. Who
   granted each is not part of that view, so the column is absent.
 - A Team's and a Member's detail pages show their grants in the same table
-  (`SubjectGrantsTable`), read-only. Change them with **Manage access**, which
-  opens this screen on them.
+  (`SubjectGrantsTable`), read-only. A Member's page grants in place: its
+  **Grant access…** is the same menu (their Teams first, then _Only <Member>_)
+  and opens the same sheet over the page (`GrantAccessSheet`, sharing the
+  Access screen's queries and save in `access-queries.ts`). **Open in Access**,
+  shown once they have grants, opens this screen on them to edit or remove
+  one. A Team's page still has **Manage access**.
 
 ## Components and readability
 

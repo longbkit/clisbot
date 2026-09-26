@@ -20,6 +20,10 @@ export interface GrantActions {
   pending: boolean;
   edit(assignment: AccessAssignment): void;
   remove(assignmentId: string): Promise<void>;
+  /** Opens the Team or Host a row comes through. */
+  openVia?(viaKey: string): void;
+  /** Grants a row's resource to the subject on screen directly, over what a Team gives. */
+  grantDirect?(row: GrantRow): void;
 }
 
 export function AccessGrantsTable({
@@ -38,8 +42,13 @@ export function AccessGrantsTable({
   const compact = useIsCompactFormFactor();
   const withActions = actions !== undefined;
   const columns = useMemo<Columns>(
-    () => ({ grantedBy: rows.some((row) => row.grantedBy !== null), actions: withActions }),
-    [rows, withActions],
+    () => ({
+      grantedBy: rows.some((row) => row.grantedBy !== null),
+      // A Member's list says where each grant comes from: Direct or a Team.
+      via: grouping === "subject" && rows.some((row) => row.via !== null),
+      actions: withActions,
+    }),
+    [grouping, rows, withActions],
   );
   if (rows.length === 0) {
     return (
@@ -71,6 +80,7 @@ export function AccessGrantsTable({
 /** Columns every row shares: Granted by only when some row knows it. */
 interface Columns {
   grantedBy: boolean;
+  via: boolean;
   actions: boolean;
 }
 
@@ -80,6 +90,7 @@ function HeaderRow({ grouping, columns }: { grouping: GrantGrouping; columns: Co
       <Text style={[tableStyles.headerCell, styles.thing]}>
         {grouping === "subject" ? "Resource" : "Who"}
       </Text>
+      {columns.via ? <Text style={[tableStyles.headerCell, styles.via]}>Access via</Text> : null}
       <Text style={[tableStyles.headerCell, styles.level]}>Level</Text>
       <Text style={[tableStyles.headerCell, styles.details]}>Details</Text>
       {columns.grantedBy ? (
@@ -109,8 +120,9 @@ function GrantRowView({
     grouping === "subject"
       ? { name: row.resource.name, context: row.resource.context }
       : { name: row.subject.name, context: SUBJECT_KIND_LABELS[row.subject.kind] };
-  const details = [...row.details, ...(row.via === null ? [] : [`via ${row.via}`])];
+  const details = [...row.details, ...(row.via === null || columns.via ? [] : [`via ${row.via}`])];
   const trailing = actions === undefined ? null : <GrantRowActions row={row} actions={actions} />;
+  const via = columns.via ? <ViaCell row={row} open={actions?.openVia} /> : null;
   if (compact) {
     return (
       <View
@@ -125,6 +137,7 @@ function GrantRowView({
           <Thing name={thing.name} context={thing.context} />
           {trailing}
         </View>
+        {via === null ? null : <Labelled label="Access via">{via}</Labelled>}
         <Labelled label="Level">
           <Text style={styles.value}>{row.level}</Text>
         </Labelled>
@@ -153,12 +166,30 @@ function GrantRowView({
       <View style={styles.thing}>
         <Thing name={thing.name} context={thing.context} />
       </View>
+      {via === null ? null : <View style={styles.via}>{via}</View>}
       <Text style={[styles.value, styles.level]}>{row.level}</Text>
       <Text style={[styles.muted, styles.details]}>{details.join(", ") || "—"}</Text>
       {columns.grantedBy ? (
         <Text style={[styles.muted, styles.grantedBy]}>{row.grantedBy ?? "—"}</Text>
       ) : null}
       {trailing}
+    </View>
+  );
+}
+
+/** Direct, or the Team the grant comes from, which opens that Team when it can. */
+function ViaCell({ row, open }: { row: GrantRow; open: ((viaKey: string) => void) | undefined }) {
+  const { viaKey } = row;
+  const press = useCallback(() => {
+    if (viaKey !== null) open?.(viaKey);
+  }, [open, viaKey]);
+  if (row.via === null) return <Text style={styles.value}>Direct</Text>;
+  if (open === undefined || viaKey === null) return <Text style={styles.value}>{row.via}</Text>;
+  return (
+    <View style={styles.viaLink}>
+      <Button size="xs" variant="ghost" onPress={press} accessibilityLabel={`Open ${row.via}`}>
+        {row.via}
+      </Button>
     </View>
   );
 }
@@ -182,27 +213,16 @@ function Labelled({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Edit, and Remove behind the menu so it is never next to Edit. A row that
- * comes through a Team has none (it is edited on the Team); a row above the
- * viewer's level says so instead.
+ * Edit, and Remove behind the menu so it is never next to Edit. A row that comes through a
+ * Team is the Team's grant: Edit on Team changes it for the whole Team, and the menu opens the
+ * Team or grants the same resource to this person alone. A row above the viewer's level says so.
  */
 function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantActions }) {
   const { assignment } = row;
   const edit = useCallback(() => {
     if (assignment !== null) actions.edit(assignment);
   }, [actions, assignment]);
-  const menu = useMemo(
-    () => [
-      {
-        label: "Remove",
-        destructive: true,
-        onSelect: () => {
-          if (assignment !== null) void actions.remove(assignment.id);
-        },
-      },
-    ],
-    [actions, assignment],
-  );
+  const menu = useMemo(() => rowMenu(row, actions), [actions, row]);
   if (assignment === null) return <View style={styles.actions} />;
   if (row.locked) {
     return (
@@ -214,15 +234,41 @@ function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantAction
   return (
     <View style={[styles.actions, styles.actionButtons]}>
       <Button size="xs" variant="ghost" disabled={actions.pending} onPress={edit}>
-        Edit
+        {row.via === null ? "Edit" : `Edit on ${viaKindLabel(row.viaKey)}`}
       </Button>
-      <RowActionsMenu
-        label={`Actions for ${row.subject.name} on ${row.resource.name}`}
-        actions={menu}
-        disabled={actions.pending}
-      />
+      {menu.length === 0 ? null : (
+        <RowActionsMenu
+          label={`Actions for ${row.subject.name} on ${row.resource.name}`}
+          actions={menu}
+          disabled={actions.pending}
+        />
+      )}
     </View>
   );
+}
+
+function rowMenu(row: GrantRow, actions: GrantActions) {
+  const { assignment, viaKey } = row;
+  if (assignment === null) return [];
+  if (row.via === null) {
+    return [
+      { label: "Remove", destructive: true, onSelect: () => void actions.remove(assignment.id) },
+    ];
+  }
+  const { openVia, grantDirect } = actions;
+  return [
+    ...(openVia === undefined || viaKey === null
+      ? []
+      : [{ label: `Open ${row.via}`, onSelect: () => openVia(viaKey) }]),
+    ...(grantDirect === undefined
+      ? []
+      : [{ label: "Grant directly instead…", onSelect: () => grantDirect(row) }]),
+  ];
+}
+
+/** "Team" or "Host", from the entry key a row comes through. */
+function viaKindLabel(viaKey: string | null): string {
+  return viaKey?.startsWith("daemon:") === true ? "Host" : "Team";
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -232,7 +278,9 @@ const styles = StyleSheet.create((theme) => ({
   level: { flex: 2, minWidth: 0 },
   details: { flex: 2, minWidth: 0 },
   grantedBy: { flex: 1.5, minWidth: 0 },
-  actions: { width: 112, flexDirection: "row", justifyContent: "flex-end" },
+  actions: { width: 152, flexDirection: "row", justifyContent: "flex-end" },
+  via: { flex: 1.5, minWidth: 0, alignItems: "flex-start" },
+  viaLink: { marginLeft: -theme.spacing[2] },
   actionButtons: { alignItems: "center", gap: theme.spacing[1] },
   value: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
   muted: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.base },
