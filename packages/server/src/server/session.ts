@@ -271,6 +271,12 @@ import {
   handleWorkspaceSetupRunRequest as handleWorkspaceSetupRunRequestMessage,
 } from "./worktree-session.js";
 import { archiveByScope, type ActiveWorkspaceRef } from "./workspace-archive-service.js";
+import type { BotService } from "./bots/index.js";
+import {
+  createBotSession,
+  dispatchBotMessage,
+  type BotSession,
+} from "./session/bots/bot-session.js";
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { SessionAuthorization, type DaemonPermission } from "./authorization/index.js";
 import type { SessionResourceAuthorization } from "./managed-access/types.js";
@@ -475,6 +481,7 @@ export interface SessionOptions {
   workspaceRegistry: WorkspaceRegistry;
   directorySync?: DirectorySyncService;
   workspaceLabelService?: WorkspaceLabelService;
+  botService?: BotService;
   filesystem?: SessionFileSystem;
   scheduleService: ScheduleService;
   checkoutDiffManager: CheckoutDiffManager;
@@ -731,6 +738,7 @@ export class Session {
   private readonly authorization: SessionAuthorization;
   private readonly resourceAuthorizer: ManagedResourceAuthorizer;
   private readonly terminalProfileSession: TerminalProfileSession;
+  private readonly botSession: BotSession | null;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
   private readonly sessionId: string;
@@ -1168,6 +1176,15 @@ export class Session {
       authority: this.resourceAuthorizer,
       actorId: () => this.accountActor?.id,
     });
+    this.botSession = createBotSession(
+      options.botService,
+      {
+        emit: (msg) => this.emit(msg),
+        actor: () => this.accountActor,
+        authority: this.resourceAuthorizer,
+      },
+      this.sessionLogger,
+    );
     this.terminalController = new TerminalSessionController({
       terminalManager,
       emit: (msg) => this.emit(msg),
@@ -2555,7 +2572,8 @@ export class Session {
       this.dispatchWorkspaceStateMessage(msg) ??
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
-      this.dispatchWorkspaceAndProjectMessage(msg)
+      this.dispatchWorkspaceAndProjectMessage(msg) ??
+      dispatchBotMessage(this.botSession, msg, (reply) => this.emit(reply))
     );
   }
 
@@ -9314,6 +9332,7 @@ export class Session {
       this.unsubscribeTerminalWorkspaceContributionEvents = null;
     }
     this.providerCatalogSession.dispose();
+    this.botSession?.dispose();
 
     this.terminalController.dispose();
 

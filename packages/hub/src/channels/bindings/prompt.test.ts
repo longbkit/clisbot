@@ -2,14 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { channelMessageId } from "../daemon/session-operation.js";
 import type { InboundMessage } from "../plane/types.js";
-import {
-  CONTEXT_HEADER,
-  MESSAGE_HEADER,
-  deliveryMessageId,
-  renderConversationPrompt,
-  senderLabel,
-  sessionTitle,
-} from "./prompt.js";
+import { deliveryMessageId, renderConversationPrompt, sessionTitle } from "./prompt.js";
 
 function message(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
@@ -26,48 +19,13 @@ function message(overrides: Partial<InboundMessage> = {}): InboundMessage {
 }
 
 describe("renderConversationPrompt", () => {
-  it("names the sender of every line, and the identity alone when no name is known", () => {
+  // The rendering itself is covered in the protocol package
+  // (`conversation-prompt.test.ts`); this proves an inbound message renders through it.
+  it("renders an inbound channel message as a sender line", () => {
     assert.equal(
       renderConversationPrompt({ context: [], messages: [message()] }),
       "Minh Dương (slack:U018WR2K090): Create a CS card",
     );
-    const { senderName: _unnamed, ...anonymous } = message({ text: "hi" });
-    assert.equal(
-      renderConversationPrompt({ context: [], messages: [anonymous] }),
-      "slack:U018WR2K090: hi",
-    );
-  });
-
-  it("puts the context before the message, marked as quoted context", () => {
-    const lan = message({
-      senderIdentity: "slack:U02ABC",
-      senderName: "Lan Nguyễn",
-      text: "code is HH-HT",
-    });
-    assert.equal(
-      renderConversationPrompt({
-        context: [lan],
-        messages: [message({ text: "create the card" })],
-      }),
-      [
-        CONTEXT_HEADER,
-        "Lan Nguyễn (slack:U02ABC): code is HH-HT",
-        MESSAGE_HEADER,
-        "Minh Dương (slack:U018WR2K090): create the card",
-      ].join("\n"),
-    );
-  });
-
-  it("adds the handle after the identity when the platform has one", () => {
-    assert.equal(
-      renderConversationPrompt({
-        context: [],
-        messages: [message({ senderUsername: "minh.duong", text: "hi" })],
-      }),
-      "Minh Dương (slack:U018WR2K090, @minh.duong): hi",
-    );
-    const { senderName: _unnamed, ...anonymous } = message({ senderUsername: "minh.duong" });
-    assert.equal(senderLabel(anonymous), "slack:U018WR2K090");
   });
 });
 

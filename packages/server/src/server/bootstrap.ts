@@ -154,6 +154,7 @@ import {
 } from "./workspace-registry.js";
 import { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { ScheduleService } from "./schedule/service.js";
+import { createBotServiceFromConfig } from "./bots/index.js";
 import { DaemonConfigStore, type MutableDaemonConfig } from "./daemon-config-store.js";
 import { createOrchestrationSkills } from "./orchestration-skills/index.js";
 import { resolveConfigFromPersisted, type CliConfigOverrides } from "./config.js";
@@ -448,6 +449,7 @@ export interface PaseoDaemonConfig {
   appBaseUrl?: string;
   auth?: DaemonAuthConfig;
   managedAccessMode?: import("@getpaseo/protocol/managed-access").ManagedAccessMode;
+  bots?: import("./bots/bots-config.js").BotsConfig;
   openai?: PaseoOpenAIConfig;
   speech?: PaseoSpeechConfig;
   voiceLlmProvider?: AgentProvider | null;
@@ -1573,6 +1575,23 @@ export async function createPaseoDaemon(
     }
   });
   logger.info({ elapsed: elapsed() }, "Schedule service initialized");
+  // Clisbot Bots (docs/features/bots-and-chats/README.md, D10): null keeps the daemon upstream-equivalent.
+  const botService = createBotServiceFromConfig(config.bots, {
+    paseoHome: config.paseoHome,
+    logger,
+    projectRegistry,
+    workspaceRegistry,
+    findOrCreateProjectForDirectory: (cwd) =>
+      workspaceProvisioning.findOrCreateProjectForDirectory(cwd),
+    createWorkspaceForDirectory: (cwd, title, projectId) =>
+      workspaceProvisioning.createWorkspaceForDirectory(cwd, title, projectId),
+    emitWorkspaceUpdates: emitWorkspaceUpdatesExternal,
+    archiveWorkspace: archiveScheduleWorkspaceExternal,
+    isProviderAvailable: (provider) =>
+      providerSnapshotManager
+        .getSnapshot()
+        .records.some(({ entry }) => entry.provider === provider && entry.enabled),
+  });
   logger.info({ elapsed: elapsed() }, "Loading persisted agent registry");
   const persistedRecords = await agentStorage.list();
   logger.info(
@@ -1954,6 +1973,7 @@ export async function createPaseoDaemon(
               pluginRuntime,
               orchestrationSkills,
               workspaceLabelService,
+              botService ?? undefined,
             );
             pluginRuntime.bindPaseoSessionHost(wsServer);
             const timelineViewers = wsServer;

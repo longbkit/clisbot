@@ -984,6 +984,20 @@ describe("DaemonConfigStore reload", () => {
     expect(store.get().git).toEqual({ maxProcessesPerSecond: 12, maxProcessConcurrency: 3 });
   });
 
+  test("reports an edit to the bots leaf as startup-only", () => {
+    const { paseoHome, store, persisted } = createReloadableStore();
+    writeConfig(paseoHome, {
+      ...persisted,
+      daemon: { ...persisted.daemon, bots: { enabled: true, root: "/srv/bots" } },
+    });
+
+    expect(store.reload()).toEqual({
+      appliedPaths: [],
+      restartRequiredPaths: ["daemon.bots.enabled", "daemon.bots.root"],
+      overrideControlledPaths: [],
+    });
+  });
+
   test("applies the global plugin switch in both directions", () => {
     const { paseoHome, store, persisted } = createReloadableStore({
       initialPersisted: { version: 1, pluginsEnabled: false },

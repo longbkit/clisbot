@@ -296,6 +296,11 @@ export const PersistedConfigSchema = z
           .optional(),
         auth: DaemonAuthSchema.optional(),
         managedAccess: MutableManagedAccessConfigSchema.optional(),
+        // Clisbot Bots (docs/features/bots-and-chats/README.md, D10); read at startup only.
+        bots: z
+          .object({ enabled: z.boolean().optional(), root: z.string().optional() })
+          .strict()
+          .optional(),
       })
       .strict()
       .transform(({ allowedHosts, ...daemon }) => {

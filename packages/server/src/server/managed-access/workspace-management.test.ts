@@ -14,6 +14,11 @@ import type { ProjectPrivilege } from "./types.js";
 const DECIDED_ELSEWHERE = new Set([
   "close_items_request", // scoped by the agents and terminals it closes
   "workspace.create.request", // its own `workspace.create` rule
+  // Bots: `bot-access.ts` admits the create by Host privilege; the handler checks the bot's Project.
+  "bot.create.request",
+  "bot.update.request",
+  "bot.archive.request",
+  "bot.template.seed.request",
 ]);
 
 function message(type: string, fields: Record<string, unknown> = {}): SessionInboundMessage {

@@ -34,7 +34,8 @@ const CHANNEL_PACKAGES = [
 ] as const;
 
 /** Anything the fork could have leaked into the daemon's advertised contract. */
-const FORK_TERMS = /channel|clisbot|fusion|slack|telegram|discord|feishu|googlechat|zalo|openclaw/i;
+const FORK_TERMS =
+  /channel|clisbot|fusion|slack|telegram|discord|feishu|googlechat|zalo|openclaw|\bbots?\b/i;
 
 let daemon: TestPaseoDaemon;
 

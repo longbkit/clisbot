@@ -116,6 +116,21 @@ describe("PersistedConfigSchema daemon web UI feature config", () => {
   });
 });
 
+describe("PersistedConfigSchema daemon bots config", () => {
+  test("accepts the bots flag and root", () => {
+    const parsed = PersistedConfigSchema.parse({
+      daemon: { bots: { enabled: true, root: "~/bots" } },
+    });
+    expect(parsed.daemon?.bots).toEqual({ enabled: true, root: "~/bots" });
+  });
+
+  test("rejects an unknown key inside bots", () => {
+    expect(() =>
+      PersistedConfigSchema.parse({ daemon: { bots: { enabled: true, template: "x" } } }),
+    ).toThrow();
+  });
+});
+
 describe("PersistedConfigSchema worktrees config", () => {
   test("accepts optional worktree root", () => {
     const parsed = PersistedConfigSchema.parse({

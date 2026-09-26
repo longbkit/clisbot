@@ -27,8 +27,18 @@ import { withSessionLogWriteIo } from "./session-storage-io.js";
 
 export { AMBIGUOUS_ID, messagePreview, type SessionMessageAnchor } from "./session-event-index.js";
 
-/** One canonical stream per record family. Every family shares `events.jsonl`. */
-export type SessionEventKind = "timeline" | "submission" | "permission";
+/**
+ * One canonical stream per record family. The three session families share `events.jsonl`;
+ * `transcript` is a Chat's `transcript.jsonl` (docs/features/bots-and-chats/README.md, D5),
+ * which reuses this log with its own file stem and derives nothing beyond seq pointers.
+ */
+export type SessionEventKind = "timeline" | "submission" | "permission" | "transcript";
+
+/** The file stem of the log pair: `<stem>.jsonl` and `<stem>.index.json`. */
+export interface SessionEventLogOptions {
+  stem?: string;
+}
+const DEFAULT_STEM = "events";
 
 export interface SessionEventState {
   epoch: string;
@@ -47,6 +57,7 @@ export class SessionEventLog {
   private static readonly open = new Map<string, SessionEventLog>();
   private static readonly maxOpen = 128;
   readonly directory: string;
+  private readonly stem: string;
   private index: SessionEventIndex | null = null;
   private tail: Promise<unknown> = Promise.resolve();
   private removed = false;
@@ -56,27 +67,35 @@ export class SessionEventLog {
   /** Size of the last checkpoint, which sets how much tail the next one waits for. */
   private saved = { pointers: 0, bytes: 0 };
 
-  private constructor(directory: string) {
+  private constructor(directory: string, stem: string) {
     this.directory = directory;
+    this.stem = stem;
   }
 
-  /** One log per directory: the lock and the cached index must be shared by every kind. */
-  static for(directory: string): SessionEventLog {
+  /** The registry key: one log per file pair, so two stems in one directory are two logs. */
+  private static key(directory: string, stem: string): string {
+    return `${path.resolve(directory)}\n${stem}`;
+  }
+
+  /** One log per file pair: the lock and the cached index must be shared by every kind. */
+  static for(directory: string, options: SessionEventLogOptions = {}): SessionEventLog {
     const resolved = path.resolve(directory);
-    const existing = SessionEventLog.open.get(resolved);
+    const stem = options.stem ?? DEFAULT_STEM;
+    const key = SessionEventLog.key(resolved, stem);
+    const existing = SessionEventLog.open.get(key);
     if (existing) {
-      SessionEventLog.open.delete(resolved);
-      SessionEventLog.open.set(resolved, existing);
+      SessionEventLog.open.delete(key);
+      SessionEventLog.open.set(key, existing);
       return existing;
     }
     // Dropping an idle log only drops its cached index. Evicting a busy one would
     // hand the next caller a second writer over the same file.
-    for (const [key, log] of SessionEventLog.open) {
+    for (const [openKey, log] of SessionEventLog.open) {
       if (SessionEventLog.open.size < SessionEventLog.maxOpen) break;
-      if (!log.busy) SessionEventLog.open.delete(key);
+      if (!log.busy) SessionEventLog.open.delete(openKey);
     }
-    const log = new SessionEventLog(resolved);
-    SessionEventLog.open.set(resolved, log);
+    const log = new SessionEventLog(resolved, stem);
+    SessionEventLog.open.set(key, log);
     return log;
   }
 
@@ -89,8 +108,8 @@ export class SessionEventLog {
     }
   }
 
-  static forget(directory: string): void {
-    SessionEventLog.open.delete(path.resolve(directory));
+  static forget(directory: string, options: SessionEventLogOptions = {}): void {
+    SessionEventLog.open.delete(SessionEventLog.key(directory, options.stem ?? DEFAULT_STEM));
   }
 
   /** How many session logs currently hold a cached index. */
@@ -118,10 +137,10 @@ export class SessionEventLog {
   }
 
   private get eventPath(): string {
-    return path.join(this.directory, "events.jsonl");
+    return path.join(this.directory, `${this.stem}.jsonl`);
   }
   private get indexPath(): string {
-    return path.join(this.directory, "events.index.json");
+    return path.join(this.directory, `${this.stem}.index.json`);
   }
 
   /** Serializes every mutation and every index repair against this session's files. */
@@ -435,7 +454,7 @@ export class SessionEventLog {
       this.index = null;
       await fs.rm(this.eventPath, { force: true });
       await fs.rm(this.indexPath, { force: true });
-      SessionEventLog.forget(this.directory);
+      SessionEventLog.forget(this.directory, { stem: this.stem });
     });
   }
 }

@@ -17,6 +17,7 @@ export const PROJECT_CREATION_REPLIES: ReadonlySet<SessionOutboundMessage["type"
   "open_project_response",
   "project.create_directory.response",
   "project.github.clone.response",
+  "bot.create.response",
 ]);
 
 /**

@@ -45,6 +45,19 @@ import {
   ChatWaitResponseSchema,
 } from "./chat/rpc-schemas.js";
 import {
+  BotCreateRequestSchema,
+  BotListRequestSchema,
+  BotUpdateRequestSchema,
+  BotArchiveRequestSchema,
+  BotTemplateSeedRequestSchema,
+  BotCreateResponseSchema,
+  BotListResponseSchema,
+  BotUpdateResponseSchema,
+  BotArchiveResponseSchema,
+  BotTemplateSeedResponseSchema,
+  BotUpdatedSchema,
+} from "./bots/rpc-schemas.js";
+import {
   ScheduleCreateRequestSchema,
   ScheduleListRequestSchema,
   ScheduleInspectRequestSchema,
@@ -3308,6 +3321,11 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceLabelUpdateRequestSchema,
   WorkspaceLabelDeleteRequestSchema,
   WorkspaceLabelDeleteInspectRequestSchema,
+  BotCreateRequestSchema,
+  BotListRequestSchema,
+  BotUpdateRequestSchema,
+  BotArchiveRequestSchema,
+  BotTemplateSeedRequestSchema,
   WorkspaceRecoveryInspectRequestSchema,
   WorkspaceRecoveryRestoreRequestSchema,
   SetVoiceModeMessageSchema,
@@ -3677,6 +3695,8 @@ export const ServerInfoStatusPayloadSchema = z
         directorySync: z.boolean().optional(),
         // COMPAT(workspaceLabels): added in v0.5.0, remove after 2027-08-14.
         workspaceLabels: z.boolean().optional(),
+        // COMPAT(bots): Clisbot Bots, added in v0.9.2-fusion; remove the gate after 2027-03-31 once the daemon floor advertises it.
+        bots: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
@@ -7002,6 +7022,12 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceUpdateMessageSchema,
   WorkspaceLabelListResponseSchema,
   WorkspaceLabelUpdateSchema,
+  BotCreateResponseSchema,
+  BotListResponseSchema,
+  BotUpdateResponseSchema,
+  BotArchiveResponseSchema,
+  BotTemplateSeedResponseSchema,
+  BotUpdatedSchema,
   WorkspaceLabelAssignmentSetResponseSchema,
   WorkspaceLabelUpdateResponseSchema,
   WorkspaceLabelDeleteResponseSchema,

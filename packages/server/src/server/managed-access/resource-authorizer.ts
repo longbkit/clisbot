@@ -43,6 +43,7 @@ import {
   PROJECT_CREATION_REPLIES,
   workspaceManagementTarget,
 } from "./workspace-management.js";
+import { allowsBotInbound, allowsBotOutbound } from "./bot-access.js";
 
 interface AgentStorageReader {
   get(agentId: string): Promise<StoredAgentRecord | null>;
@@ -384,6 +385,8 @@ export class ManagedResourceAuthorizer {
       const requestId = "payload" in message ? stringProperty(message.payload, "requestId") : null;
       if (requestId !== null && this.admittedProjectCreations.delete(requestId)) return true;
     }
+    const bot = allowsBotOutbound(message, (projectId) => this.allowsProject(projectId));
+    if (bot !== undefined) return bot;
     if (message.type.startsWith("workspace.label.")) {
       // Labels are one daemon-wide catalog today. Until the protocol carries a
       // Project owner, returning it would disclose names from other Projects.
@@ -706,6 +709,8 @@ export class ManagedResourceAuthorizer {
 
     const management = await this.allowsWorkspaceManagementInbound(message);
     if (management !== undefined) return management;
+    const bot = allowsBotInbound(message, this.authorization, this.admittedProjectCreations);
+    if (bot !== undefined) return bot;
 
     if (requiredPermissionForInbound(message.type) === "daemon.read") {
       return this.allowsRestrictedDaemonReadInbound(message);
@@ -975,12 +980,7 @@ export class ManagedResourceAuthorizer {
       allowsWorkspace: (workspaceId, privilege) => this.allowsWorkspace(workspaceId, privilege),
       allowsCwd: (cwd, privilege) => this.allowsCwd(cwd, privilege),
       isExistingProjectPlace: (target) => this.isExistingProjectPlace(target),
-      mayCreateProjectAt: async (target) => {
-        const canonical = await canonicalPathForAuthorization(target);
-        return (
-          canonical !== null && mayCreateProjectAt(canonical, await this.projectCreationScope())
-        );
-      },
+      mayCreateProjectAt: (target) => this.mayCreateProjectAt(target),
     });
     if (
       allowed === true &&
@@ -991,6 +991,12 @@ export class ManagedResourceAuthorizer {
       this.admittedProjectCreations.add(message.requestId);
     }
     return allowed;
+  }
+
+  /** The Host folder policy, the creating Host grants' rules, and no nesting, for a path that may not exist yet. */
+  async mayCreateProjectAt(target: string): Promise<boolean> {
+    const canonical = await canonicalPathForAuthorization(target);
+    return canonical !== null && mayCreateProjectAt(canonical, await this.projectCreationScope());
   }
 
   private async allowsWorkspaceInbound(

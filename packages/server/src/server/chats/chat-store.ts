@@ -1,0 +1,227 @@
+// `ChatStore`: every `chat.json` under `$PASEO_HOME/chats/{chatId}/`, cached after one scan,
+// written with the session record's durable write (temp file, fsync, rename, directory
+// sync). Mutations under one chat run in order; chats never wait on each other.
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import type { Logger } from "pino";
+import type { ChatRules } from "@getpaseo/protocol/chats/types";
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import { writeDurableJson } from "../agent/session-storage/durable-file.js";
+import { assertSessionId } from "../agent/session-storage/layout.js";
+import {
+  StoredChatSchema,
+  newChatId,
+  type StoredChat,
+  type StoredChatParticipant,
+} from "./chat-record.js";
+import { KeyedSerialQueue } from "./keyed-queue.js";
+
+const RECORD_FILE = "chat.json";
+
+export interface CreateChatInput {
+  id?: string;
+  title?: string | null;
+  botIds: readonly string[];
+  rules?: ChatRules;
+  createdBy?: SessionActor;
+}
+
+export type ChatChangeListener = (chat: StoredChat) => void;
+
+export class ChatStore {
+  private readonly cache = new Map<string, StoredChat>();
+  private readonly writes = new KeyedSerialQueue();
+  private readonly listeners = new Set<ChatChangeListener>();
+  private loaded: Promise<void> | null = null;
+  private readonly logger: Logger;
+
+  constructor(
+    readonly rootDir: string,
+    logger: Logger,
+    private readonly now: () => string = () => new Date().toISOString(),
+  ) {
+    this.logger = logger.child({ module: "chats", component: "chat-store" });
+  }
+
+  /** `$PASEO_HOME/chats/{chatId}`; the id is checked before it joins a path. */
+  directory(chatId: string): string {
+    assertSessionId(chatId);
+    return path.join(this.rootDir, chatId);
+  }
+
+  /** Scans once; a damaged record is reported and skipped, never fatal. */
+  load(): Promise<void> {
+    this.loaded ??= this.scan();
+    return this.loaded;
+  }
+
+  private async scan(): Promise<void> {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await fs.readdir(this.rootDir, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      const file = path.join(this.rootDir, entry.name, RECORD_FILE);
+      const chat = await this.readRecord(file);
+      if (chat && chat.id === entry.name) this.cache.set(chat.id, chat);
+      else if (chat) this.logger.warn({ file, id: chat.id }, "chat.record.directory_mismatch");
+    }
+  }
+
+  private async readRecord(file: string): Promise<StoredChat | null> {
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+    const parsed = StoredChatSchema.safeParse(JSON.parse(raw));
+    if (parsed.success) return parsed.data;
+    this.logger.warn({ file, issues: parsed.error.issues }, "chat.record.invalid");
+    return null;
+  }
+
+  async list(): Promise<StoredChat[]> {
+    await this.load();
+    return Array.from(this.cache.values());
+  }
+
+  async get(chatId: string): Promise<StoredChat | null> {
+    await this.load();
+    return this.cache.get(chatId) ?? null;
+  }
+
+  async require(chatId: string): Promise<StoredChat> {
+    const chat = await this.get(chatId);
+    if (!chat) throw new Error(`Chat ${chatId} not found`);
+    return chat;
+  }
+
+  subscribe(listener: ChatChangeListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  async create(input: CreateChatInput): Promise<StoredChat> {
+    await this.load();
+    const at = this.now();
+    const chat: StoredChat = StoredChatSchema.parse({
+      id: input.id ?? newChatId(),
+      title: input.title ?? null,
+      participants: Array.from(new Set(input.botIds)).map((botId) => participant(botId, at)),
+      rules: input.rules ?? {},
+      ...(input.createdBy ? { createdBy: input.createdBy } : {}),
+      createdAt: at,
+      updatedAt: at,
+      lastMessageAt: null,
+      archivedAt: null,
+    });
+    if (this.cache.has(chat.id)) throw new Error(`Chat ${chat.id} already exists`);
+    return this.writes.run(chat.id, () => this.write(chat));
+  }
+
+  /**
+   * Applies `mutate` to the current record under the chat's queue and writes the result with
+   * `at` as `updatedAt`. `mutate` returning the same object is a no-op: nothing is written
+   * or published.
+   */
+  update(
+    chatId: string,
+    mutate: (chat: StoredChat, at: string) => StoredChat,
+  ): Promise<StoredChat> {
+    return this.writes.run(chatId, async () => {
+      const current = await this.require(chatId);
+      const at = this.now();
+      const next = mutate(current, at);
+      if (next === current) return current;
+      return this.write({ ...next, updatedAt: at });
+    });
+  }
+
+  private async write(chat: StoredChat): Promise<StoredChat> {
+    const accepted = structuredClone(chat);
+    await writeDurableJson(path.join(this.directory(chat.id), RECORD_FILE), accepted);
+    this.cache.set(accepted.id, accepted);
+    for (const listener of this.listeners) listener(accepted);
+    return accepted;
+  }
+
+  /** Moves a participant's delivered mark forward; an older seq never moves it back. */
+  markDelivered(chatId: string, botId: string, seq: number): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      mapParticipant(chat, botId, (entry) =>
+        seq > entry.deliveredSeq ? { ...entry, deliveredSeq: seq } : entry,
+      ),
+    );
+  }
+
+  setParticipantAgent(chatId: string, botId: string, agentId: string | null): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      mapParticipant(chat, botId, (entry) =>
+        entry.agentId === agentId ? entry : { ...entry, agentId },
+      ),
+    );
+  }
+
+  /** `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it. */
+  resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
+    return this.update(chatId, (chat, at) =>
+      mapParticipant(chat, botId, (entry) => ({ ...entry, agentId: null, resetAt: at })),
+    );
+  }
+
+  addParticipant(chatId: string, botId: string): Promise<StoredChat> {
+    return this.update(chatId, (chat, at) =>
+      chat.participants.some((entry) => entry.botId === botId)
+        ? chat
+        : { ...chat, participants: [...chat.participants, participant(botId, at)] },
+    );
+  }
+
+  removeParticipant(chatId: string, botId: string): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      chat.participants.some((entry) => entry.botId === botId)
+        ? { ...chat, participants: chat.participants.filter((entry) => entry.botId !== botId) }
+        : chat,
+    );
+  }
+
+  touchLastMessage(chatId: string, at: string): Promise<StoredChat> {
+    return this.update(chatId, (chat) => ({ ...chat, lastMessageAt: at }));
+  }
+
+  archive(chatId: string): Promise<StoredChat> {
+    return this.update(chatId, (chat, at) =>
+      chat.archivedAt ? chat : { ...chat, archivedAt: at },
+    );
+  }
+
+  /** Waits for every queued write; a clean stop calls this before the process exits. */
+  idle(): Promise<void> {
+    return this.writes.idle();
+  }
+}
+
+function participant(botId: string, addedAt: string): StoredChatParticipant {
+  return { botId, addedAt, agentId: null, resetAt: null, deliveredSeq: 0 };
+}
+
+function mapParticipant(
+  chat: StoredChat,
+  botId: string,
+  mutate: (entry: StoredChatParticipant) => StoredChatParticipant,
+): StoredChat {
+  let changed = false;
+  const participants = chat.participants.map((entry) => {
+    if (entry.botId !== botId) return entry;
+    const next = mutate(entry);
+    changed ||= next !== entry;
+    return next;
+  });
+  return changed ? { ...chat, participants } : chat;
+}

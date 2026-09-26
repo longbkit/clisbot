@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { resolvePaseoNodeEnv } from "./paseo-env.js";
 import { z } from "zod";
 import { expandTilde } from "../utils/path.js";
+import { resolveBotsConfig, resolveBotsOverridePaths } from "./bots/bots-config.js";
 
 import type { PaseoDaemonConfig } from "./bootstrap.js";
 import {
@@ -660,6 +661,7 @@ export function resolveConfigFromPersisted(
     // runs `external` unless config says otherwise; it requires tickets only once the daemon
     // belongs to a Hub (managed-access/hub-membership.ts).
     managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "external",
+    bots: resolveBotsConfig({ env, persisted: persisted.daemon?.bots, paseoHome }),
     openai,
     speech,
     voiceLlmProvider: voiceLlm.provider,
@@ -729,6 +731,7 @@ function resolveDaemonOverrideControlledPaths(
     ...resolveCoreDaemonOverridePaths(env, cli),
     ...resolveRelayOverridePaths(env, cli),
     ...resolveServiceAndWebUiOverridePaths(env, cli),
+    ...resolveBotsOverridePaths(env),
   ];
 }
 
