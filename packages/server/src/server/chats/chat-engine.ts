@@ -48,7 +48,7 @@ export interface ChatEngineDependencies {
   transcriptOf: (chatId: string) => TranscriptLog;
   bots: BotLookup;
   botSessions: BotSessions;
-  agentManager: Pick<AgentManager, "subscribe">;
+  agentManager: Pick<AgentManager, "subscribe" | "getAgent">;
   sendPrompt: ChatPromptSender;
   publisher: ChatPublisher;
   logger: Logger;
@@ -78,6 +78,7 @@ export class ChatEngine implements TurnTrackerHost {
   private readonly queue = new KeyedSerialQueue();
   // Serialize prompt admission per session, never the running turn or the whole bot.
   private readonly deliveries = new KeyedSerialQueue();
+  private readonly finalizing = new KeyedSerialQueue();
   private readonly inFlight = new Set<Promise<unknown>>();
   /** Sender-line names of every bot seen in a chat, so rendering never awaits a lookup. */
   private readonly botNames = new Map<string, { slug: string; displayName: string }>();
@@ -119,16 +120,55 @@ export class ChatEngine implements TurnTrackerHost {
   }
 
   /** `/new` (D7): the next delivery to this bot starts a fresh session. */
-  async newSession(chatId: string, botId: string): Promise<void> {
-    const bot = await this.deps.bots.get(botId);
-    const chat = await this.deps.store.require(chatId);
-    const previousAgentId = chat.participants.find((entry) => entry.botId === botId)?.agentId;
-    await this.deps.botSessions.reset(chatId, botId);
-    if (previousAgentId) this.tracker.unwatch(previousAgentId);
-    await this.appendSystem(
-      chatId,
-      `${bot?.displayName ?? botId} will start a new session on the next message.`,
-    );
+  newSession(chatId: string, botId: string): Promise<void> {
+    return this.changeIdleParticipant(chatId, botId, async (agentId) => {
+      const bot = await this.deps.bots.get(botId);
+      await this.deps.botSessions.reset(chatId, botId);
+      if (agentId) this.tracker.unwatch(agentId);
+      await this.appendSystem(
+        chatId,
+        `${bot?.displayName ?? botId} will start a new session on the next message.`,
+      );
+    });
+  }
+
+  removeParticipant(chatId: string, botId: string): Promise<StoredChat> {
+    return this.changeIdleParticipant(chatId, botId, async (agentId) => {
+      const chat = await this.deps.store.removeParticipant(chatId, botId);
+      if (agentId) this.tracker.unwatch(agentId);
+      return chat;
+    });
+  }
+
+  /** Serialize membership changes with admission, never serialize independent running bots. */
+  private changeIdleParticipant<T>(
+    chatId: string,
+    botId: string,
+    change: (agentId: string | null) => Promise<T>,
+  ): Promise<T> {
+    return this.queue.run(chatId, async () => {
+      const key = `${chatId}:${botId}`;
+      if (this.deliveries.hasPending(key) || this.finalizing.hasPending(key))
+        throw new Error("Bot is receiving a message. Wait before resetting or removing it.");
+      return this.deliveries.run(key, async () => {
+        const chat = await this.deps.store.require(chatId);
+        const participant = chat.participants.find((entry) => entry.botId === botId);
+        if (!participant) throw new Error("Bot is not a participant in this Chat");
+        const agentId = participant.agentId;
+        const agent = agentId ? this.deps.agentManager.getAgent(agentId) : null;
+        if (
+          agent &&
+          (agent.lifecycle === "running" ||
+            agent.lifecycle === "initializing" ||
+            agent.pendingPermissions.size > 0 ||
+            agent.inFlightPermissionResponses.size > 0)
+        )
+          throw new Error(
+            "Bot is running or waiting for approval. Finish or stop its work before resetting or removing it.",
+          );
+        return change(agentId);
+      });
+    });
   }
 
   /** Resolves once every delivery and forwarding started so far has settled. Tests and stop. */
@@ -295,7 +335,9 @@ export class ChatEngine implements TurnTrackerHost {
 
   /** §2.7: the turn's final text becomes a bot line, then its mentions are forwarded. */
   onTurnCompleted(outcome: TurnOutcome): Promise<void> {
-    const work = this.appendReply(outcome);
+    const work = this.finalizing.run(`${outcome.chatId}:${outcome.botId}`, () =>
+      this.appendReply(outcome),
+    );
     this.track(work);
     return work;
   }
@@ -355,7 +397,9 @@ export class ChatEngine implements TurnTrackerHost {
   }
 
   onTurnFailed(outcome: TurnOutcome, error: string): Promise<void> {
-    const work = this.appendFailure(outcome, error);
+    const work = this.finalizing.run(`${outcome.chatId}:${outcome.botId}`, () =>
+      this.appendFailure(outcome, error),
+    );
     this.track(work);
     return work;
   }

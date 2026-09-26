@@ -2,8 +2,10 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from "react
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
 import { generateDraftId } from "@/stores/draft-keys";
-import { createMessageAttempt } from "./message-attempt";
+import { createMessageAttemptCache } from "./message-attempt";
 import { refreshBotsAndChats } from "../data/runtime";
+const attempts = createMessageAttemptCache(generateDraftId);
+
 export function useChatSend(
   client: DaemonClient | null,
   online: boolean,
@@ -13,10 +15,11 @@ export function useChatSend(
   setError: Dispatch<SetStateAction<string | null>>,
 ) {
   const [sending, setSending] = useState(false);
-  const [attempt] = useState(() => createMessageAttempt(generateDraftId));
   const send = useCallback(
     async (text: string) => {
       if (!client || !online) throw new Error("Host is disconnected");
+      if (!chat) throw new Error("Chat is not available");
+      const attempt = attempts.forChat(client, chatId);
       setSending(true);
       setError(null);
       try {
@@ -34,7 +37,12 @@ export function useChatSend(
         void client
           .listChats()
           .then((result) => {
-            if (!result.error) setChat(result.chats.find((c) => c.id === chatId) ?? null);
+            // A binding update can arrive before this follow-up RPC. Only replace the
+            // exact record this submit started with, never a newer pushed record.
+            if (!result.error) {
+              const fetched = result.chats.find((c) => c.id === chatId) ?? null;
+              setChat((current) => (current === chat ? fetched : current));
+            }
             return undefined;
           })
           .catch(() => undefined);
@@ -46,7 +54,7 @@ export function useChatSend(
         setSending(false);
       }
     },
-    [client, online, chat, chatId, attempt, setChat, setError],
+    [client, online, chat, chatId, setChat, setError],
   );
   return { send, sending };
 }

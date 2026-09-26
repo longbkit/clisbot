@@ -21,6 +21,10 @@ export class KeyedSerialQueue {
     return next;
   }
 
+  hasPending(key: string): boolean {
+    return this.tails.has(key);
+  }
+
   /** Resolves once every operation queued so far has settled. */
   async idle(): Promise<void> {
     await Promise.allSettled(Array.from(this.tails.values()));

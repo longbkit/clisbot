@@ -12,11 +12,12 @@ export function useChatRecord(
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
+    let receivedUpdate = false;
     if (client && online)
       void client
         .listChats()
         .then((r) => {
-          if (!active) return undefined;
+          if (!active || receivedUpdate) return undefined;
           if (r.error) {
             setChat(null);
             setError(r.error);
@@ -29,7 +30,7 @@ export function useChatRecord(
           return undefined;
         })
         .catch((e) => {
-          if (active) {
+          if (active && !receivedUpdate) {
             setChat(null);
             setError(String(e));
           }
@@ -38,8 +39,13 @@ export function useChatRecord(
     feed?.subscribe({
       snapshot: () => {},
       update: (event) => {
-        if (event.type === "chat.updated" && event.payload.chat.id === chatId)
+        if (active && event.type === "chat.updated" && event.payload.chat.id === chatId) {
+          // The fetch began before this push; never let its older snapshot replace a
+          // newly bound agent session (or hide it with an older request failure).
+          receivedUpdate = true;
           setChat(event.payload.chat);
+          setError(null);
+        }
       },
     });
     return () => {

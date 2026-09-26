@@ -2,7 +2,7 @@ import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
 import { FlatList, type ListRenderItemInfo } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { ChatLiveRow, type RespondToPermission } from "./chat-live-row";
+import { ChatLiveRow } from "./chat-live-row";
 import {
   botIdentity,
   ChatBotRow,
@@ -16,7 +16,6 @@ interface ChatListProps {
   rows: readonly ChatRenderRow[];
   serverId: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
-  onRespondPermission?: RespondToPermission;
   /** The top of the transcript came into view: load the older page. */
   onReachTop?: () => void;
 }
@@ -36,7 +35,6 @@ export const ChatList = memo(function ChatList({
   rows,
   serverId,
   bots,
-  onRespondPermission,
   onReachTop,
 }: ChatListProps) {
   const data = useMemo(() => rows.toReversed(), [rows]);
@@ -45,17 +43,9 @@ export const ChatList = memo(function ChatList({
       // Inverted: the row after this one in reading order sits at `index - 1`.
       const next = data[index - 1];
       const closesGroup = chatRowSender(next) !== chatRowSender(item);
-      return (
-        <ChatRowView
-          row={item}
-          serverId={serverId}
-          bots={bots}
-          closesGroup={closesGroup}
-          onRespondPermission={onRespondPermission}
-        />
-      );
+      return <ChatRowView row={item} serverId={serverId} bots={bots} closesGroup={closesGroup} />;
     },
-    [bots, data, onRespondPermission, serverId],
+    [bots, data, serverId],
   );
   return (
     <FlatList
@@ -77,13 +67,11 @@ function ChatRowView({
   serverId,
   bots,
   closesGroup,
-  onRespondPermission,
 }: {
   row: ChatRenderRow;
   serverId: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
   closesGroup: boolean;
-  onRespondPermission?: RespondToPermission;
 }) {
   switch (row.kind) {
     case "user":
@@ -99,12 +87,7 @@ function ChatRowView({
     case "live":
       return (
         <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>
-          <ChatLiveRow
-            row={row}
-            bot={botIdentity(bots, row.botId)}
-            serverId={serverId}
-            onRespondPermission={onRespondPermission}
-          />
+          <ChatLiveRow row={row} bot={botIdentity(bots, row.botId)} serverId={serverId} />
         </BotWorkspaceContext>
       );
   }

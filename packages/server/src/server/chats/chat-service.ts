@@ -220,7 +220,7 @@ export function createChatService(options: ChatServiceOptions): ChatService {
       return engine.payload(await store.addParticipant(chatId, botId));
     },
     async removeParticipant(chatId, botId) {
-      return engine.payload(await store.removeParticipant(chatId, botId));
+      return engine.payload(await engine.removeParticipant(chatId, botId));
     },
     async archive(chatId) {
       return engine.payload(await store.archive(chatId));

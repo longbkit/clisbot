@@ -11,3 +11,25 @@ export function createMessageAttempt(nextId: () => string) {
     },
   };
 }
+
+/** Transport reconnect remounts the route, but retains its client admission identity.
+ * Weak ownership prevents receipts/text crossing a replacement client or surviving its lifetime.
+ */
+export function createMessageAttemptCache(nextId: () => string) {
+  const clients = new WeakMap<object, Map<string, ReturnType<typeof createMessageAttempt>>>();
+  return {
+    forChat(client: object, chatId: string) {
+      let chats = clients.get(client);
+      if (!chats) {
+        chats = new Map();
+        clients.set(client, chats);
+      }
+      let attempt = chats.get(chatId);
+      if (!attempt) {
+        attempt = createMessageAttempt(nextId);
+        chats.set(chatId, attempt);
+      }
+      return attempt;
+    },
+  };
+}

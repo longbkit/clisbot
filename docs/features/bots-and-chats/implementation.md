@@ -50,6 +50,25 @@ the plan gets corrected in the same commit.
   mixed Host projection and ordering. Browser checks cover DM navigation, creation tooltip,
   name-field focus and Bot projects visibility.
 
+## Mobile Chat reliability review (2026-09-26)
+
+- Chat tool/thought rows now use the same ToolCallSheetProvider as cowork, with bot-specific
+  working directories. The mobile detail sheet was exercised with browser-local tool fixtures.
+- All approvals/questions use the shared permission card, pending state and response receipts.
+  Failed responses remain visible and retryable. Unsupported browser OS notification APIs fail
+  without interrupting the Chat UI.
+- Snapshot replies cannot overwrite newer Chat pushes. Message retry IDs survive a transport
+  reconnect with the same client identity; replacement clients do not inherit pending attempts.
+  This covers reconnect remounts, not a full browser reload.
+- Reset/removal rejects active delivery, running work and pending approvals, retaining access to
+  the original session until it finishes or is stopped. Independent bots still run concurrently.
+- A single header holds navigation, Chat title, cowork action and options. Group cowork opens
+  a participant chooser; direct cowork opens that bot's session.
+- Browser checks at 390px exercised tool/thought rendering, opening/closing real detail sheets,
+  question pending/error/retry with a browser-local response stub, and actual cowork navigation.
+  Both header actions measure 44×44px on the same row. These checks do not substitute for
+  testing on the user's physical Android device.
+
 ## Verification recorded
 
 Targeted protocol, daemon, CLI, Hub and app checks passed during integration. Socket E2Es cover

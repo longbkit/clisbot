@@ -45,7 +45,7 @@ interface SentPrompt {
   activeTurnBehavior?: "steer";
 }
 
-async function harness(options: { failPromptFor?: string[] } = {}) {
+async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise<void> } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "chat-engine-"));
   roots.push(root);
   const logger = createTestLogger();
@@ -85,6 +85,14 @@ async function harness(options: { failPromptFor?: string[] } = {}) {
     ensureLoaded: async () => undefined,
   });
   const subscribers = new Map<string, AgentSubscriber>();
+  const liveAgents = new Map<
+    string,
+    {
+      lifecycle: string;
+      pendingPermissions: Map<string, unknown>;
+      inFlightPermissionResponses: Set<string>;
+    }
+  >();
   const sent: SentPrompt[] = [];
   const appended: ChatMessagePayload[] = [];
   const updated: ChatPayload[] = [];
@@ -94,6 +102,7 @@ async function harness(options: { failPromptFor?: string[] } = {}) {
     bots: { get: async (id) => bots.get(id) ?? null },
     botSessions,
     agentManager: {
+      getAgent: (id) => liveAgents.get(id) as never,
       subscribe: (callback, subscribeOptions) => {
         subscribers.set(subscribeOptions?.agentId ?? "*", callback);
         return () => subscribers.delete(subscribeOptions?.agentId ?? "*");
@@ -102,6 +111,7 @@ async function harness(options: { failPromptFor?: string[] } = {}) {
     sendPrompt: async (params) => {
       if (options.failPromptFor?.includes(params.agentId)) throw new Error("provider is down");
       sent.push(params);
+      await options.waitPrompt;
       return { disposition: "turn_started" };
     },
     publisher: {
@@ -136,7 +146,18 @@ async function harness(options: { failPromptFor?: string[] } = {}) {
     await engine.idle();
   };
   const lines = async (chatId: string) => (await transcriptOf(chatId).fetch({ limit: 0 })).lines;
-  return { store, engine, sent, appended, updated, completeTurn, failTurn, lines, agents };
+  return {
+    store,
+    engine,
+    liveAgents,
+    sent,
+    appended,
+    updated,
+    completeTurn,
+    failTurn,
+    lines,
+    agents,
+  };
 }
 
 describe("ChatEngine", () => {
@@ -382,4 +403,67 @@ test("a failed completion receipt write never publishes recovered text as a fina
   ).rejects.toThrow("disk unavailable");
   await h.engine.idle();
   expect((await h.lines("cht_receipt_fail")).map((line) => line.text)).toEqual(["hello"]);
+});
+
+test.each(["running", "approval", "responding"])(
+  "reset and removal preserve a bot with %s work",
+  async (state) => {
+    const h = await harness();
+    await h.store.create({ id: "cht_guard", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_guard", text: "@alpha work", messageId: "guard-input" });
+    await h.engine.idle();
+    const agentId = h.sent[0]!.agentId;
+    h.liveAgents.set(agentId, {
+      lifecycle: state === "running" ? "running" : "idle",
+      pendingPermissions: new Map(state === "approval" ? [["p1", {}]] : []),
+      inFlightPermissionResponses: new Set(state === "responding" ? ["p1"] : []),
+    });
+    await expect(h.engine.newSession("cht_guard", alpha.id)).rejects.toThrow("Finish or stop");
+    await expect(h.engine.removeParticipant("cht_guard", alpha.id)).rejects.toThrow(
+      "Finish or stop",
+    );
+    expect((await h.store.require("cht_guard")).participants[0]?.agentId).toBe(agentId);
+    expect(await h.lines("cht_guard")).toHaveLength(1);
+    // Another idle bot in the same room remains independently manageable.
+    await h.engine.removeParticipant("cht_guard", beta.id);
+    h.liveAgents.set(agentId, {
+      lifecycle: "idle",
+      pendingPermissions: new Map(),
+      inFlightPermissionResponses: new Set(),
+    });
+    await h.engine.newSession("cht_guard", alpha.id);
+    expect((await h.store.require("cht_guard")).participants[0]?.agentId).toBeNull();
+  },
+);
+
+test("reset and removal reject prompt admission before the provider is running", async () => {
+  let release!: () => void;
+  const h = await harness({
+    waitPrompt: new Promise<void>((resolve) => {
+      release = resolve;
+    }),
+  });
+  await h.store.create({ id: "cht_admitting", botIds: [alpha.id, beta.id] });
+  await h.engine.send({
+    chatId: "cht_admitting",
+    text: "@alpha work",
+    messageId: "admission-input",
+  });
+  await expect.poll(() => h.sent.length).toBe(1);
+  try {
+    await expect(h.engine.newSession("cht_admitting", alpha.id)).rejects.toThrow(
+      "receiving a message",
+    );
+    await expect(h.engine.removeParticipant("cht_admitting", alpha.id)).rejects.toThrow(
+      "receiving a message",
+    );
+    expect((await h.store.require("cht_admitting")).participants).toHaveLength(2);
+  } finally {
+    release();
+    await h.engine.idle();
+  }
+  await h.engine.removeParticipant("cht_admitting", alpha.id);
+  expect((await h.store.require("cht_admitting")).participants.map((p) => p.botId)).toEqual([
+    beta.id,
+  ]);
 });

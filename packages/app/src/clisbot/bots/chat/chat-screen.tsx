@@ -1,3 +1,4 @@
+import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { useMemo, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -6,7 +7,6 @@ import { botsCopy } from "../copy";
 import type { ChatMessage } from "../data/contracts";
 import { ChatComposer } from "./chat-composer";
 import { ChatList } from "./chat-list";
-import type { RespondToPermission } from "./chat-live-row";
 import type { ChatBotIdentity } from "./chat-rows";
 import { buildChatRenderModel, type ChatLiveHead } from "./render-model";
 
@@ -21,7 +21,6 @@ export interface ChatScreenProps {
   /** False while the host is offline: the composer will not send. */
   canSend?: boolean;
   onSubmitMessage: (text: string) => Promise<void>;
-  onRespondPermission?: RespondToPermission;
   onReachTop?: () => void;
   headerRight?: ReactNode;
 }
@@ -40,7 +39,6 @@ export function ChatScreen({
   liveHeads,
   canSend = true,
   onSubmitMessage,
-  onRespondPermission,
   onReachTop,
   headerRight,
 }: ChatScreenProps) {
@@ -51,13 +49,9 @@ export function ChatScreen({
   return (
     <View style={styles.container} testID={`chat-screen-${chatId}`}>
       <MenuHeader title={title} rightContent={headerRight} />
-      <ChatList
-        rows={model.rows}
-        serverId={serverId}
-        bots={botsById}
-        onRespondPermission={onRespondPermission}
-        onReachTop={onReachTop}
-      />
+      <ToolCallSheetProvider>
+        <ChatList rows={model.rows} serverId={serverId} bots={botsById} onReachTop={onReachTop} />
+      </ToolCallSheetProvider>
       <ChatComposer
         serverId={serverId}
         chatId={chatId}

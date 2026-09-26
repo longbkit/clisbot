@@ -1777,18 +1777,31 @@ export function PermissionRequestCard({
     [isMobile],
   );
 
+  const responseError = permissionMutation.error ? (
+    <Text
+      accessibilityRole="alert"
+      testID="permission-response-error"
+      style={permissionStyles.description}
+    >
+      {permissionMutation.error.message}
+    </Text>
+  ) : null;
   if (request.kind === "question") {
     return (
-      <QuestionFormCard
-        permission={permission}
-        onRespond={handleResponse}
-        isResponding={isResponding}
-      />
+      <View>
+        <QuestionFormCard
+          permission={permission}
+          onRespond={handleResponse}
+          isResponding={isResponding}
+        />
+        {responseError}
+      </View>
     );
   }
 
   const footer = (
     <>
+      {responseError}
       <Text testID="permission-request-question" style={permissionStyles.question}>
         {t("agentStream.permission.question")}
       </Text>

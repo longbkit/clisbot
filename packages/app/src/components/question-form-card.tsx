@@ -335,6 +335,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   const otherInputRef = useRef<EditingTextInputHandle | null>(null);
   const [respondingAction, setRespondingAction] = useState<"submit" | "dismiss" | null>(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const pendingAction = isResponding ? respondingAction : null;
 
   const toggleOption = useCallback(
     (qIndex: number, optIndex: number, multiSelect: boolean) => {
@@ -595,7 +596,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
           accessibilityLabel={dismissLabel}
           testID="question-form-dismiss"
         >
-          {respondingAction === "dismiss" ? (
+          {pendingAction === "dismiss" ? (
             <LoadingSpinner size="small" color={theme.colors.foregroundMuted} />
           ) : (
             <View style={styles.actionContent}>
@@ -613,7 +614,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
           accessibilityLabel={primaryActionLabel}
           testID="question-form-primary-action"
         >
-          {respondingAction === "submit" ? (
+          {pendingAction === "submit" ? (
             <LoadingSpinner size="small" color={theme.colors.accentForeground} />
           ) : (
             <View style={styles.actionContent}>

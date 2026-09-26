@@ -1,24 +1,16 @@
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { PermissionRequestCard } from "@/agent-stream/view";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
-import { memo, useCallback, useMemo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { AssistantMessage, Notification, ToolCall } from "@/components/message";
-import { QuestionFormCard } from "@/components/question-form-card";
-import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
 import { botsCopy } from "../copy";
 import { BotFace } from "./bot-face";
 import type { ChatBotIdentity } from "./chat-rows";
 import type { ChatRenderRow } from "./render-model";
-
-export type RespondToPermission = (
-  permission: PendingPermission,
-  response: AgentPermissionResponse,
-) => void;
 
 /** The compact detail level of the cowork view: text streams, thoughts and tools fold. */
 function renderLiveItem(
@@ -46,6 +38,7 @@ function renderLiveItem(
       return (
         <ToolCall
           key={item.id}
+          cwd={bot.cwd}
           toolName="thinking"
           args={item.text}
           status={item.status === "ready" ? "completed" : "executing"}
@@ -56,6 +49,7 @@ function renderLiveItem(
       return item.payload.source === "agent" ? (
         <ToolCall
           key={item.id}
+          cwd={bot.cwd}
           toolName={item.payload.data.name}
           error={item.payload.data.error}
           status={item.payload.data.status}
@@ -66,6 +60,7 @@ function renderLiveItem(
       ) : (
         <ToolCall
           key={item.id}
+          cwd={bot.cwd}
           toolName={item.payload.data.toolName}
           args={item.payload.data.arguments}
           result={item.payload.data.result}
@@ -80,41 +75,15 @@ function renderLiveItem(
   }
 }
 
-/**
- * A pending approval on the bot's session. Questions get the cowork view's form; other kinds
- * show as a notice here and are answered in the cowork view until the full card is shared.
- */
-function LivePermission({
-  permission,
-  onRespond,
-  serverId,
-}: {
-  permission: PendingPermission;
-  onRespond?: RespondToPermission;
-  serverId: string;
-}) {
-  const client = useHostRuntimeClient(serverId);
-  const respond = useCallback(
-    (response: AgentPermissionResponse) => onRespond?.(permission, response),
-    [onRespond, permission],
-  );
-  if (permission.request.kind === "question") {
-    return <QuestionFormCard permission={permission} onRespond={respond} isResponding={false} />;
-  }
-  return <PermissionRequestCard permission={permission} client={client} serverId={serverId} />;
-}
-
 /** A bot's in-progress turn: live items and approvals under its face, pinned to its group. */
 export const ChatLiveRow = memo(function ChatLiveRow({
   row,
   bot,
   serverId,
-  onRespondPermission,
 }: {
   row: Extract<ChatRenderRow, { kind: "live" }>;
   bot: ChatBotIdentity;
   serverId: string;
-  onRespondPermission?: RespondToPermission;
 }) {
   const client = useHostRuntimeClient(serverId);
   const face = useMemo(
@@ -128,11 +97,11 @@ export const ChatLiveRow = memo(function ChatLiveRow({
         renderLiveItem(item, serverId, index === row.items.length - 1, bot, client),
       )}
       {row.permissions.map((permission) => (
-        <LivePermission
+        <PermissionRequestCard
           key={permission.key}
           permission={permission}
           serverId={serverId}
-          onRespond={onRespondPermission}
+          client={client}
         />
       ))}
       {showWorking ? (

@@ -6,7 +6,6 @@ import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
 import { ParticipantActions } from "./participant-actions";
-import type { RespondToPermission } from "./chat-live-row";
 import { useCallback, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { View, Text } from "react-native";
@@ -85,16 +84,18 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const reachTop = useCallback(() => {
     void loadOlder().catch((e) => setError(String(e)));
   }, [loadOlder, setError]);
-  const respond = useCallback<RespondToPermission>(
-    (permission, response) => {
-      void client
-        ?.respondToPermissionAndWait(permission.agentId, permission.request.id, response)
-        .catch((e) => setError(String(e)));
-    },
-    [client, setError],
-  );
   const options = useMemo(
-    () => (chat ? <ChatOptions serverId={serverId} chat={chat} bots={botRows} /> : null),
+    () =>
+      chat ? (
+        <View style={styles.actions}>
+          <ParticipantActions
+            serverId={serverId}
+            participants={chat.participants}
+            group={chat.kind === "group"}
+          />
+          <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
+        </View>
+      ) : null,
     [botRows, chat, serverId],
   );
   if (transcript.loadState.status === "error")
@@ -108,11 +109,6 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           {error}
         </Text>
       ) : null}
-      <View style={styles.actions}>
-        {chat.participants.map((p) => (
-          <ParticipantActions key={p.botId} serverId={serverId} participant={p} />
-        ))}
-      </View>
       <ChatScreen
         headerRight={options}
         serverId={serverId}
@@ -124,7 +120,6 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
         canSend={online && !sending}
         onSubmitMessage={send}
         onReachTop={reachTop}
-        onRespondPermission={respond}
       />
     </View>
   );
@@ -133,9 +128,9 @@ const styles = StyleSheet.create((theme) => ({
   root: { flex: 1, backgroundColor: theme.colors.surface0 },
   actions: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: theme.spacing[2],
-    padding: theme.spacing[1],
+    flexShrink: 0,
   },
   error: { color: theme.colors.foreground, padding: theme.spacing[2] },
 }));

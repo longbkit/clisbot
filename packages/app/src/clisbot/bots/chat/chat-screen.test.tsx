@@ -1,16 +1,44 @@
+import { useToolCallSheet } from "@/components/tool-call-sheet";
 import { useAssistantFileLinkResolverContext } from "@/assistant-file-links/provider";
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
 import type { ChatMessage } from "../data/contracts";
 import { ChatScreen } from "./chat-screen";
 import type { ChatLiveHead } from "./render-model";
 
+vi.mock("@/components/ui/isolated-bottom-sheet-modal", () => ({
+  IsolatedBottomSheetModal: () => null,
+  useIsolatedBottomSheetVisibility: () => ({
+    sheetRef: { current: null },
+    handleSheetChange: vi.fn(),
+    handleSheetDismiss: vi.fn(),
+  }),
+}));
+vi.mock("@gorhom/bottom-sheet", () => ({
+  BottomSheetScrollView: () => null,
+  BottomSheetBackdrop: () => null,
+}));
+vi.mock("@/components/tool-call-details", () => ({ ToolCallDetailsContent: () => null }));
 vi.mock("@/stores/navigation-active-workspace-store", () => ({ navigateToWorkspace: vi.fn() }));
 vi.mock("@/agent-stream/view", () => ({
-  PermissionRequestCard: () => <div data-testid="permission-card" />,
+  PermissionRequestCard: ({
+    permission,
+    serverId,
+  }: {
+    permission: PendingPermission;
+    serverId: string;
+  }) => (
+    <div
+      data-testid="permission-card"
+      data-agent={permission.agentId}
+      data-server={serverId}
+      data-kind={permission.request.kind}
+    />
+  ),
 }));
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
@@ -69,11 +97,14 @@ vi.mock("@/components/message", () => ({
       </p>
     );
   },
-  ToolCall: ({ toolName, status }: { toolName: string; status: string }) => (
-    <p data-kind="tool" data-status={status}>
-      {toolName}
-    </p>
-  ),
+  ToolCall: ({ toolName, status }: { toolName: string; status: string }) => {
+    useToolCallSheet();
+    return (
+      <p data-kind="tool" data-status={status}>
+        {toolName}
+      </p>
+    );
+  },
   Notification: ({ message }: { message: string }) => <p data-kind="notice">{message}</p>,
 }));
 vi.mock("@/components/question-form-card", () => ({ QuestionFormCard: () => <form /> }));
@@ -236,4 +267,46 @@ describe("ChatScreen", () => {
       true,
     );
   });
+});
+
+it("routes question permissions through the shared receipt-aware, pending-state card", () => {
+  const liveHeads = new Map<string, ChatLiveHead>([
+    [
+      "research",
+      {
+        agentId: "agent-r",
+        turnActive: true,
+        items: [],
+        permissions: [
+          {
+            key: "q",
+            agentId: "agent-r",
+            request: {
+              id: "q",
+              provider: "codex",
+              name: "AskUserQuestion",
+              kind: "question",
+              input: { questions: [{ question: "Ship?", options: [{ label: "Yes" }] }] },
+            },
+          },
+        ],
+      },
+    ],
+  ]);
+  render(
+    <ChatScreen
+      serverId="host-a"
+      chatId="question-chat"
+      title="Questions"
+      bots={BOTS}
+      transcript={[]}
+      liveHeads={liveHeads}
+      onSubmitMessage={vi.fn(async () => {})}
+    />,
+  );
+  const card = screen.getByTestId("permission-card");
+  expect(card.getAttribute("data-kind")).toBe("question");
+  expect(card.getAttribute("data-agent")).toBe("agent-r");
+  expect(card.getAttribute("data-server")).toBe("host-a");
+  expect(screen.queryByRole("form")).toBeNull();
 });

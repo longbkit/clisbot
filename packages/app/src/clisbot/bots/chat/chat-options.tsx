@@ -1,3 +1,5 @@
+import { Ellipsis } from "lucide-react-native";
+import { ChatHeaderAction } from "./header-action";
 import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { useRouter } from "expo-router";
@@ -67,9 +69,7 @@ export function ChatOptions({
   }, [busy, chat.id, client, router, serverId]);
   return (
     <>
-      <Button variant="ghost" onPress={open}>
-        Chat options
-      </Button>
+      <ChatHeaderAction label="Chat options" icon={Ellipsis} onPress={open} />
       <AdaptiveModalSheet visible={visible} header={header} onClose={close}>
         <View style={styles.body}>
           <Text style={styles.text}>Participants</Text>
