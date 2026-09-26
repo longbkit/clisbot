@@ -1451,6 +1451,9 @@ export async function createPaseoDaemon(
       });
     },
     getManagedAccessMode: () => daemonConfigStore.get().managedAccess.mode,
+    // Joining or leaving a Hub changes whether `external` asks for tickets. Deferred so a
+    // `hub connect` reply reaches its client before that session is closed for lacking one.
+    onRecordChange: () => setImmediate(() => wsServer?.refreshManagedAccessEnforcement()),
   });
   const stopHubProjectMutationPublishing =
     projectRegistry.subscribeToMutations?.(() => {
@@ -1895,6 +1898,7 @@ export async function createPaseoDaemon(
                         clientId,
                       }),
                     refresh: (leaseId) => hubRelationships.refreshAccessLease(leaseId),
+                    requiresTickets: () => hubRelationships.requiresTickets(),
                   },
                 },
               },

@@ -54,4 +54,6 @@ export interface ManagedAccessAdmissionRequest {
 export interface ManagedAccessAdmissionResolver {
   resolve(request: ManagedAccessAdmissionRequest): Promise<ManagedAccessAdmission>;
   refresh?(leaseId: string): Promise<ManagedAccessAdmission>;
+  /** Whether `external` asks for tickets now; absent means always (hub-membership.ts). */
+  requiresTickets?(): boolean;
 }

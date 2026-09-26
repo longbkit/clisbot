@@ -1817,9 +1817,22 @@ export class VoiceAssistantWebSocketServer {
     identity: WebSocketConnectionIdentity,
     pluginId: string | undefined,
   ): boolean {
+    return this.managedAccessEnforced() && this.isManagedAccessSubject(identity, pluginId);
+  }
+
+  /** `external` asks for tickets only once the daemon belongs to a Hub (hub-membership.ts). */
+  private managedAccessEnforced(): boolean {
     return (
-      this.managedAccess.mode === "external" && this.isManagedAccessSubject(identity, pluginId)
+      this.managedAccess.mode === "external" &&
+      (this.managedAccess.resolver?.requiresTickets?.() ?? true)
     );
+  }
+
+  /** Re-applies Managed Access after the daemon joined or left a Hub. */
+  public refreshManagedAccessEnforcement(): void {
+    if (this.managedAccess.mode !== "external") return;
+    this.broadcastCapabilitiesUpdate();
+    if (this.managedAccessEnforced()) this.closeTicketlessSessions();
   }
 
   private applyManagedAccessMode(mode: ManagedAccessMode): void {
@@ -1829,8 +1842,11 @@ export class VoiceAssistantWebSocketServer {
     const previous = this.managedAccess.mode;
     this.managedAccess = { ...this.managedAccess, mode };
     this.broadcastCapabilitiesUpdate();
-    if (previous === "external" || mode !== "external") return;
+    if (previous === "external" || !this.managedAccessEnforced()) return;
+    this.closeTicketlessSessions();
+  }
 
+  private closeTicketlessSessions(): void {
     for (const connection of new Set(this.externalSessionsByKey.values())) {
       if (connection.requiresManagedAccessInExternalMode && connection.managedLeaseId === null) {
         void this.closeManagedConnection(connection, "Managed access is now required");
@@ -2073,7 +2089,7 @@ export class VoiceAssistantWebSocketServer {
         pluginSourceInstallation: true,
         pluginSourceUpdates: true,
         pluginLogs: true,
-        ...(this.managedAccess.mode === "external"
+        ...(this.managedAccessEnforced()
           ? { managedAccessTickets: true, projectWorkspaceCreation: true }
           : {}),
         // COMPAT(terminalProfileGrants): launch by profileId and terminal.profile.list.

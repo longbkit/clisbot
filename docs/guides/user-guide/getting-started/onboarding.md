@@ -98,6 +98,6 @@ paseo bot stop --home "$HOME/.clisbot-dev-01"
 
 ## Dùng Hub có sẵn hoặc được mời vào tổ chức
 
-Không cần dựng Hub local mới. Trong app vào **Settings → Account**, đăng nhập Hub của tổ chức. Người vận hành làm theo [kết nối Host](../hosts/connect-and-manage.md), cấu hình provider và thêm Project trên Host; bật [Managed Access](../hosts/managed-access.md) khi cần phân quyền.
+Không cần dựng Hub local mới. Trong app vào **Settings → Account**, đăng nhập Hub của tổ chức. Người vận hành làm theo [kết nối Host](../hosts/connect-and-manage.md), cấu hình provider và thêm Project trên Host; [Managed Access](../hosts/managed-access.md) bật sẵn nên quyền theo Hub có hiệu lực ngay khi Host vào Hub.
 
 Member nhận lời mời đúng email → **Settings → Hosts** → chọn Host, Project và Workspace được cấp quyền → tạo Agent session. Không thấy tài nguyên: xem [Q&A](../help/faq.md). Mời người và cấp quyền theo [Members và Teams](../access/members-and-teams.md).

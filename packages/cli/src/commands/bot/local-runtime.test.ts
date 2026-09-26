@@ -41,6 +41,10 @@ it("rejects managed TCP onboarding before connection while preserving policy and
     daemon: { listen: "127.0.0.1:6767", managedAccess: { mode: "external" } },
   });
   await writeFile(configPath, config);
+  await writeFile(
+    path.join(directory, "hub-relationship.json"),
+    JSON.stringify({ state: "active" }),
+  );
   await expect(assertLocalOnboardingAccess(directory, {})).rejects.toThrow(
     "select an empty --home",
   );
@@ -53,6 +57,20 @@ it("rejects managed TCP onboarding before connection while preserving policy and
 
 it("allows fresh standalone onboarding without a managed ticket", async () => {
   const directory = await createHome();
+  await expect(assertLocalOnboardingAccess(directory, {})).resolves.toBeUndefined();
+});
+
+it("allows onboarding while external has no Hub to ask for tickets yet", async () => {
+  const directory = await createHome();
+  await writeFile(
+    path.join(directory, "config.json"),
+    JSON.stringify({ daemon: { listen: "127.0.0.1:6767", managedAccess: { mode: "external" } } }),
+  );
+  await expect(assertLocalOnboardingAccess(directory, {})).resolves.toBeUndefined();
+  await writeFile(
+    path.join(directory, "hub-relationship.json"),
+    JSON.stringify({ state: "pending" }),
+  );
   await expect(assertLocalOnboardingAccess(directory, {})).resolves.toBeUndefined();
 });
 

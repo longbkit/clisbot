@@ -656,7 +656,10 @@ export function resolveConfigFromPersisted(
     webUi,
     appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
-    managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "off",
+    // COMPAT(clisbot-managed-access-default): upstream Paseo runs `off`. The Clisbot fusion
+    // runs `external` unless config says otherwise; it requires tickets only once the daemon
+    // belongs to a Hub (managed-access/hub-membership.ts).
+    managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "external",
     openai,
     speech,
     voiceLlmProvider: voiceLlm.provider,

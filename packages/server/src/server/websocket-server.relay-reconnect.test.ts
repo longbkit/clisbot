@@ -752,6 +752,43 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
+  test("external asks for tickets only once the daemon belongs to a Hub", async () => {
+    let enrolled = false;
+    const server = createServer({
+      managedAccess: {
+        mode: "external",
+        resolver: {
+          resolve: async () => {
+            throw new Error("not used");
+          },
+          requiresTickets: () => enrolled,
+        },
+      },
+    });
+    const beforeEnrollment = new MockSocket();
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      beforeEnrollment,
+      createDirectRequest("127.0.0.1"),
+    );
+    beforeEnrollment.emit("message", JSON.stringify(createHelloMessage("owner-cli")));
+    expect(sessionMock.instances).toHaveLength(1);
+    expect(beforeEnrollment.readyState).toBe(1);
+
+    enrolled = true;
+    server.refreshManagedAccessEnforcement();
+    await vi.waitFor(() => expect(beforeEnrollment.readyState).toBe(3));
+
+    const afterEnrollment = new MockSocket();
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      afterEnrollment,
+      createDirectRequest("127.0.0.1"),
+    );
+    afterEnrollment.emit("message", JSON.stringify(createHelloMessage("ticketless")));
+    await vi.waitFor(() => expect(afterEnrollment.readyState).toBe(3));
+    expect(sessionMock.instances).toHaveLength(1);
+    await server.close();
+  });
+
   test("external mode binds the Hub-resolved admission before returning server info", async () => {
     const resolver = vi.fn(async () => ({
       principalId: "member:user-1",

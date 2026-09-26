@@ -24,8 +24,11 @@ import type {
 } from "./relationship-remote.js";
 import { HubEnrollmentRejectedError } from "./relationship-remote.js";
 import { BoundedExponentialHubRetryPolicy } from "./relationship-retry.js";
+import {
+  HUB_RELATIONSHIP_FILE_NAME as FILE_NAME,
+  relationshipRequiresTickets,
+} from "../managed-access/hub-membership.js";
 
-const FILE_NAME = "hub-relationship.json";
 const HubOriginSchema = z
   .string()
   .url()
@@ -201,6 +204,8 @@ export interface HubRelationshipControllerOptions {
   listProjects?: () => Promise<readonly HubProject[]>;
   getConnectionOffer?: () => Promise<ConnectionOffer | null>;
   getManagedAccessMode?: () => ManagedAccessMode;
+  /** Called after the saved relationship is written or removed. */
+  onRecordChange?: () => void;
 }
 
 const systemClock: HubRelationshipClock = {
@@ -376,6 +381,11 @@ export class HubRelationshipController implements HubRelationshipManagement {
     this.persist(this.record);
     this.options.updateAttachedPermissions(hubPrincipalId(this.record), permissions);
     return this.status();
+  }
+
+  /** Whether Managed Access `external` asks for Hub tickets (hub-membership.ts). */
+  requiresTickets(): boolean {
+    return relationshipRequiresTickets(this.record?.state ?? null);
   }
 
   async consumeAccessTicket(input: {
@@ -719,12 +729,14 @@ export class HubRelationshipController implements HubRelationshipManagement {
 
   private persist(record: HubRelationshipRecord): void {
     writePrivateFileAtomicSync(this.filePath, `${JSON.stringify(record, null, 2)}\n`);
+    this.options.onRecordChange?.();
   }
 
   private remove(): void {
     void this.retireExecutionAgents();
     this.cancelLifecycle();
     rmSync(this.filePath, { force: true });
+    this.options.onRecordChange?.();
     this.record = null;
     this.state = "not_connected";
     this.connectedAt = null;

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { loadConfig } from "@getpaseo/server";
+import { homeRequiresTickets, loadConfig } from "@getpaseo/server";
 import { readDaemonInstance, daemonLogPath } from "@getpaseo/server/daemon-control";
 import { resolveTcpHostFromListen } from "../daemon/local-daemon.js";
 import { resolveLocalHubState } from "../hub/local-hub.js";
@@ -14,7 +14,7 @@ export async function assertLocalOnboardingAccess(
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
   const config = loadConfig(home, { env: { PASEO_HOME: home } });
-  if (config.managedAccessMode !== "external") return;
+  if (config.managedAccessMode !== "external" || !homeRequiresTickets(home)) return;
   const state = await readDaemonInstance(home);
   const listen = state?.listen ?? env.PASEO_LISTEN ?? config.listen;
   if (resolveTcpHostFromListen(listen) === null) return;

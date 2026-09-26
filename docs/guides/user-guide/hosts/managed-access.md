@@ -4,6 +4,8 @@
 
 Managed Access là cấu hình **từng daemon**, quyết định daemon có buộc kết nối app đi qua kiểm tra quyền Hub hay không.
 
+Bản Clisbot để mặc định `external` từ lần chạy đầu, không cần biến môi trường hay flag. Daemon chỉ đòi vé khi đã thuộc một Hub: trước khi enroll chưa có Hub nào cấp vé, nên bạn vẫn kết nối, đăng nhập và chạy `paseo hub connect` như bình thường. Enroll xong, daemon đóng các phiên không có vé và từ đó mọi kết nối cần vé. Mất Hub (bị thu hồi hoặc đang disconnect) vẫn giữ yêu cầu vé; chỉ khi Owner disconnect xong daemon mới hết đòi vé. Ghi `daemon.managedAccess.mode` trong `config.json` thì giá trị đó thắng mặc định.
+
 |                                  | `off`                                             | `external`                                   |
 | -------------------------------- | ------------------------------------------------- | -------------------------------------------- |
 | Kết nối app                      | Luồng Paseo tin cậy thông thường                  | Cần vé truy cập do Hub cấp                   |
@@ -18,9 +20,11 @@ Không phải cứ biết daemon là vào được: vẫn cần đường kết 
 
 Với `off`, việc là Member hay chỉ được Connect trên Hub **không biến session daemon thành session giới hạn theo Project**. Đừng dùng chế độ này để chia quyền nhiều người theo Hub.
 
-## Bật external
+## Bật lại external
 
-1. Enroll daemon, kiểm tra Owner kết nối được bằng app hỗ trợ Managed Access.
+Chỉ cần khi Owner đã tắt trước đó.
+
+1. Kiểm tra Owner kết nối được bằng app hỗ trợ Managed Access.
 2. Owner vào Settings → **Hosts → [Host] → Managed access**.
 3. Bật **Require Hub access externally**, xác nhận.
 4. App hiện **Turning on managed access…**: Host đóng mọi phiên không có vé Hub, kể cả phiên của thiết bị bạn. App tự xin vé từ Hub và kết nối lại, không cần làm gì.
@@ -37,7 +41,8 @@ Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối n
 CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `paseo hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên CLI không có nhiều quyền hơn người đó.
 
 - Chưa đăng nhập Hub đó thì CLI báo: chạy `paseo hub login` rồi thử lại.
-- `paseo hub connect` không bị ảnh hưởng: khi enroll, daemon chưa thuộc Hub nên chưa thể ở `external`. Bật Managed Access là việc của Owner, làm sau khi enroll.
+- `paseo hub connect` chạy trước khi daemon thuộc Hub, lúc daemon chưa đòi vé. Daemon trả kết quả enroll xong mới đóng phiên đó.
+- Host enroll bằng `--api-key` mà máy không có phiên `paseo hub login`: CLI không xin được vé (API key không đại diện cho người nào). Dùng `paseo hub login`, hoặc đường socket/pipe local.
 
 ## Tắt external
 
