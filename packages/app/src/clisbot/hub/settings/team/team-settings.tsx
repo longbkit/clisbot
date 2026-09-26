@@ -8,6 +8,7 @@ import { AccessSettings } from "../access-settings";
 import { InvitationsTab } from "./invitations-tab";
 import { InvitePeopleModal } from "./invite-people-modal";
 import { SelectedMemberDetail } from "./member-detail";
+import { MemberTeamsModal } from "./member-teams-modal";
 import { MembersTab } from "./members-tab";
 import { peopleViews, usePeopleView } from "./people-views";
 import { SelectedTeamDetail } from "./team-detail";
@@ -123,6 +124,12 @@ export function TeamSettings() {
         />
       ) : null}
       {modal}
+      <MemberTeamsModal
+        member={people.editingTeams}
+        resources={resources}
+        actions={actions}
+        close={people.closeTeams}
+      />
     </View>
   );
 }

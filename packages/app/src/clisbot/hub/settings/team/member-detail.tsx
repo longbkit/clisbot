@@ -10,7 +10,6 @@ import { MemberChatAccounts } from "./member-chat-accounts";
 import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
 import { MemberRoleSelect } from "./member-role-select";
 import { MemberTeamsSection } from "./member-teams-section";
-import { canManageTeamMembership } from "./team-membership";
 import type { HubAccount, HubMember, HubTeam, TeamResources } from "./types";
 import type { TeamActions } from "./use-team-actions";
 import { BackLink } from "../back-link";
@@ -42,11 +41,6 @@ export function SelectedMemberDetail({
   const canManageMembers = capabilities?.manageMembers === true;
   const teams = resources.teams.data?.teams ?? NO_TEAMS;
   const members = resources.members.data?.members ?? NO_MEMBERS;
-  const { authority } = resources;
-  const canManageTeam = useCallback(
-    (teamId: string) => canManageTeamMembership(authority, teamId),
-    [authority],
-  );
   const lock = memberRemoveLockReason(member, members, capabilities);
   const menu = useMemo(
     () =>
@@ -86,12 +80,7 @@ export function SelectedMemberDetail({
           </LabeledRow>
         </View>
       </SettingsSection>
-      <MemberTeamsSection
-        member={member}
-        teams={teams}
-        actions={actions}
-        canManage={canManageTeam}
-      />
+      <MemberTeamsSection member={member} teams={teams} resources={resources} actions={actions} />
       {/* Other roles cannot read Connections or access assignments; Account shows their own. */}
       {resources.canManageResources ? (
         <>

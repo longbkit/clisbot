@@ -6,7 +6,6 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { settingsStyles } from "@/styles/settings";
-import { HubTeamSchema } from "../../contracts";
 import { EmptyRow, ResourceFeedbackGroup } from "../resource-rows";
 import { teamDirectoryRows } from "./team-directory";
 import { canSeeInvitations } from "./team-membership";
@@ -40,7 +39,14 @@ export function TeamsTab({
   const [creating, setCreating] = useState(false);
   const openCreate = useCallback(() => setCreating(true), []);
   const closeCreate = useCallback(() => setCreating(false), []);
-  const createTeam = useCreateTeam(hub, resources);
+  const { createTeam: create } = actions;
+  // The rename modal wants no result back; the new Team shows up in the list.
+  const createTeam = useCallback(
+    async (name: string) => {
+      await create(name);
+    },
+    [create],
+  );
   const canManage = resources.canManageResources;
   const invitations = canSeeInvitations(resources.authority)
     ? (hub.signedIn?.team?.invitations ?? NO_INVITATIONS)
@@ -114,17 +120,5 @@ export function TeamsTab({
         />
       ) : null}
     </View>
-  );
-}
-
-/** Creates the Team; the modal shows a refusal in place, so this throws instead of catching. */
-function useCreateTeam(hub: HubAccount, resources: TeamResources) {
-  const { teams } = resources;
-  return useCallback(
-    async (name: string) => {
-      await hub.api().post("teams", { name: name.trim() }, HubTeamSchema);
-      await teams.refetch();
-    },
-    [hub, teams],
   );
 }

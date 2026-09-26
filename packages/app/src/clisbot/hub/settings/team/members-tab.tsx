@@ -16,7 +16,7 @@ import {
   type MemberFilter,
 } from "./member-directory";
 import { MemberRow, MemberTableHeader, type MemberRowHandlers } from "./member-row";
-import { canInvitePeople } from "./team-membership";
+import { managesAnyTeam } from "./team-membership";
 import type { HubAccount, TeamResources } from "./types";
 
 /** Rows rendered before "Show all"; a long organization should not render every row at once. */
@@ -98,7 +98,7 @@ export function MembersTab({
                 members={members.data?.members ?? []}
                 capabilities={capabilities}
                 canLinkChat={hub.signedIn?.isInstanceOperator === true}
-                canInvite={canInvitePeople(resources.authority)}
+                canEditTeams={managesAnyTeam(resources.authority)}
                 pending={pending}
                 bordered
                 handlers={handlers}

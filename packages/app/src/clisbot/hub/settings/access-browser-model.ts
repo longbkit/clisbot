@@ -17,6 +17,7 @@ import {
   type GrantGrouping,
   type GrantRow,
 } from "./access-grant-rows";
+import { countLabel } from "./labels";
 
 export interface AccessEntry {
   /** `member:<id>`, `daemon:<id>`: the same key as its grant group. */
@@ -25,12 +26,19 @@ export interface AccessEntry {
   title: string;
   subtitle: string;
   rows: GrantRow[];
+  /** A Member's organization role, when it gives access without a grant. */
+  role?: RoleAccess;
+  /** A Member's Teams, as the keys of their entries: `team:<id>`. */
+  teamKeys?: string[];
   /** What the grant sheet opens on for this entry. */
   target: { subject: string | null; resource: string | null };
 }
 
-/** "all" is every entry with access; "none" every entry without; the rest a kind. */
-export type EntryFilter = "all" | "none" | SubjectKind | AccessResourceKind;
+/** Owners reach everything; Admins manage Members, Teams, Connections, and Access. */
+export type RoleAccess = "owner" | "admin";
+
+/** "all" is every entry; "with" and "none" split them by access; the rest a kind. */
+export type EntryFilter = "all" | "with" | "none" | SubjectKind | AccessResourceKind;
 
 export interface EntryFilterChip {
   value: EntryFilter;
@@ -81,7 +89,47 @@ export function accessEntries(
   const without = (
     grouping === "subject" ? subjectsWithout(directory) : resourcesWithout(directory.resources)
   ).filter(({ key }) => !listed.has(key));
-  return [...withAccess, ...without];
+  const memberById = new Map(directory.members.map((member) => [member.id, member]));
+  return [...withAccess, ...without].map((entry) =>
+    entry.kind === "member" ? withMember(entry, memberById, directory.teams) : entry,
+  );
+}
+
+/** The Member facts a grant list lacks: the role that gives access, and their Teams. */
+function withMember(
+  entry: AccessEntry,
+  memberById: ReadonlyMap<string, GrantDirectory["members"][number]>,
+  teams: GrantDirectory["teams"],
+): AccessEntry {
+  const member = memberById.get(entry.key.slice("member:".length));
+  if (member === undefined) return entry;
+  const teamKeys = teams
+    .filter(({ userIds }) => userIds.includes(member.userId))
+    .map(({ id }) => `team:${id}`);
+  const role = member.role === "owner" || member.role === "admin" ? member.role : undefined;
+  return { ...entry, teamKeys, ...(role === undefined ? {} : { role }) };
+}
+
+/** A Member's Teams as their entries, each with its own access state. */
+export function memberTeamEntries(
+  entry: AccessEntry,
+  entries: readonly AccessEntry[],
+): AccessEntry[] {
+  const keys = entry.teamKeys ?? [];
+  return entries.filter(({ key }) => keys.includes(key));
+}
+
+/** Whether the entry reaches anything: through a grant, or through an organization role. */
+export function hasAccess(entry: AccessEntry): boolean {
+  return entry.rows.length > 0 || entry.role !== undefined;
+}
+
+/** The list row's one-word state: the role that gives access, else the grant count. */
+export function entryStatus(entry: AccessEntry): string {
+  if (entry.role === "owner") return "Owner, full access";
+  const grants = entry.rows.length;
+  if (grants > 0) return countLabel(grants, "grant");
+  return entry.role === "admin" ? "Admin role" : "No access";
 }
 
 function targetOf(key: string, grouping: GrantGrouping): AccessEntry["target"] {
@@ -126,23 +174,24 @@ function resourcesWithout(resources: readonly AccessResource[]): AccessEntry[] {
     );
 }
 
-/** The chips over the list: every kind present, then "No access". */
+/** The chips over the list: all, every kind present, then with and without access. */
 export function entryFilterChips(
   entries: readonly AccessEntry[],
   grouping: GrantGrouping,
 ): EntryFilterChip[] {
-  const withAccess = entries.filter(({ rows }) => rows.length > 0);
+  const withAccess = entries.filter(hasAccess);
   const kinds: readonly AccessEntry["kind"][] =
     grouping === "subject" ? SUBJECT_KINDS : RESOURCE_KINDS;
   const labels: Partial<Record<string, string>> =
     grouping === "subject" ? SUBJECT_FILTER_LABELS : RESOURCE_FILTER_LABELS;
   const byKind = kinds.flatMap((kind) => {
-    const count = withAccess.filter((entry) => entry.kind === kind).length;
+    const count = entries.filter((entry) => entry.kind === kind).length;
     return count === 0 ? [] : [{ value: kind, label: labels[kind] ?? kind, count }];
   });
   return [
-    { value: "all", label: "With access", count: withAccess.length },
+    { value: "all", label: "All", count: entries.length },
     ...byKind,
+    { value: "with", label: "With access", count: withAccess.length },
     { value: "none", label: "No access", count: entries.length - withAccess.length },
   ];
 }
@@ -154,9 +203,12 @@ export function filterEntries(
 ): AccessEntry[] {
   const query = search.trim().toLowerCase();
   return entries.filter((entry) => {
-    const hasAccess = entry.rows.length > 0;
+    const reaches = hasAccess(entry);
     const inFilter =
-      filter === "none" ? !hasAccess : hasAccess && (filter === "all" || entry.kind === filter);
+      filter === "all" ||
+      (filter === "with" && reaches) ||
+      (filter === "none" && !reaches) ||
+      entry.kind === filter;
     if (!inFilter) return false;
     return (
       query.length === 0 ||

@@ -2,7 +2,7 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
-import { settingsStyles } from "@/styles/settings";
+import { tableStyles } from "../table-styles";
 import type { RealmLink } from "./member-directory";
 
 /**
@@ -21,13 +21,13 @@ export function MemberChatCell({
   onLink(): void;
 }) {
   if (links.length === 0) {
-    return <Text style={settingsStyles.rowHint}>No chat bots yet</Text>;
+    return <Text style={tableStyles.cellText}>No chat bots yet</Text>;
   }
   return (
     <View style={styles.list}>
       {links.map((link) => (
         <View key={link.key} style={styles.line}>
-          <Text style={settingsStyles.rowHint}>
+          <Text style={tableStyles.cellText}>
             {link.linked ? `✓ ${link.label}` : `${link.label} · not linked`}
           </Text>
           {link.linked || !canLink ? null : (

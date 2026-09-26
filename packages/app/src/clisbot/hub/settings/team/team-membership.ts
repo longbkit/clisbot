@@ -37,6 +37,11 @@ export function canManageTeamMembership(authority: PeopleAuthority, teamId: stri
   );
 }
 
+/** Whether the viewer can add or remove anyone in at least one Team. */
+export function managesAnyTeam(authority: PeopleAuthority): boolean {
+  return authority.capabilities?.manageResources === true || authority.administeredTeamIds.size > 0;
+}
+
 /** Invite people into this Team, or into any Team the viewer may invite into when none is named. */
 /** Whether the viewer manages anyone here: the organization's people, or a Team they administer. */
 export function managesPeople(authority: PeopleAuthority): boolean {
@@ -96,4 +101,15 @@ export function visibleTeams(
  */
 export function canSeeInvitations(authority: PeopleAuthority): boolean {
   return authority.capabilities?.manageMembers === true || authority.administeredTeamIds.size > 0;
+}
+
+/** The Teams to join and to leave, to go from the Teams a Member is in to the chosen ones. */
+export function memberTeamChanges(
+  current: readonly string[],
+  chosen: readonly string[],
+): { add: string[]; remove: string[] } {
+  return {
+    add: chosen.filter((id) => !current.includes(id)),
+    remove: current.filter((id) => !chosen.includes(id)),
+  };
 }

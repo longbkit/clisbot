@@ -3,7 +3,11 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { capitalizeLabel, countLabel } from "../labels";
-import { MultiSelectField, type MultiSelection } from "../multi-select-field";
+import {
+  MultiSelectField,
+  type MultiSelectCreate,
+  type MultiSelection,
+} from "../multi-select-field";
 import type { TeamAdditionPlan } from "./team-additions";
 import type { HubTeam, InvitationRole } from "./types";
 import type { InviteDraftState } from "./use-invite-people";
@@ -20,6 +24,7 @@ export function InvitePeopleFields({
   teams,
   roleLocked,
   disabled,
+  createTeam,
 }: {
   draftState: InviteDraftState;
   plan: TeamAdditionPlan;
@@ -29,6 +34,8 @@ export function InvitePeopleFields({
   /** A Team Admin invites only as Member. */
   roleLocked: boolean;
   disabled: boolean;
+  /** For people who may create Teams: a typed name that matches no Team creates one. */
+  createTeam: MultiSelectCreate | undefined;
 }) {
   const { draft, update } = draftState;
   const compact = useIsCompactFormFactor();
@@ -66,13 +73,14 @@ export function InvitePeopleFields({
       </Field>
       <MultiSelectField
         label="Teams"
-        hint={teams.length === 0 ? "Create a Team first." : "People join every Team you choose."}
+        hint={teamsHint(teams.length, createTeam !== undefined)}
         options={teamOptions}
         value={draft.teamIds}
         onChange={chooseTeams}
-        disabled={disabled || teams.length === 0}
-        placeholder="Choose Teams"
-        searchPlaceholder="Team name"
+        disabled={disabled || (teams.length === 0 && createTeam === undefined)}
+        placeholder={createTeam === undefined ? "Choose Teams" : "Choose or create Teams"}
+        searchPlaceholder={createTeam === undefined ? "Team name" : "Team name, or a new one"}
+        {...(createTeam === undefined ? {} : { create: createTeam })}
       />
       {plan.invitees.length > 0 ? (
         <SelectField
@@ -91,6 +99,11 @@ export function InvitePeopleFields({
       ) : null}
     </>
   );
+}
+
+function teamsHint(teams: number, canCreate: boolean): string {
+  if (teams > 0) return "People join every Team you choose.";
+  return canCreate ? "Type a name to create a Team." : "Create a Team first.";
 }
 
 function peopleHint(plan: TeamAdditionPlan): string {

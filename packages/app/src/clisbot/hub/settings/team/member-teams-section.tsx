@@ -1,51 +1,57 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SelectField } from "@/components/ui/select-field";
 import { settingsStyles } from "@/styles/settings";
+import { subjectAssignments } from "../access-catalog";
 import { countLabel } from "../labels";
 import { tableStyles } from "../table-styles";
+import { MemberTeamsModal } from "./member-teams-modal";
 import { RowActionsMenu } from "./row-actions-menu";
-import type { HubMember, HubTeam } from "./types";
+import { teamAccessLine } from "./team-directory";
+import { canManageTeamMembership, managesAnyTeam } from "./team-membership";
+import type { HubMember, HubTeam, TeamResources } from "./types";
 import type { TeamActions } from "./use-team-actions";
 
 /**
- * The Teams this Member is in. With dozens of Teams, listing every one to toggle does not scale:
- * Add to Team… picks one of the Teams you manage, and leaving a Team is in its row's … menu.
+ * The Teams this Member is in, each with what the Team grants, so the Member's access through
+ * Teams reads here. Edit Teams opens the same dialog as the Members row: join several Teams,
+ * leave some, or create one. Leaving one Team is also in its row's … menu.
  */
 export function MemberTeamsSection({
   member,
   teams,
+  resources,
   actions,
-  canManage,
 }: {
   member: HubMember;
   teams: readonly HubTeam[];
+  resources: TeamResources;
   actions: TeamActions;
-  canManage(teamId: string): boolean;
 }) {
-  const [adding, setAdding] = useState(false);
-  const open = useCallback(() => setAdding(true), []);
-  const close = useCallback(() => setAdding(false), []);
+  const [editing, setEditing] = useState(false);
+  const open = useCallback(() => {
+    actions.setMutationError(null);
+    setEditing(true);
+  }, [actions]);
+  const close = useCallback(() => setEditing(false), []);
   const joined = teams.filter((team) => team.userIds.includes(member.userId));
-  const joinable = teams.filter(
-    (team) => !team.userIds.includes(member.userId) && canManage(team.id),
-  );
-  const addButton = useMemo(
+  const canEdit = managesAnyTeam(resources.authority);
+  const editButton = useMemo(
     () =>
-      joinable.length > 0 ? (
+      canEdit ? (
         <Button size="sm" variant="outline" disabled={actions.pending} onPress={open}>
-          Add to Team…
+          {joined.length === 0 ? "Add to a Team" : "Edit Teams"}
         </Button>
       ) : null,
-    [actions.pending, joinable.length, open],
+    [actions.pending, canEdit, joined.length, open],
   );
+  // Only readers of access assignments see what each Team grants.
+  const assignments = resources.canManageResources
+    ? resources.assignments.data?.assignments
+    : undefined;
   return (
-    <SettingsSection title="Teams" trailing={addButton}>
+    <SettingsSection title="Teams" trailing={editButton}>
       <View style={settingsStyles.card}>
         {joined.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
@@ -58,15 +64,23 @@ export function MemberTeamsSection({
               team={team}
               member={member}
               bordered={index > 0}
-              canManage={canManage(team.id)}
+              access={
+                assignments === undefined
+                  ? undefined
+                  : teamAccessLine(subjectAssignments(assignments, "team", team.id))
+              }
+              canManage={canManageTeamMembership(resources.authority, team.id)}
               actions={actions}
             />
           ))
         )}
       </View>
-      {adding ? (
-        <AddToTeamSheet member={member} teams={joinable} actions={actions} close={close} />
-      ) : null}
+      <MemberTeamsModal
+        member={editing ? member : null}
+        resources={resources}
+        actions={actions}
+        close={close}
+      />
     </SettingsSection>
   );
 }
@@ -75,12 +89,15 @@ function JoinedTeamRow({
   team,
   member,
   bordered,
+  access,
   canManage,
   actions,
 }: {
   team: HubTeam;
   member: HubMember;
   bordered: boolean;
+  /** "2 Hosts · 1 Project" or "No access"; undefined when the viewer cannot read grants. */
+  access: string | undefined;
   canManage: boolean;
   actions: TeamActions;
 }) {
@@ -96,13 +113,16 @@ function JoinedTeamRow({
     ],
     [member.userId, pending, removeTeamMember, team.id],
   );
+  const members = countLabel(team.userIds.length, "Member");
   return (
     <View
       style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null, tableStyles.body]}
     >
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{team.name}</Text>
-        <Text style={settingsStyles.rowHint}>{countLabel(team.userIds.length, "Member")}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {access === undefined ? members : `${members} · ${access}`}
+        </Text>
       </View>
       {canManage ? (
         <RowActionsMenu label={`Actions for ${team.name}`} actions={items} disabled={pending} />
@@ -110,64 +130,3 @@ function JoinedTeamRow({
     </View>
   );
 }
-
-function AddToTeamSheet({
-  member,
-  teams,
-  actions,
-  close,
-}: {
-  member: HubMember;
-  teams: readonly HubTeam[];
-  actions: TeamActions;
-  close(): void;
-}) {
-  const [teamId, setTeamId] = useState<string | null>(null);
-  const options = useMemo(
-    () => teams.map((team) => ({ id: team.id, value: team.id, label: team.name })),
-    [teams],
-  );
-  const display = useMemo(() => {
-    const label = teams.find(({ id }) => id === teamId)?.name;
-    return label === undefined ? null : { label };
-  }, [teamId, teams]);
-  const add = useCallback(async () => {
-    if (teamId === null) return;
-    // A refusal keeps the sheet open; the page shows why.
-    const refused = await actions.addTeamMembers(teamId, [member.userId]);
-    if (refused.length === 0) close();
-  }, [actions, close, member.userId, teamId]);
-  const press = useCallback(() => void add(), [add]);
-  const header = useMemo(() => ({ title: `Add ${member.name} to a Team` }), [member.name]);
-  return (
-    <AdaptiveModalSheet visible header={header} onClose={close} desktopMaxWidth={480}>
-      <View style={styles.sheet}>
-        {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
-        <SelectField
-          label="Team"
-          value={teamId}
-          selectedDisplay={display}
-          options={options}
-          onChange={setTeamId}
-          placeholder="Choose a Team"
-          emptyText="No other Team you manage."
-          searchable
-          searchPlaceholder="Search Teams"
-        />
-        <View style={styles.actions}>
-          <Button disabled={teamId === null || actions.pending} onPress={press}>
-            Add to Team
-          </Button>
-          <Button variant="ghost" onPress={close}>
-            Cancel
-          </Button>
-        </View>
-      </View>
-    </AdaptiveModalSheet>
-  );
-}
-
-const styles = StyleSheet.create((theme) => ({
-  sheet: { gap: theme.spacing[4] },
-  actions: { flexDirection: "row", gap: theme.spacing[2] },
-}));

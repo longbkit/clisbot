@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { AccessAssignment, AccessResource, HubMember, HubTeam } from "./access-catalog";
-import { accessEntries, entryFilterChips, filterEntries } from "./access-browser-model";
+import {
+  accessEntries,
+  entryFilterChips,
+  entryStatus,
+  filterEntries,
+  memberTeamEntries,
+} from "./access-browser-model";
 import { grantRows } from "./access-grant-rows";
 
 const host = { kind: "daemon", id: "host", name: "LongPro2Max", parent: null } as AccessResource;
@@ -61,20 +67,63 @@ describe("accessEntries", () => {
   });
 });
 
+describe("a Member's Teams", () => {
+  it("lists every Team the Member is in, with or without access", () => {
+    const withEmptyTeam = {
+      ...directory,
+      teams: [...teams, { id: "t-empty", name: "Design", userIds: ["u-ai"] }] as HubTeam[],
+    };
+    const entries = accessEntries(rows, "subject", withEmptyTeam);
+    const ai = entries.find(({ title }) => title === "Ai Tran")!;
+    expect(memberTeamEntries(ai, entries).map((team) => [team.title, entryStatus(team)])).toEqual([
+      ["QC", "1 grant"],
+      ["Design", "No access"],
+    ]);
+    const bao = entries.find(({ title }) => title === "Bao")!;
+    expect(memberTeamEntries(bao, entries)).toEqual([]);
+  });
+});
+
 describe("filters", () => {
   const entries = accessEntries(rows, "subject", directory);
 
-  it("offers every kind present, then No access, with counts", () => {
+  it("starts from All, then every kind present, then with and without access", () => {
     expect(entryFilterChips(entries, "subject").map(({ label, count }) => [label, count])).toEqual([
-      ["With access", 2],
+      ["All", 4],
       ["Teams", 1],
-      ["Members", 1],
+      ["Members", 2],
+      ["Guest", 1],
+      ["With access", 2],
       ["No access", 2],
     ]);
+    expect(filterEntries(entries, "all", "")).toHaveLength(4);
+    expect(filterEntries(entries, "with", "").map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
+  });
+
+  it("counts an Owner or Admin as having access through their role, not as No access", () => {
+    const withRoles = {
+      ...directory,
+      members: [
+        ...members,
+        { id: "m-own", userId: "u-own", name: "Owen", email: "o@example.test", role: "owner" },
+        { id: "m-adm", userId: "u-adm", name: "Ada", email: "a@example.test", role: "admin" },
+      ] as HubMember[],
+    };
+    const all = accessEntries(rows, "subject", withRoles);
+    const none = filterEntries(all, "none", "").map(({ title }) => title);
+    expect(none).toEqual(["Bao", "Guest"]);
+    const byTitle = new Map(all.map((entry) => [entry.title, entryStatus(entry)]));
+    expect(byTitle.get("Owen")).toBe("Owner, full access");
+    expect(byTitle.get("Ada")).toBe("Admin role");
+    expect(byTitle.get("Ai Tran")).toBe("1 grant");
+    expect(byTitle.get("Bao")).toBe("No access");
   });
 
   it("filters by kind and searches name or email", () => {
-    expect(filterEntries(entries, "member", "").map(({ title }) => title)).toEqual(["Ai Tran"]);
+    expect(filterEntries(entries, "member", "").map(({ title }) => title)).toEqual([
+      "Ai Tran",
+      "Bao",
+    ]);
     expect(filterEntries(entries, "none", "bao@").map(({ title }) => title)).toEqual(["Bao"]);
     expect(filterEntries(entries, "all", "nobody")).toEqual([]);
   });

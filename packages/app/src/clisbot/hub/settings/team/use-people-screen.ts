@@ -21,8 +21,8 @@ export function usePeopleSelection() {
 }
 
 /**
- * The Invite people modal and the row actions that open it: from the header with nothing
- * chosen, from a Team with that Team chosen, from a "No Team" row with that Member chosen.
+ * The Invite people modal and the row actions: Invite people from the header with nothing
+ * chosen or from a Team with that Team chosen, and a Member's Teams from their row.
  */
 export function useInvitePeople(
   actions: TeamActions,
@@ -31,6 +31,8 @@ export function useInvitePeople(
 ) {
   const invite = useInviteRequest();
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingTeams, setEditingTeams] = useState<HubMember | null>(null);
+  const closeTeams = useCallback(() => setEditingTeams(null), []);
   const openInvite = useCallback(() => {
     setNotice(null);
     invite.open();
@@ -44,9 +46,21 @@ export function useInvitePeople(
       select,
       setRole,
       remove: (member) => void actions.removeMember(member.id, member.name),
-      addToTeam: (member) => invite.open({ members: [member] }),
+      editTeams: (member) => {
+        actions.setMutationError(null);
+        setEditingTeams(member);
+      },
     }),
-    [actions, invite, select, setRole],
+    [actions, select, setRole],
   );
-  return { invite, notice, setNotice, openInvite, addPeopleToTeam, handlers };
+  return {
+    invite,
+    notice,
+    setNotice,
+    openInvite,
+    addPeopleToTeam,
+    handlers,
+    editingTeams,
+    closeTeams,
+  };
 }

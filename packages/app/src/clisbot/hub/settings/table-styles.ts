@@ -22,6 +22,12 @@ export const tableStyles = StyleSheet.create((theme) => ({
   body: {
     backgroundColor: theme.colors.surface0,
   },
+  // Secondary text inside a cell. Unlike a row hint it has no top margin, so it
+  // sits level with a button beside it on the same line.
+  cellText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
   hovered: {
     backgroundColor: theme.colors.surface1,
   },

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { HubTeamMembershipSchema, HubTeamSchema } from "../../contracts";
-import type { HubAccount, HubRun, TeamResources } from "./types";
+import type { HubAccount, HubRun, HubTeam, TeamResources } from "./types";
 
 export interface TeamActions {
   pending: boolean;
@@ -11,6 +11,10 @@ export interface TeamActions {
   addTeamMember(teamId: string, userId: string): Promise<void>;
   removeTeamMember(teamId: string, userId: string): void;
   addTeamMembers(teamId: string, userIds: string[]): Promise<string[]>;
+  /** Joins one Member to `add` and takes them out of `remove`; false when the Hub refused one. */
+  setMemberTeams(userId: string, changes: { add: string[]; remove: string[] }): Promise<boolean>;
+  /** Creates a Team and reloads the list; rejects with the Hub's reason. */
+  createTeam(name: string): Promise<HubTeam>;
   /** Rejects with the Hub's reason, so a dialog can keep it in front of the person. */
   renameTeam(teamId: string, name: string): Promise<void>;
   removeTeam(teamId: string, name: string): Promise<boolean>;
@@ -72,6 +76,15 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
     [assignments, hub, run, teams],
   );
   const addTeamMembers = useAddTeamMembers(runner.run, addTeamMember, resources);
+  const setMemberTeams = useSetMemberTeams(hub, runner.run, addTeamMember, resources);
+  const createTeam = useCallback(
+    async (name: string) => {
+      const team = await hub.api().post("teams", { name: name.trim() }, HubTeamSchema);
+      await teams.refetch();
+      return team;
+    },
+    [hub, teams],
+  );
   const renameTeam = useCallback(
     (teamId: string, name: string) =>
       runner.runOrThrow(async () => {
@@ -123,6 +136,8 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
     addTeamMember,
     removeTeamMember,
     addTeamMembers,
+    setMemberTeams,
+    createTeam,
     renameTeam,
     removeTeam,
     removeMember,
@@ -165,5 +180,37 @@ function useAddTeamMembers(
       return notAdded;
     },
     [addTeamMember, assignments, members, run, teams],
+  );
+}
+
+/**
+ * Applies every join and leave, even after a refusal, then refetches once: the dialog closes
+ * only when all of them landed, and otherwise shows the Teams as the Hub now has them.
+ */
+function useSetMemberTeams(
+  hub: HubAccount,
+  run: HubRun,
+  addTeamMember: (teamId: string, userId: string) => Promise<void>,
+  { teams, assignments }: TeamResources,
+) {
+  return useCallback(
+    (userId: string, { add, remove }: { add: string[]; remove: string[] }) =>
+      run(async () => {
+        const leave = (teamId: string) =>
+          hub
+            .api()
+            .delete(`teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`);
+        const results = await Promise.allSettled([
+          ...add.map((teamId) => addTeamMember(teamId, userId)),
+          ...remove.map(leave),
+        ]);
+        await Promise.all([teams.refetch(), assignments.refetch()]);
+        const refused = results.find((result) => result.status === "rejected");
+        if (refused !== undefined) {
+          const reason = refused.reason instanceof Error ? refused.reason.message : "";
+          throw new Error(`Some Team changes were not saved. ${reason}`.trim());
+        }
+      }),
+    [addTeamMember, assignments, hub, run, teams],
   );
 }

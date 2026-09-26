@@ -41,8 +41,8 @@ Access ⓘ
 View access by  [ People and Teams | Resources ]
 
 [ Search people and Teams ]            Ai Tran                [Grant access…]
-(With access 38) (Teams 12) (Members   ai@vexere.com
- 25) (Guest 1) (No access 140)
+(All 178) (Teams 12) (Members         ai@vexere.com
+ 165) (Guest 1) (With access 38) (No access 140)
 ┌──────────────────────────────┐       Resource          Level      Details        Granted by
 │ QC            Team · 9       │       LongPro2Max       Developer  Can share      Hoa    Edit …
 │ Ai Tran       ai@…   3 grants│ ◀     Host · vexere.com
@@ -56,12 +56,28 @@ View access by  [ People and Teams | Resources ]
   grants) or _Resources_ (what grants are on). The label is part of the
   control, so the switch reads as a choice of axis, not as a filter.
 - **The list scales by narrowing, not scrolling**: search (name or email),
-  kind chips with counts, and _No access_ for everyone or everything without a
-  grant. It shows 50 entries, then _Show more_. Members show their email, so
-  two with the same name are told apart.
+  kind chips with counts, then _With access_ and _No access_. The list opens on
+  _All_, so nobody without access is hidden by default. It shows 50 entries,
+  then _Show more_. Members show their email, so two with the same name are
+  told apart.
+- **An organization role counts as access.** An Owner reaches everything and an
+  Admin manages Members, Teams, Connections, and Access without a grant, so
+  neither lands in _No access_. Their row reads _Owner, full access_ or
+  _Admin role_. The detail opens with a callout for the role (green for Owner,
+  blue for Admin, which still needs a grant for Hosts and Projects), and an
+  Owner's detail has no _Grant access…_, since a grant would change nothing.
 - **The detail is one entry's grants**, one fact per column: the thing (name,
   then its kind and parent), the Level, its modifiers, who granted it. A
   custom grant reads _Custom · N privileges_; the list is in the grant sheet.
+- **A Member's detail lists their Teams first**, every one of them with what
+  it grants (_2 grants_ or _No access_), and a Team opens on press. A Team
+  that grants nothing adds no rows to the grants table, so without this list
+  it would be invisible why the Member has no access.
+- **Grant access… on a Member in Teams is a menu, Teams first.** It lists the
+  Member's Teams under _Recommended: grant to a Team_, then _Only <Member>_ for
+  a direct grant. A Team grant covers people added later and is one row to
+  review; a direct grant stays when the Member leaves their Teams. A Member in
+  no Team gets the plain button.
 - **A Member's grants include their Teams'**, marked "via Team …", with no
   actions: that grant is edited on the Team. A Project lists the Host grants
   that reach it, marked "via Host …". Either way the entry counts as having

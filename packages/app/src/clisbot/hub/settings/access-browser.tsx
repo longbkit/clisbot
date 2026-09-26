@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
@@ -19,16 +20,21 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import {
   entryFilterChips,
+  entryStatus,
   filterEntries,
+  hasAccess,
+  memberTeamEntries,
   type AccessEntry,
   type EntryFilter,
+  type RoleAccess,
 } from "./access-browser-model";
 import type { GrantGrouping } from "./access-grant-rows";
 import { AccessGrantsTable, type GrantActions } from "./access-grants-table";
+import { GrantAccessMenu } from "./access-grant-menu";
+import { AccessMemberTeams } from "./access-member-teams";
 import { BackLink } from "./back-link";
 import { DetailHeader } from "./detail-header";
 import { FilterChips } from "./filter-chips";
-import { countLabel } from "./labels";
 import { tableStyles } from "./table-styles";
 
 const MutedChevron = withUnistyles(ChevronRight, (theme) => ({
@@ -112,9 +118,12 @@ export function AccessBrowser({
   // The Settings column, not the window, decides: side by side only when both fit.
   const compact = compactFormFactor || (width !== null && width < SPLIT_MIN_WIDTH);
   // On a wide screen the detail is never empty: the first entry with access opens.
-  const openKey =
-    selectedKey ?? (compact ? null : (entries.find(({ rows }) => rows.length > 0)?.key ?? null));
+  const openKey = selectedKey ?? (compact ? null : (entries.find(hasAccess)?.key ?? null));
   const selected = entries.find(({ key }) => key === openKey) ?? null;
+  const selectedTeams = useMemo(
+    () => (selected === null ? NO_ENTRIES : memberTeamEntries(selected, entries)),
+    [entries, selected],
+  );
   const back = useCallback(() => onSelect(null), [onSelect]);
   // The other axis lists other things, so its chips and search start over.
   const changeGrouping = useCallback(
@@ -128,7 +137,14 @@ export function AccessBrowser({
     selected === null ? (
       <Text style={styles.muted}>Choose someone or something on the left to see its access.</Text>
     ) : (
-      <EntryDetail entry={selected} grouping={grouping} actions={actions} grantTo={grantTo} />
+      <EntryDetail
+        entry={selected}
+        teams={selectedTeams}
+        grouping={grouping}
+        actions={actions}
+        grantTo={grantTo}
+        onSelect={onSelect}
+      />
     );
   if (compact && selected !== null)
     return (
@@ -249,7 +265,6 @@ function EntryRow({
     ],
     [bordered, selected],
   );
-  const grants = entry.rows.length;
   return (
     <Pressable accessibilityRole="button" accessibilityState={state} onPress={press} style={style}>
       <View style={styles.entryText}>
@@ -260,7 +275,7 @@ function EntryRow({
           {entry.subtitle}
         </Text>
       </View>
-      <Text style={styles.muted}>{grants === 0 ? "No access" : countLabel(grants, "grant")}</Text>
+      <Text style={styles.muted}>{entryStatus(entry)}</Text>
       {drillIn ? <MutedChevron /> : null}
     </Pressable>
   );
@@ -268,39 +283,87 @@ function EntryRow({
 
 function EntryDetail({
   entry,
+  teams,
   grouping,
   actions,
   grantTo,
+  onSelect,
 }: {
   entry: AccessEntry;
+  /** A Member's Teams; empty for anything else. */
+  teams: readonly AccessEntry[];
   grouping: GrantGrouping;
   actions: GrantActions;
   grantTo(entry: AccessEntry): void;
+  onSelect(key: string): void;
 }) {
   const grant = useCallback(() => grantTo(entry), [entry, grantTo]);
+  // A Member in Teams is steered to grant through one of them; see GrantAccessMenu.
   const grantButton = useMemo(
-    () => (
-      <Button size="sm" variant="outline" disabled={actions.pending} onPress={grant}>
-        Grant access…
-      </Button>
-    ),
-    [actions.pending, grant],
+    () =>
+      teams.length > 0 ? (
+        <GrantAccessMenu
+          member={entry}
+          teams={teams}
+          disabled={actions.pending}
+          grantTo={grantTo}
+        />
+      ) : (
+        <Button size="sm" variant="outline" disabled={actions.pending} onPress={grant}>
+          Grant access…
+        </Button>
+      ),
+    [actions.pending, entry, grant, grantTo, teams],
   );
   return (
     <View style={styles.stack}>
-      <DetailHeader title={entry.title} subtitle={entry.subtitle} actions={grantButton} />
+      {/* An Owner already reaches everything; a grant to them would change nothing. */}
+      <DetailHeader
+        title={entry.title}
+        subtitle={entry.subtitle}
+        actions={entry.role === "owner" ? null : grantButton}
+      />
+      {entry.role === undefined ? null : <Alert {...ROLE_ACCESS_NOTES[entry.role]} />}
+      {entry.teamKeys === undefined ? null : (
+        <AccessMemberTeams teams={teams} onSelect={onSelect} />
+      )}
       <AccessGrantsTable
         rows={entry.rows}
         grouping={grouping}
-        empty={
-          grouping === "subject"
-            ? "No access yet. Grant some, or add them to a Team that has it."
-            : "No one has access yet, other than Owners."
-        }
+        empty={emptyGrants(entry, grouping)}
         actions={actions}
       />
     </View>
   );
+}
+
+const NO_ENTRIES: AccessEntry[] = [];
+
+/** What an organization role reaches without a grant, called out over the grants. */
+const ROLE_ACCESS_NOTES: Record<
+  RoleAccess,
+  { variant: "success" | "info"; title: string; description: string }
+> = {
+  owner: {
+    variant: "success",
+    title: "Owner · full access",
+    description:
+      "Every Host, Project, Connection, and Automation, including ones added later. No grant needed.",
+  },
+  admin: {
+    variant: "info",
+    title: "Organization Admin",
+    description:
+      "Manages Members, Teams, Connections, and Access. Hosts and Projects still need a grant.",
+  },
+};
+
+/** The empty grants table, worded so it never contradicts the role above it. */
+function emptyGrants(entry: AccessEntry, grouping: GrantGrouping): string {
+  if (grouping === "resource") return "No one has access yet, other than Owners.";
+  if (entry.role === "owner") return "No grants, and none needed.";
+  if (entry.role === "admin") return "No grants yet. Grant one for a Host or Project.";
+  return "No access yet. Grant some, or add them to a Team that has it.";
 }
 
 const styles = StyleSheet.create((theme) => ({

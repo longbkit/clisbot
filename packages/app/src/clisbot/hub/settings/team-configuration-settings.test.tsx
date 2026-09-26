@@ -155,11 +155,13 @@ vi.mock("./multi-select-field", () => ({
     options,
     value,
     onChange,
+    create,
   }: {
     label: string;
     options: { value: string; label: string }[];
     value: readonly string[];
     onChange(value: string[]): void;
+    create?: { label: string; onCreate(name: string): void };
   }) => (
     <fieldset>
       <legend>{label}</legend>
@@ -172,6 +174,7 @@ vi.mock("./multi-select-field", () => ({
           onChange={onChange}
         />
       ))}
+      {create === undefined ? null : <StubCreateInput label={label} create={create} />}
     </fieldset>
   ),
 }));
@@ -205,6 +208,23 @@ function StubSearch({
     [onChangeText],
   );
   return <input aria-label={placeholder} onChange={change} />;
+}
+
+/** The typed-name choice: Enter creates what was typed. */
+function StubCreateInput({
+  label,
+  create,
+}: {
+  label: string;
+  create: { label: string; onCreate(name: string): void };
+}) {
+  const submit = React.useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") create.onCreate(event.currentTarget.value);
+    },
+    [create],
+  );
+  return <input aria-label={`${label}: ${create.label}`} onKeyDown={submit} />;
 }
 
 function StubCheckbox({
@@ -701,15 +721,113 @@ describe("Invite people", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(access.refetch).toHaveBeenCalledOnce();
   });
-  it("opens with the Team chosen from its detail, and with the Member from a No Team row", () => {
-    fixtures.queries.members = query({ members: [member, bao] });
-    const ui = render(<HubSettingsContent section="team" />);
-    fireEvent.click(screen.getByRole("button", { name: "Add to a Team" }));
-    expect((screen.getByLabelText("People") as HTMLInputElement).value).toBe("bao@example.test");
-    ui.unmount();
+  it("opens with the Team chosen from its detail", () => {
+    render(<HubSettingsContent section="team" />);
     openTeam("Sales");
     fireEvent.click(screen.getByRole("button", { name: "Add people" }));
     expect((screen.getByLabelText("Teams: Sales") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("Member Teams from the Members row", () => {
+  it("adds a Member with no Team to several Teams at once", async () => {
+    fixtures.queries.members = query({ members: [member, bao] });
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to a Team" }));
+    const dialog = screen.getByRole("dialog", { name: "Teams for Nguyễn Bảo" });
+    fireEvent.click(within(dialog).getByLabelText("Teams: Support"));
+    fireEvent.click(within(dialog).getByLabelText("Teams: Sales"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    for (const team of ["team-1", "team-2"]) {
+      expect(fixtures.post).toHaveBeenCalledWith(
+        `teams/${team}/members`,
+        { userId: "user-2" },
+        expect.anything(),
+      );
+    }
+  });
+  it("joins and leaves Teams for a Member already in one, saving only the changes", async () => {
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit Teams" }));
+    const dialog = screen.getByRole("dialog", { name: "Teams for Alice" });
+    const save = within(dialog).getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(within(dialog).getByLabelText("Teams: Support"));
+    fireEvent.click(within(dialog).getByLabelText("Teams: Sales"));
+    fireEvent.click(save);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(fixtures.delete).toHaveBeenCalledWith("teams/team-1/members/user-1");
+    expect(fixtures.post).toHaveBeenCalledWith(
+      "teams/team-2/members",
+      { userId: "user-1" },
+      expect.anything(),
+    );
+  });
+  it("creates a typed Team that does not exist yet, chooses it, and joins it on save", async () => {
+    fixtures.post.mockImplementation(async (path: string) =>
+      path === "teams"
+        ? { id: "team-3", name: "Design", userIds: [], createdAt: "now", updatedAt: null }
+        : {},
+    );
+    fixtures.queries.members = query({ members: [member, bao] });
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to a Team" }));
+    const dialog = screen.getByRole("dialog", { name: "Teams for Nguyễn Bảo" });
+    const typed = within(dialog).getByLabelText("Teams: Create Team") as HTMLInputElement;
+    typed.value = "Design";
+    fireEvent.keyDown(typed, { key: "Enter" });
+    await waitFor(() =>
+      expect(fixtures.post).toHaveBeenCalledWith("teams", { name: "Design" }, expect.anything()),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(fixtures.post).toHaveBeenCalledWith(
+        "teams/team-3/members",
+        { userId: "user-2" },
+        expect.anything(),
+      ),
+    );
+  });
+  it("offers no Create Team to a Team Admin, who cannot create Teams", () => {
+    const teamAdminCapabilities = {
+      manageMembers: false,
+      manageOwners: false,
+      manageResources: false,
+    };
+    hub.signedIn = {
+      account,
+      organization: { id: "organization" },
+      capabilities: teamAdminCapabilities,
+    };
+    fixtures.queries["access-assignments/effective?include=team"] = query({
+      owner: false,
+      grants: [
+        {
+          resource: { kind: "team", id: "team-1" },
+          privileges: ["hub.access.manage"],
+        },
+      ],
+    });
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit Teams" }));
+    const dialog = screen.getByRole("dialog", { name: "Teams for Alice" });
+    expect(within(dialog).getByLabelText("Teams: Support")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Teams: Sales")).toBeNull();
+    expect(within(dialog).queryByLabelText("Teams: Create Team")).toBeNull();
+  });
+  it("stays open with the Hub's reason when a change is refused", async () => {
+    fixtures.post.mockRejectedValueOnce(new Error("Not allowed."));
+    render(<HubSettingsContent section="team" />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit Teams" }));
+    const dialog = screen.getByRole("dialog", { name: "Teams for Alice" });
+    fireEvent.click(within(dialog).getByLabelText("Teams: Sales"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText("Some Team changes were not saved. Not allowed."),
+      ).toBeTruthy(),
+    );
   });
 });
 
@@ -763,16 +881,17 @@ describe("Member roles", () => {
 });
 
 describe("Member detail", () => {
-  it("lists only the Member's Teams, adds one through Add to Team, and removes through the menu", async () => {
+  it("lists only the Member's Teams with what each grants, edits them, and removes through the menu", async () => {
     render(<HubSettingsContent section="team" />);
     openMember("Alice");
     const teams = screen.getByRole("heading", { name: "Teams" }).closest("section")!;
     expect(within(teams).getByText("Support")).toBeTruthy();
+    expect(within(teams).getByText("1 Member · 1 Connection")).toBeTruthy();
     expect(within(teams).queryByText("Sales")).toBeNull();
-    fireEvent.click(within(teams).getByRole("button", { name: "Add to Team…" }));
-    const sheet = screen.getByRole("dialog", { name: "Add Alice to a Team" });
-    fireEvent.change(within(sheet).getByLabelText("Team"), { target: { value: "team-2" } });
-    fireEvent.click(within(sheet).getByRole("button", { name: "Add to Team" }));
+    fireEvent.click(within(teams).getByRole("button", { name: "Edit Teams" }));
+    const sheet = screen.getByRole("dialog", { name: "Teams for Alice" });
+    fireEvent.click(within(sheet).getByLabelText("Teams: Sales"));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(fixtures.post).toHaveBeenCalledWith(
         "teams/team-2/members",

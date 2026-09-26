@@ -7,6 +7,8 @@ import {
   canSeeInvitations,
   invitableTeams,
   inviteRoleLocked,
+  managesAnyTeam,
+  memberTeamChanges,
   visibleTeams,
 } from "./team-membership";
 import type { HubCapabilities, PeopleAuthority } from "./types";
@@ -101,5 +103,16 @@ describe("memberRemoveLockReason", () => {
       "The last Owner cannot be removed.",
     );
     expect(memberRemoveLockReason(plain, [owner, plain], MEMBER)).not.toBeNull();
+  });
+});
+
+describe("Member Teams", () => {
+  it("lets a Team Admin edit a Member's Teams, and a plain Member not", () => {
+    expect(managesAnyTeam(teamAdmin)).toBe(true);
+    expect(managesAnyTeam({ capabilities: MEMBER, administeredTeamIds: new Set() })).toBe(false);
+  });
+  it("joins the newly chosen Teams and leaves the dropped ones", () => {
+    expect(memberTeamChanges(["a", "b"], ["b", "c"])).toEqual({ add: ["c"], remove: ["a"] });
+    expect(memberTeamChanges(["a"], ["a"])).toEqual({ add: [], remove: [] });
   });
 });

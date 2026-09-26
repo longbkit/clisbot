@@ -23,6 +23,17 @@ export type MultiSelection = "*" | readonly string[];
 
 const ALL_OPTION_ID = "*";
 
+/**
+ * Offers the typed text as a new option when nothing matches it exactly, as
+ * `Create Team "…"`. Choosing it calls `onCreate` with the text; the caller
+ * makes the option and adds it to the value.
+ */
+export interface MultiSelectCreate {
+  label: string;
+  description?: string;
+  onCreate(name: string): void;
+}
+
 /** One line naming a selection, for triggers and collapsed summaries. */
 export function selectionLabel(
   value: MultiSelection | null,
@@ -61,6 +72,7 @@ export function MultiSelectField({
   allLabel,
   placeholder,
   searchPlaceholder,
+  create,
 }: {
   label: string;
   hint?: string;
@@ -71,6 +83,7 @@ export function MultiSelectField({
   allLabel?: string;
   placeholder: string;
   searchPlaceholder: string;
+  create?: MultiSelectCreate;
 }) {
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
@@ -85,8 +98,13 @@ export function MultiSelectField({
     [],
   );
   const select = useCallback(
-    (optionId: string) => onChange(toggleSelection(value, optionId)),
-    [onChange, value],
+    (optionId: string) => {
+      // The Combobox's typed-text option carries the text as its id.
+      const known = optionId === ALL_OPTION_ID || options.some((o) => o.value === optionId);
+      if (!known && create !== undefined) create.onCreate(optionId);
+      else onChange(toggleSelection(value, optionId));
+    },
+    [create, onChange, options, value],
   );
   const comboboxOptions = useMemo(
     () => [
@@ -158,6 +176,15 @@ export function MultiSelectField({
         open={open}
         onOpenChange={setOpen}
         keepOpenOnSelect
+        allowCustomValue={create !== undefined}
+        {...(create === undefined
+          ? {}
+          : {
+              customValuePrefix: create.label,
+              ...(create.description === undefined
+                ? {}
+                : { customValueDescription: create.description }),
+            })}
         anchorRef={anchorRef}
         renderOption={renderOption}
       />

@@ -17,10 +17,9 @@ import type {
 } from "./types";
 import type { TeamActions } from "./use-team-actions";
 
-/** What the Invite people modal opens with: Teams and Members chosen from where it was opened. */
+/** What the Invite people modal opens with: the Teams chosen from where it was opened. */
 export interface InviteRequest {
   teamIds: readonly string[];
-  members: readonly HubMember[];
 }
 
 export interface InviteDraft {
@@ -41,7 +40,6 @@ export function useInviteRequest() {
   const open = useCallback((input: Partial<InviteRequest> = {}) => {
     setRequest((current) => ({
       teamIds: input.teamIds ?? [],
-      members: input.members ?? [],
       key: (current?.key ?? 0) + 1,
     }));
   }, []);
@@ -51,7 +49,7 @@ export function useInviteRequest() {
 
 export function useInviteDraft(request: InviteRequest) {
   const [draft, setDraft] = useState<InviteDraft>(() => ({
-    text: request.members.map(({ email }) => email).join("\n"),
+    text: "",
     teamIds: request.teamIds,
     role: "member",
     textResetKey: 0,
@@ -60,7 +58,13 @@ export function useInviteDraft(request: InviteRequest) {
     (patch: Partial<InviteDraft>) => setDraft((current) => ({ ...current, ...patch })),
     [],
   );
-  return useMemo(() => ({ draft, update }), [draft, update]);
+  /** Chooses a Team made while the modal is open, keeping whatever was chosen meanwhile. */
+  const addTeam = useCallback(
+    (teamId: string) =>
+      setDraft((current) => ({ ...current, teamIds: [...current.teamIds, teamId] })),
+    [],
+  );
+  return useMemo(() => ({ draft, update, addTeam }), [addTeam, draft, update]);
 }
 
 export type InviteDraftState = ReturnType<typeof useInviteDraft>;

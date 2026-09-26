@@ -16,6 +16,7 @@ import {
   useSubmitInvite,
   type InviteRequest,
 } from "./use-invite-people";
+import { useCreateTeamChoice } from "./use-create-team-choice";
 import type { TeamActions } from "./use-team-actions";
 
 const HEADER: SheetHeader = { title: "Invite people" };
@@ -61,6 +62,7 @@ export function InvitePeopleModal({
     () => invitableTeams(resources.authority, teams),
     [resources.authority, teams],
   );
+  const createTeam = useCreateTeamChoice(actions, resources.canManageResources, draftState.addTeam);
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
@@ -92,6 +94,7 @@ export function InvitePeopleModal({
           teams={offeredTeams}
           roleLocked={inviteRoleLocked(resources.authority)}
           disabled={actions.pending}
+          createTeam={createTeam}
         />
         {preview.length === 0 ? null : <Alert variant="info" title={preview} />}
         <InviteAccessNote resources={resources} teamIds={plan.teamIds} />

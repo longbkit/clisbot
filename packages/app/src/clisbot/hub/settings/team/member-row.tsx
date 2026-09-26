@@ -18,8 +18,8 @@ export interface MemberRowHandlers {
   select(value: TeamSelection): void;
   setRole(member: HubMember, role: OrganizationRole): Promise<void>;
   remove(member: HubMember): void;
-  /** Opens Invite people with this Member picked, from a "No Team" row. */
-  addToTeam(member: HubMember): void;
+  /** Opens the Member's Teams, to join or leave any of the Teams the viewer manages. */
+  editTeams(member: HubMember): void;
 }
 
 export function MemberRow({
@@ -27,7 +27,7 @@ export function MemberRow({
   members,
   capabilities,
   canLinkChat,
-  canInvite,
+  canEditTeams,
   pending,
   bordered,
   handlers,
@@ -36,7 +36,7 @@ export function MemberRow({
   members: readonly HubMember[];
   capabilities: HubCapabilities | undefined;
   canLinkChat: boolean;
-  canInvite: boolean;
+  canEditTeams: boolean;
   pending: boolean;
   bordered: boolean;
   handlers: MemberRowHandlers;
@@ -47,7 +47,7 @@ export function MemberRow({
     [handlers, member.id],
   );
   const remove = useCallback(() => handlers.remove(member), [handlers, member]);
-  const addToTeam = useCallback(() => handlers.addToTeam(member), [handlers, member]);
+  const editTeams = useCallback(() => handlers.editTeams(member), [handlers, member]);
   const removeLocked = memberRemoveLockReason(member, members, capabilities) !== null;
   const actions = useMemo(
     () => [
@@ -60,10 +60,10 @@ export function MemberRow({
   const compact = useIsCompactFormFactor();
   const teamsCell = (
     <View style={styles.cellLine}>
-      <Text style={settingsStyles.rowHint}>{memberTeamNames(member, teams)}</Text>
-      {canInvite && needsTeam(member, teams) ? (
-        <Button size="xs" variant="ghost" disabled={pending} onPress={addToTeam}>
-          Add to a Team
+      <Text style={tableStyles.cellText}>{memberTeamNames(member, teams)}</Text>
+      {canEditTeams && (teams.length > 0 || needsTeam(member, teams)) ? (
+        <Button size="xs" variant="ghost" disabled={pending} onPress={editTeams}>
+          {teams.length === 0 ? "Add to a Team" : "Edit Teams"}
         </Button>
       ) : null}
     </View>

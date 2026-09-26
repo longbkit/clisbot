@@ -245,9 +245,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The grant form is a sheet the page's Grant access… button opens. */
+/**
+ * The grant form is a sheet the page's Grant access… button opens. For a Member in Teams the
+ * button is a menu that puts the Teams first; these tests grant to the Member directly.
+ */
 async function openGrant() {
   fireEvent.click(await screen.findByRole("button", { name: "Grant access…" }));
+  const direct = screen.queryByText(/^Only /);
+  if (direct !== null) fireEvent.click(direct);
 }
 function renderAccess() {
   return render(
@@ -256,6 +261,25 @@ function renderAccess() {
     </QueryClientProvider>,
   );
 }
+
+describe("Grant access for a Member in Teams", () => {
+  it("offers their Teams first, and opens the grant sheet on the Team chosen", async () => {
+    const withTeam = {
+      ...resources,
+      teams: {
+        teams: [{ id: "qc", name: "QC", userIds: ["user"], createdAt: "now", updatedAt: null }],
+      },
+    };
+    adapters.get.mockImplementation(async (path: string) => withTeam[resourceOf(path)]);
+    renderAccess();
+    fireEvent.click(await screen.findByRole("button", { name: "Grant access…" }));
+    const team = await screen.findByText("Team QC");
+    expect(screen.getByText("Only Member One")).toBeTruthy();
+    fireEvent.click(team);
+    const subject = (await screen.findByLabelText("Team, Member or Guest")) as HTMLSelectElement;
+    expect(subject.value).toBe("team\0qc");
+  });
+});
 
 describe("Access assignment editing", () => {
   it.each(["Save access", "Remove"])(
