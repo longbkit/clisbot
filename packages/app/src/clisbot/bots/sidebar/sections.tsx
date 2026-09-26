@@ -84,6 +84,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         </Text>
       ) : null}
       <ChatsSection
+        botCount={botRows.length}
         chats={projectGroupSidebar(chatRows, hosts.length > 1)}
         onBeforeNavigate={onBeforeNavigate}
         onCreateChat={openGroup}

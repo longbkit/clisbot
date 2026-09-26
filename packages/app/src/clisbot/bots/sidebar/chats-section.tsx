@@ -2,6 +2,7 @@ import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-s
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
 import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { botsCopy } from "../copy";
@@ -33,6 +34,7 @@ interface ChatsSectionProps {
   onBeforeNavigate?: () => void;
   onCreateChat: () => void;
   canCreateChat?: boolean;
+  botCount?: number;
   onOpenChatMenu?: (chat: ChatsSidebarChat) => void;
 }
 
@@ -42,6 +44,7 @@ export const ChatsSection = memo(function ChatsSection({
   onBeforeNavigate,
   onCreateChat,
   canCreateChat = true,
+  botCount,
   onOpenChatMenu,
 }: ChatsSectionProps) {
   const router = useRouter();
@@ -66,7 +69,11 @@ export const ChatsSection = memo(function ChatsSection({
         onCreate={onCreateChat}
         disabled={!canCreateChat}
       />
-      {!canCreateChat ? <Text>{botsCopy.createBotFirst}</Text> : null}
+      {!canCreateChat ? (
+        <Text style={hintStyles.hint}>
+          {botCount === 1 ? "Add another bot to create a group chat." : botsCopy.createBotFirst}
+        </Text>
+      ) : null}
       {visible.map((chat) => (
         <ChatRow
           key={chat.key}
@@ -128,3 +135,12 @@ const ChatRow = memo(function ChatRow({
 // Unistyles style, so building the element at module scope materialises nothing theme-bound.
 const leadingDotStyle = { width: 6, height: 6, borderRadius: 3, opacity: 0 } as const;
 const chatLeading = <View style={leadingDotStyle} />;
+
+const hintStyles = StyleSheet.create((theme) => ({
+  hint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    paddingHorizontal: theme.spacing[2],
+    paddingBottom: theme.spacing[2],
+  },
+}));
