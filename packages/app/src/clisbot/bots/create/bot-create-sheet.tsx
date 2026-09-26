@@ -1,3 +1,4 @@
+import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
 import type { BotPayload } from "../data/contracts";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { ChoiceButton } from "./choice-button";
@@ -35,6 +36,7 @@ export function BotCreateForm({
     }),
   );
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
+  const providerSnapshot = useBotProviderSnapshot(model, state, bot?.cwd);
   const [profiles, setProfiles] = useState<AgentProfile[]>([]);
   const [busy, setBusy] = useState(false);
   useEffect(() => () => model.close(), [model]);
@@ -44,14 +46,6 @@ export function BotCreateForm({
     if (!serverId) return;
     let current = true;
     const client = getHostRuntimeStore().getClient(serverId);
-    if (client)
-      void client
-        .getProvidersSnapshot()
-        .then((snapshot) => {
-          if (current) model.applyProviderSnapshot(serverId, snapshot);
-          return undefined;
-        })
-        .catch((error) => model.setSubmitError(String(error)));
     setProfiles([]);
     if (client)
       void client
@@ -143,7 +137,10 @@ export function BotCreateForm({
         selectedProvider={state.selectedProvider ?? ""}
         selectedModel={state.selectedModel}
         onSelect={model.setModel}
-        isLoading={Boolean(state.providerSnapshotRequest)}
+        isLoading={providerSnapshot.isLoading}
+        onOpen={providerSnapshot.onOpen}
+        onRetryProvider={providerSnapshot.onRetryProvider}
+        isRetryingProvider={providerSnapshot.isRefreshing}
         serverId={state.selectedServerId}
       />
       <View style={styles.row}>
@@ -183,6 +180,11 @@ export function BotCreateForm({
             </ChoiceButton>
           ))}
         </View>
+      ) : null}
+      {providerSnapshot.error ? (
+        <Text accessibilityRole="alert" style={styles.text}>
+          {providerSnapshot.error}
+        </Text>
       ) : null}
       {state.submitError ? (
         <Text accessibilityRole="alert" style={styles.text}>
