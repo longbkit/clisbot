@@ -17,6 +17,7 @@ export function BotProjectsToggle({ menu = false }: { menu?: boolean }) {
         accessibilityRole="switch"
         accessibilityLabel="Show Bot projects"
         accessibilityState={accessibilityState}
+        aria-checked={show}
         onPress={toggle}
         testID="sidebar-toggle-bot-projects"
         style={styles.toggle}
@@ -45,6 +46,7 @@ export function BotProjectsGroup({ children }: { children: ReactNode }) {
         accessibilityRole="button"
         accessibilityLabel="Bot projects"
         accessibilityState={state}
+        aria-expanded={!collapsed}
         onPress={toggle}
         style={styles.heading}
         testID="sidebar-bot-projects-group"
