@@ -46,7 +46,7 @@ import { RetainedPanelActivity } from "@/components/retained-panel";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
-import { useHosts } from "@/runtime/host-runtime";
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
@@ -404,7 +404,7 @@ function SidebarHostPicker({
   onOpenHostSettings: (serverId: string) => void;
 }) {
   const { t } = useTranslation();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const hostFilters = useSidebarViewStore((state) => state.hostFilters);
   const pinHostFilter = useSidebarViewStore((state) => state.pinHostFilter);
   const clearHostFilters = useSidebarViewStore((state) => state.clearHostFilters);

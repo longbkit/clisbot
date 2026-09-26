@@ -25,6 +25,10 @@ Host đã lưu sẵn trong app (ví dụ kết nối trực tiếp `localhost`) 
 
 Trong **Connections** của Host, kết nối Hub cấp (thường là Relay) ghi **Provided by Hub** và không có nút Remove, vì Hub sẽ thêm lại. Kết nối bạn tự lưu vẫn xoá được.
 
+**Settings → Hosts** và bộ chọn Host dùng chung quy tắc: hiện Host bạn thêm trực tiếp và Host do Hub quản lý mà tài khoản hiện tại được phép dùng. Direct hay Relay chỉ là đường kết nối, không quyết định quyền. Host do Hub quản lý từ tài khoản hoặc tổ chức khác không hiện; khi đang tải quyền của tài khoản mới, app chưa hiện các Host đó. Host offline vẫn hiện để bạn mở cấu hình và kết nối lại. Một Host có nhiều đường kết nối chỉ hiện một lần. Host đã đăng ký trên Hub nhưng chưa có thông tin kết nối vẫn có trạng thái chờ trong Settings → Hosts; chưa thể chọn để làm việc.
+
+Quy tắc này cũng áp dụng cho bộ chọn Host ở New Workspace, Sessions và Schedules. Khi danh sách đang tải, hộp chọn hiện **Loading Hosts…**, không tự chọn Host khác hay chuyển sang Add Host; nếu tải lỗi, bấm **Retry**. URL Settings cũ của Host không còn quyền sẽ báo không khả dụng thay vì mở cấu hình Host đó.
+
 Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `PASEO_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
 
 Hub báo **Host "…" already uses this daemon's identity** khi `PASEO_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `paseo daemon stop`, `paseo daemon reset-identity`, `paseo daemon start` rồi `paseo hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.

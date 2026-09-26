@@ -1,3 +1,4 @@
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import {
   useCallback,
   useEffect,
@@ -27,7 +28,7 @@ import {
   type AggregatedSchedule,
   type ScheduleHostError,
 } from "@/hooks/use-schedules";
-import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import {
   resolveSchedule,
   type ScheduleBucket,
@@ -67,7 +68,7 @@ function SchedulesScreenContent(): ReactElement {
   const schedules = loadState.status === "loaded" ? loadState.data : EMPTY_SCHEDULES;
   const { agents } = useAggregatedAgents({ includeArchived: true });
   const { projects } = useProjects();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const runtime = getHostRuntimeStore();
   const runtimeVersion = useSyncExternalStore(
     (onStoreChange) => runtime.subscribeAll(onStoreChange),
@@ -214,7 +215,7 @@ function SchedulesScreenBody({
   statusFilter: ScheduleBucket;
   onStatusFilterChange: (value: ScheduleBucket) => void;
   showHostFilter: boolean;
-  hosts: ReturnType<typeof useHosts>;
+  hosts: ReturnType<typeof useAvailableHosts>;
   selectedHost: string;
   onSelectHost: (serverId: string) => void;
   onRetry: () => void;

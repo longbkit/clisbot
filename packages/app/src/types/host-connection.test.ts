@@ -320,6 +320,29 @@ describe("upsertHostConnectionInProfiles", () => {
 });
 
 describe("resolveActiveHostServerId", () => {
+  it("does not let an inaccessible settings URL override the visible Host selection", () => {
+    expect(
+      resolveActiveHostServerId({
+        routedServerId: "revoked",
+        selectedServerId: "revoked",
+        localServerId: null,
+        hosts: [makeHost("personal")],
+        orderedHosts: [makeHost("personal")],
+      }),
+    ).toBe("personal");
+  });
+
+  it("keeps an accessible routed Host ahead of the remembered selection", () => {
+    expect(
+      resolveActiveHostServerId({
+        routedServerId: "routed",
+        selectedServerId: "remembered",
+        localServerId: null,
+        hosts: [makeHost("remembered"), makeHost("routed")],
+        orderedHosts: [makeHost("remembered"), makeHost("routed")],
+      }),
+    ).toBe("routed");
+  });
   it("uses the selected host when one is set", () => {
     expect(
       resolveActiveHostServerId({

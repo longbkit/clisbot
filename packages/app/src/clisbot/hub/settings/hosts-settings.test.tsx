@@ -5,6 +5,10 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostsSettings } from "./hosts-settings";
 import { HubHostSynchronization } from "../host-synchronization";
+import { useHostInventory } from "../host-inventory";
+import type { HostProfile } from "@/types/host-connection";
+import { defaultHostAppearance } from "@/hosts/appearance";
+import { HostSettingsAccess } from "./host-settings-access";
 
 const adapters = vi.hoisted(() => ({
   get: vi.fn(),
@@ -13,20 +17,22 @@ const adapters = vi.hoisted(() => ({
   confirm: vi.fn(),
   canManageResources: true,
   role: "owner",
+  accountId: "owner",
+  hubEnabled: true,
   copy: vi.fn(),
   openAddProject: vi.fn(),
   upsert: vi.fn(),
   remove: vi.fn(),
   restart: vi.fn(),
-  hosts: [],
+  hosts: [] as HostProfile[],
   statuses: new Map(),
 }));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
-    enabled: true,
+    enabled: adapters.hubEnabled,
     origin: "https://hub.example.test",
     signedIn: {
-      account: { id: "owner" },
+      account: { id: adapters.accountId },
       organization: { id: "org" },
       capabilities: { manageResources: adapters.canManageResources },
       membership: { role: adapters.role },
@@ -118,6 +124,9 @@ beforeEach(() => {
   adapters.confirm.mockReset();
   adapters.canManageResources = true;
   adapters.role = "owner";
+  adapters.accountId = "owner";
+  adapters.hubEnabled = true;
+  adapters.hosts = [];
   adapters.copy.mockReset();
   adapters.upsert.mockReset();
   adapters.remove.mockReset().mockResolvedValue(undefined);
@@ -136,6 +145,207 @@ function renderSection() {
     </QueryClientProvider>,
   );
 }
+
+function HostChoices() {
+  const { hosts, status } = useHostInventory();
+  return (
+    <select aria-label="Host choices" data-status={status}>
+      {hosts.map((host) => (
+        <option key={host.serverId}>{host.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function savedHost(
+  serverId: string,
+  label: string,
+  management?: HostProfile["management"],
+): HostProfile {
+  return {
+    serverId,
+    label,
+    management,
+    appearance: defaultHostAppearance(),
+    lifecycle: {},
+    connections: [{ id: "direct", type: "directTcp", endpoint: "localhost:6768" }],
+    preferredConnectionId: "direct",
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-01T00:00:00.000Z",
+  };
+}
+
+const managedHost = savedHost("server-1", "Hub Host", {
+  kind: "hub",
+  hubOrigin: "https://hub.example.test",
+  organizationId: "org",
+  daemonId: "daemon-1",
+  managedAccessMode: "external",
+});
+const connectableDaemon = {
+  ...registeredDaemon,
+  slug: "Hub Host",
+  connectionOffer: {
+    v: 2,
+    serverId: "server-1",
+    daemonPublicKeyB64: "key",
+    relay: { endpoint: "relay.example.test", useTls: true },
+  },
+};
+
+function InventoryViews() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HostChoices />
+      <HostsSettings />
+    </QueryClientProvider>
+  );
+}
+
+it("keeps app settings available while the Host inventory is loading", () => {
+  adapters.get.mockImplementation(() => new Promise(() => {}));
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostSettingsAccess serverId={null}>
+        <div>General settings</div>
+      </HostSettingsAccess>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("General settings")).toBeDefined();
+  expect(screen.queryByText("Loading Hosts...")).toBeNull();
+});
+
+it("does not mount settings behind an inaccessible Host URL while access loads or after denial", async () => {
+  adapters.hosts = [managedHost];
+  let finish!: (value: typeof emptyHosts) => void;
+  adapters.get.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const Detail = vi.fn(() => <div>Host settings</div>);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostSettingsAccess serverId="server-1">
+        <Detail />
+      </HostSettingsAccess>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("Loading Hosts...")).toBeDefined();
+  expect(Detail).not.toHaveBeenCalled();
+  await act(async () => finish(emptyHosts));
+  await screen.findByText(
+    "This Host is not available to your current account. Choose another Host.",
+  );
+  expect(Detail).not.toHaveBeenCalled();
+});
+
+it("retries a failed Host access check before mounting its settings", async () => {
+  adapters.hosts = [managedHost];
+  adapters.get
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValueOnce({ daemons: [connectableDaemon] });
+  const Detail = vi.fn(() => <div>Host settings</div>);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostSettingsAccess serverId="server-1">
+        <Detail />
+      </HostSettingsAccess>
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Hosts unavailable. Try loading your Hosts again.");
+  expect(Detail).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Retry"));
+  await screen.findByText("Host settings");
+});
+
+it("uses the same inventory for Host choices and the Hosts tab for a member without grants", async () => {
+  adapters.canManageResources = false;
+  adapters.role = "member";
+  adapters.hosts = [
+    savedHost("manual", "Personal Host"),
+    savedHost("saved", "Old Hub Host", {
+      kind: "hub",
+      hubOrigin: "https://hub.example.test",
+      organizationId: "org",
+      daemonId: "denied",
+      managedAccessMode: "external",
+    }),
+  ];
+  adapters.get.mockResolvedValue(emptyHosts);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostChoices />
+      <HostsSettings />
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(adapters.get).toHaveBeenCalled());
+  await waitFor(() => expect(screen.getAllByText("Personal Host")).toHaveLength(2));
+  expect(screen.queryByText("Old Hub Host")).toBeNull();
+  expect(screen.queryByText("No Hosts available")).toBeNull();
+});
+
+it("shows an allowed Hub Host using a direct connection once on each surface", async () => {
+  adapters.hosts = [managedHost, savedHost("manual", "Personal Host")];
+  adapters.get.mockResolvedValue({ daemons: [connectableDaemon] });
+  render(<InventoryViews />);
+  await waitFor(() => expect(screen.getAllByText("Hub Host")).toHaveLength(2));
+  expect(screen.getAllByText("Personal Host")).toHaveLength(2);
+  expect(screen.getAllByRole("option")).toHaveLength(2);
+});
+
+it("hides the previous account's Host immediately while a new Member's access loads", async () => {
+  adapters.hosts = [managedHost, savedHost("manual", "Personal Host")];
+  adapters.get.mockResolvedValue({ daemons: [connectableDaemon] });
+  const view = render(<InventoryViews />);
+  await waitFor(() => expect(screen.getAllByText("Hub Host")).toHaveLength(2));
+  let finish!: (value: typeof emptyHosts) => void;
+  adapters.get.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  adapters.accountId = "new-member";
+  adapters.role = "member";
+  adapters.canManageResources = false;
+  view.rerender(<InventoryViews />);
+  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("loading");
+  expect(screen.queryByText("Hub Host")).toBeNull();
+  expect(screen.getAllByText("Personal Host")).toHaveLength(2);
+  await act(async () => finish(emptyHosts));
+  await waitFor(() =>
+    expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("ready"),
+  );
+  expect(screen.queryByText("Hub Host")).toBeNull();
+  expect(screen.getAllByText("Personal Host")).toHaveLength(2);
+});
+
+it("keeps direct Hosts usable when the Hub inventory request fails", async () => {
+  adapters.hosts = [managedHost, savedHost("manual", "Personal Host")];
+  adapters.get.mockRejectedValue(new Error("offline"));
+  render(<InventoryViews />);
+  await screen.findByText("Hosts unavailable");
+  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("error");
+  expect(screen.queryByText("Hub Host")).toBeNull();
+  expect(screen.getAllByText("Personal Host")).toHaveLength(2);
+});
+
+it("preserves the standalone Host chooser when Hub support is disabled", () => {
+  adapters.hubEnabled = false;
+  adapters.hosts = [managedHost, savedHost("manual", "Personal Host")];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostChoices />
+    </QueryClientProvider>,
+  );
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+    "Hub Host",
+    "Personal Host",
+  ]);
+  expect(adapters.get).not.toHaveBeenCalled();
+});
 
 describe("Host onboarding query recovery", () => {
   it.each([

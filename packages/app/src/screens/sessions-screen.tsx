@@ -1,3 +1,4 @@
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useMemo, useState, useCallback, useEffect, type ReactElement } from "react";
 import { View, Text } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
@@ -16,7 +17,6 @@ import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
-import { useHosts } from "@/runtime/host-runtime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
 /** Long enough that a typed word is one request, short enough to feel live. */
@@ -74,7 +74,7 @@ function SessionsScreenContent() {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const importSession = useImportSession();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();

@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
-import { useFetchQuery } from "@/data/query";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
 import type { HubHostManagement } from "@/types/host-connection";
 import { useHubAccount } from "./account-provider";
-import { HubAccessTicketSchema, HubDaemonsSchema } from "./contracts";
+import { HubAccessTicketSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
-import { hubResourceQueryKey } from "./query-keys";
+import { useHubDaemonsQuery } from "./host-inventory";
 import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
@@ -26,29 +25,6 @@ function enqueueManagedHostMutation(operation: () => Promise<void>): Promise<voi
   const next = managedHostMutationTail.then(operation);
   managedHostMutationTail = next.catch(() => undefined);
   return next;
-}
-
-/** The Hub's daemon list for the signed-in account; one cached query shared by every reader. */
-function useHubDaemonsQuery() {
-  const hub = useHubAccount();
-  const signedIn = hub.signedIn;
-  const organizationId = signedIn?.organization.id ?? null;
-  return useFetchQuery({
-    queryKey: hubResourceQueryKey(
-      {
-        origin: hub.origin,
-        organizationId,
-        accountId: signedIn?.account.id ?? null,
-      },
-      "daemons",
-    ),
-    queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
-    dataShape: "value",
-    enabled: organizationId !== null,
-    retry: false,
-    refetchInterval: 60_000,
-    staleTimeMs: 0,
-  });
 }
 
 /**

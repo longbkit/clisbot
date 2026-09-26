@@ -1,3 +1,4 @@
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import type {
   CreateAgentRequestOptions,
   CreateWorkspaceRequestOptions,
@@ -50,7 +51,6 @@ import {
   useHostRuntimeClient,
   useHostRuntimeConnectionStatuses,
   useHostRuntimeIsConnected,
-  useHosts,
   type HostRuntimeConnectionStatus,
 } from "@/runtime/host-runtime";
 import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
@@ -1293,7 +1293,7 @@ function useNewWorkspaceInitialContext({
   projectId,
   displayName: displayNameProp,
 }: NewWorkspaceScreenProps): NewWorkspaceInitialContextState {
-  const allHosts = useHosts();
+  const allHosts = useAvailableHosts();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
   const projects = useHostProjects(allServerIds);
   const routeDisplayName = displayNameProp?.trim() ?? "";

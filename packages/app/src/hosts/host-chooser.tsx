@@ -23,7 +23,8 @@ import {
   useGlobalWebOverlayLayer,
   useWebOverlayRegistration,
 } from "@/lib/overlay-root";
-import { useHosts } from "@/runtime/host-runtime";
+import { useHostInventory } from "@/clisbot/hub/host-inventory";
+import { Button } from "@/components/ui/button";
 import { orderHostsLocalFirst, type HostProfile } from "@/types/host-connection";
 import { buildSettingsAddHostRoute } from "@/utils/host-routes";
 
@@ -40,8 +41,9 @@ export interface ChooseHostInput {
 interface HostChoiceRequest {
   id: number;
   title: string;
-  serverIds: string[];
+  filter?: HostFilter;
   onChooseHost: HostChoiceHandler;
+  onNoHosts?: () => void;
 }
 
 interface HostChooserState {
@@ -70,7 +72,7 @@ function matchesHostQuery(host: HostProfile, query: string): boolean {
 }
 
 export function useHostChooser() {
-  const hosts = useHosts();
+  const { hosts, status } = useHostInventory();
   const localServerId = useLocalDaemonServerId();
   const open = useHostChooserStore((state) => state.open);
 
@@ -80,24 +82,25 @@ export function useHostChooser() {
         input.filter ?? (() => true),
       );
 
-      if (availableHosts.length === 0) {
+      if (status === "ready" && availableHosts.length === 0) {
         (input.onNoHosts ?? (() => router.push(buildSettingsAddHostRoute(Date.now()))))();
         return false;
       }
 
-      if (availableHosts.length === 1) {
+      if (status === "ready" && availableHosts.length === 1) {
         void input.onChooseHost(availableHosts[0].serverId);
         return true;
       }
 
       open({
         title: input.title ?? "Choose host",
-        serverIds: availableHosts.map((host) => host.serverId),
+        filter: input.filter,
         onChooseHost: input.onChooseHost,
+        onNoHosts: input.onNoHosts,
       });
       return true;
     },
-    [hosts, localServerId, open],
+    [hosts, status, localServerId, open],
   );
 }
 
@@ -145,7 +148,8 @@ function HostChooserRow({
 
 export function HostChooserModal() {
   const { theme } = useUnistyles();
-  const hosts = useHosts();
+  const { hosts, status, error, retry } = useHostInventory();
+  const localServerId = useLocalDaemonServerId();
   const request = useHostChooserStore((state) => state.request);
   const close = useHostChooserStore((state) => state.close);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -155,12 +159,8 @@ export function HostChooserModal() {
 
   const requestHosts = useMemo(() => {
     if (!request) return [];
-    const hostByServerId = new Map(hosts.map((host) => [host.serverId, host] as const));
-    return request.serverIds.flatMap((serverId) => {
-      const host = hostByServerId.get(serverId);
-      return host ? [host] : [];
-    });
-  }, [hosts, request]);
+    return orderHostsLocalFirst(hosts, localServerId).filter(request.filter ?? (() => true));
+  }, [hosts, localServerId, request]);
 
   const options = useMemo(
     () => requestHosts.filter((host) => matchesHostQuery(host, query)),
@@ -182,14 +182,19 @@ export function HostChooserModal() {
     setActiveIndex(0);
   }, []);
 
+  const addHost = useCallback(() => {
+    close();
+    (request?.onNoHosts ?? (() => router.push(buildSettingsAddHostRoute(Date.now()))))();
+  }, [close, request]);
+
   const chooseHost = useCallback(
     (serverId: string) => {
       const currentRequest = request;
       close();
-      if (!currentRequest) return;
+      if (!currentRequest || !requestHosts.some((host) => host.serverId === serverId)) return;
       void currentRequest.onChooseHost(serverId);
     },
-    [close, request],
+    [close, request, requestHosts],
   );
 
   const handleWebOverlayKeyDown = useCallback(
@@ -266,7 +271,19 @@ export function HostChooserModal() {
             keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
           >
-            {options.length === 0 ? <Text style={styles.emptyText}>No matching hosts</Text> : null}
+            {status === "loading" ? <Text style={styles.emptyText}>Loading Hosts...</Text> : null}
+            {status === "error" ? (
+              <View>
+                <Text style={styles.emptyText}>Hosts unavailable: {error}</Text>
+                <Button onPress={retry}>Retry</Button>
+              </View>
+            ) : null}
+            {status === "ready" && options.length === 0 ? (
+              <Text style={styles.emptyText}>No matching hosts</Text>
+            ) : null}
+            {status === "ready" && requestHosts.length === 0 ? (
+              <Button onPress={addHost}>Add Host</Button>
+            ) : null}
             {options.map((host, index) => (
               <HostChooserRow
                 key={host.serverId}

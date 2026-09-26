@@ -8,44 +8,30 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { useFetchQuery } from "@/data/query";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
-import { useHostRuntimeConnectionStatuses, useHosts } from "@/runtime/host-runtime";
+import { useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
-import { HubDaemonsSchema } from "../contracts";
+import { useHostInventory } from "../host-inventory";
+import { SavedHostRow } from "./saved-host-row";
 import { CopyableCommand } from "../copyable-command";
 import { buildHubLoginCommand, projectHubHostOnboarding } from "../host-onboarding";
 import { HubHostOnboardingRow } from "../host-onboarding-row";
-import { hubResourceQueryKey } from "../query-keys";
 
 /** Set only by `npm run dev:clisbot`: this checkout's CLI against the dev home. An `EXPO_PUBLIC_`
  * variable rather than an Expo config extra, because Metro caches the inlined app manifest. */
 const DEV_CLI_COMMAND = process.env.EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND?.trim() || undefined;
 
 const INFO =
-  "Machines in your organization that run Agents. Who may use each one is set in People & access › Access.";
+  "Hosts you added directly and organization Hosts you may access. Organization access is set in People & access › Access.";
 
 export function HostsSettings() {
   const hub = useHubAccount();
-  const hosts = useHosts();
+  const { hosts, daemons } = useHostInventory();
   const openAddProject = useOpenAddProject();
-  const organizationId = hub.signedIn?.organization.id ?? null;
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const connectionStatuses = useHostRuntimeConnectionStatuses(serverIds);
-  const daemons = useFetchQuery({
-    queryKey: hubResourceQueryKey(
-      { origin: hub.origin, organizationId, accountId: hub.signedIn?.account.id ?? null },
-      "daemons",
-    ),
-    queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
-    dataShape: "value",
-    enabled: organizationId !== null,
-    retry: false,
-    refetchInterval: 60_000,
-    staleTimeMs: 0,
-  });
   const items = useMemo(
     () =>
       projectHubHostOnboarding({
@@ -55,6 +41,8 @@ export function HostsSettings() {
       }),
     [connectionStatuses, daemons.data?.daemons, hosts],
   );
+  const savedHosts = hosts.filter((host) => !items.some((item) => item.serverId === host.serverId));
+  const hasHosts = items.length > 0 || savedHosts.length > 0;
   const command = buildHubLoginCommand(hub.origin ?? "", DEV_CLI_COMMAND);
   const retry = useCallback(() => void daemons.refetch(), [daemons]);
   const refreshAction = useMemo(
@@ -69,11 +57,11 @@ export function HostsSettings() {
   if (!hub.enabled || hub.signedIn === null || hub.origin === null) return null;
 
   let content: ReactNode = null;
-  if (daemons.isPending) {
+  if (daemons.isPending && !hasHosts) {
     content = <Text style={settingsStyles.rowHint}>Loading Hosts...</Text>;
   } else if (
     daemons.data !== undefined &&
-    items.length === 0 &&
+    !hasHosts &&
     !hub.signedIn.capabilities.manageResources
   ) {
     content = (
@@ -83,7 +71,7 @@ export function HostsSettings() {
         description="Ask an organization owner or admin to give you access to a Host and Project."
       />
     );
-  } else if (daemons.data !== undefined && items.length === 0) {
+  } else if (daemons.data !== undefined && !hasHosts) {
     content = (
       <Alert
         variant="info"
@@ -91,7 +79,7 @@ export function HostsSettings() {
         description="Add one with the command under Add a Host."
       />
     );
-  } else if (items.length > 0) {
+  } else if (hasHosts) {
     content = (
       <View style={settingsStyles.card}>
         {items.map((item, index) => (
@@ -101,6 +89,14 @@ export function HostsSettings() {
             bordered={index > 0}
             cliCommand={DEV_CLI_COMMAND ?? "paseo"}
             openAddProject={openAddProject}
+          />
+        ))}
+        {savedHosts.map((host, index) => (
+          <SavedHostRow
+            key={host.serverId}
+            host={host}
+            status={connectionStatuses.get(host.serverId)}
+            bordered={items.length + index > 0}
           />
         ))}
       </View>

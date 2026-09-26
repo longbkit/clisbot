@@ -122,16 +122,21 @@ export function orderHostsLocalFirst<T extends { serverId: string }>(
  * using one would resolve the section to an unknown id and render "host not found".
  */
 export function resolveActiveHostServerId(params: {
+  routedServerId?: string | null;
   selectedServerId: string | null;
   localServerId: string | null;
   hosts: readonly { serverId: string }[];
   orderedHosts: readonly { serverId: string }[];
 }): string | null {
-  const { selectedServerId, localServerId, hosts, orderedHosts } = params;
+  const { routedServerId, selectedServerId, localServerId, hosts, orderedHosts } = params;
   const connected = (serverId: string | null): string | null =>
     serverId && hosts.some((host) => host.serverId === serverId) ? serverId : null;
   return (
-    connected(selectedServerId) ?? connected(localServerId) ?? orderedHosts[0]?.serverId ?? null
+    connected(routedServerId ?? null) ??
+    connected(selectedServerId) ??
+    connected(localServerId) ??
+    orderedHosts[0]?.serverId ??
+    null
   );
 }
 

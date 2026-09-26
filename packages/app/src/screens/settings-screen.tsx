@@ -65,7 +65,9 @@ import {
   type ServiceUrlBehavior,
   type Settings as EffectiveSettings,
 } from "@/hooks/use-settings";
-import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
+import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
+import { HostSettingsAccess } from "@/clisbot/hub/settings/host-settings-access";
 import { useSessionStore } from "@/stores/session-store";
 import {
   orderHostsLocalFirst,
@@ -670,7 +672,7 @@ function normalizeVersion(version: string | null | undefined): string | null {
 
 function ConnectedHostsSection({ clientVersion }: { clientVersion: string | null }) {
   const { t } = useTranslation();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   if (hosts.length === 0) {
     return null;
   }
@@ -1126,7 +1128,7 @@ function SettingsSidebar({
 }: SettingsSidebarProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const localServerId = useLocalDaemonServerId();
   const sortedHosts = useSortedHosts(hosts, localServerId);
   const hasHosts = sortedHosts.length > 0;
@@ -1338,7 +1340,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   const isCompactLayout = useIsCompactFormFactor();
   const insets = useSafeAreaInsets();
   const insetBottomStyle = useMemo(() => ({ paddingBottom: insets.bottom }), [insets.bottom]);
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const localServerId = useLocalDaemonServerId();
   const sortedHosts = useSortedHosts(hosts, localServerId);
   const lastWorkspaceSelection = useLastWorkspaceSelection();
@@ -1360,15 +1362,14 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   // The host the four sections scope to: the host on the active view, otherwise
   // the picker choice, otherwise the connected local daemon, otherwise the first host.
   const activeHostServerId = useMemo(() => {
-    if (view.kind === "host" || view.kind === "project" || view.kind === "plugin")
-      return view.serverId;
     return resolveActiveHostServerId({
+      routedServerId: routedSettingsHostServerId,
       selectedServerId: selectedSettingsHostServerId,
       localServerId,
       hosts,
       orderedHosts: sortedHosts,
     });
-  }, [view, selectedSettingsHostServerId, localServerId, hosts, sortedHosts]);
+  }, [routedSettingsHostServerId, selectedSettingsHostServerId, localServerId, hosts, sortedHosts]);
 
   const handleSendBehaviorChange = useCallback(
     (behavior: SendBehavior) => {
@@ -1680,6 +1681,10 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         return null;
       })();
   }
+
+  content = (
+    <HostSettingsAccess serverId={routedSettingsHostServerId}>{content}</HostSettingsAccess>
+  );
 
   if (settingsLoading) {
     return (
