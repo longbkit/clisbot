@@ -137,7 +137,9 @@ message with a sender line, the same shape channels use ([conversation flow](../
 
 `daemon.bots.enabled` in persisted config, `PASEO_BOTS_ENABLED` override, `server_info.features.bots`
 with a `COMPAT` tag; the app gates on `useHostFeature`. Off: no RPC registered, no storage touched,
-no sidebar entry; daemon and app behave byte-for-byte as upstream.
+no sidebar entry; the daemon behaves byte-for-byte as upstream. The app is behavior-equivalent: its
+two route files and three sidebar insertion points exist in the bundle and return nothing while the
+Host reports no `bots` feature. That is the one recorded exception to byte-equivalence.
 
 ### D11. Templates move into the daemon
 
