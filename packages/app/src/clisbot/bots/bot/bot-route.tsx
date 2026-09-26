@@ -71,7 +71,7 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
     };
   }, [botId, client]);
   const archive = useCallback(async () => {
-    if (!client) return;
+    if (!client || bot?.canConfigure !== true) return;
     setBusy(true);
     setError(null);
     try {
@@ -84,7 +84,7 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
     } finally {
       setBusy(false);
     }
-  }, [client, botId, router]);
+  }, [client, botId, router, bot?.canConfigure]);
   const archiveAction = useCallback(() => {
     void archive();
   }, [archive]);
@@ -108,7 +108,10 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
           {error}
         </Text>
       ) : null}
-      {bot ? (
+      {bot && bot.canConfigure !== true ? (
+        <Text style={styles.text}>You do not have permission to configure this bot.</Text>
+      ) : null}
+      {bot?.canConfigure === true ? (
         <>
           <BotCreateForm
             name={bot.name}

@@ -41,6 +41,7 @@ export function GroupChatForm({
       const client = getHostRuntimeStore().getClient(serverId);
       if (!client) throw new Error("Host is disconnected");
       const r = await client.createChat({
+        kind: "group",
         botIds: ids,
         title: title.trim() || undefined,
         rules: {

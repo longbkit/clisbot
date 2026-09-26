@@ -76,6 +76,7 @@ test("shared Bot grants protect private Chat and ordinary agent timelines over W
   };
   try {
     const owner = await open();
+    expect(owner.getLastServerInfoMessage()?.botCreationAllowed).toBe(true);
     const created = await owner.createBot({
       name: "Shared",
       kind: "team",
@@ -90,6 +91,8 @@ test("shared Bot grants protect private Chat and ordinary agent timelines over W
     const bob = await open("bob");
     const outsider = await open("outsider");
     expect(alice.getLastServerInfoMessage()?.features?.channelFileRead).toBe(true);
+    expect(alice.getLastServerInfoMessage()?.botCreationAllowed).toBe(false);
+    expect((await bob.listBots()).bots[0]?.canConfigure).toBe(false);
     expect((await outsider.listBots()).bots).toEqual([]);
     expect((await bob.listBots()).bots.map((bot) => bot.id)).toContain(created.bot!.id);
     const chat = await alice.createChat({

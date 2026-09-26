@@ -63,7 +63,10 @@ export class BotSession {
     this.service = options.service;
     this.logger = options.logger;
     this.unsubscribe = this.service.subscribe((event) => {
-      this.host.emit({ type: "bot.updated", payload: event });
+      this.host.emit({
+        type: "bot.updated",
+        payload: event.kind === "upsert" ? { ...event, bot: this.project(event.bot) } : event,
+      });
     });
   }
 
@@ -96,7 +99,7 @@ export class BotSession {
         type: "bot.create.response",
         payload: {
           requestId,
-          bot: result.bot,
+          bot: this.project(result.bot),
           reused: result.reused,
           template: pickTemplateResult(result.template),
           error: null,
@@ -114,9 +117,9 @@ export class BotSession {
   async handleList(request: BotRequestOf<"bot.list.request">): Promise<void> {
     const { requestId } = request;
     try {
-      const bots = (await this.service.list(request.includeArchived === true)).filter((bot) =>
-        this.host.authority.allowsProject(bot.projectId, "project.use"),
-      );
+      const bots = (await this.service.list(request.includeArchived === true))
+        .filter((bot) => this.host.authority.allowsProject(bot.projectId, "project.use"))
+        .map((bot) => this.project(bot));
       this.host.emit({ type: "bot.list.response", payload: { requestId, bots, error: null } });
     } catch (error) {
       this.host.emit({
@@ -137,7 +140,10 @@ export class BotSession {
         avatar: request.avatar,
         launch: request.launch,
       });
-      this.host.emit({ type: "bot.update.response", payload: { requestId, bot, error: null } });
+      this.host.emit({
+        type: "bot.update.response",
+        payload: { requestId, bot: this.project(bot), error: null },
+      });
     } catch (error) {
       this.host.emit({
         type: "bot.update.response",
@@ -172,7 +178,7 @@ export class BotSession {
         type: "bot.template.seed.response",
         payload: {
           requestId,
-          bot: result.bot,
+          bot: this.project(result.bot),
           template: pickTemplateResult(result.template),
           error: null,
         },
@@ -183,6 +189,15 @@ export class BotSession {
         payload: { requestId, bot: null, ...errorPayload(error) },
       });
     }
+  }
+
+  private project(bot: StoredBot) {
+    return {
+      ...bot,
+      canConfigure:
+        this.host.authority.allowsProject(bot.projectId, "project.use") &&
+        this.host.authority.allowsProject(bot.projectId, "workspace.manage"),
+    };
   }
 
   /** A restricted session edits a bot through `workspace.manage` on the bot's Project (D13). */

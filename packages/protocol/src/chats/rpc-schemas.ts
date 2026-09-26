@@ -32,6 +32,7 @@ export const ChatCreateRequestSchema = z.object({
   type: z.literal("chat.create.request"),
   requestId: z.string(),
   botIds: z.array(z.string()),
+  kind: z.enum(["direct", "group"]).optional(),
   title: z.string().nullable().optional(),
   rules: ChatRulesSchema.optional(),
   firstMessage: ChatFirstMessageSchema.optional(),

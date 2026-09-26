@@ -42,6 +42,7 @@ export interface ChatServiceOptions {
 
 export interface CreateChatServiceInput {
   botIds: readonly string[];
+  kind?: "direct" | "group";
   title?: string | null;
   rules?: ChatRules;
   createdBy?: SessionActor;
@@ -187,6 +188,7 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     async create(input) {
       const chat = await store.create({
         botIds: input.botIds,
+        kind: input.kind,
         ...(input.title !== undefined ? { title: input.title } : {}),
         ...(input.rules ? { rules: input.rules } : {}),
         ...(input.createdBy ? { createdBy: input.createdBy } : {}),

@@ -1,8 +1,9 @@
+import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
 import { memo, useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { BotFace } from "../chat/bot-face";
 import { botsCopy } from "../copy";
-import { NewBotRow } from "./new-bot-row";
+import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { BotsSidebarRow } from "./row";
 import { BotsSectionHeader } from "./section-header";
 
@@ -15,8 +16,11 @@ export interface BotsSidebarBot {
   avatar?: string | null;
   /** Shown under the name when more than one host has bots. */
   hostLabel?: string | null;
-  /** A session of the bot is running somewhere. */
+  /** The current user’s direct-chat session is running. */
   active?: boolean;
+  updatedAt?: string;
+  agentId?: string | null;
+  canConfigure?: boolean;
 }
 
 interface BotsSectionProps {
@@ -25,20 +29,28 @@ interface BotsSectionProps {
   /** The Grok gesture: the row opens (or creates) the direct chat; the caller owns that. */
   onPressBot: (bot: BotsSidebarBot) => void;
   onOpenBotMenu?: (bot: BotsSidebarBot) => void;
-  onCreateBot: (name: string) => void;
+  onCreateBot: () => void;
+  canCreateBot?: boolean;
 }
 
-/** The Bots section: one row per bot and the create-by-name row (plans/app.md §1). */
+/** Each bot is its personal direct-chat entry; creation stays in the header. */
 export const BotsSection = memo(function BotsSection({
   bots,
   selectedBotKey = null,
   onPressBot,
   onOpenBotMenu,
   onCreateBot,
+  canCreateBot = true,
 }: BotsSectionProps) {
   return (
     <View testID="sidebar-bots-section">
-      <BotsSectionHeader label={botsCopy.bots} testID="sidebar-bots-header" />
+      <BotsSectionHeader
+        label={botsCopy.bots}
+        testID="sidebar-bots-header"
+        createLabel={botsCopy.form.create}
+        onCreate={onCreateBot}
+        disabled={!canCreateBot}
+      />
       {bots.map((bot) => (
         <BotRow
           key={bot.key}
@@ -48,7 +60,6 @@ export const BotsSection = memo(function BotsSection({
           onOpenMenu={onOpenBotMenu}
         />
       ))}
-      <NewBotRow onCreate={onCreateBot} />
     </View>
   );
 });
@@ -64,6 +75,16 @@ const BotRow = memo(function BotRow({
   onPress: (bot: BotsSidebarBot) => void;
   onOpenMenu?: (bot: BotsSidebarBot) => void;
 }) {
+  const active = useSessionStore((state) =>
+    bot.agentId
+      ? selectAgentTurnPresentation(state.sessions[bot.serverId], bot.agentId).isActive
+      : false,
+  );
+  const updatedAt = useMemo(
+    () => (bot.updatedAt ? new Date(bot.updatedAt) : null),
+    [bot.updatedAt],
+  );
+  const timeAgo = useCompactTimeAgo(updatedAt);
   const handlePress = useCallback(() => onPress(bot), [bot, onPress]);
   const handleOpenMenu = useCallback(() => onOpenMenu?.(bot), [bot, onOpenMenu]);
   const face = useMemo(
@@ -75,11 +96,12 @@ const BotRow = memo(function BotRow({
       leading={face}
       title={bot.name}
       subtitle={bot.hostLabel}
-      active={bot.active}
+      active={bot.active ?? active}
+      trailing={bot.updatedAt ? timeAgo : null}
       selected={selected}
       testID={`sidebar-bot-${bot.botId}`}
       onPress={handlePress}
-      onOpenMenu={onOpenMenu ? handleOpenMenu : undefined}
+      onOpenMenu={onOpenMenu && bot.canConfigure ? handleOpenMenu : undefined}
       menuLabel={botsCopy.botSettings}
     />
   );

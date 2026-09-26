@@ -59,6 +59,12 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
+// These render-count fixtures model an upstream Host without the optional Bots feature.
+vi.mock("@/clisbot/bots/sidebar/hide-bot-projects", () => {
+  const keys = new Set<string>();
+  return { useSidebarBotProjectKeys: () => keys };
+});
+
 const SERVER_ID = "sidebar-render-count";
 
 interface RenderCounts {

@@ -108,13 +108,17 @@ function RowKebab({
   testID: string;
 }) {
   const isCompact = useIsCompactFormFactor();
+  const [focused, setFocused] = useState(false);
+  const onFocus = useCallback(() => setFocused(true), []);
+  const onBlur = useCallback(() => setFocused(false), []);
   const kebabStyle = useCallback(
     ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.kebab,
-      (visible || hovered || isNative || isCompact) && styles.kebabVisible,
+      (isNative || isCompact) && styles.kebabTouch,
+      (visible || hovered || focused || isNative || isCompact) && styles.kebabVisible,
       (hovered || pressed) && styles.kebabHovered,
     ],
-    [isCompact, visible],
+    [focused, isCompact, visible],
   );
   return (
     <Pressable
@@ -124,6 +128,8 @@ function RowKebab({
       style={kebabStyle}
       testID={testID}
       hitSlop={4}
+      onFocus={onFocus}
+      onBlur={onBlur}
     >
       <ThemedEllipsis size={14} uniProps={mutedColorMapping} />
     </Pressable>
@@ -192,14 +198,15 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
   },
   kebab: {
-    width: 24,
-    height: 24,
+    width: 32,
+    height: 32,
     marginRight: theme.spacing[1],
     alignItems: "center",
     justifyContent: "center",
     borderRadius: theme.borderRadius.md,
     opacity: 0,
   },
+  kebabTouch: { width: 44, height: 44 },
   kebabVisible: { opacity: 1 },
   kebabHovered: { backgroundColor: theme.colors.surface2 },
 }));

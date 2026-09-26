@@ -1,3 +1,4 @@
+import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
 import { FolderPlus, GitBranch, Import, Server, Settings, X } from "lucide-react-native";
@@ -854,6 +855,7 @@ function WorkspacesSectionHeader() {
       <View style={styles.workspacesSectionTitleRow}>
         <Text style={styles.workspacesSectionTitle}>Workspaces</Text>
         <View style={styles.workspacesSectionActions}>
+          <BotProjectsToggle />
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
               <View>

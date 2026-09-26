@@ -823,3 +823,15 @@ it("retains session permissions and updates permission-only server info changes"
     useSessionStore.getState().sessions["test-server"]?.serverInfo?.permissions,
   ).toBeUndefined();
 });
+
+it("updates and clears Bot creation authority independently of feature support", () => {
+  initializeTestSession();
+  const store = useSessionStore.getState();
+  const info = { serverId: "test-server", hostname: null, version: null };
+  for (const botCreationAllowed of [true, false, undefined]) {
+    store.updateSessionServerInfo("test-server", { ...info, botCreationAllowed });
+    expect(useSessionStore.getState().sessions["test-server"]?.serverInfo?.botCreationAllowed).toBe(
+      botCreationAllowed,
+    );
+  }
+});

@@ -1,7 +1,6 @@
-import {
-  hideBotProjects,
-  useSidebarBotProjectKeys,
-} from "@/clisbot/bots/sidebar/hide-bot-projects";
+import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
+import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
+import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
 import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
@@ -152,13 +151,14 @@ export function useSidebarWorkspacesList(options?: {
 
   const hostProjects = useHostProjects(directoryServerIds);
   const botProjectKeys = useSidebarBotProjectKeys();
+  const showBotProjects = useBotProjectsPreference((state) => state.showBotProjects);
 
   const sidebarModel = useMemo(
     () =>
       buildSidebarWorkspacePlacementModel({
-        projects: hideBotProjects(hostProjects, botProjectKeys),
+        projects: projectBotWorkspaces(hostProjects, botProjectKeys, showBotProjects),
       }),
-    [hostProjects, botProjectKeys],
+    [hostProjects, botProjectKeys, showBotProjects],
   );
 
   const projects = sidebarModel.projects.length > 0 ? sidebarModel.projects : EMPTY_PROJECTS;

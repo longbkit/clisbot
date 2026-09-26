@@ -86,9 +86,12 @@ inside the Host folder policy's allow set.
 Project root = bot directory, one Workspace of kind `directory`. This is what gives per-bot sharing
 through Project grants and per-bot session storage. One shared "Bots" Project would lose both.
 
-When the feature is on, the app hides bot Projects from the sidebar Projects section only, using
-the `projectId` in the bot record; they stay listed in Settings › Projects, where the sharing grant
-lives. The upstream Project schema is untouched.
+Bot Projects are hidden from the cowork sidebar by default. A device-local **Bot projects** toggle
+beside **Workspaces**, mirrored in Display preferences → Show, reveals a separate collapsible group.
+It reuses the existing Project/workspace/session rows and respects Project/Status grouping, filters,
+pins and grants. The heading remains reachable when hidden Bot Projects are the only projects.
+Mixed multi-Host project entries must be split by Host/Project identity before filtering so an
+ordinary project on another Host is not hidden. Settings › Projects remains unchanged.
 
 ### D5. Transcript is separate from timelines
 
@@ -112,8 +115,19 @@ The user can inspect the session in cowork and send a new message to continue.
 
 ### D6. One Chat model
 
-Direct and group chats share the model, the storage, the RPCs and the screen. Group is the case
-with more than one participant; nothing else differs.
+Direct and group chats share the model, storage, RPCs and screen. Sidebar navigation distinguishes
+their intent: **Bots** owns the user's DM entry and **Group chats** owns group entries. A group must
+stay a group when its participants shrink to one; the Bot row must never adopt that group as its DM.
+
+Each Bot appears once in the communication sidebar: clicking its row resumes the user's DM, while
+a separate options action exposes Bot settings only with configuration authority. Activity shown
+there belongs to that user's DM, not to other people's sessions of a shared Bot. Group chats does
+not repeat DMs. The selected fill follows the open DM's Bot row or the active group row.
+
+**Create bot** and **Create group chat** are always-visible plus buttons on their respective section
+headings, replacing separate create rows. They have explicit accessible names, hover/focus tooltips,
+and touch targets (32 px desktop, at least 44 px touch). Creation and configuration remain subject
+to the existing daemon authority. This supersedes the initial separate Chats-and-Bots sidebar.
 
 ### D7. Sessions in a Chat
 
@@ -213,15 +227,15 @@ Per-area plans: [server-bot](plans/server-bot.md), [server-chat](plans/server-ch
 ## Phases
 
 1. Bot record, storage, seeding, RPCs, flag; Chat record, transcript, fan-out rules, RPCs; app: Bots
-   and Chats sidebar sections, create-by-name, chat screen as a timeline rendering, switch to cowork;
+   and Group chats sidebar sections, create-by-name, chat screen as a timeline rendering, switch to cowork;
    sharing through Project grants. Web, desktop and mobile from the one Expo app.
 2. Lead bot role, Schedules and Heartbeats attached to a Bot, Routes targeting a Bot on external
    channels, share links.
 3. Hosted Hosts from the Hub, a high-density in-process provider, Hub conversation plane for chats
    with several humans.
 
-Sidebar uses Bots and Chats sections ahead of Projects; naming rationale is in
-[plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A.
+Sidebar uses Group chats and Bots sections ahead of the existing cowork list. D4 and D6
+supersede the original sidebar layout in [plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A.
 
 ## Open
 

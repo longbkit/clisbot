@@ -93,6 +93,7 @@ export function BotCreateForm({
       <Text style={styles.title}>{bot ? "Bot settings" : "New bot"}</Text>
       <FormTextInput
         accessibilityLabel="Bot name"
+        autoFocus={!bot}
         style={styles.input}
         initialValue={state.name}
         onChangeText={model.setName}

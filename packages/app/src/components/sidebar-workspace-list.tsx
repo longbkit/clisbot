@@ -1,3 +1,6 @@
+import { isBotProject } from "@/clisbot/bot-projects/projection";
+import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
+import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
 import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
@@ -2179,6 +2182,7 @@ function ProjectModeList({
   const selectionEnabled = isWorkspaceRoute;
   const activeWorkspaceSelection = useActiveWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
+  const hasBotsFeature = useBotsFeatureHosts().length > 0;
   const {
     visibleItems: visiblePinnedChats,
     expanded: pinnedChatsExpanded,
@@ -2431,24 +2435,36 @@ function ProjectModeList({
     ],
   );
 
+  const renderProjectList = (items: SidebarProjectEntry[], testID: string) => (
+    <DraggableList
+      testID={testID}
+      data={items}
+      keyExtractor={projectViewKeyExtractor}
+      renderItem={renderProject}
+      onDragEnd={handleProjectDragEnd}
+      extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
+      scrollEnabled={false}
+      useDragHandle
+      nestable={platformIsNative}
+      simultaneousGestureRef={parentGestureRef}
+      gestureHostPresented={dragGestureHostActive}
+      containerStyle={styles.projectListContainer}
+    />
+  );
+  const regularProjects = unpinnedProjects.filter((project) => !isBotProject(project));
+  const botProjects = unpinnedProjects.filter((project) => isBotProject(project));
   const projectBody =
     projects.length === 0 ? (
       <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
     ) : (
-      <DraggableList
-        testID="sidebar-project-list"
-        data={unpinnedProjects}
-        keyExtractor={projectViewKeyExtractor}
-        renderItem={renderProject}
-        onDragEnd={handleProjectDragEnd}
-        extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
-        scrollEnabled={false}
-        useDragHandle
-        nestable={platformIsNative}
-        simultaneousGestureRef={parentGestureRef}
-        gestureHostPresented={dragGestureHostActive}
-        containerStyle={styles.projectListContainer}
-      />
+      <>
+        {renderProjectList(regularProjects, "sidebar-project-list")}
+        {botProjects.length > 0 ? (
+          <BotProjectsGroup>
+            {renderProjectList(botProjects, "sidebar-bot-project-list")}
+          </BotProjectsGroup>
+        ) : null}
+      </>
     );
 
   const content = (
@@ -2489,7 +2505,8 @@ function ProjectModeList({
         Every filter that can empty this branch needs a term here: a project filter pinned to a
         project whose chats are all pinned leaves `unpinnedProjects` empty, and without its term
         the header would go with it, taking the only route back to the filter page. */}
-      {unpinnedProjects.length > 0 ||
+      {hasBotsFeature ||
+      unpinnedProjects.length > 0 ||
       hasActiveHostFilter ||
       hasActiveProjectFilter ||
       sidebarFilterEmpty

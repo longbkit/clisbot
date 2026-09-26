@@ -31,6 +31,25 @@ the plan gets corrected in the same commit.
 - Hardened idempotent creation, reserved-root checks, transcript receipt lookup, synchronous turn
   events, concurrent admission and restart recovery. No global per-Bot execution queue was added.
 
+## Sidebar refinement (2026-09-26)
+
+- Bot rows open the current user's DM; Group chats excludes DMs. Existing direct-chat links
+  select the Bot even when older duplicate DMs exist. Creation guards rapid repeated clicks
+  and rechecks the scoped chat list before making a new DM.
+- Header creation buttons remain visible, provide hover/focus tooltips, and use 32px desktop /
+  44px compact touch targets. Configuration and creation controls use session-projected
+  authority; older hosts without those capabilities fail closed.
+- Bot projects default hidden and have a device-local toggle beside Workspaces and in Show.
+  Their collapsible group reuses existing Project/Status renderers, after filtering mixed Host
+  placements and before pinned extraction. Existing filters, pinning and ordering remain intact.
+- Chat `kind` preserves group intent after participant removal. Legacy records infer from their
+  current membership; a group already reduced to one participant before this metadata existed
+  cannot recover its original intent automatically.
+- Focused sidebar and Bot projects tests, authority/store/protocol checks, managed socket and
+  flag-off checks passed. Independent cross-review covered authority, grouping, pinning,
+  mixed Host projection and ordering. Browser checks cover DM navigation, creation tooltip,
+  name-field focus and Bot projects visibility.
+
 ## Verification recorded
 
 Targeted protocol, daemon, CLI, Hub and app checks passed during integration. Socket E2Es cover
@@ -67,7 +86,7 @@ The plans were written in parallel and diverged on a few names. These are the se
 | Chat limits in phase 1         | `maxInputCharacters` and `hops.max` enforced; the other limit leaves accepted and ignored with a documented exception                                | —                                                             |
 | Label constants                | Exported from `packages/protocol/src/bots/` and imported by daemon and app; no string literals at call sites                                         | app plan asked for this; server plans inline the strings      |
 | App lists                      | `useFetchQuery` + `AggregateLoadState` like schedules, invalidated by `bot.updated` / `chat.updated`; not the replica cache                          | —                                                             |
-| Bot Projects in the app        | Hidden from the sidebar Projects section only; still listed in Settings › Projects, where the sharing grant lives                                    | README D4 said "Projects section" without the settings nuance |
+| Bot Projects in the app        | Hidden by default; device-local toggle reveals a separate collapsible Bot projects group. Settings › Projects and sharing grants remain available    | README D4 said "Projects section" without the settings nuance |
 | App flag-off                   | Behavior-equivalent, not byte-equivalent (README D10 exception)                                                                                      | —                                                             |
 
 ## Order of work

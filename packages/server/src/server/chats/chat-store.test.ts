@@ -173,6 +173,7 @@ describe("ChatStore", () => {
     );
     expect(payload).toEqual({
       id: "cht_1",
+      kind: "direct",
       title: null,
       participants: [
         {
@@ -230,4 +231,19 @@ test("completion receipts survive restart and /new clears their session scope", 
   await restarted.resetParticipantSession("cht_receipt", "bot_a");
   await restarted.recordCompletedTurn("cht_receipt", "bot_a", receipt);
   expect((await restarted.require("cht_receipt")).participants[0]?.completedTurn).toBeNull();
+});
+
+test("Chat kind survives group membership changes and restart", async () => {
+  const root = await temporary();
+  const store = new ChatStore(root, createTestLogger());
+  const direct = await store.create({ botIds: ["a"] });
+  expect(direct.kind).toBe("direct");
+  await store.addParticipant(direct.id, "b");
+  await store.removeParticipant(direct.id, "b");
+  expect((await store.get(direct.id))?.kind).toBe("group");
+  const singleGroup = await store.create({ botIds: ["a"], kind: "group" });
+  expect(singleGroup.kind).toBe("group");
+  const reopened = new ChatStore(root, createTestLogger());
+  expect((await reopened.get(direct.id))?.kind).toBe("group");
+  expect((await reopened.get(singleGroup.id))?.kind).toBe("group");
 });

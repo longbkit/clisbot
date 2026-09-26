@@ -55,7 +55,11 @@ export const StoredBotSchema = z.object({
 });
 export type StoredBot = z.infer<typeof StoredBotSchema>;
 
-export const BotPayloadSchema = StoredBotSchema;
+// Session-projected capability; never persisted as Bot ownership or authority.
+export const BotPayloadSchema = StoredBotSchema.extend({
+  // COMPAT(botConfigureAuthority): older hosts omit; configuration UI fails closed.
+  canConfigure: z.boolean().optional(),
+});
 export type BotPayload = z.infer<typeof BotPayloadSchema>;
 
 /** The `errorCode` values a `bot.*` reply carries; the wire keeps the field a plain string. */

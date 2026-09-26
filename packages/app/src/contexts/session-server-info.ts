@@ -5,6 +5,9 @@ import type { DaemonServerInfo } from "@/stores/session-store";
 export function toSessionServerInfo(info: ServerInfoStatusPayload): DaemonServerInfo {
   return {
     serverId: info.serverId,
+    ...(info.botCreationAllowed === undefined
+      ? {}
+      : { botCreationAllowed: info.botCreationAllowed }),
     hostname: info.hostname ?? null,
     version: info.version ?? null,
     ...(info.permissions === undefined ? {} : { permissions: info.permissions }),

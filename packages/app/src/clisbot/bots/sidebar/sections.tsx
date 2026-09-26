@@ -1,12 +1,12 @@
+import { useBotSidebarActions } from "./use-sidebar-actions";
+import { projectGroupSidebar, projectBotSidebar, selectedDirectBotKey } from "./sidebar-model";
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { useGlobalSearchParams, useRouter } from "expo-router";
+import { useGlobalSearchParams, useRouter, usePathname } from "expo-router";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
-import { Button } from "@/components/ui/button";
-import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { useBotsFeatureHosts } from "../feature";
-import { useBotCatalog, refreshBotsAndChats } from "../data/runtime";
-import { buildHostBotRoute, buildHostChatRoute } from "../routes";
+import { useBotsFeatureHosts, useBotCreationHosts } from "../feature";
+import { useBotCatalog } from "../data/runtime";
+import { buildHostBotRoute, parseChatRouteFromPathname } from "../routes";
 import { BotCreateForm } from "../create/bot-create-sheet";
 import { GroupChatForm } from "../create/group-chat-form";
 import { BotsSection } from "./bots-section";
@@ -22,57 +22,25 @@ export function BotsAndChatsSidebarSections({
 }
 function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
   const { hosts, bots, chats } = useBotCatalog();
+  const creationHosts = useBotCreationHosts();
   const router = useRouter();
   const params = useGlobalSearchParams<{ serverId?: string }>();
-  const defaultServerId = hosts.some((host) => host.serverId === params.serverId)
+  const defaultServerId = creationHosts.some((host) => host.serverId === params.serverId)
     ? params.serverId
     : undefined;
   const [createName, setCreateName] = useState<string | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [opening, setOpening] = useState(false);
   const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : [];
   const chatRows = useMemo(
     () => (chats.loadState.status === "loaded" ? chats.loadState.data : []),
     [chats.loadState],
   );
-  const navigate = useCallback(
-    (serverId: string, chatId: string) => {
-      onBeforeNavigate?.();
-      router.push(buildHostChatRoute(serverId, chatId));
-    },
-    [onBeforeNavigate, router],
+  const { openBot, navigate, error } = useBotSidebarActions(
+    chatRows,
+    onBeforeNavigate,
+    chats.loadState.status === "loaded",
   );
-  const openBot = useCallback(
-    async (serverId: string, botId: string) => {
-      if (opening) return;
-      setOpening(true);
-      setError(null);
-      try {
-        const existing = chatRows.find(
-          (chat) =>
-            chat.serverId === serverId &&
-            chat.participants.length === 1 &&
-            chat.participants[0]?.botId === botId,
-        );
-        if (existing) {
-          navigate(serverId, existing.id);
-          return;
-        }
-        const client = getHostRuntimeStore().getClient(serverId);
-        if (!client) throw new Error("Host is disconnected");
-        const result = await client.createChat({ botIds: [botId] });
-        if (result.error || !result.chat) throw new Error(result.error ?? "Could not open chat");
-        refreshBotsAndChats();
-        navigate(serverId, result.chat.id);
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setOpening(false);
-      }
-    },
-    [chatRows, navigate, opening],
-  );
+  const openCreate = useCallback(() => setCreateName(""), []);
   const closeCreate = useCallback(() => setCreateName(null), []);
   const closeGroup = useCallback(() => setGroupOpen(false), []);
   const openGroup = useCallback(() => setGroupOpen(true), []);
@@ -103,6 +71,9 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
     },
     [onBeforeNavigate, router],
   );
+  const current = parseChatRouteFromPathname(usePathname());
+  const projectedBots = projectBotSidebar(botRows, chatRows, hosts.length > 1);
+  const selectedBotKey = selectedDirectBotKey(chatRows, current);
   const botHeader = useMemo(() => ({ title: "New bot" }), []);
   const groupHeader = useMemo(() => ({ title: "New group chat" }), []);
   return (
@@ -113,38 +84,74 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         </Text>
       ) : null}
       <ChatsSection
-        chats={chatRows.map((chat) => ({
-          key: `${chat.serverId}:${chat.id}`,
-          serverId: chat.serverId,
-          chatId: chat.id,
-          title: chat.title,
-          updatedAt: chat.updatedAt,
-          hostLabel: hosts.length > 1 ? chat.serverName : null,
-        }))}
+        chats={projectGroupSidebar(chatRows, hosts.length > 1)}
         onBeforeNavigate={onBeforeNavigate}
+        onCreateChat={openGroup}
+        canCreateChat={hosts.some(
+          (host) => botRows.filter((bot) => bot.serverId === host.serverId).length >= 2,
+        )}
       />
-      <Button variant="ghost" onPress={openGroup}>
-        New group chat
-      </Button>
       <BotsSection
-        bots={botRows.map((bot) => ({
-          key: `${bot.serverId}:${bot.id}`,
-          serverId: bot.serverId,
-          botId: bot.id,
-          name: bot.name,
-          avatar: bot.avatar,
-          hostLabel: hosts.length > 1 ? bot.serverName : null,
-        }))}
+        bots={projectedBots}
+        selectedBotKey={selectedBotKey}
         onPressBot={onPressBot}
         onOpenBotMenu={onBotMenu}
-        onCreateBot={setCreateName}
+        onCreateBot={openCreate}
+        canCreateBot={creationHosts.length > 0}
       />
+      <CreationSheets
+        createName={createName}
+        groupOpen={groupOpen}
+        botHeader={botHeader}
+        groupHeader={groupHeader}
+        closeCreate={closeCreate}
+        closeGroup={closeGroup}
+        defaultServerId={defaultServerId}
+        hosts={hosts}
+        creationHosts={creationHosts}
+        botRows={botRows}
+        onBotCreated={onBotCreated}
+        onGroupCreated={onGroupCreated}
+      />
+    </View>
+  );
+}
+
+function CreationSheets({
+  createName,
+  groupOpen,
+  botHeader,
+  groupHeader,
+  closeCreate,
+  closeGroup,
+  defaultServerId,
+  hosts,
+  creationHosts,
+  botRows,
+  onBotCreated,
+  onGroupCreated,
+}: {
+  createName: string | null;
+  groupOpen: boolean;
+  botHeader: { title: string };
+  groupHeader: { title: string };
+  closeCreate: () => void;
+  closeGroup: () => void;
+  defaultServerId?: string;
+  hosts: { serverId: string; label: string }[];
+  creationHosts: { serverId: string; label: string }[];
+  botRows: Parameters<typeof GroupChatForm>[0]["bots"];
+  onBotCreated: (serverId: string, botId: string) => void;
+  onGroupCreated: (serverId: string, chatId: string) => void;
+}) {
+  return (
+    <>
       <AdaptiveModalSheet visible={createName !== null} header={botHeader} onClose={closeCreate}>
         {createName !== null ? (
           <BotCreateForm
             name={createName}
             defaultServerId={defaultServerId}
-            hosts={hosts}
+            hosts={creationHosts}
             onCancel={closeCreate}
             onCreated={onBotCreated}
           />
@@ -155,6 +162,6 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
           <GroupChatForm bots={botRows} hosts={hosts} onCreated={onGroupCreated} />
         ) : null}
       </AdaptiveModalSheet>
-    </View>
+    </>
   );
 }

@@ -285,6 +285,7 @@ export interface AgentFileExplorerState {
 }
 
 export interface DaemonServerInfo {
+  botCreationAllowed?: boolean;
   permissions?: ServerInfoStatusPayload["permissions"];
   serverId: string;
   hostname: string | null;
@@ -695,6 +696,7 @@ function isSessionServerInfoUnchanged(input: {
   nextFeatures: ServerInfoStatusPayload["features"] | undefined;
   nextServerId: string;
   nextPermissions: ServerInfoStatusPayload["permissions"];
+  nextBotCreationAllowed: boolean | undefined;
 }): boolean {
   const {
     currentServerInfo,
@@ -707,6 +709,7 @@ function isSessionServerInfoUnchanged(input: {
   const prevHostname = currentServerInfo?.hostname?.trim() || null;
   const prevVersion = currentServerInfo?.version?.trim() || null;
   return (
+    currentServerInfo?.botCreationAllowed === input.nextBotCreationAllowed &&
     JSON.stringify(currentServerInfo?.permissions) === JSON.stringify(input.nextPermissions) &&
     currentServerInfo?.serverId === input.nextServerId &&
     prevHostname === nextHostname &&
@@ -862,6 +865,7 @@ export const useSessionStore = create<SessionStore>()(
               nextFeatures,
               nextServerId: info.serverId,
               nextPermissions: info.permissions,
+              nextBotCreationAllowed: info.botCreationAllowed,
             })
           ) {
             return prev;
@@ -876,6 +880,9 @@ export const useSessionStore = create<SessionStore>()(
                 serverInfo: {
                   serverId: info.serverId,
                   ...(info.permissions === undefined ? {} : { permissions: info.permissions }),
+                  ...(info.botCreationAllowed === undefined
+                    ? {}
+                    : { botCreationAllowed: info.botCreationAllowed }),
                   hostname: nextHostname,
                   version: nextVersion,
                   ...(nextDesktopManaged !== undefined

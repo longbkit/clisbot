@@ -3700,6 +3700,8 @@ export const ServerInfoStatusPayloadSchema = z
     version: ServerInfoVersionSchema.optional(),
     // COMPAT(sessionPermissions): optional while clients support older daemons.
     permissions: z.array(DaemonPermissionSchema).optional(),
+    // COMPAT(botCreationAllowed): older hosts omit authority; clients fail closed.
+    botCreationAllowed: z.boolean().optional(),
     // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
     desktopManaged: z.boolean().optional(),
     capabilities: ServerCapabilitiesFromUnknownSchema.optional(),

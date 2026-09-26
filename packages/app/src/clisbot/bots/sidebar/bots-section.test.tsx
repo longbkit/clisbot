@@ -34,48 +34,22 @@ vi.mock("react-native", () => ({
     </button>
   ),
 }));
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => children,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => children,
+  TooltipContent: () => null,
+}));
 vi.mock("lucide-react-native", () => ({ Ellipsis: () => <i />, Plus: () => <i /> }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
 vi.mock("@/constants/platform", () => ({ isNative: false, isWeb: true }));
 vi.mock("../chat/bot-face", () => ({
   BotFace: ({ name }: { name: string }) => <b>{name.charAt(0)}</b>,
 }));
-// The mocked field forwards to whatever props the row rendered it with last.
-const inputProps: {
-  onChangeText?: (text: string) => void;
-  onSubmitEditing?: () => void;
-  onBlur?: () => void;
-} = {};
-function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-  inputProps.onChangeText?.(event.target.value);
-}
-function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-  if (event.key === "Enter") inputProps.onSubmitEditing?.();
-}
-function handleInputBlur() {
-  inputProps.onBlur?.();
-}
-vi.mock("@/components/ui/form-field", () => ({
-  FormTextInput: (props: {
-    placeholder: string;
-    accessibilityLabel: string;
-    onChangeText: (text: string) => void;
-    onSubmitEditing: () => void;
-    onBlur: () => void;
-  }) => {
-    Object.assign(inputProps, props);
-    return (
-      <input
-        aria-label={props.accessibilityLabel}
-        placeholder={props.placeholder}
-        onChange={handleInputChange}
-        onKeyDown={handleInputKeyDown}
-        onBlur={handleInputBlur}
-      />
-    );
-  },
+vi.mock("@/stores/session-store", () => ({
+  useSessionStore: () => false,
+  selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
-
+vi.mock("@/hooks/use-compact-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
 function bot(id: string, overrides: Partial<BotsSidebarBot> = {}): BotsSidebarBot {
   return { key: `host-a:${id}`, serverId: "host-a", botId: id, name: `Bot ${id}`, ...overrides };
 }
@@ -114,7 +88,7 @@ describe("BotsSection", () => {
     const onOpenBotMenu = vi.fn();
     render(
       <BotsSection
-        bots={[bot("a")]}
+        bots={[bot("a", { canConfigure: true })]}
         onPressBot={onPressBot}
         onOpenBotMenu={onOpenBotMenu}
         onCreateBot={vi.fn()}
@@ -126,27 +100,23 @@ describe("BotsSection", () => {
     expect(onOpenBotMenu).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }));
   });
 
-  it("turns the New bot row into a name field and submits the typed name on Enter", () => {
+  it("always offers Create bot in the header without a bottom create row", () => {
     const onCreateBot = vi.fn();
     render(<BotsSection bots={[]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />);
-    fireEvent.click(screen.getByRole("button", { name: "New bot" }));
-    const input = screen.getByPlaceholderText("Type a name");
-    fireEvent.change(input, { target: { value: "  Research bot " } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(onCreateBot).toHaveBeenCalledWith("Research bot");
-    expect(screen.getByRole("button", { name: "New bot" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Create bot" }));
+    expect(onCreateBot).toHaveBeenCalledOnce();
+    expect(screen.queryByText("New bot")).toBeNull();
   });
-
-  it("goes back to the row when the field blurs empty, and creates when it blurs with text", () => {
-    const onCreateBot = vi.fn();
-    render(<BotsSection bots={[]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />);
-    fireEvent.click(screen.getByRole("button", { name: "New bot" }));
-    fireEvent.blur(screen.getByPlaceholderText("Type a name"));
-    expect(onCreateBot).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "New bot" }));
-    const input = screen.getByPlaceholderText("Type a name");
-    fireEvent.change(input, { target: { value: "Ops" } });
-    fireEvent.blur(input);
-    expect(onCreateBot).toHaveBeenCalledWith("Ops");
+  it("hides settings for use-only or unknown authority and shows private chat time", () => {
+    render(
+      <BotsSection
+        bots={[bot("a", { updatedAt: "2026-09-26T01:00:00Z" })]}
+        onPressBot={vi.fn()}
+        onOpenBotMenu={vi.fn()}
+        onCreateBot={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Bot settings" })).toBeNull();
+    expect(screen.getByText("2m")).toBeTruthy();
   });
 });

@@ -2041,6 +2041,7 @@ export class VoiceAssistantWebSocketServer {
       hostname: getHostname(),
       version: this.daemonVersion,
       permissions: session.getPermissions(),
+      ...(this.botService ? { botCreationAllowed: session.canCreateBot() } : {}),
       // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),

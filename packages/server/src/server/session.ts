@@ -2424,6 +2424,13 @@ export class Session {
     }
   }
 
+  public canCreateBot(): boolean {
+    return (
+      this.authorization.allowsPermission("workspace.manage") &&
+      this.authorization.allowsDaemonPrivilege("workspace.manage")
+    );
+  }
+
   public getPermissions(): DaemonPermission[] {
     return this.authorization.listPermissions();
   }

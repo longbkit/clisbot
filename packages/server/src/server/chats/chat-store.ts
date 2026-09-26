@@ -23,6 +23,7 @@ export interface CreateChatInput {
   id?: string;
   title?: string | null;
   botIds: readonly string[];
+  kind?: "direct" | "group";
   rules?: ChatRules;
   createdBy?: SessionActor;
 }
@@ -89,7 +90,11 @@ export class ChatStore {
       return null;
     }
     const parsed = StoredChatSchema.safeParse(value);
-    if (parsed.success) return parsed.data;
+    if (parsed.success)
+      return {
+        ...parsed.data,
+        kind: parsed.data.kind ?? (parsed.data.participants.length > 1 ? "group" : "direct"),
+      };
     this.logger.warn({ file, issues: parsed.error.issues }, "chat.record.invalid");
     return null;
   }
@@ -125,6 +130,7 @@ export class ChatStore {
     const chat: StoredChat = StoredChatSchema.parse({
       id: input.id ?? newChatId(),
       title: input.title ?? null,
+      kind: new Set(input.botIds).size > 1 ? "group" : (input.kind ?? "direct"),
       participants: Array.from(new Set(input.botIds)).map((botId) => participant(botId, at)),
       rules: input.rules ?? {},
       ...(input.createdBy ? { createdBy: input.createdBy } : {}),
@@ -208,14 +214,18 @@ export class ChatStore {
     return this.update(chatId, (chat, at) =>
       chat.participants.some((entry) => entry.botId === botId)
         ? chat
-        : { ...chat, participants: [...chat.participants, participant(botId, at)] },
+        : { ...chat, kind: "group", participants: [...chat.participants, participant(botId, at)] },
     );
   }
 
   removeParticipant(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat) =>
       chat.participants.some((entry) => entry.botId === botId)
-        ? { ...chat, participants: chat.participants.filter((entry) => entry.botId !== botId) }
+        ? {
+            ...chat,
+            kind: chat.kind ?? (chat.participants.length > 1 ? "group" : "direct"),
+            participants: chat.participants.filter((entry) => entry.botId !== botId),
+          }
         : chat,
     );
   }

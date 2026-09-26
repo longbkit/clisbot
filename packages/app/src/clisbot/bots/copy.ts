@@ -6,6 +6,9 @@
 export const botsCopy = {
   bots: "Bots",
   chats: "Chats",
+  groupChats: "Group chats",
+  createGroupChat: "Create group chat",
+  createBotFirst: "Add at least two bots on one Host to start a group chat.",
   newBot: "New bot",
   newBotPlaceholder: "Type a name",
   bot: "Bot",

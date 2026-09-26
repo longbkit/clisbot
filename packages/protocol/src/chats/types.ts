@@ -93,6 +93,9 @@ export const ChatParticipantPayloadSchema = z.object({
 export type ChatParticipantPayload = z.infer<typeof ChatParticipantPayloadSchema>;
 
 export const ChatPayloadSchema = z.object({
+  /** Stable kind; old daemons omit it. Adding a second bot promotes a direct Chat to group. */
+  // COMPAT(chatKind): older records infer by participant count; new groups retain kind.
+  kind: z.enum(["direct", "group"]).optional(),
   id: z.string(),
   title: z.string().nullable(),
   participants: z.array(ChatParticipantPayloadSchema),

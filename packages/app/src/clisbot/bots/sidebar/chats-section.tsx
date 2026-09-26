@@ -1,6 +1,7 @@
+import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { botsCopy } from "../copy";
@@ -22,6 +23,7 @@ export interface ChatsSidebarChat {
   hostLabel?: string | null;
   /** A participating bot is mid-turn. */
   active?: boolean;
+  agentIds?: readonly string[];
 }
 
 interface ChatsSectionProps {
@@ -29,6 +31,8 @@ interface ChatsSectionProps {
   chats: readonly ChatsSidebarChat[];
   /** Runs before the route push, as `AutomationSidebarItem` does; the compact sidebar closes here. */
   onBeforeNavigate?: () => void;
+  onCreateChat: () => void;
+  canCreateChat?: boolean;
   onOpenChatMenu?: (chat: ChatsSidebarChat) => void;
 }
 
@@ -36,6 +40,8 @@ interface ChatsSectionProps {
 export const ChatsSection = memo(function ChatsSection({
   chats,
   onBeforeNavigate,
+  onCreateChat,
+  canCreateChat = true,
   onOpenChatMenu,
 }: ChatsSectionProps) {
   const router = useRouter();
@@ -51,10 +57,16 @@ export const ChatsSection = memo(function ChatsSection({
     },
     [onBeforeNavigate, router],
   );
-  if (chats.length === 0) return null;
   return (
     <View testID="sidebar-chats-section">
-      <BotsSectionHeader label={botsCopy.chats} testID="sidebar-chats-header" />
+      <BotsSectionHeader
+        label={botsCopy.groupChats}
+        testID="sidebar-chats-header"
+        createLabel={botsCopy.createGroupChat}
+        onCreate={onCreateChat}
+        disabled={!canCreateChat}
+      />
+      {!canCreateChat ? <Text>{botsCopy.createBotFirst}</Text> : null}
       {visible.map((chat) => (
         <ChatRow
           key={chat.key}
@@ -86,6 +98,12 @@ const ChatRow = memo(function ChatRow({
   onPress: (chat: ChatsSidebarChat) => void;
   onOpenMenu?: (chat: ChatsSidebarChat) => void;
 }) {
+  const active = useSessionStore(
+    (state) =>
+      chat.agentIds?.some(
+        (id) => selectAgentTurnPresentation(state.sessions[chat.serverId], id).isActive,
+      ) ?? false,
+  );
   const updatedAt = useMemo(() => new Date(chat.updatedAt), [chat.updatedAt]);
   const timeAgo = useCompactTimeAgo(updatedAt);
   const handlePress = useCallback(() => onPress(chat), [chat, onPress]);
@@ -96,7 +114,7 @@ const ChatRow = memo(function ChatRow({
       title={chat.title}
       subtitle={chat.hostLabel}
       trailing={timeAgo}
-      active={chat.active}
+      active={chat.active ?? active}
       selected={selected}
       testID={`sidebar-chat-${chat.chatId}`}
       onPress={handlePress}

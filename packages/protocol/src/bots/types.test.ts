@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { AgentProfileSchema } from "../agent-profile.js";
-import { BotLaunchDefaultsSchema, StoredBotSchema } from "./types.js";
+import { BotLaunchDefaultsSchema, BotPayloadSchema, StoredBotSchema } from "./types.js";
 
 const stored = {
   id: "bot_0123456789abcdef",
@@ -51,4 +51,12 @@ describe("StoredBotSchema", () => {
       featureValues: { fast_mode: true },
     });
   });
+});
+
+test("Bot authority is optional on old hosts and not persisted", () => {
+  expect(BotPayloadSchema.parse(stored).canConfigure).toBeUndefined();
+  expect(BotPayloadSchema.parse({ ...stored, canConfigure: false }).canConfigure).toBe(false);
+  expect(StoredBotSchema.parse({ ...stored, canConfigure: true })).not.toHaveProperty(
+    "canConfigure",
+  );
 });

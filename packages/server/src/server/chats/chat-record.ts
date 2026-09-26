@@ -73,6 +73,7 @@ export type StoredChatParticipant = z.infer<typeof StoredChatParticipantSchema>;
 export const StoredChatSchema = z
   .object({
     id: z.string().min(1),
+    kind: z.enum(["direct", "group"]).optional(),
     title: z.string().nullable(),
     participants: z.array(StoredChatParticipantSchema),
     rules: StoredChatRulesSchema,
@@ -151,6 +152,7 @@ export function chatPayload(
 ): ChatPayload {
   return {
     id: chat.id,
+    kind: chat.kind ?? (chat.participants.length > 1 ? "group" : "direct"),
     title: chat.title,
     participants: chat.participants.map((participant) => {
       const bot = botOf(participant.botId);

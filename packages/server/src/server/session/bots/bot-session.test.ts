@@ -96,7 +96,7 @@ describe("BotSession", () => {
     ).toBeUndefined();
     expect(findByType(emitted, "bot.create.response")?.payload).toEqual({
       requestId: "c1",
-      bot,
+      bot: { ...bot, canConfigure: true },
       reused: false,
       template: { created: ["AGENTS.md"], skipped: [] },
       error: null,
@@ -229,7 +229,10 @@ describe("BotSession", () => {
     listeners[0]?.({ kind: "upsert", bot });
     session.dispose();
     expect(listeners).toHaveLength(0);
-    expect(findByType(emitted, "bot.updated")?.payload).toEqual({ kind: "upsert", bot });
+    expect(findByType(emitted, "bot.updated")?.payload).toEqual({
+      kind: "upsert",
+      bot: { ...bot, canConfigure: true },
+    });
   });
 });
 
@@ -250,4 +253,30 @@ describe("dispatchBotMessage", () => {
   it("ignores messages that are not bot requests", () => {
     expect(dispatchBotMessage(null, { type: "ping" } as never, () => undefined)).toBeUndefined();
   });
+});
+
+it("projects configuration capability from the current Project grant, never the Bot creator", async () => {
+  let manage = false;
+  const { session, emitted, listeners } = makeSession(
+    { list: async () => [bot] },
+    {
+      authority: {
+        isRestricted: () => true,
+        allowsProject: (_id, privilege) => privilege === "project.use" || manage,
+        mayCreateProjectAt: async () => false,
+      },
+    },
+  );
+  await session.handleList({ type: "bot.list.request", requestId: "limited" });
+  expect(findByType(emitted, "bot.list.response")?.payload.bots[0]?.canConfigure).toBe(false);
+  listeners[0]!({ kind: "upsert", bot });
+  expect(findByType(emitted, "bot.updated")?.payload).toMatchObject({
+    bot: { canConfigure: false },
+  });
+  manage = true;
+  emitted.length = 0;
+  await session.handleList({ type: "bot.list.request", requestId: "manager" });
+  expect(findByType(emitted, "bot.list.response")?.payload.bots[0]?.canConfigure).toBe(true);
+  expect(bot).not.toHaveProperty("canConfigure");
+  session.dispose();
 });

@@ -21,18 +21,21 @@ vi.mock("react-native", () => ({
   Pressable: ({
     children,
     onPress,
+    disabled,
     accessibilityLabel,
     testID,
     ...rest
   }: {
     children?: ReactNode | ((state: { hovered: boolean; pressed: boolean }) => ReactNode);
     onPress?: () => void;
+    disabled?: boolean;
     accessibilityLabel?: string;
     testID?: string;
     "aria-selected"?: boolean;
   }) => (
     <button
       type="button"
+      disabled={disabled}
       aria-label={accessibilityLabel}
       aria-selected={rest["aria-selected"]}
       data-testid={testID}
@@ -41,6 +44,15 @@ vi.mock("react-native", () => ({
       {typeof children === "function" ? children({ hovered: false, pressed: false }) : children}
     </button>
   ),
+}));
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => children,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => children,
+  TooltipContent: () => null,
+}));
+vi.mock("@/stores/session-store", () => ({
+  useSessionStore: () => false,
+  selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
 vi.mock("lucide-react-native", () => ({ Ellipsis: () => <i />, Plus: () => <i /> }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
@@ -76,13 +88,15 @@ afterEach(() => {
 
 describe("ChatsSection", () => {
   it("renders nothing without chats", () => {
-    render(<ChatsSection chats={[]} />);
-    expect(screen.queryByTestId("sidebar-chats-section")).toBeNull();
+    render(<ChatsSection onCreateChat={vi.fn()} chats={[]} />);
+    expect(screen.getByRole("button", { name: "Create group chat" })).toBeTruthy();
   });
 
   it("closes the compact sidebar first, then opens the chat route", () => {
     const close = vi.fn();
-    render(<ChatsSection chats={[chat(1), chat(2)]} onBeforeNavigate={close} />);
+    render(
+      <ChatsSection onCreateChat={vi.fn()} chats={[chat(1), chat(2)]} onBeforeNavigate={close} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Chat 1" }));
     expect(close).toHaveBeenCalledTimes(1);
     expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
@@ -90,7 +104,9 @@ describe("ChatsSection", () => {
   });
 
   it("fills only the row whose route is current and shows the time and host", () => {
-    render(<ChatsSection chats={[chat(1, { hostLabel: "Host A" }), chat(2)]} />);
+    render(
+      <ChatsSection onCreateChat={vi.fn()} chats={[chat(1, { hostLabel: "Host A" }), chat(2)]} />,
+    );
     expect(screen.getByRole("button", { name: "Chat 2" }).getAttribute("aria-selected")).toBe(
       "true",
     );
@@ -102,7 +118,12 @@ describe("ChatsSection", () => {
   });
 
   it("caps recent chats and toggles the rest", () => {
-    render(<ChatsSection chats={[1, 2, 3, 4, 5, 6, 7].map((index) => chat(index))} />);
+    render(
+      <ChatsSection
+        onCreateChat={vi.fn()}
+        chats={[1, 2, 3, 4, 5, 6, 7].map((index) => chat(index))}
+      />,
+    );
     expect(screen.queryByRole("button", { name: "Chat 6" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show more" }));
     expect(screen.getByRole("button", { name: "Chat 7" })).toBeTruthy();
@@ -111,11 +132,21 @@ describe("ChatsSection", () => {
   });
 
   it("offers the menu only when a handler is given", () => {
-    const { rerender } = render(<ChatsSection chats={[chat(1)]} />);
+    const { rerender } = render(<ChatsSection onCreateChat={vi.fn()} chats={[chat(1)]} />);
     expect(screen.queryByTestId("sidebar-chat-chat-1-menu")).toBeNull();
     const openMenu = vi.fn();
-    rerender(<ChatsSection chats={[chat(1)]} onOpenChatMenu={openMenu} />);
+    rerender(<ChatsSection onCreateChat={vi.fn()} chats={[chat(1)]} onOpenChatMenu={openMenu} />);
     fireEvent.click(screen.getByTestId("sidebar-chat-chat-1-menu"));
     expect(openMenu).toHaveBeenCalledWith(expect.objectContaining({ chatId: "chat-1" }));
   });
+});
+
+it("keeps group creation discoverable but disabled until a bot exists", () => {
+  const create = vi.fn();
+  render(<ChatsSection chats={[]} onCreateChat={create} canCreateChat={false} />);
+  const button = screen.getByRole("button", { name: "Create group chat" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(button);
+  expect(create).not.toHaveBeenCalled();
+  expect(screen.getByText("Add at least two bots on one Host to start a group chat.")).toBeTruthy();
 });

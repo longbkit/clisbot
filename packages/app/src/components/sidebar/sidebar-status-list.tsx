@@ -1,3 +1,5 @@
+import { splitBotStatusGroups } from "@/clisbot/bot-projects/projection";
+import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
 import {
   memo,
   useCallback,
@@ -295,22 +297,27 @@ function StatusGroupList({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
+  const sections = splitBotStatusGroups(groups);
+  const renderGroup = (group: SidebarWorkspaceGroup) => (
+    <StatusGroupRows
+      key={group.key}
+      group={group}
+      collapsed={collapsedWorkspaceGroupKeys.has(group.key)}
+      projectIconByProjectViewKey={projectIconByProjectViewKey}
+      shortcutIndex={shortcutIndex}
+      showShortcutBadges={showShortcutBadges}
+      onWorkspacePress={onWorkspacePress}
+      hostBadgeByServerId={hostBadgeByServerId}
+      supportsPinningByServerId={supportsPinningByServerId}
+      onToggleWorkspacePin={onToggleWorkspacePin}
+    />
+  );
   return (
     <>
-      {groups.map((group) => (
-        <StatusGroupRows
-          key={group.key}
-          group={group}
-          collapsed={collapsedWorkspaceGroupKeys.has(group.key)}
-          projectIconByProjectViewKey={projectIconByProjectViewKey}
-          shortcutIndex={shortcutIndex}
-          showShortcutBadges={showShortcutBadges}
-          onWorkspacePress={onWorkspacePress}
-          hostBadgeByServerId={hostBadgeByServerId}
-          supportsPinningByServerId={supportsPinningByServerId}
-          onToggleWorkspacePin={onToggleWorkspacePin}
-        />
-      ))}
+      {sections.regular.map(renderGroup)}
+      {sections.bots.length > 0 ? (
+        <BotProjectsGroup>{sections.bots.map(renderGroup)}</BotProjectsGroup>
+      ) : null}
     </>
   );
 }

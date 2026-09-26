@@ -19,3 +19,15 @@ it("keeps wire session authority through the shared handshake replay/live projec
     });
   }
 });
+
+it("preserves explicit Bot creation authority and old-host omission", () => {
+  for (const botCreationAllowed of [undefined, false, true]) {
+    const wire = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "host",
+      botCreationAllowed,
+    });
+    expect(wire).not.toBeNull();
+    expect(toSessionServerInfo(wire!).botCreationAllowed).toBe(botCreationAllowed);
+  }
+});
