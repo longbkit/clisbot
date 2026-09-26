@@ -628,7 +628,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             ),
             ...(target.projectRoot ? { projectRoot: target.projectRoot } : {}),
           });
-          return { token, canSendFiles: target.projectRoot !== undefined };
+          return { token, canSendFiles: true };
         },
         bindCapability: (token, agentId) => deps.replyCapabilities?.bind(token, agentId) ?? false,
         revokeCapability: (token) => deps.replyCapabilities?.revoke(token),

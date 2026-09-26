@@ -884,6 +884,10 @@ async function createChannelReplyServerAtComposition(
       log: channelLogger,
       post: (ref, text, postOptions) => supervisor.channelReplyPost(ref, text, postOptions),
       mediaPost: (ref, file) => supervisor.channelReplyMediaPost(ref, file),
+      readLocalFile: (_capability, token, path, maxBytes) => {
+        if (!supervisor.readChannelReplyFile) throw new Error("Host file transfer is unavailable");
+        return supervisor.readChannelReplyFile(token, path, maxBytes);
+      },
     });
   } catch (error) {
     reportFailure(error, {

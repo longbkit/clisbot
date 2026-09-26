@@ -128,24 +128,38 @@ One tool sends text and files: `message` `send` with upstream's `media`,
 `attachments[]`, `buffer`, `caption` and `asVoice`. There is no separate file
 tool — the earlier `send_file` is deleted, not aliased.
 
-Authority for a local path is the reply capability's Project root, never the
-model's argument, and containment is checked after `realpath` on both sides so a
-symlink inside the Project cannot point out of it. A remote `http(s)` source is
-the one URL Hub code dereferences on a model's word, so it goes through
-`channels-shared`'s guarded read: public hosts only, no redirect followed, and
-the channel's own outbound cap enforced on `Content-Length` and again on the
-bytes.
+Local paths belong to the Agent's **Host**, not to the Hub. The Hub resolves
+its server-owned reply capability to the account's Host and bound Agent, then
+reads the file through `channel.file.read.request` on the existing Host socket.
+The Host verifies the capability hash against that Agent's `channel_reply` MCP
+configuration before reading. File access uses the Host user running the Agent;
+there is no separate Project-root restriction. Absolute paths outside the
+Project (including provider-generated images) and readable symlinks work.
+
+Reads are bounded to 512 KiB chunks, with the channel's upload cap and a file
+version checked by the Host. The Hub stages those chunks into its own temporary
+file for the native upload and removes it after success or failure. It never
+tries the Agent's path against its own filesystem. The existing channel-plane
+enable switch owns this path; with the plane off no reply tool is installed.
+`server_info.features.channelFileRead` gates the RPC once at the Host client:
+an older Host gets an explicit update-required error, with no local fallback.
+The request/response are additive and existing clients keep their wire shapes.
+
+A remote `http(s)` source still goes through `channels-shared`'s guarded read:
+public hosts only, no redirects, and the channel's outbound cap enforced on
+`Content-Length` and again on the bytes. Inline `buffer` data retains its existing
+Hub-side staging path.
 
 Two things about the staging seam are not visible from either side alone:
 
 - **Core stages `buffer` itself.** `message-action-params.ts` decodes inline
   bytes through the same media host adapter the Hub backs, then rewrites the
   send to the staged _path_. So the stager is handed a file it just created,
-  under the staging root rather than the Project, and has to recognize its own
-  output — otherwise every `buffer` send is refused as an escape.
+  under the staging root, and has to recognize its own output so it does not
+  ask the Host to read a Hub staging path.
 - **A stager is per call, not per process.** It is installed in an
   `AsyncLocalStorage` scope next to the outbound sender, because one Hub serves
-  many organizations and each call stages under its own Project root and its own
+  many organizations and each call stages in its own temporary directory with its own
   channel cap.
 
 One `send` becomes several platform messages: the body, then one per attachment,

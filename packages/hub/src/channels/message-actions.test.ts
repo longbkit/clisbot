@@ -1,3 +1,4 @@
+import { readFile as readHostTestFile } from "node:fs/promises";
 // The Hub's edge of the ported message-action layer, under concurrency.
 //
 // One Hub process serves every account of every organization, so two `message`
@@ -847,7 +848,9 @@ describe("native media over the Hub seam", () => {
       conversation: { to: TELEGRAM_CHAT },
       stageMedia: createChannelMediaStager({
         channel: "telegram",
-        projectRoot: project.root,
+        readLocalFile: async function* (path) {
+          yield await readHostTestFile(path);
+        },
       }),
       send: telegramMediaSeam(createFakeMediaApi(calls)),
     });
@@ -875,7 +878,9 @@ describe("native media over the Hub seam", () => {
       conversation: { to: TELEGRAM_CHAT },
       stageMedia: createChannelMediaStager({
         channel: "telegram",
-        projectRoot: project.root,
+        readLocalFile: async function* (path) {
+          yield await readHostTestFile(path);
+        },
       }),
       send: telegramMediaSeam(createFakeMediaApi(calls)),
     });
@@ -940,7 +945,9 @@ describe("native media over the Hub seam", () => {
         conversation: { to: SLACK_CHANNEL },
         stageMedia: createChannelMediaStager({
           channel: "slack",
-          projectRoot: project.root,
+          readLocalFile: async function* (path) {
+            yield await readHostTestFile(path);
+          },
         }),
         send: async (params) => {
           const base = {

@@ -3251,7 +3251,33 @@ export const SubscriptionReleaseResponseSchema = z.object({
   payload: z.object({ requestId: z.string(), subscriptionId: z.string() }),
 });
 
+// Host-side attachment reads for a channel capability bound to an Agent.
+export const ChannelFileReadRequestSchema = z.object({
+  type: z.literal("channel.file.read.request"),
+  requestId: z.string(),
+  agentId: z.string(),
+  capabilityHash: z.string().regex(/^[a-f0-9]{64}$/),
+  path: z.string().min(1),
+  offset: z.number().int().nonnegative(),
+  maxBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(1024 * 1024 * 1024),
+  version: z.string().optional(),
+});
+export const ChannelFileReadResponseSchema = z.object({
+  type: z.literal("channel.file.read.response"),
+  payload: z.object({
+    requestId: z.string(),
+    data: z.string(),
+    size: z.number().int().nonnegative(),
+    version: z.string(),
+  }),
+});
+
 export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
+  ChannelFileReadRequestSchema,
   BrowserHostRegisterRequestSchema,
   SubscriptionReleaseRequestSchema,
   SessionEventsSetSubscriptionRequestSchema,
@@ -3747,6 +3773,7 @@ export const ServerInfoStatusPayloadSchema = z
         daemonSelfUpdate: z.boolean().optional(),
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: z.boolean().optional(),
+        channelFileRead: z.boolean().optional(),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: z.boolean().optional(),
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
@@ -6925,6 +6952,7 @@ export const AgentSkillsImportLegacySelectionResponseSchema = z.object({
 });
 
 export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
+  ChannelFileReadResponseSchema,
   BrowserHostRegisterResponseSchema,
   SubscriptionReleaseResponseSchema,
   SessionEventsSetSubscriptionResponseSchema,

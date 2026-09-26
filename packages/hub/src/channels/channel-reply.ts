@@ -104,6 +104,12 @@ export interface ChannelReplyMcp {
   >;
   post: ChannelReplyPost;
   mediaPost?: ChannelReplyMediaPost;
+  readLocalFile?(
+    capability: ChannelReplyCapability,
+    token: string,
+    path: string,
+    maxBytes: number,
+  ): AsyncIterable<Buffer>;
   resolveCapability(token: string): ChannelReplyCapability | undefined;
   /** The per-turn output ceiling for a capability with no durable budget (the
    * channel binding path). Absent = that path posts unbounded. */
@@ -283,6 +289,7 @@ async function messageCall(
   const result = await executeChannelSend({
     mcp,
     capability,
+    token,
     args,
     reserveOutput: () => reserveOutput(mcp, capability, token),
   });

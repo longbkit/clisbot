@@ -1,6 +1,9 @@
 import { afterEach, expect, test } from "vitest";
 import type { SessionOutboundMessage } from "../messages.js";
 import { HubRelationshipHarness } from "./test-utils/relationship-harness.js";
+import { createHash } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 
 let relationship: HubRelationshipHarness | null = null;
 
@@ -23,6 +26,50 @@ function createdAgentWorkspaceId(message: SessionOutboundMessage): string {
   if (!message.payload.agent.workspaceId) throw new Error("Workspace was not created");
   return message.payload.agent.workspaceId;
 }
+
+test("Hub reads an attachment on the bound agent's Host through the session wire", async () => {
+  const hub = await HubRelationshipHarness.startWithAgentMcp();
+  relationship = hub;
+  await hub.beginConnect().result;
+  hub.connectLatestSocket();
+  const created = await hub.requestOrdinary({
+    type: "create_agent_request",
+    requestId: "create-channel-file-agent",
+    config: {
+      provider: "codex",
+      cwd: hub.repoRoot(),
+      mcpServers: {
+        channel_reply: { type: "http", url: "https://hub.test/mcp/channel/file-session" },
+      },
+    },
+  });
+  expect(created).toMatchObject({ type: "status", payload: { status: "agent_created" } });
+  if (created.type !== "status" || created.payload.status !== "agent_created")
+    throw new Error("Agent was not created");
+  const file = path.join(hub.repoRoot(), "image.png");
+  await writeFile(file, "generated image");
+  const input = {
+    type: "channel.file.read.request",
+    agentId: created.payload.agent.id,
+    capabilityHash: createHash("sha256").update("file-session").digest("hex"),
+    path: file,
+    offset: 0,
+    maxBytes: 1000,
+  };
+  expect(await hub.requestOrdinary({ ...input, requestId: "read-channel-file" })).toMatchObject({
+    type: "channel.file.read.response",
+    payload: { data: Buffer.from("generated image").toString("base64"), size: 15 },
+  });
+  expect(
+    await hub.requestOrdinary({
+      ...input,
+      capabilityHash: "0".repeat(64),
+      requestId: "wrong-channel-file",
+    }),
+  ).toMatchObject({
+    type: "rpc_error",
+  });
+});
 
 test("Hub retries one durable daemon execution across concurrency and reconstruction", async () => {
   const hub = await launchRelationship();

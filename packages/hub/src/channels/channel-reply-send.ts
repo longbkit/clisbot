@@ -7,7 +7,7 @@
 // It now runs on the same ported runner every other action uses
 // (`message-actions.ts` -> core's `executeMessageSend`), with two Hub-owned
 // seams plugged into it: the delivery ledger as core's durable sender, and the
-// capability's Project-scoped media stager as core's media store.
+// capability-bound Host media stager as core's media store.
 //
 // One `send` can become several platform messages (the reply text, then one per
 // attachment). They share one `eventTurnId` and one output-budget attempt; each
@@ -58,6 +58,7 @@ export type ReserveChannelReplyOutput = () => Promise<ChannelReplyOutputAttempt 
 export interface ChannelSendCall {
   mcp: ChannelReplyMcp;
   capability: ChannelReplyCapability;
+  token: string;
   args: Record<string, unknown>;
   reserveOutput: ReserveChannelReplyOutput;
 }
@@ -201,7 +202,7 @@ async function runSend(
         ...(ref.externalThreadId === null ? {} : { threadId: ref.externalThreadId }),
       },
       send: async (params) => await ledger.post(async () => await seam.post(params)),
-      stageMedia: sendFileStager(capability),
+      stageMedia: sendFileStager(call),
       ...(capability.requesterSenderId === undefined
         ? {}
         : { requesterSenderId: capability.requesterSenderId }),
@@ -430,9 +431,10 @@ async function mediaPost(
   };
 }
 
-/** The capability's Project-scoped stager. A channel without a native upload
+/** The capability-bound Host stager. A channel without a native upload
  * path refuses every file by name instead of staging bytes nobody can post. */
-function sendFileStager(capability: ChannelReplyCapability): ChannelMediaStager {
+function sendFileStager(call: ChannelSendCall): ChannelMediaStager {
+  const { capability } = call;
   const { channel } = capability.ref;
   if (!isMediaChannel(channel)) {
     return () => {
@@ -441,7 +443,11 @@ function sendFileStager(capability: ChannelReplyCapability): ChannelMediaStager 
   }
   return createChannelMediaStager({
     channel,
-    ...(capability.projectRoot === undefined ? {} : { projectRoot: capability.projectRoot }),
+    readLocalFile: (path, maxBytes) => {
+      if (!call.mcp.readLocalFile)
+        throw new ChannelMediaRefusedError("Host file transfer is unavailable");
+      return call.mcp.readLocalFile(capability, call.token, path, maxBytes);
+    },
   });
 }
 

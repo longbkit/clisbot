@@ -10,22 +10,15 @@
 // URL, and inline base64 `buffer` bytes — into one absolute local file a
 // vertical's `outbound.sendMedia` can upload.
 //
-// Authority is the reply capability's Project root, not the model's argument.
-// The containment check is realpath on BOTH
-// sides, so a symlink inside the Project cannot point out of it. Size is the
-// channel's own outbound cap from `@getpaseo/channels-shared`. A remote URL is
-// model-authored input and goes through the shared SSRF guard, which refuses
-// private hosts and refuses to follow a redirect.
-//
-// A stager is built per call and installed in an `AsyncLocalStorage` scope
-// alongside the outbound sender (the R1 pattern): one Hub serves many
-// organizations, and each call stages under its own Project root and its own
-// channel cap, so a process-global stager would let a later call write through
-// an earlier call's boundary.
+// Local paths belong to the Agent's Host, not the Hub. Read them through the
+// capability-bound Host transport and stage bounded chunks for the vertical.
+// Filesystem access follows the Host user running the agent; there is no extra
+// Project-root restriction. Remote URLs retain the shared SSRF guard.
+// Each call owns its staging directory and cleanup independently.
 
 import { randomUUID } from "node:crypto";
 import { mkdir, open, rm, writeFile } from "node:fs/promises";
-import { realpathSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -58,7 +51,7 @@ export interface StagedChannelMedia {
   mimeType?: string | undefined;
   sizeBytes: number;
   asVoice?: boolean | undefined;
-  /** Removes bytes the stager wrote; absent for a file already in the Project. */
+  /** Removes bytes the stager wrote; called after upload or failure. */
   release?: (() => Promise<void>) | undefined;
 }
 
@@ -75,8 +68,8 @@ export class ChannelMediaRefusedError extends Error {
 
 export interface ChannelMediaStagerOptions {
   channel: MediaChannel;
-  /** The reply capability's Project root; absent means no local file may be read. */
-  projectRoot?: string | undefined;
+  /** Reads bytes on the bound Agent's Host, with its existing filesystem access. */
+  readLocalFile?: ((path: string, maxBytes: number) => AsyncIterable<Buffer>) | undefined;
   /** Where staged bytes are written. Defaults to a per-process temp directory. */
   stagingRoot?: string | undefined;
   /** Test seams for the guarded remote read. */
@@ -86,54 +79,6 @@ export interface ChannelMediaStagerOptions {
 
 const DATA_URL = /^data:([^;,]*)(;base64)?,/i;
 const REMOTE_URL = /^https?:\/\//i;
-
-/**
- * Resolves a model-supplied path against the capability's Project root.
- *
- * Containment is checked AFTER symlink resolution on both sides: a lexical
- * check would let a link inside the Project escape to a target outside it, and
- * the canonical path is what gets uploaded.
- */
-export function resolveProjectFile(
-  projectRoot: string | undefined,
-  filePath: string,
-): { path: string; sizeBytes: number } {
-  if (projectRoot === undefined) {
-    throw new ChannelMediaRefusedError(
-      "file sending is unavailable for this session: no Project root is configured",
-    );
-  }
-  if (!path.isAbsolute(filePath)) {
-    throw new ChannelMediaRefusedError("path must be an absolute path (e.g. /home/.../report.md)");
-  }
-  let root: string;
-  try {
-    root = realpathSync(projectRoot);
-  } catch {
-    throw new ChannelMediaRefusedError(
-      "file sending is unavailable for this session: the Project root does not exist",
-    );
-  }
-  let target: string;
-  try {
-    target = realpathSync(filePath);
-  } catch {
-    throw new ChannelMediaRefusedError(`file not found: ${filePath}`);
-  }
-  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
-    throw new ChannelMediaRefusedError("path is outside the allowed Project root");
-  }
-  let sizeBytes: number;
-  try {
-    const stats = statSync(target);
-    if (!stats.isFile()) throw new ChannelMediaRefusedError("not a regular file");
-    sizeBytes = stats.size;
-  } catch (error) {
-    if (error instanceof ChannelMediaRefusedError) throw error;
-    throw new ChannelMediaRefusedError(`file not found: ${filePath}`);
-  }
-  return { path: target, sizeBytes };
-}
 
 /** Refuses a file the channel cannot upload; the wording is the shared G11 notice. */
 function assertWithinChannelCap(params: {
@@ -180,7 +125,7 @@ async function readSniffPrefix(filePath: string): Promise<Buffer> {
 /** The per-call staging context every branch below shares. */
 interface StagerContext {
   channel: MediaChannel;
-  projectRoot?: string | undefined;
+  readLocalFile?: ChannelMediaStagerOptions["readLocalFile"];
   maxBytes: number;
   stagingRoot: string;
   fetchImpl?: typeof globalThis.fetch | undefined;
@@ -191,8 +136,8 @@ interface StagerContext {
    * Core stages inline `buffer` bytes itself, through the media host adapter
    * this same stager backs, and then rewrites the send's params to the staged
    * PATH. So the send's own staging step is handed a path this call just
-   * created — under the staging root, not under the Project — and must
-   * recognize its own output instead of refusing it as an escape.
+   * created under the Hub staging root, and must recognize its own output
+   * instead of asking the Host to read it.
    */
   written: Map<string, StagedChannelMedia>;
 }
@@ -297,35 +242,51 @@ async function stageLocal(
       ...(source.asVoice === undefined ? {} : { asVoice: source.asVoice }),
     };
   }
-  const resolved = resolveProjectFile(context.projectRoot, localPath);
-  const fileName = source.fileName ?? mediaFileName(resolved.path);
-  assertWithinChannelCap({
-    channel: context.channel,
-    sizeBytes: resolved.sizeBytes,
-    fileName,
-  });
-  const mimeType =
-    source.mimeType ??
-    (await detectMime({
-      buffer: await readSniffPrefix(resolved.path),
-      filePath: resolved.path,
-    }));
-  // A Project file is uploaded where it lies: staging a copy would double the
-  // bytes on disk and hand the vertical a path outside the authorized root.
-  return {
-    filePath: resolved.path,
-    fileName,
-    sizeBytes: resolved.sizeBytes,
-    ...(mimeType === undefined ? {} : { mimeType }),
-    ...(source.asVoice === undefined ? {} : { asVoice: source.asVoice }),
-  };
+  if (!path.isAbsolute(localPath)) throw new ChannelMediaRefusedError("File path must be absolute");
+  if (!context.readLocalFile)
+    throw new ChannelMediaRefusedError("Host file transfer is unavailable");
+  const fileName = safeFileName(source.fileName ?? mediaFileName(localPath));
+  const directory = path.join(context.stagingRoot, randomUUID());
+  await mkdir(directory, { recursive: true });
+  const filePath = path.join(directory, fileName);
+  try {
+    const handle = await open(filePath, "wx");
+    let sizeBytes = 0;
+    try {
+      for await (const chunk of context.readLocalFile(localPath, context.maxBytes)) {
+        sizeBytes += chunk.length;
+        assertWithinChannelCap({ channel: context.channel, sizeBytes, fileName });
+        await handle.writeFile(chunk);
+      }
+    } finally {
+      await handle.close();
+    }
+    const mimeType =
+      source.mimeType ?? (await detectMime({ buffer: await readSniffPrefix(filePath), filePath }));
+    const staged: StagedChannelMedia = {
+      filePath,
+      fileName,
+      sizeBytes,
+      ...(mimeType === undefined ? {} : { mimeType }),
+      ...(source.asVoice === undefined ? {} : { asVoice: source.asVoice }),
+      release: async () => {
+        context.written.delete(filePath);
+        await rm(directory, { recursive: true, force: true });
+      },
+    };
+    context.written.set(filePath, staged);
+    return staged;
+  } catch (error) {
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 /** Builds the per-call stager. Every source it accepts ends as a local file. */
 export function createChannelMediaStager(options: ChannelMediaStagerOptions): ChannelMediaStager {
   const context: StagerContext = {
     channel: options.channel,
-    projectRoot: options.projectRoot,
+    readLocalFile: options.readLocalFile,
     maxBytes: mediaMaxBytesForChannel(options.channel),
     stagingRoot: options.stagingRoot ?? path.join(tmpdir(), "paseo-hub-channel-outbound-media"),
     fetchImpl: options.fetchImpl,
@@ -340,7 +301,7 @@ export function createChannelMediaStager(options: ChannelMediaStagerOptions): Ch
       throw new ChannelMediaRefusedError("media requires a path, a URL, or buffer bytes");
     }
     if (REMOTE_URL.test(media)) return await stageRemote(context, source, media);
-    const localPath = media.startsWith("file://") ? media.slice("file://".length) : media;
+    const localPath = media.startsWith("file:") ? fileURLToPath(media) : media;
     return await stageLocal(context, source, localPath);
   };
 }

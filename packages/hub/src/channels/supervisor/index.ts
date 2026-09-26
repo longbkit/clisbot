@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { registerChannelDriveConfig } from "../message-actions.js";
 import { createConversationMetadataResolver } from "../conversation-metadata.js";
 import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
@@ -1006,6 +1007,33 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       text,
       ...(options?.presentation === undefined ? {} : { presentation: options.presentation }),
     });
+  }
+
+  async *readChannelReplyFile(
+    token: string,
+    path: string,
+    maxBytes: number,
+  ): AsyncIterable<Buffer> {
+    // Resolve again at read time: a revoked capability must not start a transfer.
+    for (const handle of this.handles.values()) {
+      if (!handle.organizationId) continue;
+      const capability = this.channelReplyCapabilities.resolve(token, handle.organizationId);
+      if (
+        !capability ||
+        capability.ref.channel !== handle.channel ||
+        capability.ref.accountId !== handle.accountId
+      )
+        continue;
+      if (!capability.agentId || !handle.daemon?.readChannelFile) break;
+      yield* handle.daemon.readChannelFile({
+        agentId: capability.agentId,
+        capabilityHash: createHash("sha256").update(token).digest("hex"),
+        path,
+        maxBytes,
+      });
+      return;
+    }
+    throw new Error("The agent's Host file transfer is unavailable");
   }
 
   async channelReplyMediaPost(

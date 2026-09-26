@@ -177,6 +177,7 @@ export interface ChannelSupervisor {
     text: string,
     options?: { presentation?: MessagePresentation | undefined },
   ): Promise<OutboundPostResult>;
+  readChannelReplyFile?(token: string, path: string, maxBytes: number): AsyncIterable<Buffer>;
   channelReplyMediaPost(
     ref: ChannelReplyBindingRef,
     file: StagedChannelMedia,

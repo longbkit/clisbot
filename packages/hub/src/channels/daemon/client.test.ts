@@ -25,6 +25,7 @@ class FakeDaemon {
   readonly hellos: RecordedMessage[] = [];
   clients: Set<import("ws").WebSocket>;
   port = 0;
+  channelFileRead = true;
 
   constructor() {
     this.wss = new WebSocketServer({ noServer: true });
@@ -80,7 +81,11 @@ class FakeDaemon {
             payload: {
               status: "server_info",
               serverId: "fake",
-              features: { agentForkContext: true, agentConfigApply: true },
+              features: {
+                agentForkContext: true,
+                agentConfigApply: true,
+                channelFileRead: this.channelFileRead,
+              },
             },
           },
         }),
@@ -99,6 +104,11 @@ class FakeDaemon {
 
   private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
     const catalog: Record<string, Record<string, unknown>> = {
+      "channel.file.read.request": {
+        data: Buffer.from(message["offset"] === 0 ? "first" : "second").toString("base64"),
+        size: 11,
+        version: "file-version",
+      },
       list_available_providers_request: { providers: [{ provider: "codex", available: true }] },
       list_provider_models_request: {
         models: [{ provider: "codex", id: "model", label: "Model" }],
@@ -393,6 +403,50 @@ describe("channel trusted-client daemon connection", () => {
   afterAll(async () => {
     client.stop();
     await daemon.close();
+  });
+
+  it("reads Host file chunks over the wire without a cwd or Project boundary", async () => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of client.readChannelFile!({
+      agentId: "agent-1",
+      capabilityHash: "a".repeat(64),
+      path: "/host/generated.png",
+      maxBytes: 100,
+    }))
+      chunks.push(chunk);
+    assert.equal(Buffer.concat(chunks).toString(), "firstsecond");
+    const requests = daemon.messages.filter((m) => m.type === "channel.file.read.request");
+    assert.equal(requests.length, 2);
+    assert.equal(requests[1]?.["offset"], 5);
+    assert.equal(requests[1]?.["version"], "file-version");
+    assert.equal(requests[0]?.["cwd"], undefined);
+  });
+
+  it("asks for a Host update before calling an unsupported file RPC", async () => {
+    const old = new FakeDaemon();
+    old.channelFileRead = false;
+    await old.listen(0);
+    const connection = connectChannelDaemon({ host: `127.0.0.1:${old.port}` });
+    try {
+      await connection.waitForConnected();
+      await assert.rejects(async () => {
+        const chunks = [];
+        for await (const chunk of connection.readChannelFile!({
+          agentId: "a",
+          capabilityHash: "a".repeat(64),
+          path: "/file",
+          maxBytes: 10,
+        }))
+          chunks.push(chunk);
+      }, /Update this Host/);
+      assert.equal(
+        old.messages.some((m) => m.type === "channel.file.read.request"),
+        false,
+      );
+    } finally {
+      connection.stop();
+      await old.close();
+    }
   });
 
   it("creates an agent via the trusted create_agent_request", async () => {

@@ -29,8 +29,8 @@ import type {
 
 // The channel control plane's one code path to a daemon, for both forms
 // (plan §14.7): the embedded form connects over loopback; the team/remote form
-// pairs over the relay with the same ordinary-client wire. Everything here is an
-// existing trusted-client RPC — no new schema, no enrollment.
+// pairs over the relay with the same session wire. Host file reads use the
+// additive channel.file.read RPC, gated by the Host feature advertisement.
 
 /**
  * The two calls that wait on a provider process rather than on the daemon. The
@@ -126,6 +126,12 @@ export interface DaemonConnection {
       responseId?: string;
     },
   ): Promise<void>;
+  readChannelFile?(input: {
+    agentId: string;
+    capabilityHash: string;
+    path: string;
+    maxBytes: number;
+  }): AsyncIterable<Buffer>;
   listAgents(): Promise<AgentSnapshot[]>;
   isAgentInProject(agent: AgentSnapshot, projectId: string): Promise<boolean>;
   getServerInfo(): DaemonServerInfo | undefined;
@@ -327,6 +333,41 @@ function createFacade(
     discovery,
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
     hasFreeCreateSlot: () => hostHasCreateSlot(hostKey),
+    async *readChannelFile(input) {
+      if (asRecord(socket.serverInfo?.["features"])?.["channelFileRead"] !== true) {
+        throw new Error("Update this Host to send local files to channels");
+      }
+      let offset = 0;
+      let version: string | undefined;
+      while (true) {
+        const result = asRecord(
+          await socket.call("channel.file.read.request", {
+            ...input,
+            offset,
+            ...(version === undefined ? {} : { version }),
+          }),
+        );
+        if (
+          typeof result?.["data"] !== "string" ||
+          typeof result["size"] !== "number" ||
+          typeof result["version"] !== "string"
+        )
+          throw new Error("Invalid Host file response");
+        const bytes = Buffer.from(result["data"], "base64");
+        if (
+          result["size"] > input.maxBytes ||
+          offset + bytes.length > result["size"] ||
+          (version !== undefined && version !== result["version"])
+        ) {
+          throw new Error("Host file changed or exceeds the channel upload limit");
+        }
+        version = result["version"];
+        offset += bytes.length;
+        if (bytes.length) yield bytes;
+        if (offset === result["size"]) return;
+        if (!bytes.length) throw new Error("Incomplete Host file transfer");
+      }
+    },
     createAgent: async (config, options) => {
       const request = await identify(
         "create_agent_request",

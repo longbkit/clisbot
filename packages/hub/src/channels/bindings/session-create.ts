@@ -163,7 +163,7 @@ function issueReplyCapability(
       : { requesterMessageId: requester.externalMessageId }),
     ...(accessTarget.projectRoot === undefined ? {} : { projectRoot: accessTarget.projectRoot }),
   });
-  return { token, canSendFiles: accessTarget.projectRoot !== undefined };
+  return { token, canSendFiles: true };
 }
 
 /**

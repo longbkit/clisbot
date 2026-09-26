@@ -9,7 +9,14 @@ import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, describe, it } from "vitest";
-import { mkdtemp, realpath, truncate, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  realpath,
+  truncate,
+  writeFile,
+  stat,
+  readFile as readLocalTestFile,
+} from "node:fs/promises";
 import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -277,7 +284,8 @@ describe("channel-reply MCP endpoint", () => {
       projectRoot: directory,
       mediaPost: async (ref, file) => {
         assert.equal(ref.accountId, "work");
-        assert.equal(file.filePath, filePath);
+        assert.equal(await readLocalTestFile(file.filePath, "utf8"), "report");
+        assert.notEqual(file.filePath, filePath, "upload reads a Hub-owned staged copy");
         assert.equal(file.fileName, "report.md");
         return { ok: true, externalMessageId: "file-1", mediaPosted: true };
       },
@@ -310,18 +318,19 @@ describe("channel-reply MCP endpoint", () => {
     ]);
   });
 
-  it("rejects a symlink inside the Project that points outside it (containment after realpath)", async () => {
+  it("sends a Host symlink outside the Project without a separate root restriction", async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "channel-reply-project-"));
     const outside = await mkdtemp(join(tmpdir(), "channel-reply-outside-"));
-    const outsideFile = join(outside, "secret.md");
-    await writeFile(outsideFile, "secret");
-    const linkPath = join(projectRoot, "link.md");
+    const outsideFile = join(outside, "image.png");
+    await writeFile(outsideFile, "generated image");
+    const linkPath = join(projectRoot, "image.png");
     symlinkSync(outsideFile, linkPath);
     let mediaCalls = 0;
     const fixture = makeFixture({
       projectRoot,
-      mediaPost: async () => {
-        mediaCalls += 1;
+      mediaPost: async (_ref, file) => {
+        assert.equal(await readLocalTestFile(file.filePath, "utf8"), "generated image");
+        mediaCalls++;
         return { ok: true, externalMessageId: "x", mediaPosted: true };
       },
     });
@@ -329,53 +338,37 @@ describe("channel-reply MCP endpoint", () => {
       name: "message",
       arguments: { action: "send", attachments: [{ media: linkPath }] },
     });
-    const result = ToolResultSchema.parse(body.result);
-    assert.equal(result.isError, true);
-    assert.match(
-      String((body.result as { content: [{ text: string }] }).content[0]?.text),
-      /outside the allowed Project root/,
-    );
-    assert.equal(mediaCalls, 0, "the vertical seam is never driven for an escaped path");
-    // Record-before-post applies to a refused file too: the anchor row is
-    // claimed, then failed, so a retry re-arms the same key instead of finding
-    // an unexplained gap.
-    assert.deepEqual(
-      fixture.records.map((record) => record.sequence),
-      [0],
-    );
-    assert.equal(fixture.confirms.length, 0);
-    assert.match(String(fixture.failures[0]?.failureReason), /outside the allowed Project root/);
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined);
+    assert.equal(mediaCalls, 1);
+    assert.equal(fixture.confirms.length, 1);
   });
 
-  it("omits and rejects file sending when no Project root is configured", async () => {
-    let mediaCalls = 0;
+  it("sends a Host file with no Project root and no matching Hub path", async () => {
+    let uploadedPath = "";
     const fixture = makeFixture({
       projectRoot: null,
-      mediaPost: async () => {
-        mediaCalls += 1;
+      readLocalFile: async function* (capability, token, path) {
+        assert.equal(capability.agentId, "agent-1");
+        assert.equal(token, TOKEN);
+        assert.equal(path, "/host-only/generated_images/image.png");
+        yield Buffer.from("generated image");
+      },
+      mediaPost: async (_ref, file) => {
+        uploadedPath = file.filePath;
+        assert.equal(await readLocalTestFile(file.filePath, "utf8"), "generated image");
         return { ok: true, externalMessageId: "x", mediaPosted: true };
       },
     });
-    const listed = await fixture.call("tools/list");
-    const tools = z
-      .array(z.object({ name: z.string() }))
-      .parse((listed.result as { tools: unknown[] }).tools);
-    assert.deepEqual(
-      tools.map(({ name }) => name),
-      ["message"],
-    );
     const body = await fixture.call("tools/call", {
       name: "message",
-      arguments: { action: "send", attachments: [{ media: "/etc/hostname" }] },
+      arguments: {
+        action: "send",
+        attachments: [{ media: "/host-only/generated_images/image.png" }],
+      },
     });
-    const result = ToolResultSchema.parse(body.result);
-    assert.equal(result.isError, true);
-    assert.match(
-      String((body.result as { content: [{ text: string }] }).content[0]?.text),
-      /no Project root is configured/,
-    );
-    assert.equal(mediaCalls, 0, "absence of a home root is never unrestricted access");
-    assert.equal(fixture.confirms.length, 0);
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined);
+    assert.equal(fixture.confirms.length, 1);
+    await assert.rejects(stat(uploadedPath), /ENOENT/);
   });
 
   it("omits threadId when the ref is a conversation-root session", async () => {
@@ -584,7 +577,7 @@ describe("channel-reply MCP endpoint", () => {
     assert.equal(ToolResultSchema.parse(body.result).isError, true);
     assert.match(
       String((body.result as { content: [{ text: string }] }).content[0]?.text),
-      /too large \(Slack limit 250 MB\)/,
+      /File exceeds the channel upload limit/,
     );
     assert.equal(mediaCalls, 0);
     assert.equal(fixture.confirms.length, 0);
@@ -1158,6 +1151,7 @@ function makeFixture(
   options: {
     post?: ChannelReplyPost;
     mediaPost?: ChannelReplyMediaPost;
+    readLocalFile?: ChannelReplyMcp["readLocalFile"];
     projectRoot?: string | null;
     ref?: ChannelReplyBindingRef;
     requestToken?: string;
@@ -1271,6 +1265,13 @@ function makeFixture(
     organizationId: "org-1",
     store,
     resolveCapability: (candidate) => registry.resolve(candidate, "org-1"),
+    readLocalFile:
+      options.readLocalFile ??
+      async function* (_capability, _token, path, maxBytes) {
+        if ((await stat(path)).size > maxBytes)
+          throw new Error("File exceeds the channel upload limit");
+        yield await readLocalTestFile(path);
+      },
     reserveTurnOutput: (candidate) => registry.reserveTurnOutput(candidate),
     noteDelivery: (candidate, delivery) => registry.noteDelivery(candidate, delivery),
     admitProgress: (candidate) => registry.admitProgress(candidate),
