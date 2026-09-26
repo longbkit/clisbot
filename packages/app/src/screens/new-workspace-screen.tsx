@@ -40,8 +40,7 @@ import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
-import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
+import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import { LaunchControl } from "@/new-workspace-launch/launch-control";
 import { resolveLaunchTarget, type LaunchTarget } from "@/new-workspace-launch/target";
@@ -1416,6 +1415,8 @@ interface NewWorkspaceFormStackInput {
     target: LaunchTarget;
     onChange: (target: LaunchTarget) => void;
     profiles: readonly TerminalProfile[];
+    shell?: boolean;
+    canManageProfiles?: boolean;
     disabled: boolean;
   };
 }
@@ -1591,6 +1592,8 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
       target={launch.target}
       onChange={launch.onChange}
       profiles={launch.profiles}
+      shell={launch.shell}
+      canManageProfiles={launch.canManageProfiles}
       disabled={launch.disabled}
       badgePressableStyle={badgePressableStyle}
     />
@@ -1690,19 +1693,41 @@ export function NewWorkspaceScreen({
   // frozen useState initializer.
   const { preferences: formPreferences, updatePreferences: updateFormPreferences } =
     useFormPreferences();
-  const { config: daemonConfig } = useDaemonConfig(selectedServerId);
-  const terminalProfiles: readonly TerminalProfile[] = useMemo(
-    () => resolveTerminalProfiles(daemonConfig?.terminalProfiles),
-    [daemonConfig?.terminalProfiles],
-  );
+  const {
+    selectedProject,
+    selectedSourceDirectory,
+    projectPickerOptions,
+    projectByOptionId,
+    selectedProjectOptionId,
+    projectTriggerLabel,
+    handleSelectProjectOption: selectProjectOption,
+  } = useNewWorkspaceProjectPicker({
+    selectedServerId,
+    projects,
+    routeProject,
+    routeProjectContextViewKey,
+    lastActiveProject,
+    allowAllProjects: supportsWorkspaceMultiplicity,
+  });
+  // Clisbot Managed Access: only the profiles, and the shell, this Project grants.
+  const {
+    profiles: terminalProfiles,
+    shell: terminalShellAllowed,
+    canManageProfiles: canManageTerminalProfiles,
+  } = useLaunchableTerminalProfiles(selectedServerId, selectedSourceDirectory);
   // Manual selection wins once the user picks something; until then the target
   // reads live from preferences so the async load can't race a frozen
   // initializer. Both go through `resolveLaunchTarget`, so a profile deleted
   // daemon-side falls back to chat rather than leaving a dead selection.
   const [manualLaunchTarget, setManualLaunchTarget] = useState<LaunchTarget | null>(null);
   const launchTarget = useMemo(
-    () => resolveLaunchTarget(manualLaunchTarget ?? formPreferences.launchTarget, terminalProfiles),
-    [manualLaunchTarget, formPreferences.launchTarget, terminalProfiles],
+    () =>
+      resolveLaunchTarget(
+        manualLaunchTarget ?? formPreferences.launchTarget,
+        terminalProfiles,
+        terminalShellAllowed,
+      ),
+    [manualLaunchTarget, formPreferences.launchTarget, terminalProfiles, terminalShellAllowed],
   );
   const [terminalPromptText, setTerminalPromptText] = useState("");
   const {
@@ -1735,22 +1760,6 @@ export function NewWorkspaceScreen({
   const { workspace } = creationResult;
   const client = useHostRuntimeClient(selectedServerId);
   const isConnected = useHostRuntimeIsConnected(selectedServerId);
-  const {
-    selectedProject,
-    selectedSourceDirectory,
-    projectPickerOptions,
-    projectByOptionId,
-    selectedProjectOptionId,
-    projectTriggerLabel,
-    handleSelectProjectOption: selectProjectOption,
-  } = useNewWorkspaceProjectPicker({
-    selectedServerId,
-    projects,
-    routeProject,
-    routeProjectContextViewKey,
-    lastActiveProject,
-    allowAllProjects: supportsWorkspaceMultiplicity,
-  });
   const projectIconTargets = useMemo(
     () => buildNewWorkspaceProjectIconTargets(projects, selectedServerId),
     [projects, selectedServerId],
@@ -2197,7 +2206,14 @@ export function NewWorkspaceScreen({
             input.workspaceDirectory,
             input.name,
             undefined,
-            { command: input.command, args: input.args, workspaceId: input.workspaceId },
+            {
+              command: input.command,
+              args: input.args,
+              workspaceId: input.workspaceId,
+              ...(input.profileId === undefined
+                ? {}
+                : { profileId: input.profileId, prompt: input.prompt }),
+            },
           );
           const terminal = createdTerminal.terminal;
           if (!terminal) {
@@ -2362,6 +2378,8 @@ export function NewWorkspaceScreen({
       target: launchTarget,
       onChange: setManualLaunchTarget,
       profiles: terminalProfiles,
+      shell: terminalShellAllowed,
+      canManageProfiles: canManageTerminalProfiles,
       disabled: isPending,
     },
   });

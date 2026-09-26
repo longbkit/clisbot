@@ -70,7 +70,7 @@ Trên Host hoặc Project, dưới ô mức quyền có công tắc **Can share*
 | Connect       | Không có               |
 | Office worker | Tắt mặc định, bật được |
 | Developer     | Tắt mặc định, bật được |
-| Full access   | Luôn bật               |
+| Full access   | Bật mặc định, tắt được |
 | Administrator | Luôn bật               |
 
 - Người có Can share ở mức Office worker chỉ cấp được Office worker; ở Host thì cấp được mọi Project trên Host đó. Trong **Access** họ chỉ thấy tài nguyên mình chia sẻ được; mức cao hơn mức của họ không hiện trong ô chọn (có dòng "Above your own level"); grant cao hơn hiện **Locked**, không sửa hay xóa được.

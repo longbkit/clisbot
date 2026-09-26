@@ -2076,6 +2076,8 @@ export class VoiceAssistantWebSocketServer {
         ...(this.managedAccess.mode === "external"
           ? { managedAccessTickets: true, projectWorkspaceCreation: true }
           : {}),
+        // COMPAT(terminalProfileGrants): launch by profileId and terminal.profile.list.
+        terminalProfileGrants: true,
         // COMPAT(pluginThemes): added in v0.5.0, remove gate after 2027-08-20.
         pluginThemes: true,
         pluginSettings: true,

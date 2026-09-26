@@ -16,6 +16,8 @@ export const PROJECT_PRIVILEGES = [
   "agent.create",
   "agent.fast.use",
   "terminal.use",
+  // Launch only granted Terminal profiles; the daemon resolves the command.
+  "terminal.profile.use",
   "approval.file",
   "approval.config",
   "approval.command",

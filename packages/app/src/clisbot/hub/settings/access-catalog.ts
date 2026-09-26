@@ -182,6 +182,16 @@ export function constraintSummary(constraints: Record<string, unknown>): string 
       `${String(agentConfigurations.length)} Agent configuration${agentConfigurations.length === 1 ? "" : "s"}`,
     );
   }
+  const terminalProfiles = constraints["terminalProfiles"];
+  if (terminalProfiles === "*") values.push("All Terminal profiles");
+  else if (Array.isArray(terminalProfiles)) {
+    values.push(
+      `${String(terminalProfiles.length)} Terminal profile${terminalProfiles.length === 1 ? "" : "s"}`,
+    );
+  }
+  if (typeof constraints["projectFolders"] === "object" && constraints["projectFolders"] !== null) {
+    values.push("Narrowed Project folders");
+  }
   return values.length === 0 ? null : values.join(" · ");
 }
 

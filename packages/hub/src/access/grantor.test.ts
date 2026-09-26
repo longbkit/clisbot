@@ -88,8 +88,8 @@ describe("decideGrant", () => {
       ...withinLevel,
       privileges: [...RESOURCE_ACCESS_LEVELS.daemon.full_access],
     };
-    expect(refusal(decideGrant(developerWhoShares, aboveLevel, resources))).toContain(
-      "workspace.manage",
+    expect(refusal(decideGrant(developerWhoShares, aboveLevel, resources))).toMatch(
+      /^You do not hold (terminal\.use|workspace\.manage) on this resource\.$/,
     );
   });
 
@@ -204,11 +204,13 @@ describe("decideGrant", () => {
     ).toMatchObject({ allowed: false });
   });
 
-  it("treats Full access and Administrator as sharing, and Team Admin as scoped to the Team", () => {
+  it("treats Administrator as sharing, Full access as sharing by preset, and Team Admin as scoped to the Team", () => {
     expect(impliedPrivileges("daemon", ["daemon.connect", "daemon.manage"])).toContain(
       "hub.access.manage",
     );
-    expect(impliedPrivileges("project", ["project.use", "workspace.manage"])).toContain(
+    // Can share is a switch on Full access: its level carries it, the privilege does not.
+    expect(RESOURCE_ACCESS_LEVELS.project.full_access).toContain("hub.access.manage");
+    expect(impliedPrivileges("project", ["project.use", "workspace.manage"])).not.toContain(
       "hub.access.manage",
     );
     expect(impliedPrivileges("daemon", [...RESOURCE_ACCESS_LEVELS.daemon.developer])).not.toContain(
@@ -263,5 +265,143 @@ describe("decideGrant", () => {
         resources,
       ),
     ).toMatchObject({ allowed: false });
+  });
+});
+
+describe("decideGrant: Terminal profiles and Project folders", () => {
+  const profileDeveloper: GrantActor = {
+    role: "member",
+    assignments: [
+      grant("daemon", HOST, [...RESOURCE_ACCESS_LEVELS.daemon.developer, "hub.access.manage"], {
+        agentConfigurations: [codex],
+        terminalProfiles: ["claude"],
+      }),
+    ],
+  };
+  const developerGrant = (terminalProfiles: "*" | string[]) => ({
+    resourceKind: "project" as const,
+    resourceId: PROJECT,
+    privileges: [...RESOURCE_ACCESS_LEVELS.project.developer],
+    constraints: { agentConfigurations: [codex], terminalProfiles },
+  });
+
+  it("grants only the Terminal profiles the grantor holds", () => {
+    expect(decideGrant(profileDeveloper, developerGrant(["claude"]), resources).allowed).toBe(true);
+    expect(refusal(decideGrant(profileDeveloper, developerGrant(["codex"]), resources))).toBe(
+      "The Terminal profiles exceed your own.",
+    );
+    expect(refusal(decideGrant(profileDeveloper, developerGrant("*"), resources))).toBe(
+      "The Terminal profiles exceed your own.",
+    );
+  });
+
+  it("treats a grantor who names no profile as holding none", () => {
+    const noProfiles: GrantActor = {
+      role: "member",
+      assignments: [
+        grant("daemon", HOST, ["daemon.connect", "project.use", "hub.access.manage"], {}),
+      ],
+    };
+    const candidate = {
+      resourceKind: "project" as const,
+      resourceId: PROJECT,
+      privileges: ["project.use"],
+      constraints: { terminalProfiles: ["claude"] },
+    };
+    expect(refusal(decideGrant(noProfiles, candidate as never, resources))).toBe(
+      "The Terminal profiles exceed your own.",
+    );
+  });
+
+  it("never grants the shell from Terminal profiles alone", () => {
+    const withShell = {
+      ...developerGrant(["claude"]),
+      privileges: [...RESOURCE_ACCESS_LEVELS.project.developer, "terminal.use" as const],
+    };
+    expect(refusal(decideGrant(profileDeveloper, withShell, resources))).toBe(
+      "You do not hold terminal.use on this resource.",
+    );
+  });
+
+  it("lets a shell holder grant any profile", () => {
+    const shellHolder: GrantActor = {
+      role: "member",
+      assignments: [
+        grant("daemon", HOST, [...RESOURCE_ACCESS_LEVELS.daemon.full_access], {
+          agentConfigurations: [codex],
+          terminalProfiles: ["claude"],
+        }),
+      ],
+    };
+    expect(decideGrant(shellHolder, developerGrant("*"), resources).allowed).toBe(true);
+  });
+
+  const fullAccessHost = (projectFolders?: { allow: string[]; deny: string[] }) => ({
+    resourceKind: "daemon" as const,
+    resourceId: HOST,
+    privileges: [...RESOURCE_ACCESS_LEVELS.daemon.full_access],
+    constraints: {
+      agentConfigurations: [codex],
+      terminalProfiles: "*" as const,
+      ...(projectFolders ? { projectFolders } : {}),
+    },
+  });
+  const narrowedLead: GrantActor = {
+    role: "member",
+    assignments: [
+      grant("daemon", HOST, [...RESOURCE_ACCESS_LEVELS.daemon.full_access], {
+        agentConfigurations: [codex],
+        terminalProfiles: "*",
+        projectFolders: { allow: ["/workspace/qc/**"], deny: ["/workspace/qc/prod/**"] },
+      }),
+    ],
+  };
+
+  it("passes a narrowed grantor's folders on, under their own and with their deny rules", () => {
+    const within = fullAccessHost({
+      allow: ["/workspace/qc/app/**"],
+      deny: ["/workspace/qc/prod/**"],
+    });
+    expect(decideGrant(narrowedLead, within, resources).allowed).toBe(true);
+  });
+
+  it("refuses folders outside the grantor's, an un-narrowed grant, or dropped deny rules", () => {
+    for (const candidate of [
+      fullAccessHost({ allow: ["/workspace/**"], deny: ["/workspace/qc/prod/**"] }),
+      fullAccessHost(),
+      fullAccessHost({ allow: ["/workspace/qc/app/**"], deny: [] }),
+    ]) {
+      expect(refusal(decideGrant(narrowedLead, candidate, resources))).toBe(
+        "The Project folders exceed your own.",
+      );
+    }
+  });
+
+  it("does not limit folders for a grantor whose own Host grant is un-narrowed", () => {
+    const lead: GrantActor = {
+      role: "member",
+      assignments: [
+        grant("daemon", HOST, [...RESOURCE_ACCESS_LEVELS.daemon.full_access], {
+          agentConfigurations: [codex],
+          terminalProfiles: "*",
+        }),
+      ],
+    };
+    expect(decideGrant(lead, fullAccessHost(), resources).allowed).toBe(true);
+  });
+});
+
+describe("impliedPrivileges: Can share", () => {
+  it("is a preset of Full access, not implied by workspace.manage", () => {
+    expect(impliedPrivileges("daemon", ["daemon.connect", "workspace.manage"])).not.toContain(
+      "hub.access.manage",
+    );
+    expect(RESOURCE_ACCESS_LEVELS.daemon.full_access).toContain("hub.access.manage");
+  });
+
+  it("stays implied by Administrator", () => {
+    expect(impliedPrivileges("daemon", ["daemon.connect", "daemon.manage"])).toContain(
+      "hub.access.manage",
+    );
   });
 });

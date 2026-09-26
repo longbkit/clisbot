@@ -63,9 +63,10 @@ later. Use a Host assignment when the answer is "all of them".
 
 `hub.access.manage` on a Host or Project is **Can share**; on a Team, Channel
 account, or Automation it is that resource's **Admin**. It sits in the same grant
-row as the level. Full access, Administrator, and Connection Admin always carry
-it: the Hub adds it when it saves those levels and when it reads rows written before
-the level carried it (`impliedPrivileges` in `contract.ts`). A holder grants at most what they
+row as the level. Administrator and Connection Admin always carry it: the Hub adds
+it when it saves those levels and when it reads rows written before the level
+carried it (`impliedPrivileges` in `contract.ts`). Full access names it as a preset
+the grant can switch off. A holder grants at most what they
 hold on that resource, privileges and constraints alike, and may change or remove
 only grants inside that bound (`access/grantor.ts`, error `access_exceeds_grantor`);
 Organization Owners and Admins are not bound. A Host grant's Can share reaches its
@@ -101,10 +102,14 @@ Project mode, so provider and model limits still apply to every Project it reach
 removing, and archiving Projects, workspaces, and worktrees. The Hub then gives the
 session the daemon permission of the same name, which is session-wide, so the
 daemon checks `workspace.manage` on **every Project, workspace, and path** such an
-operation names. Creating a Project at a path no Project covers needs `workspace.manage`
-granted on the Host itself, which the ticket carries as `daemonPrivileges`; a
-Project grant creates only inside its own root. The level-by-level effect is in
-the [user guide](guides/user-guide/access/permissions.md).
+operation names. Creating a Project needs `workspace.manage` granted on the Host
+itself, which the ticket carries as `daemonPrivileges`, at a path the Host folder
+policy and the grant's folder rules allow and no existing Project covers; a Project
+grant creates none. Terminal is split in two: `terminal.use` is the shell,
+`terminal.profile.use` launches only the Terminal profiles the grant names, with the
+daemon resolving the command. Both are in
+[Terminal profiles and Project creation](features/access/terminal-and-project-creation.md).
+The level-by-level effect is in the [user guide](guides/user-guide/access/permissions.md).
 
 A Channel account assignment carries channel authority, not Project authority.
 The only level is **Admin** (`channel.manage` + `hub.access.manage`, wire key

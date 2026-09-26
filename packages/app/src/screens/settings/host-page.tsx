@@ -63,6 +63,10 @@ import {
 import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useSessionStore } from "@/stores/session-store";
+import {
+  TerminalsAdministratorNotice,
+  useCanManageHostTerminals,
+} from "@/clisbot/terminal-profiles/terminals-administrator-notice";
 import { settingsStyles } from "@/styles/settings";
 import type { HostConnection, HostProfile } from "@/types/host-connection";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -1683,10 +1687,12 @@ function TerminalProfilesSection({ serverId }: { serverId: string }) {
 
 export function HostTerminalsPage({ serverId }: { serverId: string }) {
   const host = useHostProfile(serverId);
+  const canManageTerminals = useCanManageHostTerminals(serverId);
 
   if (!host) {
     return <HostNotFound />;
   }
+  if (!canManageTerminals) return <TerminalsAdministratorNotice />;
 
   return (
     <View>

@@ -121,7 +121,22 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
         {props.children}
       </div>
     ) : null,
+  AdaptiveTextInput: TextInputStub,
 }));
+function TextInputStub(props: {
+  defaultValue?: string;
+  placeholder?: string;
+  onChangeText?(value: string): void;
+}) {
+  const { onChangeText } = props;
+  const onChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => onChangeText?.(event.target.value),
+    [onChangeText],
+  );
+  return (
+    <input defaultValue={props.defaultValue} placeholder={props.placeholder} onChange={onChange} />
+  );
+}
 // The row's … menu renders its items inline, so a test presses Remove directly.
 vi.mock("./team/row-actions-menu", () => ({
   RowActionsMenu: (props: {
@@ -717,15 +732,17 @@ describe("Access granted to more than one Resource at a time", () => {
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "full_access" } });
     // The consequences show under the picker, before anyone presses Grant.
     const summary = screen.getByTestId("access-level-summary");
-    expect(summary.textContent).toContain("Create Projects in any folder on this Host");
+    expect(summary.textContent).toContain("Create Projects where this Host allows");
     expect(summary.textContent).toContain("Before you grant");
-    expect(summary.textContent).toContain("Any folder this machine can read can become a Project");
+    expect(summary.textContent).toContain(
+      "Any folder this Host's Project folder policy allows can become a Project",
+    );
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
     chooseMany("Models", ["m1"]);
     fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
     await waitFor(() => expect(adapters.confirm).toHaveBeenCalledTimes(1));
     const { message } = adapters.confirm.mock.calls[0]![0] as { message: string };
-    expect(message).toContain("Create Projects in any folder on this Host");
+    expect(message).toContain("Create Projects where this Host allows");
     expect(message).toContain("including other people's");
     expect(adapters.post).not.toHaveBeenCalled();
   });
@@ -825,13 +842,19 @@ describe("Access picker catalog", () => {
 
 describe("Can share and grant-at-most-what-you-hold", () => {
   const OFFICE_WORKER = ["project.use", "agent.interact", "agent.create", "approval.file"];
-  const DEVELOPER = [...OFFICE_WORKER, "terminal.use"];
+  const DEVELOPER = [...OFFICE_WORKER, "terminal.profile.use"];
   const levels = {
     daemon: {
       connect: ["daemon.connect"],
       office_worker: ["daemon.connect", ...OFFICE_WORKER],
       developer: ["daemon.connect", ...DEVELOPER],
-      full_access: ["daemon.connect", ...DEVELOPER, "workspace.manage", "hub.access.manage"],
+      full_access: [
+        "daemon.connect",
+        ...DEVELOPER,
+        "terminal.use",
+        "workspace.manage",
+        "hub.access.manage",
+      ],
       administrator: ["daemon.connect", "daemon.manage", "hub.access.manage"],
     },
     project: { office_worker: OFFICE_WORKER, developer: DEVELOPER },
@@ -842,6 +865,10 @@ describe("Can share and grant-at-most-what-you-hold", () => {
       { id: "codex", label: "Codex", models: [{ id: "m1", label: "M1", thinkingOptions: [] }] },
     ],
   };
+  const terminalProfileCatalog = [
+    { id: "claude", name: "Claude Code" },
+    { id: "codex", name: "Codex" },
+  ];
   const project = {
     kind: "project",
     id: "project",
@@ -849,6 +876,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     available: true,
     parent: { kind: "daemon", id: "host" },
     agentConfigurationCatalog: catalog,
+    terminalProfileCatalog,
   };
   const team = { kind: "team", id: "team", name: "QC", parent: null, available: true };
 
@@ -869,7 +897,11 @@ describe("Can share and grant-at-most-what-you-hold", () => {
           privileges: [],
           accessLevels: levels,
           resources: [
-            { ...resources["access-catalog"].resources[0], agentConfigurationCatalog: catalog },
+            {
+              ...resources["access-catalog"].resources[0],
+              agentConfigurationCatalog: catalog,
+              terminalProfileCatalog,
+            },
             ...(input.resources ?? [project, team]),
           ],
         };
@@ -883,7 +915,7 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     fireEvent.change(select);
   }
 
-  it("locks Can share on for Full access, hides it for Connect, and offers it for Developer", async () => {
+  it("starts Can share on for Full access, hides it for Connect, and offers it for Developer", async () => {
     mockHub({});
     renderAccess();
     await openGrant();
@@ -893,9 +925,9 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
     expect(screen.queryByLabelText("Can share")).toBeNull();
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "full_access" } });
-    const locked = screen.getByLabelText("Can share") as HTMLInputElement;
-    expect(locked.checked).toBe(true);
-    expect(locked.disabled).toBe(true);
+    const preset = (await screen.findByLabelText("Can share")) as HTMLInputElement;
+    await waitFor(() => expect(preset.checked).toBe(true));
+    expect(preset.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
     const optional = screen.getByLabelText("Can share") as HTMLInputElement;
     expect(optional.checked).toBe(false);
@@ -920,6 +952,88 @@ describe("Can share and grant-at-most-what-you-hold", () => {
     await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
     expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
       privileges: ["daemon.connect", ...DEVELOPER, "hub.access.manage"],
+    });
+  });
+
+  it("grants Developer the chosen Terminal profiles without a shell, and the shell by switch", async () => {
+    mockHub({});
+    renderAccess();
+    await openGrant();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    const shell = (await screen.findByLabelText("Terminal (shell)")) as HTMLInputElement;
+    expect(shell.checked).toBe(false);
+    const profiles = screen.getByLabelText("Terminal profiles") as HTMLSelectElement;
+    for (const option of profiles.options) option.selected = option.value === "claude";
+    fireEvent.change(profiles);
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseModels(["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      privileges: ["daemon.connect", ...DEVELOPER],
+      constraints: { terminalProfiles: ["claude"] },
+    });
+  });
+
+  it("grants every Terminal profile, including later ones, unless narrowed", async () => {
+    mockHub({});
+    renderAccess();
+    await openGrant();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseModels(["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      privileges: ["daemon.connect", ...DEVELOPER],
+      constraints: { terminalProfiles: "*" },
+    });
+  });
+
+  it("writes the shell and every profile when Terminal is switched on", async () => {
+    mockHub({});
+    renderAccess();
+    await openGrant();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "developer" } });
+    fireEvent.click(await screen.findByLabelText("Terminal (shell)"));
+    expect(screen.getByText("All profiles, included with Terminal")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseModels(["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      privileges: ["daemon.connect", ...DEVELOPER, "terminal.use"],
+      constraints: { terminalProfiles: "*" },
+    });
+  });
+
+  it("narrows where a Full access Host grant creates Projects", async () => {
+    mockHub({});
+    renderAccess();
+    await openGrant();
+    fireEvent.change(await screen.findByLabelText("Resource"), {
+      target: { value: "daemon\0host" },
+    });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "full_access" } });
+    fireEvent.click(await screen.findByLabelText("Narrow Project folders"));
+    fireEvent.change(screen.getByPlaceholderText("/workspace/**"), {
+      target: { value: "/workspace/qc/**" },
+    });
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "codex" } });
+    chooseModels(["m1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalledTimes(1));
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      constraints: { projectFolders: { allow: ["/workspace/qc/**"], deny: [] } },
     });
   });
 

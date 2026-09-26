@@ -3,7 +3,7 @@ import { authenticateDaemonRequest } from "../daemons/registration.js";
 import type { Database } from "../db/types.js";
 import { reportFailure } from "../failures/index.js";
 import type { AccessStore } from "./store.js";
-import { AgentConfigurationCatalogSchema } from "./contract.js";
+import { AgentConfigurationCatalogSchema, TerminalProfileCatalogSchema } from "./contract.js";
 
 const replaceProjectsBodySchema = z
   .object({
@@ -13,6 +13,7 @@ const replaceProjectsBodySchema = z
           projectId: z.string().min(1).max(256),
           name: z.string().trim().min(1).max(256),
           agentConfigurationCatalog: AgentConfigurationCatalogSchema.optional(),
+          terminalProfileCatalog: TerminalProfileCatalogSchema.optional(),
         })
         .strict(),
     ),
@@ -49,11 +50,19 @@ export async function replaceDaemonProjects(
   const projects = await access.replaceDaemonProjects(
     machine.orgId,
     daemon.id,
-    body.data.projects.map(({ projectId, name, agentConfigurationCatalog }) =>
-      Object.assign(
-        { projectId, name },
-        agentConfigurationCatalog === undefined ? {} : { metadata: { agentConfigurationCatalog } },
-      ),
+    body.data.projects.map(
+      ({ projectId, name, agentConfigurationCatalog, terminalProfileCatalog }) =>
+        Object.assign(
+          { projectId, name },
+          agentConfigurationCatalog === undefined && terminalProfileCatalog === undefined
+            ? {}
+            : {
+                metadata: {
+                  ...(agentConfigurationCatalog === undefined ? {} : { agentConfigurationCatalog }),
+                  ...(terminalProfileCatalog === undefined ? {} : { terminalProfileCatalog }),
+                },
+              },
+        ),
     ),
   );
   return Response.json({

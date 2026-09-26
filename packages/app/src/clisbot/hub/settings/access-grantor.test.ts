@@ -6,10 +6,20 @@ import {
   holdsCanShareAnywhere,
   privilegesWithinHoldings,
   shareableAgentConfigurationCatalog,
+  shareableTerminalProfiles,
+  sharesEveryTerminalProfile,
   viewerAuthority,
   viewerHoldings,
+  type ViewerAuthority,
 } from "./access-grantor";
-import { canShareState, levelOptionsWithinHoldings, withCanShare } from "./access-level-choice";
+import {
+  canShareState,
+  levelOptionsWithinHoldings,
+  levelSwitchPresets,
+  offersTerminalSwitch,
+  withCanShare,
+  withTerminal,
+} from "./access-level-choice";
 
 const host: AccessResource = {
   kind: "daemon",
@@ -184,12 +194,12 @@ describe("viewer authority", () => {
 });
 
 describe("Can share on a level", () => {
-  it("is hidden for Connect, a choice for Office worker and Developer, locked above", () => {
+  it("is hidden for Connect, a choice up to Full access, locked for Administrator", () => {
     expect(canShareState("daemon", ["daemon.connect"])).toBe("hidden");
     expect(canShareState("project", OFFICE_WORKER)).toBe("optional");
     expect(canShareState("project", [...OFFICE_WORKER, "hub.access.manage"])).toBe("optional");
     expect(canShareState("daemon", ["daemon.connect", ...OFFICE_WORKER, "workspace.manage"])).toBe(
-      "locked",
+      "optional",
     );
     expect(canShareState("daemon", ["daemon.connect", "daemon.manage"])).toBe("locked");
     expect(canShareState("team", ["hub.access.manage"])).toBe("hidden");
@@ -209,5 +219,57 @@ describe("Can share on a level", () => {
       "hub.access.manage",
     ]);
     expect(withCanShare("team", ["hub.access.manage"], false)).toEqual(["hub.access.manage"]);
+  });
+});
+
+describe("Terminal switch and profiles on a level", () => {
+  const DEVELOPER_LEVEL = ["project.use", "terminal.profile.use"];
+  it("offers the shell switch wherever a level launches profiles, never on Administrator", () => {
+    expect(offersTerminalSwitch("project", DEVELOPER_LEVEL)).toBe(true);
+    expect(offersTerminalSwitch("project", ["project.use"])).toBe(false);
+    expect(offersTerminalSwitch("daemon", ["daemon.connect", "daemon.manage"])).toBe(false);
+    expect(withTerminal("project", DEVELOPER_LEVEL, true)).toEqual([
+      ...DEVELOPER_LEVEL,
+      "terminal.use",
+    ]);
+    expect(withTerminal("project", [...DEVELOPER_LEVEL, "terminal.use"], false)).toEqual(
+      DEVELOPER_LEVEL,
+    );
+    expect(levelSwitchPresets([...DEVELOPER_LEVEL, "terminal.use", "hub.access.manage"])).toEqual({
+      canShare: true,
+      terminal: true,
+    });
+  });
+
+  it("passes on only the profiles the viewer holds, or all with the shell", () => {
+    const catalog = [
+      { id: "claude", name: "Claude Code" },
+      { id: "codex", name: "Codex" },
+    ];
+    const grant = (privileges: string[], constraints: Record<string, unknown>) =>
+      ({
+        unrestricted: false,
+        grants: [
+          {
+            assignmentId: "own",
+            resource: { kind: "daemon", id: "host", name: "Host", parent: null, available: true },
+            privileges,
+            constraints,
+            source: { kind: "direct" },
+          },
+        ],
+      }) as unknown as ViewerAuthority;
+    const profileHolder = viewerHoldings(
+      grant(["project.use", "terminal.profile.use"], { terminalProfiles: ["claude"] }),
+      host,
+      [],
+    );
+    expect(shareableTerminalProfiles(catalog, profileHolder).map(({ id }) => id)).toEqual([
+      "claude",
+    ]);
+    expect(sharesEveryTerminalProfile(profileHolder)).toBe(false);
+    const shellHolder = viewerHoldings(grant(["project.use", "terminal.use"], {}), host, []);
+    expect(shareableTerminalProfiles(catalog, shellHolder)).toHaveLength(2);
+    expect(sharesEveryTerminalProfile(shellHolder)).toBe(true);
   });
 });

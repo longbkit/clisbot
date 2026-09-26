@@ -40,6 +40,7 @@ import type { TerminalManager, TerminalsChangedEvent } from "./terminal-manager.
 import { applyTerminalSize } from "./terminal-size-ownership.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import { terminalSubscriptionKey } from "@getpaseo/protocol/terminal-subscription-key";
+import type { TerminalProfileLaunch } from "@getpaseo/protocol/terminal-profiles";
 
 const MAX_TERMINAL_STREAM_SLOTS = 256;
 
@@ -101,6 +102,10 @@ export interface TerminalSessionControllerOptions {
   getClientBufferedAmount?: (source: object) => number | null;
   canUseWorkspace?: (workspaceId: string) => Promise<boolean>;
   canUseTerminal?: (terminalId: string) => boolean;
+  // A `profileId` launch runs what the daemon's own Terminal profile says, never the
+  // client's command. Null for an unknown profile.
+  resolveProfileLaunch?: (profileId: string, prompt: string) => TerminalProfileLaunch | null;
+  onTerminalCreated?: (session: TerminalSession, launch: { profileId?: string }) => void;
 }
 
 interface TerminalWorkspaceRef {
@@ -150,6 +155,14 @@ export class TerminalSessionController {
   private readonly getClientBufferedAmount: (source: object) => number | null;
   private readonly canUseWorkspace: (workspaceId: string) => Promise<boolean>;
   private readonly canUseTerminal: (terminalId: string) => boolean;
+  private readonly resolveProfileLaunch: (
+    profileId: string,
+    prompt: string,
+  ) => TerminalProfileLaunch | null;
+  private readonly onTerminalCreated: (
+    session: TerminalSession,
+    launch: { profileId?: string },
+  ) => void;
 
   private readonly subscribedDirectories = new Map<string, TerminalDirectorySubscription>();
   private unsubscribeTerminalsChanged: (() => void) | null = null;
@@ -170,6 +183,8 @@ export class TerminalSessionController {
     this.getClientBufferedAmount = options.getClientBufferedAmount ?? (() => 0);
     this.canUseWorkspace = options.canUseWorkspace ?? (async () => true);
     this.canUseTerminal = options.canUseTerminal ?? (() => true);
+    this.resolveProfileLaunch = options.resolveProfileLaunch ?? (() => null);
+    this.onTerminalCreated = options.onTerminalCreated ?? (() => {});
   }
 
   start(): void {
@@ -509,7 +524,10 @@ export class TerminalSessionController {
     terminals: readonly TerminalSession[],
   ): Promise<TerminalSession[]> {
     const decisions = await Promise.all(
-      terminals.map((terminal) => this.canUseWorkspace(terminal.workspaceId)),
+      terminals.map(
+        async (terminal) =>
+          (await this.canUseWorkspace(terminal.workspaceId)) && this.canUseTerminal(terminal.id),
+      ),
     );
     return terminals.filter((_, index) => decisions[index] === true);
   }
@@ -592,15 +610,23 @@ export class TerminalSessionController {
         throw new Error(`Workspace ${workspaceId} is not active or does not exist`);
       }
 
+      const profileLaunch =
+        msg.profileId === undefined
+          ? null
+          : this.resolveProfileLaunch(msg.profileId, msg.prompt ?? "");
+      if (msg.profileId !== undefined && profileLaunch === null) {
+        throw new Error(`Terminal profile ${msg.profileId} cannot be launched on this host`);
+      }
       const session = await this.terminalManager.createTerminal({
         cwd: msg.cwd,
         workspaceId,
-        name: msg.name,
-        command: msg.command,
-        args: msg.args,
+        name: msg.name ?? profileLaunch?.name,
+        command: profileLaunch?.command ?? msg.command,
+        args: profileLaunch?.args ?? msg.args,
         rows: msg.size?.rows,
         cols: msg.size?.cols,
       });
+      this.onTerminalCreated(session, { profileId: msg.profileId });
       this.emit({
         type: "create_terminal_response",
         payload: {

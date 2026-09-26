@@ -1292,3 +1292,118 @@ test.each([false, true])(
     }
   },
 );
+
+describe("terminal-session-controller Terminal profile launch", () => {
+  function managerWith(createTerminal: TerminalManager["createTerminal"]): TerminalManager {
+    return {
+      getTerminals: vi.fn(async () => []),
+      createTerminal,
+      registerCwdEnv: vi.fn(),
+      validateTerminalActivityToken: vi.fn(() => "unknown"),
+      getTerminal: vi.fn(),
+      getTerminalState: vi.fn(),
+      setTerminalTitle: vi.fn(),
+      setTerminalActivity: vi.fn(),
+      clearTerminalAttention: vi.fn(),
+      killTerminal: vi.fn(),
+      killTerminalAndWait: vi.fn(),
+      captureTerminal: vi.fn(),
+      listDirectories: vi.fn(() => []),
+      killAll: vi.fn(),
+      subscribeTerminalsChanged: vi.fn(() => vi.fn()),
+      subscribeTerminalActivity: vi.fn(() => vi.fn()),
+      subscribeTerminalWorkspaceContributionChanged: vi.fn(() => vi.fn()),
+    };
+  }
+
+  test("runs the daemon's profile, not the client's command, and reports the launch", async () => {
+    const outbound: SessionOutboundMessage[] = [];
+    const createTerminal = vi.fn(
+      async (options: Parameters<TerminalManager["createTerminal"]>[0]) =>
+        listSession({
+          id: "term-p",
+          name: options.name ?? "Terminal",
+          cwd: options.cwd,
+          workspaceId: options.workspaceId,
+        }),
+    );
+    const onTerminalCreated = vi.fn();
+    const controller = createController({
+      terminalManager: managerWith(createTerminal),
+      emit: (message) => outbound.push(message),
+      emitBinary: vi.fn(),
+      hasBinaryChannel: () => true,
+      isPathWithinRoot: isSameOrDescendantPath,
+      sessionLogger: createLogger(),
+      listTerminalWorkspaceRefs: async () => [{ workspaceId: "ws", cwd: "/work" }],
+      resolveProfileLaunch: (profileId, prompt) =>
+        profileId === "claude" ? { name: "Claude Code", command: "claude", args: [prompt] } : null,
+      onTerminalCreated,
+    });
+
+    await controller.dispatch({
+      type: "create_terminal_request",
+      cwd: "/work",
+      workspaceId: "ws",
+      command: "bash",
+      args: ["-c", "cat .env"],
+      profileId: "claude",
+      prompt: "fix the bug",
+      requestId: "launch",
+    });
+    expect(createTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Claude Code", command: "claude", args: ["fix the bug"] }),
+    );
+    expect(onTerminalCreated).toHaveBeenCalledWith(expect.objectContaining({ id: "term-p" }), {
+      profileId: "claude",
+    });
+
+    await controller.dispatch({
+      type: "create_terminal_request",
+      cwd: "/work",
+      workspaceId: "ws",
+      command: "bash",
+      profileId: "made-up",
+      requestId: "unknown",
+    });
+    expect(createTerminal).toHaveBeenCalledTimes(1);
+    expect(outbound.at(-1)).toMatchObject({
+      type: "create_terminal_response",
+      payload: { terminal: null, requestId: "unknown" },
+    });
+  });
+
+  test("lists only the terminals the session may use, one by one", async () => {
+    const outbound: SessionOutboundMessage[] = [];
+    const terminals = [
+      listSession({ id: "shell", name: "Shell", cwd: "/work", workspaceId: "ws" }),
+      listSession({ id: "claude", name: "Claude Code", cwd: "/work", workspaceId: "ws" }),
+    ];
+    const manager = managerWith(vi.fn());
+    manager.getTerminals = vi.fn(async () => terminals);
+    manager.listDirectories = vi.fn(() => ["/work"]);
+    const controller = createController({
+      terminalManager: manager,
+      emit: (message) => outbound.push(message),
+      emitBinary: vi.fn(),
+      hasBinaryChannel: () => true,
+      isPathWithinRoot: isSameOrDescendantPath,
+      sessionLogger: createLogger(),
+      listTerminalWorkspaceRefs: async () => [{ workspaceId: "ws", cwd: "/work" }],
+      canUseTerminal: (terminalId) => terminalId === "claude",
+    });
+
+    await controller.dispatch({
+      type: "list_terminals_request",
+      cwd: "/work",
+      workspaceId: "ws",
+      requestId: "list",
+    });
+    const listed = outbound.find((message) => message.type === "list_terminals_response");
+    expect(
+      listed && "payload" in listed
+        ? (listed.payload as { terminals: { id: string }[] }).terminals.map(({ id }) => id)
+        : [],
+    ).toEqual(["claude"]);
+  });
+});

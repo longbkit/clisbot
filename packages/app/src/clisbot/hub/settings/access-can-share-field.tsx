@@ -8,8 +8,8 @@ import { accessSettingsStyles as styles } from "./access-settings-styles";
 
 /**
  * The Can share switch under the level picker of a Host or Project grant. Locked
- * on for Full access and Administrator, a choice for Office worker and Developer,
- * absent for Connect (docs/features/access/scoped-admins.md).
+ * on for Administrator, a choice for every other level (on by default for Full
+ * access), absent for Connect (docs/features/access/scoped-admins.md).
  */
 export function CanShareField({
   state,

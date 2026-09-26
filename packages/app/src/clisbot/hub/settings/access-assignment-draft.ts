@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { accessConstraintDraft } from "./access-assignment-edit";
-import { subjectKey, type AccessAssignment } from "./access-catalog";
+import { subjectKey, type AccessAssignment, type AccessCatalog } from "./access-catalog";
 import { CAN_SHARE_PRIVILEGE } from "./access-grantor";
-import { confirmAdministratorLevel } from "./access-level-choice";
+import { confirmAdministratorLevel, levelSwitchPresets } from "./access-level-choice";
 import {
   agentConfigurationDraftFrom,
   createAgentConfigurationDraft,
@@ -22,6 +22,10 @@ function initialAssignmentDraft(
     resource: editing ? `${editing.resourceKind}\0${editing.resourceId}` : initialResource,
     accessLevel: editing ? "current" : null,
     canShare: editing?.privileges.includes(CAN_SHARE_PRIVILEGE) ?? false,
+    terminal: editing?.privileges.includes("terminal.use") ?? false,
+    // A new grant has no choice yet; the form offers the grantor's default.
+    terminalProfiles: editing ? (constraints.terminalProfiles as MultiSelection) : null,
+    projectFolders: constraints.projectFolders,
     fastMode: editing?.privileges.includes("agent.fast.use") ?? false,
     agentConfigurations:
       constraints.agentConfigurations.length > 0
@@ -36,6 +40,7 @@ export function useAccessAssignmentDraft(
   initialSubject: string | null,
   initialResource: string | null,
   isCurrent: () => boolean,
+  accessLevels: AccessCatalog["accessLevels"],
 ) {
   const [initial] = useState(() =>
     initialAssignmentDraft(editing, initialSubject, initialResource),
@@ -45,6 +50,11 @@ export function useAccessAssignmentDraft(
   const [alsoResourceKeys, setAlsoResourceKeys] = useState<readonly string[]>([]);
   const [accessLevel, setAccessLevel] = useState(initial.accessLevel);
   const [canShare, setCanShare] = useState(initial.canShare);
+  const [terminal, setTerminal] = useState(initial.terminal);
+  const [terminalProfiles, setTerminalProfiles] = useState<MultiSelection | null>(
+    initial.terminalProfiles,
+  );
+  const [projectFolders, setProjectFolders] = useState(initial.projectFolders);
   const [agentConfigurations, setAgentConfigurations] = useState<AgentConfigurationDraft[]>(
     initial.agentConfigurations,
   );
@@ -54,6 +64,9 @@ export function useAccessAssignmentDraft(
     setAlsoResourceKeys([]);
     setAccessLevel(null);
     setCanShare(false);
+    setTerminal(false);
+    setTerminalProfiles(null);
+    setProjectFolders(null);
     setFastMode(false);
     setAgentConfigurations([createAgentConfigurationDraft()]);
   }, []);
@@ -62,9 +75,15 @@ export function useAccessAssignmentDraft(
     (value: string) =>
       void (async () => {
         if (value === "administrator" && !(await confirmAdministratorLevel())) return;
-        if (isCurrent()) setAccessLevel(value);
+        if (!isCurrent()) return;
+        setAccessLevel(value);
+        // A level starts its switches where it names them: Full access shares and has the shell.
+        const kind = resourceKeyValue?.split("\0")[0] ?? "";
+        const presets = levelSwitchPresets(accessLevels[kind]?.[value] ?? []);
+        setCanShare(presets.canShare);
+        setTerminal(presets.terminal);
       })(),
-    [isCurrent],
+    [accessLevels, isCurrent, resourceKeyValue],
   );
   // The field offers no "all" option here, so it only ever reports exact ids.
   const changeAlsoResources = useCallback(
@@ -87,6 +106,12 @@ export function useAccessAssignmentDraft(
     changeLevel,
     canShare,
     setCanShare,
+    terminal,
+    setTerminal,
+    terminalProfiles,
+    setTerminalProfiles,
+    projectFolders,
+    setProjectFolders,
     agentConfigurations,
     setAgentConfigurations,
     addAgentConfiguration,

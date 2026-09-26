@@ -26,11 +26,8 @@ import {
   iconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
-import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import {
-  getTerminalProfileIcon,
-  resolveTerminalProfiles,
-} from "@getpaseo/protocol/terminal-profiles";
+import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
+import { getTerminalProfileIcon } from "@getpaseo/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { Theme } from "@/styles/theme";
 
@@ -201,6 +198,8 @@ function HeaderMenuProfileItem({
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   normalizedServerId: string;
+  /** Clisbot Managed Access: the Project whose Terminal grants decide the terminal rows. */
+  workspaceDirectory?: string | null;
   showCreateBrowserTab: boolean;
   createTerminalDisabled: boolean;
   onCreateDraftTab: () => void;
@@ -215,6 +214,7 @@ export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspace
  */
 export function WorkspaceHeaderMenuMobile({
   normalizedServerId,
+  workspaceDirectory,
   showCreateBrowserTab,
   createTerminalDisabled,
   onCreateDraftTab,
@@ -225,11 +225,11 @@ export function WorkspaceHeaderMenuMobile({
 }: WorkspaceHeaderMenuMobileProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { config } = useDaemonConfig(normalizedServerId);
-  const profiles = useMemo(
-    () => resolveTerminalProfiles(config?.terminalProfiles),
-    [config?.terminalProfiles],
+  const terminalAccess = useLaunchableTerminalProfiles(
+    normalizedServerId,
+    workspaceDirectory ?? null,
   );
+  const profiles = terminalAccess.profiles;
 
   const handleEditProfiles = useCallback(() => {
     router.push(buildSettingsHostSectionRoute(normalizedServerId, "terminals") as Href);
@@ -271,14 +271,16 @@ export function WorkspaceHeaderMenuMobile({
         <WorkspaceHeaderWorkspaceActionItems {...workspaceActions} />
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t("workspace.tabs.actions.terminalProfilesMenu")}</DropdownMenuLabel>
-        <DropdownMenuItem
-          testID="workspace-header-new-terminal"
-          leading={MENU_NEW_TERMINAL_ICON}
-          disabled={createTerminalDisabled}
-          onSelect={onCreateTerminal}
-        >
-          {t("workspace.header.actions.newTerminal")}
-        </DropdownMenuItem>
+        {terminalAccess.shell ? (
+          <DropdownMenuItem
+            testID="workspace-header-new-terminal"
+            leading={MENU_NEW_TERMINAL_ICON}
+            disabled={createTerminalDisabled}
+            onSelect={onCreateTerminal}
+          >
+            {t("workspace.header.actions.newTerminal")}
+          </DropdownMenuItem>
+        ) : null}
         {profiles.map((profile) => (
           <HeaderMenuProfileItem
             key={profile.id}
@@ -287,13 +289,17 @@ export function WorkspaceHeaderMenuMobile({
             onCreateTerminalWithProfile={onCreateTerminalWithProfile}
           />
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          testID="workspace-header-edit-terminal-profiles"
-          onSelect={handleEditProfiles}
-        >
-          {t("workspace.tabs.actions.editTerminalProfiles")}
-        </DropdownMenuItem>
+        {terminalAccess.canManageProfiles ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              testID="workspace-header-edit-terminal-profiles"
+              onSelect={handleEditProfiles}
+            >
+              {t("workspace.tabs.actions.editTerminalProfiles")}
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

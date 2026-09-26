@@ -15,13 +15,13 @@ A QC lead needs to manage the people on their own Team and Host. Today the only 
 
 ## Host and Project: Can share
 
-| Level         | Can share                 |
-| ------------- | ------------------------- |
-| Connect       | No                        |
-| Office worker | Off by default; can be on |
-| Developer     | Off by default; can be on |
-| Full access   | Always on                 |
-| Administrator | Always on                 |
+| Level         | Can share                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect       | No                                                                                                                                                 |
+| Office worker | Off by default; can be on                                                                                                                          |
+| Developer     | Off by default; can be on                                                                                                                          |
+| Full access   | On by default; can be off ([Terminal profiles and Project creation](terminal-and-project-creation.md#developer-and-full-access-after-this-change)) |
+| Administrator | Always on                                                                                                                                          |
 
 - **Up to your own level.** An Office worker who can share adds Office workers. An Administrator can grant Administrator.
 - **Can share passes on** within your level, as a Drive editor can invite another editor.

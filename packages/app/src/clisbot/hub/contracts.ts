@@ -670,6 +670,8 @@ const HubAccessResourceSchema = z.object({
       ),
     })
     .optional(),
+  /** The Host's Terminal profiles by name; absent from older Hubs and daemons. */
+  terminalProfileCatalog: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
 });
 
 export const HubEffectiveAccessSchema = z.object({

@@ -208,7 +208,7 @@ it("lets Can share grant up to its own level on a Host, and tells Admins about A
       resourceKind: "daemon",
       resourceId: TEST_DAEMON_ID,
       privileges: [...RESOURCE_ACCESS_LEVELS.daemon.developer, "hub.access.manage"],
-      constraints: { agentConfigurations: [codex] },
+      constraints: { agentConfigurations: [codex], terminalProfiles: "*" },
     }),
   );
   assert.equal(shared.status, 201);
@@ -327,7 +327,10 @@ it("lets a Project sharer write the Connect row a Project grant needs, never rep
     resourceKind: "project",
     resourceId: projectId,
     privileges: [...privileges],
-    constraints: { agentConfigurations: [codex] },
+    constraints: {
+      agentConfigurations: [codex],
+      ...(privileges.includes("terminal.profile.use") ? { terminalProfiles: "*" } : {}),
+    },
   });
   const connect = {
     subjectKind: "member",
@@ -420,7 +423,10 @@ function hostGrant(subjectId: string, privileges: readonly string[]) {
     resourceKind: "daemon",
     resourceId: TEST_DAEMON_ID,
     privileges: [...privileges],
-    constraints: { agentConfigurations: [codex] },
+    constraints: {
+      agentConfigurations: [codex],
+      ...(privileges.includes("terminal.profile.use") ? { terminalProfiles: "*" } : {}),
+    },
   };
 }
 

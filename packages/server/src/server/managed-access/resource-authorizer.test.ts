@@ -3,7 +3,7 @@ import { getPaseoWorktreesRoot } from "../../utils/worktree.js";
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SessionAuthorization } from "../authorization/index.js";
 import type { AgentManager } from "../agent/agent-manager.js";
@@ -17,6 +17,7 @@ import type {
 } from "../workspace-registry.js";
 import type { ProjectAuthorization, ProjectPrivilege } from "./types.js";
 import { ManagedResourceAuthorizer } from "./resource-authorizer.js";
+import { forgetTerminalLaunch, recordTerminalLaunch } from "./terminal-launches.js";
 
 function project(projectId: string, rootPath: string): PersistedProjectRecord {
   return {
@@ -57,6 +58,11 @@ function workspace(workspaceId: string, projectId: string, cwd: string): Persist
 function createHarness(
   privileges: readonly ProjectPrivilege[],
   paths: { projectA?: string; projectB?: string; archivedAgent?: boolean } = {},
+  grant: {
+    terminalProfiles?: ProjectAuthorization["terminalProfiles"];
+    daemonPrivileges?: readonly ProjectPrivilege[];
+    projectFolders?: readonly { allow: string[]; deny: string[] }[];
+  } = {},
 ) {
   const projectA = paths.projectA ?? "/work/a";
   const projectB = paths.projectB ?? "/work/b";
@@ -143,10 +149,15 @@ function createHarness(
         thinkingOptionIds: ["high"],
       },
     ],
+    ...(grant.terminalProfiles === undefined ? {} : { terminalProfiles: grant.terminalProfiles }),
   };
   const authorization = new SessionAuthorization([], {
     resourceMode: "projects",
     projects: new Map([["project-a", projectAuthorization]]),
+    ...(grant.daemonPrivileges === undefined
+      ? {}
+      : { daemonPrivileges: new Set(grant.daemonPrivileges) }),
+    ...(grant.projectFolders === undefined ? {} : { projectFolders: grant.projectFolders }),
     leaseId: "00000000-0000-4000-8000-000000000001",
     leaseExpiresAt: Date.now() + 60_000,
   });
@@ -986,4 +997,142 @@ it("authorizes retained file tokens by the owning archived Agent, never the supp
   await expect(authorizer.allowsInbound({ ...request, agentId: "agent-legacy" })).resolves.toBe(
     false,
   );
+});
+
+describe("Terminal and Terminal profiles", () => {
+  const profileOnly = ["project.use", "terminal.profile.use"] as const;
+  const create = (profileId?: string) => ({
+    type: "create_terminal_request" as const,
+    cwd: "/work/a",
+    workspaceId: "workspace-a",
+    requestId: "create",
+    ...(profileId === undefined ? {} : { profileId }),
+  });
+  afterEach(() => forgetTerminalLaunch("terminal-a"));
+
+  it("launches only granted profiles, and never a shell, from Terminal profiles alone", async () => {
+    const authorizer = createHarness(profileOnly, {}, { terminalProfiles: ["claude"] });
+    await expect(authorizer.allowsInbound(create("claude"))).resolves.toBe(true);
+    await expect(authorizer.allowsInbound(create("codex"))).resolves.toBe(false);
+    await expect(authorizer.allowsInbound(create())).resolves.toBe(false);
+  });
+
+  it("lets Terminal launch a shell and every profile", async () => {
+    const authorizer = createHarness(["project.use", "terminal.use"]);
+    await expect(authorizer.allowsInbound(create())).resolves.toBe(true);
+    await expect(authorizer.allowsInbound(create("anything"))).resolves.toBe(true);
+  });
+
+  it("reaches a running terminal by how it was launched: a profile terminal, not a shell", async () => {
+    const authorizer = createHarness(profileOnly, {}, { terminalProfiles: "*" });
+    await authorizer.ready();
+    const capture = {
+      type: "capture_terminal_request" as const,
+      terminalId: "terminal-a",
+      requestId: "capture",
+      stripAnsi: true,
+    };
+    // Unrecorded counts as a shell, so a lost record fails closed.
+    await expect(authorizer.allowsInbound(capture)).resolves.toBe(false);
+    recordTerminalLaunch("terminal-a", { profileId: "claude" });
+    await expect(authorizer.allowsInbound(capture)).resolves.toBe(true);
+    expect(authorizer.allowsTerminalSync("terminal-a")).toBe(true);
+  });
+
+  it("delivers the reply to a profile launch to a user without the shell", async () => {
+    const authorizer = createHarness(profileOnly, {}, { terminalProfiles: ["claude"] });
+    await expect(authorizer.allowsInbound(create("claude"))).resolves.toBe(true);
+    recordTerminalLaunch("terminal-a", { profileId: "claude" });
+    const reply = (terminalId: string) =>
+      ({
+        type: "create_terminal_response",
+        payload: {
+          terminal: { id: terminalId, name: "Claude", cwd: "/work/a", workspaceId: "workspace-a" },
+          error: null,
+          requestId: "create",
+        },
+      }) as never;
+    expect(authorizer.allowsOutbound(reply("terminal-a"))).toBe(true);
+    // A CLI that exited at once still answers its requester.
+    expect(authorizer.allowsOutbound(reply("terminal-gone"))).toBe(true);
+    // A shell's reply is not a profile user's to see.
+    forgetTerminalLaunch("terminal-a");
+    expect(authorizer.allowsOutbound(reply("terminal-a"))).toBe(false);
+  });
+
+  it("needs the terminal rule on both the cwd's Project and the workspace's", async () => {
+    const authorizer = createHarness(["project.use", "terminal.use"]);
+    await expect(
+      authorizer.allowsInbound({ ...create(), cwd: "/work/b", workspaceId: "workspace-a" }),
+    ).resolves.toBe(false);
+    await expect(
+      authorizer.allowsInbound({ ...create(), cwd: "/work/a", workspaceId: "workspace-b" }),
+    ).resolves.toBe(false);
+  });
+
+  it("admits terminal lists with Terminal profiles, leaving each terminal to its own rule", async () => {
+    const authorizer = createHarness(profileOnly, {}, { terminalProfiles: ["claude"] });
+    await expect(
+      authorizer.allowsInbound({
+        type: "subscribe_terminals_request",
+        cwd: "/work/a",
+        workspaceId: "workspace-a",
+      } as never),
+    ).resolves.toBe(true);
+    await expect(authorizer.allowsWorkspaceTerminals("workspace-a")).resolves.toBe(true);
+    await expect(
+      createHarness(["project.use"]).allowsWorkspaceTerminals("workspace-a"),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("Project creation and Add project folder search", () => {
+  const hostCreator = {
+    daemonPrivileges: ["project.use", "workspace.manage"] as ProjectPrivilege[],
+  };
+  const previous = {
+    allow: process.env.PASEO_PROJECT_FOLDERS_ALLOW,
+    deny: process.env.PASEO_PROJECT_FOLDERS_DENY,
+  };
+  beforeEach(() => {
+    process.env.PASEO_PROJECT_FOLDERS_ALLOW = "/free/**";
+    process.env.PASEO_PROJECT_FOLDERS_DENY = "/free/secret/**";
+  });
+  afterEach(() => {
+    for (const [key, value] of [
+      ["PASEO_PROJECT_FOLDERS_ALLOW", previous.allow],
+      ["PASEO_PROJECT_FOLDERS_DENY", previous.deny],
+    ] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  const add = (cwd: string) => ({ type: "project.add.request" as const, cwd, requestId: "add" });
+
+  it("creates where the Host policy and the grant's rules allow, never inside a Project", async () => {
+    const authorizer = createHarness(["project.use"], {}, hostCreator);
+    await expect(authorizer.allowsInbound(add("/free/app"))).resolves.toBe(true);
+    await expect(authorizer.allowsInbound(add("/free/secret/keys"))).resolves.toBe(false);
+    await expect(authorizer.allowsInbound(add("/elsewhere/app"))).resolves.toBe(false);
+    await expect(authorizer.allowsInbound(add("/work/a/nested"))).resolves.toBe(false);
+    const narrowed = createHarness(
+      ["project.use"],
+      {},
+      { ...hostCreator, projectFolders: [{ allow: ["/free/qc/**"], deny: [] }] },
+    );
+    await expect(narrowed.allowsInbound(add("/free/qc/app"))).resolves.toBe(true);
+    await expect(narrowed.allowsInbound(add("/free/app"))).resolves.toBe(false);
+  });
+
+  it("searches folders only for a Host creator, and only where it may create or on the way", async () => {
+    const search = { type: "directory_suggestions_request" as const, query: "a", requestId: "s" };
+    await expect(createHarness(["project.use"]).allowsInbound(search)).resolves.toBe(false);
+    const authorizer = createHarness(["project.use"], {}, hostCreator);
+    await expect(authorizer.allowsInbound(search)).resolves.toBe(true);
+    const entries = ["/free/app", "/free", "/", "/elsewhere", "/work/a/sub", "/free/secret/x"].map(
+      (folder) => ({ path: folder, kind: "directory" as const }),
+    );
+    const visible = await authorizer.filterProjectFolderSearch(entries);
+    expect(visible.map((entry) => entry.path)).toEqual(["/free/app", "/free", "/"]);
+  });
 });

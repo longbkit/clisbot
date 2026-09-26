@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidFolderPattern } from "@getpaseo/protocol/project-folders";
 
 /** Stable semantic privileges shared by Hub policy, management clients, and daemon admission. */
 export const ACCESS_PRIVILEGES = [
@@ -19,6 +20,7 @@ export const ACCESS_PRIVILEGES = [
   "agent.create",
   "agent.fast.use",
   "terminal.use",
+  "terminal.profile.use",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -126,10 +128,42 @@ export const AgentConfigurationCatalogSchema = z
   .strict();
 export type AgentConfigurationCatalog = z.infer<typeof AgentConfigurationCatalogSchema>;
 
+/** Terminal profile ids a grant may launch; `*` covers every profile on the Host. */
+export const TerminalProfileSelectionSchema = z.union([
+  z.literal("*"),
+  z.array(z.string().min(1)).min(1),
+]);
+export type TerminalProfileSelection = z.infer<typeof TerminalProfileSelectionSchema>;
+
+/**
+ * One folder pattern: `**` or an absolute path with no `.` or `..` segment. A
+ * relative segment would read as inside a grantor's folder and resolve outside it.
+ */
+const FolderPatternSchema = z.string().min(1).refine(isValidFolderPattern, {
+  message: "Folder patterns are absolute paths without . or .. segments",
+});
+
+/** A grant's narrowing of where it may create Projects, inside the Host's folder policy. */
+export const ProjectFolderRulesSchema = z
+  .object({
+    allow: z.array(FolderPatternSchema),
+    deny: z.array(FolderPatternSchema),
+  })
+  .strict();
+export type ProjectFolderRules = z.infer<typeof ProjectFolderRulesSchema>;
+
+/** A Host's Terminal profiles as the Access form offers them: never the command. */
+export const TerminalProfileCatalogSchema = z.array(
+  z.object({ id: z.string().min(1), name: z.string().min(1) }).strict(),
+);
+export type TerminalProfileCatalog = z.infer<typeof TerminalProfileCatalogSchema>;
+
 export const AccessConstraintsSchema = z
   .object({
     conversation: ConversationAccessSchema.optional(),
     agentConfigurations: z.array(AgentConfigurationGrantSchema).optional(),
+    terminalProfiles: TerminalProfileSelectionSchema.optional(),
+    projectFolders: ProjectFolderRulesSchema.optional(),
   })
   .strict();
 export type AccessConstraints = z.infer<typeof AccessConstraintsSchema>;
@@ -166,7 +200,7 @@ const DEVELOPER_PROJECT_PRIVILEGES = [
   "workspace.create",
   "agent.interact",
   "agent.create",
-  "terminal.use",
+  "terminal.profile.use",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -176,25 +210,26 @@ const DEVELOPER_PROJECT_PRIVILEGES = [
 ] as const satisfies readonly AccessPrivilege[];
 
 /**
- * Developer plus creating and managing Projects, workspaces, and worktrees. On a
- * Host it may create a Project at any path; on a Project, only inside it. Full
- * access always carries Can share (`hub.access.manage`); see
- * `impliedPrivileges`.
+ * Developer plus the shell and creating and managing Projects, workspaces, and
+ * worktrees. A Host grant creates Projects where the Host's folder policy
+ * allows; a Project grant creates none. Terminal (`terminal.use`) and Can share
+ * (`hub.access.manage`) are presets the grant can switch off
+ * (docs/features/access/terminal-and-project-creation.md).
  */
 const FULL_ACCESS_PROJECT_PRIVILEGES = [
   ...DEVELOPER_PROJECT_PRIVILEGES,
+  "terminal.use",
   "workspace.manage",
   "hub.access.manage",
 ] as const satisfies readonly AccessPrivilege[];
 
 /**
  * The privileges that carry Can share on a Host or Project without naming it:
- * Full access (`workspace.manage`) and Administrator (`daemon.manage`) always
- * share. Office worker and Developer share only when the grant names
- * `hub.access.manage` (docs/features/access/scoped-admins.md).
+ * Administrator (`daemon.manage`) always shares. Every other level shares only
+ * when the grant names `hub.access.manage`; Full access names it by default
+ * (docs/features/access/scoped-admins.md).
  */
 const CAN_SHARE_IMPLYING_PRIVILEGES = [
-  "workspace.manage",
   "daemon.manage",
 ] as const satisfies readonly AccessPrivilege[];
 

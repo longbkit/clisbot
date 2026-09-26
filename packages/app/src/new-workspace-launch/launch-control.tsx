@@ -82,6 +82,10 @@ export interface LaunchControlProps {
   target: LaunchTarget;
   onChange: (target: LaunchTarget) => void;
   profiles: readonly TerminalProfile[];
+  /** Clisbot Managed Access: false hides the blank shell row. */
+  shell?: boolean;
+  /** Clisbot Managed Access: false hides Manage profiles (needs Host Administrator). */
+  canManageProfiles?: boolean;
   disabled?: boolean;
   /**
    * The meta row's shared badge style. Passed in rather than redeclared so this
@@ -118,6 +122,8 @@ export function LaunchControl({
   target,
   onChange,
   profiles,
+  shell = true,
+  canManageProfiles = true,
   disabled = false,
   badgePressableStyle,
 }: LaunchControlProps) {
@@ -202,14 +208,16 @@ export function LaunchControl({
           {t("newWorkspace.launch.chat")}
         </DropdownMenuItem>
         <DropdownMenuLabel>{t("newWorkspace.launch.terminal")}</DropdownMenuLabel>
-        <DropdownMenuItem
-          testID="new-workspace-launch-option-blank"
-          onSelect={selectBlankTerminal}
-          selected={isBlankTerminalTarget(target)}
-          leading={blankTerminalIcon}
-        >
-          {t("newWorkspace.launch.terminal")}
-        </DropdownMenuItem>
+        {shell ? (
+          <DropdownMenuItem
+            testID="new-workspace-launch-option-blank"
+            onSelect={selectBlankTerminal}
+            selected={isBlankTerminalTarget(target)}
+            leading={blankTerminalIcon}
+          >
+            {t("newWorkspace.launch.terminal")}
+          </DropdownMenuItem>
+        ) : null}
         {profiles.map((profile) => (
           <LaunchProfileMenuItem
             key={profile.id}
@@ -218,14 +226,18 @@ export function LaunchControl({
             onSelect={selectTerminalProfile}
           />
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          testID="new-workspace-launch-manage-profiles"
-          onSelect={openProfileSettings}
-          muted
-        >
-          {t("newWorkspace.launch.manageProfiles")}
-        </DropdownMenuItem>
+        {canManageProfiles ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              testID="new-workspace-launch-manage-profiles"
+              onSelect={openProfileSettings}
+              muted
+            >
+              {t("newWorkspace.launch.manageProfiles")}
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

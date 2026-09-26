@@ -140,6 +140,10 @@ export function useWorkspaceTerminals(input: UseWorkspaceTerminalsInput) {
             command: profile.command,
             args: profile.args,
             workspaceId: normalizedWorkspaceId || undefined,
+            // Clisbot Managed Access: the daemon launches its own copy of the profile.
+            // COMPAT(terminalProfileLaunch): command/args serve daemons that predate
+            // `profileId`; remove them after 2027-03-26.
+            profileId: _input.profile!.id,
           })
         : await client.createTerminal(workspaceDirectory, undefined, undefined, {
             workspaceId: normalizedWorkspaceId || undefined,

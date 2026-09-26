@@ -66,6 +66,7 @@ it("fans a Host grant out to every Project and lets a Project grant only add to 
           agentConfigurations: [
             { providerId: "codex", modelIds: ["gpt-5.6-luna"], thinkingOptionIds: "*" },
           ],
+          terminalProfiles: ["claude"],
         },
       },
       "owner",
@@ -315,6 +316,7 @@ it("puts workspace.manage in the ticket only for Full access, and marks it Host-
     await enrollTestDaemon(database, "org");
     const access = new AccessStore(bundle.runtime);
     const constraints = {
+      terminalProfiles: "*" as const,
       agentConfigurations: [
         { providerId: "codex", modelIds: "*" as const, thinkingOptionIds: "*" as const },
       ],
@@ -389,6 +391,113 @@ it("puts workspace.manage in the ticket only for Full access, and marks it Host-
     expect(developer?.daemonPrivileges).not.toContain("workspace.manage");
     expect(RESOURCE_ACCESS_LEVELS.project.developer).not.toContain("workspace.manage");
     expect(projectB).toBeDefined();
+  } finally {
+    await bundle.runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30_000);
+
+it("puts the union of Terminal profiles per Project and one folder rule set per creating Host grant in the ticket", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-terminal-profiles-"));
+  const bundle = await embeddedDatabaseRuntime(root);
+  try {
+    await bundle.runtime.migrate();
+    const db = bundle.runtime.drizzle();
+    await db.insert(schema.organizations).values({ id: "org", name: "Org", slug: "org" });
+    await db.insert(schema.users).values([
+      { id: "owner", name: "Owner", email: "owner@example.test" },
+      { id: "member", name: "Member", email: "member@example.test" },
+    ]);
+    await db.insert(schema.members).values([
+      { id: "owner-membership", organizationId: "org", userId: "owner", role: "owner" },
+      { id: "membership", organizationId: "org", userId: "member", role: "member" },
+    ]);
+    const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    await enrollTestDaemon(database, "org");
+    const [projectA] = await db
+      .insert(schema.daemonProjects)
+      .values([
+        { organizationId: "org", daemonId: TEST_DAEMON_ID, externalProjectId: "a", name: "A" },
+        { organizationId: "org", daemonId: TEST_DAEMON_ID, externalProjectId: "b", name: "B" },
+      ])
+      .returning();
+    const access = new AccessStore(bundle.runtime);
+    const agentConfigurations = [
+      { providerId: "codex", modelIds: "*" as const, thinkingOptionIds: "*" as const },
+    ];
+    const save = (
+      resourceKind: "daemon" | "project",
+      resourceId: string,
+      privileges: readonly string[],
+      constraints: Record<string, unknown>,
+    ) =>
+      access.saveAssignment(
+        "org",
+        {
+          subjectKind: "member",
+          subjectId: "membership",
+          resourceKind,
+          resourceId,
+          privileges: [...privileges] as never,
+          constraints: { agentConfigurations, ...constraints } as never,
+        },
+        "owner",
+      );
+    await save("daemon", TEST_DAEMON_ID, RESOURCE_ACCESS_LEVELS.daemon.full_access, {
+      terminalProfiles: ["claude"],
+      projectFolders: { allow: ["/workspace/**"], deny: ["/workspace/prod/**"] },
+    });
+    await save("project", projectA!.id, RESOURCE_ACCESS_LEVELS.project.developer, {
+      terminalProfiles: ["codex"],
+    });
+    const resolved = await access.resolveDaemonAccess({
+      organizationId: "org",
+      daemonId: TEST_DAEMON_ID,
+      membershipId: "membership",
+      userId: "member",
+    });
+    expect(
+      Object.fromEntries(
+        resolved!.projects.map(({ projectId, terminalProfiles }) => [projectId, terminalProfiles]),
+      ),
+    ).toEqual({ a: ["claude", "codex"], b: ["claude"] });
+    expect(resolved!.projectFolders).toEqual([
+      { allow: ["/workspace/**"], deny: ["/workspace/prod/**"] },
+    ]);
+    // A Project grant never carries folder rules: only a Host grant creates.
+    await expect(
+      save("project", projectA!.id, RESOURCE_ACCESS_LEVELS.project.full_access, {
+        terminalProfiles: "*",
+        projectFolders: { allow: ["**"], deny: [] },
+      }),
+    ).rejects.toThrow("Project folder rules apply only to Hosts");
+  } finally {
+    await bundle.runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30_000);
+
+it("offers the Host's published Terminal profiles on the Host and its Projects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-terminal-catalog-"));
+  const bundle = await embeddedDatabaseRuntime(root);
+  try {
+    await bundle.runtime.migrate();
+    const db = bundle.runtime.drizzle();
+    await db.insert(schema.organizations).values({ id: "org", name: "Org", slug: "org" });
+    const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    await enrollTestDaemon(database, "org");
+    const access = new AccessStore(bundle.runtime);
+    const terminalProfileCatalog = [{ id: "claude", name: "Claude Code" }];
+    await access.replaceDaemonProjects("org", TEST_DAEMON_ID, [
+      { projectId: "a", name: "A", metadata: { terminalProfileCatalog } },
+    ]);
+    const resources = await access.listResources("org");
+    expect(resources.find(({ kind }) => kind === "daemon")?.terminalProfileCatalog).toEqual(
+      terminalProfileCatalog,
+    );
+    expect(resources.find(({ kind }) => kind === "project")?.terminalProfileCatalog).toEqual(
+      terminalProfileCatalog,
+    );
   } finally {
     await bundle.runtime.close();
     await rm(root, { recursive: true, force: true });

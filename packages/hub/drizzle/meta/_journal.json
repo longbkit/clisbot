@@ -596,6 +596,13 @@
       "when": 1790092081671,
       "tag": "0084_channel_binding_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1790358141115,
+      "tag": "0085_terminal_profile_grants",
+      "breakpoints": true
     }
   ]
 }

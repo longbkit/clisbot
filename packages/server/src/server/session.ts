@@ -274,6 +274,10 @@ import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { SessionAuthorization, type DaemonPermission } from "./authorization/index.js";
 import type { SessionResourceAuthorization } from "./managed-access/types.js";
 import { ManagedResourceAuthorizer } from "./managed-access/resource-authorizer.js";
+import {
+  createTerminalProfileSession,
+  type TerminalProfileSession,
+} from "./managed-access/terminal-profile-session.js";
 
 function resolveWorkspaceSetupRuntime(
   runtime: WorkspaceSetupRuntime | undefined,
@@ -725,6 +729,7 @@ export class Session {
   private readonly clientId: string;
   private readonly authorization: SessionAuthorization;
   private readonly resourceAuthorizer: ManagedResourceAuthorizer;
+  private readonly terminalProfileSession: TerminalProfileSession;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
   private readonly sessionId: string;
@@ -1157,6 +1162,11 @@ export class Session {
       : null;
     this.daemonConfigStore = daemonConfigStore;
     this.terminalManager = terminalManager;
+    this.terminalProfileSession = createTerminalProfileSession({
+      configuredProfiles: () => daemonConfigStore.get().terminalProfiles,
+      authority: this.resourceAuthorizer,
+      actorId: () => this.accountActor?.id,
+    });
     this.terminalController = new TerminalSessionController({
       terminalManager,
       emit: (msg) => this.emit(msg),
@@ -1168,8 +1178,9 @@ export class Session {
         this.supportsForSource(CLIENT_CAPS.terminalReflowableSnapshot, source),
       getClientBufferedAmount: (source) => this.getTransportBufferedAmount(source),
       canUseWorkspace: (workspaceId) =>
-        this.resourceAuthorizer.allowsWorkspace(workspaceId, "terminal.use"),
+        this.resourceAuthorizer.allowsWorkspaceTerminals(workspaceId),
       canUseTerminal: (terminalId) => this.resourceAuthorizer.allowsTerminalSync(terminalId),
+      ...this.terminalProfileSession.controllerHooks,
     });
     this.agentUpdates = createAgentUpdatesService({
       emit: (message) => this.emit(message),
@@ -3278,6 +3289,8 @@ export class Session {
         return this.handleWorkspaceScriptStartRequest(msg);
       case "workspace.script.stop.request":
         return this.handleWorkspaceScriptStopRequest(msg);
+      case "terminal.profile.list.request":
+        return this.terminalProfileSession.handleList(msg).then((reply) => this.emit(reply));
       default:
         return this.terminalController.dispatch(msg, this.delivery);
     }
@@ -5416,14 +5429,18 @@ export class Session {
         matchMode,
         limit,
       });
-      const directories = entries
+      // Add project's folder search shows only where this session may create.
+      const visibleEntries = searchesWorkspace
+        ? entries
+        : await this.resourceAuthorizer.filterProjectFolderSearch(entries);
+      const directories = visibleEntries
         .filter((entry) => entry.kind === "directory")
         .map((entry) => entry.path);
       this.emit({
         type: "directory_suggestions_response",
         payload: {
           directories,
-          entries,
+          entries: visibleEntries,
           error: null,
           requestId,
         },

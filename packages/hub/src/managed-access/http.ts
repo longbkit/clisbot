@@ -106,6 +106,7 @@ function accessAdmissionResponse(
     resourceMode: admission.resourceMode,
     projects: admission.projects,
     daemonPrivileges: admission.daemonPrivileges,
+    ...(admission.projectFolders === undefined ? {} : { projectFolders: admission.projectFolders }),
     leaseExpiresAt: admission.leaseExpiresAt.toISOString(),
   });
 }

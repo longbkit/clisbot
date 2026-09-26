@@ -28,11 +28,12 @@ const EVERY_APPROVAL = [...APPROVALS, "approval.channel"] as const;
 const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) => string)> = {
   connect: "Connect to the Host. Grants no Project on its own.",
   office_worker: "Use agents in existing workspaces. No terminal, no shell commands.",
-  developer: "Terminal, worktrees, and every approval. Cannot create or manage Projects.",
+  developer:
+    "Agents, Terminal profiles, worktrees, and every approval. No shell by default; cannot create or manage Projects.",
   full_access: (kind) =>
     kind === "daemon"
-      ? "Developer, plus create Projects in any folder and manage every Project on this Host."
-      : "Developer, plus rename, remove, and archive this Project and its workspaces.",
+      ? "Developer and the shell, plus create Projects where this Host allows and manage every Project on it."
+      : "Developer and the shell, plus rename, remove, and archive this Project and its workspaces.",
   administrator: "Operate this Host with any model. Always can share.",
   use: "Talk to the bot in the chosen conversations.",
   manage:
@@ -46,8 +47,8 @@ const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) =>
 
 /**
  * Can share on a Host or Project: the same `hub.access.manage` privilege that is
- * Admin on a Team or Automation. Full access and Administrator always carry it;
- * Office worker and Developer carry it only when the grant names it.
+ * Admin on a Team or Automation. Administrator always carries it; every other
+ * level only when the grant names it, which Full access does by default.
  */
 export function sharesAccess(resourceKind: AccessResourceKind, privileges: readonly string[]) {
   return (
@@ -166,11 +167,18 @@ function summarizeProjectWork(
   allowIf(held, "agent.create", "Start agent sessions with the allowed models", summary);
   allowIf(held, "agent.fast.use", "Use Fast mode, which may cost more", summary);
   allowIf(held, "workspace.create", "Create workspaces and worktrees", summary);
-  allowIf(held, "terminal.use", "Open terminals", summary);
-  if (!held.has("terminal.use")) summary.withholds.push("No terminal");
+  allowIf(held, "terminal.use", "Open a shell and run any command", summary);
+  if (!held.has("terminal.use")) {
+    allowIf(held, "terminal.profile.use", "Open the chosen Terminal profiles", summary);
+    summary.withholds.push("No shell");
+  }
   summarizeApprovals(held, summary);
   summarizeManagement(held, onHost, summary);
-  if (held.has("terminal.use") || held.has("approval.command")) {
+  if (
+    held.has("terminal.use") ||
+    held.has("approval.command") ||
+    held.has("terminal.profile.use")
+  ) {
     summary.cautions.push(
       "Terminals and approved commands run as the Host's account, beyond Project and model limits",
     );
@@ -203,11 +211,7 @@ function summarizeManagement(
     summary.withholds.push("Cannot create, rename, or remove Projects");
     return;
   }
-  summary.allows.push(
-    onHost
-      ? "Create Projects in any folder on this Host"
-      : "Create Projects inside this Project's folder",
-  );
+  if (onHost) summary.allows.push("Create Projects where this Host allows");
   summary.allows.push(
     onHost
       ? "Rename, remove, or archive any Project, workspace, or worktree on this Host"
@@ -216,7 +220,11 @@ function summarizeManagement(
   summary.cautions.push(
     "Removing a Project stops every agent in it, including other people's; cleaning a worktree can delete it from disk",
   );
-  if (onHost) summary.cautions.push("Any folder this machine can read can become a Project");
+  if (onHost) {
+    summary.cautions.push(
+      "Any folder this Host's Project folder policy allows can become a Project",
+    );
+  }
 }
 
 function allowIf(
@@ -267,7 +275,7 @@ export function matchingAccessLevel(
 function levelPrivileges(resourceKind: AccessResourceKind, privileges: readonly string[]) {
   const flags =
     resourceKind === "daemon" || resourceKind === "project"
-      ? ["agent.fast.use", CAN_SHARE_PRIVILEGE]
+      ? ["agent.fast.use", CAN_SHARE_PRIVILEGE, "terminal.use"]
       : ["agent.fast.use"];
   return privileges.filter((privilege) => !flags.includes(privilege));
 }

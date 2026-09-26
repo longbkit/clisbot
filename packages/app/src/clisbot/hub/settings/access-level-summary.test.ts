@@ -15,7 +15,7 @@ const DEVELOPER = [
   "workspace.create",
   "agent.interact",
   "agent.create",
-  "terminal.use",
+  "terminal.profile.use",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -23,7 +23,7 @@ const DEVELOPER = [
   "approval.channel",
   "approval.other",
 ];
-const FULL_ACCESS = [...DEVELOPER, "workspace.manage"];
+const FULL_ACCESS = [...DEVELOPER, "terminal.use", "workspace.manage"];
 const LEVELS = {
   daemon: {
     connect: ["daemon.connect"],
@@ -41,7 +41,7 @@ describe("summarizeAccess", () => {
     const summary = summarizeAccess({ privileges: OFFICE_WORKER, resourceKind: "project" });
     expect(summary.allows).toContain("Approve file edits");
     expect(summary.withholds).toEqual([
-      "No terminal",
+      "No shell",
       "Cannot approve shell commands",
       "Cannot create workspaces or worktrees",
       "Cannot create, rename, or remove Projects",
@@ -49,22 +49,23 @@ describe("summarizeAccess", () => {
     expect(summary.cautions).toEqual([]);
   });
 
-  it("separates Developer from Full access by Project management alone", () => {
+  it("separates Developer from Full access by the shell and Project management", () => {
     const developer = summarizeAccess({ privileges: DEVELOPER, resourceKind: "project" });
     expect(developer.allows).toContain("Run agents without asking for approval");
-    expect(developer.withholds).toEqual(["Cannot create, rename, or remove Projects"]);
+    expect(developer.allows).toContain("Open the chosen Terminal profiles");
+    expect(developer.withholds).toEqual(["No shell", "Cannot create, rename, or remove Projects"]);
     expect(
       accessChanges({ before: DEVELOPER, after: FULL_ACCESS, resourceKind: "project" }),
     ).toEqual({
       added: [
-        "Create Projects inside this Project's folder",
+        "Open a shell and run any command",
         "Rename, remove, or archive this Project and its workspaces and worktrees",
       ],
-      removed: [],
+      removed: ["Open the chosen Terminal profiles"],
     });
   });
 
-  it("says a Host grant reaches every Project and any folder", () => {
+  it("says a Host grant reaches every Project and creates where the Host allows", () => {
     const summary = summarizeAccess({
       privileges: ["daemon.connect", ...FULL_ACCESS],
       resourceKind: "daemon",
@@ -72,8 +73,10 @@ describe("summarizeAccess", () => {
     expect(summary.allows).toContain(
       "Use every Project on this Host, including Projects added later",
     );
-    expect(summary.allows).toContain("Create Projects in any folder on this Host");
-    expect(summary.cautions).toContain("Any folder this machine can read can become a Project");
+    expect(summary.allows).toContain("Create Projects where this Host allows");
+    expect(summary.cautions).toContain(
+      "Any folder this Host's Project folder policy allows can become a Project",
+    );
     expect(summary.cautions).toContain(
       "A Project assignment can add to this grant, never narrow it",
     );
@@ -104,7 +107,7 @@ describe("summarizeAccess", () => {
       accessChanges({ before: DEVELOPER, after: OFFICE_WORKER, resourceKind: "project" }).removed,
     ).toEqual([
       "Create workspaces and worktrees",
-      "Open terminals",
+      "Open the chosen Terminal profiles",
       "Approve every action, destructive commands included",
       "Run agents without asking for approval",
     ]);
@@ -113,7 +116,7 @@ describe("summarizeAccess", () => {
 
 describe("level names", () => {
   it("describes Full access by where it is granted", () => {
-    expect(accessLevelDescription("full_access", "daemon")).toContain("any folder");
+    expect(accessLevelDescription("full_access", "daemon")).toContain("where this Host allows");
     expect(accessLevelDescription("full_access", "project")).toContain("this Project");
     expect(accessLevelDescription("future_level", "project")).toBeUndefined();
   });

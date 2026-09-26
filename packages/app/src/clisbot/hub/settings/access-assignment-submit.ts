@@ -128,6 +128,15 @@ function createAccessAssignment(
   if (selection.needsAgentConfiguration) {
     constraints["agentConfigurations"] = uniqueAgentConfigurationGrants(input.agentConfigurations);
   }
+  // With the shell on, every profile is reachable anyway, so the grant names them all.
+  if (selection.needsTerminalProfiles) {
+    constraints["terminalProfiles"] = selection.privileges.includes("terminal.use")
+      ? "*"
+      : selection.terminalProfiles;
+  }
+  if (selection.createsProjects && selection.projectFolders !== null) {
+    constraints["projectFolders"] = selection.projectFolders;
+  }
   return {
     subjectKind: selection.subject!.kind,
     subjectId: selection.subject!.id,

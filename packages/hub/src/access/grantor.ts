@@ -12,7 +12,10 @@ import type {
   AccessResourceKind,
   AgentConfigurationGrant,
   ConversationAccess,
+  ProjectFolderRules,
+  TerminalProfileSelection,
 } from "./contract.js";
+import { unionTerminalProfiles } from "./grant-constraints.js";
 import type { AccessAssignmentRecord, AccessResourceRecord } from "./store.js";
 
 export interface GrantActor {
@@ -38,6 +41,10 @@ interface Holdings {
   /** Undefined means no Agent ceiling: Administrator, or a kind without one. */
   agentConfigurations: AgentConfigurationGrant[] | undefined;
   conversations: ConversationAccess[];
+  /** Undefined means every profile: the shell or Administrator. */
+  terminalProfiles: TerminalProfileSelection | undefined;
+  /** Undefined means no narrowing: some creating Host grant is un-narrowed, or Administrator. */
+  projectFolders: ProjectFolderRules[] | undefined;
 }
 
 export function decideGrant(
@@ -60,6 +67,12 @@ export function decideGrant(
   }
   if (!conversationCovered(held.conversations, candidate.constraints.conversation)) {
     return { allowed: false, reason: "The conversations exceed your own." };
+  }
+  if (!terminalProfilesCovered(held.terminalProfiles, candidate.constraints.terminalProfiles)) {
+    return { allowed: false, reason: "The Terminal profiles exceed your own." };
+  }
+  if (!projectFoldersCovered(held.projectFolders, candidate)) {
+    return { allowed: false, reason: "The Project folders exceed your own." };
   }
   return { allowed: true };
 }
@@ -136,7 +149,69 @@ function holdings(
     conversations: applicable.flatMap(({ constraints }) =>
       constraints.conversation === undefined ? [] : [constraints.conversation],
     ),
+    // Without the shell, holding no named profile means holding none.
+    terminalProfiles:
+      privileges.has("terminal.use") || privileges.has("daemon.manage")
+        ? undefined
+        : (unionTerminalProfiles(applicable.map(({ constraints }) => constraints)) ?? []),
+    projectFolders: heldProjectFolders(applicable, privileges),
   };
+}
+
+function heldProjectFolders(
+  applicable: readonly AccessAssignmentRecord[],
+  privileges: ReadonlySet<AccessPrivilege>,
+): ProjectFolderRules[] | undefined {
+  if (privileges.has("daemon.manage")) return undefined;
+  const creating = applicable.filter(
+    ({ resourceKind, privileges: own }) =>
+      resourceKind === "daemon" && own.includes("workspace.manage"),
+  );
+  if (creating.some(({ constraints }) => constraints.projectFolders === undefined)) {
+    return undefined;
+  }
+  return creating.flatMap(({ constraints }) =>
+    constraints.projectFolders === undefined ? [] : [constraints.projectFolders],
+  );
+}
+
+function terminalProfilesCovered(
+  held: TerminalProfileSelection | undefined,
+  candidate: TerminalProfileSelection | undefined,
+): boolean {
+  if (candidate === undefined || held === undefined || held === "*") return true;
+  if (candidate === "*") return false;
+  return candidate.every((id) => held.includes(id));
+}
+
+/**
+ * A narrowed grantor passes on narrowing: every folder they grant lies under one of
+ * their own, compared by path prefix, and their deny rules come along. General glob
+ * containment is not attempted.
+ */
+function projectFoldersCovered(
+  held: readonly ProjectFolderRules[] | undefined,
+  candidate: GrantCandidate,
+): boolean {
+  if (held === undefined) return true;
+  if (candidate.resourceKind !== "daemon" || !candidate.privileges.includes("workspace.manage")) {
+    return true;
+  }
+  const granted = candidate.constraints.projectFolders;
+  if (granted === undefined) return false;
+  const ownAllow = held.flatMap(({ allow }) => allow);
+  const ownDeny = held.flatMap(({ deny }) => deny);
+  return (
+    granted.allow.every((pattern) => ownAllow.some((own) => folderPatternUnder(pattern, own))) &&
+    ownDeny.every((pattern) => granted.deny.includes(pattern))
+  );
+}
+
+function folderPatternUnder(pattern: string, own: string): boolean {
+  if (own === "**" || pattern === own) return true;
+  if (!own.endsWith("/**")) return false;
+  const base = own.slice(0, -"/**".length);
+  return pattern === base || pattern.startsWith(`${base}/`);
 }
 
 function agentConfigurationsCovered(

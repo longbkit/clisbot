@@ -6,6 +6,8 @@ const conversationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("direct_messages") }),
   z.object({ kind: z.literal("public_channels") }),
 ]);
+const terminalProfilesSchema = z.union([z.literal("*"), z.array(z.string()).min(1)]);
+const projectFoldersSchema = z.object({ allow: z.array(z.string()), deny: z.array(z.string()) });
 const configurationSchema = z.array(
   z.object({
     providerId: z.string(),
@@ -17,14 +19,24 @@ const configurationSchema = z.array(
 export function accessConstraintDraft(constraints: Record<string, unknown>) {
   const conversation = conversationSchema.optional().safeParse(constraints.conversation);
   const configurations = configurationSchema.optional().safeParse(constraints.agentConfigurations);
+  const terminalProfiles = terminalProfilesSchema
+    .optional()
+    .safeParse(constraints.terminalProfiles);
+  const projectFolders = projectFoldersSchema.optional().safeParse(constraints.projectFolders);
   return {
-    valid: conversation.success && configurations.success,
+    valid:
+      conversation.success &&
+      configurations.success &&
+      terminalProfiles.success &&
+      projectFolders.success,
     conversation: conversation.data?.kind ?? "specific",
     conversationIds:
       conversation.data?.kind === "specific" ? conversation.data.conversationIds.join(", ") : "",
     // One stored grant is one editable row; flattening it into single-value rows
     // would turn one decision into a screen of near-identical cards.
     agentConfigurations: configurations.data ?? [],
+    terminalProfiles: terminalProfiles.data ?? ("*" as const),
+    projectFolders: projectFolders.data ?? null,
   };
 }
 
@@ -35,7 +47,12 @@ export function mergeAccessConstraints(
 ): Record<string, unknown> {
   if (!existing) return next;
   const merged = { ...existing, ...next };
-  for (const key of ["conversation", "agentConfigurations"] as const) {
+  for (const key of [
+    "conversation",
+    "agentConfigurations",
+    "terminalProfiles",
+    "projectFolders",
+  ] as const) {
     if (!(key in next)) {
       delete merged[key];
       continue;

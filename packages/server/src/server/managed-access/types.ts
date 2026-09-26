@@ -1,6 +1,7 @@
 import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import type { DaemonPermission } from "../authorization/index.js";
 import type { ManagedAccessMode as ProtocolManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ProjectFolderRules } from "@getpaseo/protocol/project-folders";
 // One definition of the product privilege vocabulary, shared with the Hub via a
 // pure fusion protocol module (build-time reuse, not a wire contract).
 import {
@@ -21,6 +22,8 @@ export interface ResolvedAgentConfigurationGrant {
 export interface ProjectAuthorization {
   privileges: ReadonlySet<ProjectPrivilege>;
   agentConfigurations: readonly ResolvedAgentConfigurationGrant[];
+  /** Terminal profile ids `terminal.profile.use` may launch; `*` covers every profile. */
+  terminalProfiles?: "*" | readonly string[];
 }
 
 export interface SessionResourceAuthorization {
@@ -28,6 +31,8 @@ export interface SessionResourceAuthorization {
   projects: ReadonlyMap<string, ProjectAuthorization>;
   /** Project privileges granted on the whole Host; absent from Hubs that predate it. */
   daemonPrivileges?: ReadonlySet<ProjectPrivilege>;
+  /** One rule set per creating Host grant, inside the Host folder policy; absent from older Hubs. */
+  projectFolders?: readonly ProjectFolderRules[];
   leaseId: string;
   leaseExpiresAt: number;
 }

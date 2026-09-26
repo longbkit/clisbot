@@ -84,7 +84,8 @@ export function grantRows(input: GrantRowInput): GrantRow[] {
 
 function grantDetails(assignment: AccessAssignment, canShare: boolean): string[] {
   const limits = constraintSummary(assignment.constraints);
-  return [...(canShare ? ["Can share"] : []), ...(limits === null ? [] : [limits])];
+  const shell = assignment.privileges.includes("terminal.use") ? ["Terminal"] : [];
+  return [...(canShare ? ["Can share"] : []), ...shell, ...(limits === null ? [] : [limits])];
 }
 
 function subjectName(kind: SubjectKind, id: string, input: GrantRowInput): string {

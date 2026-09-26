@@ -2994,6 +2994,11 @@ export const CreateTerminalRequestSchema = z.object({
   agentId: z.string().optional(),
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
+  // Clisbot Managed Access: launch this Terminal profile. The daemon resolves its
+  // command from its own config and ignores `command`/`args`, which clients still
+  // send for daemons that predate it. `prompt` fills the profile's prompt slot.
+  profileId: z.string().optional(),
+  prompt: z.string().optional(),
   // Initial PTY size. Added in v0.1.107; the app no longer sends it (the estimate cache that fed
   // it was removed — the pane-focus resize claim sizes the PTY instead). Kept and honored
   // permanently: released v0.1.107 clients still send it, and programmatic callers may pass an
@@ -3004,6 +3009,18 @@ export const CreateTerminalRequestSchema = z.object({
       cols: z.number().int().positive(),
     })
     .optional(),
+  requestId: z.string(),
+});
+
+/**
+ * Clisbot Managed Access: the Terminal profiles this session may launch in `cwd`'s
+ * Project, and whether it may open a shell there. A session without the shell
+ * receives profiles with an empty `command` and no `args` beyond the prompt slot:
+ * the daemon resolves the command at launch.
+ */
+export const TerminalProfileListRequestSchema = z.object({
+  type: z.literal("terminal.profile.list.request"),
+  cwd: z.string(),
   requestId: z.string(),
 });
 
@@ -3414,6 +3431,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   UnsubscribeTerminalsRequestSchema,
   CreateTerminalRequestSchema,
   RenameTerminalRequestSchema,
+  TerminalProfileListRequestSchema,
   StartWorkspaceScriptRequestSchema,
   WorkspaceScriptListRequestSchema,
   WorkspaceScriptStartRequestSchema,
@@ -3676,6 +3694,9 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(clisbotManagedAccess): diagnostic only. Managed Host metadata
         // decides whether a ticket is needed before the first hello.
         managedAccessTickets: z.boolean().optional(),
+        // COMPAT(terminalProfileGrants): Clisbot Managed Access, added 2026-09-26; remove the
+        // gate after 2027-03-26. Launch by `profileId` and `terminal.profile.list`.
+        terminalProfileGrants: z.boolean().optional(),
         // COMPAT(pluginSourceInstallation): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports source identifiers.
         pluginSourceInstallation: z.boolean().optional(),
         // COMPAT(pluginSourceUpdates): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports reviewed updates.
@@ -6497,6 +6518,16 @@ export const CreateTerminalResponseSchema = z.object({
   }),
 });
 
+export const TerminalProfileListResponseSchema = z.object({
+  type: z.literal("terminal.profile.list.response"),
+  payload: z.object({
+    requestId: z.string(),
+    profiles: z.array(TerminalProfileSchema),
+    shell: z.boolean(),
+    error: z.string().nullable(),
+  }),
+});
+
 export const RenameTerminalResponseSchema = z.object({
   type: z.literal("terminal.rename.response"),
   payload: z.object({
@@ -7093,6 +7124,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   TerminalsChangedSchema,
   CreateTerminalResponseSchema,
   RenameTerminalResponseSchema,
+  TerminalProfileListResponseSchema,
   SubscribeTerminalResponseSchema,
   KillTerminalResponseSchema,
   CaptureTerminalResponseSchema,
@@ -7549,6 +7581,8 @@ export type CreateTerminalRequest = z.infer<typeof CreateTerminalRequestSchema>;
 export type CreateTerminalResponse = z.infer<typeof CreateTerminalResponseSchema>;
 export type RenameTerminalRequest = z.infer<typeof RenameTerminalRequestSchema>;
 export type RenameTerminalResponse = z.infer<typeof RenameTerminalResponseSchema>;
+export type TerminalProfileListRequest = z.infer<typeof TerminalProfileListRequestSchema>;
+export type TerminalProfileListResponse = z.infer<typeof TerminalProfileListResponseSchema>;
 export type StartWorkspaceScriptRequest = z.infer<typeof StartWorkspaceScriptRequestSchema>;
 export type StartWorkspaceScriptResponse = z.infer<
   typeof StartWorkspaceScriptResponseMessageSchema

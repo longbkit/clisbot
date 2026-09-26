@@ -38,12 +38,14 @@ export function resolveLaunchProfile(
 export function resolveLaunchTarget(
   target: LaunchTarget | undefined,
   profiles: readonly TerminalProfile[],
+  // Clisbot Managed Access: a Project without the shell falls back to chat.
+  shell = true,
 ): LaunchTarget {
   if (!target || target.kind === "chat") {
     return CHAT_LAUNCH_TARGET;
   }
   if (isBlankTerminalTarget(target)) {
-    return target;
+    return shell ? target : CHAT_LAUNCH_TARGET;
   }
   return resolveLaunchProfile(target, profiles) ? target : CHAT_LAUNCH_TARGET;
 }

@@ -333,7 +333,7 @@ async function grantProject(membershipId: string): Promise<string> {
       resourceKind: "project",
       resourceId: projectRowId,
       privileges: [...RESOURCE_ACCESS_LEVELS.project.developer],
-      constraints: { agentConfigurations: [codex] },
+      constraints: { agentConfigurations: [codex], terminalProfiles: "*" },
     }),
   );
   assert.equal(project.status, 201);

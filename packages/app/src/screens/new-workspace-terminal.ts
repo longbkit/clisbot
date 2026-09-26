@@ -15,7 +15,7 @@ export interface CreateTerminalWorkspaceInput {
   cwd: string;
   prompt: string;
   /** The selected profile's command/args, or null for the default shell. */
-  profile: SubstitutableCommand | null;
+  profile: (SubstitutableCommand & { id?: string }) | null;
   /** Terminal tab name: the profile's display name, or undefined for shell. */
   profileName: string | undefined;
   ensureWorkspace: (input: {
@@ -30,6 +30,9 @@ export interface CreateTerminalWorkspaceInput {
     name?: string;
     command?: string;
     args?: string[];
+    /** Clisbot Managed Access: the daemon launches its own copy of this profile. */
+    profileId?: string;
+    prompt?: string;
   }) => Promise<CreatedTerminal>;
   /** Types text into a live terminal. Used for the shell path, where the typed command is a command, not argv. */
   sendTerminalInput: (terminalId: string, data: string) => void;
@@ -69,6 +72,9 @@ export async function runCreateTerminalWorkspace(
     workspaceId: ensuredWorkspace.id,
     name: profileName,
     ...(resolved ? { command: resolved.command, args: resolved.args } : {}),
+    // COMPAT(terminalProfileLaunch): command/args above serve daemons that predate
+    // `profileId`; remove them after 2027-03-26.
+    ...(profile?.id === undefined ? {} : { profileId: profile.id, prompt }),
   });
 
   // A profile's prompt is argv, substituted into command/args above. A blank

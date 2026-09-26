@@ -70,6 +70,8 @@ describe("Access assignment constraint editing", () => {
       conversation: "specific",
       conversationIds: "",
       agentConfigurations: [],
+      terminalProfiles: "*",
+      projectFolders: null,
     });
     expect(mergeAccessConstraints({}, {})).toEqual({});
   });

@@ -1,3 +1,7 @@
+import os from "node:os";
+import nodePath from "node:path";
+import { parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
+import { expandHomePath } from "@getpaseo/protocol/project-folders";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import type { ProjectPrivilege } from "./types.js";
 
@@ -21,7 +25,7 @@ export const PROJECT_CREATION_REPLIES: ReadonlySet<SessionOutboundMessage["type"
  * holding the privilege on one Project must not reach another.
  */
 export type WorkspaceManagementTarget =
-  /** A Project that may not exist yet, at a path no Project may cover. */
+  /** A Project that may not exist yet: the folder that becomes its root. */
   | { kind: "new-project"; path: string }
   /**
    * Every resource the request names. Handlers choose between them (a worktree
@@ -39,6 +43,10 @@ export interface WorkspaceManagementAuthority {
   allowsProject(projectId: string, privilege: ProjectPrivilege): boolean;
   allowsWorkspace(workspaceId: string, privilege: ProjectPrivilege): Promise<boolean>;
   allowsCwd(cwd: string, privilege: ProjectPrivilege): Promise<boolean>;
+  /** Whether `path` is already a Project's root or a workspace's folder: adding it creates nothing. */
+  isExistingProjectPlace(path: string): Promise<boolean>;
+  /** The Host folder policy, the creating Host grants' rules, and no nesting. */
+  mayCreateProjectAt(path: string): Promise<boolean>;
 }
 
 /** The targets of a `workspace.manage` operation, or undefined for any other message. */
@@ -48,11 +56,19 @@ export function workspaceManagementTarget(
   switch (message.type) {
     case "project.add.request":
     case "open_project_request":
-      return { kind: "new-project", path: message.cwd };
+      return { kind: "new-project", path: expandHome(message.cwd) };
     case "project.create_directory.request":
-      return { kind: "new-project", path: message.parentPath };
-    case "project.github.clone.request":
-      return { kind: "new-project", path: message.targetDirectory };
+      return {
+        kind: "new-project",
+        path: nodePath.join(expandHome(message.parentPath), message.name),
+      };
+    case "project.github.clone.request": {
+      const folder = cloneFolderName(message.repo);
+      // A name the handler would refuse names no resource, so it is refused here too.
+      return folder === null
+        ? existing({})
+        : { kind: "new-project", path: nodePath.join(expandHome(message.targetDirectory), folder) };
+    }
     case "project.rename.request":
     case "project.icon.set.request":
     case "project.remove.request":
@@ -94,8 +110,9 @@ function existing(named: {
 
 /**
  * Whether a Project-restricted session may run a `workspace.manage` operation, or
- * undefined when the message is not one. A Host grant may create a Project at any
- * path; every other case needs the privilege on each resource the request names,
+ * undefined when the message is not one. Only a Host grant creates, where
+ * `mayCreateProjectAt` allows; re-adding an existing Project needs the privilege on
+ * it. Every other case needs the privilege on each resource the request names,
  * and a request that names none is refused.
  */
 export async function allowsWorkspaceManagement(
@@ -105,7 +122,12 @@ export async function allowsWorkspaceManagement(
   const target = workspaceManagementTarget(message);
   if (target === undefined) return undefined;
   if (target.kind === "new-project") {
-    return authority.allowsDaemonPrivilege(MANAGE) || authority.allowsCwd(target.path, MANAGE);
+    if (await authority.isExistingProjectPlace(target.path)) {
+      return authority.allowsCwd(target.path, MANAGE);
+    }
+    return (
+      authority.allowsDaemonPrivilege(MANAGE) && (await authority.mayCreateProjectAt(target.path))
+    );
   }
   if (target.resources.length === 0) return false;
   const checks = await Promise.all(
@@ -126,4 +148,24 @@ function allowsResource(
     case "path":
       return authority.allowsCwd(resource.path, MANAGE);
   }
+}
+
+function expandHome(value: string): string {
+  return expandHomePath(value, os.homedir());
+}
+
+/**
+ * The folder a clone lands in, named the way the clone handler names it
+ * (`normalizeCloneRepository` in `session.ts`): the remote's last path segment,
+ * or `name` of `owner/name`, without `.git`.
+ */
+function cloneFolderName(repo: string): string | null {
+  const trimmed = repo.trim();
+  const remote = parseGitRemoteLocation(trimmed);
+  const raw = remote
+    ? remote.path.split("/").findLast((segment) => segment.length > 0)
+    : trimmed.split("/")[1];
+  const name = raw?.endsWith(".git") ? raw.slice(0, -4) : raw;
+  if (!name || name === "." || name === ".." || /[/\\]/.test(name)) return null;
+  return name;
 }

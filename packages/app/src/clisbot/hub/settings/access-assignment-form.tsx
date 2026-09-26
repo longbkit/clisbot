@@ -34,6 +34,7 @@ import {
 } from "./access-catalog";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
 import { MultiSelectField } from "./multi-select-field";
+import { ProjectFolderFields, TerminalAccessFields } from "./access-terminal-fields";
 import {
   AgentConfigurationGrantEditor,
   type AgentConfigurationDraft,
@@ -96,7 +97,13 @@ function AccessAssignmentForm({
   save,
 }: AccessAssignmentFormProps) {
   const isCurrent = useMountedAccessScope();
-  const draft = useAccessAssignmentDraft(editing, initialSubject, initialResource, isCurrent);
+  const draft = useAccessAssignmentDraft(
+    editing,
+    initialSubject,
+    initialResource,
+    isCurrent,
+    catalog.accessLevels,
+  );
   const identityDisabled = pending || editing !== null;
   const subjectOptions = useMemo(() => assignmentSubjectOptions(members, teams), [members, teams]);
   const resourceOptions = useMemo(
@@ -118,6 +125,9 @@ function AccessAssignmentForm({
     alsoResourceKeys: draft.alsoResourceKeys,
     accessLevel: draft.accessLevel,
     canShare: draft.canShare,
+    terminal: draft.terminal,
+    terminalProfiles: draft.terminalProfiles,
+    projectFolders: draft.projectFolders,
     agentConfigurations: draft.agentConfigurations,
   });
   const siblingOptions = useSiblingProjectOptions(catalog, selection.resource, editing);
@@ -221,6 +231,26 @@ function AccessAssignmentForm({
           addConfiguration={draft.addAgentConfiguration}
           fastMode={draft.fastMode}
           setFastMode={draft.setFastMode}
+          pending={pending}
+        />
+      ) : null}
+      {selection.resource && selection.needsTerminalProfiles ? (
+        <TerminalAccessFields
+          resource={selection.resource}
+          holdings={selection.holdings}
+          terminalSwitch={selection.terminalSwitch}
+          terminal={draft.terminal}
+          setTerminal={draft.setTerminal}
+          profiles={selection.terminalProfiles}
+          setProfiles={draft.setTerminalProfiles}
+          pending={pending}
+        />
+      ) : null}
+      {selection.createsProjects ? (
+        <ProjectFolderFields
+          value={selection.projectFolders}
+          onChange={draft.setProjectFolders}
+          holdings={selection.holdings}
           pending={pending}
         />
       ) : null}

@@ -10,8 +10,8 @@ import { accessLevelDescription } from "./access-level-summary";
 
 /**
  * How the Can share switch behaves for the chosen level on a Host or Project
- * (docs/features/access/scoped-admins.md): Connect never shares, Full access and
- * Administrator always share, Office worker and Developer choose.
+ * (docs/features/access/scoped-admins.md): Connect never shares, Administrator
+ * always shares, every other level chooses; Full access starts on.
  */
 export type CanShareState = "hidden" | "locked" | "optional";
 
@@ -20,11 +20,47 @@ export function canShareState(
   levelPrivileges: readonly string[],
 ): CanShareState {
   if (resourceKind !== "daemon" && resourceKind !== "project") return "hidden";
-  // The same privileges the Hub treats as implying Can share (`impliedPrivileges`).
-  if (levelPrivileges.includes("workspace.manage") || levelPrivileges.includes("daemon.manage")) {
-    return "locked";
-  }
+  // The same privilege the Hub treats as implying Can share (`impliedPrivileges`).
+  if (levelPrivileges.includes("daemon.manage")) return "locked";
   return levelPrivileges.includes("project.use") ? "optional" : "hidden";
+}
+
+/**
+ * The Terminal (shell) switch on a Host or Project grant: offered wherever the
+ * level launches Terminal profiles, and never on Administrator, which has it all
+ * (docs/features/access/terminal-and-project-creation.md).
+ */
+export function offersTerminalSwitch(
+  resourceKind: AccessResourceKind,
+  levelPrivileges: readonly string[],
+): boolean {
+  return (
+    (resourceKind === "daemon" || resourceKind === "project") &&
+    !levelPrivileges.includes("daemon.manage") &&
+    levelPrivileges.includes("terminal.profile.use")
+  );
+}
+
+/** The level's privileges with the Terminal switch applied. */
+export function withTerminal(
+  resourceKind: AccessResourceKind,
+  levelPrivileges: readonly string[],
+  terminal: boolean,
+): string[] {
+  if (!offersTerminalSwitch(resourceKind, levelPrivileges)) return [...levelPrivileges];
+  const without = levelPrivileges.filter((privilege) => privilege !== "terminal.use");
+  return terminal ? [...without, "terminal.use"] : without;
+}
+
+/** Where a level starts its Can share and Terminal switches: what the level itself names. */
+export function levelSwitchPresets(levelPrivileges: readonly string[]): {
+  canShare: boolean;
+  terminal: boolean;
+} {
+  return {
+    canShare: levelPrivileges.includes(CAN_SHARE_PRIVILEGE),
+    terminal: levelPrivileges.includes("terminal.use"),
+  };
 }
 
 /** The level's privileges with Can share applied the way the switch shows it. */
@@ -54,7 +90,12 @@ export function levelOptionsWithinHoldings(
   const options: SelectFieldOption<string>[] = [];
   const aboveOwn: string[] = [];
   for (const [id, privileges] of Object.entries(accessLevels)) {
-    if (!privilegesWithinHoldings(holdings, withCanShare(resourceKind, privileges, false))) {
+    const minimal = withTerminal(
+      resourceKind,
+      withCanShare(resourceKind, privileges, false),
+      false,
+    );
+    if (!privilegesWithinHoldings(holdings, minimal)) {
       aboveOwn.push(accessLevelLabel(id));
       continue;
     }

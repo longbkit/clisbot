@@ -924,6 +924,34 @@ async function withDeadline<T>(promise: Promise<T>, message: string): Promise<T>
   }
 }
 
+test("admits Terminal profiles per Project and the folder rules of creating Host grants", async () => {
+  const remote = new DirectHubRelationshipRemote();
+  const admitted = await remote.consumeAccessTicket({
+    hubOrigin: await startHubReturning(200, {
+      leaseId: "00000000-0000-4000-8000-000000000002",
+      principalId: "membership",
+      permissions: ["daemon.read", "workspace.read", "workspace.write"],
+      resourceMode: "projects",
+      projects: [
+        {
+          projectId: "project-a",
+          privileges: ["project.use", "terminal.profile.use"],
+          agentConfigurations: [],
+          terminalProfiles: ["claude"],
+        },
+      ],
+      projectFolders: [{ allow: ["/workspace/**"], deny: [] }],
+      leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }),
+    credential: "credential",
+    daemonId: "daemon-1",
+    accessTicket: "ticket",
+    clientId: "client",
+  });
+  expect(admitted.projects.get("project-a")?.terminalProfiles).toEqual(["claude"]);
+  expect(admitted.projectFolders).toEqual([{ allow: ["/workspace/**"], deny: [] }]);
+});
+
 test("admits the Host privileges it knows, ignores the rest, and stays strict per Project", async () => {
   const admission = {
     leaseId: "00000000-0000-4000-8000-000000000001",

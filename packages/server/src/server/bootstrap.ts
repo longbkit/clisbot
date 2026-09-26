@@ -158,6 +158,7 @@ import { DaemonConfigStore, type MutableDaemonConfig } from "./daemon-config-sto
 import { createOrchestrationSkills } from "./orchestration-skills/index.js";
 import { resolveConfigFromPersisted, type CliConfigOverrides } from "./config.js";
 import { resolvePaseoToolPolicy } from "./agent/paseo-tool-policy.js";
+import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
 import { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { DaemonConfigBrowserToolsPolicy } from "./browser-tools/policy.js";
 import { WorkspaceGitServiceImpl } from "./workspace-git-service.js";
@@ -1419,12 +1420,17 @@ export async function createPaseoDaemon(
       const agentConfigurationCatalog = createHubAgentConfigurationCatalog(
         providerSnapshotManager.getSnapshot().records.map(({ entry }) => entry),
       );
+      // Names only: the Access form offers profiles by name, never their commands.
+      const terminalProfileCatalog = resolveTerminalProfiles(
+        daemonConfigStore.get().terminalProfiles,
+      ).map(({ id, name }) => ({ id, name }));
       return (await projectRegistry.list())
         .filter((project) => project.archivedAt === null)
         .map((project) => ({
           projectId: project.projectId,
           name: project.customName ?? project.displayName,
           agentConfigurationCatalog,
+          terminalProfileCatalog,
         }));
     },
     getConnectionOffer: async () => {
@@ -1465,8 +1471,17 @@ export async function createPaseoDaemon(
     hubProviderCatalogPublishTimer.unref?.();
   };
   providerSnapshotManager.on("change", publishHubProviderCatalog);
+  const stopHubTerminalProfilePublishing = daemonConfigStore.onFieldChange(
+    "terminalProfiles",
+    () => {
+      void hubRelationships.publishProjects().catch((error: unknown) => {
+        logger.warn({ err: error }, "Failed to replace Hub Terminal profile catalog");
+      });
+    },
+  );
   const stopHubProjectPublishing = () => {
     stopHubProjectMutationPublishing();
+    stopHubTerminalProfilePublishing();
     providerSnapshotManager.off("change", publishHubProviderCatalog);
     if (hubProviderCatalogPublishTimer !== null) {
       clearTimeout(hubProviderCatalogPublishTimer);

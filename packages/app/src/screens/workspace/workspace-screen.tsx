@@ -949,6 +949,8 @@ function WorkspaceHeaderProjectRow({
 
 interface WorkspaceHeaderTitleBarProps {
   isLoading: boolean;
+  /** Clisbot Managed Access: decides which terminal rows the mobile menu offers. */
+  workspaceDirectory: string | null;
   title: string;
   subtitle: string;
   isSubtitleDistinct: boolean;
@@ -992,6 +994,7 @@ function WorkspaceHeaderTitleBar({
   createTerminalDisabled,
   importAgentDisabled,
   copyPathDisabled,
+  workspaceDirectory,
   onCreateDraftTab,
   onCreateTerminal,
   onCreateTerminalWithProfile,
@@ -1024,6 +1027,7 @@ function WorkspaceHeaderTitleBar({
         {isMobile ? (
           <WorkspaceHeaderMenuMobile
             normalizedServerId={normalizedServerId}
+            workspaceDirectory={workspaceDirectory}
             currentBranchName={currentBranchName}
             showWorkspaceSetup={showWorkspaceSetup}
             showCreateBrowserTab={showCreateBrowserTab}
@@ -3865,6 +3869,7 @@ function WorkspaceScreenContent({
       showPullRequest: hasPullRequest,
       showBrowser: showCreateBrowserTab,
       terminalDisabled: createTerminalDisabled,
+      workspaceDirectory,
       launch: launchWorkspaceTab,
     }),
     [
@@ -3873,6 +3878,7 @@ function WorkspaceScreenContent({
       isGitCheckout,
       launchWorkspaceTab,
       showCreateBrowserTab,
+      workspaceDirectory,
     ],
   );
   const focusedPaneIdOrUndefined = useMemo(() => focusedPaneId ?? undefined, [focusedPaneId]);
@@ -3908,6 +3914,7 @@ function WorkspaceScreenContent({
                 createTerminalDisabled={createTerminalDisabled}
                 importAgentDisabled={!canOpenImportSheet}
                 copyPathDisabled={!workspaceDirectory}
+                workspaceDirectory={workspaceDirectory}
                 onCreateDraftTab={handleCreateDraftTab}
                 onCreateTerminal={handleCreateTerminal}
                 onCreateTerminalWithProfile={handleCreateTerminalWithProfile}

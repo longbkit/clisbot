@@ -1,5 +1,6 @@
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import { DAEMON_PERMISSIONS, type DaemonPermission } from "@getpaseo/protocol/messages";
+import type { ProjectFolderRules } from "@getpaseo/protocol/project-folders";
 import {
   type PermissionRequirement,
   requiredPermissionForInbound,
@@ -73,6 +74,9 @@ export class SessionAuthorization {
       ...(resources.daemonPrivileges === undefined
         ? {}
         : { daemonPrivileges: resources.daemonPrivileges }),
+      ...(resources.projectFolders === undefined
+        ? {}
+        : { projectFolders: resources.projectFolders }),
       leaseId: resources.leaseId,
       leaseExpiresAt: resources.leaseExpiresAt,
     };
@@ -100,6 +104,15 @@ export class SessionAuthorization {
       return undefined;
     }
     return this.resources.projects.get(projectId);
+  }
+
+  /**
+   * Where Host grants that create Projects may create them, inside the Host policy.
+   * Undefined from a Hub that predates folder rules: each such grant creates anywhere.
+   */
+  projectCreationRules(): readonly ProjectFolderRules[] | undefined {
+    if (this.resources === null || this.resources.resourceMode === "daemon") return undefined;
+    return this.resources.projectFolders;
   }
 
   /** A privilege the Hub granted on the whole Host, not only on listed Projects. */

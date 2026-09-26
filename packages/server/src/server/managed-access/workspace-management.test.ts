@@ -1,3 +1,5 @@
+import os from "node:os";
+import nodePath from "node:path";
 import { describe, expect, test } from "vitest";
 import { SessionInboundMessageSchema, type SessionInboundMessage } from "../messages.js";
 import { requiredPermissionForInbound } from "../authorization/operation-permissions.js";
@@ -18,8 +20,13 @@ function message(type: string, fields: Record<string, unknown> = {}): SessionInb
   return { type, requestId: "r", ...fields } as unknown as SessionInboundMessage;
 }
 
-/** Project A grants workspace.manage; Project B only project.use. */
-function authority(input: { host?: boolean } = {}): WorkspaceManagementAuthority {
+/**
+ * Project A grants workspace.manage; Project B only project.use. `/work/a` and
+ * `/work/b` are Project roots; the folder policy allows creating only under `/free`.
+ */
+function authority(
+  input: { host?: boolean; checked?: string[] } = {},
+): WorkspaceManagementAuthority {
   const projects: Record<string, ReadonlySet<ProjectPrivilege>> = {
     "project-a": new Set(["project.use", "workspace.manage"]),
     "project-b": new Set(["project.use"]),
@@ -43,6 +50,12 @@ function authority(input: { host?: boolean } = {}): WorkspaceManagementAuthority
       const projectId = projectForPath(cwd);
       return projectId !== null && allowsProject(projectId, privilege);
     },
+    // `/work/a/wt` is an existing workspace folder inside Project A.
+    isExistingProjectPlace: async (path) => ["/work/a", "/work/b", "/work/a/wt"].includes(path),
+    mayCreateProjectAt: async (path) => {
+      input.checked?.push(path);
+      return path.startsWith("/free/");
+    },
   };
 }
 
@@ -62,6 +75,8 @@ describe("workspace.manage operations in a Project-restricted session", () => {
           message(type, {
             cwd: "/x",
             parentPath: "/x",
+            name: "n",
+            repo: "org/repo",
             targetDirectory: "/x",
             projectId: "p",
             workspaceId: "w",
@@ -71,32 +86,65 @@ describe("workspace.manage operations in a Project-restricted session", () => {
     expect(uncovered).toEqual([]);
   });
 
-  test("a Host grant creates a Project at any path; a Project grant only inside itself", async () => {
+  test("only a Host grant creates, where the folder rules allow; re-adding a Project needs it", async () => {
     for (const type of ["project.add.request", "open_project_request"]) {
-      expect(
-        await allowsWorkspaceManagement(
-          message(type, { cwd: "/anywhere" }),
-          authority({ host: true }),
-        ),
-      ).toBe(true);
-      expect(
-        await allowsWorkspaceManagement(message(type, { cwd: "/anywhere" }), authority()),
-      ).toBe(false);
-      expect(
-        await allowsWorkspaceManagement(message(type, { cwd: "/work/a/new" }), authority()),
-      ).toBe(true);
-      expect(
-        await allowsWorkspaceManagement(message(type, { cwd: "/work/b/new" }), authority()),
-      ).toBe(false);
+      const at = (cwd: string, host: boolean) =>
+        allowsWorkspaceManagement(message(type, { cwd }), authority({ host }));
+      expect(await at("/free/app", true)).toBe(true);
+      // Outside the folder rules, even for a Host grant.
+      expect(await at("/elsewhere", true)).toBe(false);
+      // A Project grant creates nothing, not even inside its own root.
+      expect(await at("/free/app", false)).toBe(false);
+      expect(await at("/work/a/new", false)).toBe(false);
+      // Re-adding an existing Project follows that Project's own grant.
+      expect(await at("/work/a", false)).toBe(true);
+      expect(await at("/work/b", true)).toBe(false);
     }
-    const create = message("project.create_directory.request", {
-      parentPath: "/elsewhere",
-      name: "n",
+    const create = (parentPath: string, name: string) =>
+      message("project.create_directory.request", { parentPath, name });
+    // The folder that becomes the root is checked, not its parent.
+    expect(await allowsWorkspaceManagement(create("/free", "app"), authority({ host: true }))).toBe(
+      true,
+    );
+    expect(
+      await allowsWorkspaceManagement(create("/free", "../etc"), authority({ host: true })),
+    ).toBe(false);
+    const clone = message("project.github.clone.request", {
+      repo: "org/app",
+      targetDirectory: "/free",
     });
-    expect(await allowsWorkspaceManagement(create, authority({ host: true }))).toBe(true);
-    expect(await allowsWorkspaceManagement(create, authority())).toBe(false);
-    const clone = message("project.github.clone.request", { targetDirectory: "/work/a/repo" });
-    expect(await allowsWorkspaceManagement(clone, authority())).toBe(true);
+    expect(await allowsWorkspaceManagement(clone, authority({ host: true }))).toBe(true);
+    expect(await allowsWorkspaceManagement(clone, authority())).toBe(false);
+  });
+
+  test("reopening an existing workspace folder is not creating, and follows its Project", async () => {
+    const reopen = message("open_project_request", { cwd: "/work/a/wt" });
+    expect(await allowsWorkspaceManagement(reopen, authority())).toBe(true);
+  });
+
+  test("checks the folder a clone really lands in, named as the handler names it", async () => {
+    const checked: string[] = [];
+    const clone = (repo: string) =>
+      allowsWorkspaceManagement(
+        message("project.github.clone.request", { repo, targetDirectory: "/free" }),
+        authority({ host: true, checked }),
+      );
+    expect(await clone("org/infra.git")).toBe(true);
+    expect(await clone("https://github.com/org/app")).toBe(true);
+    expect(checked).toEqual(["/free/infra", "/free/app"]);
+    // A name the handler refuses is refused here, never checked against a parent folder.
+    expect(await clone("org/..")).toBe(false);
+    expect(await clone("not-a-repo")).toBe(false);
+    expect(checked).toHaveLength(2);
+  });
+
+  test("expands ~ before checking where a Project is added", async () => {
+    const checked: string[] = [];
+    await allowsWorkspaceManagement(
+      message("project.add.request", { cwd: "~/new" }),
+      authority({ host: true, checked }),
+    );
+    expect(checked).toEqual([nodePath.join(os.homedir(), "new")]);
   });
 
   test("managing one Project never reaches another the session can only use", async () => {
@@ -111,7 +159,7 @@ describe("workspace.manage operations in a Project-restricted session", () => {
       expect(
         await allowsWorkspaceManagement(message(type, { projectId: "project-b" }), authority()),
       ).toBe(false);
-      // A Host grant creates anywhere, but managing still follows each Project's own grant.
+      // A Host grant may create, but managing still follows each Project's own grant.
       expect(
         await allowsWorkspaceManagement(
           message(type, { projectId: "project-b" }),

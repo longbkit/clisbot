@@ -54,6 +54,29 @@ describe("runCreateTerminalWorkspace", () => {
     ]);
   });
 
+  it("names the profile so a Managed Access daemon launches its own copy with the prompt", async () => {
+    const createTerminal = vi.fn().mockResolvedValue({ terminalId: "term-p" });
+    await runCreateTerminalWorkspace({
+      cwd: "/repo",
+      prompt: "fix the bug",
+      profile: { id: "claude", command: "claude", args: ["{{{prompt}}}"] },
+      profileName: "Claude Code",
+      ensureWorkspace: vi.fn().mockResolvedValue({ id: "ws", workspaceDirectory: "/repo/ws" }),
+      createTerminal,
+      sendTerminalInput: vi.fn(),
+      serverId: "server",
+      navigate: vi.fn(),
+    });
+    expect(createTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "claude",
+        args: ["fix the bug"],
+        profileId: "claude",
+        prompt: "fix the bug",
+      }),
+    );
+  });
+
   it("drops a sentinel-only arg when the prompt is empty, so a bare command still launches", async () => {
     const workspace = { id: "ws-1", workspaceDirectory: "/repo/ws-1" };
     const ensureWorkspace = vi.fn().mockResolvedValue(workspace);

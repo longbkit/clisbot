@@ -95,6 +95,61 @@ describe("database migration application", () => {
     );
   }, 120_000);
 
+  it("moves Developer grants to Terminal profiles and writes Can share where it was implied", async () => {
+    const url = await createHistoricalBaseline({
+      postgres,
+      prefix: "terminal_profile_grants",
+      through: "0084_channel_binding_inbox",
+    });
+    const developer = [
+      "daemon.connect",
+      "project.use",
+      "workspace.create",
+      "agent.interact",
+      "agent.create",
+      "terminal.use",
+      "approval.command",
+    ];
+    const fullAccess = ["project.use", "workspace.create", "terminal.use", "workspace.manage"];
+    const officeWorker = ["project.use", "agent.interact", "agent.create", "approval.file"];
+    await poolQuery(
+      url,
+      `insert into organization (id, name, slug) values ('org-terminal', 'Org', 'org-terminal');
+       insert into access_assignments
+         (id, organization_id, subject_kind, subject_id, resource_kind, resource_id, privileges, constraints)
+       values
+         ('50000000-0000-4000-8000-000000000001', 'org-terminal', 'member', 'm', 'daemon', 'host',
+          '${JSON.stringify(developer)}', '{"agentConfigurations":[]}'),
+         ('50000000-0000-4000-8000-000000000002', 'org-terminal', 'member', 'lead', 'project', 'p',
+          '${JSON.stringify(fullAccess)}', '{}'),
+         ('50000000-0000-4000-8000-000000000003', 'org-terminal', 'member', 'office', 'project', 'p',
+          '${JSON.stringify(officeWorker)}', '{}')`,
+    );
+
+    const database = await createDatabase(url);
+    await database.close();
+
+    const rows = await poolQuery<{ privileges: string[]; constraints: Record<string, unknown> }>(
+      url,
+      `select privileges, constraints from access_assignments
+       where organization_id = 'org-terminal' order by id`,
+    );
+    const [developerRow, fullAccessRow, officeWorkerRow] = rows.rows;
+    assert.deepEqual(developerRow?.privileges, [
+      ...developer.filter((privilege) => privilege !== "terminal.use"),
+      "terminal.profile.use",
+    ]);
+    assert.deepEqual(developerRow?.constraints, { agentConfigurations: [], terminalProfiles: "*" });
+    assert.deepEqual(fullAccessRow?.privileges, [
+      ...fullAccess,
+      "hub.access.manage",
+      "terminal.profile.use",
+    ]);
+    assert.deepEqual(fullAccessRow?.constraints, { terminalProfiles: "*" });
+    assert.deepEqual(officeWorkerRow?.privileges, officeWorker);
+    assert.deepEqual(officeWorkerRow?.constraints, {});
+  }, 120_000);
+
   it("migrates production-shaped identity state without changing durable identities", async () => {
     const url = await createHistoricalBaseline({
       postgres,

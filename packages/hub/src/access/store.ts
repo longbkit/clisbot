@@ -27,6 +27,17 @@ import {
   type ApprovalPrivilege,
   formatChannelAccountResourceId,
 } from "./contract.js";
+import {
+  parseTerminalProfileCatalog,
+  projectCreationRules,
+  terminalAndFolderConstraintError,
+  unionTerminalProfiles,
+} from "./grant-constraints.js";
+import type {
+  ProjectFolderRules,
+  TerminalProfileCatalog,
+  TerminalProfileSelection,
+} from "./contract.js";
 
 const DAEMON_SESSION_PERMISSIONS = ["daemon.read", "workspace.read", "workspace.write"] as const;
 const DAEMON_ADMIN_SESSION_PERMISSIONS = [
@@ -54,6 +65,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "agent.create",
     "agent.fast.use",
     "terminal.use",
+    "terminal.profile.use",
     "approval.file",
     "approval.config",
     "approval.command",
@@ -70,6 +82,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "agent.create",
     "agent.fast.use",
     "terminal.use",
+    "terminal.profile.use",
     "approval.file",
     "approval.config",
     "approval.command",
@@ -92,6 +105,7 @@ const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
   "agent.create",
   "agent.fast.use",
   "terminal.use",
+  "terminal.profile.use",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -116,6 +130,7 @@ export interface AccessResourceRecord {
   parent: { kind: AccessResourceKind; id: string } | null;
   available: boolean;
   agentConfigurationCatalog?: z.infer<typeof AgentConfigurationCatalogSchema>;
+  terminalProfileCatalog?: TerminalProfileCatalog;
 }
 
 export type EffectiveAccessSource =
@@ -151,6 +166,7 @@ export interface ResolvedProjectAccess {
   projectId: string;
   privileges: AccessPrivilege[];
   agentConfigurations: AgentConfigurationGrant[];
+  terminalProfiles?: TerminalProfileSelection;
 }
 
 export interface ResolvedDaemonAccess {
@@ -167,6 +183,8 @@ export interface ResolvedDaemonAccess {
    * existing one.
    */
   daemonPrivileges: string[];
+  /** One rule set per Host grant that creates Projects; see `projectCreationRules`. */
+  projectFolders?: ProjectFolderRules[];
 }
 
 /** The subject whose assignments an access resolution reads: a linked Member or the Guest group. */
@@ -573,6 +591,7 @@ export class AccessStore {
             available: daemon.status === "active",
           },
           daemonAgentConfigurationCatalog(projectRows, daemon.id),
+          daemonTerminalProfileCatalog(projectRows, daemon.id),
         ),
       ),
       ...projectRows.map((project) =>
@@ -585,6 +604,7 @@ export class AccessStore {
             available: project.available,
           },
           parseAgentConfigurationCatalog(project.metadata),
+          parseTerminalProfileCatalog(project.metadata),
         ),
       ),
       ...teamRows.map((team) => ({
@@ -1329,6 +1349,9 @@ export class AccessStore {
           projectId: project.externalProjectId,
           privileges,
           agentConfigurations: grants.agentConfigurations,
+          ...(grants.terminalProfiles === undefined
+            ? {}
+            : { terminalProfiles: grants.terminalProfiles }),
         },
       ];
     });
@@ -1365,6 +1388,7 @@ export class AccessStore {
       resourceMode: "projects",
       projects,
       daemonPrivileges,
+      projectFolders: projectCreationRules(daemonGrants),
     };
   }
 
@@ -1606,6 +1630,10 @@ function validateConstraints(assignment: AccessAssignmentInput): void {
       "Agent configuration constraints require agent.create",
     );
   }
+  const terminalOrFolderError = terminalAndFolderConstraintError(assignment);
+  if (terminalOrFolderError !== null) {
+    throw new AccessPolicyError("invalid_assignment", terminalOrFolderError);
+  }
 }
 
 function createChannelIdentityChallengeCode(): string {
@@ -1634,16 +1662,18 @@ function privilegeUnion(assignments: readonly AccessAssignmentRecord[]): Set<Acc
   return new Set(assignments.flatMap(({ privileges }) => privileges));
 }
 
-/** Unions the privileges and agent-configuration grants that apply to one Project. */
+/** Unions the privileges, Agent choices, and Terminal profiles that apply to one Project. */
 function accumulateProjectGrants(applicable: AccessAssignmentRecord[]): {
   privileges: Set<AccessPrivilege>;
   agentConfigurations: AgentConfigurationGrant[];
+  terminalProfiles: TerminalProfileSelection | undefined;
 } {
   return {
     privileges: privilegeUnion(applicable),
     agentConfigurations: applicable.flatMap(
       ({ constraints }) => constraints.agentConfigurations ?? [],
     ),
+    terminalProfiles: unionTerminalProfiles(applicable.map(({ constraints }) => constraints)),
   };
 }
 
@@ -1701,6 +1731,19 @@ function daemonAgentConfigurationCatalog(
     if (project.daemonId !== daemonId || !project.available) continue;
     const parsed = parseAgentConfigurationCatalog(project.metadata);
     if ("agentConfigurationCatalog" in parsed) return parsed;
+  }
+  return {};
+}
+
+/** Same rule as `daemonAgentConfigurationCatalog`, for the Host's Terminal profiles. */
+function daemonTerminalProfileCatalog(
+  projects: readonly { daemonId: string; available: boolean; metadata: unknown }[],
+  daemonId: string,
+): { terminalProfileCatalog?: TerminalProfileCatalog } {
+  for (const project of projects) {
+    if (project.daemonId !== daemonId || !project.available) continue;
+    const parsed = parseTerminalProfileCatalog(project.metadata);
+    if ("terminalProfileCatalog" in parsed) return parsed;
   }
   return {};
 }

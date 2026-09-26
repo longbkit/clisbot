@@ -25,9 +25,19 @@ import {
 import { requiredPrivilegeForOperation } from "@getpaseo/protocol/managed-access-privileges";
 import {
   PROJECT_PRIVILEGES,
+  type ProjectAuthorization,
   type ProjectPrivilege,
   type ResolvedAgentConfigurationGrant,
 } from "./types.js";
+import { grantAllowsTerminalLaunch, grantHasAnyTerminal } from "./terminal-access.js";
+import { terminalLaunchOf } from "./terminal-launches.js";
+import {
+  canonicalHostPolicy,
+  hostProjectFolderPolicy,
+  mayBrowseForProjectAt,
+  mayCreateProjectAt,
+  type ProjectCreationScope,
+} from "./project-folder-policy.js";
 import {
   allowsWorkspaceManagement,
   PROJECT_CREATION_REPLIES,
@@ -209,18 +219,100 @@ export class ManagedResourceAuthorizer {
     return record?.workspaceId ? this.allowsWorkspaceSync(record.workspaceId, privilege) : false;
   }
 
+  /** A shell needs Terminal; a profile terminal needs Terminal or that profile. */
   async allowsTerminal(terminalId: string): Promise<boolean> {
     if (!this.authorization.isLeaseActive()) return false;
     if (!this.isRestricted()) return true;
     const terminal = this.terminalManager?.getTerminal(terminalId);
-    return terminal ? this.allowsWorkspace(terminal.workspaceId, "terminal.use") : false;
+    if (!terminal || !(await this.allowsWorkspace(terminal.workspaceId))) return false;
+    return this.allowsTerminalLaunch(terminalId, terminal.workspaceId);
   }
 
   allowsTerminalSync(terminalId: string): boolean {
     if (!this.authorization.isLeaseActive()) return false;
     if (!this.isRestricted()) return true;
     const terminal = this.terminalManager?.getTerminal(terminalId);
-    return terminal ? this.allowsWorkspaceSync(terminal.workspaceId, "terminal.use") : false;
+    if (!terminal || !this.allowsWorkspaceSync(terminal.workspaceId)) return false;
+    return this.allowsTerminalLaunch(terminalId, terminal.workspaceId);
+  }
+
+  /** Terminal lists and subscriptions: either terminal privilege, filtered per terminal. */
+  async allowsWorkspaceTerminals(workspaceId: string): Promise<boolean> {
+    if (!this.isRestricted()) return true;
+    if (!(await this.allowsWorkspace(workspaceId))) return false;
+    return grantHasAnyTerminal(this.workspaceGrant(workspaceId));
+  }
+
+  /**
+   * The grant that decides Terminal for `cwd`: `unrestricted` outside Managed Access,
+   * null when `cwd` is outside every granted Project.
+   */
+  async terminalGrantForCwd(cwd: string): Promise<ProjectAuthorization | "unrestricted" | null> {
+    if (!this.isRestricted()) return "unrestricted";
+    await this.ready();
+    const projectId = await this.projectIdForCwd(cwd);
+    if (projectId === null || !this.allowsProject(projectId)) return null;
+    return this.authorization.project(projectId) ?? null;
+  }
+
+  /** Add project folder search: keep folders you may create in, or on the way to one. */
+  async filterProjectFolderSearch<T extends { path: string }>(entries: readonly T[]): Promise<T[]> {
+    if (!this.isRestricted()) return [...entries];
+    const scope = await this.projectCreationScope();
+    const decisions = await Promise.all(
+      entries.map(async ({ path: entryPath }) => {
+        const canonical = await canonicalPathForAuthorization(entryPath);
+        return canonical !== null && mayBrowseForProjectAt(canonical, scope);
+      }),
+    );
+    return entries.filter((_, index) => decisions[index] === true);
+  }
+
+  /**
+   * Whether adding `target` reopens something that already exists (a Project's
+   * root or a workspace's folder) instead of creating a Project.
+   */
+  private async isExistingProjectPlace(target: string): Promise<boolean> {
+    const canonical = await canonicalPathForAuthorization(target);
+    if (canonical === null) return false;
+    const workspaceFolders = await canonicalPaths(
+      [...this.workspaces.values()].map(({ cwd }) => cwd),
+    );
+    return (
+      (await this.canonicalProjectRoots()).includes(canonical) ||
+      workspaceFolders.includes(canonical)
+    );
+  }
+
+  private async canonicalProjectRoots(): Promise<string[]> {
+    return canonicalPaths(
+      [...this.projects.values()]
+        .filter(({ archivedAt }) => archivedAt === null)
+        .map(({ rootPath }) => rootPath),
+    );
+  }
+
+  private allowsTerminalLaunch(terminalId: string, workspaceId: string): boolean {
+    return grantAllowsTerminalLaunch(
+      this.workspaceGrant(workspaceId),
+      terminalLaunchOf(terminalId).profileId,
+    );
+  }
+
+  private workspaceGrant(workspaceId: string): ProjectAuthorization | undefined {
+    const workspace = this.workspaces.get(workspaceId);
+    return workspace ? this.authorization.project(workspace.projectId) : undefined;
+  }
+
+  private async projectCreationScope(): Promise<ProjectCreationScope> {
+    return {
+      hostPolicy: await canonicalHostPolicy(
+        hostProjectFolderPolicy(),
+        canonicalPathForAuthorization,
+      ),
+      grantRules: this.authorization.projectCreationRules(),
+      projectRoots: await this.canonicalProjectRoots(),
+    };
   }
 
   allowsAnyProject(privilege: ProjectPrivilege = "project.use"): boolean {
@@ -435,7 +527,13 @@ export class ManagedResourceAuthorizer {
     if (terminalId) return this.allowsTerminalSync(terminalId);
     const terminal = objectProperty(payload, "terminal");
     const terminalWorkspaceId = stringProperty(terminal, "workspaceId");
-    if (terminalWorkspaceId) return this.allowsWorkspaceSync(terminalWorkspaceId, "terminal.use");
+    if (terminalWorkspaceId) {
+      // Decided per terminal, as for its id: a profile terminal reaches Terminal profiles.
+      const id = stringProperty(terminal, "id");
+      if (id && this.terminalManager?.getTerminal(id)) return this.allowsTerminalSync(id);
+      // Gone already (a profile whose CLI exited at once): the reply still reaches its requester.
+      return grantHasAnyTerminal(this.workspaceGrant(terminalWorkspaceId));
+    }
 
     const workspaceId = stringProperty(payload, "workspaceId");
     if (workspaceId) return this.allowsWorkspaceSync(workspaceId);
@@ -804,6 +902,7 @@ export class ManagedResourceAuthorizer {
   }
 
   private async allowsTerminalInbound(message: SessionInboundMessage): Promise<boolean> {
+    if (message.type === "create_terminal_request") return this.allowsTerminalCreation(message);
     if (
       "terminalId" in message &&
       typeof message.terminalId === "string" &&
@@ -814,14 +913,14 @@ export class ManagedResourceAuthorizer {
     if (
       "workspaceId" in message &&
       typeof message.workspaceId === "string" &&
-      !(await this.allowsWorkspace(message.workspaceId, "terminal.use"))
+      !(await this.allowsWorkspaceTerminals(message.workspaceId))
     ) {
       return false;
     }
     if (
       "cwd" in message &&
       typeof message.cwd === "string" &&
-      !(await this.allowsCwd(message.cwd, "terminal.use"))
+      !grantHasAnyTerminal(await this.grantForCwd(message.cwd))
     ) {
       return false;
     }
@@ -840,6 +939,32 @@ export class ManagedResourceAuthorizer {
     );
   }
 
+  /** A shell needs Terminal; a `profileId` launch needs Terminal or that profile. */
+  private async allowsTerminalCreation(
+    message: Extract<SessionInboundMessage, { type: "create_terminal_request" }>,
+  ): Promise<boolean> {
+    if (
+      message.agentId !== undefined &&
+      !(await this.allowsAgent(message.agentId, "terminal.use"))
+    ) {
+      return false;
+    }
+    // The PTY starts in `cwd` and belongs to `workspaceId`: both Projects must allow it.
+    const grants = [await this.grantForCwd(message.cwd)];
+    if (message.workspaceId !== undefined) {
+      if (!(await this.allowsWorkspace(message.workspaceId))) return false;
+      grants.push(this.workspaceGrant(message.workspaceId));
+    }
+    return grants.every((grant) => grantAllowsTerminalLaunch(grant, message.profileId));
+  }
+
+  private async grantForCwd(cwd: string): Promise<ProjectAuthorization | undefined> {
+    const projectId = await this.projectIdForCwd(cwd);
+    return projectId !== null && this.allowsProject(projectId)
+      ? this.authorization.project(projectId)
+      : undefined;
+  }
+
   /** `workspace.manage` operations, remembering admitted creations so their replies get out. */
   private async allowsWorkspaceManagementInbound(
     message: SessionInboundMessage,
@@ -849,6 +974,13 @@ export class ManagedResourceAuthorizer {
       allowsProject: (projectId, privilege) => this.allowsProject(projectId, privilege),
       allowsWorkspace: (workspaceId, privilege) => this.allowsWorkspace(workspaceId, privilege),
       allowsCwd: (cwd, privilege) => this.allowsCwd(cwd, privilege),
+      isExistingProjectPlace: (target) => this.isExistingProjectPlace(target),
+      mayCreateProjectAt: async (target) => {
+        const canonical = await canonicalPathForAuthorization(target);
+        return (
+          canonical !== null && mayCreateProjectAt(canonical, await this.projectCreationScope())
+        );
+      },
     });
     if (
       allowed === true &&
@@ -865,7 +997,12 @@ export class ManagedResourceAuthorizer {
     message: SessionInboundMessage,
   ): Promise<boolean | undefined> {
     if (message.type === "directory_suggestions_request") {
-      return message.cwd === undefined ? false : this.allowsCwd(message.cwd);
+      // You can search where you can create: without `cwd` it is Add project's
+      // folder search, and the reply is filtered by `filterProjectFolderSearch`.
+      if (message.cwd === undefined) {
+        return this.authorization.allowsDaemonPrivilege("workspace.manage");
+      }
+      return this.allowsCwd(message.cwd);
     }
     if (message.type === "fetch_recent_provider_sessions_request") {
       return message.cwd === undefined ? false : this.allowsCwd(message.cwd);
@@ -1190,6 +1327,11 @@ async function canonicalExistingPath(value: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function canonicalPaths(values: readonly string[]): Promise<string[]> {
+  const canonical = await Promise.all(values.map(canonicalPathForAuthorization));
+  return canonical.filter((value): value is string => value !== null);
 }
 
 async function canonicalPathForAuthorization(value: string): Promise<string | null> {

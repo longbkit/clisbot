@@ -21,6 +21,8 @@ the screen.
 
 One grant is **Who × Resource × Level**, plus two modifiers: **Can share**, and
 **Agent limits** (providers, models, Fast mode) on Host and Project grants.
+Also **Terminal** and **Terminal profiles**;
+see [Terminal profiles and Project creation](terminal-and-project-creation.md#screens).
 
 - **Who**: a Member, a Team, or Guest (channel senders without a linked Member).
 - **Resource**: a Host, a Project (its Host is its parent), a Team, a

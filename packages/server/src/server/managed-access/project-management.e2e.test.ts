@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
@@ -56,6 +56,7 @@ async function fixture() {
     permissions: DaemonPermission[];
     projects: Record<string, ProjectPrivilege[]>;
     daemonPrivileges?: ProjectPrivilege[];
+    projectFolders?: { allow: string[]; deny: string[] }[];
   }) => {
     const messages: SessionOutboundMessage[] = [];
     const snapshot = createProviderSnapshotManagerStub();
@@ -76,6 +77,7 @@ async function fixture() {
           ]),
         ),
         ...(grant.daemonPrivileges ? { daemonPrivileges: new Set(grant.daemonPrivileges) } : {}),
+        ...(grant.projectFolders ? { projectFolders: grant.projectFolders } : {}),
       },
       logger,
       paseoHome: daemon.paseoHome,
@@ -151,8 +153,8 @@ test("Full access on a Host adds a Project in a folder no Project covers", async
   ).toBe("denied");
 });
 
-test("Full access on one Project adds Projects only inside it", async () => {
-  const { root, projects, addProject, open } = await fixture();
+test("Full access on one Project manages it but adds no Project, not even inside it", async () => {
+  const { root, addProject, open } = await fixture();
   const repo = await addProject("repo");
   const inside = path.join(repo.rootPath, "packages", "app");
   const outside = path.join(root, "anywhere");
@@ -161,27 +163,42 @@ test("Full access on one Project adds Projects only inside it", async () => {
     permissions: [...SESSION, "workspace.manage"],
     projects: { [repo.projectId]: FULL_ACCESS },
   });
+  for (const [requestId, cwd] of [
+    ["out", outside],
+    ["in", inside],
+  ]) {
+    expect(await project.request({ type: "project.add.request", requestId, cwd })).toBe("denied");
+  }
+  // Re-adding its own Project creates nothing and stays allowed.
   expect(
-    await project.request({ type: "project.add.request", requestId: "out", cwd: outside }),
-  ).toBe("denied");
-  expect(
-    await project.request({ type: "project.add.request", requestId: "in", cwd: inside }),
-  ).toMatchObject({
-    error: null,
+    await project.request({ type: "project.add.request", requestId: "again", cwd: repo.rootPath }),
+  ).toMatchObject({ error: null });
+});
+
+test("Full access on a Host adds Projects only where the folder rules allow, never nested", async () => {
+  const { root, projects, addProject, open } = await fixture();
+  const repo = await addProject("repo");
+  const allowed = path.join(root, "team", "app");
+  const other = path.join(root, "other");
+  const nested = path.join(repo.rootPath, "nested");
+  await Promise.all([mkdir(allowed, { recursive: true }), mkdir(other), mkdir(nested)]);
+  const host = open({
+    permissions: [...SESSION, "workspace.manage"],
+    projects: { [repo.projectId]: FULL_ACCESS },
+    daemonPrivileges: FULL_ACCESS,
+    // Grant rules are matched as written, not through symlinks (macOS tmp is /private/var).
+    projectFolders: [{ allow: [path.join(await realpath(root), "team", "**")], deny: [] }],
   });
-  expect((await projects.list()).map(({ rootPath }) => rootPath)).toEqual(
-    expect.arrayContaining([repo.rootPath, inside]),
-  );
-  // The nested Project is a new Project that no grant names, and the deepest
-  // Project owns its folder: its own creator no longer reaches inside it.
-  await mkdir(path.join(inside, "deeper"));
   expect(
-    await project.request({
-      type: "project.add.request",
-      requestId: "deeper",
-      cwd: path.join(inside, "deeper"),
-    }),
-  ).toBe("denied");
+    await host.request({ type: "project.add.request", requestId: "ok", cwd: allowed }),
+  ).toMatchObject({ error: null });
+  for (const [requestId, cwd] of [
+    ["other", other],
+    ["nested", nested],
+  ]) {
+    expect(await host.request({ type: "project.add.request", requestId, cwd })).toBe("denied");
+  }
+  expect((await projects.list()).map(({ rootPath }) => rootPath)).toContain(allowed);
 });
 
 test("Developer adds no Project, even inside one it works in", async () => {

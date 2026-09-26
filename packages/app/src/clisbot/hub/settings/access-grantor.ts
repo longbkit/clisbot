@@ -34,6 +34,15 @@ export interface ViewerHoldings {
   privileges: ReadonlySet<string> | "all";
   /** Undefined means no Agent ceiling: unrestricted, Administrator, or a kind without one. */
   agentConfigurations: readonly AgentConfigurationGrant[] | undefined;
+  /** Undefined means every Terminal profile: unrestricted, Terminal, or Administrator. */
+  terminalProfiles?: "*" | readonly string[];
+  /** Undefined means no narrowing to pass on: some creating Host grant is un-narrowed. */
+  projectFolders?: readonly ProjectFolderRules[];
+}
+
+export interface ProjectFolderRules {
+  allow: string[];
+  deny: string[];
 }
 
 export function viewerAuthority(
@@ -70,13 +79,78 @@ export function viewerHoldings(
   );
   const privileges = new Set(applicable.flatMap((grant) => grant.privileges));
   const scopesAgents = target.kind === "daemon" || target.kind === "project";
+  const everyTerminal = privileges.has("terminal.use") || privileges.has("daemon.manage");
+  const terminalProfiles = everyTerminal
+    ? undefined
+    : unionProfiles(applicable.map(({ constraints }) => constraints["terminalProfiles"]));
+  const projectFolders = privileges.has("daemon.manage") ? undefined : heldFolders(applicable);
   return {
     privileges,
     agentConfigurations:
       !scopesAgents || privileges.has("daemon.manage")
         ? undefined
         : applicable.flatMap(({ constraints }) => agentConfigurationsOf(constraints)),
+    ...(terminalProfiles === undefined ? {} : { terminalProfiles }),
+    ...(projectFolders === undefined ? {} : { projectFolders }),
   };
+}
+
+/** The Terminal profiles the viewer may pass on, from the Host's catalog. */
+export function shareableTerminalProfiles<T extends { id: string }>(
+  catalog: readonly T[] | undefined,
+  holdings: ViewerHoldings,
+): T[] {
+  const own = holdings.terminalProfiles;
+  if (catalog === undefined) return [];
+  if (own === undefined || own === "*") return [...catalog];
+  return catalog.filter(({ id }) => own.includes(id));
+}
+
+/**
+ * The folder narrowing a narrowed grantor must pass on: their allowed folders and
+ * every deny rule. Undefined when some creating Host grant of theirs is un-narrowed.
+ */
+export function folderNarrowingToPassOn(holdings: ViewerHoldings): ProjectFolderRules | undefined {
+  const rules = holdings.projectFolders;
+  if (rules === undefined) return undefined;
+  return {
+    allow: [...new Set(rules.flatMap(({ allow }) => allow))],
+    deny: [...new Set(rules.flatMap(({ deny }) => deny))],
+  };
+}
+
+/** Whether the viewer may pass on every profile, including ones added later. */
+export function sharesEveryTerminalProfile(holdings: ViewerHoldings): boolean {
+  return holdings.terminalProfiles === undefined || holdings.terminalProfiles === "*";
+}
+
+function unionProfiles(values: readonly unknown[]): "*" | string[] | undefined {
+  const selections = values.filter(
+    (value): value is "*" | string[] =>
+      value === "*" || (Array.isArray(value) && value.every((id) => typeof id === "string")),
+  );
+  if (selections.length === 0) return [];
+  if (selections.includes("*")) return "*";
+  return [...new Set(selections.flatMap((value) => (value === "*" ? [] : value)))];
+}
+
+function heldFolders(applicable: readonly EffectiveGrant[]): ProjectFolderRules[] | undefined {
+  const creating = applicable.filter(
+    ({ resource, privileges }) =>
+      resource.kind === "daemon" && privileges.includes("workspace.manage"),
+  );
+  const rules = creating.map(({ constraints }) => folderRulesOf(constraints["projectFolders"]));
+  if (rules.length === 0 || rules.some((rule) => rule === null)) return undefined;
+  return rules.filter((rule): rule is ProjectFolderRules => rule !== null);
+}
+
+function folderRulesOf(value: unknown): ProjectFolderRules | null {
+  if (typeof value !== "object" || value === null) return null;
+  const allow = Reflect.get(value, "allow");
+  const deny = Reflect.get(value, "deny");
+  const strings = (list: unknown): list is string[] =>
+    Array.isArray(list) && list.every((item) => typeof item === "string");
+  return strings(allow) && strings(deny) ? { allow, deny } : null;
 }
 
 /** Whether the viewer may add, change, or remove anyone on this resource at all. */

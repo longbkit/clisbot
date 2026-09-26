@@ -10,7 +10,7 @@ import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Globe, SquarePen, SquareTerminal } from "lucide-react-native";
 import invariant from "tiny-invariant";
-import { useDaemonConfig } from "@/hooks/use-daemon-config";
+import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import { resolvePluginIcon } from "@/plugins/icons";
 import { useInstalledPlugins } from "@/plugins/registry";
 import { pluginPanelSupportsLocation } from "@/plugins/workspace-panels/locations";
@@ -25,10 +25,7 @@ import {
   type PanelPresentation,
 } from "@/panels/panel-registry";
 import { ensurePanelsRegistered } from "@/panels/register-panels";
-import {
-  getTerminalProfileIcon,
-  resolveTerminalProfiles,
-} from "@getpaseo/protocol/terminal-profiles";
+import { getTerminalProfileIcon } from "@getpaseo/protocol/terminal-profiles";
 import { getBuiltInLaunchOrder, type BuiltInLaunchItemId } from "./internal/catalog";
 
 export type WorkspaceTabLaunchPurpose = "primary" | "supporting";
@@ -42,6 +39,8 @@ export interface NewTabLauncher {
   showPullRequest: boolean;
   showBrowser: boolean;
   terminalDisabled: boolean;
+  /** Clisbot Managed Access: the Project whose Terminal grants decide the terminal rows. */
+  workspaceDirectory?: string | null;
   launch: (selection: NewTabSelection, destination: WorkspaceTabLaunchDestination) => void;
 }
 
@@ -103,7 +102,10 @@ export function useWorkspaceTabLaunchCatalog(input: {
   const router = useRouter();
   const launcher = useContext(NewTabLauncherContext);
   invariant(launcher, "NewTabLauncherProvider is required");
-  const { config } = useDaemonConfig(serverId);
+  const terminalAccess = useLaunchableTerminalProfiles(
+    serverId,
+    launcher.workspaceDirectory ?? null,
+  );
   const plugins = useInstalledPlugins();
   ensurePanelsRegistered();
 
@@ -139,6 +141,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
         Icon: SquareTerminal,
         shortcutActionId: "workspace-terminal-new",
         disabled: launcher.terminalDisabled,
+        hidden: !terminalAccess.shell,
         panelKind: "terminal",
         toggleTarget: null,
         launch: launchSelection(BUILT_IN_SELECTIONS.terminal),
@@ -224,7 +227,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
       }
     }
 
-    const profiles = resolveTerminalProfiles(config?.terminalProfiles);
+    const profiles = terminalAccess.profiles;
     const groups: WorkspaceTabLaunchGroup[] = [{ id: "tabs", label: null, items: tabItems }];
     if (pluginItems.length > 0) {
       groups.push({ id: "plugin-panels", label: null, items: pluginItems });
@@ -242,16 +245,20 @@ export function useWorkspaceTabLaunchCatalog(input: {
           toggleTarget: null,
           launch: launchSelection({ kind: "terminal", profile }),
         })),
-        accessory: {
-          id: "edit-terminal-profiles",
-          label: t("workspace.tabs.actions.editTerminalProfiles"),
-          run: editTerminalProfiles,
-        },
+        ...(terminalAccess.canManageProfiles
+          ? {
+              accessory: {
+                id: "edit-terminal-profiles",
+                label: t("workspace.tabs.actions.editTerminalProfiles"),
+                run: editTerminalProfiles,
+              },
+            }
+          : {}),
       });
     }
     return groups;
   }, [
-    config?.terminalProfiles,
+    terminalAccess,
     editTerminalProfiles,
     launchSelection,
     launcher,

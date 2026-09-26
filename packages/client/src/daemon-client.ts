@@ -554,6 +554,10 @@ type AgentPermissionResolvedPayload = AgentPermissionResolvedMessage["payload"];
 type ListTerminalsPayload = ListTerminalsResponse["payload"];
 type CreateTerminalPayload = CreateTerminalResponse["payload"];
 export type RenameTerminalResult = z.infer<typeof RenameTerminalResponseSchema>["payload"];
+export type TerminalProfileListResult = Extract<
+  SessionOutboundMessage,
+  { type: "terminal.profile.list.response" }
+>["payload"];
 type SubscribeTerminalPayload = SubscribeTerminalResponse["payload"];
 type CloseItemsPayload = CloseItemsResponse["payload"];
 type KillTerminalPayload = KillTerminalResponse["payload"];
@@ -5860,6 +5864,10 @@ export class DaemonClient {
       args?: string[];
       workspaceId?: string;
       size?: { rows: number; cols: number };
+      // Clisbot Managed Access: the daemon launches its own copy of this Terminal
+      // profile; `command`/`args` stay for daemons that predate it.
+      profileId?: string;
+      prompt?: string;
     },
   ): Promise<CreateTerminalPayload> {
     const resolvedRequestId = this.createRequestId(requestId);
@@ -5872,6 +5880,8 @@ export class DaemonClient {
       args: options?.args,
       ...(options?.workspaceId !== undefined ? { workspaceId: options.workspaceId } : {}),
       ...(options?.size !== undefined ? { size: options.size } : {}),
+      ...(options?.profileId !== undefined ? { profileId: options.profileId } : {}),
+      ...(options?.prompt !== undefined ? { prompt: options.prompt } : {}),
       requestId: resolvedRequestId,
     });
     return this.sendCorrelatedRequest({
@@ -5879,6 +5889,15 @@ export class DaemonClient {
       message,
       responseType: "create_terminal_response",
       options: { skipQueue: true },
+    });
+  }
+
+  /** Terminal profiles this session may launch in `cwd`'s Project, and whether it has a shell. */
+  async listTerminalProfiles(cwd: string, requestId?: string): Promise<TerminalProfileListResult> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "terminal.profile.list.request", cwd },
+      responseType: "terminal.profile.list.response",
     });
   }
 

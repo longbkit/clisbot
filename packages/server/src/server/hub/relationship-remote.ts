@@ -69,6 +69,7 @@ export interface HubProject {
   projectId: string;
   name: string;
   agentConfigurationCatalog?: HubAgentConfigurationCatalog;
+  terminalProfileCatalog?: readonly { id: string; name: string }[];
 }
 
 export interface HubAgentConfigurationCatalog {
@@ -174,8 +175,12 @@ const AccessTicketAdmissionSchema = z.object({
           thinkingOptionIds: z.union([z.literal("*"), z.array(z.string().min(1))]),
         }),
       ),
+      terminalProfiles: z.union([z.literal("*"), z.array(z.string().min(1))]).optional(),
     }),
   ),
+  projectFolders: z
+    .array(z.object({ allow: z.array(z.string()), deny: z.array(z.string()) }))
+    .optional(),
   // Unlike Project privileges, unknown values here are dropped rather than
   // rejected: a newer Hub may add Host-level privileges this daemon cannot use.
   daemonPrivileges: z.array(z.string()).optional(),
@@ -510,10 +515,14 @@ function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
         {
           privileges: new Set(project.privileges),
           agentConfigurations: project.agentConfigurations,
+          ...(project.terminalProfiles === undefined
+            ? {}
+            : { terminalProfiles: project.terminalProfiles }),
         },
       ]),
     ),
     daemonPrivileges: new Set((admission.daemonPrivileges ?? []).filter(isProjectPrivilege)),
+    ...(admission.projectFolders === undefined ? {} : { projectFolders: admission.projectFolders }),
     leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
   };
 }
