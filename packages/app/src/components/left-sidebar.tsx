@@ -1,3 +1,4 @@
+import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
 import { FolderPlus, GitBranch, Import, Server, Settings, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -570,6 +571,10 @@ function MobileSidebar({
   insetsBottom,
   closeSidebar,
 }: MobileSidebarProps) {
+  const botsAndChatsSections = useMemo(
+    () => <BotsAndChatsSidebarSections onBeforeNavigate={closeSidebar} />,
+    [closeSidebar],
+  );
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture();
 
@@ -638,6 +643,7 @@ function MobileSidebar({
             onImportSession={handleImportSession}
             parentGestureRef={closeGestureRef}
             dragGestureHostActive={active}
+            listLeadingComponent={botsAndChatsSections}
             listHeaderComponent={workspacesSectionHeaderElement}
           />
         )}
@@ -814,6 +820,7 @@ function DesktopSidebar({
             onRefresh={handleRefresh}
             onAddProject={handleOpenProject}
             onImportSession={handleImportSession}
+            listLeadingComponent={botsAndChatsSectionsElement}
             listHeaderComponent={workspacesSectionHeaderElement}
           />
         )}
@@ -1047,3 +1054,5 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.popoverForeground,
   },
 }));
+
+const botsAndChatsSectionsElement = <BotsAndChatsSidebarSections />;

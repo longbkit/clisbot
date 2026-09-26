@@ -1,3 +1,6 @@
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { PermissionRequestCard } from "@/agent-stream/view";
+import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useCallback, useMemo, type ReactNode } from "react";
 import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -18,7 +21,13 @@ export type RespondToPermission = (
 ) => void;
 
 /** The compact detail level of the cowork view: text streams, thoughts and tools fold. */
-function renderLiveItem(item: StreamItem, serverId: string, isLast: boolean): ReactNode {
+function renderLiveItem(
+  item: StreamItem,
+  serverId: string,
+  isLast: boolean,
+  bot: ChatBotIdentity,
+  client: DaemonClient | null,
+): ReactNode {
   switch (item.kind) {
     case "assistant_message":
       return (
@@ -29,6 +38,8 @@ function renderLiveItem(item: StreamItem, serverId: string, isLast: boolean): Re
           timestamp={item.timestamp.getTime()}
           serverId={serverId}
           phase="streaming"
+          client={client}
+          workspaceRoot={bot.cwd}
         />
       );
     case "thought":
@@ -76,10 +87,13 @@ function renderLiveItem(item: StreamItem, serverId: string, isLast: boolean): Re
 function LivePermission({
   permission,
   onRespond,
+  serverId,
 }: {
   permission: PendingPermission;
   onRespond?: RespondToPermission;
+  serverId: string;
 }) {
+  const client = useHostRuntimeClient(serverId);
   const respond = useCallback(
     (response: AgentPermissionResponse) => onRespond?.(permission, response),
     [onRespond, permission],
@@ -87,8 +101,7 @@ function LivePermission({
   if (permission.request.kind === "question") {
     return <QuestionFormCard permission={permission} onRespond={respond} isResponding={false} />;
   }
-  const title = permission.request.title ?? permission.request.name ?? permission.key;
-  return <Notification level="warning" message={title} />;
+  return <PermissionRequestCard permission={permission} client={client} serverId={serverId} />;
 }
 
 /** A bot's in-progress turn: live items and approvals under its face, pinned to its group. */
@@ -103,6 +116,7 @@ export const ChatLiveRow = memo(function ChatLiveRow({
   serverId: string;
   onRespondPermission?: RespondToPermission;
 }) {
+  const client = useHostRuntimeClient(serverId);
   const face = useMemo(
     () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
     [bot.avatar, bot.botId, bot.name],
@@ -111,12 +125,13 @@ export const ChatLiveRow = memo(function ChatLiveRow({
   return (
     <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
       {row.items.map((item, index) =>
-        renderLiveItem(item, serverId, index === row.items.length - 1),
+        renderLiveItem(item, serverId, index === row.items.length - 1, bot, client),
       )}
       {row.permissions.map((permission) => (
         <LivePermission
           key={permission.key}
           permission={permission}
+          serverId={serverId}
           onRespond={onRespondPermission}
         />
       ))}

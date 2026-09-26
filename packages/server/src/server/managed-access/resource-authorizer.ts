@@ -101,6 +101,9 @@ export class ManagedResourceAuthorizer {
     private readonly agentStorage: AgentStorageReader,
     private readonly terminalManager: TerminalManager | null,
     private readonly agentConfigurationSafety: AgentConfigurationSafetyResolver,
+    private readonly allowsPrivateAgent: (
+      labels: Record<string, string> | undefined,
+    ) => boolean = () => true,
   ) {
     // Mode off must retain the upstream path exactly: no registry reads,
     // subscriptions, managed state, or background rejection.
@@ -209,7 +212,7 @@ export class ManagedResourceAuthorizer {
     await this.ready();
     const live = this.agentManager.getAgent(agentId);
     const record = live ?? this.storedAgents.get(agentId) ?? (await this.agentStorage.get(agentId));
-    if (!record?.workspaceId) return false;
+    if (!record?.workspaceId || !this.allowsPrivateAgent(record.labels)) return false;
     if (!("lifecycle" in record)) this.storedAgents.set(record.id, record);
     return this.allowsWorkspace(record.workspaceId, privilege);
   }
@@ -217,7 +220,9 @@ export class ManagedResourceAuthorizer {
   allowsAgentSync(agentId: string, privilege: ProjectPrivilege = "project.use"): boolean {
     if (!this.isRestricted()) return true;
     const record = this.agentManager.getAgent(agentId) ?? this.storedAgents.get(agentId);
-    return record?.workspaceId ? this.allowsWorkspaceSync(record.workspaceId, privilege) : false;
+    return record?.workspaceId && this.allowsPrivateAgent(record.labels)
+      ? this.allowsWorkspaceSync(record.workspaceId, privilege)
+      : false;
   }
 
   /** A shell needs Terminal; a profile terminal needs Terminal or that profile. */
@@ -385,6 +390,7 @@ export class ManagedResourceAuthorizer {
       const requestId = "payload" in message ? stringProperty(message.payload, "requestId") : null;
       if (requestId !== null && this.admittedProjectCreations.delete(requestId)) return true;
     }
+    if (message.type.startsWith("chat.")) return true; // ChatSession checks owner and current Project authority.
     const bot = allowsBotOutbound(message, (projectId) => this.allowsProject(projectId));
     if (bot !== undefined) return bot;
     if (message.type.startsWith("workspace.label.")) {
@@ -634,6 +640,15 @@ export class ManagedResourceAuthorizer {
     });
   }
 
+  /** Chat delivery may reuse a session whose controls changed in cowork. */
+  async allowsChatSessionConfiguration(agentId: string): Promise<boolean> {
+    if (!this.isRestricted()) return true;
+    await this.ready();
+    const record = this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId));
+    if (!record || ("archivedAt" in record && record.archivedAt)) return true; // Replacement is checked against Bot launch defaults.
+    return this.allowsExistingAgentConfiguration(agentId, {});
+  }
+
   private async allowsExistingAgentConfiguration(
     agentId: string,
     update: {
@@ -709,6 +724,7 @@ export class ManagedResourceAuthorizer {
 
     const management = await this.allowsWorkspaceManagementInbound(message);
     if (management !== undefined) return management;
+    if (message.type.startsWith("chat.")) return true; // ChatSession resolves private Chat authority.
     const bot = allowsBotInbound(message, this.authorization, this.admittedProjectCreations);
     if (bot !== undefined) return bot;
 

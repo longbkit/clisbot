@@ -29,15 +29,15 @@ import { ProviderPaseoToolsPolicySchema } from "./provider-config.js";
 import { TOOL_CALL_ICON_NAMES } from "./agent-types.js";
 import { WORKSPACE_LABEL_COLORS } from "./workspace-labels.js";
 import {
-  ChatCreateRequestSchema,
-  ChatListRequestSchema,
+  ChatCreateRequestSchema as LegacyChatCreateRequestSchema,
+  ChatListRequestSchema as LegacyChatListRequestSchema,
   ChatInspectRequestSchema,
   ChatDeleteRequestSchema,
   ChatPostRequestSchema,
   ChatReadRequestSchema,
   ChatWaitRequestSchema,
-  ChatCreateResponseSchema,
-  ChatListResponseSchema,
+  ChatCreateResponseSchema as LegacyChatCreateResponseSchema,
+  ChatListResponseSchema as LegacyChatListResponseSchema,
   ChatInspectResponseSchema,
   ChatDeleteResponseSchema,
   ChatPostResponseSchema,
@@ -57,6 +57,26 @@ import {
   BotTemplateSeedResponseSchema,
   BotUpdatedSchema,
 } from "./bots/rpc-schemas.js";
+import {
+  ChatCreateRequestSchema,
+  ChatListRequestSchema,
+  ChatParticipantAddRequestSchema,
+  ChatParticipantRemoveRequestSchema,
+  ChatMessageSendRequestSchema,
+  ChatTranscriptFetchRequestSchema,
+  ChatArchiveRequestSchema,
+  ChatSessionResetRequestSchema,
+  ChatCreateResponseSchema,
+  ChatListResponseSchema,
+  ChatParticipantAddResponseSchema,
+  ChatParticipantRemoveResponseSchema,
+  ChatMessageSendResponseSchema,
+  ChatTranscriptFetchResponseSchema,
+  ChatArchiveResponseSchema,
+  ChatSessionResetResponseSchema,
+  ChatTranscriptAppendedSchema,
+  ChatUpdatedSchema,
+} from "./chats/rpc-schemas.js";
 import {
   ScheduleCreateRequestSchema,
   ScheduleListRequestSchema,
@@ -3213,6 +3233,9 @@ export type HubExecutionControlRequest = z.infer<typeof HubExecutionControlReque
 
 // These connection event streams have no directory bootstrap or timeline membership.
 export const SessionEventSubscriptionSchema = z.enum([
+  "bot.updated",
+  "chat.updated",
+  "chat.transcript.appended",
   "project.update",
   "providers_snapshot_update",
   "agent_attention_required",
@@ -3326,6 +3349,14 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   BotUpdateRequestSchema,
   BotArchiveRequestSchema,
   BotTemplateSeedRequestSchema,
+  ChatCreateRequestSchema,
+  ChatListRequestSchema,
+  ChatParticipantAddRequestSchema,
+  ChatParticipantRemoveRequestSchema,
+  ChatMessageSendRequestSchema,
+  ChatTranscriptFetchRequestSchema,
+  ChatArchiveRequestSchema,
+  ChatSessionResetRequestSchema,
   WorkspaceRecoveryInspectRequestSchema,
   WorkspaceRecoveryRestoreRequestSchema,
   SetVoiceModeMessageSchema,
@@ -3485,8 +3516,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   TerminalInputSchema,
   KillTerminalRequestSchema,
   CaptureTerminalRequestSchema,
-  ChatCreateRequestSchema,
-  ChatListRequestSchema,
+  LegacyChatCreateRequestSchema,
+  LegacyChatListRequestSchema,
   ChatInspectRequestSchema,
   ChatDeleteRequestSchema,
   ChatPostRequestSchema,
@@ -7028,6 +7059,16 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   BotArchiveResponseSchema,
   BotTemplateSeedResponseSchema,
   BotUpdatedSchema,
+  ChatCreateResponseSchema,
+  ChatListResponseSchema,
+  ChatParticipantAddResponseSchema,
+  ChatParticipantRemoveResponseSchema,
+  ChatMessageSendResponseSchema,
+  ChatTranscriptFetchResponseSchema,
+  ChatArchiveResponseSchema,
+  ChatSessionResetResponseSchema,
+  ChatTranscriptAppendedSchema,
+  ChatUpdatedSchema,
   WorkspaceLabelAssignmentSetResponseSchema,
   WorkspaceLabelUpdateResponseSchema,
   WorkspaceLabelDeleteResponseSchema,
@@ -7184,8 +7225,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CaptureTerminalResponseSchema,
   TerminalStreamExitSchema,
   TerminalAttentionRequiredSchema,
-  ChatCreateResponseSchema,
-  ChatListResponseSchema,
+  LegacyChatCreateResponseSchema,
+  LegacyChatListResponseSchema,
   ChatInspectResponseSchema,
   ChatDeleteResponseSchema,
   ChatPostResponseSchema,
@@ -7360,8 +7401,8 @@ export type ProviderUsageDetail = z.infer<typeof ProviderUsageDetailSchema>;
 export type ProviderUsageListResponseMessage = z.infer<
   typeof ProviderUsageListResponseMessageSchema
 >;
-export type ChatCreateResponse = z.infer<typeof ChatCreateResponseSchema>;
-export type ChatListResponse = z.infer<typeof ChatListResponseSchema>;
+export type ChatCreateResponse = z.infer<typeof LegacyChatCreateResponseSchema>;
+export type ChatListResponse = z.infer<typeof LegacyChatListResponseSchema>;
 export type ChatInspectResponse = z.infer<typeof ChatInspectResponseSchema>;
 export type ChatDeleteResponse = z.infer<typeof ChatDeleteResponseSchema>;
 export type ChatPostResponse = z.infer<typeof ChatPostResponseSchema>;
@@ -7428,8 +7469,8 @@ export type RefreshProvidersSnapshotRequestMessage = z.infer<
 export type ProviderDiagnosticRequestMessage = z.infer<
   typeof ProviderDiagnosticRequestMessageSchema
 >;
-export type ChatCreateRequest = z.infer<typeof ChatCreateRequestSchema>;
-export type ChatListRequest = z.infer<typeof ChatListRequestSchema>;
+export type ChatCreateRequest = z.infer<typeof LegacyChatCreateRequestSchema>;
+export type ChatListRequest = z.infer<typeof LegacyChatListRequestSchema>;
 export type ChatInspectRequest = z.infer<typeof ChatInspectRequestSchema>;
 export type ChatDeleteRequest = z.infer<typeof ChatDeleteRequestSchema>;
 export type ChatPostRequest = z.infer<typeof ChatPostRequestSchema>;

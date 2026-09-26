@@ -151,6 +151,7 @@ describe("ChatEngine", () => {
     });
     expect(result).toEqual({ messageId: "m1", seq: 1, targets: [alpha.id], duplicate: false });
     expect(h.appended.map((line) => line.id)).toEqual(["m1"]);
+    expect(h.appended[0]?.deliveryBotIds).toEqual([alpha.id]);
     await h.engine.idle();
     expect(h.sent).toEqual([
       {
@@ -166,6 +167,12 @@ describe("ChatEngine", () => {
     });
 
     await h.completeTurn("agent-bot_a-1", "Here it is.", "turn-1");
+    expect((await h.store.require("cht_1")).participants[0]?.completedTurn).toMatchObject({
+      agentId: "agent-bot_a-1",
+      turnId: "turn-1",
+      messageIds: ["m1"],
+      lastRow: { epoch: "ep", seq: 2 },
+    });
     const [, reply] = await h.lines("cht_1");
     expect(reply).toMatchObject({
       seq: 2,
@@ -188,6 +195,19 @@ describe("ChatEngine", () => {
         "Long Luong (user:usr_1): Thanks, summarize it",
       ].join("\n"),
     );
+  });
+
+  test("concurrent messages admit in order without consuming future context", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id] });
+    await Promise.all([
+      h.engine.send({ chatId: "cht_1", text: "first", messageId: "m1" }),
+      h.engine.send({ chatId: "cht_1", text: "second", messageId: "m2" }),
+    ]);
+    await h.engine.idle();
+    expect(h.sent.map((item) => item.prompt)).toEqual(["user: first", "user: second"]);
+    expect(h.agents.size).toBe(1);
+    expect((await h.store.require("cht_1")).participants[0]?.deliveredSeq).toBe(2);
   });
 
   test("a group: no mention reaches every bot in parallel, a mention reaches one and leaves the other's mark alone", async () => {
@@ -314,4 +334,52 @@ describe("ChatEngine", () => {
     await expect(h.engine.send({ chatId: "cht_1", text: "hi" })).rejects.toThrow("is archived");
     expect(await h.lines("cht_1")).toEqual([]);
   });
+});
+
+test("removed bots and pre-/new sessions cannot publish or forward late outcomes", async () => {
+  const h = await harness();
+  await h.store.create({ id: "cht_late", botIds: [alpha.id, beta.id] });
+  await h.engine.send({ chatId: "cht_late", text: "@alpha start", messageId: "late-input" });
+  await h.engine.idle();
+  const outcome = {
+    agentId: "agent-bot_a-1",
+    chatId: "cht_late",
+    botId: alpha.id,
+    turnId: "late-turn",
+    text: "@beta unwanted",
+    lastRow: null,
+    expectation: null,
+  };
+  await h.store.removeParticipant("cht_late", alpha.id);
+  await h.engine.onTurnCompleted(outcome);
+  await h.engine.onTurnFailed(outcome, "late error");
+  expect(await h.lines("cht_late")).toHaveLength(1);
+  expect(h.sent).toHaveLength(1);
+  await h.store.addParticipant("cht_late", alpha.id);
+  await h.engine.newSession("cht_late", alpha.id);
+  await h.engine.onTurnCompleted(outcome);
+  expect((await h.lines("cht_late")).some((line) => line.text.includes("unwanted"))).toBe(false);
+});
+
+test("a failed completion receipt write never publishes recovered text as a final answer", async () => {
+  const h = await harness();
+  await h.store.create({ id: "cht_receipt_fail", botIds: [alpha.id] });
+  await h.engine.send({ chatId: "cht_receipt_fail", text: "hello", messageId: "m1" });
+  await h.engine.idle();
+  h.store.recordCompletedTurn = async () => {
+    throw new Error("disk unavailable");
+  };
+  await expect(
+    h.engine.onTurnCompleted({
+      agentId: "agent-bot_a-1",
+      chatId: "cht_receipt_fail",
+      botId: alpha.id,
+      turnId: "turn",
+      text: "not committed",
+      lastRow: { epoch: "ep", seq: 2 },
+      expectation: { messageIds: ["m1"], hop: 0, disposition: "turn_started" },
+    }),
+  ).rejects.toThrow("disk unavailable");
+  await h.engine.idle();
+  expect((await h.lines("cht_receipt_fail")).map((line) => line.text)).toEqual(["hello"]);
 });

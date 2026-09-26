@@ -25,6 +25,11 @@ export function resourceKey(resource: { kind: string; id: string }): string {
   return `${resource.kind}\0${resource.id}`;
 }
 
+/** A Project that is a Bot's home. The grant on it stays a Project grant; only the picker differs. */
+export function isBotProject(resource: Pick<AccessResource, "kind" | "bot">): boolean {
+  return resource.kind === "project" && resource.bot !== undefined;
+}
+
 export function assignmentResourceOptions(
   resources: AccessResource[],
   availableOnly: boolean,
@@ -44,14 +49,16 @@ export function assignmentResourceOptions(
       const parent = resource.parent
         ? (names.get(resourceKey(resource.parent)) ?? resource.parent.id)
         : null;
+      const bot = isBotProject(resource);
       return {
         id: resourceKey(resource),
         value: resourceKey(resource),
         label: resource.name,
-        group: groups[resource.kind],
+        group: bot ? "Bots" : groups[resource.kind],
         description:
-          [parent, !resource.available ? "Unavailable" : null].filter(Boolean).join(" · ") ||
-          resourceKindLabel(resource.kind),
+          [bot ? "Bot" : null, parent, !resource.available ? "Unavailable" : null]
+            .filter(Boolean)
+            .join(" · ") || resourceKindLabel(resource.kind),
       };
     });
 }

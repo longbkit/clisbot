@@ -69,3 +69,12 @@ describe("transcript store", () => {
     expect(selectTranscript(useTranscriptStore.getState(), other).messages).toHaveLength(1);
   });
 });
+
+it("preserves a live push arriving before a stale page response", () => {
+  const store = useTranscriptStore.getState();
+  store.append(KEY, line(3));
+  store.replacePage(KEY, { messages: [line(1), line(2)], hasOlder: false });
+  expect(selectTranscript(useTranscriptStore.getState(), KEY).messages.map((m) => m.seq)).toEqual([
+    1, 2, 3,
+  ]);
+});

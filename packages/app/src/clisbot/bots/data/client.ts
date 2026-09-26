@@ -1,11 +1,6 @@
 import type { BotPayload, ChatPayload, ChatTranscriptPage } from "./contracts";
 
-/**
- * The daemon calls the bots feature reads. The next wave implements this with the
- * `DaemonClient` method block (`botList`, `chatList`, `chatTranscriptFetch`,
- * docs/features/bots-and-chats/plans/app.md §6); until then the hooks take it as an input so
- * they can be built and tested against a fake.
- */
+/** Read adapter for protocol records projected into the feature views. */
 export interface BotsClient {
   botList(): Promise<{ bots: BotPayload[]; error?: string }>;
   chatList(): Promise<{ chats: ChatPayload[]; error?: string }>;
@@ -18,6 +13,8 @@ export interface BotsClient {
 
 export interface BotsRuntimeSnapshot {
   connectionStatus: string;
+  clientGeneration?: number;
+  connectionEpoch?: number;
 }
 
 /** Same shape as `ScheduleRuntime`: connectivity is read at fetch time, per host. */

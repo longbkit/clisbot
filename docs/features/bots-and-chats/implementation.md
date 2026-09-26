@@ -11,17 +11,39 @@ the plan gets corrected in the same commit.
 | 2026-09-26 | Decisions D1–D15 recorded. Four plans written: server-bot, server-chat, app, cli-hub-naming. No code yet.                                                                                                                                                               |
 | 2026-09-26 | Wave 1 landed: daemon Bot store, home rules, templates and `bot.*` RPCs behind `daemon.bots.enabled`; Chat engine and storage (`chats/`) without RPC registration; app models, sidebar sections and chat screen under `clisbot/bots` without wiring; glossary and docs. |
 
-## Wave 2, in order
+## Integration completed (2026-09-26)
 
-1. Protocol `chats/rpc-schemas.ts`, `messages.ts` registration, validators, `operation-permissions.ts` rows; `session/chats/chat-session.ts`; bootstrap wiring of `createChatService` with a `BotLookup` over the bot store (`name` → `displayName`) and `start()` after the agent registry load.
-2. Client: `DaemonClient` methods for `bot.*` and `chat.*`, push subscriptions; the app swaps `clisbot/bots/data/contracts.ts` for the protocol types and the `"bots"` cast in `feature.ts` goes.
-3. App wiring: route files and `Stack.Screen` lines, `listLeadingComponent`, `hideBotProjects`, mutations, the create sheet, live heads through `viewedTimelineSync`, "Open in cowork".
-4. CLI: `bot start` / `hub init` on `bot.create`, manifest v2, delete the CLI template copy and `copy-templates.mjs`.
-5. Hub Project marker and the Access picker Bots group.
-6. Daemon e2e for `bot.*` and the chat flow; the flag-off byte-equivalence check.
+- Registered Chat schemas, validators, permission rules and daemon handlers; added typed client
+  methods and owned push subscriptions. Chat sessions inherit the creator's authorship.
+- Wired app routes, sidebar sections, Bot create/settings, group creation/options, live replies,
+  approvals/questions and cowork navigation. Text and voice dictation are supported; attachment
+  submission is explicitly disabled in this initial Chat surface.
+- Migrated CLI provisioning to daemon RPCs and v2 reference manifests; removed duplicate CLI
+  templates. Legacy adoption requires matching the existing workspace. Obsolete idle-agent and
+  workspace-switch flags fail explicitly instead of silently doing nothing.
+- Published Bot markers through the existing Project catalog and grouped them in Access. Project
+  grants share Bots; Chat records, transcripts and their agent sessions remain private per creator.
+  Both Bot defaults and actual resumed session configuration are checked against narrowed grants.
+  App query/transcript caches are scoped by client generation and connection epoch, so a new
+  admission must revalidate access before rendering old private data.
+- Fixed the pre-existing `channelFileRead` flag-off compatibility failure: publication depends on
+  a persisted Hub relationship, not merely the existence of a relationship controller.
+- Hardened idempotent creation, reserved-root checks, transcript receipt lookup, synchronous turn
+  events, concurrent admission and restart recovery. No global per-Bot execution queue was added.
 
-Known pre-existing failure: `upstream-compatibility.test.ts` reports `channelFileRead` in a flag-off
-`server_info`; it predates this feature and is not caused by `bots`.
+## Verification recorded
+
+Targeted protocol, daemon, CLI, Hub and app checks passed during integration. Socket E2Es cover
+Bot creation, direct/group messages, mention routing, retry idempotence, push delivery and restart;
+a separate managed socket test covers shared Bots and private Chat/session visibility. Feature-off
+compatibility passes. Recovery tests cover completion receipts, accepted-but-undispatched messages,
+scoped interruption notices and stale sessions after participant removal or `/new`.
+
+Browser QA used an isolated fake-provider daemon and the actual Expo web app: created personal and
+team Bots, sent direct and group messages, checked mention versus broadcast, observed live replies,
+reloaded persisted history and opened the same Bot session in cowork. Desktop and narrow mobile
+viewport screenshots were inspected. This is not a real-provider, native iOS or Electron runtime
+acceptance run; those release checks remain outstanding.
 
 Plan corrections from wave 1: the chat service lives in `chats/chat-service.ts` (the server package
 forbids barrel `index.ts`); `chats/final-answer.ts` holds the shared final-answer rule;
@@ -80,6 +102,7 @@ directory, and for daemon tasks the flag-off byte-equivalence check.
   files are seeded; the bot answers a first message and the transcript has both lines.
 - Two bots in one chat: a mention reaches one bot; no mention reaches both in parallel; a bot
   mentioning the other is forwarded once and stops at the hop limit.
-- Daemon restart mid-turn: the missing reply is backfilled from the timeline.
+- Daemon restart mid-turn: backfill only with a durable completion receipt matching the timeline;
+  otherwise show a scoped interrupted/unknown outcome without blindly retrying work.
 - A Member with a Project grant on the bot opens it and gets their own session; a Member without
   the grant does not see it.

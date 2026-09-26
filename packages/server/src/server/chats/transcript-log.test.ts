@@ -69,6 +69,20 @@ describe("TranscriptLog", () => {
     expect((await rebuilt.findById("m2"))?.seq).toBe(2);
   });
 
+  test("recovers ids older than the tail window when the index is lost", async () => {
+    const directory = await temporary();
+    const log = new TranscriptLog(directory);
+    for (let index = 1; index <= 260; index++) await log.append(userLine(`m${index}`));
+    await log.flush();
+    SessionEventLog.forgetAll();
+    await fs.rm(path.join(directory, "transcript.index.json"));
+    const rebuilt = new TranscriptLog(directory);
+    expect((await rebuilt.findById("m1"))?.seq).toBe(1);
+    expect(await rebuilt.findById("missing")).toBeNull();
+    await rebuilt.append(userLine("m261"));
+    expect((await rebuilt.findById("m261"))?.seq).toBe(261);
+  });
+
   test("pages tail, before and after windows like the timeline fetch", async () => {
     const log = new TranscriptLog(await temporary());
     for (let index = 1; index <= 5; index += 1) await log.append(userLine(`m${index}`));

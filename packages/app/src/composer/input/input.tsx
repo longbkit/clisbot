@@ -123,6 +123,7 @@ export interface MessageInputProps {
   /** When true, keep the grown input height after submit (text is preserved, not cleared). */
   preserveHeightOnSubmit?: boolean;
   attachments: ComposerAttachment[];
+  attachmentsEnabled?: boolean;
   cwd: string;
   attachmentMenuItems: AttachmentMenuItem[];
   onAttachButtonRef?: (node: View | null) => void;
@@ -1080,6 +1081,7 @@ interface ResolvedMessageInputProps {
   inputWrapperStyle: import("react-native").ViewStyle | undefined;
   attachmentSlot: React.ReactNode;
   inputMode: ComposerInputMode;
+  showAttachments: boolean;
   readOnly: boolean;
   textReplacement: TextReplacement;
   submitLabel: string | undefined;
@@ -1102,8 +1104,8 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     cwd: props.cwd,
     attachmentMenuItems: props.attachmentMenuItems,
     onAttachButtonRef: props.onAttachButtonRef,
-    onAddImages: props.onAddImages,
-    onPasteImages: props.onPasteImages,
+    onAddImages: props.attachmentsEnabled === false ? undefined : props.onAddImages,
+    onPasteImages: props.attachmentsEnabled === false ? undefined : props.onPasteImages,
     client: props.client,
     isReadyForDictation: props.isReadyForDictation,
     placeholder: props.placeholder,
@@ -1127,6 +1129,9 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     inputWrapperStyle: props.inputWrapperStyle,
     attachmentSlot: props.attachmentSlot,
     inputMode: props.inputMode ?? "chat",
+    showAttachments:
+      resolveComposerInputMode(props.inputMode ?? "chat").showAttachments &&
+      props.attachmentsEnabled !== false,
     readOnly: props.readOnly ?? false,
     textReplacement: props.textReplacement,
     submitLabel: props.submitLabel,
@@ -1182,6 +1187,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       inputWrapperStyle,
       attachmentSlot,
       inputMode,
+      showAttachments,
       readOnly,
       textReplacement,
       submitLabel,
@@ -1832,7 +1838,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             {/* Toolbar left: attachment button + agent controls */}
             <View style={styles.leftButtonGroup}>
               <AttachmentDropdown
-                visible={mode.showAttachments}
+                visible={showAttachments}
                 isConnected={isConnected}
                 disabled={disabled}
                 attachButtonStyle={attachButtonStyle}

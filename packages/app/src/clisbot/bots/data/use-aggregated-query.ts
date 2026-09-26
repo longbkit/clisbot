@@ -1,3 +1,4 @@
+import { botsSessionScope } from "./session-scope";
 import { useMemo } from "react";
 import type { QueryKey } from "@tanstack/react-query";
 import { useFetchQuery } from "@/data/query";
@@ -42,10 +43,14 @@ export function useAggregatedQuery<T>(input: AggregatedQueryInput<T>): Aggregate
     [connectionStatuses, serverIds],
   );
   const { hosts, runtime, load, allHostsFailedMessage } = input;
+  const admissionKey = serverIds
+    .map((id) => `${id}:${botsSessionScope(runtime.getSnapshot(id))}`)
+    .join("|");
   const query = useFetchQuery({
-    queryKey: [...input.queryKey, connectionStatusKey],
+    queryKey: [...input.queryKey, connectionStatusKey, admissionKey],
     queryFn: () => fetchAggregated({ hosts, runtime, load, allHostsFailedMessage }),
-    dataShape: "list",
+    // List placeholders must not carry data across a new transport admission.
+    dataShape: "value",
     staleTimeMs: LIST_STALE_TIME_MS,
     enabled: input.enabled ?? true,
   });

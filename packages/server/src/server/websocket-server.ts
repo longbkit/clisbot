@@ -111,6 +111,7 @@ import type { DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
 import { DirectorySyncService } from "./directory-sync/index.js";
 import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
 import type { WorkspaceLabelService } from "./workspace-labels/index.js";
+import type { ChatService } from "./chats/chat-service.js";
 import type { BotService } from "./bots/index.js";
 import {
   APPLICATION_SOCKET_LEASE_CHECK_INTERVAL_MS,
@@ -753,6 +754,7 @@ export class VoiceAssistantWebSocketServer {
     orchestrationSkills?: SessionOptions["orchestrationSkills"],
     workspaceLabelService?: WorkspaceLabelService,
     botService?: BotService,
+    private readonly chatService?: ChatService,
   ) {
     this.logger = logger.child({ module: "websocket-server" });
     this.workspaceSetupRuntime = workspaceSetupRuntime;
@@ -1613,6 +1615,7 @@ export class VoiceAssistantWebSocketServer {
       workspaceRegistry: this.workspaceRegistry,
       workspaceLabelService: this.workspaceLabelService ?? undefined,
       botService: this.botService ?? undefined,
+      chatService: this.chatService,
       directorySync: this.directorySync,
       scheduleService: this.scheduleService,
       checkoutDiffManager: this.checkoutDiffManager,
@@ -2148,7 +2151,7 @@ export class VoiceAssistantWebSocketServer {
         daemonSelfUpdate: this.daemonRuntimeConfig?.desktopManaged !== true,
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: true,
-        channelFileRead: true,
+        ...(this.hubRelationships?.status().daemonId != null ? { channelFileRead: true } : {}),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: true,
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.

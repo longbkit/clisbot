@@ -1,284 +1,138 @@
-import { mkdtemp, readFile, readlink, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { initializeAssistantWorkspace } from "./init.js";
 import { runBotStart, type BotStartDeps } from "./run.js";
+import { initializeAssistantWorkspace } from "./init.js";
 import { readBotManifest, writeBotManifest } from "./manifest.js";
-import { seedWorkspaceTemplate } from "./workspace-template.js";
-import type { ChannelAddInput } from "../channels/client.js";
 
-async function fixture(overrides: Partial<BotStartDeps> = {}) {
+async function fixture() {
   const home = await mkdtemp(path.join(tmpdir(), "bot-onboarding-"));
-  const calls: string[] = [];
-  const inputs: ChannelAddInput[] = [];
-  const directory = path.join(home, "workspaces", "default");
   const deps: BotStartDeps = {
-    ensureHubUp: async () => {
-      calls.push("hub");
-      return { hub: "started", url: "http://localhost:6868" };
-    },
+    ensureHubUp: async () => ({ hub: "started", url: "http://localhost:6868" }),
     waitHubReady: async () => {},
-    ensureDaemonUp: async () => {
-      calls.push("daemon");
-      return { daemon: "started" };
-    },
+    ensureDaemonUp: async () => ({ daemon: "started" }),
     waitDaemonUp: async () => {},
     daemonHost: () => "localhost:6767",
     daemonPassword: () => undefined,
     openDaemon: async () => ({}) as DaemonClient,
-    closeDaemon: async () => {},
+    closeDaemon: vi.fn(async () => {}),
     prepareOnboarding: async () => ({ daemonId: "daemon-1", ownerEmail: "owner@example.com" }),
-    providerKnown: async () => true,
-    findWorkspace: async () => ({ projectId: "prj-1", directory }),
-    createWorkspace: async () => {
-      calls.push("workspace");
-      return { id: "ws-1", projectId: "prj-1", directory };
-    },
-    seedTemplate: async (cwd, type, overwrite, provider) => {
-      calls.push("seed");
-      return seedWorkspaceTemplate(cwd, type, overwrite, provider);
-    },
-    createIdleAgent: async () => {
-      calls.push("agent");
-      return { id: "agent-1" };
-    },
-    ensureWorkspaceDir: async () => {},
-    addChannel: async (input) => {
-      inputs.push(input);
-      return {
-        channel: input.channel,
-        account: input.account,
-        installed: true,
-        revision: true,
-        transport: "started",
-        owner: { ready: true },
-        connectionId: "connection-1",
-      };
-    },
-    channelStatus: async () => [
-      {
-        channel: "telegram",
-        account: "personal-assistant",
-        integrity: "ok",
-        loadTrace: "ok",
-        transport: "started",
-      },
-    ],
+    provisionBot: vi.fn(async () => ({
+      botId: "bot_1234567890123456",
+      agentId: "",
+      agentTitle: "Assistant",
+      workspacePath: "/remote/bot",
+      workspaceId: "ws-1",
+      projectId: "prj-1",
+      template: { directory: "/remote/bot", created: ["AGENTS.md"], skipped: [] },
+    })),
+    addChannel: vi.fn(async (input) => ({
+      channel: input.channel,
+      account: input.account,
+      installed: true,
+      revision: true,
+      transport: "started",
+      owner: { ready: true },
+      connectionId: "connection-1",
+    })),
+    channelStatus: async () => [],
     readManifest: readBotManifest,
     writeManifest: writeBotManifest,
-    ...overrides,
   };
-  const input = { home, env: {}, options: { provider: "codex", telegramBotToken: "test-token" } };
   return {
     home,
-    calls,
-    inputs,
     deps,
-    input,
+    input: { home, env: {}, options: { provider: "codex", telegramBotToken: "secret-token" } },
     cleanup: () => rm(home, { recursive: true, force: true }),
   };
 }
 
-describe("API-first bot onboarding", () => {
-  it("applies template overwrite only to the requested invocation when resuming a saved bot", async () => {
-    const f = await fixture();
-    try {
-      const first = await runBotStart(f.input, f.deps);
-      await writeFile(path.join(first.workspacePath, "USER.md"), "Saved owner context");
-      const overwritten = await runBotStart(
-        { ...f.input, options: { ...f.input.options, overwriteTemplate: true } },
-        f.deps,
-      );
-      expect(overwritten.reused).toBe(true);
-      expect(overwritten.template?.overwritten).toContain("USER.md");
-      expect(
-        await readFile(path.join(overwritten.template!.backupDirectory!, "USER.md"), "utf8"),
-      ).toBe("Saved owner context");
-      await writeFile(path.join(first.workspacePath, "USER.md"), "New owner context");
-      const resumed = await runBotStart(f.input, f.deps);
-      expect(resumed.template?.overwritten).toBeUndefined();
-      expect(await readFile(path.join(first.workspacePath, "USER.md"), "utf8")).toBe(
-        "New owner context",
-      );
-    } finally {
-      await f.cleanup();
-    }
-  });
-  it("seeds before provider startup and installs a usable owner route without hub init or deploy", async () => {
-    const f = await fixture();
-    try {
-      const report = await runBotStart(f.input, f.deps);
-      expect(f.calls).toEqual(["daemon", "hub", "workspace", "seed", "agent"]);
-      expect(report.template?.created).toContain("AGENTS.md");
-      expect(report.ownerReady).toBe(true);
-      expect(f.inputs[0]?.setup).toMatchObject({
-        projectId: "prj-1",
-        cwd: report.workspacePath,
-        provider: "codex",
-      });
-      expect(report.routeNote).not.toContain("add a");
-      const manifest = await readBotManifest(f.home, "personal-assistant");
-      expect(manifest?.projectId).toBe("prj-1");
-      expect(JSON.stringify(manifest)).not.toContain("test-token");
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("selects the team template and Claude discovery link from the onboarding plan", async () => {
-    const f = await fixture();
-    try {
-      const report = await runBotStart(
-        { ...f.input, options: { ...f.input.options, provider: "claude", botType: "team" } },
-        f.deps,
-      );
-      expect(await readlink(path.join(report.workspacePath, "CLAUDE.md"))).toBe("AGENTS.md");
-      expect(await readFile(path.join(report.workspacePath, "MEMORY.md"), "utf8")).toContain(
-        "Team Long-Term Memory",
-      );
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("retains the seeded assistant when the owner has not finished Account setup", async () => {
-    const f = await fixture();
-    try {
-      f.deps.prepareOnboarding = async () => {
-        throw new Error("Finish Account setup");
-      };
-      await expect(runBotStart(f.input, f.deps)).rejects.toThrow("Finish Account setup");
-      expect(f.calls).toContain("seed");
-      expect((await readBotManifest(f.home, "personal-assistant"))?.projectId).toBe("prj-1");
-      expect(f.inputs).toHaveLength(0);
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("retries a failed Channel install without duplicating the workspace or agent", async () => {
-    const f = await fixture();
-    try {
-      const add = f.deps.addChannel;
-      f.deps.addChannel = async () => {
-        throw new Error("revision conflict");
-      };
-      await expect(runBotStart(f.input, f.deps)).rejects.toThrow("revision conflict");
-      expect((await readBotManifest(f.home, "personal-assistant"))?.credentials).toEqual({});
-      f.deps.addChannel = add;
-      const report = await runBotStart(f.input, f.deps);
-      expect(report.reused).toBe(true);
-      expect(f.calls.filter((call) => call === "workspace")).toHaveLength(1);
-      expect(f.calls.filter((call) => call === "agent")).toHaveLength(1);
-      expect(report.template?.created).toEqual([]);
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("reports owner verification as pending and carries only the explicit operator identity", async () => {
-    const f = await fixture({
-      addChannel: async () => ({
-        channel: "telegram",
-        account: "personal-assistant",
-        installed: true,
-        revision: true,
-        transport: "started",
-        owner: {
-          ready: false,
-          command: "link one-time-code",
-          expiresAt: "2026-09-06T12:10:00.000Z",
-        },
-      }),
-    });
-    try {
-      const report = await runBotStart(f.input, f.deps);
-      expect(report.ownerReady).toBe(false);
-      expect(report.ownerLinkCommand).toBe("link one-time-code");
-      expect(report.ownerLinkExpiresAt).toBe("2026-09-06T12:10:00.000Z");
-      expect(report.ownerLinkRenewCommand).toContain(`--home '${f.home}'`);
-      expect(report.nextStep).toContain("linking command");
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("seeds the directory returned by the daemon for a worktree", async () => {
-    const f = await fixture();
-    try {
-      const directory = path.join(f.home, "actual-worktree");
-      f.deps.createWorkspace = async () => ({ id: "ws-worktree", projectId: "prj-1", directory });
-      const report = await runBotStart(
-        { ...f.input, options: { ...f.input.options, newWorkspace: "worktree" } },
-        f.deps,
-      );
-      expect(report.workspacePath).toBe(directory);
-      expect(report.template?.directory).toBe(await realpath(directory));
-      expect(f.inputs[0]?.setup?.cwd).toBe(directory);
-      expect((await readBotManifest(f.home, "personal-assistant"))?.sourcePath).toBe(
-        path.join(f.home, "workspaces", "default"),
-      );
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("runs channel-less hub init with the default provider and seeds before the agent", async () => {
-    const f = await fixture();
-    try {
-      const report = await initializeAssistantWorkspace(
-        { provider: undefined },
-        f.home,
-        f.deps,
-        {},
-      );
-      expect(report.projectId).toBe("prj-1");
-      expect(f.calls).toEqual(["daemon", "workspace", "seed", "agent", "hub"]);
-      expect(f.inputs).toHaveLength(0);
-    } finally {
-      await f.cleanup();
-    }
-  });
-
-  it("reuses its encrypted Connection without resupplying a token, including after a failed retry", async () => {
+describe("daemon-owned Bot onboarding", () => {
+  it("uses daemon ids for channel setup and persists only a restart reference", async () => {
     const f = await fixture();
     try {
       await runBotStart(f.input, f.deps);
-      const add = f.deps.addChannel;
-      f.deps.addChannel = async () => {
-        throw new Error("temporary failure");
-      };
-      await expect(runBotStart({ ...f.input, options: {} }, f.deps)).rejects.toThrow(
-        "temporary failure",
+      expect(f.deps.provisionBot).toHaveBeenCalledOnce();
+      expect(f.deps.addChannel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          setup: expect.objectContaining({ projectId: "prj-1", cwd: "/remote/bot" }),
+        }),
       );
-      f.deps.addChannel = add;
-      const report = await runBotStart({ ...f.input, options: {} }, f.deps);
-      expect(report.reused).toBe(true);
-      expect(f.inputs.at(-1)).toMatchObject({ channel: "telegram", connectionId: "connection-1" });
-      expect(f.inputs.at(-1)).not.toHaveProperty("botToken");
-      expect(f.inputs.at(-1)?.setup?.update).toBe(false);
-      expect(f.calls.filter((c) => c === "agent")).toHaveLength(1);
+      const disk = JSON.parse(
+        await readFile(path.join(f.home, "bots/personal-assistant.json"), "utf8"),
+      );
+      expect(disk).toMatchObject({
+        version: 2,
+        botId: "bot_1234567890123456",
+        connectionId: "connection-1",
+      });
+      expect(disk).not.toHaveProperty("workspacePath");
+      expect(disk).not.toHaveProperty("agentId");
+      expect(JSON.stringify(disk)).not.toContain("secret-token");
     } finally {
       await f.cleanup();
     }
   });
-
-  it("keeps template and enrollment effects off with the rollout disabled", async () => {
-    const f = await fixture({
-      prepareOnboarding: async () => {
-        throw new Error("unexpected onboarding");
-      },
-    });
+  it("checkpoints the bot before a failed channel installation and closes the client", async () => {
+    const f = await fixture();
+    f.deps.addChannel = async () => {
+      throw new Error("channel unavailable");
+    };
     try {
-      const report = await runBotStart(
-        { ...f.input, env: { CLISBOT_ONBOARDING_ENABLED: "0" } },
-        f.deps,
+      await expect(runBotStart(f.input, f.deps)).rejects.toThrow("channel unavailable");
+      expect((await readBotManifest(f.home, "personal-assistant"))?.botId).toBe(
+        "bot_1234567890123456",
       );
-      expect(f.calls).not.toContain("seed");
-      expect(f.inputs[0]?.setup).toBeUndefined();
-      expect(report.template).toBeUndefined();
+      expect(f.deps.closeDaemon).toHaveBeenCalledOnce();
+    } finally {
+      await f.cleanup();
+    }
+  });
+  it("adopts a v1 manifest at its exact directory and writes v2", async () => {
+    const f = await fixture();
+    try {
+      await writeBotManifest(f.home, {
+        version: 1,
+        name: "personal-assistant",
+        botType: "team",
+        provider: "codex",
+        workspacePath: "/legacy/team",
+        workspaceId: "old-ws",
+        agentId: "old-agent",
+        agentTitle: "Legacy",
+        channel: "telegram",
+        account: "legacy",
+        connectionId: "old-connection",
+        credentials: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      });
+      await runBotStart({ ...f.input, options: { botName: "personal-assistant" } }, f.deps);
+      expect(f.deps.provisionBot).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ workspacePath: "/legacy/team", botType: "team" }),
+        undefined,
+      );
+      expect((await readBotManifest(f.home, "personal-assistant"))?.version).toBe(2);
+    } finally {
+      await f.cleanup();
+    }
+  });
+  it("bare hub init keeps the shipped default path but named Bots let the daemon choose", async () => {
+    const f = await fixture();
+    try {
+      await initializeAssistantWorkspace({}, f.home, f.deps, {});
+      expect(f.deps.provisionBot).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ workspacePath: path.join(f.home, "workspaces/default") }),
+      );
+      await initializeAssistantWorkspace({ botName: "CEO" }, f.home, f.deps, {});
+      expect(f.deps.provisionBot).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ workspacePath: "" }),
+      );
     } finally {
       await f.cleanup();
     }

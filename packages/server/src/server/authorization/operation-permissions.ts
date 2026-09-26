@@ -6,6 +6,15 @@ type OutboundOperation = SessionOutboundMessage["type"];
 export type PermissionRequirement = DaemonPermission | readonly DaemonPermission[] | null;
 
 const INBOUND_PERMISSION = {
+  "chat.create.request": "workspace.write",
+  "chat.list.request": "workspace.read",
+  "chat.participant.add.request": "workspace.write",
+  "chat.participant.remove.request": "workspace.write",
+  "chat.message.send.request": "workspace.write",
+  "chat.transcript.fetch.request": "workspace.read",
+  "chat.archive.request": "workspace.write",
+  "chat.session.reset.request": "workspace.write",
+
   "channel.file.read.request": "hub.execute",
   abort_request: "workspace.write",
   "agent.config.apply.request": ["workspace.write", "hub.execute"],
@@ -225,6 +234,16 @@ const INBOUND_PERMISSION = {
 } as const satisfies Record<InboundOperation, PermissionRequirement>;
 
 const OUTBOUND_PERMISSION = {
+  "chat.create.response": "workspace.read",
+  "chat.list.response": "workspace.read",
+  "chat.participant.add.response": "workspace.read",
+  "chat.participant.remove.response": "workspace.read",
+  "chat.message.send.response": "workspace.read",
+  "chat.transcript.fetch.response": "workspace.read",
+  "chat.archive.response": "workspace.read",
+  "chat.session.reset.response": "workspace.read",
+  "chat.updated": "workspace.read",
+  "chat.transcript.appended": "workspace.read",
   "channel.file.read.response": "hub.execute",
   "agent.create.response": ["workspace.write", "hub.execute"],
   "agent.create.update": ["workspace.write", "hub.execute"],

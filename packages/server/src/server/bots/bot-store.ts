@@ -43,6 +43,7 @@ export class BotStore {
   ) {}
 
   private filePath(id: string): string {
+    if (!/^bot_[0-9a-f]{16}$/.test(id)) throw new Error("Invalid Bot id");
     return join(this.dir, `${id}.json`);
   }
 
@@ -63,7 +64,7 @@ export class BotStore {
     );
     const files = await Promise.all(
       entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .filter((entry) => entry.isFile() && /^bot_[0-9a-f]{16}\.json$/.test(entry.name))
         .map(async (entry) => {
           const filePath = join(this.dir, entry.name);
           return { filePath, parsed: parseStoredBot(await readFile(filePath, "utf-8")) };

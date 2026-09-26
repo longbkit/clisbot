@@ -672,6 +672,11 @@ const HubAccessResourceSchema = z.object({
     .optional(),
   /** The Host's Terminal profiles by name; absent from older Hubs and daemons. */
   terminalProfileCatalog: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+  /**
+   * Set on a `project` that is a Bot's home (docs/features/bots-and-chats/README.md, D13).
+   * The kind stays open so a Bot kind the app does not know yet cannot reject the catalog.
+   */
+  bot: z.object({ id: z.string(), kind: z.string() }).optional(),
 });
 
 export const HubEffectiveAccessSchema = z.object({

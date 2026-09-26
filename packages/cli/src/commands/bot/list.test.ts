@@ -8,7 +8,7 @@ import { afterEach, describe, it } from "vitest";
 import type { ControlPlaneTarget } from "../control-plane.js";
 import type { ChannelStatusAccount } from "../channels/client.js";
 import type { BotManifest } from "./manifest.js";
-import { writeBotManifest } from "./manifest.js";
+import { readBotManifests, writeBotManifest } from "./manifest.js";
 import { buildBotListEntry, runBotListCommand } from "./list.js";
 
 const servers: Array<ReturnType<typeof createServer>> = [];
@@ -115,7 +115,11 @@ describe("runBotListCommand", () => {
           credentials: { "slack:work": { persisted: true } },
         }),
       );
-      const result = await runBotListCommand({ home, hub: target.origin }, undefined as never);
+      const result = await runBotListCommand(
+        { home, hub: target.origin },
+        undefined as never,
+        fixtureCatalog,
+      );
       assert.equal(result.type, "list");
       assert.equal(result.data.length, 2);
       const [telegram, slack] = result.data;
@@ -133,11 +137,28 @@ describe("runBotListCommand", () => {
     const home = mkdtempSync(path.join(tmpdir(), "bot-list-"));
     const target = await statusServer(LIVE);
     try {
-      const result = await runBotListCommand({ home, hub: target.origin }, undefined as never);
+      const result = await runBotListCommand(
+        { home, hub: target.origin },
+        undefined as never,
+        fixtureCatalog,
+      );
       assert.equal(result.type, "list");
       assert.deepEqual(result.data, []);
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
   });
+});
+
+async function fixtureCatalog(home: string) {
+  return (await readBotManifests(home)).map((entry) => ({ manifest: entry, hasChannel: true }));
+}
+
+it("lists an app-created Bot without requiring a running Hub", async () => {
+  const result = await runBotListCommand({ home: "/unused" }, undefined as never, async () => [
+    { manifest: manifest({ name: "App bot", agentId: "" }), hasChannel: false },
+  ]);
+  assert.equal(result.data[0]?.name, "App bot");
+  assert.equal(result.data[0]?.channel, "-");
+  assert.equal(result.data[0]?.running, false);
 });

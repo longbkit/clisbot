@@ -36,6 +36,10 @@ export const ChatComposer = memo(function ChatComposer({
   const draft = useAgentInputDraft({ draftKey });
   const handleSubmit = useCallback(
     async (payload: MessagePayload) => {
+      if (payload.attachments?.length)
+        throw new Error(
+          "Attachments are not supported in Chat yet. Open this bot in cowork to send files.",
+        );
       await onSubmitMessage(payload.text);
     },
     [onSubmitMessage],
@@ -53,6 +57,7 @@ export const ChatComposer = memo(function ChatComposer({
         textSource={draft.textSource}
         onChangeText={draft.editText}
         textReplacement={draft.textReplacement}
+        attachmentsEnabled={false}
         attachments={draft.attachments}
         onChangeAttachments={draft.setAttachments}
         cwd=""

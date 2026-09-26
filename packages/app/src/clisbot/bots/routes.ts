@@ -1,3 +1,4 @@
+import type { Href } from "expo-router";
 import { buildHostRootRoute } from "@/utils/host-routes";
 
 /**
@@ -28,12 +29,12 @@ function buildHostLeafRoute(serverId: string, segment: string, id: string): stri
   return `${base}/${segment}/${encodeURIComponent(normalizedId)}`;
 }
 
-export function buildHostChatRoute(serverId: string, chatId: string): string {
-  return buildHostLeafRoute(serverId, CHAT_SEGMENT, chatId);
+export function buildHostChatRoute(serverId: string, chatId: string): Href & string {
+  return buildHostLeafRoute(serverId, CHAT_SEGMENT, chatId) as Href & string;
 }
 
-export function buildHostBotRoute(serverId: string, botId: string): string {
-  return buildHostLeafRoute(serverId, BOT_SEGMENT, botId);
+export function buildHostBotRoute(serverId: string, botId: string): Href & string {
+  return buildHostLeafRoute(serverId, BOT_SEGMENT, botId) as Href & string;
 }
 
 export interface ChatRouteMatch {

@@ -96,6 +96,8 @@ describe("ChatStore", () => {
     await fs.mkdir(path.join(root, "cht_bad"));
     await fs.writeFile(path.join(root, "cht_bad", "chat.json"), JSON.stringify({ id: "cht_bad" }));
 
+    await fs.mkdir(path.join(root, "cht_malformed"));
+    await fs.writeFile(path.join(root, "cht_malformed", "chat.json"), "{truncated");
     const reopened = new ChatStore(root, createTestLogger(), clock());
     expect((await reopened.list()).map((entry) => entry.id)).toEqual(["cht_1"]);
     expect(await reopened.get("cht_1")).toEqual(chat);
@@ -209,4 +211,23 @@ describe("KeyedSerialQueue", () => {
     expect(order).toEqual(["b1", "a1", "a2", "a3"]);
     await queue.idle();
   });
+});
+
+test("completion receipts survive restart and /new clears their session scope", async () => {
+  const root = await temporary();
+  const store = new ChatStore(root, createTestLogger());
+  await store.create({ id: "cht_receipt", botIds: ["bot_a"] });
+  await store.setParticipantAgent("cht_receipt", "bot_a", "agent-a");
+  const receipt = {
+    agentId: "agent-a",
+    turnId: "turn-a",
+    messageIds: ["m1"],
+    lastRow: { epoch: "ep", seq: 3 },
+  };
+  await store.recordCompletedTurn("cht_receipt", "bot_a", receipt);
+  const restarted = new ChatStore(root, createTestLogger());
+  expect((await restarted.require("cht_receipt")).participants[0]?.completedTurn).toEqual(receipt);
+  await restarted.resetParticipantSession("cht_receipt", "bot_a");
+  await restarted.recordCompletedTurn("cht_receipt", "bot_a", receipt);
+  expect((await restarted.require("cht_receipt")).participants[0]?.completedTurn).toBeNull();
 });

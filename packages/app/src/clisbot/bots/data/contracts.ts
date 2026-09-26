@@ -1,72 +1,49 @@
-// TODO(bots-wire): replace with @getpaseo/protocol/bots and @getpaseo/protocol/chats types once
-// the `bot.*` / `chat.*` schemas land. These mirror the record shapes in
-// docs/features/bots-and-chats/README.md (D2, D5) and nothing else; the app never re-declares a
-// wire type after the protocol module exists.
-
-export type BotKind = "personal" | "team";
-
-/** Agent controls with the shape of an Agent profile (README D2 "launch defaults"). */
-export interface BotLaunchDefaults {
-  provider: string;
-  model?: string | null;
-  modeId?: string | null;
-  thinkingOptionId?: string | null;
-  featureValues?: Record<string, unknown>;
-}
-
-export interface BotPayload {
-  id: string;
-  /** Immutable directory name (README D3). */
-  slug: string;
-  name: string;
-  title?: string | null;
-  description?: string | null;
-  avatar?: string | null;
-  projectId: string;
-  workspaceId: string;
-  cwd: string;
-  kind: BotKind;
-  launchDefaults: BotLaunchDefaults;
-}
-
-export interface ChatParticipant {
-  botId: string;
-}
-
-/** Group turn rules with the Route vocabulary (README D9). Every leaf optional on the wire. */
-export interface ChatRules {
-  answer?: "mentioned" | "everyone";
-  hops?: { max?: number };
-  maxInputCharacters?: number;
-}
-
-export interface ChatPayload {
-  id: string;
+import type {
+  BotPayload as WireBot,
+  BotKind,
+  BotLaunchDefaults,
+} from "@getpaseo/protocol/bots/types";
+import type {
+  ChatRules,
+  ChatMessageSender,
+  ChatMessagePayload,
+  ChatPayload as WireChat,
+} from "@getpaseo/protocol/chats/types";
+export type { BotKind, BotLaunchDefaults, ChatRules, ChatMessageSender };
+// Display projections of canonical protocol records. The wire is never re-declared here.
+export type BotPayload = Pick<
+  WireBot,
+  | "id"
+  | "slug"
+  | "name"
+  | "title"
+  | "description"
+  | "avatar"
+  | "projectId"
+  | "workspaceId"
+  | "cwd"
+  | "kind"
+> & { launchDefaults: BotLaunchDefaults };
+export type ChatParticipant = Pick<WireChat["participants"][number], "botId">;
+export type ChatPayload = Pick<WireChat, "id" | "rules" | "createdAt" | "updatedAt"> & {
   title: string;
   participants: ChatParticipant[];
-  rules: ChatRules;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** `system` is the line the daemon writes when a session could not resume (README D7). */
-export type ChatMessageSender =
-  | { kind: "user" }
-  | { kind: "bot"; botId: string }
-  | { kind: "system" };
-
-/** One transcript line (README D5): final text only, joined to the timeline by reference. */
-export interface ChatMessage {
-  id: string;
-  seq: number;
-  at: string;
-  sender: ChatMessageSender;
-  text: string;
+};
+export type ChatMessage = Pick<ChatMessagePayload, "id" | "seq" | "at" | "sender" | "text"> & {
   agentId?: string;
   timelineItemId?: string;
-}
-
+  reply?: ChatMessagePayload["reply"];
+};
 export interface ChatTranscriptPage {
   messages: ChatMessage[];
   hasOlder: boolean;
+}
+export function botView(bot: WireBot): BotPayload {
+  return { ...bot, launchDefaults: bot.launch };
+}
+export function chatView(chat: WireChat): ChatPayload {
+  return { ...chat, title: chat.title ?? chat.participants.map((p) => p.displayName).join(", ") };
+}
+export function messageView(line: ChatMessagePayload): ChatMessage {
+  return { ...line, agentId: line.reply?.agentId };
 }

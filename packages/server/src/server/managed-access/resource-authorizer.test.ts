@@ -63,6 +63,7 @@ function createHarness(
     daemonPrivileges?: readonly ProjectPrivilege[];
     projectFolders?: readonly { allow: string[]; deny: string[] }[];
   } = {},
+  privateAgentAllowed: () => boolean = () => true,
 ) {
   const projectA = paths.projectA ?? "/work/a";
   const projectB = paths.projectB ?? "/work/b";
@@ -210,6 +211,7 @@ function createHarness(
     agentStorage,
     terminalManager,
     agentConfigurationSafety,
+    privateAgentAllowed,
   );
 }
 
@@ -1135,4 +1137,25 @@ describe("Project creation and Add project folder search", () => {
     const visible = await authorizer.filterProjectFolderSearch(entries);
     expect(visible.map((entry) => entry.path)).toEqual(["/free/app", "/free", "/"]);
   });
+});
+
+it("private Chat predicate protects ordinary agent list, reads and stream pushes despite a shared Project grant", async () => {
+  let allowed = true;
+  const authorizer = createHarness(["project.use", "agent.interact"], {}, {}, () => allowed);
+  await authorizer.ready();
+  expect(await authorizer.allowsAgent("agent-a")).toBe(true);
+  allowed = false;
+  expect(await authorizer.allowsAgent("agent-a")).toBe(false);
+  expect(authorizer.allowsAgentSync("agent-a")).toBe(false);
+  expect(
+    authorizer.allowsOutbound({ type: "agent_deleted", payload: { agentId: "agent-a" } }),
+  ).toBe(false);
+  expect(
+    await authorizer.allowsInbound({
+      type: "fetch_agent_timeline_request",
+      agentId: "agent-a",
+      requestId: "read",
+    }),
+  ).toBe(false);
+  authorizer.dispose();
 });

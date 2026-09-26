@@ -50,6 +50,7 @@ interface WatchedAgent {
   turns: Map<string, OpenTurn>;
   openTurnId: string | null;
   unnamedTurns: number;
+  buffered: AgentManagerEvent[] | null;
 }
 
 export class TurnTracker {
@@ -75,6 +76,7 @@ export class TurnTracker {
       turns: new Map(),
       openTurnId: null,
       unnamedTurns: 0,
+      buffered: null,
     };
     this.agents.set(agentId, watched);
     watched.unsubscribe = this.agentManager.subscribe(
@@ -109,7 +111,31 @@ export class TurnTracker {
     watched.pending.push(expectation);
   }
 
+  /** Provider events can arrive before prompt admission returns its disposition. */
+  async dispatch(
+    agentId: string,
+    expectation: Omit<TurnExpectation, "disposition">,
+    send: () => Promise<{ disposition: PromptDispatchDisposition }>,
+  ): Promise<void> {
+    const watched = this.agents.get(agentId);
+    if (!watched) throw new Error(`Agent ${agentId} is not watched`);
+    if (watched.buffered) throw new Error(`Concurrent prompt admission for ${agentId}`);
+    const events: AgentManagerEvent[] = [];
+    watched.buffered = events;
+    try {
+      const { disposition } = await send();
+      this.expect(agentId, { ...expectation, disposition });
+    } finally {
+      watched.buffered = null;
+      for (const event of events) this.onEvent(agentId, watched, event);
+    }
+  }
+
   private onEvent(agentId: string, watched: WatchedAgent, event: AgentManagerEvent): void {
+    if (watched.buffered) {
+      watched.buffered.push(event);
+      return;
+    }
     if (event.type === "agent_state") {
       if (event.agent.lifecycle === "closed") this.unwatch(agentId);
       return;
@@ -150,7 +176,10 @@ export class TurnTracker {
       event.epoch !== undefined && event.seq !== undefined
         ? { epoch: event.epoch, seq: event.seq }
         : null;
-    turn.items.push({ item: stream.item, row });
+    // Only the final contiguous assistant run is projected into the transcript.
+    // Tool output stays in the timeline, not in this long-lived subscriber's memory.
+    if (stream.item.type !== "assistant_message") turn.items = [];
+    else turn.items.push({ item: stream.item, row });
   }
 
   private close(

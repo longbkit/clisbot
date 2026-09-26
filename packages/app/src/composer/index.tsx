@@ -964,6 +964,8 @@ interface ComposerProps {
   onChangeText: (text: string) => void;
   textReplacement: TextReplacement;
   attachments: UserComposerAttachment[];
+  /** Text-only conversation surfaces cannot accept attachments. Defaults to existing behavior. */
+  attachmentsEnabled?: boolean;
   attachmentScopeKeys?: readonly string[];
   onOpenWorkspaceAttachment?: (attachment: WorkspaceComposerAttachment) => void;
   onChangeAttachments: (updater: AttachmentListUpdater) => void;
@@ -1258,6 +1260,7 @@ function ComposerContentImpl({
   onChangeText,
   textReplacement,
   attachments,
+  attachmentsEnabled = true,
   attachmentScopeKeys = EMPTY_ATTACHMENT_SCOPE_KEYS,
   onOpenWorkspaceAttachment,
   onChangeAttachments,
@@ -1348,7 +1351,7 @@ function ComposerContentImpl({
       remoteUrl: resolveCheckoutRemoteUrl(checkoutStatusQuery.status),
       attachments,
       client,
-      isConnected,
+      isConnected: isConnected && attachmentsEnabled,
       serverId,
       cwd,
       supportsForgeSearch,
@@ -1357,6 +1360,7 @@ function ComposerContentImpl({
       onChangeRequestAdded: onForgeChangeRequestAutoAttach,
     }),
     [
+      attachmentsEnabled,
       checkoutStatusQuery.status,
       attachments,
       client,
@@ -2385,7 +2389,7 @@ function ComposerContentImpl({
       onGenericFiles: handleGenericFilesDropped,
       onWorkspaceFile: handleWorkspaceFileDropped,
     },
-    { disabled: isSubmitLoadingVisible },
+    { disabled: !attachmentsEnabled || isSubmitLoadingVisible },
   );
 
   const messageInputAutoFocus = autoFocus && isDesktopWebBreakpoint;
@@ -2457,6 +2461,7 @@ function ComposerContentImpl({
                   preserveHeightOnSubmit={submitBehavior === "preserve-and-lock"}
                   attachments={selectedAttachments}
                   cwd={cwd}
+                  attachmentsEnabled={attachmentsEnabled}
                   attachmentMenuItems={attachmentMenuItems}
                   onAttachButtonRef={handleAttachButtonRef}
                   onAddImages={addImages}

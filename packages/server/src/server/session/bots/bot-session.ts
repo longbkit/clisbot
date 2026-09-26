@@ -86,6 +86,7 @@ export class BotSession {
         },
         {
           owner: this.host.actor() ?? LOCAL_OWNER,
+          mayReuse: (bot) => authority.allowsProject(bot.projectId, "workspace.manage"),
           mayCreateAt: authority.isRestricted()
             ? (cwd) => authority.mayCreateProjectAt(cwd)
             : undefined,
@@ -210,11 +211,13 @@ function pickTemplateResult(template: {
   created: string[];
   skipped: string[];
   overwritten?: string[];
-}): { created: string[]; skipped: string[]; overwritten?: string[] } {
+  backupDirectory?: string;
+}): { created: string[]; skipped: string[]; overwritten?: string[]; backupDirectory?: string } {
   return {
     created: template.created,
     skipped: template.skipped,
     ...(template.overwritten ? { overwritten: template.overwritten } : {}),
+    ...(template.backupDirectory ? { backupDirectory: template.backupDirectory } : {}),
   };
 }
 

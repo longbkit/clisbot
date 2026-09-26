@@ -503,3 +503,33 @@ it("offers the Host's published Terminal profiles on the Host and its Projects",
     await rm(root, { recursive: true, force: true });
   }
 }, 30_000);
+
+it("carries a Bot's Project marker onto its project resource and nothing else", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-bot-marker-"));
+  const bundle = await embeddedDatabaseRuntime(root);
+  try {
+    await bundle.runtime.migrate();
+    const db = bundle.runtime.drizzle();
+    await db.insert(schema.organizations).values({ id: "org", name: "Org", slug: "org" });
+    const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    await enrollTestDaemon(database, "org");
+    const access = new AccessStore(bundle.runtime);
+    const marker = { id: "bot_1", kind: "personal" as const };
+    await access.replaceDaemonProjects("org", TEST_DAEMON_ID, [
+      { projectId: "bot-home", name: "Ada", metadata: { bot: marker } },
+      { projectId: "repo", name: "Website" },
+      // A marker the Hub cannot read is dropped, never passed through.
+      { projectId: "odd", name: "Odd", metadata: { bot: { id: "bot_2", kind: "swarm" } } },
+    ]);
+    const projects = (await access.listResources("org")).filter(({ kind }) => kind === "project");
+    expect(projects.map(({ kind, name, bot }) => ({ kind, name, bot }))).toEqual([
+      { kind: "project", name: "Ada", bot: marker },
+      { kind: "project", name: "Odd", bot: undefined },
+      { kind: "project", name: "Website", bot: undefined },
+    ]);
+    expect(projects.find(({ name }) => name === "Website")).not.toHaveProperty("bot");
+  } finally {
+    await bundle.runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30_000);

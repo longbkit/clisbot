@@ -309,32 +309,17 @@ A turn that ends while the daemon is down is the [§3](#3-restart-reconciliation
 
 ## 3. Restart reconciliation
 
-At `ChatService.start()`, after `agentStorage.list()` has loaded (bootstrap loads the registry
-before services that need it, `packages/server/src/server/bootstrap.ts:1577`), run `reconcile.ts`
-in the background, one chat at a time:
+The implementation refines the original recovery sketch: timeline text and an idle agent alone
+are not proof that a turn completed. The canonical rule is [D5](../README.md#d5-transcript-is-separate-from-timelines)
+and the implementation in `chats/reconcile.ts`.
 
-1. For each participant with an `agentId`: `pending = transcript lines with sender user|bot,
-seq > deliveredSeq` — nothing to do for them (they were never handed over; §2.1 step 7 will not
-   re-run them automatically; they appear as context on the next message). Only the other gap
-   matters: lines with `seq <= deliveredSeq` whose reply is missing.
-2. "Reply is missing" = the newest delivered line for that bot has no later bot line with
-   `reply.agentId === agentId`. Find its row in the bot's timeline by id:
-   `durableTimelineReader.getSubmittedUserMessage(agentId, lineId)`
-   (`agent-manager.ts:5615`, store `file-agent-timeline-store.ts:411`) → `{ epoch, seq }`.
-3. Read forward: `agentManager.fetchTimelineForRead(agentId, { direction: "after", cursor: { epoch, seq }, limit: 0 })`
-   (`agent-manager.ts:1408`; options `agent-timeline-store-types.ts:22-33`, `limit: 0` = all rows
-   in the window). Stop at the next `user_message`. Apply the §2.7 final-answer rule to the rows
-   between; if the agent's record is `idle`/`closed` and a text exists, append the bot line with
-   `reply` pointing at the last assistant row. If the agent is `running`, do nothing: the tracker
-   will catch the end. If no assistant text exists and the agent is not running, append the
-   failed-turn system line (the turn died with the daemon; conversation-flow.md:38).
-4. Never forward hops from a backfilled reply: the user is not waiting on a chain that a restart
-   interrupted, and re-driving it can double-post. Record the line; the next user message continues.
-
-Reads are bounded: one submission lookup and one forward window per participant. Sessions whose
-history is provider-only (session storage off) skip step 2 and 3 (`getSubmittedUserMessage` is
-optional on the reader, `agent-timeline-store-types.ts:96`) and get the system line only when the
-record says the agent is not running.
+Before acknowledging a message, persist its selected `deliveryBotIds`. Before appending a final
+answer, persist the participant's `completedTurn` receipt with source message IDs, agent/turn IDs
+and the last durable timeline row (no duplicate text). Recovery scans transcript pages and may
+backfill only when that receipt matches the durable timeline. Missing proof, provider-only history
+or accepted-but-undispatched work gets a scoped interruption/unknown-outcome notice. Never blindly
+resend the work or forward bot hops from a recovered answer. Removed/reset sessions cannot publish
+stale outcomes, and corrupt Chat records do not prevent scanning other Chats.
 
 ## 4. RPCs and pushes
 

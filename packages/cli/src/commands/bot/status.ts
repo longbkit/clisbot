@@ -1,9 +1,6 @@
-// COMPAT(clisbot-bot): `bot status` — read one bot's manifest and join it with
-// the running Hub's live channel-account status (implementation doc §2.1). The
-// manifest is the source of the bot's ids; `channelStatus` is the source of the
-// live transport/integrity/load-trace. A bot whose account is absent from the
-// live status is reported as not running, not as an error.
+// Read the daemon Bot and join optional channel status from the Hub.
 
+import { readBotCatalog } from "./catalog.js";
 import { Command } from "commander";
 import type {
   AnyCommandResult,
@@ -21,7 +18,7 @@ import {
   resolveControlPlaneTarget,
 } from "../control-plane.js";
 import { channelStatus, findChannelStatus, type ChannelStatusAccount } from "../channels/client.js";
-import { credentialKindFor, readBotManifest, type BotManifest } from "./manifest.js";
+import { credentialKindFor, type BotManifest } from "./manifest.js";
 import { resolveBotHome } from "./home.js";
 import { botRestartCommand } from "./start-output.js";
 
@@ -30,7 +27,7 @@ export interface BotStatusReport {
   botType: "personal" | "team";
   provider: string;
   model?: string;
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "-";
   account: string;
   agentId: string;
   agentTitle: string;
@@ -53,24 +50,31 @@ export async function runBotStatusCommand(
   name: string,
   options: CommandOptions,
   _command: Command,
+  catalogReader = readBotCatalog,
 ): Promise<BotStatusCommandResult> {
   const home = resolveBotHome(options);
-  const manifest = await readBotManifest(home, name);
-  if (manifest === null) {
+  const row = (await catalogReader(home)).find(
+    (entry) => entry.manifest.name === name || entry.manifest.botId === name,
+  );
+  if (!row) {
     const error: CommandError = {
       code: "BOT_NOT_FOUND",
       message: `No bot named "${name}" in ${home}/bots. Run \`clisbot bot start\` first.`,
     };
     throw error;
   }
-  const target = resolveControlPlaneTarget(extractControlPlaneOptions(options));
-  const accounts = await channelStatus(target);
+  const { manifest, hasChannel } = row;
+  const accounts = hasChannel
+    ? await channelStatus(resolveControlPlaneTarget(extractControlPlaneOptions(options)))
+    : [];
   const live = findChannelStatus(accounts, manifest.channel, manifest.account);
   return {
     type: "single",
     data: {
       ...buildStatusReport(manifest, live),
-      ownerLinkRenewCommand: botRestartCommand(home, name),
+      ...(hasChannel
+        ? { ownerLinkRenewCommand: botRestartCommand(home, name) }
+        : { channel: "-" as const, account: "-" }),
     },
     schema: botStatusSchema,
   };
@@ -155,6 +159,10 @@ export function statusCommand(): Command {
         .argument("<bot-name>", "Bot name to show"),
     ),
   );
-  command.action(withOutput(runBotStatusCommand));
+  command.action(
+    withOutput<BotStatusReport, [string]>((name, options, cmd) =>
+      runBotStatusCommand(name, options, cmd),
+    ),
+  );
   return command;
 }

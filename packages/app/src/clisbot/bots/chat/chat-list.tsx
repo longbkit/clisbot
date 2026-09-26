@@ -1,3 +1,4 @@
+import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
 import { FlatList, type ListRenderItemInfo } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -88,17 +89,23 @@ function ChatRowView({
     case "user":
       return <ChatUserRow row={row} serverId={serverId} closesGroup={closesGroup} />;
     case "bot":
-      return <ChatBotRow row={row} bot={botIdentity(bots, row.botId)} serverId={serverId} />;
+      return (
+        <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>
+          <ChatBotRow row={row} bot={botIdentity(bots, row.botId)} serverId={serverId} />
+        </BotWorkspaceContext>
+      );
     case "system":
       return <ChatSystemRow row={row} />;
     case "live":
       return (
-        <ChatLiveRow
-          row={row}
-          bot={botIdentity(bots, row.botId)}
-          serverId={serverId}
-          onRespondPermission={onRespondPermission}
-        />
+        <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>
+          <ChatLiveRow
+            row={row}
+            bot={botIdentity(bots, row.botId)}
+            serverId={serverId}
+            onRespondPermission={onRespondPermission}
+          />
+        </BotWorkspaceContext>
       );
   }
 }

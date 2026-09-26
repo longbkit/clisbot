@@ -15,6 +15,7 @@ import type { PushNotificationSender } from "../push/index.js";
 import type { AgentProfile } from "@getpaseo/protocol/messages";
 
 interface TestPaseoDaemonOptions {
+  bots?: PaseoDaemonConfig["bots"];
   createDaemon?: typeof createPaseoDaemon;
   agentSessionStorage?: boolean;
   daemonVersion?: string;
@@ -177,6 +178,7 @@ async function prepareTestDaemonConfig(
     daemonVersion: options.daemonVersion,
     desktopManaged: options.desktopManaged,
     corsAllowedOrigins: options.corsAllowedOrigins ?? [],
+    bots: options.bots,
     hostnames: true,
     mcpEnabled: options.mcpEnabled ?? true,
     staticDir,

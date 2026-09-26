@@ -41,6 +41,16 @@ export const StoredChatRulesSchema = z
   .strict();
 export type StoredChatRules = z.infer<typeof StoredChatRulesSchema>;
 
+export const ChatCompletedTurnSchema = z
+  .object({
+    agentId: z.string(),
+    turnId: z.string(),
+    messageIds: z.array(z.string()),
+    lastRow: z.object({ epoch: z.string(), seq: z.number().int().nonnegative() }).nullable(),
+  })
+  .strict();
+export type ChatCompletedTurn = z.infer<typeof ChatCompletedTurnSchema>;
+
 export const StoredChatParticipantSchema = z
   .object({
     botId: z.string().min(1),
@@ -54,6 +64,8 @@ export const StoredChatParticipantSchema = z
     resetAt: z.string().nullable(),
     /** Transcript seq up to which this bot has been handed lines. */
     deliveredSeq: z.number().int().nonnegative(),
+    /** Durable proof of the most recent completed turn, before transcript projection. */
+    completedTurn: ChatCompletedTurnSchema.nullable().optional(),
   })
   .strict();
 export type StoredChatParticipant = z.infer<typeof StoredChatParticipantSchema>;

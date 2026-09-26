@@ -1,16 +1,12 @@
+import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { useFetchQuery } from "@/data/query";
-import { useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
+import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { toErrorMessage } from "@/utils/error-messages";
 import type { BotsRuntime } from "./client";
 import type { ChatTranscriptPage } from "./contracts";
 import { chatTranscriptQueryKey } from "./query-keys";
-import {
-  selectTranscript,
-  transcriptKey,
-  useTranscriptStore,
-  type ChatTranscript,
-} from "./transcript-store";
+import { selectTranscript, useTranscriptStore, type ChatTranscript } from "./transcript-store";
 
 export const TRANSCRIPT_PAGE_SIZE = 50;
 
@@ -54,14 +50,19 @@ export function useChatTranscriptQuery(input: {
   runtime: BotsRuntime;
 }): UseChatTranscriptResult {
   const { serverId, chatId, runtime } = input;
-  const key = transcriptKey(serverId, chatId);
-  const connectionStatus = useHostRuntimeConnectionStatus(serverId);
+  const snapshot = useHostRuntimeSnapshot(serverId);
+  const key = scopedTranscriptKey(serverId, chatId, snapshot);
+  const connectionStatus = snapshot?.connectionStatus ?? "connecting";
   const online = connectionStatus === "online";
   const transcript = useTranscriptStore(
     useCallback((state) => selectTranscript(state, key), [key]),
   );
   const query = useFetchQuery({
-    queryKey: [...chatTranscriptQueryKey(serverId, chatId), connectionStatus],
+    queryKey: [
+      ...chatTranscriptQueryKey(serverId, chatId),
+      connectionStatus,
+      botsSessionScope(snapshot),
+    ],
     queryFn: async () => {
       const page = await fetchPage(runtime, { serverId, chatId });
       useTranscriptStore.getState().replacePage(key, page);

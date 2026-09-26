@@ -1,3 +1,4 @@
+import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo } from "react";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { AssistantMessage, Notification, UserMessage } from "@/components/message";
@@ -10,6 +11,8 @@ export interface ChatBotIdentity {
   botId: string;
   name: string;
   avatar?: string | null;
+  cwd?: string;
+  workspaceId?: string;
 }
 
 export function botIdentity(
@@ -51,6 +54,7 @@ export const ChatBotRow = memo(function ChatBotRow({
   bot: ChatBotIdentity;
   serverId: string;
 }) {
+  const client = useHostRuntimeClient(serverId);
   const face = useMemo(
     () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
     [bot.avatar, bot.botId, bot.name],
@@ -63,6 +67,8 @@ export const ChatBotRow = memo(function ChatBotRow({
         timestamp={Date.parse(row.line.at)}
         serverId={serverId}
         phase="complete"
+        client={client}
+        workspaceRoot={bot.cwd}
         underSenderName={row.opensGroup}
       />
     </ActorResponseRow>

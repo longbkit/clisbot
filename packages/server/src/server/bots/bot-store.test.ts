@@ -68,7 +68,7 @@ describe("BotStore", () => {
       store.update(created.id, (bot) => ({ ...bot, description: "second" })),
     ]);
     expect(await store.get(created.id)).toMatchObject({ title: "first", description: "second" });
-    expect(await store.update("bot_missing", (bot) => bot)).toBeNull();
+    expect(await store.update("bot_0000000000000000", (bot) => bot)).toBeNull();
   });
 
   it("notifies subscribers on every write and leaves no temp file behind", async () => {
@@ -83,4 +83,10 @@ describe("BotStore", () => {
     expect(events).toEqual(["upsert", "upsert"]);
     expect((await readdir(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
+});
+
+it("rejects path traversal Bot ids before reading outside the store", async () => {
+  const { store } = await createStore();
+  await expect(store.get("../config")).rejects.toThrow("Invalid Bot id");
+  await expect(store.update("../config", (bot) => bot)).rejects.toThrow("Invalid Bot id");
 });

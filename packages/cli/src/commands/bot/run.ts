@@ -1,10 +1,7 @@
-// COMPAT(clisbot-bot): `bot start` orchestration (implementation doc §2.1).
-// The one-line bootstrap: ensure the daemon + embedded Hub are up, then create the
-// bot composite (workspace + idle agent + channel account) and tie their ids
-// together in the bot manifest. Every external boundary (lifecycle, daemon socket,
-// control-plane HTTP, disk) is a `BotStartDeps` function so the orchestration is
-// testable with fakes; `createBotStartDeps` wires the real implementations.
+// Start the local daemon and Hub, provision a daemon-owned Bot, then connect a channel.
+// The local manifest contains only restart metadata; the daemon owns identity and files.
 
+import { hydrateBotReference, listDaemonBots, provisionDaemonBot } from "./daemon-bot.js";
 import { ownerBootstrapEnvironment } from "./owner-bootstrap.js";
 import { botRestartCommand } from "./start-output.js";
 import {
@@ -14,17 +11,9 @@ import {
   verifyOnboardingDaemon,
   waitForOnboardingHub,
 } from "./local-runtime.js";
-import {
-  provisionAssistant,
-  findAssistantWorkspace,
-  waitForAssistantProvider,
-  createAssistantWorkspace,
-  createAssistantAgent,
-} from "./assistant-workspace.js";
-import { seedWorkspaceTemplate, type WorkspaceTemplateResult } from "./workspace-template.js";
+import type { BotTemplateResult } from "@getpaseo/protocol/bots/rpc-schemas";
+type WorkspaceTemplateResult = BotTemplateResult & { directory: string; backupDirectory?: string };
 import { connectOnboardingDaemon, isOnboardingEnabled } from "./onboarding-client.js";
-import { mkdir } from "node:fs/promises";
-import type { WorkspaceCreateRequest } from "@getpaseo/protocol/messages";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandError } from "../../output/index.js";
@@ -64,6 +53,7 @@ export interface BotStartInput {
 }
 
 export interface BotStartReport {
+  botId?: string;
   name: string;
   reused: boolean;
   agentId: string;
@@ -122,43 +112,12 @@ export interface BotStartDeps {
     client: DaemonClient,
     ownerEmail?: string,
   ): Promise<{ daemonId: string; ownerEmail: string }>;
-  seedTemplate(
-    directory: string,
-    type: BotStartPlan["botType"],
-    overwrite?: boolean,
-    provider?: string,
-  ): Promise<WorkspaceTemplateResult>;
-  findWorkspace(
-    client: DaemonClient,
-    id: string,
-  ): Promise<{ projectId: string; directory: string } | undefined>;
-  providerKnown(client: DaemonClient, provider: string): Promise<boolean>;
-  createWorkspace(
-    client: DaemonClient,
-    source: BotWorkspaceSource,
-    title?: string,
-  ): Promise<{ id: string; projectId: string; directory?: string }>;
-  createIdleAgent(client: DaemonClient, options: BotAgentCreateOptions): Promise<{ id: string }>;
-  /** Create the bot's workspace directory on disk (a `directory` source must exist). */
-  ensureWorkspaceDir(path: string): Promise<void>;
+  provisionBot: typeof provisionDaemonBot;
   addChannel(input: ChannelAddInput): Promise<ChannelAddResult>;
   /** The running Hub's per-account channel status (the plane-boot verification). */
   channelStatus(): Promise<ChannelStatusAccount[]>;
   readManifest(home: string, name: string): Promise<BotManifest | null>;
   writeManifest(home: string, manifest: BotManifest): Promise<void>;
-}
-
-/** The daemon workspace source a bot is created in (directory or worktree). */
-export type BotWorkspaceSource = WorkspaceCreateRequest["source"];
-
-export interface BotAgentCreateOptions {
-  provider: string;
-  model?: string;
-  modeId?: string;
-  cwd: string;
-  workspaceId: string;
-  title: string;
-  assistantName?: string;
 }
 
 /** Run the full `bot start` flow. Pure of transport: all I/O is in `deps`. */
@@ -168,7 +127,22 @@ export async function runBotStart(
 ): Promise<BotStartReport> {
   const name = input.options.botName ?? `${input.options.botType ?? "personal"}-assistant`;
   assertBotName(name);
-  const saved = await deps.readManifest(input.home, name);
+  let saved = await deps.readManifest(input.home, name);
+  if (saved?.version === 2) {
+    await deps.ensureDaemonUp(input.home, input.env);
+    await deps.waitDaemonUp(input.home);
+    const daemon = await deps.openDaemon(
+      await deps.daemonHost(input.home, input.env),
+      deps.daemonPassword(input.home),
+    );
+    try {
+      const bot = (await listDaemonBots(daemon)).find((entry) => entry.id === saved?.botId);
+      if (!bot) throw new Error("The saved Bot is missing or archived on this Host.");
+      saved = hydrateBotReference(saved, bot);
+    } finally {
+      await deps.closeDaemon(daemon);
+    }
+  }
   const options = resumeBotOptions(input.options, saved);
   const plan = buildBotStartPlan(options, input.home);
   assertBotName(plan.name);
@@ -226,26 +200,9 @@ async function resolveAssistantResources(
   reused: boolean,
   env: NodeJS.ProcessEnv,
 ) {
-  if (!reused || !existing) return provisionAssistant(client, deps, plan, env);
-  const workspace = await deps.findWorkspace(client, existing.workspaceId);
-  if (!workspace)
-    throw new Error(
-      "The bot workspace is missing or archived. Restore it before restarting the bot.",
-    );
-  const template = isOnboardingEnabled(env)
-    ? await deps.seedTemplate(
-        workspace.directory,
-        plan.botType,
-        plan.overwriteTemplate,
-        plan.provider,
-      )
-    : undefined;
-  return {
-    ...existing,
-    projectId: workspace.projectId,
-    workspacePath: workspace.directory,
-    template,
-  };
+  void reused;
+  void env;
+  return deps.provisionBot(client, plan, existing?.botId);
 }
 
 async function recordInstalledConnection(
@@ -279,9 +236,8 @@ function resumeBotOptions(options: BotStartOptions, existing: BotManifest | null
     mode: existing.mode,
     botType: existing.botType,
     botName: existing.name,
-    agentName: existing.agentTitle,
     workspace: options.workspace ?? options.cwd ?? existing.sourcePath ?? existing.workspacePath,
-    newWorkspace: existing.isolation ?? "local",
+
     ...supplied,
   };
   if (
@@ -448,6 +404,7 @@ async function writeRecordedManifest(
   plan: BotStartPlan,
   existing: BotManifest | null,
   ids: {
+    botId?: string;
     agentId: string;
     agentTitle: string;
     workspacePath: string;
@@ -458,6 +415,8 @@ async function writeRecordedManifest(
   const now = new Date();
   const manifest: BotManifest = {
     ...buildBotManifest(plan, { workspaceId: ids.workspaceId, agentId: ids.agentId }, now),
+    version: 2,
+    botId: ids.botId,
     workspacePath: ids.workspacePath,
     projectId: ids.projectId,
     createdAt: existing?.createdAt ?? now.toISOString(),
@@ -475,7 +434,13 @@ async function writeRecordedManifest(
 
 function buildReport(
   plan: BotStartPlan,
-  ids: { agentId: string; agentTitle: string; workspacePath: string; workspaceId: string },
+  ids: {
+    botId?: string;
+    agentId: string;
+    agentTitle: string;
+    workspacePath: string;
+    workspaceId: string;
+  },
   reused: boolean,
   infrastructure: {
     hub: "started" | "already-running";
@@ -488,6 +453,7 @@ function buildReport(
 ): BotStartReport {
   return {
     name: plan.name,
+    botId: ids.botId,
     reused,
     agentId: ids.agentId,
     agentTitle: ids.agentTitle,
@@ -542,22 +508,7 @@ export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotSta
     closeDaemon: (client) => client.close().catch(() => undefined),
     prepareOnboarding: (client, email) =>
       connectOnboardingDaemon(localControlPlaneTarget(home, env), client, email),
-    seedTemplate: seedWorkspaceTemplate,
-    findWorkspace: async (client, id) => {
-      const workspace = await findAssistantWorkspace(client, (entry) => entry.id === id);
-      return workspace
-        ? {
-            projectId: workspace.projectId,
-            directory: workspace.workspaceDirectory ?? workspace.projectRootPath,
-          }
-        : undefined;
-    },
-    providerKnown: waitForAssistantProvider,
-    createWorkspace: createAssistantWorkspace,
-    createIdleAgent: createAssistantAgent,
-    ensureWorkspaceDir: async (workspacePath) => {
-      await mkdir(workspacePath, { recursive: true });
-    },
+    provisionBot: provisionDaemonBot,
     addChannel: (input) => addChannel(localControlPlaneTarget(home, env), input),
     channelStatus: () => channelStatus(localControlPlaneTarget(home, env)),
     readManifest: (h, name) => readBotManifest(h, name),

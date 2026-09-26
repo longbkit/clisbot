@@ -1,9 +1,6 @@
-// COMPAT(clisbot-bot): `bot list` — every bot in the home, joined with the
-// running Hub's live channel-account status (implementation doc §2.1). The
-// manifest is the source of each bot's ids; `channelStatus` supplies the live
-// transport/integrity/load-trace. A bot whose account is absent from the live
-// status is reported as not running, not as an error.
+// List authoritative Bots from the daemon, joined to optional local channel references.
 
+import { readBotCatalog } from "./catalog.js";
 import { Command } from "commander";
 import type { CommandOptions, ListResult, OutputSchema } from "../../output/index.js";
 import { withOutput } from "../../output/index.js";
@@ -14,7 +11,7 @@ import {
   resolveControlPlaneTarget,
 } from "../control-plane.js";
 import { channelStatus, findChannelStatus, type ChannelStatusAccount } from "../channels/client.js";
-import { credentialKindFor, readBotManifests, type BotManifest } from "./manifest.js";
+import { credentialKindFor, type BotManifest } from "./manifest.js";
 import { resolveBotHome } from "./home.js";
 
 /** One row of `bot list`: the manifest's ids plus the live transport state. */
@@ -22,7 +19,7 @@ export interface BotListEntry {
   name: string;
   botType: "personal" | "team";
   provider: string;
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "-";
   account: string;
   agentId: string;
   credential: "persisted" | "pending";
@@ -35,14 +32,21 @@ export type BotListCommandResult = ListResult<BotListEntry>;
 export async function runBotListCommand(
   options: CommandOptions,
   _command: Command,
+  catalogReader = readBotCatalog,
 ): Promise<BotListCommandResult> {
   const home = resolveBotHome(options);
-  const manifests = await readBotManifests(home);
-  const target = resolveControlPlaneTarget(extractControlPlaneOptions(options));
-  const accounts = await channelStatus(target);
+  const catalog = await catalogReader(home);
+  const accounts = catalog.some((row) => row.hasChannel)
+    ? await channelStatus(resolveControlPlaneTarget(extractControlPlaneOptions(options)))
+    : [];
   return {
     type: "list",
-    data: manifests.map((manifest) => buildBotListEntry(manifest, accounts)),
+    data: catalog.map(({ manifest, hasChannel }) =>
+      Object.assign(
+        buildBotListEntry(manifest, hasChannel ? accounts : []),
+        !hasChannel ? { channel: "-" as const, account: "-" } : {},
+      ),
+    ),
     schema: botListSchema,
   };
 }
@@ -90,6 +94,6 @@ export function listCommand(): Command {
       new Command("list").description("List bots in the home with their live channel status"),
     ),
   );
-  command.action(withOutput(runBotListCommand));
+  command.action(withOutput<BotListEntry, []>((options, cmd) => runBotListCommand(options, cmd)));
   return command;
 }

@@ -1,9 +1,6 @@
-// COMPAT(clisbot-bot): `bot start` — the one-line bootstrap (implementation doc
-// §2.1). Spawns the daemon + embedded Hub as needed, creates the bot composite
-// (workspace + idle agent + channel account), and writes the bot manifest. This
-// file is the thin commander/output layer; the orchestration lives in `run.ts`.
+// Thin command/output layer for daemon-owned Bot and channel onboarding.
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { renderBotStart } from "./start-output.js";
 import type { CommandOptions, OutputSchema, SingleResult } from "../../output/index.js";
 import { withOutput } from "../../output/index.js";
@@ -20,7 +17,7 @@ export function extractBotStartOptions(options: CommandOptions): BotStartOptions
     provider: pick("provider"),
     model: pick("model"),
     mode: pick("mode"),
-    botType: pick("botType"),
+    botType: pick("kind") ?? pick("botType"),
     botName: pick("botName"),
     agentName: pick("agentName"),
     workspace: pick("workspace"),
@@ -54,10 +51,10 @@ export async function runStartCommand(
 }
 
 const botStartSchema: OutputSchema<BotStartReport> = {
-  idField: "agentId",
+  idField: "botId",
   columns: [
     { header: "BOT", field: "name" },
-    { header: "AGENT", field: "agentId" },
+    { header: "ID", field: "botId" },
     { header: "CHANNEL", field: (item) => `${item.channel}/${item.account}` },
     { header: "CREDENTIAL", field: "credential" },
     {
@@ -73,9 +70,7 @@ export type BotStartCommandResult = SingleResult<BotStartReport>;
 
 export function startCommand(): Command {
   const command = addJsonOption(
-    new Command("start").description(
-      "One-line bootstrap: start a channel bot (daemon + Hub + workspace + agent + account)",
-    ),
+    new Command("start").description("Create a Bot on the daemon and connect a channel account"),
   )
     .option(
       "--provider <provider>",
@@ -83,15 +78,20 @@ export function startCommand(): Command {
     )
     .option("--model <model>", "Model id (or use --provider <provider>/<model>)")
     .option("--mode <mode>", "Agent mode id")
-    .option("--bot-type <type>", "Bot type: personal or team (default: personal)")
-    .option("--bot-name <name>", "Composite name (default: <bot-type>-assistant)")
-    .option("--agent-name <name>", "Agent title override (default: the bot name)")
-    .option(
-      "--workspace <path>",
-      "Workspace directory (default: <home>/workspaces/default; team uses <home>/workspaces/team)",
+    .option("--kind <kind>", "Bot kind: personal or team (default: personal)")
+    .addOption(new Option("--bot-type <type>", "Alias for --kind").hideHelp())
+    .option("--bot-name <name>", "Bot name (default: <kind>-assistant)")
+    .addOption(
+      new Option("--agent-name <name>", "Removed: use --bot-name to name the Bot").hideHelp(),
     )
+    .option("--workspace <path>", "Bot home on the daemon (default: daemon.bots.root/<slug>)")
     .option("--cwd <path>", "Alias for --workspace")
-    .option("--new-workspace <kind>", "Workspace isolation: local or worktree (default: local)")
+    .addOption(
+      new Option(
+        "--new-workspace <kind>",
+        "Removed: Bot homes use directory Workspaces",
+      ).hideHelp(),
+    )
     .option(
       "--overwrite-template",
       "Replace template files, including user context, after backing them up",

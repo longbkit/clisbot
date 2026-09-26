@@ -1,6 +1,6 @@
 # Bots and Chats
 
-Date: 2026-09-26. Status: decided, not yet implemented. Names decided 2026-09-26: **Bot** and
+Date: 2026-09-26. Status: implementation in progress; see [verification and remaining work](implementation.md). Names decided 2026-09-26: **Bot** and
 **Chat**, with **Bot kind** and **Transcript**, in [the glossary](../../glossary.md).
 
 Grok-style teammates inside the Paseo app: create a bot by name, chat with it, put several bots in
@@ -103,9 +103,12 @@ the `agentId` and timeline item id it came from. Tool calls and progress stay in
 Accepted duplication: a final answer exists in the transcript and in the timeline, joined by the
 reference. The alternative, merging N timelines at read time, was rejected.
 
-Only the daemon writes. A user message is written before fan-out. A bot reply is written when its
-turn ends. After a daemon restart the daemon reconciles missing replies from timelines by the
-referenced ids.
+Only the daemon writes. A user message and its chosen bot recipients are written before fan-out.
+A completed turn records a durable completion receipt (source-message and timeline references)
+before its final answer is appended. After restart, a matching receipt permits backfill from the
+timeline. A message accepted before dispatch, an interrupted turn, or provider-only history without
+completion evidence gets a scoped system notice instead of a guessed final answer or blind resend.
+The user can inspect the session in cowork and send a new message to continue.
 
 ### D6. One Chat model
 
@@ -188,8 +191,9 @@ daemon Chat model.
 
 ## RPC surface
 
-Dotted namespaces per [rpc-namespacing](../../rpc-namespacing.md); every schema field optional on
-the wire, gated once on `server_info.features.bots`.
+Dotted namespaces per [rpc-namespacing](../../rpc-namespacing.md), gated once on
+`server_info.features.bots`. Additions to existing messages remain optional; new RPCs declare
+the inputs they require.
 
 - `bot.create.request` / `.response`, `bot.list`, `bot.update`, `bot.archive`, `bot.template.seed`
   (re-seeding and explicit overwrite; the one verb that touches files, kept apart from `bot.update`)
@@ -197,7 +201,9 @@ the wire, gated once on `server_info.features.bots`.
   `chat.message.send`, `chat.transcript.fetch`
 - pushed: `chat.transcript.appended`, `chat.updated`, `bot.updated`
 
-`bot.create` names an existing slug idempotently and returns that bot with `reused: true`. It sets
+`bot.create` names an existing slug idempotently and returns that bot with `reused: true` only
+when the caller may manage its Project. Reuse can seed files, so permission to create a new
+Project alone is insufficient. It sets
 the Project's `customName` to the display name, so Access pickers show the bot's name, not its slug.
 The initial idle agent the CLI created is gone: sessions start per (bot, chat) on the first message.
 
@@ -214,10 +220,10 @@ Per-area plans: [server-bot](plans/server-bot.md), [server-chat](plans/server-ch
 3. Hosted Hosts from the Hub, a high-density in-process provider, Hub conversation plane for chats
    with several humans.
 
+Sidebar uses Bots and Chats sections ahead of Projects; naming rationale is in
+[plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A.
+
 ## Open
 
-- Sidebar placement: head rows keyed `bots` / `chats`, or sections like Projects. Names are decided
-  (Bot, Chat; entries in [the glossary](../../glossary.md), rationale in
-  [plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A).
 - Whether `USER.md` is shared across a user's bots once the second brain exists.
 - `git init` in bot directories for memory history and diff viewing.

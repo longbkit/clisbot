@@ -275,6 +275,10 @@ export type ConnectionState =
   | { status: "disposed" };
 
 export type DaemonEvent =
+  | Extract<
+      SessionOutboundMessage,
+      { type: "bot.updated" | "chat.updated" | "chat.transcript.appended" }
+    >
   | {
       type: "agent_update";
       agentId: string;
@@ -2013,6 +2017,149 @@ export class DaemonClient {
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     }
+  }
+
+  createBot(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.create.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.create.response">({
+      message: { ...params, type: "bot.create.request" },
+    });
+  }
+
+  listBots(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.list.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.list.response">({
+      message: { ...params, type: "bot.list.request" },
+    });
+  }
+
+  updateBot(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.update.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.update.response">({
+      message: { ...params, type: "bot.update.request" },
+    });
+  }
+
+  archiveBot(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.archive.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.archive.response">({
+      message: { ...params, type: "bot.archive.request" },
+    });
+  }
+
+  seedBotTemplate(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.template.seed.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.template.seed.response">({
+      message: { ...params, type: "bot.template.seed.request" },
+    });
+  }
+
+  createChat(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.create.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.create.response">({
+      message: { ...params, type: "chat.create.request" },
+    });
+  }
+
+  listChats(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.list.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.list.response">({
+      message: { ...params, type: "chat.list.request" },
+    });
+  }
+
+  addChatParticipant(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.participant.add.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.participant.add.response">({
+      message: { ...params, type: "chat.participant.add.request" },
+    });
+  }
+
+  removeChatParticipant(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.participant.remove.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.participant.remove.response">({
+      message: { ...params, type: "chat.participant.remove.request" },
+    });
+  }
+
+  sendChatMessage(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.message.send.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.message.send.response">({
+      message: { ...params, type: "chat.message.send.request" },
+    });
+  }
+
+  fetchChatTranscript(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.transcript.fetch.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.transcript.fetch.response">({
+      message: { ...params, type: "chat.transcript.fetch.request" },
+    });
+  }
+
+  archiveChat(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.archive.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.archive.response">({
+      message: { ...params, type: "chat.archive.request" },
+    });
+  }
+
+  resetChatSession(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.session.reset.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.session.reset.response">({
+      message: { ...params, type: "chat.session.reset.request" },
+    });
   }
 
   async clearAgentAttention(agentId: string | string[]): Promise<void> {
@@ -6839,6 +6986,10 @@ export class DaemonClient {
           ...(typeof msg.payload.seq === "number" ? { seq: msg.payload.seq } : {}),
           ...(typeof msg.payload.epoch === "string" ? { epoch: msg.payload.epoch } : {}),
         };
+      case "bot.updated":
+      case "chat.updated":
+      case "chat.transcript.appended":
+        return msg;
       case "status":
         return { type: "status", payload: msg.payload };
       case "agent_deleted":

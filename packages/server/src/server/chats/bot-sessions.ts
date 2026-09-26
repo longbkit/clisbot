@@ -1,3 +1,4 @@
+import { withSessionOperationIdentity } from "../agent/session-operation-context.js";
 // One agent session per (bot, chat) pair (docs/features/bots-and-chats/README.md,
 // D2, D7). The labels on the agent are the truth; `participants[bot].agentId` is a
 // cache of the lookup. A session that cannot resume, or was archived from the
@@ -103,20 +104,22 @@ export class BotSessions {
     replaced: BotSessionReplacement | null,
   ): Promise<ResolvedBotSession> {
     const { launch } = bot;
-    const result = await this.deps.createAgent({
-      kind: "mcp",
-      provider: formatProviderModel(launch.provider, launch.model),
-      title: title ?? chat.title ?? bot.displayName,
-      ...(launch.modeId ? { mode: launch.modeId } : {}),
-      ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
-      ...(launch.featureValues ? { features: launch.featureValues } : {}),
-      cwd: bot.cwd,
-      workspaceId: bot.workspaceId,
-      labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
-      background: true,
-      notifyOnFinish: false,
-      promptFailure: "throw",
-    });
+    const result = await withSessionOperationIdentity({ actor: chat.createdBy }, () =>
+      this.deps.createAgent({
+        kind: "mcp",
+        provider: formatProviderModel(launch.provider, launch.model),
+        title: title ?? chat.title ?? bot.displayName,
+        ...(launch.modeId ? { mode: launch.modeId } : {}),
+        ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
+        ...(launch.featureValues ? { features: launch.featureValues } : {}),
+        cwd: bot.cwd,
+        workspaceId: bot.workspaceId,
+        labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
+        background: true,
+        notifyOnFinish: false,
+        promptFailure: "throw",
+      }),
+    );
     const agentId = result.snapshot.id;
     await this.deps.store.setParticipantAgent(chat.id, bot.id, agentId);
     return { agentId, created: true, replaced };

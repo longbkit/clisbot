@@ -5,7 +5,7 @@ import type { BotStartReport, BotStartDeps } from "./run.js";
 import { readBotManifest, assertBotName } from "./manifest.js";
 import { createBotStartDeps } from "./run.js";
 import { buildAssistantPlan, type BotStartOptions } from "./plan.js";
-import { provisionAssistant } from "./assistant-workspace.js";
+import path from "node:path";
 import { resolveBotHome } from "./home.js";
 import { startCommand, runStartCommand, extractBotStartOptions } from "./start.js";
 
@@ -32,7 +32,13 @@ export function onboardingInitCommand(): Command {
           saved
         ) {
           return runStartCommand(
-            { ...options, ...(!saved && !input.provider ? { provider: "codex" } : {}) },
+            {
+              ...options,
+              ...(!saved && !input.provider ? { provider: "codex" } : {}),
+              ...(!saved && !input.botName && !input.workspace && !input.cwd
+                ? { workspace: path.join(home, "workspaces", "default") }
+                : {}),
+            },
             command,
           );
         }
@@ -55,13 +61,8 @@ const initSchema: OutputSchema<AssistantInitReport> = {
     return [
       `Assistant workspace ready: ${assistant.workspacePath}`,
       `  project ${assistant.projectId}; workspace ${assistant.workspaceId}`,
-      `  agent ${assistant.agentId}; Hub ${assistant.hubUrl}`,
+      `  bot ${assistant.botId}; Hub ${assistant.hubUrl}`,
       `  template created: ${assistant.template?.created.join(", ") || "none"}; preserved: ${assistant.template?.skipped.join(", ") || "none"}`,
-      ...(assistant.template?.backupDirectory
-        ? [
-            `  template overwritten: ${assistant.template.overwritten?.length ?? 0}; backup: ${assistant.template.backupDirectory}`,
-          ]
-        : []),
       assistant.nextStep,
     ].join("\n");
   },
@@ -74,13 +75,23 @@ export async function initializeAssistantWorkspace(
   inheritedEnv: NodeJS.ProcessEnv = process.env,
 ) {
   const env = ownerBootstrapEnvironment(options, inheritedEnv);
-  const plan = buildAssistantPlan({ ...options, provider: options.provider ?? "codex" }, home);
+  const plan = buildAssistantPlan(
+    {
+      ...options,
+      workspace:
+        options.workspace ??
+        options.cwd ??
+        (!options.botName ? path.join(home, "workspaces", "default") : undefined),
+      provider: options.provider ?? "codex",
+    },
+    home,
+  );
   assertBotName(plan.name);
   await deps.ensureDaemonUp(home, env);
   await deps.waitDaemonUp(home);
   const client = await deps.openDaemon(await deps.daemonHost(home, env), deps.daemonPassword(home));
   try {
-    const assistant = await provisionAssistant(client, deps, plan, env);
+    const assistant = await deps.provisionBot(client, plan);
     const hub = await deps.ensureHubUp(home, env);
     await deps.waitHubReady(hub.url);
     return {

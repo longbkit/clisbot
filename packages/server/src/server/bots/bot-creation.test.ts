@@ -122,6 +122,31 @@ describe("createBotService", () => {
     expect(await service.list()).toHaveLength(1);
   });
 
+  it("checks management access before reusing or seeding an existing bot", async () => {
+    const { bot } = await service.create(
+      { name: "Private", launch: { provider: "codex" } },
+      { owner: OWNER },
+    );
+    await rm(path.join(bot.cwd, "TOOLS.md"));
+    for (const extra of [{}, { path: bot.cwd }]) {
+      await expect(
+        service.create(
+          { name: "Private", launch: { provider: "codex" }, ...extra },
+          { owner: { kind: "user", id: "other" }, mayReuse: () => false },
+        ),
+      ).rejects.toMatchObject({ code: "access_denied" });
+    }
+    await expect(lstat(path.join(bot.cwd, "TOOLS.md"))).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await service.list()).toHaveLength(1);
+  });
+
+  it("does not allow the bots root to become a bot Project", async () => {
+    await expect(
+      service.create({ name: "Root", path: root, launch: { provider: "codex" } }, { owner: OWNER }),
+    ).rejects.toMatchObject({ code: "inside_project" });
+    expect(await projectRegistry.list()).toEqual([]);
+  });
+
   it("refuses an unknown provider, an empty name, and a home inside a Project", async () => {
     await expect(
       service.create({ name: "x", launch: { provider: "nope" } }, { owner: OWNER }),

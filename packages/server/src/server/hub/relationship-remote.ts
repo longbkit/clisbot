@@ -66,6 +66,7 @@ export interface HubAccessLeaseRefresh {
 }
 
 export interface HubProject {
+  bot?: { id: string; kind: "personal" | "team" };
   projectId: string;
   name: string;
   agentConfigurationCatalog?: HubAgentConfigurationCatalog;

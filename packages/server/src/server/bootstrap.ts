@@ -1,3 +1,4 @@
+import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-session-authorship.js";
 import { deleteSessionDirectory } from "./file-upload/session-files.js";
 import { startSessionFileMaintenance } from "./file-upload/session-file-maintenance.js";
@@ -154,6 +155,7 @@ import {
 } from "./workspace-registry.js";
 import { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { ScheduleService } from "./schedule/service.js";
+import { startChatRuntime } from "./chats/chat-runtime.js";
 import { createBotServiceFromConfig } from "./bots/index.js";
 import { DaemonConfigStore, type MutableDaemonConfig } from "./daemon-config-store.js";
 import { createOrchestrationSkills } from "./orchestration-skills/index.js";
@@ -1010,6 +1012,8 @@ export async function createPaseoDaemon(
     }
   });
   const workspaceProvisioning = createWorkspaceProvisioningService({
+    assertProjectDirectory: (cwd) =>
+      assertNotBotProjectRoot(cwd, config.bots?.enabled ? config.bots.root : undefined),
     lifecycle: pluginRuntime,
     serverId,
     projectRegistry,
@@ -1426,14 +1430,21 @@ export async function createPaseoDaemon(
       const terminalProfileCatalog = resolveTerminalProfiles(
         daemonConfigStore.get().terminalProfiles,
       ).map(({ id, name }) => ({ id, name }));
+      const bots = (await botService?.list()) ?? [];
       return (await projectRegistry.list())
         .filter((project) => project.archivedAt === null)
-        .map((project) => ({
-          projectId: project.projectId,
-          name: project.customName ?? project.displayName,
-          agentConfigurationCatalog,
-          terminalProfileCatalog,
-        }));
+        .map((project) => {
+          const bot = bots.find((candidate) => candidate.projectId === project.projectId);
+          const entry: import("./hub/relationship-remote.js").HubProject = {
+            projectId: project.projectId,
+            name: project.customName ?? project.displayName,
+            agentConfigurationCatalog,
+            terminalProfileCatalog,
+          };
+          // COMPAT(clisbot-bot-project-marker): older Hubs omit this optional metadata.
+          if (bot) entry.bot = { id: bot.id, kind: bot.kind };
+          return entry;
+        });
     },
     getConnectionOffer: async () => {
       const relay = daemonConfigStore.get().relay;
@@ -1592,6 +1603,19 @@ export async function createPaseoDaemon(
         .getSnapshot()
         .records.some(({ entry }) => entry.provider === provider && entry.enabled),
   });
+  const chatRuntime = await startChatRuntime(
+    botService,
+    {
+      rootDir: path.join(config.paseoHome, "chats"),
+      agentManager,
+      agentStorage,
+      createAgent,
+      durableTimelineStore: sessionStorage.agentManagerOptions.durableTimelineStore,
+      logger,
+    },
+    () => hubRelationships.publishProjects(),
+  );
+  const chatService = chatRuntime.service;
   logger.info({ elapsed: elapsed() }, "Loading persisted agent registry");
   const persistedRecords = await agentStorage.list();
   logger.info(
@@ -1974,6 +1998,7 @@ export async function createPaseoDaemon(
               orchestrationSkills,
               workspaceLabelService,
               botService ?? undefined,
+              chatService,
             );
             pluginRuntime.bindPaseoSessionHost(wsServer);
             const timelineViewers = wsServer;
@@ -2071,6 +2096,7 @@ export async function createPaseoDaemon(
     await pluginRuntime.stopAllPlugins();
     terminalManager.killAll();
     await speechService.stop();
+    await chatRuntime.stop();
     await scheduleService.stop().catch(() => undefined);
     await relayRuntime?.stop().catch(() => undefined);
     if (wsServer) {

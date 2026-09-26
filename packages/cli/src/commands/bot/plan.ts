@@ -1,8 +1,4 @@
-// COMPAT(clisbot-bot): pure planning for `bot start` (implementation doc §2.1).
-// A bot is a composite — workspace + idle agent + channel account + route — and
-// the plan is the single place that resolves the operator's flags into that
-// bundle. Kept pure (no I/O) so idempotency and the flag semantics are testable
-// in isolation; the orchestration in `run.ts` performs the side effects.
+// Pure flag and channel-credential planning for daemon-owned Bot onboarding.
 
 import path from "node:path";
 import type { CommandError } from "../../output/index.js";
@@ -70,7 +66,6 @@ export type BotCredentialPlan =
   | { channel: "telegram"; account: string; connectionId: string };
 
 const DEFAULT_ISOLATION = "local";
-const WORKSPACE_ISOLATIONS = ["local", "worktree"] as const;
 
 export type AssistantPlan = Pick<
   BotStartPlan,
@@ -86,6 +81,11 @@ export type AssistantPlan = Pick<
 >;
 
 export function buildAssistantPlan(options: BotStartOptions, home: string): AssistantPlan {
+  if (options.agentName !== undefined)
+    throw commandError(
+      "INVALID_AGENT_NAME",
+      "Bots no longer create an initial agent session; use --bot-name to name the Bot.",
+    );
   const botType = resolveBotType(options.botType);
   const name = (options.botName ?? `${botType}-assistant`).trim();
   const providerModel = resolveProviderAndModel({
@@ -100,7 +100,7 @@ export function buildAssistantPlan(options: BotStartOptions, home: string): Assi
     ...(options.mode?.trim() ? { mode: options.mode.trim() } : {}),
     workspacePath: resolveWorkspacePath(options, home),
     isolation: resolveIsolation(options.newWorkspace),
-    agentTitle: options.agentName?.trim() || name,
+    agentTitle: name,
     ...(options.overwriteTemplate ? { overwriteTemplate: true } : {}),
   };
 }
@@ -126,20 +126,19 @@ function resolveBotType(raw: string | undefined): BotType {
 }
 
 function resolveIsolation(raw: string | undefined): string {
-  const value = raw?.trim() || DEFAULT_ISOLATION;
-  if (!(WORKSPACE_ISOLATIONS as readonly string[]).includes(value)) {
+  // COMPAT(clisbot-bot-new-workspace): Bot homes are directory Workspaces.
+  if (raw !== undefined)
     throw commandError(
       "INVALID_WORKSPACE",
-      `--new-workspace must be one of: ${WORKSPACE_ISOLATIONS.join(", ")}`,
+      "Bots use a directory Workspace; remove --new-workspace and use --workspace for an explicit directory.",
     );
-  }
-  return value;
+  return DEFAULT_ISOLATION;
 }
 
 function resolveWorkspacePath(options: BotStartOptions, home: string): string {
   const explicit = options.workspace?.trim() || options.cwd?.trim();
-  const folder = options.botType?.trim() === "team" ? "team" : "default";
-  return path.resolve(explicit ?? path.join(home, "workspaces", folder));
+  void home;
+  return explicit ? path.resolve(explicit) : "";
 }
 
 /** At least one channel credential is required; one bot answers on one channel. */

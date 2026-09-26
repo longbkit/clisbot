@@ -309,9 +309,9 @@ function launchOf(state: BotFormState): BotLaunchDefaults {
   if (!state.selectedProvider) throw new Error("A provider is required");
   return {
     provider: state.selectedProvider,
-    model: state.selectedModel.trim() || null,
-    modeId: state.selectedMode.trim() || null,
-    thinkingOptionId: state.selectedThinkingOptionId.trim() || null,
+    model: state.selectedModel.trim() || undefined,
+    modeId: state.selectedMode.trim() || undefined,
+    thinkingOptionId: state.selectedThinkingOptionId.trim() || undefined,
     featureValues: Object.keys(state.featureValues).length > 0 ? state.featureValues : undefined,
   };
 }

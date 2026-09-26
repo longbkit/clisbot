@@ -170,7 +170,7 @@ describe("openBotForm", () => {
         provider: "mock",
         model: "model-a",
         modeId: "build",
-        thinkingOptionId: null,
+        thinkingOptionId: undefined,
         featureValues: { fast: true },
       },
     });

@@ -27,6 +27,7 @@ import {
   type ApprovalPrivilege,
   formatChannelAccountResourceId,
 } from "./contract.js";
+import { parseProjectBotMarker, type ProjectBotMarker } from "./project-bot-marker.js";
 import {
   parseTerminalProfileCatalog,
   projectCreationRules,
@@ -131,6 +132,8 @@ export interface AccessResourceRecord {
   available: boolean;
   agentConfigurationCatalog?: z.infer<typeof AgentConfigurationCatalogSchema>;
   terminalProfileCatalog?: TerminalProfileCatalog;
+  /** Set on a `project` that is a Bot's home; the grant on it stays a Project grant. */
+  bot?: ProjectBotMarker;
 }
 
 export type EffectiveAccessSource =
@@ -605,6 +608,7 @@ export class AccessStore {
           },
           parseAgentConfigurationCatalog(project.metadata),
           parseTerminalProfileCatalog(project.metadata),
+          parseProjectBotMarker(project.metadata),
         ),
       ),
       ...teamRows.map((team) => ({

@@ -50,6 +50,10 @@ export interface CreateChatServiceInput {
 }
 
 export interface ChatService {
+  record(chatId: string): import("./chat-record.js").StoredChat | null;
+  subscribe(
+    listener: (message: import("../messages.js").SessionOutboundMessage) => void,
+  ): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
   create(
@@ -70,6 +74,18 @@ export interface ChatService {
 
 export function createChatService(options: ChatServiceOptions): ChatService {
   const { agentManager, agentStorage, logger } = options;
+  const listeners = new Set<(message: import("../messages.js").SessionOutboundMessage) => void>();
+  const publisher: ChatPublisher = {
+    chatUpdated(chat) {
+      options.publisher.chatUpdated(chat);
+      for (const listener of listeners) listener({ type: "chat.updated", payload: { chat } });
+    },
+    transcriptAppended(chatId, line) {
+      options.publisher.transcriptAppended(chatId, line);
+      for (const listener of listeners)
+        listener({ type: "chat.transcript.appended", payload: { chatId, line } });
+    },
+  };
   const store = new ChatStore(options.rootDir, logger);
   const transcripts = new Map<string, TranscriptLog>();
   const transcriptOf = (chatId: string): TranscriptLog => {
@@ -92,7 +108,7 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     bots: options.bots,
     botSessions,
     agentManager,
-    publisher: options.publisher,
+    publisher,
     logger,
     sendPrompt: (params) =>
       sendPromptToAgent({
@@ -133,17 +149,30 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     });
 
   return {
+    record: (chatId) => store.getCached(chatId),
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     async start() {
       await store.load();
       unsubscribe ??= store.subscribe((chat) => {
         void engine
           .payload(chat)
-          .then((summary) => options.publisher.chatUpdated(summary))
+          .then((summary) => publisher.chatUpdated(summary))
           .catch((error: unknown) =>
             logger.warn({ chatId: chat.id, err: error }, "chat.updated.publish_failed"),
           );
       });
-      void reconcile().catch((error: unknown) =>
+      for (const chat of await store.list()) {
+        for (const participant of chat.participants) {
+          if (participant.agentId)
+            engine.tracker.watch(participant.agentId, chat.id, participant.botId);
+        }
+      }
+      await reconcile().catch((error: unknown) =>
         logger.warn({ err: error }, "chat.reconcile.failed"),
       );
     },

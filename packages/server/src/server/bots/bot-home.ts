@@ -40,6 +40,9 @@ export async function resolveBotHome(input: ResolveBotHomeInput): Promise<BotHom
   const explicit = input.path?.trim();
   if (explicit) {
     const cwd = path.resolve(expandTilde(explicit));
+    if ((await canonicalOrSelf(cwd)) === (await canonicalOrSelf(input.root))) {
+      throw new BotHomeError("inside_project", "The bots root cannot itself be a bot home.");
+    }
     return { cwd, slug: path.basename(cwd), explicit: true };
   }
   const slug = await uniqueBotSlug(input.name, input.takenSlugs, (candidate) =>

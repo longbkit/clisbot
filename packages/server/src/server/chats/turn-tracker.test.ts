@@ -88,6 +88,25 @@ describe("TurnTracker", () => {
     ]);
   });
 
+  test("binds a synchronous complete turn before prompt admission resolves", async () => {
+    const h = harness();
+    h.tracker.watch("agent-1", "cht_1", "bot_a");
+    await h.tracker.dispatch("agent-1", { messageIds: ["m1"], hop: 2 }, async () => {
+      h.emit("agent-1", { type: "turn_started", provider: "codex", turnId: "t1" });
+      h.timeline("agent-1", h.assistant("fast", "a1"));
+      h.emit("agent-1", { type: "turn_completed", provider: "codex", turnId: "t1" });
+      expect(h.completed).toHaveLength(0);
+      return { disposition: "turn_started" };
+    });
+    expect(h.completed[0]).toMatchObject({
+      text: "fast",
+      expectation: { messageIds: ["m1"], hop: 2 },
+    });
+    h.emit("agent-1", { type: "turn_started", provider: "codex", turnId: "t2" });
+    h.emit("agent-1", { type: "turn_completed", provider: "codex", turnId: "t2" });
+    expect(h.completed[1]?.expectation).toBeNull();
+  });
+
   test("keeps the last contiguous assistant run: a tool call resets it, messages join by id", () => {
     const h = harness();
     h.tracker.watch("agent-1", "cht_1", "bot_a");

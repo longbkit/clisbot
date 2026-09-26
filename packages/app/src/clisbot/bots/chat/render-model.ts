@@ -88,6 +88,17 @@ function unreferencedItems(
   const lastLine = lines[lines.length - 1];
   const cutoff = lastReferencedIndex < 0 && lastLine ? Date.parse(lastLine.at) : Number.NaN;
   return items.filter((item, index) => {
+    const cursor = item.timelineCursor;
+    if (
+      cursor &&
+      lines.some(
+        (line) =>
+          line.reply?.epoch === cursor.epoch &&
+          line.reply.seq !== undefined &&
+          cursor.seq <= line.reply.seq,
+      )
+    )
+      return false;
     if (item.kind === "user_message") return false;
     if (index <= lastReferencedIndex) return false;
     if (!Number.isNaN(cutoff) && item.timestamp.getTime() <= cutoff) return false;

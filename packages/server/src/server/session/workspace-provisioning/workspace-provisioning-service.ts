@@ -99,6 +99,7 @@ export function createWorkspaceProvisioningService(deps: {
   isDirectory: (path: string) => Promise<boolean>;
   logger: Logger;
   lifecycle?: PluginLifecycle;
+  assertProjectDirectory?: (cwd: string) => Promise<void>;
 }): WorkspaceProvisioningService {
   const { serverId, workspaceRegistry, projectRegistry, workspaceGitService, logger } = deps;
 
@@ -191,6 +192,7 @@ export function createWorkspaceProvisioningService(deps: {
   }
 
   async function findOrCreateProjectForDirectory(cwd: string): Promise<PersistedProjectRecord> {
+    await deps.assertProjectDirectory?.(cwd);
     const rootPath = resolve(cwd);
     const checkout = await workspaceGitService.getCheckout(rootPath);
     const timestamp = new Date().toISOString();
@@ -222,6 +224,7 @@ export function createWorkspaceProvisioningService(deps: {
     projectId?: string,
     context?: { expectsInitialAgent?: boolean; workspaceId?: string },
   ): Promise<PersistedWorkspaceRecord> {
+    await deps.assertProjectDirectory?.(cwd);
     const normalizedCwd = resolve(cwd);
     const checkout = await workspaceGitService.getCheckout(normalizedCwd);
     const project = projectId

@@ -1,16 +1,12 @@
-// COMPAT(clisbot-bot): the bot manifest — the only new persistence artifact the
-// `bot` group introduces (implementation doc §2.1). A bot is a composite of four
-// existing things (workspace + idle agent + channel account + route); the
-// manifest ties their ids together so idempotency, `bot stop`, and a future
-// `bot status` can find them. Lives at `$CLISBOT_HOME/bots/<bot-name>.json`,
-// one file per bot, written atomically (write-tmp + rename), mode 0600 so one
-// bot's ids are not readable as another's.
+// Local channel restart references. Version 2 stores no daemon-owned workspace or session facts.
+// Version 1 remains readable for explicit adoption at its existing directory.
 
 import { mkdir, readdir, rename, rm, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface BotManifest {
-  version: 1;
+  version: 1 | 2;
+  botId?: string;
   name: string;
   botType: "personal" | "team";
   provider: string;
@@ -55,6 +51,8 @@ export function botManifestPath(home: string, name: string): string {
 
 export function assertBotName(name: string): void {
   const trimmed = name.trim();
+  if (/^bot_[0-9a-f]{16}$/.test(trimmed))
+    throw new Error("Bot names cannot use the reserved daemon record id format");
   if (trimmed.length === 0 || trimmed.length > MAX_NAME_LENGTH) {
     throw new Error(`bot name "${name}" is invalid: 1-${MAX_NAME_LENGTH} characters`);
   }
@@ -117,10 +115,14 @@ export async function writeBotManifest(home: string, manifest: BotManifest): Pro
   await mkdir(path.dirname(target), { recursive: true, mode: MANIFEST_DIR_MODE });
   const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await writeFile(tmp, `${JSON.stringify(manifest, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: MANIFEST_FILE_MODE,
-    });
+    await writeFile(
+      tmp,
+      `${JSON.stringify(manifest.version === 2 ? restartReference(manifest) : manifest, null, 2)}\n`,
+      {
+        encoding: "utf8",
+        mode: MANIFEST_FILE_MODE,
+      },
+    );
     await rename(tmp, target);
   } catch (error) {
     await rm(tmp, { force: true }).catch(() => undefined);
@@ -145,6 +147,24 @@ const REQUIRED_STRING_FIELDS = [
 
 function parseBotManifest(value: unknown): BotManifest {
   const record = asManifestRecord(value);
+  // COMPAT(clisbot-bot-manifest-v1): old manifests are adopted at their exact cwd.
+  // The v2 disk reference has no daemon-owned fields; these empty projection
+  // fields must be hydrated from bot.list before use.
+  if (record["version"] === 2) {
+    if (typeof record["botId"] !== "string" || !record["botId"].startsWith("bot_"))
+      throw new Error("invalid bot reference");
+    const legacy = parseBotManifest({
+      ...record,
+      version: 1,
+      botType: "personal",
+      provider: "",
+      workspacePath: "",
+      workspaceId: "",
+      agentId: "",
+      agentTitle: "",
+    });
+    return { ...legacy, version: 2, botId: record["botId"] };
+  }
   for (const field of REQUIRED_STRING_FIELDS) {
     if (typeof record[field] !== "string") throw new Error("invalid bot manifest");
   }
@@ -198,4 +218,19 @@ function parseManifestCredentials(value: unknown): Record<string, { persisted: t
     credentials[key] = { persisted: true };
   }
   return credentials;
+}
+
+function restartReference(manifest: BotManifest) {
+  if (!manifest.botId) throw new Error("A v2 bot reference requires botId");
+  return {
+    version: 2,
+    name: manifest.name,
+    botId: manifest.botId,
+    channel: manifest.channel,
+    account: manifest.account,
+    ...(manifest.connectionId ? { connectionId: manifest.connectionId } : {}),
+    credentials: manifest.credentials,
+    createdAt: manifest.createdAt,
+    updatedAt: manifest.updatedAt,
+  };
 }

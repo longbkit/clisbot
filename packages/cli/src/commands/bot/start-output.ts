@@ -89,7 +89,7 @@ function renderSummary(bot: BotStartReport, options: OutputOptions): string {
     { label: "Hub", value: bot.hubUrl },
     { label: "Daemon", value: `${bot.daemonHost} (${bot.daemon})` },
     { label: "Agent", value: bot.agentTitle },
-    { label: "Agent ID", value: bot.agentId },
+    { label: bot.botId ? "Bot ID" : "Agent ID", value: bot.botId ?? bot.agentId },
     { label: "Credentials", value: "Stored in Hub" },
   ];
   if (template)

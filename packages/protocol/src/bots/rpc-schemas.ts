@@ -11,6 +11,7 @@ export const BotTemplateResultSchema = z.object({
   created: z.array(z.string()),
   skipped: z.array(z.string()),
   overwritten: z.array(z.string()).optional(),
+  backupDirectory: z.string().optional(),
 });
 export type BotTemplateResult = z.infer<typeof BotTemplateResultSchema>;
 
@@ -116,8 +117,16 @@ export const BotTemplateSeedResponseSchema = z.object({
 export const BotUpdatedSchema = z.object({
   type: z.literal("bot.updated"),
   payload: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("upsert"), bot: BotPayloadSchema }),
-    z.object({ kind: z.literal("remove"), botId: z.string() }),
+    z.object({
+      kind: z.literal("upsert"),
+      bot: BotPayloadSchema,
+      subscriptionId: z.string().optional(),
+    }),
+    z.object({
+      kind: z.literal("remove"),
+      botId: z.string(),
+      subscriptionId: z.string().optional(),
+    }),
   ]),
 });
 

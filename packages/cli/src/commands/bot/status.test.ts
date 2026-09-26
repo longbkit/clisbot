@@ -8,7 +8,7 @@ import { afterEach, describe, it } from "vitest";
 import type { ControlPlaneTarget } from "../control-plane.js";
 import { buildStatusReport, type BotStatusReport } from "./status.js";
 import type { BotManifest } from "./manifest.js";
-import { writeBotManifest } from "./manifest.js";
+import { readBotManifests, writeBotManifest } from "./manifest.js";
 import { runBotStatusCommand } from "./status.js";
 import type { ChannelStatusAccount } from "../channels/client.js";
 
@@ -118,6 +118,7 @@ describe("runBotStatusCommand", () => {
         "personal-assistant",
         { home, hub: target.origin },
         undefined as never,
+        fixtureCatalog,
       );
       assert.equal(result.type, "single");
       assert.equal(result.data.agentId, "ag-1");
@@ -134,7 +135,12 @@ describe("runBotStatusCommand", () => {
     const target = await statusServer(LIVE);
     try {
       await assert.rejects(
-        runBotStatusCommand("ghost", { home, hub: target.origin }, undefined as never),
+        runBotStatusCommand(
+          "ghost",
+          { home, hub: target.origin },
+          undefined as never,
+          fixtureCatalog,
+        ),
         (error: unknown) =>
           (error as { code?: string }).code === "BOT_NOT_FOUND" &&
           /No bot named "ghost"/.test((error as { message: string }).message),
@@ -162,6 +168,7 @@ describe("runBotStatusCommand", () => {
         "slack-bot",
         { home, hub: target.origin },
         undefined as never,
+        fixtureCatalog,
       );
       assert.equal(result.data.running, false);
       assert.equal(result.data.credential, "persisted");
@@ -170,3 +177,7 @@ describe("runBotStatusCommand", () => {
     }
   });
 });
+
+async function fixtureCatalog(home: string) {
+  return (await readBotManifests(home)).map((entry) => ({ manifest: entry, hasChannel: true }));
+}

@@ -11,6 +11,7 @@ import { assertSessionId } from "../agent/session-storage/layout.js";
 import {
   StoredChatSchema,
   newChatId,
+  type ChatCompletedTurn,
   type StoredChat,
   type StoredChatParticipant,
 } from "./chat-record.js";
@@ -80,10 +81,21 @@ export class ChatStore {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
     }
-    const parsed = StoredChatSchema.safeParse(JSON.parse(raw));
+    let value: unknown;
+    try {
+      value = JSON.parse(raw);
+    } catch (error) {
+      this.logger.warn({ file, err: error }, "chat.record.invalid_json");
+      return null;
+    }
+    const parsed = StoredChatSchema.safeParse(value);
     if (parsed.success) return parsed.data;
     this.logger.warn({ file, issues: parsed.error.issues }, "chat.record.invalid");
     return null;
+  }
+
+  getCached(chatId: string): StoredChat | null {
+    return this.cache.get(chatId) ?? null;
   }
 
   async list(): Promise<StoredChat[]> {
@@ -171,7 +183,24 @@ export class ChatStore {
   /** `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it. */
   resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat, at) =>
-      mapParticipant(chat, botId, (entry) => ({ ...entry, agentId: null, resetAt: at })),
+      mapParticipant(chat, botId, (entry) => ({
+        ...entry,
+        agentId: null,
+        resetAt: at,
+        completedTurn: null,
+      })),
+    );
+  }
+
+  recordCompletedTurn(
+    chatId: string,
+    botId: string,
+    receipt: ChatCompletedTurn,
+  ): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      mapParticipant(chat, botId, (entry) =>
+        entry.agentId === receipt.agentId ? { ...entry, completedTurn: receipt } : entry,
+      ),
     );
   }
 

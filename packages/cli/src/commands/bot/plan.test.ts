@@ -25,16 +25,15 @@ describe("buildBotStartPlan", () => {
     assert.equal(plan.agentTitle, "personal-assistant");
     assert.equal(plan.provider, "codex");
     assert.equal(plan.model, undefined);
-    assert.equal(plan.workspacePath, `${HOME}/workspaces/default`);
+    assert.equal(plan.workspacePath, "");
     assert.equal(plan.isolation, "local");
   });
 
-  it("honors --bot-type team and the bot-name/account/agent-name overrides", () => {
+  it("honors --bot-type team and the bot-name/account overrides", () => {
     const plan = buildBotStartPlan(
       options({
         botType: "team",
         botName: "ops-bot",
-        agentName: "Ops Agent",
         slackConnectionId: "00000000-0000-4000-8000-000000000001",
         slackAccount: "ops",
       }),
@@ -42,9 +41,9 @@ describe("buildBotStartPlan", () => {
     );
     assert.equal(plan.name, "ops-bot");
     assert.equal(plan.botType, "team");
-    assert.equal(plan.workspacePath, `${HOME}/workspaces/team`);
+    assert.equal(plan.workspacePath, "");
     assert.equal(plan.account, "ops");
-    assert.equal(plan.agentTitle, "Ops Agent");
+    assert.equal(plan.agentTitle, "ops-bot");
     assert.equal(plan.channel, "slack");
     assert.equal(
       plan.credential.channel === "slack" ? plan.credential.connectionId : undefined,
@@ -127,7 +126,7 @@ describe("planUnchanged", () => {
       name: "personal-assistant",
       botType: "personal",
       provider: "codex",
-      workspacePath: `${HOME}/workspaces/default`,
+      workspacePath: "",
       workspaceId: "ws-1",
       agentId: "ag-1",
       agentTitle: "personal-assistant",
@@ -177,4 +176,16 @@ describe("buildBotManifest", () => {
       "telegram:personal-assistant": { persisted: true },
     });
   });
+});
+
+it("rejects obsolete session-title and workspace-isolation flags", () => {
+  assert.throws(
+    () => buildBotStartPlan(options({ agentName: "Session", telegramBotToken: "tg" }), HOME),
+    (error: unknown) => (error as { code?: string }).code === "INVALID_AGENT_NAME",
+  );
+  for (const newWorkspace of ["local", "worktree"])
+    assert.throws(
+      () => buildBotStartPlan(options({ newWorkspace, telegramBotToken: "tg" }), HOME),
+      (error: unknown) => (error as { code?: string }).code === "INVALID_WORKSPACE",
+    );
 });

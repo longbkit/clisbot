@@ -1,3 +1,5 @@
+import { isBotChatEvent } from "./session/chats/chat-events.js";
+import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { withoutPermissionGeneration } from "./agent/permission-generation-projection.js";
 import {
   projectTimelineRows,
@@ -121,6 +123,13 @@ import type {
   AgentTimelineFetchResult,
   ManagedAgent,
 } from "./agent/agent-manager.js";
+import {
+  ChatSession,
+  createChatSession,
+  dispatchChatMessage,
+} from "./session/chats/chat-session.js";
+import type { ChatService } from "./chats/chat-service.js";
+import { CHAT_ID_LABEL } from "@getpaseo/protocol/bots/labels";
 import { createAgentCommand } from "./agent/create-agent/create.js";
 import { resolveCreateAgentIntent, type CreateAgentIntent } from "./agent/create-agent/intent.js";
 import {
@@ -482,6 +491,7 @@ export interface SessionOptions {
   directorySync?: DirectorySyncService;
   workspaceLabelService?: WorkspaceLabelService;
   botService?: BotService;
+  chatService?: ChatService;
   filesystem?: SessionFileSystem;
   scheduleService: ScheduleService;
   checkoutDiffManager: CheckoutDiffManager;
@@ -739,6 +749,7 @@ export class Session {
   private readonly resourceAuthorizer: ManagedResourceAuthorizer;
   private readonly terminalProfileSession: TerminalProfileSession;
   private readonly botSession: BotSession | null;
+  private readonly chatSession: ChatSession | null;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
   private readonly sessionId: string;
@@ -912,6 +923,10 @@ export class Session {
       agentStorage,
       terminalManager,
       providerSnapshotManager,
+      (labels) =>
+        !options.chatService ||
+        !labels?.[CHAT_ID_LABEL] ||
+        this.chatSession?.allows(labels[CHAT_ID_LABEL]) === true,
     );
     this.appVersion = appVersion ?? null;
     this.clientCapabilities = parseClientCapabilities(clientCapabilities);
@@ -1005,6 +1020,7 @@ export class Session {
     });
     this.workspaceAutoName = workspaceAutoName;
     this.workspaceProvisioning = createWorkspaceProvisioningService({
+      assertProjectDirectory: (cwd) => assertNotBotProjectRoot(cwd, options.botService?.root),
       lifecycle: this.pluginRuntime,
       serverId,
       workspaceRegistry: this.workspaceRegistry,
@@ -1176,6 +1192,13 @@ export class Session {
       authority: this.resourceAuthorizer,
       actorId: () => this.accountActor?.id,
     });
+    this.chatSession = createChatSession(
+      options.chatService,
+      options.botService,
+      this.resourceAuthorizer,
+      () => this.accountActor,
+      (msg) => this.emit(msg),
+    );
     this.botSession = createBotSession(
       options.botService,
       {
@@ -2573,7 +2596,8 @@ export class Session {
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
       this.dispatchWorkspaceAndProjectMessage(msg) ??
-      dispatchBotMessage(this.botSession, msg, (reply) => this.emit(reply))
+      dispatchBotMessage(this.botSession, msg, (reply) => this.emit(reply)) ??
+      dispatchChatMessage(this.chatSession, msg, (reply) => this.emit(reply))
     );
   }
 
@@ -5597,7 +5621,7 @@ export class Session {
       agents = agents.filter(
         (agent) =>
           typeof agent.workspaceId === "string" &&
-          this.resourceAuthorizer.allowsWorkspaceSync(agent.workspaceId),
+          this.resourceAuthorizer.allowsAgentSync(agent.id),
       );
     }
     if (!includeArchived) {
@@ -9333,6 +9357,7 @@ export class Session {
     }
     this.providerCatalogSession.dispose();
     this.botSession?.dispose();
+    this.chatSession?.dispose();
 
     this.terminalController.dispose();
 
@@ -9396,6 +9421,7 @@ function isValidGitHubRepoSegment(value: string): boolean {
 }
 
 function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubscription | null {
+  if (isBotChatEvent(message.type)) return message.type;
   switch (message.type) {
     case "project.update":
     case "providers_snapshot_update":

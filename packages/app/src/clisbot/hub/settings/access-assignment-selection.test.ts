@@ -13,19 +13,37 @@ vi.mock("@/components/ui/select-field", () => ({ SelectField: () => null }));
 
 const DEVELOPER = ["daemon.connect", "project.use", "terminal.profile.use", "hub.access.manage"];
 const FULL_ACCESS = [...DEVELOPER, "terminal.use", "workspace.manage"];
+const PROJECT_OFFICE_WORKER = ["project.use", "agent.interact", "agent.create", "approval.file"];
 const catalog = {
   privileges: [],
-  accessLevels: { daemon: { developer: DEVELOPER, full_access: FULL_ACCESS } },
-  resources: [{ kind: "daemon", id: "host", name: "Host", parent: null, available: true }],
+  accessLevels: {
+    daemon: { developer: DEVELOPER, full_access: FULL_ACCESS },
+    project: { office_worker: PROJECT_OFFICE_WORKER },
+  },
+  resources: [
+    { kind: "daemon", id: "host", name: "Host", parent: null, available: true },
+    {
+      kind: "project",
+      id: "bot-home",
+      name: "Ada",
+      parent: { kind: "daemon", id: "host" },
+      available: true,
+      bot: { id: "bot_1", kind: "personal" },
+    },
+  ],
 } as unknown as AccessCatalog;
 
-function selection(authority: ViewerAuthority, accessLevel: string) {
+function selection(
+  authority: ViewerAuthority,
+  accessLevel: string,
+  resourceKeyValue = "daemon\u0000host",
+) {
   return resolveAssignmentSelection({
     editing: null,
     catalog,
     authority,
     subjectKeyValue: "member\u0000m",
-    resourceKeyValue: "daemon\u0000host",
+    resourceKeyValue,
     alsoResourceKeys: [],
     accessLevel,
     canShare: true,
@@ -70,5 +88,15 @@ describe("resolveAssignmentSelection defaults", () => {
       deny: ["/workspace/qc/prod/**"],
     });
     expect(selection({ unrestricted: true }, "full_access").projectFolders).toBeNull();
+  });
+
+  it("resolves a Bot's Project as a Project grant with Project levels", () => {
+    const chosen = selection({ unrestricted: true }, "office_worker", "project\u0000bot-home");
+    expect(chosen.resource?.bot).toEqual({ id: "bot_1", kind: "personal" });
+    expect(chosen.levelOptions.map(({ value }) => value)).toEqual(["office_worker"]);
+    // The helper switches Can share on, so the level's privileges gain `hub.access.manage`.
+    expect(chosen.privileges).toEqual([...PROJECT_OFFICE_WORKER, "hub.access.manage"]);
+    expect(chosen.needsAgentConfiguration).toBe(true);
+    expect(chosen.createsProjects).toBe(false);
   });
 });

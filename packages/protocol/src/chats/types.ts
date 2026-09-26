@@ -75,6 +75,8 @@ export const ChatMessagePayloadSchema = z.object({
   text: z.string(),
   reply: ChatMessageReplySchema.optional(),
   inReplyTo: z.string().optional(),
+  /** Accepted target snapshot, persisted before dispatch for restart recovery. */
+  deliveryBotIds: z.array(z.string()).optional(),
   /** 0 for a user line; a bot line answering a hop-n line is hop n+1. */
   hop: z.number().int().nonnegative(),
 });

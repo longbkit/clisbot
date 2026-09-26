@@ -1,3 +1,4 @@
+import { useAssistantFileLinkResolverContext } from "@/assistant-file-links/provider";
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -7,6 +8,11 @@ import type { ChatMessage } from "../data/contracts";
 import { ChatScreen } from "./chat-screen";
 import type { ChatLiveHead } from "./render-model";
 
+vi.mock("@/stores/navigation-active-workspace-store", () => ({ navigateToWorkspace: vi.fn() }));
+vi.mock("@/agent-stream/view", () => ({
+  PermissionRequestCard: () => <div data-testid="permission-card" />,
+}));
+vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
@@ -55,11 +61,14 @@ vi.mock("@/components/message", () => ({
       {message}
     </p>
   ),
-  AssistantMessage: ({ message, phase }: { message: string; phase: string }) => (
-    <p data-kind="assistant" data-phase={phase}>
-      {message}
-    </p>
-  ),
+  AssistantMessage: ({ message, phase }: { message: string; phase: string }) => {
+    useAssistantFileLinkResolverContext();
+    return (
+      <p data-kind="assistant" data-phase={phase}>
+        {message}
+      </p>
+    );
+  },
   ToolCall: ({ toolName, status }: { toolName: string; status: string }) => (
     <p data-kind="tool" data-status={status}>
       {toolName}

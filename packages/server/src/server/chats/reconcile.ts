@@ -7,7 +7,7 @@ import type { Logger } from "pino";
 import type { AgentTimelineRow } from "../agent/agent-timeline-store-types.js";
 import { resolveClientMessageId } from "../client-message-id.js";
 import type { BotLookup } from "./chat-engine.js";
-import type { StoredChat, StoredChatParticipant } from "./chat-record.js";
+import type { ChatCompletedTurn, StoredChat, StoredChatParticipant } from "./chat-record.js";
 import type { ChatStore } from "./chat-store.js";
 import { finalAnswer, type TimelineReference } from "./final-answer.js";
 import type { TranscriptLine, TranscriptLineInput, TranscriptLog } from "./transcript-log.js";
@@ -28,8 +28,8 @@ export interface ReconcileDependencies {
   now?: () => string;
 }
 
-/** How far back the transcript is read; a missing reply is never older than this. */
-const TAIL_LINES = 200;
+/** Bound each disk read without bounding the recovery horizon. */
+const PAGE_LINES = 256;
 const BACKFILL_FAILURE_SUFFIX = "stopped while the daemon was down; no reply was recorded.";
 
 /** Runs one chat at a time; a chat that fails is logged and the next one still runs. */
@@ -45,12 +45,29 @@ export async function reconcileChats(deps: ReconcileDependencies): Promise<void>
 }
 
 async function reconcileChat(deps: ReconcileDependencies, chat: StoredChat): Promise<void> {
-  const { lines } = await deps.transcriptOf(chat.id).fetch({ limit: TAIL_LINES });
+  // Delivery can be pending behind arbitrarily many replies from other bots.
+  // Page the complete journal; the UI context window is not a recovery boundary.
+  const lines: TranscriptLine[] = [];
+  let cursor = 0;
+  for (;;) {
+    const page = await deps
+      .transcriptOf(chat.id)
+      .fetch({ direction: "after", cursor: { seq: cursor }, limit: PAGE_LINES });
+    lines.push(...page.lines);
+    if (!page.hasNewer || page.endSeq <= cursor) break;
+    cursor = page.endSeq;
+  }
   for (const participant of chat.participants) {
-    if (!participant.agentId) continue;
     const pending = missingReply(lines, participant);
-    if (!pending || deps.isRunning(participant.agentId)) continue;
-    await backfill(deps, chat, participant.botId, participant.agentId, pending);
+    if (!pending || (participant.agentId && deps.isRunning(participant.agentId))) continue;
+    await backfill(
+      deps,
+      chat,
+      participant.botId,
+      participant.agentId,
+      pending,
+      participant.completedTurn,
+    );
   }
 }
 
@@ -61,14 +78,29 @@ function missingReply(
 ): TranscriptLine | null {
   const own = (line: TranscriptLine) =>
     line.sender.kind === "bot" && line.sender.botId === participant.botId;
-  const delivered = lines.filter((line) => line.seq <= participant.deliveredSeq && !own(line));
+  const delivered = lines.filter(
+    (line) =>
+      line.sender.kind !== "system" &&
+      !own(line) &&
+      (line.deliveryBotIds
+        ? line.deliveryBotIds.includes(participant.botId)
+        : line.seq <= participant.deliveredSeq) &&
+      (!participant.resetAt || line.at > participant.resetAt),
+  );
   const newest = delivered.at(-1);
   if (!newest) return null;
   const answered = lines.some(
     (line) =>
       line.seq > newest.seq &&
-      ((own(line) && line.reply?.agentId === participant.agentId) ||
-        (line.sender.kind === "system" && line.text.endsWith(BACKFILL_FAILURE_SUFFIX))),
+      ((own(line) &&
+        line.reply?.agentId === participant.agentId &&
+        (line.inReplyTo === newest.id || (!line.inReplyTo && !line.deliveryBotIds))) ||
+        (line.sender.kind === "system" &&
+          line.inReplyTo === newest.id &&
+          (line.deliveryBotIds?.includes(participant.botId) ||
+            (participant.agentId !== null &&
+              line.reply?.agentId === participant.agentId &&
+              line.text.endsWith(BACKFILL_FAILURE_SUFFIX))))),
   );
   return answered ? null : newest;
 }
@@ -77,23 +109,14 @@ async function backfill(
   deps: ReconcileDependencies,
   chat: StoredChat,
   botId: string,
-  agentId: string,
+  agentId: string | null,
   pending: TranscriptLine,
+  receipt?: ChatCompletedTurn | null,
 ): Promise<void> {
   const at = deps.now?.() ?? new Date().toISOString();
-  const submitted = await deps.findSubmittedRow(agentId, pending.id);
-  const rows = submitted ? await deps.rowsAfter(agentId, submitted) : [];
-  // The window starts after the submitted user row and ends at the next prompt.
-  const nextPrompt = rows.findIndex((row) => row.item.type === "user_message");
-  const turn = nextPrompt < 0 ? rows : rows.slice(0, nextPrompt);
-  const answer = finalAnswer(
-    turn.map((row) => ({
-      item: row.item,
-      row: submitted ? { epoch: submitted.epoch, seq: row.seq } : null,
-      turnId: row.turnId,
-    })),
-  );
-  if (answer) {
+  const submitted = agentId ? await deps.findSubmittedRow(agentId, pending.id) : null;
+  const answer = await completedAnswer(deps, agentId, pending.id, submitted, receipt);
+  if (answer && agentId) {
     await deps.appendLine(chat.id, {
       id: resolveClientMessageId(undefined),
       at,
@@ -102,6 +125,7 @@ async function backfill(
       reply: { agentId, ...(answer.turnId ? { turnId: answer.turnId } : {}), ...answer.lastRow },
       inReplyTo: pending.id,
       hop: pending.hop + 1,
+      deliveryBotIds: [],
     });
     return;
   }
@@ -110,7 +134,47 @@ async function backfill(
     id: resolveClientMessageId(undefined),
     at,
     sender: { kind: "system" },
-    text: `⚠️ ${bot?.displayName ?? botId} ${BACKFILL_FAILURE_SUFFIX}`,
+    text: `⚠️ ${bot?.displayName ?? botId} ${!submitted && pending.deliveryBotIds ? "delivery could not be confirmed after restart; send a new message to retry." : BACKFILL_FAILURE_SUFFIX}`,
+    ...(agentId ? { reply: { agentId } } : {}),
+    deliveryBotIds: [botId],
+    inReplyTo: pending.id,
     hop: 0,
   });
+}
+
+async function completedAnswer(
+  deps: ReconcileDependencies,
+  agentId: string | null,
+  messageId: string,
+  submitted: TimelineReference | null,
+  receipt?: ChatCompletedTurn | null,
+) {
+  if (
+    !agentId ||
+    !submitted ||
+    !receipt?.lastRow ||
+    receipt.agentId !== agentId ||
+    !receipt.messageIds.includes(messageId) ||
+    receipt.lastRow.epoch !== submitted.epoch
+  )
+    return null;
+  const rows = await deps.rowsAfter(agentId, submitted);
+  const nextPrompt = rows.findIndex((row) => row.item.type === "user_message");
+  const turn = (nextPrompt < 0 ? rows : rows.slice(0, nextPrompt)).filter(
+    (row) => row.seq <= receipt.lastRow!.seq,
+  );
+  const answer = finalAnswer(
+    turn.map((row) => ({
+      item: row.item,
+      row: { epoch: submitted.epoch, seq: row.seq },
+      turnId: row.turnId,
+    })),
+  );
+  if (
+    !answer ||
+    (answer.turnId && answer.turnId !== receipt.turnId) ||
+    answer.lastRow?.seq !== receipt.lastRow.seq
+  )
+    return null;
+  return answer;
 }

@@ -76,6 +76,8 @@ const NOTICE_ERROR_MAX_CHARS = 300;
 export class ChatEngine implements TurnTrackerHost {
   readonly tracker: TurnTracker;
   private readonly queue = new KeyedSerialQueue();
+  // Serialize prompt admission per session, never the running turn or the whole bot.
+  private readonly deliveries = new KeyedSerialQueue();
   private readonly inFlight = new Set<Promise<unknown>>();
   /** Sender-line names of every bot seen in a chat, so rendering never awaits a lookup. */
   private readonly botNames = new Map<string, { slug: string; displayName: string }>();
@@ -99,14 +101,18 @@ export class ChatEngine implements TurnTrackerHost {
       const id = resolveClientMessageId(input.messageId);
       const existing = await this.deps.transcriptOf(chat.id).findById(id);
       if (existing) return duplicateSend(existing, input.text);
-      const line = await this.appendLine(chat.id, {
+      const inputLine = {
         id,
         at: this.now(),
-        sender: { kind: "user", ...(input.actor ? { actor: input.actor } : {}) },
+        sender: { kind: "user" as const, ...(input.actor ? { actor: input.actor } : {}) },
         text: input.text,
         hop: 0,
+      };
+      const decision = await this.decide(chat, rules, { ...inputLine, seq: 0 });
+      const line = await this.appendLine(chat.id, {
+        ...inputLine,
+        deliveryBotIds: decision.targets,
       });
-      const decision = await this.decide(chat, rules, line);
       this.track(this.fanOut(chat.id, decision, line));
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
     });
@@ -115,7 +121,10 @@ export class ChatEngine implements TurnTrackerHost {
   /** `/new` (D7): the next delivery to this bot starts a fresh session. */
   async newSession(chatId: string, botId: string): Promise<void> {
     const bot = await this.deps.bots.get(botId);
+    const chat = await this.deps.store.require(chatId);
+    const previousAgentId = chat.participants.find((entry) => entry.botId === botId)?.agentId;
     await this.deps.botSessions.reset(chatId, botId);
+    if (previousAgentId) this.tracker.unwatch(previousAgentId);
     await this.appendSystem(
       chatId,
       `${bot?.displayName ?? botId} will start a new session on the next message.`,
@@ -146,10 +155,23 @@ export class ChatEngine implements TurnTrackerHost {
     return line;
   }
 
-  private appendSystem(chatId: string, text: string): Promise<TranscriptLine> {
+  private outcomeScope(outcome: TurnOutcome): Partial<TranscriptLineInput> {
+    return {
+      deliveryBotIds: [outcome.botId],
+      reply: { agentId: outcome.agentId, turnId: outcome.turnId },
+      ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1) } : {}),
+    };
+  }
+
+  private appendSystem(
+    chatId: string,
+    text: string,
+    scope: Partial<TranscriptLineInput> = {},
+  ): Promise<TranscriptLine> {
     return this.appendLine(chatId, {
       id: resolveClientMessageId(undefined),
       at: this.now(),
+      ...scope,
       sender: { kind: "system" },
       text,
       hop: 0,
@@ -185,7 +207,9 @@ export class ChatEngine implements TurnTrackerHost {
   ): Promise<void> {
     if (decision.notice) await this.appendSystem(chatId, decision.notice);
     const results = await Promise.allSettled(
-      decision.targets.map((botId) => this.deliver(chatId, botId, [line])),
+      decision.targets.map((botId) =>
+        this.deliveries.run(`${chatId}:${botId}`, () => this.deliver(chatId, botId, [line])),
+      ),
     );
     for (const [index, result] of results.entries()) {
       if (result.status === "fulfilled") continue;
@@ -195,6 +219,7 @@ export class ChatEngine implements TurnTrackerHost {
       await this.appendSystem(
         chatId,
         `⚠️ ${bot?.displayName ?? botId} could not take the message: ${errorLine(result.reason)}`,
+        { deliveryBotIds: [botId], inReplyTo: line.id },
       );
     }
   }
@@ -202,6 +227,7 @@ export class ChatEngine implements TurnTrackerHost {
   /** §2.6: resolve the session, render the window, prompt, expect the turn, mark delivered. */
   private async deliver(chatId: string, botId: string, lines: TranscriptLine[]): Promise<void> {
     const chat = await this.deps.store.require(chatId);
+    if (chat.archivedAt) throw new Error(`Chat ${chatId} is archived`);
     const participant = chat.participants.find((entry) => entry.botId === botId);
     const bot = await this.deps.bots.get(botId);
     if (!participant || !bot) throw new Error(`Bot ${botId} is not in chat ${chatId}`);
@@ -209,10 +235,15 @@ export class ChatEngine implements TurnTrackerHost {
     const title = sessionTitleFor(chat.title, lines[0]?.text ?? "");
     const session = await this.deps.botSessions.resolve(chat, bot, title);
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
-    const window = await this.deps
-      .transcriptOf(chatId)
-      .since(participant.deliveredSeq, rules.context.maxMessages);
-    const deliveredSeq = Math.max(...[...window, ...lines].map((entry) => entry.seq));
+    const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));
+    // A concurrent send can already be in the log. It belongs to its own dispatch,
+    // never this prompt's context or delivery watermark.
+    const page = await this.deps.transcriptOf(chatId).fetch({
+      direction: "before",
+      cursor: { seq: deliveredSeq + 1 },
+      limit: rules.context.maxMessages,
+    });
+    const window = page.lines.filter((entry) => entry.seq > participant.deliveredSeq);
     await this.rememberBots(chat);
     const prompt = renderChatPrompt({
       botId,
@@ -233,17 +264,22 @@ export class ChatEngine implements TurnTrackerHost {
     prompt: string,
   ): Promise<void> {
     this.tracker.watch(agentId, chat.id, bot.id);
-    const result = await this.deps.sendPrompt({
+    await this.tracker.dispatch(
       agentId,
-      prompt,
-      messageId: lines.at(-1)!.id,
-      ...(rules.interaction.whenBusy === "steer" ? { activeTurnBehavior: "steer" } : {}),
-    });
-    this.tracker.expect(agentId, {
-      messageIds: lines.map((line) => line.id),
-      hop: Math.max(...lines.map((line) => line.hop)),
-      disposition: result.disposition,
-    });
+      {
+        messageIds: lines.map((line) => line.id),
+        hop: Math.max(...lines.map((line) => line.hop)),
+      },
+      () =>
+        this.deps.sendPrompt({
+          agentId,
+          prompt,
+          messageId: lines.at(-1)!.id,
+          ...(rules.interaction.whenBusy === "steer"
+            ? { activeTurnBehavior: "steer" as const }
+            : {}),
+        }),
+    );
   }
 
   private knownBot(botId: string): { slug: string; displayName: string } | null {
@@ -266,17 +302,39 @@ export class ChatEngine implements TurnTrackerHost {
 
   private async appendReply(outcome: TurnOutcome): Promise<void> {
     const chat = await this.deps.store.get(outcome.chatId);
-    if (!chat || chat.archivedAt) return;
+    if (
+      !chat ||
+      chat.archivedAt ||
+      !chat.participants.some(
+        (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
+      )
+    )
+      return;
+    if (outcome.expectation) {
+      const recorded = await this.deps.store.recordCompletedTurn(chat.id, outcome.botId, {
+        agentId: outcome.agentId,
+        turnId: outcome.turnId,
+        messageIds: outcome.expectation.messageIds,
+        lastRow: outcome.lastRow,
+      });
+      if (
+        !recorded.participants.some(
+          (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
+        )
+      )
+        return;
+    }
     const bot = await this.deps.bots.get(outcome.botId);
     if (outcome.text === null) {
       if (outcome.expectation)
         await this.appendSystem(
           chat.id,
           `⚠️ ${bot?.displayName ?? outcome.botId} finished without a reply.`,
+          this.outcomeScope(outcome),
         );
       return;
     }
-    const line = await this.appendLine(chat.id, {
+    const replyInput: TranscriptLineInput = {
       id: resolveClientMessageId(undefined),
       at: this.now(),
       sender: { kind: "bot", botId: outcome.botId },
@@ -284,8 +342,15 @@ export class ChatEngine implements TurnTrackerHost {
       reply: { agentId: outcome.agentId, turnId: outcome.turnId, ...outcome.lastRow },
       ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1)! } : {}),
       hop: (outcome.expectation?.hop ?? 0) + 1,
+    };
+    const decision = await this.decide(chat, resolveChatRules(chat.rules), {
+      ...replyInput,
+      seq: 0,
     });
-    const decision = await this.decide(chat, resolveChatRules(chat.rules), line);
+    const line = await this.appendLine(chat.id, {
+      ...replyInput,
+      deliveryBotIds: decision.targets,
+    });
     this.track(this.fanOut(chat.id, decision, line));
   }
 
@@ -297,11 +362,19 @@ export class ChatEngine implements TurnTrackerHost {
 
   private async appendFailure(outcome: TurnOutcome, error: string): Promise<void> {
     const chat = await this.deps.store.get(outcome.chatId);
-    if (!chat || chat.archivedAt) return;
+    if (
+      !chat ||
+      chat.archivedAt ||
+      !chat.participants.some(
+        (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
+      )
+    )
+      return;
     const bot = await this.deps.bots.get(outcome.botId);
     await this.appendSystem(
       chat.id,
       `⚠️ ${bot?.displayName ?? outcome.botId} stopped with an error: ${errorLine(error)}`,
+      this.outcomeScope(outcome),
     );
   }
 

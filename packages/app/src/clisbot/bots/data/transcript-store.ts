@@ -51,7 +51,17 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set) => ({
     set((state) => ({
       transcripts: {
         ...state.transcripts,
-        [key]: { messages: mergeTranscriptMessages([], page.messages), hasOlder: page.hasOlder },
+        [key]: {
+          // A push may arrive while the page RPC is in flight. Keep only lines newer than
+          // the fetched window, rather than dropping an already acknowledged live answer.
+          messages: mergeTranscriptMessages(
+            page.messages,
+            (state.transcripts[key]?.messages ?? []).filter(
+              (line) => line.seq > (page.messages.at(-1)?.seq ?? 0),
+            ),
+          ),
+          hasOlder: page.hasOlder,
+        },
       },
     })),
   prependOlder: (key, messages, hasOlder) =>

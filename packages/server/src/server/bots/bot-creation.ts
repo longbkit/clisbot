@@ -51,6 +51,8 @@ export interface BotCreateContext {
   owner: SessionActor;
   /** A restricted session's Project-creation rule for the resolved home; absent for the owner. */
   mayCreateAt?: (cwd: string) => Promise<boolean>;
+  /** Reusing a home can seed files, so it requires management of that Project. */
+  mayReuse?: (bot: StoredBot) => boolean;
 }
 
 export interface BotCreateResult {
@@ -92,6 +94,9 @@ export async function createBot(
   });
   const existing = findReusableBot(bots, home, name);
   if (existing) {
+    if (context.mayReuse && !context.mayReuse(existing)) {
+      throw new BotRequestError("access_denied", "Your access does not allow reusing this bot.");
+    }
     const template = await seedBotTemplate(
       existing.cwd,
       existing.kind,
@@ -191,7 +196,10 @@ async function provisionBot(
     const bot = await deps.store.create(
       newBotRecord(plan, project.projectId, workspace.workspaceId),
     );
-    await deps.emitWorkspaceUpdates([workspace.workspaceId]);
+    // The bot record is the commit point. A notification failure must not remove its home.
+    await deps.emitWorkspaceUpdates([workspace.workspaceId]).catch((error: unknown) => {
+      deps.logger.warn({ err: error, botId: bot.id }, "Failed to publish the created workspace");
+    });
     return { bot, reused: false, template };
   } catch (error) {
     await rollbackProvisioning(deps, cwd, made);

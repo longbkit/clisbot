@@ -1,10 +1,8 @@
 import { useMemo } from "react";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import { useHostFeature, useHostFeatureMap, type HostFeatureName } from "@/runtime/host-features";
+import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
 
-// TODO(bots-wire): drop this alias and the cast once `bots` is in the `server_info` features
-// object (`packages/protocol/src/messages.ts`, README D10); `HostFeatureName` derives from it.
-const BOTS_FEATURE = "bots" as HostFeatureName;
+const BOTS_FEATURE = "bots";
 
 /** The one gate every fusion bots component starts with (docs/features/bots-and-chats/plans/app.md §3). */
 export function useHostBotsFeature(serverId: string | null | undefined): boolean {

@@ -29,13 +29,14 @@ const TRANSCRIPT_STEM = "transcript";
 const TRANSCRIPT_KIND = "transcript" as const;
 /** The index namespace of a message id lookup. */
 const MESSAGE_ID_NAMESPACE = "transcript-message";
-/** How far back `findById` scans when the index has no lookup for the id. */
-const RECENT_SCAN_LINES = 256;
+/** Rebuild the derived id map in bounded pages after opening the log. */
+const ID_INDEX_PAGE_SIZE = 256;
 const DEFAULT_PAGE_LIMIT = 200;
 
 export class TranscriptLog {
   private readonly log: SessionEventLog;
   private readonly writes = new KeyedSerialQueue();
+  private idIndexReady: Promise<void> | undefined;
 
   constructor(readonly directory: string) {
     this.log = SessionEventLog.for(directory, { stem: TRANSCRIPT_STEM });
@@ -91,19 +92,24 @@ export class TranscriptLog {
     return this.read(start, maxSeq);
   }
 
-  /**
-   * The line carrying a message id, for idempotent sends. The index lookup is written after
-   * the append, so a crash between the two leaves the id findable only by the tail scan.
-   */
+  /** Message ids remain idempotent even after losing the rebuildable index file. */
   async findById(id: string): Promise<TranscriptLine | null> {
+    await (this.idIndexReady ??= this.rebuildIdIndex().catch((error: unknown) => {
+      this.idIndexReady = undefined;
+      throw error;
+    }));
     const seq = await this.log.lookupId(MESSAGE_ID_NAMESPACE, id);
-    if (seq !== undefined && seq > 0) {
-      const [line] = await this.read(seq, seq);
-      if (line?.id === id) return line;
-    }
+    if (seq === undefined || seq < 1) return null;
+    const [line] = await this.read(seq, seq);
+    return line?.id === id ? line : null;
+  }
+
+  private async rebuildIdIndex(): Promise<void> {
     const { minSeq, maxSeq } = await this.state();
-    const recent = await this.read(Math.max(minSeq, maxSeq - RECENT_SCAN_LINES + 1), maxSeq);
-    return recent.find((line) => line.id === id) ?? null;
+    for (let start = minSeq; start <= maxSeq && start > 0; start += ID_INDEX_PAGE_SIZE) {
+      const lines = await this.read(start, Math.min(maxSeq, start + ID_INDEX_PAGE_SIZE - 1));
+      for (const line of lines) await this.log.putId(MESSAGE_ID_NAMESPACE, line.id, line.seq);
+    }
   }
 
   /** Checkpoints the index so a clean stop leaves no tail to rescan. */
