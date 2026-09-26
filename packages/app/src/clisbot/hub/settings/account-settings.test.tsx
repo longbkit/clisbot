@@ -11,7 +11,7 @@ const hub = vi.hoisted(() => ({
   signInKind: "password",
   state: { status: "signedOut", registration: "open" } as Record<string, unknown>,
   error: null,
-  signedIn: null,
+  signedIn: null as Record<string, unknown> | null,
   signIn: vi.fn(async () => {}),
   signUp: vi.fn(async () => {}),
   registrationToken: null,
@@ -53,7 +53,9 @@ vi.mock("./channel-identity-self-link", () => ({
 }));
 vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
 // People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
-vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
+vi.mock("./team/team-settings", () => ({
+  TeamSettings: () => <div data-testid="team-settings" />,
+}));
 // Account's own chat-account list has its browser test; here only its entry to the flow matters.
 vi.mock("./channel-identities-section", () => ({
   ChannelIdentitiesSection: ({ onManage }: { onManage(): void }) => (
@@ -153,6 +155,7 @@ beforeEach(() => {
     navigation.params = { ...navigation.params, ...params };
   });
   hub.state = { status: "signedOut", registration: "open" };
+  hub.signedIn = null;
 });
 afterEach(cleanup);
 function enter(label: string, value: string) {
@@ -224,6 +227,26 @@ describe("Account entry lifecycle and recovery", () => {
     expect(screen.getByTestId("identity-settings").textContent).toBe("slack-connection");
     expect(navigation.setParams).not.toHaveBeenCalled();
     expect(hub.completeAppSetup).not.toHaveBeenCalled();
+  });
+
+  it("signs in where a Hub section was asked for, then shows that section", async () => {
+    const ui = render(<HubSettingsContent section="team" />);
+    expect(screen.queryByTestId("team-settings")).toBeNull();
+    enter("Email", account.email);
+    enter("Password", "member-password");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sign in" })));
+    expect(hub.signIn).toHaveBeenCalledWith({ email: account.email, password: "member-password" });
+    hub.state = {
+      status: "active",
+      account,
+      organization: { id: "org", name: "Organization" },
+      membership: { role: "member" },
+      isInstanceOperator: false,
+    };
+    hub.signedIn = hub.state;
+    ui.rerender(<HubSettingsContent section="team" />);
+    expect(screen.getByTestId("team-settings")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Sign in" })).toBeNull();
   });
 
   it("keeps an identity deep link behind account sign-in", () => {

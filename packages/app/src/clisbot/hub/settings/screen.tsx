@@ -45,17 +45,9 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
   const account = useHubAccount();
   if (!account.enabled) return null;
   if (account.loading) return <StateMessage message="Loading Hub account…" />;
-  if (!account.signedIn) {
-    return (
-      <SettingsSection title="Hub">
-        <Alert
-          variant="info"
-          title="Sign in required"
-          description="Sign in before managing Channels, Automations, or People."
-        />
-      </SettingsSection>
-    );
-  }
+  // Sign in where the section was asked for; signing in changes this component's
+  // key in HubSettingsContent, so the section renders without a trip to Account.
+  if (!account.signedIn) return <HubAccountSettings />;
 
   switch (section) {
     case "channels":
