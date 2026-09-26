@@ -27,7 +27,7 @@ the wiring rows listed in [§4](#4-rpcs-and-pushes).
 | `packages/server/src/server/chats/chat-engine.ts`          | `ChatEngine`: send → append → fan out → deliver; reply → append; hop forwarding                                                                                                             |
 | `packages/server/src/server/chats/reconcile.ts`            | Startup backfill of replies that never reached a transcript                                                                                                                                 |
 | `packages/server/src/server/chats/keyed-queue.ts`          | `KeyedSerialQueue`: per-key promise chain ([§5](#5-concurrency))                                                                                                                            |
-| `packages/server/src/server/chats/index.ts`                | `createChatService(...)` wiring, exported types                                                                                                                                             |
+| `packages/server/src/server/chats/chat-service.ts`         | `createChatService(...)` wiring, exported types                                                                                                                                             |
 | `packages/server/src/server/session/chats/chat-session.ts` | RPC handlers, same shape as `session/schedule/schedule-session.ts:1-25`                                                                                                                     |
 | `packages/protocol/src/chats/rpc-schemas.ts`, `types.ts`   | Wire schemas. Not `packages/protocol/src/chat/`: that folder is the removed chat-rooms feature kept as `COMPAT(chatRooms)` until 2027-02-09 (`packages/protocol/src/chat/rpc-schemas.ts:4`) |
 | `packages/protocol/src/conversation-prompt.ts`             | `senderLabel`, `CONTEXT_HEADER`, `MESSAGE_HEADER`, `renderConversationPrompt` moved out of the Hub so daemon and Hub render one shape ([§2.4](#24-context-what-a-bot-receives))             |
@@ -512,7 +512,7 @@ Each under ~2 h; order respects dependencies. Run `npm run typecheck` and `npm r
 6. **Turn tracker** — `chats/turn-tracker.ts` on `agentManager.subscribe`; final-text
    accumulation; expectations FIFO; test with stubbed events.
 7. **Engine** — `chats/chat-engine.ts`: `send`, `deliver`, reply append, hop forwarding, system
-   lines, publish callbacks; `chats/index.ts` `createChatService` with `start/stop`.
+   lines, publish callbacks; `chats/chat-service.ts` `createChatService` with `start/stop`.
 8. **Protocol + client** — `packages/protocol/src/chats/{types,rpc-schemas}.ts`, register in
    `messages.ts` unions and type exports, `SessionEventSubscriptionSchema`, `features.bots`
    with COMPAT tag, regenerate validators, `daemon-client.ts` wrappers, wire-compat test rows.

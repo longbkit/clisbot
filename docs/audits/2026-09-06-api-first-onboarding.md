@@ -58,6 +58,14 @@ Changes to shared upstream files are limited to registration/composition seams;
 Clisbot behavior lives in its bot/onboarding modules. No daemon wire change is
 required. Existing user data and unrelated working-tree changes must remain intact.
 
+2026-09-26 supersession ([Bots and Chats](../features/bots-and-chats/README.md),
+D11): the seed catalog and the seeding step move from the CLI into the daemon.
+`bot start` and bare `hub init` call `bot.create`, which seeds on the Host. The
+manifest is only the restart reference and holds the bot id and the Connection
+id, nothing the daemon already stores. The initial idle agent is no longer
+created; sessions start per (bot, chat) on the first message. `workspaces/default`
+stays the shipped assistant's path.
+
 ## Superseded documentation
 
 The default Hub Project, automatic legacy bundle deployment, template `--force`,

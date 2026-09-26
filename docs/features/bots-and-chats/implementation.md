@@ -6,9 +6,27 @@ the plan gets corrected in the same commit.
 
 ## Status
 
-| Date       | State                                                                                                     |
-| ---------- | --------------------------------------------------------------------------------------------------------- |
-| 2026-09-26 | Decisions D1–D15 recorded. Four plans written: server-bot, server-chat, app, cli-hub-naming. No code yet. |
+| Date       | State                                                                                                                                                                                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-26 | Decisions D1–D15 recorded. Four plans written: server-bot, server-chat, app, cli-hub-naming. No code yet.                                                                                                                                                               |
+| 2026-09-26 | Wave 1 landed: daemon Bot store, home rules, templates and `bot.*` RPCs behind `daemon.bots.enabled`; Chat engine and storage (`chats/`) without RPC registration; app models, sidebar sections and chat screen under `clisbot/bots` without wiring; glossary and docs. |
+
+## Wave 2, in order
+
+1. Protocol `chats/rpc-schemas.ts`, `messages.ts` registration, validators, `operation-permissions.ts` rows; `session/chats/chat-session.ts`; bootstrap wiring of `createChatService` with a `BotLookup` over the bot store (`name` → `displayName`) and `start()` after the agent registry load.
+2. Client: `DaemonClient` methods for `bot.*` and `chat.*`, push subscriptions; the app swaps `clisbot/bots/data/contracts.ts` for the protocol types and the `"bots"` cast in `feature.ts` goes.
+3. App wiring: route files and `Stack.Screen` lines, `listLeadingComponent`, `hideBotProjects`, mutations, the create sheet, live heads through `viewedTimelineSync`, "Open in cowork".
+4. CLI: `bot start` / `hub init` on `bot.create`, manifest v2, delete the CLI template copy and `copy-templates.mjs`.
+5. Hub Project marker and the Access picker Bots group.
+6. Daemon e2e for `bot.*` and the chat flow; the flag-off byte-equivalence check.
+
+Known pre-existing failure: `upstream-compatibility.test.ts` reports `channelFileRead` in a flag-off
+`server_info`; it predates this feature and is not caused by `bots`.
+
+Plan corrections from wave 1: the chat service lives in `chats/chat-service.ts` (the server package
+forbids barrel `index.ts`); `chats/final-answer.ts` holds the shared final-answer rule;
+`StoredChatParticipant.resetAt` makes `/new` survive the crash-safe label scan;
+`PASEO_BOTS_ENABLED` also had to join `DAEMON_SETTING_ENV_KEYS` in `config-environment.ts`.
 
 ## Conventions the plans must share
 

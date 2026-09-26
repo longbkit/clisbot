@@ -44,6 +44,8 @@ Naming the thing that holds Routes:
 3. **Channel** — collides with the channel type (Slack, Telegram) on the
    Channel Integrations tab.
 
+Bot became the daemon resource on 2026-09-26 ([Bots and Chats](../features/bots-and-chats/README.md)).
+
 Auto-accept:
 
 1. Keep S10 and add a daemon-side auto-accept outside channel policy. Two

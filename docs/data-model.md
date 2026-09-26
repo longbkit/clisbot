@@ -56,6 +56,12 @@ $PASEO_HOME/
 │       └── {agentId}.json               # One file per agent
 ├── schedules/
 │   └── {scheduleId}.json                # One file per schedule
+├── bots/
+│   └── {botId}.json                     # One file per Bot (only with daemon.bots.enabled)
+├── chats/
+│   └── {chatId}/
+│       ├── chat.json                    # Participants, rules, times
+│       └── transcript.jsonl             # Append-only, one line per message
 ├── projects/
 │   ├── projects.json                    # Project registry
 │   ├── workspaces.json                  # Workspace registry
@@ -72,6 +78,8 @@ $PASEO_HOME/
 ```
 
 The `agents/{sanitized-cwd}/` directory name is derived from the agent's `cwd` by stripping the filesystem root and replacing path separators with `-` (Windows drive letters become a `C-` style prefix). Persistent server stores write atomically by writing a temp file in the target directory and then renaming it into place.
+
+`bots/` and `chats/` exist only when `daemon.bots.enabled` is on; their record shapes are in [Bots and Chats](features/bots-and-chats/README.md).
 
 ---
 

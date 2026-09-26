@@ -1,7 +1,7 @@
 # Bots and Chats
 
-Date: 2026-09-26. Status: decided, not yet implemented. Names `Bot` and `Chat` are provisional
-until a naming pass lands them in [the glossary](../../glossary.md).
+Date: 2026-09-26. Status: decided, not yet implemented. Names decided 2026-09-26: **Bot** and
+**Chat**, with **Bot kind** and **Transcript**, in [the glossary](../../glossary.md).
 
 Grok-style teammates inside the Paseo app: create a bot by name, chat with it, put several bots in
 one chat, open any bot's work in the cowork view. The bot layer lives on the daemon and the app;
@@ -86,8 +86,9 @@ inside the Host folder policy's allow set.
 Project root = bot directory, one Workspace of kind `directory`. This is what gives per-bot sharing
 through Project grants and per-bot session storage. One shared "Bots" Project would lose both.
 
-The app hides bot Projects from the Projects section when the feature is on, using the
-`projectId` in the bot record. The upstream Project schema is untouched.
+When the feature is on, the app hides bot Projects from the sidebar Projects section only, using
+the `projectId` in the bot record; they stay listed in Settings › Projects, where the sharing grant
+lives. The upstream Project schema is untouched.
 
 ### D5. Transcript is separate from timelines
 
@@ -216,6 +217,7 @@ Per-area plans: [server-bot](plans/server-bot.md), [server-chat](plans/server-ch
 ## Open
 
 - Sidebar placement: head rows keyed `bots` / `chats`, or sections like Projects. Names are decided
-  (Bot, Chat; see [plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A for the glossary entries).
+  (Bot, Chat; entries in [the glossary](../../glossary.md), rationale in
+  [plans/cli-hub-naming.md](plans/cli-hub-naming.md) §A).
 - Whether `USER.md` is shared across a user's bots once the second brain exists.
 - `git init` in bot directories for memory history and diff viewing.
