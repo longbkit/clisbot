@@ -27,7 +27,9 @@ Trong **Connections** của Host, kết nối Hub cấp (thường là Relay) gh
 
 **Settings → Hosts** và bộ chọn Host dùng chung quy tắc: hiện Host bạn thêm trực tiếp và Host do Hub quản lý mà tài khoản hiện tại được phép dùng. Direct hay Relay chỉ là đường kết nối, không quyết định quyền. Host do Hub quản lý từ tài khoản hoặc tổ chức khác không hiện; khi đang tải quyền của tài khoản mới, app chưa hiện các Host đó. Host offline vẫn hiện để bạn mở cấu hình và kết nối lại. Một Host có nhiều đường kết nối chỉ hiện một lần. Host đã đăng ký trên Hub nhưng chưa có thông tin kết nối vẫn có trạng thái chờ trong Settings → Hosts; chưa thể chọn để làm việc.
 
-Quy tắc này cũng áp dụng cho bộ chọn Host ở New Workspace, Sessions và Schedules. Khi danh sách đang tải, hộp chọn hiện **Loading Hosts…**, không tự chọn Host khác hay chuyển sang Add Host; nếu tải lỗi, bấm **Retry**. URL Settings cũ của Host không còn quyền sẽ báo không khả dụng thay vì mở cấu hình Host đó.
+Quy tắc này cũng áp dụng cho bộ chọn Host ở New Workspace, Sessions và Schedules. Khi danh sách đang tải, hộp chọn hiện **Loading Hosts…**, không tự chọn Host khác hay chuyển sang Add Host; nếu tải lỗi, bấm **Retry**. URL Settings hoặc workspace cũ của Host không còn quyền sẽ báo không khả dụng thay vì mở nội dung Host đó.
+
+Khi mở workspace, Host đã biết là offline được báo ngay. Host managed không có quyền sẽ hướng dẫn xin quyền; lỗi tải danh sách quyền được báo riêng. Nếu kết nối hoặc tải workspace vẫn chưa có kết quả sau 20 giây, app hiện thông báo hết thời gian chờ cùng **Retry** và **Manage host**. Retry kết nối tạo lại kết nối của Host đó; Retry quyền tải lại danh sách từ Hub. App giữ nguyên URL để bạn tiếp tục khi Host sẵn sàng, không tự chuyển sang Host khác.
 
 Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `PASEO_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
 

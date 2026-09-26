@@ -437,6 +437,8 @@ export const ru: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "Загрузка рабочего пространства",
       connecting: "Подключение",
       hostOffline: "{{hostName}} не в сети",
@@ -1489,6 +1491,7 @@ export const ru: TranslationResources = {
     details: "Подробности",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "Повторное подключение к этому хосту…",
     reconnectingBody:
       "Paseo заново добавляет этот хост. Как только он будет готов, страница продолжит работу с того же места.",

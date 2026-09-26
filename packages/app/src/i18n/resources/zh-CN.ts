@@ -433,6 +433,8 @@ export const zhCN: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "正在加载 workspace",
       connecting: "正在连接",
       hostOffline: "{{hostName}} 已离线",
@@ -1446,6 +1448,7 @@ export const zhCN: TranslationResources = {
     details: "详情",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "正在重新连接此主机…",
     reconnectingBody: "Paseo 正在重新添加此主机。准备就绪后，此页面会从你离开的地方继续。",
     title: "此主机不可用",

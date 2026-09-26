@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useFetchQuery } from "@/data/query";
 import { useHosts } from "@/runtime/host-runtime";
 import { useHubAccount } from "./account-provider";
@@ -33,6 +34,7 @@ export function useHubDaemonsQuery() {
  * registry intact: it also owns saved connections and asynchronous Hub reconciliation.
  */
 export function useHostInventory() {
+  const queryClient = useQueryClient();
   const hub = useHubAccount();
   const registeredHosts = useHosts();
   const daemons = useHubDaemonsQuery();
@@ -72,10 +74,21 @@ export function useHostInventory() {
     status = "loading";
   const refreshAccount = hub.refresh;
   const refetchDaemons = daemons.refetch;
+  const accountId = hub.signedIn?.account.id ?? null;
+  const origin = hub.origin;
   const retry = useCallback(() => {
     if (organizationId === null) void refreshAccount();
-    else void refetchDaemons();
-  }, [organizationId, refreshAccount, refetchDaemons]);
+    else {
+      // A first fetch with no data may never settle. Explicit retry must replace it,
+      // rather than join that pending request again; late results cannot restore access.
+      void queryClient
+        .cancelQueries({
+          queryKey: hubResourceQueryKey({ origin, organizationId, accountId }, "daemons"),
+          exact: true,
+        })
+        .then(() => refetchDaemons());
+    }
+  }, [queryClient, origin, accountId, organizationId, refreshAccount, refetchDaemons]);
   return { hosts, daemons, status, error, retry };
 }
 

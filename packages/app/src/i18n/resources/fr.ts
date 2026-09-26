@@ -439,6 +439,8 @@ export const fr: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "Chargement de l'espace de travail",
       connecting: "De liaison",
       hostOffline: "{{hostName}}est hors ligne",
@@ -1510,6 +1512,7 @@ export const fr: TranslationResources = {
     details: "Détails",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "Reconnexion à cet hôte…",
     reconnectingBody:
       "Paseo rajoute cet hôte. Cette page reprendra là où vous en étiez dès qu'il sera prêt.",

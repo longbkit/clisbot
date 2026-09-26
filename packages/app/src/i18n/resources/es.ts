@@ -438,6 +438,8 @@ export const es: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "Cargando espacio de trabajo",
       connecting: "Conectando",
       hostOffline: "{{hostName}}está desconectado",
@@ -1507,6 +1509,7 @@ export const es: TranslationResources = {
     details: "Detalles",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "Reconectando con este Host…",
     reconnectingBody:
       "Paseo está volviendo a añadir este Host. Esta página continuará donde la dejaste en cuanto esté listo.",

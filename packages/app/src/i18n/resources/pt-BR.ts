@@ -437,6 +437,8 @@ export const ptBR: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "Carregando workspace",
       connecting: "Conectando",
       hostOffline: "{{hostName}} está offline",
@@ -1492,6 +1494,7 @@ export const ptBR: TranslationResources = {
     details: "Detalhes",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "Reconectando a este Host…",
     reconnectingBody:
       "O Paseo está adicionando este Host de novo. Esta página continua de onde você parou assim que ele estiver pronto.",

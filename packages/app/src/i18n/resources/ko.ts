@@ -434,6 +434,8 @@ export const ko: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "워크스페이스 불러오는 중",
       connecting: "연결 중",
       hostOffline: "{{hostName}}이(가) 오프라인입니다",
@@ -1471,6 +1473,7 @@ export const ko: TranslationResources = {
     details: "세부",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "이 호스트에 다시 연결하는 중…",
     reconnectingBody:
       "Paseo가 이 호스트를 다시 추가하고 있습니다. 준비되면 이 페이지가 중단한 곳에서 이어집니다.",

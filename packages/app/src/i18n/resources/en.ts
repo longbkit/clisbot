@@ -430,6 +430,8 @@ export const en = {
   },
   workspace: {
     route: {
+      connectionTimedOut: "Connection to {{hostName}} timed out",
+      loadTimedOut: "Loading this workspace timed out",
       loading: "Loading workspace",
       connecting: "Connecting",
       hostOffline: "{{hostName}} is offline",
@@ -1486,6 +1488,17 @@ export const en = {
     details: "Details",
   },
   hostUnavailable: {
+    loadingTitle: "Loading Host access…",
+    loadingBody: "Checking whether this Host is available to your account.",
+    errorTitle: "Could not load Host access",
+    errorBody: "Try again to check your access to this Host.",
+    deniedTitle: "You do not have access to this managed Host",
+    deniedBody:
+      "Ask an organization owner or admin to grant you access, then retry. The Host may also have been removed.",
+    offlineTitle: "This Host is offline",
+    offlineBody: "The Host is disconnected from the Hub. Retry when it is back online.",
+    timeoutTitle: "Waiting for this Host timed out",
+    timeoutBody: "Try again, or choose another Host.",
     reconnectingTitle: "Reconnecting to this Host…",
     reconnectingBody:
       "Paseo is adding this Host back. This page picks up where you left off once it is ready.",

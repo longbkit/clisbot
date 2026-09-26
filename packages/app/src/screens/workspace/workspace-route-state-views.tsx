@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Text, View } from "react-native";
 import { ArrowLeftToLine, RotateCw, Settings } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -8,6 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatConnectionStatus } from "@/utils/daemons";
 import type { WorkspaceRouteState } from "@/screens/workspace/workspace-route-state";
 import type { Theme } from "@/styles/theme";
+import { useHostWaitTimeout } from "@/hosts/use-host-wait-timeout";
+import { useHostRouteServerId } from "@/navigation/host-route-context";
+import { useHostInventory } from "@/clisbot/hub/host-inventory";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -28,7 +32,13 @@ export function renderWorkspaceRouteGate(input: {
 }): React.ReactNode {
   switch (input.state.kind) {
     case "loading":
-      return <WorkspaceConnecting hostName={input.state.hostName} />;
+      return (
+        <WorkspaceConnecting
+          hostName={input.state.hostName}
+          onRetry={input.actions.onRetryHost}
+          onManageHost={input.actions.onManageHost}
+        />
+      );
     case "missing":
       return (
         <WorkspaceEmptyState
@@ -95,16 +105,41 @@ function getWorkspaceHostStateTitle(
   return t("workspace.route.cannotReachHost", { hostName: state.hostName });
 }
 
-function WorkspaceConnecting({ hostName }: { hostName: string }) {
+function WorkspaceConnecting({
+  hostName,
+  onRetry,
+  onManageHost,
+}: {
+  hostName: string;
+  onRetry: () => void;
+  onManageHost: () => void;
+}) {
   const { t } = useTranslation();
+  const { timedOut, reset } = useHostWaitTimeout(true, useHostRouteServerId());
+  const retry = useCallback(() => {
+    reset();
+    onRetry();
+  }, [reset, onRetry]);
 
   return (
     <View style={styles.emptyState}>
-      <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
+      {!timedOut ? (
+        <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
+      ) : null}
       <View style={styles.textStack}>
-        <Text style={styles.title}>{t("workspace.route.loading")}</Text>
+        <Text style={styles.title}>
+          {t(timedOut ? "workspace.route.loadTimedOut" : "workspace.route.loading")}
+        </Text>
         <Text style={styles.description}>{hostName}</Text>
       </View>
+      {timedOut ? (
+        <View style={styles.actions}>
+          <Button onPress={retry}>{t("common.actions.retry")}</Button>
+          <Button variant="outline" onPress={onManageHost}>
+            {t("workspace.route.manageHost")}
+          </Button>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -208,20 +243,43 @@ function WorkspaceUnreachable({
   onManageHost: () => void;
 }) {
   const { t } = useTranslation();
-  const canRetry = state.connectionStatus === "offline" || state.connectionStatus === "error";
+  const serverId = useHostRouteServerId();
+  const { hosts, daemons, retry: refreshHosts } = useHostInventory();
+  const management = hosts.find((host) => host.serverId === serverId)?.management;
+  const hubOffline =
+    management &&
+    !daemons.error &&
+    !daemons.isPlaceholderData &&
+    daemons.data?.daemons.some(
+      (daemon) => daemon.id === management.daemonId && daemon.presence === "offline",
+    );
+  const displayState = hubOffline ? { ...state, connectionStatus: "offline" as const } : state;
+  const waiting =
+    displayState.connectionStatus === "connecting" || displayState.connectionStatus === "idle";
+  const { timedOut, reset } = useHostWaitTimeout(waiting, serverId);
+  const canRetry = !waiting || timedOut;
+  const retry = useCallback(() => {
+    reset();
+    refreshHosts();
+    onRetry();
+  }, [reset, refreshHosts, onRetry]);
 
   return (
     <View style={styles.emptyState}>
-      {state.connectionStatus === "connecting" || state.connectionStatus === "idle" ? (
+      {waiting && !timedOut ? (
         <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
       ) : null}
       <View style={styles.textStack}>
-        <Text style={styles.title}>{getWorkspaceHostStateTitle(state, t)}</Text>
+        <Text style={styles.title}>
+          {timedOut
+            ? t("workspace.route.connectionTimedOut", { hostName: state.hostName })
+            : getWorkspaceHostStateTitle(displayState, t)}
+        </Text>
         <Text style={styles.description}>
-          {state.connectionStatus === "connecting" || state.connectionStatus === "idle"
+          {waiting
             ? state.hostName
             : t("workspace.route.hostStatus", {
-                status: formatConnectionStatus(state.connectionStatus),
+                status: formatConnectionStatus(displayState.connectionStatus),
               })}
         </Text>
         {state.lastError ? (
@@ -239,7 +297,7 @@ function WorkspaceUnreachable({
       </View>
       {canRetry ? (
         <View style={styles.actions}>
-          <Button size="sm" variant="default" leftIcon={RotateCw} onPress={onRetry}>
+          <Button size="sm" variant="default" leftIcon={RotateCw} onPress={retry}>
             {t("common.actions.retry")}
           </Button>
           <Button size="sm" variant="outline" leftIcon={Settings} onPress={onManageHost}>

@@ -433,6 +433,8 @@ export const ar: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "جارٍ تحميل مساحة العمل",
       connecting: "الاتصال",
       hostOffline: "{{hostName}}غير متواجد حالياً",
@@ -1462,6 +1464,7 @@ export const ar: TranslationResources = {
     details: "التفاصيل",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "جارٍ إعادة الاتصال بهذا المضيف…",
     reconnectingBody:
       "يعيد Paseo إضافة هذا المضيف. ستتابع هذه الصفحة من حيث توقفت بمجرد أن يصبح جاهزًا.",

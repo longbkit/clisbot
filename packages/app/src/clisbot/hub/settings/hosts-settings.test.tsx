@@ -554,3 +554,39 @@ describe("Host administration", () => {
     expect(screen.getByText("paseo hub login https://hub.example.test")).toBeTruthy();
   });
 });
+
+function InventoryRetry() {
+  const { retry } = useHostInventory();
+  return (
+    <button type="button" onClick={retry}>
+      Retry inventory
+    </button>
+  );
+}
+
+it("replaces a hung initial inventory request on retry and ignores its late result", async () => {
+  adapters.hosts = [managedHost];
+  let finishOldRequest!: (value: { daemons: (typeof connectableDaemon)[] }) => void;
+  adapters.get.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishOldRequest = resolve;
+      }),
+  );
+  adapters.get.mockResolvedValue(emptyHosts);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostChoices />
+      <InventoryRetry />
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(adapters.get).toHaveBeenCalledOnce());
+  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("loading");
+  fireEvent.click(screen.getByText("Retry inventory"));
+  await waitFor(() =>
+    expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("ready"),
+  );
+  expect(adapters.get).toHaveBeenCalledTimes(2);
+  await act(async () => finishOldRequest({ daemons: [connectableDaemon] }));
+  expect(screen.queryByText("Hub Host")).toBeNull();
+});

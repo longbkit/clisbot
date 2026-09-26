@@ -3,7 +3,8 @@ import { useHostRuntimeBootstrapState } from "@/app/_layout";
 import { HostRouteProvider } from "@/navigation/host-route-context";
 import { resolveStartupRoute } from "@/navigation/host-runtime-bootstrap";
 import { ThemedStack } from "@/navigation/themed-stack";
-import { useHostRegistryStatus, useHosts } from "@/runtime/host-runtime";
+import { useHostRegistryStatus } from "@/runtime/host-runtime";
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { HostUnavailableScreen } from "@/screens/host-unavailable-screen";
 
 const HOST_STACK_SCREEN_OPTIONS = {
@@ -19,7 +20,7 @@ export default function HostRouteLayout() {
 
 function KnownHostRoute() {
   const params = useLocalSearchParams<{ serverId?: string | string[] }>();
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const hostRegistryStatus = useHostRegistryStatus();
   const bootstrapState = useHostRuntimeBootstrapState();
   const routeServerId = typeof params.serverId === "string" ? params.serverId : null;

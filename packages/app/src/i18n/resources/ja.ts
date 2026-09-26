@@ -438,6 +438,8 @@ export const ja: TranslationResources = {
   },
   workspace: {
     route: {
+      connectionTimedOut: en.workspace.route.connectionTimedOut,
+      loadTimedOut: en.workspace.route.loadTimedOut,
       loading: "ワークスペースを読み込み中",
       connecting: "接続中",
       hostOffline: "{{hostName}}はオフラインです",
@@ -1478,6 +1480,7 @@ export const ja: TranslationResources = {
     details: "詳細",
   },
   hostUnavailable: {
+    ...en.hostUnavailable,
     reconnectingTitle: "このホストに再接続しています…",
     reconnectingBody:
       "Paseo がこのホストを再追加しています。準備ができると、このページは中断したところから再開します。",
