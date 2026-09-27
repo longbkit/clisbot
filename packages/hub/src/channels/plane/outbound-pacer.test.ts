@@ -1,7 +1,9 @@
+import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import { OutboundPacer } from "./outbound-pacer.js";
+import { ingressAttempt } from "../ingress/attempt.js";
 
 const ROUTE = {
   audienceRules: [],
@@ -55,6 +57,41 @@ function pacer(
 }
 
 describe("OutboundPacer", () => {
+  it("cancels an expired queued post using its own attempt, not the lane worker's", async () => {
+    const sent: string[] = [];
+    const gate = createDeferredCore<void>();
+    const started = createDeferredCore<void>();
+    const instance = new OutboundPacer({
+      account: account({ perConversation: { messagesSentPerMinute: 100 } }),
+      logger: { warn: () => undefined },
+    });
+    const post = instance.paced(async (params) => {
+      if (params.text === "first") {
+        started.resolve();
+        await gate.promise;
+      }
+      if (params.text === "healthy") assert.equal(ingressAttempt.getStore(), undefined);
+      sent.push(params.text);
+      return { ok: true };
+    });
+    const base = { channel: "slack", accountId: "bot", to: "C1" } as const;
+    const worker = new AbortController();
+    const expired = new AbortController();
+    const first = ingressAttempt.run(worker.signal, () => post({ ...base, text: "first" }));
+    await started.promise;
+    const second = ingressAttempt.run(expired.signal, () => post({ ...base, text: "expired" }));
+    const third = post({ ...base, text: "healthy" });
+    expired.abort();
+    worker.abort(); // The first write already started; its queued neighbor still has its own scope.
+    gate.resolve();
+    const results = await Promise.all([first, second, third]);
+    assert.equal(results[0]?.ok, true);
+    assert.equal(results[1]?.failure?.kind, "canceled");
+    assert.equal(results[1]?.failure?.retryable, false);
+    assert.equal(results[2]?.ok, true);
+    assert.deepEqual(sent, ["first", "healthy"]);
+  });
+
   it("passes every message through at once when nothing is limited", async () => {
     const { post, sent } = pacer(undefined);
     for (let index = 0; index < 50; index += 1) await post({ to: "C1", text: String(index) });

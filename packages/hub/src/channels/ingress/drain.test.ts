@@ -1,3 +1,4 @@
+import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
 // Targeted tests for the durable ingress drain on its production path: the
 // real `ChannelStore` over a migrated embedded (PGlite) database, the real
 // queue-sink adapter, and the retry policy ported verbatim from OpenClaw
@@ -9,8 +10,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import type { InboundQueueSink } from "@getpaseo/channels-shared";
-import { ChannelStore } from "../../db/channels.js";
+import type { InboundLedgerSink, InboundQueueSink } from "@getpaseo/channels-shared";
+import { ChannelDeliveryRecordNotFoundError, ChannelStore } from "../../db/channels.js";
 import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import { embeddedDatabaseRuntime } from "../../db/runtime/index.js";
 import type { DatabaseRuntimeBundle } from "../../db/runtime/index.js";
@@ -21,6 +22,8 @@ import {
   type ChannelIngressDrainOptions,
 } from "./drain.js";
 import { resolveHubIngressNonRetryableFailure } from "./non-retryable.js";
+import { dispatchQueuedInbound } from "./dispatch.js";
+import type { InboundReplyResult } from "../loader/host.js";
 import { sessionLaneKey } from "./session-lane.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import type { InboundMessage } from "../plane/types.js";
@@ -112,14 +115,569 @@ function drainFor(
   });
 }
 
+function ledgerFor(accountId: string): InboundLedgerSink {
+  return {
+    record: async (input) => {
+      const { created } = await store.recordInbound({
+        ...input,
+        channel: CHANNEL,
+        accountId,
+        organizationId: ORGANIZATION_ID,
+      });
+      return { created };
+    },
+    consume: async (input) => {
+      await store.consumeInbound({
+        ...input,
+        accountId,
+        organizationId: ORGANIZATION_ID,
+        consumedAt: new Date(),
+      });
+    },
+  };
+}
+
+async function admitCommand(accountId: string, command: string): Promise<void> {
+  await sinkFor(accountId).enqueue({
+    channel: CHANNEL,
+    accountId,
+    externalEventId: command,
+    externalMessageId: command,
+    externalConversationId: accountId,
+    laneKey: accountId,
+    payload: {
+      channel: CHANNEL,
+      accountId,
+      ctxPayload: { ChatId: accountId, MessageSid: command, Body: `/${command}` },
+    },
+  });
+  await sleep(3);
+}
+
 describe("channel ingress drain", () => {
+  it("does not dispatch after a timed-out audit write eventually returns", async () => {
+    const accountId = "late-audit";
+    await admitCommand(accountId, "status");
+    const recordGate = createDeferredCore<void>();
+    const finished = createDeferredCore<void>();
+    let replies = 0;
+    const ledger = ledgerFor(accountId);
+    const drain = drainFor(accountId, {
+      dispatchTimeoutMs: 20,
+      dispatch: async (payload, claim) => {
+        try {
+          return await dispatchQueuedInbound({
+            channel: CHANNEL,
+            accountId,
+            payload,
+            ingressId: claim.id,
+            logger: { warn: () => undefined },
+            hostRuntime: {
+              inboundLedger: {
+                ...ledger,
+                record: async (input) => {
+                  await recordGate.promise;
+                  return ledger.record(input);
+                },
+              },
+              onInboundReply: async () => {
+                replies += 1;
+                return { dispatched: true };
+              },
+            },
+          });
+        } finally {
+          finished.resolve();
+        }
+      },
+    });
+    try {
+      const pass = await drain.drainOnce();
+      assert.equal(pass.deadLettered, 1);
+      assert.equal(pass.retried, 0);
+      recordGate.resolve();
+      await finished.promise;
+      assert.equal(replies, 0);
+      assert.equal((await readEvent(accountId, "status")).status, "dead_letter");
+    } finally {
+      recordGate.resolve();
+      await drain.stop();
+    }
+  });
+
+  it("ends a hung dispatch on account abort without replaying or claiming the next event", async () => {
+    const accountId = "aborted-dispatch";
+    await admit(accountId, "hung");
+    await admit(accountId, "next");
+    const account = new AbortController();
+    const started = createDeferredCore<void>();
+    const late = createDeferredCore<void>();
+    const drain = drainFor(accountId, {
+      abortSignal: account.signal,
+      concurrency: 1,
+      dispatch: async () => {
+        started.resolve();
+        await late.promise;
+      },
+    });
+    const pending = drain.drainOnce();
+    try {
+      await started.promise;
+      account.abort();
+      const pass = await pending;
+      assert.equal(pass.claimed, 1);
+      assert.equal(pass.deadLettered, 1);
+      assert.equal(pass.retried, 0);
+      assert.equal((await readEvent(accountId, "next")).status, "pending");
+    } finally {
+      late.resolve();
+      await pending;
+      await drain.stop();
+    }
+  });
+
+  it("caps a long deferral at the event's age budget", async () => {
+    const accountId = "bounded-deferral";
+    await admit(accountId, "waiting");
+    const event = await readEvent(accountId, "waiting");
+    const expiresAt = event.createdAt.getTime() + 10 * 60_000;
+    let now = event.createdAt.getTime() + 9 * 60_000;
+    let calls = 0;
+    const drain = drainFor(accountId, {
+      now: () => now,
+      dispatch: async () => {
+        calls += 1;
+        return { kind: "deferred", reason: "host away", retryAfterMs: 24 * 60 * 60_000 };
+      },
+    });
+    assert.equal((await drain.drainOnce()).deferred, 1);
+    assert.equal((await readEvent(accountId, "waiting")).availableAt.getTime(), expiresAt);
+    // The real store uses wall time for claims; make the row due as that time elapses.
+    await bundle.runtime.query(
+      "update channel_ingress_queue set available_at = now() where id = $1",
+      [event.id],
+    );
+    now = expiresAt;
+    assert.equal((await drain.drainOnce()).deadLettered, 1);
+    assert.equal(calls, 1);
+  });
+
+  it("ends a hung dispatch without replay, frees its lane and ignores a late completion", async () => {
+    const accountId = "dispatch-deadline";
+    await admit(accountId, "hung");
+    await admit(accountId, "next");
+    const hung = await readEvent(accountId, "hung");
+    const late = createDeferredCore<void>();
+    const dispatched: string[] = [];
+    const signals: AbortSignal[] = [];
+    const drain = drainFor(accountId, {
+      dispatchTimeoutMs: 20,
+      concurrency: 1,
+      dispatch: async (_payload, claim, signal) => {
+        dispatched.push(claim.id);
+        signals.push(signal);
+        if (claim.id === hung.id) await late.promise;
+      },
+    });
+    const passPromise = drain.drainOnce();
+    try {
+      const pass = await Promise.race([
+        passPromise,
+        sleep(1_000).then(() => {
+          throw new Error("dispatch deadline did not end the wait");
+        }),
+      ]);
+      assert.equal(pass.deadLettered, 1);
+      assert.equal(pass.retried, 0);
+      assert.equal(pass.completed, 1);
+      assert.equal(signals[0]?.aborted, true);
+      assert.equal((await readEvent(accountId, "hung")).failedReason, "dispatch-outcome-unknown");
+      late.resolve();
+      await late.promise;
+      assert.equal((await drain.drainOnce()).claimed, 0);
+      assert.equal((await readEvent(accountId, "hung")).status, "dead_letter");
+      assert.deepEqual(dispatched, [hung.id, (await readEvent(accountId, "next")).id]);
+    } finally {
+      late.resolve();
+      await passPromise;
+      await drain.stop();
+    }
+  });
+
+  it("ends an exhausted recovered claim before dispatch and frees the lane", async () => {
+    const accountId = "recovery-budget";
+    await admit(accountId, "poison");
+    await admit(accountId, "next");
+    const claim = await sinkFor(accountId).claim({
+      organizationId: ORGANIZATION_ID,
+      channel: CHANNEL,
+      accountId,
+      workerId: "dead-worker",
+      leaseMs: 30_000,
+    });
+    assert.ok(claim);
+    await bundle.runtime.query(
+      "update channel_ingress_queue set attempts = 8, lease_expires_at = now() - interval '1 second' where id = $1",
+      [claim.id],
+    );
+    const delivered: string[] = [];
+    const drain = drainFor(accountId, {
+      dispatch: async (_payload, current) => {
+        delivered.push(current.id);
+      },
+    });
+    const pass = await drain.drainOnce();
+    assert.equal(pass.deadLettered, 1);
+    assert.equal(pass.completed, 1);
+    assert.deepEqual(delivered, [(await readEvent(accountId, "next")).id]);
+    assert.equal((await readEvent(accountId, "poison")).failedReason, "retry-limit-exceeded");
+  });
+
+  it("expires an old queued event before dispatch but honors an explicit resubmission", async () => {
+    const accountId = "age-budget";
+    await admit(accountId, "old");
+    const row = await readEvent(accountId, "old");
+    await bundle.runtime.query(
+      "update channel_ingress_queue set created_at = now() - interval '11 minutes' where id = $1",
+      [row.id],
+    );
+    const delivered: string[] = [];
+    const drain = drainFor(accountId, {
+      dispatch: async (_payload, current) => {
+        delivered.push(current.id);
+      },
+    });
+    assert.equal((await drain.drainOnce()).deadLettered, 1);
+    assert.deepEqual(delivered, []);
+    assert.equal((await readEvent(accountId, "old")).failedReason, "ingress-age-exceeded");
+    await store.resubmitChannelIngress({ organizationId: ORGANIZATION_ID, ids: [row.id] });
+    assert.equal((await drain.drainOnce()).completed, 1);
+    assert.deepEqual(delivered, [row.id]);
+  });
+
+  it.each([
+    {
+      accountId: "audit-declined",
+      result: { dispatched: false },
+      status: "completed",
+      attempts: 1,
+    },
+    {
+      accountId: "audit-deferred",
+      result: { dispatched: false, deferred: { reason: "route busy", retryAfterMs: 5_000 } },
+      status: "pending",
+      attempts: 0,
+    },
+  ])(
+    "does not consume an audit for $accountId",
+    async ({ accountId, result, status, attempts }) => {
+      await admitCommand(accountId, "status");
+      const drain = drainFor(accountId, {
+        now: () => Date.now() + 60_000,
+        dispatch: (payload, claim) =>
+          dispatchQueuedInbound({
+            channel: CHANNEL,
+            accountId,
+            payload,
+            ingressId: claim.id,
+            logger: { warn: () => assert.fail("unexpected audit failure") },
+            hostRuntime: {
+              inboundLedger: ledgerFor(accountId),
+              onInboundReply: async (): Promise<InboundReplyResult> => result,
+            },
+          }),
+      });
+      const pass = await drain.drainOnce();
+      assert.equal(pass.claimed, 1);
+      assert.equal(pass.retried, 0);
+      const row = await readEvent(accountId, "status");
+      assert.equal(row.status, status);
+      assert.equal(row.attempts, attempts);
+      const audit = await bundle.runtime.query(
+        "select status from delivery_ledger where account_id = $1",
+        [accountId],
+      );
+      assert.deepEqual(audit.rows, [{ status: "recorded" }]);
+    },
+  );
+
+  it("dispatches events without a native message id without inventing a ledger identity", async () => {
+    const accountId = "no-native-message-id";
+    const delivered: unknown[] = [];
+    await dispatchQueuedInbound({
+      channel: CHANNEL,
+      accountId,
+      ingressId: "durable-operation-id",
+      payload: { channel: CHANNEL, accountId, ctxPayload: { ChatId: "conversation" } },
+      logger: { warn: () => assert.fail("unexpected audit failure") },
+      hostRuntime: {
+        inboundLedger: {
+          record: async () => assert.fail("no native identity to record"),
+          consume: async () => assert.fail("no native identity to consume"),
+        },
+        onInboundReply: async (params) => {
+          delivered.push(params.ctxPayload?.["ClisbotInboundOperationId"]);
+          return { dispatched: true };
+        },
+      },
+    });
+    assert.deepEqual(delivered, ["durable-operation-id"]);
+  });
+
+  it.each([
+    { accountId: "audit-missing-after-dispatch", error: new ChannelDeliveryRecordNotFoundError() },
+    { accountId: "audit-unavailable-after-dispatch", error: new Error("audit write unavailable") },
+  ])(
+    "completes delivered commands and frees the lane when $accountId",
+    async ({ accountId, error }) => {
+      await admitCommand(accountId, "status");
+      await admitCommand(accountId, "stop");
+      const delivered: unknown[] = [];
+      const warnings: unknown[] = [];
+      const drain = drainFor(accountId, {
+        dispatch: (payload, claim) =>
+          dispatchQueuedInbound({
+            channel: CHANNEL,
+            accountId,
+            payload,
+            ingressId: claim.id,
+            logger: { warn: (message, detail) => warnings.push({ message, detail }) },
+            hostRuntime: {
+              inboundLedger: {
+                ...ledgerFor(accountId),
+                consume: async () => {
+                  throw error;
+                },
+              },
+              onInboundReply: async (params) => {
+                delivered.push(params.ctxPayload?.["Body"]);
+                return { dispatched: true };
+              },
+            },
+          }),
+      });
+      const pass = await drain.drainOnce();
+      assert.equal(pass.completed, 2);
+      assert.equal(pass.retried, 0);
+      assert.equal(pass.deadLettered, 0);
+      assert.deepEqual(delivered, ["/status", "/stop"]);
+      assert.deepEqual(
+        warnings,
+        await Promise.all(
+          ["status", "stop"].map(async (command) => ({
+            message: "channel inbound audit failed after dispatch",
+            detail: {
+              channel: CHANNEL,
+              account: accountId,
+              event: (await readEvent(accountId, command)).id,
+              error: error.message,
+            },
+          })),
+        ),
+      );
+      assert.equal((await drain.drainOnce()).claimed, 0);
+      assert.deepEqual(delivered, ["/status", "/stop"]);
+    },
+  );
+
+  it("retries an audit record failure before any command side effect", async () => {
+    const accountId = "audit-unavailable-before-dispatch";
+    await admitCommand(accountId, "status");
+    const ledger = ledgerFor(accountId);
+    let failuresRemaining = 1;
+    const delivered: unknown[] = [];
+    const warnings: string[] = [];
+    const drain = drainFor(accountId, {
+      retryPolicy: { baseMs: 0, maxMs: 0 },
+      dispatch: (payload, claim) =>
+        dispatchQueuedInbound({
+          channel: CHANNEL,
+          accountId,
+          payload,
+          ingressId: claim.id,
+          logger: { warn: (message) => warnings.push(message) },
+          hostRuntime: {
+            inboundLedger: {
+              ...ledger,
+              record: async (input) => {
+                if (failuresRemaining > 0) {
+                  failuresRemaining -= 1;
+                  throw new Error("audit store unavailable");
+                }
+                return ledger.record(input);
+              },
+            },
+            onInboundReply: async (params) => {
+              delivered.push(params.ctxPayload?.["Body"]);
+              return { dispatched: true };
+            },
+          },
+        }),
+    });
+    const pass = await drain.drainOnce();
+    assert.equal(pass.retried, 1);
+    assert.equal(pass.completed, 1);
+    assert.deepEqual(delivered, ["/status"]);
+    assert.deepEqual(warnings, []);
+  });
+
+  it("retries a failed dispatch against an existing audit without treating it as delivered", async () => {
+    const accountId = "audit-existing-dispatch-retry";
+    await admitCommand(accountId, "status");
+    let failuresRemaining = 1;
+    const delivered: unknown[] = [];
+    const drain = drainFor(accountId, {
+      retryPolicy: { baseMs: 0, maxMs: 0 },
+      dispatch: (payload, claim) =>
+        dispatchQueuedInbound({
+          channel: CHANNEL,
+          accountId,
+          payload,
+          ingressId: claim.id,
+          logger: { warn: () => assert.fail("unexpected audit failure") },
+          hostRuntime: {
+            inboundLedger: ledgerFor(accountId),
+            onInboundReply: async (params) => {
+              if (failuresRemaining > 0) {
+                failuresRemaining -= 1;
+                throw new Error("host temporarily disconnected");
+              }
+              delivered.push(params.ctxPayload?.["Body"]);
+              return { dispatched: true };
+            },
+          },
+        }),
+    });
+    const pass = await drain.drainOnce();
+    assert.equal(pass.retried, 1);
+    assert.equal(pass.completed, 1);
+    assert.deepEqual(delivered, ["/status"]);
+    const audit = await bundle.runtime.query(
+      "select status from delivery_ledger where account_id = $1",
+      [accountId],
+    );
+    assert.deepEqual(audit.rows, [{ status: "consumed" }]);
+  });
+
+  it("exhausts eight failed attempts on a fresh event and releases the next command", async () => {
+    const accountId = "fresh-retry-ceiling";
+    await admit(accountId, "poison");
+    await admit(accountId, "stop");
+    const delivered: string[] = [];
+    const drain = drainFor(accountId, {
+      // Keep the production attempt/age budget; only remove the wait between tries.
+      retryPolicy: { baseMs: 0, maxMs: 0 },
+      dispatch: async (_payload, claim) => {
+        const row = await readEvent(accountId, "poison");
+        if (claim.id === row.id) throw new Error("handoff failed");
+        delivered.push("stop");
+      },
+    });
+    const pass = await drain.drainOnce();
+    assert.equal(pass.retried, 7);
+    assert.equal(pass.deadLettered, 1);
+    assert.equal(pass.completed, 1);
+    const row = await readEvent(accountId, "poison");
+    assert.equal(row.attempts, 8);
+    assert.equal(row.failedReason, "retry-limit-exceeded");
+    assert.deepEqual(delivered, ["stop"]);
+  });
+
+  it("dead-letters a missing delivery record on the first attempt and frees its lane", async () => {
+    const accountId = "missing-delivery-record";
+    await admit(accountId, "poison");
+    await admit(accountId, "stop");
+    const poison = await readEvent(accountId, "poison");
+    const drain = drainFor(accountId, {
+      now: () => Date.now() + 60_000,
+      dispatch: async (_payload, claim) => {
+        if (claim.id === poison.id) throw new ChannelDeliveryRecordNotFoundError();
+      },
+    });
+    const pass = await drain.drainOnce();
+    assert.equal(pass.deadLettered, 1);
+    assert.equal(pass.retried, 0);
+    assert.equal(pass.completed, 1);
+    assert.equal((await readEvent(accountId, "poison")).attempts, 1);
+    assert.equal((await readEvent(accountId, "poison")).failedReason, "delivery-record-not-found");
+  });
+
+  it("repairs a missing inbound audit before dispatch and completes without replay", async () => {
+    const accountId = "missing-inbound-audit";
+    const messageId = "status-1";
+    const conversationId = "incident-thread";
+    const ledger = ledgerFor(accountId);
+    await sinkFor(accountId).enqueue({
+      channel: CHANNEL,
+      accountId,
+      externalEventId: messageId,
+      externalMessageId: messageId,
+      externalConversationId: conversationId,
+      laneKey: "incident-thread",
+      payload: {
+        channel: CHANNEL,
+        accountId,
+        ctxPayload: {
+          ChatId: conversationId,
+          MessageSid: messageId,
+          Body: "/status",
+          SenderId: "incident-sender",
+        },
+      },
+    });
+    const delivered: string[] = [];
+    const warnings: string[] = [];
+    const drain = drainFor(accountId, {
+      now: () => Date.now() + 60_000,
+      dispatch: (payload, claim) =>
+        dispatchQueuedInbound({
+          channel: CHANNEL,
+          accountId,
+          payload,
+          ingressId: claim.id,
+          logger: { warn: (message) => warnings.push(message) },
+          hostRuntime: {
+            inboundLedger: {
+              ...ledger,
+              record: (input) => {
+                assert.equal(input.senderIdentity, "incident-sender");
+                return ledger.record(input);
+              },
+            },
+            onInboundReply: async () => {
+              const audit = await bundle.runtime.query(
+                "select status from delivery_ledger where account_id = $1 and external_message_id = $2",
+                [accountId, messageId],
+              );
+              assert.deepEqual(audit.rows, [{ status: "recorded" }]);
+              delivered.push(messageId);
+              return { dispatched: true };
+            },
+          },
+        }),
+    });
+
+    const pass = await drain.drainOnce();
+    assert.equal(pass.completed, 1);
+    assert.equal(pass.retried, 0);
+    assert.equal((await readEvent(accountId, messageId)).status, "completed");
+    assert.equal((await drain.drainOnce()).claimed, 0);
+    assert.deepEqual(delivered, [messageId]);
+    assert.deepEqual(warnings, []);
+    const audit = await bundle.runtime.query(
+      "select status, turn_id from delivery_ledger where account_id = $1 and external_message_id = $2",
+      [accountId, messageId],
+    );
+    assert.deepEqual(audit.rows, [{ status: "consumed", turn_id: `${CHANNEL}:${messageId}` }]);
+  });
+
   it("schedules the upstream backoff delay for a retryable failure", async () => {
     const accountId = "backoff";
     await admit(accountId, "event-backoff");
-    // An hour out: a backoff that lands in the past would make the row due
+    // A minute out: a backoff that lands in the past would make the row due
     // again inside the same pass, and the assertion below would count the
     // batch instead of the one retry it is about.
-    const now = Date.now() + 3_600_000;
+    const now = Date.now() + 60_000;
     const retries: Array<{ retryAt: Date; message: string }> = [];
     const drain = drainFor(accountId, {
       dispatch: () => Promise.reject(new Error("daemon client is not connected")),
@@ -727,8 +1285,8 @@ describe("channel ingress drain", () => {
     await admit(accountId, "event-deferred", "lane-deferred");
     await admit(accountId, "event-declined", "lane-declined");
     const deferrals: Array<{ reason: string; retryAt: Date }> = [];
-    // An hour out, so the released row is not due again inside this pass.
-    const now = Date.now() + 3_600_000;
+    // A minute out, so the released row is not due again inside this pass.
+    const now = Date.now() + 60_000;
     const drain = drainFor(accountId, {
       now: () => now,
       dispatch: async (payload) => {

@@ -12,6 +12,7 @@ import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js
 import { conversationSettings, type ConversationSettings } from "../config/conversation.js";
 import type { InboundReplyParams } from "../loader/host.js";
 import { claimedInbound } from "../ingress/claimed-inbound.js";
+import { INGRESS_OUTCOME_UNKNOWN } from "../ingress/attempt.js";
 import { readInboundKind } from "../plane/inbound-kinds.js";
 import type {
   InboundMessage,
@@ -48,7 +49,7 @@ export interface ConversationPlaneSeams {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    kind: "unprocessed" | "refused" | "host-lost",
+    kind: "unprocessed" | "refused" | "host-lost" | "outcome-unknown",
   ): Promise<void>;
   mayUse(
     message: InboundMessage,
@@ -84,7 +85,10 @@ export interface HeldBatch {
 }
 
 /** A dead-lettered row: what the plane reads off it. */
-export type DeadLetteredRow = Pick<ChannelIngressQueueRecord, "id" | "payload" | "sentIn">;
+export type DeadLetteredRow = Pick<
+  ChannelIngressQueueRecord,
+  "id" | "payload" | "sentIn" | "failedReason"
+>;
 
 /** Where a running turn answers: the message it answers, and its Route. */
 interface TurnAddress {
@@ -260,12 +264,19 @@ export class ConversationFlow {
     const { message, account, rows } = letter;
     const route = await this.servingRoute(message, account);
     const scope = letter.scope ?? (route && this.inbox.scopeOf(message, route));
-    if (scope !== undefined) await this.inbox.fileUndelivered(scope, rows);
+    const outcomeUnknown = record.failedReason === INGRESS_OUTCOME_UNKNOWN;
+    if (scope !== undefined) await this.inbox.fileUndelivered(scope, rows, { outcomeUnknown });
     const kept = scope !== undefined && rows.length > 0 && rows.every((row) => row.sentIn === null);
     // The first Route covering the conversation places the notice.
     const noticeRoute = recordedRoute(account, message.conversation, undefined);
     if (noticeRoute === undefined) return;
-    await this.deps.plane.notice(message, account, noticeRoute, kept ? "unprocessed" : "refused");
+    const knownNotice = kept ? "unprocessed" : "refused";
+    await this.deps.plane.notice(
+      message,
+      account,
+      noticeRoute,
+      outcomeUnknown ? "outcome-unknown" : knownNotice,
+    );
   }
 
   /** Re-admit a flush for every binding a previous run left holding. */

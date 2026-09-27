@@ -1433,7 +1433,7 @@ describe("unprocessed inbound (dead-lettered)", () => {
     harness.next.message = message({ externalMessageId: OPENER_TS });
 
     // No prompt ever carried it: it stays as context, and the notice says so.
-    const record = { id: randomUUID(), payload: params, sentIn: null };
+    const record = { id: randomUUID(), payload: params, sentIn: null, failedReason: null };
     await harness.plane.onDeadLettered(record);
     await harness.plane.onDeadLettered(record);
 
@@ -1452,6 +1452,7 @@ describe("unprocessed inbound (dead-lettered)", () => {
       id: randomUUID(),
       payload: params,
       sentIn: "an-earlier-prompt",
+      failedReason: null,
     });
 
     assert.deepEqual(harness.posted, ["This message could not be processed. Send it again."]);
@@ -1466,6 +1467,7 @@ describe("unprocessed inbound (dead-lettered)", () => {
       id: randomUUID(),
       payload: { ...params, ctxPayload: { EventKind: "reaction" } },
       sentIn: null,
+      failedReason: null,
     });
 
     assert.deepEqual(harness.posted, []);

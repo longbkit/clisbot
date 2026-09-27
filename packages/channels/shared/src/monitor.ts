@@ -346,19 +346,9 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
         throw error;
       }
       if (!admitted.created) return { dispatched: false, reason: "queue replay" };
-      // Keep the existing ledger as an audit join, but never use it as the queue
-      // admission gate (the queue owns payload durability and replay).
-      if (sink !== undefined) {
-        await sink.record({
-          channel,
-          accountId,
-          externalConversationId: event.externalConversationId,
-          externalMessageId: event.externalMessageId,
-          ...(event.senderId !== "" ? { senderIdentity: event.senderId } : {}),
-        });
-      }
-      // The supervisor-owned drain claims and dispatches the payload. Returning
-      // after admission is the provider ACK/offset boundary.
+      // The drain owns audit recording as well as dispatch: it may already be
+      // awake, and a crash after admission must not leave an unrepairable audit.
+      // Returning after admission is the provider ACK/offset boundary.
       return { dispatched: true, reason: "queued" };
     }
 

@@ -588,7 +588,8 @@ export class ChannelStore {
   /**
    * Record-before-handoff: write the `in` ledger row before the `onInboundReply`
    * handoff (blueprint §2.4). Replayed events (same external message id) return
-   * the stored row with `created: false`, so the caller must NOT dispatch.
+   * the stored row with `created: false`. Ledger-only callers use that as
+   * dedupe; queued callers use the durable queue's claim/completion instead.
    */
   async recordInbound(input: RecordInboundInput): Promise<RecordInboundResult> {
     const [recorded] = await this.database
@@ -945,6 +946,7 @@ export class ChannelStore {
       .select({
         releases: schema.channelIngressQueue.releases,
         createdAt: schema.channelIngressQueue.createdAt,
+        resubmittedAt: schema.channelIngressQueue.resubmittedAt,
       })
       .from(schema.channelIngressQueue)
       .where(eq(schema.channelIngressQueue.id, input.id))
@@ -952,7 +954,7 @@ export class ChannelStore {
     if (row === undefined) return false;
     return (
       row.releases + 1 >= budget.maxReleases ||
-      now.getTime() - row.createdAt.getTime() > budget.pendingTtlMs
+      now.getTime() - (row.resubmittedAt ?? row.createdAt).getTime() >= budget.pendingTtlMs
     );
   }
 

@@ -690,6 +690,36 @@ describe("review regressions", () => {
     await flow.plane.stop();
   });
 
+  it("never includes a timed-out message as context even without sentIn", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    try {
+      const lost = say("possibly already executed");
+      const { record } = await store.enqueueChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        externalEventId: lost.externalMessageId!,
+        externalMessageId: lost.externalMessageId!,
+        externalConversationId: "C0FLOW",
+        externalThreadId: lost.conversation.threadId,
+        laneKey: "lane:unknown",
+        payload: { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: lost } },
+      });
+      await flow.plane.onDeadLettered({ ...record, failedReason: "dispatch-outcome-unknown" });
+      await flow.send(say("next"));
+      assert.equal((await rowOf(record.id)).inboxState, "delivered");
+      assert.equal(daemon.sends.at(-1)!.text, "slack:U0ALICE: next");
+      assert.deepEqual(flow.posted, [
+        "Processing stopped before its outcome could be confirmed. It was not retried automatically. Check the session before sending this message again.",
+      ]);
+    } finally {
+      await flow.plane.stop();
+    }
+  });
+
   it("never resends as context a message a prompt already carried", async () => {
     const say = conversation();
     const daemon = makeDaemon({ failSends: 1 });

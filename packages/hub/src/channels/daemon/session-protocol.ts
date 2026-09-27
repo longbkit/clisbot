@@ -8,6 +8,7 @@
 // what lets the channel plane above the transport stay identical on both.
 
 import { randomUUID } from "node:crypto";
+import { ingressAttempt } from "../ingress/attempt.js";
 
 export interface DaemonSessionFrame {
   type: string;
@@ -51,6 +52,8 @@ export class DaemonSessionProtocol {
    * with the raw frame. Rejects on `rpc_error`, timeout, or a closed transport.
    */
   call(requestType: string, fields: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
+    const attempt = ingressAttempt.getStore();
+    if (attempt?.aborted) return Promise.reject(attempt.reason);
     const requestId = randomUUID();
     const limit = timeoutMs ?? this.options.rpcTimeoutMs ?? DEFAULT_RPC_TIMEOUT_MS;
     const timer = setTimeout(() => {
@@ -69,6 +72,8 @@ export class DaemonSessionProtocol {
 
   /** Fire-and-forget session message: no daemon reply is correlated. */
   send(message: Record<string, unknown>): Promise<void> {
+    const attempt = ingressAttempt.getStore();
+    if (attempt?.aborted) return Promise.reject(attempt.reason);
     return this.options.write(sessionFrame(message));
   }
 

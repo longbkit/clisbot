@@ -15,6 +15,7 @@ import {
 // the one shared consumer that fans out to the relay and the approval engine
 // (§4-S3 one code path: relay and approvals are two handlers on one stream).
 import { randomUUID, createHash } from "node:crypto";
+import { ingressAttempt } from "./ingress/attempt.js";
 import type { AgentExecutionRecord, ThreadBindingRecord } from "../db/types.js";
 import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
@@ -1135,7 +1136,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     notice: keyof typeof WAIT_NOTICE_TEXT,
   ): Promise<void> {
     const key = message.externalMessageId ?? message.ingressId;
-    const once = notice === "unprocessed" ? unprocessedNotices : waitingNotices;
+    const once =
+      notice === "unprocessed" || notice === "outcome-unknown"
+        ? unprocessedNotices
+        : waitingNotices;
     // `too-long` and `host-lost` are said once per message by construction.
     const repeatable = notice === "too-long" || notice === "host-lost";
     if (!repeatable && (key === undefined || !once.remember(key))) return;
@@ -1242,14 +1246,16 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       key.externalThreadId,
     ]);
     try {
+      const identity = deps.resolveSessionIdentity
+        ? { sessionIdentity: await deps.resolveSessionIdentity(message) }
+        : {};
+      ingressAttempt.getStore()?.throwIfAborted();
       await deps.dispatchWorkflow({
         organizationId: deps.organizationId,
         deliveryId,
         receivedAt: new Date(clock.now()),
         payload: {
-          ...(deps.resolveSessionIdentity
-            ? { sessionIdentity: await deps.resolveSessionIdentity(message) }
-            : {}),
+          ...identity,
           workflow,
           text: message.text,
           channel: {

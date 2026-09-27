@@ -10,6 +10,7 @@
  */
 import type { InboundQueueSink } from "@getpaseo/channels-shared";
 import type { ChannelStore } from "../../db/channels.js";
+import { CHANNEL_INGRESS_MAX_AGE_MS } from "./budget.js";
 import type {
   ChannelIngressQueueRecord,
   ChannelIngressReleaseBudget,
@@ -29,7 +30,7 @@ import type {
  */
 export const CHANNEL_INGRESS_RELEASE_BUDGET: ChannelIngressReleaseBudget = Object.freeze({
   maxReleases: 50,
-  pendingTtlMs: 24 * 60 * 60 * 1_000,
+  pendingTtlMs: CHANNEL_INGRESS_MAX_AGE_MS,
 });
 
 type SinkDisposition = Parameters<InboundQueueSink["fail"]>[0]["disposition"];
@@ -111,7 +112,7 @@ export function createChannelIngressQueueSink(
         payload: row.payload,
         laneKey: row.laneKey,
         attempts: row.attempts,
-        receivedAt: row.createdAt,
+        receivedAt: row.resubmittedAt ?? row.createdAt,
       };
     },
     complete: async (params) => {

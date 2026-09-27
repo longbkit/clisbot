@@ -13,6 +13,7 @@
 // docs/features/channels/conversation-flow.md#outbound
 
 import { setTimeout as delay } from "node:timers/promises";
+import { ingressAttempt } from "../ingress/attempt.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import { inWindow, limitScopes, RATE_WINDOW_MS, type LimitScope } from "./limit-scopes.js";
 import {
@@ -114,11 +115,26 @@ export class OutboundPacer {
     write: () => Promise<Result | WriteFailure>,
   ): Promise<Result | WriteFailure> {
     if (this.stopped()) return Promise.resolve(canceled());
-    if (this.scopes(destination.to).length === 0) return this.withDeadline(destination, write);
+    // A different dispatch can drain this lane; capture the submitting one.
+    const attempt = ingressAttempt.getStore();
+    const guardedWrite = () => {
+      if (attempt?.aborted)
+        return Promise.resolve(
+          writeFailed(
+            { ...outboundFailure("canceled"), retryable: false },
+            "the inbound dispatch ended before the message was sent",
+          ),
+        );
+      return attempt === undefined
+        ? ingressAttempt.exit(write)
+        : ingressAttempt.run(attempt, write);
+    };
+    if (this.scopes(destination.to).length === 0)
+      return this.withDeadline(destination, guardedWrite);
     return new Promise((resolve, reject) => {
       this.enqueue(destination, {
         priority,
-        send: () => this.withDeadline(destination, write).then(resolve, reject),
+        send: () => this.withDeadline(destination, guardedWrite).then(resolve, reject),
         supersede: () =>
           resolve(
             writeFailed(outboundFailure("superseded"), "superseded by a newer progress message"),
