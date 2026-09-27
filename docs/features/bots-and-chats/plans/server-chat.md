@@ -197,7 +197,9 @@ header. `deliveredSeq` moves to the newest line in the prompt once the prompt is
 context and triggering messages; its provider session already owns that output. Only user,
 other-bot, and system lines above the delivered watermark are eligible. A delayed trigger
 already delivered as context does not start another turn. Resume retains the watermark;
-`/new` does not replay the already-delivered transcript into the fresh session.
+`/new` does not replay the already-delivered transcript into the fresh session. Startup repairs
+a lagging watermark only when the current participant session has a durable submitted-message
+row; a missing reply or recovery notice alone is not proof of accepted ingress.
 
 Title: first session for a (bot, chat) gets `initialTitle` = chat title or first line of the user
 text, for the same reason the Hub sets one (`prompt.ts:63-75`): the daemon otherwise titles the
