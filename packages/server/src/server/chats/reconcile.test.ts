@@ -65,8 +65,15 @@ function harness(options: {
 }) {
   const appended: { chatId: string; input: TranscriptLineInput }[] = [];
   const lookups: string[] = [];
+  const repaired: number[] = [];
   const deps: ReconcileDependencies = {
-    store: { list: async () => options.chats ?? [chat()] },
+    store: {
+      list: async () => options.chats ?? [chat()],
+      markDelivered: async (_chatId, _botId, seq) => {
+        repaired.push(seq);
+        return chat();
+      },
+    },
     transcriptOf: () => ({
       fetch: async () => ({
         lines: options.lines ?? [],
@@ -94,7 +101,7 @@ function harness(options: {
     logger: createTestLogger(),
     now: () => "2026-09-26T12:00:00.000Z",
   };
-  return { deps, appended, lookups };
+  return { deps, appended, lookups, repaired };
 }
 
 describe("reconcileChats", () => {
@@ -314,4 +321,50 @@ test("partial text without durable completion proof stays a scoped interruption 
     deliveryBotIds: [alpha.id],
   });
   expect(h.appended[0]?.input.text).not.toContain("Incomplete text");
+});
+
+test("repairs confirmed ingress even when its reply landed and the newest trigger is unsubmitted", async () => {
+  const record = chat();
+  record.participants[0]!.deliveredSeq = 0;
+  const h = harness({
+    chats: [record],
+    lines: [
+      line(1, { deliveryBotIds: [alpha.id] }),
+      line(2, {
+        sender: { kind: "bot", botId: alpha.id },
+        inReplyTo: "m1",
+        reply: { agentId: "agent-a" },
+      }),
+      line(3, { deliveryBotIds: [alpha.id] }),
+    ],
+    submitted: { m1: { epoch: "ep", seq: 10 } },
+  });
+  await reconcileChats(h.deps);
+  expect(h.repaired).toEqual([1]);
+  expect(h.lookups.slice(0, 2)).toEqual(["m3", "m1"]);
+  expect(h.appended[0]?.input.inReplyTo).toBe("m3");
+});
+
+test("repairs the newest positive receipt only, excluding own output and pre-reset history", async () => {
+  const record = chat();
+  record.participants[0] = { ...record.participants[0]!, deliveredSeq: 0, resetAt: "b" };
+  const h = harness({
+    chats: [record],
+    running: ["agent-a"],
+    lines: [
+      line(1, { at: "a" }),
+      line(2, { at: "c" }),
+      line(3, { at: "d" }),
+      line(4, { at: "e", sender: { kind: "bot", botId: alpha.id } }),
+    ],
+    submitted: {
+      m1: { epoch: "ep", seq: 1 },
+      m2: { epoch: "ep", seq: 2 },
+      m4: { epoch: "ep", seq: 4 },
+    },
+  });
+  await reconcileChats(h.deps);
+  expect(h.lookups).toEqual(["m3", "m2"]);
+  expect(h.repaired).toEqual([2]);
+  expect(h.appended).toEqual([]);
 });

@@ -271,6 +271,10 @@ export class ChatEngine implements TurnTrackerHost {
     const participant = chat.participants.find((entry) => entry.botId === botId);
     const bot = await this.deps.bots.get(botId);
     if (!participant || !bot) throw new Error(`Bot ${botId} is not in chat ${chatId}`);
+    // A later queued delivery may already have included this trigger as context.
+    // The per-pair queue makes the persisted watermark authoritative at admission.
+    lines = lines.filter((line) => line.seq > participant.deliveredSeq);
+    if (lines.length === 0) return;
     const rules = resolveChatRules(chat.rules);
     const title = sessionTitleFor(chat.title, lines[0]?.text ?? "");
     const session = await this.deps.botSessions.resolve(chat, bot, title);

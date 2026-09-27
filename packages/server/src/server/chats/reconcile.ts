@@ -1,7 +1,7 @@
 // Startup backfill of replies that never reached a transcript
 // (docs/features/bots-and-chats/plans/server-chat.md, §3): a turn that ended
 // while the daemon was down left its answer in the bot's timeline only. One
-// submission lookup and one forward window per participant; a backfilled reply
+// receipt scan and one forward window per participant; a backfilled reply
 // is never forwarded, the next user message continues the chat.
 import type { Logger } from "pino";
 import type { AgentTimelineRow } from "../agent/agent-timeline-store-types.js";
@@ -13,7 +13,7 @@ import { finalAnswer, type TimelineReference } from "./final-answer.js";
 import type { TranscriptLine, TranscriptLineInput, TranscriptLog } from "./transcript-log.js";
 
 export interface ReconcileDependencies {
-  store: Pick<ChatStore, "list">;
+  store: Pick<ChatStore, "list" | "markDelivered">;
   transcriptOf: (chatId: string) => Pick<TranscriptLog, "fetch">;
   bots: BotLookup;
   /** Appends through the engine so the line is published like any other. */
@@ -57,7 +57,8 @@ async function reconcileChat(deps: ReconcileDependencies, chat: StoredChat): Pro
     if (!page.hasNewer || page.endSeq <= cursor) break;
     cursor = page.endSeq;
   }
-  for (const participant of chat.participants) {
+  for (const storedParticipant of chat.participants) {
+    const participant = await repairDeliveredSequence(deps, chat.id, storedParticipant, lines);
     const pending = missingReply(lines, participant);
     if (!pending || (participant.agentId && deps.isRunning(participant.agentId))) continue;
     await backfill(
@@ -69,6 +70,33 @@ async function reconcileChat(deps: ReconcileDependencies, chat: StoredChat): Pro
       participant.completedTurn,
     );
   }
+}
+
+/** Prompt acceptance and the Chat watermark are separate durable writes. Only an actual
+ * submitted row proves ingress; a projected reply or an unknown recovery notice does not.
+ * Run independently of reply backfill, including when the newest trigger was never submitted.
+ */
+async function repairDeliveredSequence(
+  deps: ReconcileDependencies,
+  chatId: string,
+  participant: StoredChatParticipant,
+  lines: readonly TranscriptLine[],
+): Promise<StoredChatParticipant> {
+  if (!participant.agentId) return participant;
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const line = lines[index]!;
+    if (line.seq <= participant.deliveredSeq) break;
+    if (
+      line.sender.kind === "system" ||
+      (line.sender.kind === "bot" && line.sender.botId === participant.botId) ||
+      (participant.resetAt && line.at <= participant.resetAt)
+    )
+      continue;
+    if (!(await deps.findSubmittedRow(participant.agentId, line.id))) continue;
+    await deps.store.markDelivered(chatId, participant.botId, line.seq);
+    return { ...participant, deliveredSeq: line.seq };
+  }
+  return participant;
 }
 
 /** The newest line handed to the bot whose reply never landed, or `null` when none is owed. */

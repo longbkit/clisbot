@@ -94,6 +94,9 @@ test("real socket: bot homes, direct and group transcripts, mentions and restart
     ).toBe(true);
     await events.release();
     const before = await client.fetchChatTranscript({ chatId: group.chat!.id });
+    const directAgentBeforeRestart = (await client.listChats()).chats.find(
+      (chat) => chat.id === direct.chat!.id,
+    )!.participants[0]!.agentId;
     await client.close();
     await daemon.close();
     daemon = await createTestPaseoDaemon(options);
@@ -104,6 +107,28 @@ test("real socket: bot homes, direct and group transcripts, mentions and restart
     expect((await client.fetchChatTranscript({ chatId: group.chat!.id })).lines).toEqual(
       before.lines,
     );
+    // A resumed provider session already owns its earlier ingress and own output.
+    const resumed = await client.sendChatMessage({
+      chatId: direct.chat!.id,
+      text: "after-resume",
+      messageId: "direct-2",
+    });
+    expect(resumed.error).toBeNull();
+    await expect
+      .poll(
+        async () => (await client.fetchChatTranscript({ chatId: direct.chat!.id })).lines.length,
+      )
+      .toBe(4);
+    const resumedChat = (await client.listChats()).chats.find(
+      (chat) => chat.id === direct.chat!.id,
+    )!;
+    const resumedAgentId = resumedChat.participants[0]!.agentId!;
+    expect(resumedAgentId).toBe(directAgentBeforeRestart);
+    const timeline = await client.fetchAgentTimeline(resumedAgentId, { limit: 0 });
+    const inputs = timeline.entries.flatMap((entry) =>
+      entry.item.type === "user_message" ? [entry.item.text] : [],
+    );
+    expect(inputs.at(-1)).toBe("user:owner: after-resume");
     expect(
       (await client.resetChatSession({ chatId: group.chat!.id, botId: analyst.id })).error,
     ).toBeNull();

@@ -53,7 +53,7 @@ describe("renderChatPrompt", () => {
     ).toBe("Long Luong (user:usr_1): Find the spec");
   });
 
-  test("earlier lines, the bot's own included, are quoted context before the trigger", () => {
+  test("earlier user and other-bot lines are context; own identity is excluded", () => {
     const earlier = line({ kind: "user", actor }, "Any update?");
     const own = line({ kind: "bot", botId: "bot_a" }, "Still looking", 1);
     const other = line({ kind: "bot", botId: "bot_b" }, "@researcher I drafted the intro", 1);
@@ -69,7 +69,6 @@ describe("renderChatPrompt", () => {
       [
         CONTEXT_HEADER,
         "Long Luong (user:usr_1): Any update?",
-        "Researcher (bot:researcher): Still looking",
         "Writer (bot:writer): @researcher I drafted the intro",
         MESSAGE_HEADER,
         "Long Luong (user:usr_1): @researcher status",
@@ -95,4 +94,18 @@ describe("sessionTitleFor", () => {
     expect(sessionTitleFor(null, "x".repeat(80))).toBe("x".repeat(60));
     expect(sessionTitleFor(null, "  \n ")).toBeUndefined();
   });
+});
+
+test("self filtering uses stable Bot identity, not equal names or identical text", () => {
+  const own = line({ kind: "bot", botId: "bot_a" }, "same reply");
+  const other = line({ kind: "bot", botId: "bot_b" }, "same reply");
+  const trigger = line({ kind: "user" }, "continue");
+  const prompt = renderChatPrompt({
+    botId: "bot_a",
+    window: [own, other, trigger],
+    triggering: [trigger],
+    botOf: () => ({ slug: "same", displayName: "Same" }),
+  });
+  expect(prompt.match(/same reply/g)).toHaveLength(1);
+  expect(prompt).toContain("Same (bot:same): same reply");
 });

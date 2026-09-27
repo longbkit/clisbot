@@ -193,8 +193,11 @@ Sender label inputs, using the `senderLabel({ senderIdentity, senderName, sender
 Window: lines with `seq > participant.deliveredSeq`, oldest first, newest kept when more than
 `context.maxMessages`; the triggering line(s) go under `[Message]`, the rest under the context
 header. `deliveredSeq` moves to the newest line in the prompt once the prompt is accepted
-(`sendPromptToAgent` returned). The bot's own earlier lines are included as context: it sees
-what it said, labelled as itself. Lines by the bot being prompted are never the `[Message]`.
+(`sendPromptToAgent` returned). Exclude the receiving bot's own sender identity from both
+context and triggering messages; its provider session already owns that output. Only user,
+other-bot, and system lines above the delivered watermark are eligible. A delayed trigger
+already delivered as context does not start another turn. Resume retains the watermark;
+`/new` does not replay the already-delivered transcript into the fresh session.
 
 Title: first session for a (bot, chat) gets `initialTitle` = chat title or first line of the user
 text, for the same reason the Hub sets one (`prompt.ts:63-75`): the daemon otherwise titles the
@@ -421,7 +424,7 @@ Unit (`packages/server/src/server/chats/*.test.ts`):
 - `turn-rules.test.ts`: the [§2.2](#22-who-answers-turn-rulests-pure) table row by row; hop 3 stops;
   `maxInputCharacters` refuses; `off` disables.
 - `context-prompt.test.ts`: window since `deliveredSeq`, `maxMessages` keeps newest, headers only
-  when context exists, sender labels for user/bot/system, the bot's own lines as context. Snapshot
+  when context exists, sender labels for user/bot/system, the bot's own lines excluded from context and triggers. Snapshot
   the rendered text against the Hub's `prompt.test.ts` expectations after the move to protocol.
 - `transcript-log.test.ts`: seq continues after reopen, index rebuilt after deleting
   `transcript.index.json`, `fetch` tail/before/after windows, concurrent appends get distinct seqs.

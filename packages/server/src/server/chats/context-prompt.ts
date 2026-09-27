@@ -11,7 +11,7 @@ import {
 export type BotNameResolver = (botId: string) => { slug: string; displayName: string } | null;
 
 export interface ChatPromptInput {
-  /** The bot being prompted; its own lines are context, never the `[Message]`. */
+  /** The bot being prompted; its own output is never re-ingested as input. */
   botId: string;
   /** Lines since the bot's `deliveredSeq`, oldest first, already cut to `context.maxMessages`. */
   window: readonly ChatMessagePayload[];
@@ -49,8 +49,8 @@ function senderOf(
 
 /**
  * The prompt text. Context = the window minus the triggering lines; messages = the
- * triggering lines not written by the bot itself. A triggering line that only the bot
- * wrote leaves nothing to answer, so the prompt is empty and the engine sends nothing.
+ * triggering lines not written by the bot itself. Own output is excluded from both.
+ * With only own-output triggers there is nothing to answer, so the engine sends nothing.
  */
 export function renderChatPrompt(input: ChatPromptInput): string {
   const triggeringIds = new Set(input.triggering.map((line) => line.id));
@@ -58,7 +58,11 @@ export function renderChatPrompt(input: ChatPromptInput): string {
     (line) => !(line.sender.kind === "bot" && line.sender.botId === input.botId),
   );
   if (messages.length === 0) return "";
-  const context = input.window.filter((line) => !triggeringIds.has(line.id));
+  const context = input.window.filter(
+    (line) =>
+      !triggeringIds.has(line.id) &&
+      !(line.sender.kind === "bot" && line.sender.botId === input.botId),
+  );
   return renderConversationPrompt({
     context: context.map((line) => senderLineOf(line, input.botOf)),
     messages: messages.map((line) => senderLineOf(line, input.botOf)),

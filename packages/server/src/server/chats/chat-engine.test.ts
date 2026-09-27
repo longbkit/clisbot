@@ -208,14 +208,7 @@ describe("ChatEngine", () => {
 
     await h.engine.send({ chatId: "cht_1", text: "Thanks, summarize it", messageId: "m2", actor });
     await h.engine.idle();
-    expect(h.sent[1]?.prompt).toBe(
-      [
-        CONTEXT_HEADER,
-        "Alpha (bot:alpha): Here it is.",
-        MESSAGE_HEADER,
-        "Long Luong (user:usr_1): Thanks, summarize it",
-      ].join("\n"),
-    );
+    expect(h.sent[1]?.prompt).toBe("Long Luong (user:usr_1): Thanks, summarize it");
   });
 
   test("concurrent messages admit in order without consuming future context", async () => {
@@ -334,6 +327,7 @@ describe("ChatEngine", () => {
     await h.engine.send({ chatId: "cht_1", text: "two", messageId: "m2" });
     await h.engine.idle();
     expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_a-2"]);
+    expect(h.sent[1]?.prompt).not.toContain("user: one");
     expect((await h.lines("cht_1")).map((line) => line.text)).toEqual([
       "one",
       "Alpha will start a new session on the next message.",
@@ -466,4 +460,66 @@ test("reset and removal reject prompt admission before the provider is running",
   expect((await h.store.require("cht_admitting")).participants.map((p) => p.botId)).toEqual([
     beta.id,
   ]);
+});
+
+test("group input contains other bot output once, never own output", async () => {
+  const h = await harness();
+  await h.store.create({ id: "cht_ingress", botIds: [alpha.id, beta.id] });
+  await h.engine.send({ chatId: "cht_ingress", text: "round-one", messageId: "u1" });
+  await h.engine.idle();
+  const a = h.sent.find((p) => p.agentId.includes(alpha.id))!.agentId;
+  const b = h.sent.find((p) => p.agentId.includes(beta.id))!.agentId;
+  await h.completeTurn(a, "alpha-answer");
+  await h.completeTurn(b, "beta-answer");
+  await h.engine.send({ chatId: "cht_ingress", text: "round-two", messageId: "u2" });
+  await h.engine.idle();
+  const ap = h.sent.filter((p) => p.agentId === a)[1]!.prompt;
+  const bp = h.sent.filter((p) => p.agentId === b)[1]!.prompt;
+  expect(ap).toContain("beta-answer");
+  expect(ap).not.toContain("alpha-answer");
+  expect(bp).toContain("alpha-answer");
+  expect(bp).not.toContain("beta-answer");
+  expect(ap + bp).not.toContain("round-one");
+  await h.engine.send({ chatId: "cht_ingress", text: "round-three", messageId: "u3" });
+  await h.engine.idle();
+  expect(h.sent.slice(-2).map((p) => p.prompt)).toEqual(["user: round-three", "user: round-three"]);
+});
+
+test("late forwarding does not resend a bot line already consumed as context", async () => {
+  const h = await harness();
+  await h.store.create({ id: "cht_overtake", botIds: [alpha.id, beta.id] });
+  await h.engine.send({ chatId: "cht_overtake", text: "@alpha start", messageId: "u1" });
+  await h.engine.idle();
+  const append = h.engine.appendLine.bind(h.engine);
+  let release!: () => void;
+  let stored!: () => void;
+  const paused = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const written = new Promise<void>((resolve) => {
+    stored = resolve;
+  });
+  h.engine.appendLine = async (chatId, input) => {
+    const line = await append(chatId, input);
+    if (input.sender.kind === "bot") {
+      stored();
+      await paused;
+    }
+    return line;
+  };
+  const completion = h.completeTurn(h.sent[0]!.agentId, "@beta forwarded-once");
+  await written;
+  try {
+    await h.engine.send({ chatId: "cht_overtake", text: "@beta next", messageId: "u2" });
+    await expect.poll(() => h.sent.length).toBe(2);
+  } finally {
+    release();
+    await completion;
+  }
+  expect(h.sent).toHaveLength(2);
+  expect(h.sent[1]!.prompt).toContain("forwarded-once");
+  expect(
+    (await h.store.require("cht_overtake")).participants.find((p) => p.botId === beta.id)
+      ?.deliveredSeq,
+  ).toBe(3);
 });
