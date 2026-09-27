@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type KeyboardEvent } from "react";
+import { isWeb } from "@/constants/platform";
 import {
   Pressable,
   type GestureResponderEvent,
@@ -90,6 +91,18 @@ export function Switch({
     [disabled, onValueChange, value],
   );
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // React Native Web handles Enter; its switch role needs Space explicitly.
+      if (event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!disabled && !event.repeat) onValueChange?.(!value);
+    },
+    [disabled, onValueChange, value],
+  );
+  const keyboardProps = isWeb ? { onKeyDown: handleKeyDown } : {};
+
   const accessibilityState = useMemo(() => ({ checked: value, disabled }), [value, disabled]);
   const pressableStyle = useMemo(
     () => [styles.switchControl, disabled ? styles.disabled : null, style],
@@ -98,6 +111,7 @@ export function Switch({
 
   return (
     <Pressable
+      {...keyboardProps}
       onPress={handlePress}
       disabled={disabled}
       hitSlop={8}

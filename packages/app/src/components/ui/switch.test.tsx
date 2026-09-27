@@ -21,6 +21,8 @@ const { theme } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@/constants/platform", () => ({ isWeb: true }));
+
 vi.mock("react-native-reanimated", () => ({
   default: {
     View: "div",
@@ -48,6 +50,7 @@ vi.mock("react-native", () => ({
     children,
     disabled,
     onPress,
+    onKeyDown,
     testID,
   }: {
     "aria-checked"?: boolean;
@@ -56,6 +59,7 @@ vi.mock("react-native", () => ({
     accessibilityState?: { checked?: boolean; disabled?: boolean };
     children: React.ReactNode;
     disabled?: boolean;
+    onKeyDown?: React.KeyboardEventHandler;
     onPress?: (event: { stopPropagation: () => void }) => void;
     testID?: string;
   }) =>
@@ -67,6 +71,11 @@ vi.mock("react-native", () => ({
         "aria-label": accessibilityLabel,
         "data-disabled": disabled,
         "data-testid": testID,
+        onKeyDown,
+        // Match RN Web: Enter invokes onPress on keyup even for role=switch.
+        onKeyUp: (event: React.KeyboardEvent) => {
+          if (event.key === "Enter" && !disabled) onPress?.({ stopPropagation: vi.fn() });
+        },
         onClick: () => onPress?.({ stopPropagation: vi.fn() }),
         role: accessibilityRole,
         type: "button",
@@ -165,6 +174,37 @@ describe("Switch", () => {
 
     expect(onValueChange).not.toHaveBeenCalled();
   });
+
+  it.each([" ", "Enter"])(
+    "toggles once on %s, suppresses repeats and disabled activation",
+    (key) => {
+      const onValueChange = vi.fn();
+      const element = renderSwitch({ value: false, onValueChange });
+      const press = (repeat = false) => {
+        const event = new window.KeyboardEvent("keydown", {
+          key,
+          repeat,
+          bubbles: true,
+          cancelable: true,
+        });
+        act(() => {
+          element.dispatchEvent(event);
+        });
+        expect(event.defaultPrevented).toBe(key === " ");
+      };
+      press();
+      press(true);
+      if (key === "Enter") {
+        act(() => {
+          element.dispatchEvent(new window.KeyboardEvent("keyup", { key, bubbles: true }));
+        });
+      }
+      expect(onValueChange).toHaveBeenCalledExactlyOnceWith(true);
+      renderSwitch({ value: false, disabled: true, onValueChange });
+      press();
+      expect(onValueChange).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("reflects checked accessibility state from value", () => {
     const switchElement = renderSwitch({ value: true });
