@@ -56,9 +56,14 @@ it("keeps one conversation draft while selected bot controls and workspace chang
     cwd: "/analyst",
     submissionTarget: "conversation",
     attachmentsEnabled: true,
+    realtimeVoiceEnabled: true,
     onSubmitMessage: submit,
     showAgentControls: true,
   });
+  const insertedPath = (mocks.props.resolveWorkspaceFilePath as (path: string) => string)(
+    "src/app.ts",
+  );
+  expect(insertedPath).toBe("/analyst/src/app.ts");
   const key = mocks.draftKey;
   mocks.context = {
     agentId: "writer-session",
@@ -75,6 +80,9 @@ it("keeps one conversation draft while selected bot controls and workspace chang
     />,
   );
   expect(mocks.draftKey).toBe(key);
+  expect((mocks.props.resolveWorkspaceFilePath as (path: string) => string)(insertedPath)).toBe(
+    "/analyst/src/app.ts",
+  );
   expect(mocks.props).toMatchObject({
     agentId: "writer-session",
     cwd: "/writer",
@@ -90,4 +98,14 @@ it("explains pending voice session without disabling first-message attachments",
     attachmentsEnabled: true,
     pendingSessionReason: "Send a message to start this bot session.",
   });
+});
+
+it("old Hosts cannot enable chat realtime voice, while the shared composer remains available", () => {
+  mocks.supported = false;
+  mocks.context = { agentId: "active", workspaceId: "bot", cwd: "/bot", canConfigure: true };
+  render(
+    <ChatComposer serverId="host" chatId="old" placeholder="Message" onSubmitMessage={vi.fn()} />,
+  );
+  expect(mocks.props.realtimeVoiceEnabled).toBe(false);
+  mocks.supported = true;
 });

@@ -1,7 +1,8 @@
 import { useSessionStore } from "@/stores/session-store";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
-import { memo } from "react";
+import { memo, useCallback } from "react";
+import { conversationFilePath } from "./source-file-path";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Composer } from "@/composer";
@@ -41,12 +42,19 @@ export const ChatComposer = memo(function ChatComposer({
   const draftKey = buildChatDraftKey(serverId, chatId);
   const draft = useAgentInputDraft({ draftKey });
   const project = useConversationProjectContext();
+  const resolveWorkspaceFilePath = useCallback(
+    (path: string) => conversationFilePath(project?.cwd, path),
+    [project?.cwd],
+  );
   return (
     <View style={styles.dock} testID="chat-composer">
       <Composer
         agentId={project?.agentId ?? draftKey}
         workspaceId={project?.workspaceId}
         submissionTarget="conversation"
+        resolveWorkspaceFilePath={resolveWorkspaceFilePath}
+        // f08392764 introduced chatAttachments and canonical spoken-input routing together.
+        realtimeVoiceEnabled={attachmentsSupported}
         showAgentControls={project?.canConfigure === true}
         pendingSessionReason={
           !project?.agentId ? "Send a message to start this bot session." : undefined

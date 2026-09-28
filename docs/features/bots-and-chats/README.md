@@ -133,6 +133,14 @@ a separate options action exposes Bot settings only with configuration authority
 there belongs to that user's DM, not to other people's sessions of a shared Bot. Group chats does
 not repeat DMs. The selected fill follows the open DM's Bot row or the active group row.
 
+Pinning a DM or its Bot represents the same sidebar item. Existing duplicate pins are resolved
+when the chat catalog loads; unpinning either surface removes the known aliases. Unknown/offline
+pins stay intact, and Host/account scopes remain separate. A one-bot group retains its own pin.
+
+New bot reuses the saved agent-creation provider, model, permission and thinking defaults. Late
+preference hydration must preserve fields the user already changed; editing a Bot uses its saved
+launch configuration instead of creation defaults.
+
 **Create bot** and **Create group chat** are always-visible plus buttons on their respective section
 headings, replacing separate create rows. They have explicit accessible names, hover/focus tooltips,
 and touch targets (32 px desktop, at least 44 px touch). Creation and configuration remain subject
@@ -159,6 +167,12 @@ Defaults for a new Chat: a mentioned bot answers; without a mention every bot in
 the message and they run in parallel; a bot mentioning another bot is forwarded up to 3 hops per
 user message. The context handed to a bot is the transcript since its last turn, one line per
 message with a sender line, the same shape channels use ([conversation flow](../channels/conversation-flow.md)).
+
+The chat owner can change a group's name and everyday reply policy in **Chat options → Group
+settings**. The `chat.update` RPC is gated by `server_info.features.chatSettings` and checks current
+Project access. Changes affect subsequent messages without resetting sessions or altering internal
+limits. Participant changes apply immediately; name/reply edits use Save. Older Hosts expose the
+current values with an update hint. Direct and archived chats cannot use this operation.
 
 ### D10. Feature flag
 

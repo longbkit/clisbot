@@ -37,16 +37,17 @@ export function useOpenConversationFile({
         const bot = bots.find((candidate) => candidate.workspaceId === origin.workspaceId);
         if (bot) selectBot(bot.botId);
         if (singlePanel) {
+          const isGit = workspace.projectKind === "git";
           usePanelStore.getState().setExplorerTabForCheckout({
             serverId: origin.serverId,
             cwd: workspace.workspaceDirectory,
-            isGit: false,
-            tab: "files",
+            isGit,
+            tab: target.kind === "changes_tree" ? "changes" : "files",
           });
           usePanelStore.getState().openCompactFileExplorer({
             serverId: origin.serverId,
             cwd: workspace.workspaceDirectory,
-            isGit: false,
+            isGit,
           });
           return;
         }

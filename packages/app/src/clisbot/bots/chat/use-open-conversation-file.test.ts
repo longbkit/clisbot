@@ -2,7 +2,10 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
-  workspace: { workspaceDirectory: "/writer" } as { workspaceDirectory: string } | null,
+  workspace: { workspaceDirectory: "/writer" } as {
+    workspaceDirectory: string;
+    projectKind?: "git" | "non_git";
+  } | null,
   open: vi.fn(),
   select: vi.fn(),
   show: vi.fn(),
@@ -25,7 +28,7 @@ vi.mock("@/stores/panel-store", () => ({
 vi.mock("./conversation-layout", () => ({ openConversationFile: mocks.open }));
 vi.mock("./conversation-access", () => ({
   isConversationDocumentTarget: (target: { kind: string }) =>
-    ["files", "file"].includes(target.kind),
+    ["files", "file", "changes_tree"].includes(target.kind),
 }));
 import { useOpenConversationFile } from "./use-open-conversation-file";
 const source = { serverId: "host", workspaceId: "writer" };
@@ -62,6 +65,20 @@ it("mobile file opens a conversation tab and closes Explorer", () => {
     compact: true,
   });
   expect(mocks.show).toHaveBeenCalledOnce();
+});
+it("mobile changes link selects the source bot and opens Changes in its existing Explorer", () => {
+  mocks.workspace = { workspaceDirectory: "/writer", projectKind: "git" };
+  setup(true)(source, { kind: "changes_tree" });
+  expect(mocks.select).toHaveBeenCalledWith("writer-bot");
+  expect(mocks.setTree).toHaveBeenCalledWith({
+    serverId: "host",
+    cwd: "/writer",
+    isGit: true,
+    tab: "changes",
+  });
+  expect(mocks.explorer).toHaveBeenCalledWith({ serverId: "host", cwd: "/writer", isGit: true });
+  expect(mocks.open).not.toHaveBeenCalled();
+  expect(mocks.show).not.toHaveBeenCalled();
 });
 it("desktop folder opens scoped Explorer without changing route", () => {
   setup(false)(source, { kind: "files" });

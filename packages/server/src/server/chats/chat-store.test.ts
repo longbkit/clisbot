@@ -247,3 +247,48 @@ test("Chat kind survives group membership changes and restart", async () => {
   expect((await reopened.get(direct.id))?.kind).toBe("group");
   expect((await reopened.get(singleGroup.id))?.kind).toBe("group");
 });
+
+test("group settings persist without replacing internal limits or session bindings", async () => {
+  const root = await temporary();
+  const logger = createTestLogger();
+  const store = new ChatStore(root, logger);
+  const chat = await store.create({
+    id: "group-settings",
+    kind: "group",
+    botIds: ["a", "b"],
+    title: "Before",
+    rules: {
+      interaction: { whenBusy: "queue" },
+      hops: { max: 5 },
+      limits: { maxInputCharacters: 9000 },
+    },
+  });
+  const updated = await store.updateSettings(chat.id, {
+    title: "  Launch  ",
+    requireMention: true,
+  });
+  expect(updated.title).toBe("Launch");
+  expect(updated.rules).toEqual({
+    interaction: { whenBusy: "queue", requireMention: true },
+    hops: { max: 5 },
+    limits: { maxInputCharacters: 9000 },
+  });
+  expect(updated.participants).toEqual(chat.participants);
+  expect(await new ChatStore(root, logger).get(chat.id)).toEqual(updated);
+  expect((await store.updateSettings(chat.id, { title: " " })).title).toBeNull();
+  expect(() => store.updateSettings(chat.id, { title: "x".repeat(257) })).toThrow();
+});
+
+test("group settings reject direct and archived chats and unknown rule fields", async () => {
+  const store = new ChatStore(await temporary(), createTestLogger());
+  await store.create({ id: "direct-settings", kind: "direct", botIds: ["a"] });
+  await expect(store.updateSettings("direct-settings", { title: "rename" })).rejects.toThrow(
+    "Only group",
+  );
+  await store.create({ id: "archived-settings", kind: "group", botIds: ["a"] });
+  await store.update("archived-settings", (chat) => ({ ...chat, archivedAt: "now" }));
+  await expect(store.updateSettings("archived-settings", { requireMention: true })).rejects.toThrow(
+    "Archived",
+  );
+  expect(() => store.updateSettings("archived-settings", { hops: { max: 0 } } as never)).toThrow();
+});

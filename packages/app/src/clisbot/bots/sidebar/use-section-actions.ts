@@ -1,11 +1,12 @@
+import type { PinChat } from "./pin-identity";
 import type { Rect } from "@/components/ui/menu/menu-anchor";
 import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
 import { buildHostBotRoute } from "../routes";
-import { useResourcePins, pinKey, type ResourcePin } from "./pins";
-export function useSidebarPinMenu(onBeforeNavigate?: () => void) {
+import { useResourcePins, type ResourcePin } from "./pins";
+export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonly PinChat[]) {
   const router = useRouter();
-  const { pins, toggle: togglePin } = useResourcePins();
+  const { pins, toggle: togglePin, isPinned } = useResourcePins(chats);
   const [menu, setMenu] = useState<(ResourcePin & { canConfigure?: boolean; anchor: Rect }) | null>(
     null,
   );
@@ -25,8 +26,8 @@ export function useSidebarPinMenu(onBeforeNavigate?: () => void) {
       setMenu({ anchor, kind: "chat", serverId: chat.serverId, id: chat.chatId }),
     [],
   );
-  const pinned = (kind: "bot" | "chat", serverId: string, id: string) =>
-    pins.some((pin) => pinKey(pin) === pinKey({ kind, serverId, id }));
+  const pinned = (kind: ResourcePin["kind"], serverId: string, id: string) =>
+    isPinned({ kind, serverId, id });
   const closeMenu = useCallback(() => setMenu(null), []);
   const toggleMenuPin = useCallback(() => {
     if (menu) togglePin(menu);

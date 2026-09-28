@@ -222,3 +222,78 @@ typechecks and scoped lint pass; protocol distribution and outbound validators r
 - Group creation uses Settings switch rows for membership and a SelectField for reply policy. Search preserves selected bot IDs; compact creation sheets use a large initial snap and a fixed submit footer.
 - Agent profiles use the searchable SelectField instead of a separate button list. Unresolved AI setup has an explicit Choose setup action.
 - Validation: 28 focused tests passed; app typecheck and changed-file lint passed. Browser review covered mobile group selection/search, desktop/mobile Bot settings, Customize/Done, archive cancellation, Chat → Cowork → Chat, and Files/Changes staying on the chat route. No production bot was created, edited, or archived during review.
+
+### Defaults, unified pins and group settings (2026-09-28)
+
+CURRENT: New bot now consumes the existing hydrated creation preferences through the form model's
+untouched-field guards. Bot editing and applied profiles keep their explicit configuration. DM and
+Bot pins resolve to one Bot identity, including legacy duplicates, without deleting unresolved
+offline pins. Group names and reply policies can now be edited through the additive, capability-gated
+`chat.update` RPC; daemon ownership, current Project access and the per-chat write queue remain
+authoritative. This supersedes the earlier read-only group-rule limitation.
+
+The platform audit found two additional defects and fixed them inside the bot/chat boundary:
+
+- Compact/native Changes links opened Files with `isGit: false`. They now retain their requested
+  tab and source workspace's Git identity. The project selector uses known workspace metadata
+  while checkout status loads, avoiding a temporary switch back to Files.
+- Transcript image IDs contained colons, rejected by Electron's managed attachment bridge. Chat
+  image previews now use the existing filesystem-safe preview-ID helper and retain those same IDs
+  during garbage collection.
+
+Verification: 112 focused tests passed across creation defaults, pin identity/hooks, group update
+storage/authorization/reply behavior, form errors and compatibility, SDK correlation, conversation
+file opening and image retention. Workspace dependency builds, full monorepo typecheck and scoped
+lint/format checks pass. Android and iOS Metro exports succeed with their native module resolution
+(JavaScript bundles, not signed native binaries).
+
+Browser QA used the isolated fake-provider Host: created a Bot on mobile with persisted Sonnet and
+Bypass defaults; changed a group's name/reply policy on desktop and reopened it on mobile; pinned
+from a DM, verified a single Pinned row and no regular Bot duplicate, then unpinned from the sidebar.
+With bots disabled, the normal workspace navigation remains available. An isolated macOS Electron
+renderer with the real preload/IPC saved and displayed a chat image from managed desktop storage;
+opening README.md created a side pane while retaining the chat route.
+
+Limits: no device/simulator app was installed or run for this pass. Native keyboard, touch gestures,
+hardware Back, microphone/STT/TTS, push/background lifecycle, signed APK/IPA and Windows/Linux
+Electron packages still need their platform integration runs. Successful Metro exports do not prove
+those runtime behaviors. The Electron UI check used the shared web bundle and the real desktop
+bridge; it does not validate Electron-only browser-tab bundling. Tests used no real user bot/chat.
+
+### Source-first cross-platform review (2026-09-28)
+
+The follow-up review traces the bot/chat flows against the existing workspace, native menu,
+composer, storage and Electron bridge implementations. Bundle success alone is not evidence of
+behavioral parity. The following defects were identified from source before regression tests:
+
+- Android Back from the conversation explorer lacked the workspace's handler to return to chat.
+- Retained conversation routes lacked a route-level activity boundary. Individual pane focus did
+  not deactivate header menus and selected diff panels after navigating away.
+- Chat history did not use the agent stream's shared native scroll/keyboard-dismiss lifecycle.
+- Pin mutations could race asynchronous storage hydration and overwrite saved principal scopes.
+- Creation/settings RPC completions could navigate or dismiss a replacement form after cancellation.
+- A Host inventory changing from multiple choices to one could hide an unresolved Host selection.
+- Group file drops and autocomplete references could retain relative paths from one bot, then be
+  interpreted against another bot's workspace when sent. Resolve paths at insertion time.
+- Realtime voice supplied a selected agent, but mentions-only group routing ignored that selection.
+- Old Hosts lacked a gate preventing voice from bypassing canonical conversation delivery. The
+  existing `chatAttachments` capability and chat-aware spoken-input routing were introduced together
+  in `f08392764`; reuse that cohort gate without adding another protocol field. Dictation remains
+  ordinary draft input.
+
+Changes reuse the existing retained-panel, keyboard and explorer machinery. Shared Composer
+extension points are optional and preserve ordinary agent-session behavior. The forms and pin
+fixes remain under the Clisbot boundary; voice recipient validation stays in the daemon.
+
+Implemented all findings above. Chat options also explicitly hides and clears its teleported
+settings sheet on route inactivity, because an activity context alone cannot dismiss a generic
+adaptive sheet. Unsupported live voice is gated at both the button and keyboard entry points.
+Pin storage failures retain queued intent and retry the read on the next interaction, without
+an automatic retry loop or overwriting unread storage.
+
+Verification after the source review: 40 focused form/pin tests, 46 focused composer/file/voice
+tests, and 25 explorer/activity/keyboard tests passed. These include canceled RPC completion,
+hydration failure/recovery, unchanged-input bot switching, spoofed voice targets, Android Back
+handler cleanup, retained route state and settings-sheet dismissal. App/server typechecks and
+changed-file lint pass. These are targeted regression checks following source findings; they do
+not substitute for signed-device packaging or microphone integration validation.

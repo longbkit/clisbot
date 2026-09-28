@@ -2175,6 +2175,21 @@ export class DaemonClient {
     });
   }
 
+  updateChat(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.update.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    if (!this.lastServerInfoMessage?.features?.chatSettings)
+      throw new Error(
+        "This Host does not support editing group settings. Update the Host to continue.",
+      );
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.update.response">({
+      message: { ...params, type: "chat.update.request" },
+    });
+  }
+
   listChats(
     params: Omit<
       Extract<SessionInboundMessage, { type: "chat.list.request" }>,

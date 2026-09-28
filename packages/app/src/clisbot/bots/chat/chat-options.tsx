@@ -1,7 +1,10 @@
+import { SettingsSection } from "@/components/settings";
+import { GroupChatSettings } from "./group-chat-settings";
 import { ConversationProjectActions } from "./conversation-project-actions";
 import { useChatOptionsState } from "./chat-options-context";
 import { Ellipsis, FileText, FileDiff, MessageSquare } from "lucide-react-native";
-import { useCallback, useContext, useMemo, useState } from "react";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
@@ -9,10 +12,9 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { buildHostRootRoute } from "@/utils/host-routes";
-import { SettingsCard, SettingsRow, SettingsSection } from "@/components/settings";
 import { ChatParticipantSettings } from "./chat-participant-settings";
 import { buildHostBotRoute } from "../routes";
-import { useResourcePins, pinKey } from "../sidebar/pins";
+import { useResourcePins } from "../sidebar/pins";
 import type { BotPayload } from "../data/contracts";
 import { refreshBotsAndChats } from "../data/runtime";
 
@@ -52,6 +54,7 @@ export function ChatOptions({
   chat: ChatPayload;
   bots: BotPayload[];
 }) {
+  const active = useRetainedPanelActive();
   const compact = useIsCompactFormFactor();
   const triggerStyle = useCallback(
     (state: MenuTriggerState) =>
@@ -73,18 +76,22 @@ export function ChatOptions({
     () => buildConversationTabOptions(tabs?.tabs ?? [], labels, group),
     [tabs?.tabs, labels, group],
   );
-  const { pins, toggle: togglePin } = useResourcePins();
+  const pinChats = useMemo(() => [{ ...chat, serverId }], [chat, serverId]);
+  const { toggle: togglePin, isPinned } = useResourcePins(pinChats);
   const pin = useMemo(
     () => ({ kind: "chat" as const, serverId, id: chat.id }),
     [serverId, chat.id],
   );
-  const pinned = pins.some((p) => pinKey(p) === pinKey(pin));
+  const pinned = isPinned(pin);
   const changePin = useCallback(() => togglePin(pin), [togglePin, pin]);
   const close = useCallback(() => {
     setVisible(false);
     setDetails(null);
     setError(null);
   }, [setVisible]);
+  useEffect(() => {
+    if (!active) close();
+  }, [active, close]);
   const directBot = !group ? bots.find((bot) => bot.id === chat.participants[0]?.botId) : undefined;
   const configureBot = useCallback(() => {
     if (!directBot?.canConfigure) return;
@@ -92,7 +99,7 @@ export function ChatOptions({
     router.push(buildHostBotRoute(serverId, directBot.id));
   }, [directBot, close, router, serverId]);
   const header = useMemo(
-    () => ({ title: details === "project" ? "Project" : "Participants and replies" }),
+    () => ({ title: details === "project" ? "Project" : "Group settings" }),
     [details],
   );
   const toggleParticipant = useCallback(
@@ -197,9 +204,7 @@ export function ChatOptions({
             <DropdownMenuItem onSelect={configureBot}>Bot settings</DropdownMenuItem>
           ) : null}
           {group ? (
-            <DropdownMenuItem onSelect={openParticipants}>
-              Participants and replies
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={openParticipants}>Group settings</DropdownMenuItem>
           ) : null}
           {project ? (
             <DropdownMenuItem onSelect={openProject}>Project actions</DropdownMenuItem>
@@ -212,42 +217,41 @@ export function ChatOptions({
         </DropdownMenuContent>
       </DropdownMenu>
       <AdaptiveModalSheet
-        visible={details !== null || error !== null}
+        visible={active && (details !== null || error !== null)}
         header={header}
         onClose={close}
       >
-        <View style={styles.body}>
-          {details === "project" && project ? (
-            <ConversationProjectActions project={project} onChoose={close} />
-          ) : null}
-          {details === "participants" && group ? (
-            <>
-              <ChatParticipantSettings
-                chat={chat}
-                bots={bots}
-                busy={busy || !client}
-                toggle={toggleParticipant}
-              />
-              <SettingsSection title="Replies" flush>
-                <SettingsCard>
-                  <SettingsRow
-                    label={
-                      chat.rules.interaction?.requireMention
-                        ? "Only mentioned bots reply"
-                        : "All bots reply unless you @mention one"
-                    }
-                    hint="Set when this chat was created. Use @mentions to direct your next message."
+        {active ? (
+          <View style={styles.body}>
+            {details === "project" && project ? (
+              <ConversationProjectActions project={project} onChoose={close} />
+            ) : null}
+            {details === "participants" && group ? (
+              <>
+                <SettingsSection title="Name and replies" flush>
+                  <GroupChatSettings
+                    key={chat.id}
+                    serverId={serverId}
+                    chat={chat}
+                    onSaved={close}
                   />
-                </SettingsCard>
-              </SettingsSection>
-            </>
-          ) : null}
-          {error ? (
-            <Text accessibilityRole="alert" style={styles.text}>
-              {error}
-            </Text>
-          ) : null}
-        </View>
+                </SettingsSection>
+                <Text style={styles.text}>Participant changes apply immediately.</Text>
+                <ChatParticipantSettings
+                  chat={chat}
+                  bots={bots}
+                  busy={busy || !client}
+                  toggle={toggleParticipant}
+                />
+              </>
+            ) : null}
+            {error ? (
+              <Text accessibilityRole="alert" style={styles.text}>
+                {error}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </AdaptiveModalSheet>
     </>
   );

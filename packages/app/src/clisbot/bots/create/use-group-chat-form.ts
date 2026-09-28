@@ -1,3 +1,4 @@
+import { useFormLifetime } from "./use-form-lifetime";
 import { useCallback, useState } from "react";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import type { AggregatedBot } from "../data/use-bots";
@@ -14,6 +15,7 @@ export interface GroupChatFormProps {
   onCreated: (serverId: string, chatId: string) => void;
 }
 export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
+  const isCurrent = useFormLifetime();
   const [draft, setDraft] = useState(() => openGroupChatDraft(hosts.map((host) => host.serverId)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,13 +61,13 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
       );
       if (result.error || !result.chat) throw new Error(result.error ?? "Could not create chat");
       refreshBotsAndChats();
-      onCreated(draft.serverId, result.chat.id);
+      if (isCurrent()) onCreated(draft.serverId, result.chat.id);
     } catch (cause) {
-      setError(String(cause));
+      if (isCurrent()) setError(String(cause));
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
-  }, [bots, draft, hosts, onCreated]);
+  }, [bots, draft, hosts, onCreated, isCurrent]);
   return {
     draft,
     hostBots,

@@ -525,31 +525,40 @@ test("late forwarding does not resend a bot line already consumed as context", a
   ).toBe(3);
 });
 
-test("spoken Chat input persists once and wraps only the selected voice bot prompt", async () => {
+test("mentions-only spoken Chat input targets the selected active voice bot", async () => {
   const h = await harness();
   await h.store.create({ id: "cht_voice", botIds: [alpha.id, beta.id] });
-  await h.engine.send({
+  await h.engine.send({ chatId: "cht_voice", text: "Start", messageId: "initial" });
+  await h.engine.idle();
+  await h.store.updateSettings("cht_voice", { requireMention: true });
+  const selectedAgent = (await h.store.require("cht_voice")).participants[0]!.agentId!;
+  h.sent.length = 0;
+  const response = await h.engine.send({
     chatId: "cht_voice",
-    text: "@alpha @beta hello",
+    text: "Hello",
     messageId: "voice-1",
     actor,
-    spokenInputAgentId: "agent-bot_a-1",
+    spokenInputAgentId: selectedAgent,
   });
   await h.engine.idle();
-  expect((await h.lines("cht_voice")).filter((line) => line.sender.kind === "user")).toHaveLength(
-    1,
-  );
-  expect((await h.lines("cht_voice"))[0]).toMatchObject({
-    text: "@alpha @beta hello",
-    spokenInputAgentId: "agent-bot_a-1",
+  expect(response.targets).toEqual([alpha.id]);
+  expect((await h.lines("cht_voice")).filter((line) => line.id === "voice-1")).toHaveLength(1);
+  expect((await h.lines("cht_voice")).find((line) => line.id === "voice-1")).toMatchObject({
+    text: "Hello",
+    spokenInputAgentId: selectedAgent,
   });
-  expect(h.sent.find((prompt) => prompt.agentId === "agent-bot_a-1")?.prompt).toContain(
-    "<spoken-input>",
-  );
-  expect(h.sent.find((prompt) => prompt.agentId !== "agent-bot_a-1")?.prompt).not.toContain(
-    "<spoken-input>",
-  );
-  expect(h.sent).toHaveLength(2);
+  expect(h.sent).toHaveLength(1);
+  expect(h.sent[0]!.agentId).toBe(selectedAgent);
+  expect(h.sent[0]!.prompt).toContain("<spoken-input>");
+  await expect(
+    h.engine.send({
+      chatId: "cht_voice",
+      text: "Spoof",
+      messageId: "spoof",
+      spokenInputAgentId: "outside-session",
+    }),
+  ).rejects.toThrow("active Chat participant");
+  expect((await h.lines("cht_voice")).some((line) => line.id === "spoof")).toBe(false);
 });
 
 test("chat attachments persist, fan out once, and full-payload retries conflict", async () => {
@@ -668,4 +677,26 @@ test("chat releases upload ownership only after transcript acceptance", async ()
   });
   await h.engine.idle();
   expect(released).toBe(true);
+});
+
+test("updated reply policy applies to subsequent messages without resetting group sessions", async () => {
+  const h = await harness();
+  await h.store.create({ id: "editable-group", botIds: [alpha.id, beta.id] });
+  expect(
+    (await h.engine.send({ chatId: "editable-group", text: "First", messageId: "before" })).targets,
+  ).toEqual([alpha.id, beta.id]);
+  await h.engine.idle();
+  const sessions = (await h.store.require("editable-group")).participants.map((p) => p.agentId);
+  await h.store.updateSettings("editable-group", { requireMention: true });
+  expect(
+    (await h.engine.send({ chatId: "editable-group", text: "Quiet", messageId: "quiet" })).targets,
+  ).toEqual([]);
+  expect(
+    (await h.engine.send({ chatId: "editable-group", text: "@alpha next", messageId: "after" }))
+      .targets,
+  ).toEqual([alpha.id]);
+  await h.engine.idle();
+  expect((await h.store.require("editable-group")).participants.map((p) => p.agentId)).toEqual(
+    sessions,
+  );
 });

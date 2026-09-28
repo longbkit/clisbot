@@ -219,3 +219,33 @@ export type ChatSessionResetRequest = z.infer<typeof ChatSessionResetRequestSche
 export type ChatSessionResetResponse = z.infer<typeof ChatSessionResetResponseSchema>;
 export type ChatTranscriptAppendedMessage = z.infer<typeof ChatTranscriptAppendedSchema>;
 export type ChatUpdatedMessage = z.infer<typeof ChatUpdatedSchema>;
+
+/** Only group name and the everyday reply policy are editable here. */
+export const ChatUpdatePatchSchema = z
+  .object({
+    title: z.string().max(256).nullable().optional(),
+    requireMention: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (patch) => patch.title !== undefined || patch.requireMention !== undefined,
+    "Choose a group setting to update",
+  );
+export const ChatUpdateRequestSchema = z.object({
+  type: z.literal("chat.update.request"),
+  requestId: z.string(),
+  chatId: z.string(),
+  patch: ChatUpdatePatchSchema,
+});
+export const ChatUpdateResponseSchema = z.object({
+  type: z.literal("chat.update.response"),
+  payload: z.object({
+    requestId: z.string(),
+    chat: ChatPayloadSchema.nullable(),
+    error: z.string().nullable(),
+    errorCode: z.string().optional(),
+  }),
+});
+export type ChatUpdatePatch = z.infer<typeof ChatUpdatePatchSchema>;
+export type ChatUpdateRequest = z.infer<typeof ChatUpdateRequestSchema>;
+export type ChatUpdateResponse = z.infer<typeof ChatUpdateResponseSchema>;

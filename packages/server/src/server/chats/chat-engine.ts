@@ -265,6 +265,15 @@ export class ChatEngine implements TurnTrackerHost {
     rules: ResolvedChatRules,
     line: TranscriptLine,
   ): Promise<TurnDecision> {
+    if (line.sender.kind === "user" && line.spokenInputAgentId) {
+      const participant = chat.participants.find(
+        (entry) => entry.agentId === line.spokenInputAgentId,
+      );
+      if (!participant) throw new Error("Voice session is no longer an active Chat participant");
+      const bot = await this.deps.bots.get(participant.botId);
+      if (!bot) throw new Error("Voice bot is unavailable");
+      return { targets: [participant.botId] };
+    }
     await this.rememberBots(chat);
     return targetsFor({
       participants: this.participantsOf(chat),

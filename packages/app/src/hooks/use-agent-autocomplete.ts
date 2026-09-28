@@ -35,6 +35,7 @@ interface UseAgentAutocompleteInput {
   serverId: string;
   agentId: string;
   draftConfig?: DraftCommandConfig;
+  resolveWorkspaceFilePath?: (path: string) => string;
   onAutocompleteApplied?: () => void;
   onClientSlashCommand?: (command: ClientSlashCommand) => void;
   canExecuteClientSlashCommand?: boolean;
@@ -346,6 +347,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     serverId,
     agentId,
     draftConfig,
+    resolveWorkspaceFilePath,
     onAutocompleteApplied,
     onClientSlashCommand,
     canExecuteClientSlashCommand,
@@ -534,7 +536,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       const nextInput = applyFileMentionReplacement({
         text: current.text,
         mention: current.fileMention,
-        relativePath: selected.entryPath,
+        relativePath: resolveWorkspaceFilePath?.(selected.entryPath) ?? selected.entryPath,
       });
       setUserInput(nextInput);
       onAutocompleteApplied?.();
@@ -548,6 +550,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       cursorIndex,
       activeFileMention,
       activeSlashCommand,
+      resolveWorkspaceFilePath,
     ],
   );
 

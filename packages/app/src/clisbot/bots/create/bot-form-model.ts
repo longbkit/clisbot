@@ -258,7 +258,7 @@ function updateDerivedState(input: {
     hosts: [...input.hosts],
     selectedHostDisplay:
       state.selectedHostDisplay ?? hostDisplay(input.hosts, state.selectedServerId),
-    showHostField: input.hosts.length > 1,
+    showHostField: input.hosts.length !== 1 || input.hosts[0]?.serverId !== state.selectedServerId,
     selectedModelDisplay: modelDisplay(models, state.selectedModel),
     selectedModeDisplay: modeDisplay(modeOptions, state.selectedMode),
     selectedThinkingDisplay: thinkingDisplay(thinkingOptions, state.selectedThinkingOptionId),

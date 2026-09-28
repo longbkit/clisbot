@@ -1,6 +1,8 @@
+import { useFormLifetime } from "./use-form-lifetime";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { BotPayload } from "../data/contracts";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { useFormPreferences } from "@/hooks/use-form-preferences";
 import { refreshBotsAndChats } from "../data/runtime";
 import { openBotForm, toCreateRequest, toUpdateRequest } from "./bot-form-model";
 import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
@@ -13,6 +15,8 @@ export interface BotCreateFormProps {
   onCancel: () => void;
 }
 export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: BotCreateFormProps) {
+  const isCurrent = useFormLifetime();
+  const { preferences } = useFormPreferences();
   const [model] = useState(() =>
     openBotForm({
       mode: bot ? "edit" : "create",
@@ -20,6 +24,7 @@ export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: Bot
       hosts,
       defaults: {
         name,
+        preferences,
         ...(defaultServerId ? { serverId: defaultServerId } : {}),
       },
     }),
@@ -29,6 +34,7 @@ export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: Bot
   const [busy, setBusy] = useState(false);
   useEffect(() => () => model.close(), [model]);
   useEffect(() => model.applyHosts(hosts), [hosts, model]);
+  useEffect(() => model.applyPreferences(preferences), [preferences, model]);
   const submit = useCallback(async () => {
     setBusy(true);
     model.setSubmitError(null);
@@ -41,13 +47,13 @@ export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: Bot
       const result = bot ? await client.updateBot(update) : await client.createBot(request);
       if (result.error || !result.bot) throw new Error(result.error ?? "Bot could not be created");
       refreshBotsAndChats();
-      onCreated(serverId, result.bot.id);
+      if (isCurrent()) onCreated(serverId, result.bot.id);
     } catch (error) {
-      model.setSubmitError(String(error));
+      if (isCurrent()) model.setSubmitError(String(error));
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
-  }, [state, model, onCreated, bot]);
+  }, [state, model, onCreated, bot, isCurrent]);
   const submitAction = useCallback(() => {
     void submit();
   }, [submit]);

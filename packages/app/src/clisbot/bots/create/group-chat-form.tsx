@@ -105,7 +105,7 @@ function GroupBotPicker({
 > & { hosts: GroupChatFormProps["hosts"]; size: "sm" | "md" }) {
   return (
     <>
-      {hosts.length !== 1 ? (
+      {hosts.length !== 1 || hosts[0]?.serverId !== draft.serverId ? (
         <SelectField
           label="Host"
           value={draft.serverId}

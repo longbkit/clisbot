@@ -1,11 +1,14 @@
 import { useCallback, useEffect } from "react";
+import { BackHandler } from "react-native";
+import { isWeb } from "@/constants/platform";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   collectAllTabs,
   findPaneById,
   selectIsExplorerSidebarVisible,
   useWorkspaceLayoutStore,
 } from "@/stores/workspace-layout-store";
-import { usePanelStore } from "@/stores/panel-store";
+import { selectIsCompactFileExplorerOpen, usePanelStore } from "@/stores/panel-store";
 import type { WorkspaceTargetContext } from "@/workspace-tabs/model";
 import { useConversationExplorerOwner } from "./explorer-owner";
 import { withConversationSource } from "./conversation-layout";
@@ -58,6 +61,17 @@ export function useConversationExplorer(input: {
   isGit: boolean;
 }) {
   const { layoutKey, focused, singlePanel, source, cwd, isGit } = input;
+  const compact = useIsCompactFormFactor();
+  const explorerOpen = usePanelStore(selectIsCompactFileExplorerOpen);
+  useEffect(() => {
+    // Match WorkspaceScreen: Back dismisses the compact overlay before navigation.
+    if (isWeb || !compact || !focused || !explorerOpen || !source || !cwd) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      usePanelStore.getState().showMobileAgent();
+      return true;
+    });
+    return () => handler.remove();
+  }, [compact, focused, explorerOpen, source, cwd]);
   useEffect(() => {
     if (!focused || !singlePanel) return;
     const owner = useConversationExplorerOwner.getState();

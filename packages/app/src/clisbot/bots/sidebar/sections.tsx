@@ -1,4 +1,3 @@
-import { pinKey } from "./pins";
 import { useSidebarPinMenu, useCreationActions } from "./use-section-actions";
 import { PinOptionsMenu } from "./pin-options";
 import { useBotSidebarActions } from "./use-sidebar-actions";
@@ -38,8 +37,6 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
   );
   const directoryStatus = directoryLoadStatus(bots);
   const creationHosts = useBotCreationHosts();
-  const { pins, menu, pinned, onBotMenu, onChatMenu, closeMenu, toggleMenuPin, configureMenuBot } =
-    useSidebarPinMenu(onBeforeNavigate);
   const params = useGlobalSearchParams<{ serverId?: string }>();
   const defaultServerId = creationHosts.some((host) => host.serverId === params.serverId)
     ? params.serverId
@@ -49,6 +46,8 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
     () => (chats.loadState.status === "loaded" ? chats.loadState.data : []),
     [chats.loadState],
   );
+  const { menu, pinned, onBotMenu, onChatMenu, closeMenu, toggleMenuPin, configureMenuBot } =
+    useSidebarPinMenu(onBeforeNavigate, chatRows);
   const { openBot, navigate, error } = useBotSidebarActions(
     chatRows,
     onBeforeNavigate,
@@ -106,7 +105,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         anchor={menu?.anchor}
         visible={menu !== null}
         title={menu?.kind === "bot" ? "Bot" : "Group chat"}
-        pinned={!!menu && pins.some((pin) => pinKey(pin) === pinKey(menu))}
+        pinned={!!menu && pinned(menu.kind, menu.serverId, menu.id)}
         onToggle={toggleMenuPin}
         onClose={closeMenu}
         onConfigure={menu?.kind === "bot" && menu.canConfigure ? configureMenuBot : undefined}

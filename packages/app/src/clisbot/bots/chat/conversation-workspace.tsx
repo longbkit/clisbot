@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useIsFocused } from "@react-navigation/native";
+import { RetainedPanelActivity } from "@/components/retained-panel";
 import { useIsCompactFormFactor, supportsDesktopPaneSplits } from "@/constants/layout";
 import { useConversationLayout } from "./use-conversation-layout";
 import { useConversationProject } from "./use-conversation-project";
@@ -74,34 +75,36 @@ export function ConversationWorkspace({
     [state.mainTabs, state.active?.tabId, actions.selectTab],
   );
   return (
-    <ChatOptionsProvider>
-      <ConversationTabsContext.Provider value={tabContext}>
-        <ConversationContextProviders
-          serverId={serverId}
-          chatId={chatId}
-          bots={bots}
-          group={group}
-          project={project}
-          layoutKey={state.layoutKey}
-          open={actions.open}
-          messages={children}
-        >
-          <View style={styles.fill}>
-            {singlePanel ? (
-              <MobileConversationSurface
-                {...surface}
-                project={project}
-                selector={selector}
-                compact={compact}
-              />
-            ) : (
-              <DesktopConversationSurface {...surface} openExplorer={openExplorer} />
-            )}
-            <ConversationBotChooser project={project} bots={bots} />
-          </View>
-        </ConversationContextProviders>
-      </ConversationTabsContext.Provider>
-    </ChatOptionsProvider>
+    <RetainedPanelActivity active={focused}>
+      <ChatOptionsProvider>
+        <ConversationTabsContext.Provider value={tabContext}>
+          <ConversationContextProviders
+            serverId={serverId}
+            chatId={chatId}
+            bots={bots}
+            group={group}
+            project={project}
+            layoutKey={state.layoutKey}
+            open={actions.open}
+            messages={children}
+          >
+            <View style={styles.fill}>
+              {singlePanel ? (
+                <MobileConversationSurface
+                  {...surface}
+                  project={project}
+                  selector={selector}
+                  compact={compact}
+                />
+              ) : (
+                <DesktopConversationSurface {...surface} openExplorer={openExplorer} />
+              )}
+              <ConversationBotChooser project={project} bots={bots} />
+            </View>
+          </ConversationContextProviders>
+        </ConversationTabsContext.Provider>
+      </ChatOptionsProvider>
+    </RetainedPanelActivity>
   );
 }
 const styles = StyleSheet.create((theme) => ({

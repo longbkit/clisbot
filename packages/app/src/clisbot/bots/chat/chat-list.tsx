@@ -1,3 +1,5 @@
+import { useStableEvent } from "@/hooks/use-stable-event";
+import { useChatKeyboardDismiss } from "./use-chat-keyboard-dismiss";
 import { useChatScrollPosition } from "./use-chat-scroll-position";
 import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
@@ -42,6 +44,17 @@ export const ChatList = memo(function ChatList({
   onReachTop,
 }: ChatListProps) {
   const scrollPosition = useChatScrollPosition<ChatRenderRow>(scrollKey);
+  const keyboardDismiss = useChatKeyboardDismiss();
+  const onScroll = useStableEvent((event: Parameters<typeof scrollPosition.onScroll>[0]) => {
+    scrollPosition.onScroll(event);
+    keyboardDismiss.onScroll(event);
+  });
+  const onScrollBeginDrag = useStableEvent(
+    (event: Parameters<typeof scrollPosition.onScroll>[0]) => {
+      scrollPosition.onScrollBeginDrag();
+      keyboardDismiss.onScrollBeginDrag(event);
+    },
+  );
   const data = useMemo(() => rows.toReversed(), [rows]);
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatRenderRow>) => {
@@ -59,6 +72,10 @@ export const ChatList = memo(function ChatList({
   return (
     <FlatList
       {...scrollPosition}
+      onScroll={onScroll}
+      onScrollBeginDrag={onScrollBeginDrag}
+      onScrollEndDrag={keyboardDismiss.onScrollEndDrag}
+      scrollEventThrottle={16}
       inverted
       data={data}
       keyExtractor={keyExtractor}

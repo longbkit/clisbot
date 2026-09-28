@@ -74,6 +74,7 @@ import {
   ChatMessageSendRequestSchema,
   ChatTranscriptFetchRequestSchema,
   ChatArchiveRequestSchema,
+  ChatUpdateRequestSchema,
   ChatSessionResetRequestSchema,
   ChatCreateResponseSchema,
   ChatListResponseSchema,
@@ -82,6 +83,7 @@ import {
   ChatMessageSendResponseSchema,
   ChatTranscriptFetchResponseSchema,
   ChatArchiveResponseSchema,
+  ChatUpdateResponseSchema,
   ChatSessionResetResponseSchema,
   ChatTranscriptAppendedSchema,
   ChatUpdatedSchema,
@@ -3239,6 +3241,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ChatMessageSendRequestSchema,
   ChatTranscriptFetchRequestSchema,
   ChatArchiveRequestSchema,
+  ChatUpdateRequestSchema,
   ChatSessionResetRequestSchema,
   WorkspaceRecoveryInspectRequestSchema,
   WorkspaceRecoveryRestoreRequestSchema,
@@ -3615,6 +3618,8 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(bots): Clisbot Bots, added in v0.9.2-fusion; remove the gate after 2027-03-31 once the daemon floor advertises it.
         bots: z.boolean().optional(),
         chatAttachments: z.boolean().optional(),
+        // COMPAT(chatSettings): added in v0.10.0-beta.1-fusion; remove the gate after 2027-03-31 once the daemon floor advertises group name/reply editing.
+        chatSettings: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
@@ -6953,6 +6958,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ChatMessageSendResponseSchema,
   ChatTranscriptFetchResponseSchema,
   ChatArchiveResponseSchema,
+  ChatUpdateResponseSchema,
   ChatSessionResetResponseSchema,
   ChatTranscriptAppendedSchema,
   ChatUpdatedSchema,

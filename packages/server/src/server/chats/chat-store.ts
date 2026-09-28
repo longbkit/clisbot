@@ -1,3 +1,4 @@
+import { ChatUpdatePatchSchema, type ChatUpdatePatch } from "@getpaseo/protocol/chats/rpc-schemas";
 // `ChatStore`: every `chat.json` under `$PASEO_HOME/chats/{chatId}/`, cached after one scan,
 // written with the session record's durable write (temp file, fsync, rename, directory
 // sync). Mutations under one chat run in order; chats never wait on each other.
@@ -141,6 +142,27 @@ export class ChatStore {
     });
     if (this.cache.has(chat.id)) throw new Error(`Chat ${chat.id} already exists`);
     return this.writes.run(chat.id, () => this.write(chat));
+  }
+
+  updateSettings(chatId: string, input: ChatUpdatePatch): Promise<StoredChat> {
+    const patch = ChatUpdatePatchSchema.parse(input);
+    return this.update(chatId, (chat) => {
+      if (chat.kind !== "group" && !(chat.kind === undefined && chat.participants.length > 1))
+        throw new Error("Only group chats have editable group settings");
+      if (chat.archivedAt) throw new Error("Archived chats cannot be edited");
+      return {
+        ...chat,
+        ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
+        ...(patch.requireMention !== undefined
+          ? {
+              rules: {
+                ...chat.rules,
+                interaction: { ...chat.rules.interaction, requireMention: patch.requireMention },
+              },
+            }
+          : {}),
+      };
+    });
   }
 
   /**

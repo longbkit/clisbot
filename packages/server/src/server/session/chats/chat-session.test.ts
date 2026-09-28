@@ -32,6 +32,7 @@ function harness(actorId: string) {
       return () => {};
     },
     list: async () => [chat],
+    update: vi.fn(async () => chat),
     fetchTranscript: vi.fn(async () => ({
       lines: [],
       hasOlder: false,
@@ -173,4 +174,32 @@ test("voice rejects another actor, stale binding and forbidden effective configu
     alice.session.dispose();
     bob.session.dispose();
   }
+});
+
+test("only the Chat owner with current Project access may update group settings", async () => {
+  const request = {
+    type: "chat.update.request" as const,
+    requestId: "edit",
+    chatId: chat.id,
+    patch: { title: "Launch", requireMention: true },
+  };
+  const owner = harness("alice");
+  await owner.session.handle(request);
+  expect(owner.service.update).toHaveBeenCalledWith(chat.id, request.patch);
+  expect(owner.messages.at(-1)).toMatchObject({
+    type: "chat.update.response",
+    payload: { error: null },
+  });
+  const other = harness("bob");
+  await other.session.handle(request);
+  expect(other.service.update).not.toHaveBeenCalled();
+  expect(other.messages.at(-1)).toMatchObject({
+    payload: { chat: null, errorCode: "chat_request_failed" },
+  });
+  owner.revoke();
+  await owner.session.handle({ ...request, requestId: "revoked" });
+  expect(owner.service.update).toHaveBeenCalledTimes(1);
+  expect(owner.messages.at(-1)).toMatchObject({ payload: { errorCode: "chat_request_failed" } });
+  owner.session.dispose();
+  other.session.dispose();
 });

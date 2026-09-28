@@ -32,7 +32,7 @@ export function useConversationProject(
     normalizedWorkspaceId: source?.workspaceId ?? "",
     workspaceDirectory: cwd,
   });
-  const isGit = checkoutQuery.data?.isGit ?? false;
+  const isGit = checkoutQuery.data?.isGit ?? workspace?.projectKind === "git";
   return {
     source,
     cwd,

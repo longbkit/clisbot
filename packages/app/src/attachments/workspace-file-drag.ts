@@ -47,9 +47,11 @@ export function resolveWorkspaceFileDrop(input: {
   payload: WorkspaceFileDragPayload;
   serverId: string;
   workspaceId: string;
+  resolvePath?: (path: string) => string;
 }): WorkspaceFileComposerAttachment | null {
-  return input.payload.serverId === input.serverId &&
-    input.payload.workspaceId === input.workspaceId
-    ? input.payload.attachment
-    : null;
+  if (input.payload.serverId !== input.serverId || input.payload.workspaceId !== input.workspaceId)
+    return null;
+  return input.resolvePath
+    ? { ...input.payload.attachment, path: input.resolvePath(input.payload.attachment.path) }
+    : input.payload.attachment;
 }

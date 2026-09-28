@@ -51,6 +51,10 @@ export interface CreateChatServiceInput {
 }
 
 export interface ChatService {
+  update(
+    chatId: string,
+    patch: import("@getpaseo/protocol/chats/rpc-schemas").ChatUpdatePatch,
+  ): Promise<ChatPayload>;
   record(chatId: string): import("./chat-record.js").StoredChat | null;
   subscribe(
     listener: (message: import("../messages.js").SessionOutboundMessage) => void,
@@ -210,6 +214,9 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     async get(chatId) {
       const chat = await store.get(chatId);
       return chat ? engine.payload(chat) : null;
+    },
+    async update(chatId, patch) {
+      return engine.payload(await store.updateSettings(chatId, patch));
     },
     async participantBotIds(chatId) {
       const chat = await store.get(chatId);

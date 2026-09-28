@@ -2,7 +2,7 @@ import type { BotPayload, ChatPayload } from "../data/contracts";
 import type { HostTagged } from "../data/aggregate";
 
 /** Older hosts lack kind; new hosts persist it so a reduced group stays a group. */
-export function isDirectChat(chat: ChatPayload): boolean {
+export function isDirectChat(chat: Pick<ChatPayload, "kind" | "participants">): boolean {
   return chat.kind ? chat.kind === "direct" : chat.participants.length === 1;
 }
 export function directChatForBot(

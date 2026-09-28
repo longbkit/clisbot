@@ -7670,6 +7670,58 @@ test("reviewed plugin updates gate before requests and preserve exact proposal d
   }
 });
 
+test("updateChat sends and correlates group settings when the Host advertises support", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "chat-settings",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connecting = client.connect();
+  mock.triggerOpen({ features: { bots: true, chatSettings: true } });
+  await connecting;
+  const patch = { title: "Launch", requireMention: true };
+  const response = client.updateChat({ chatId: "group", patch });
+  const request = parseSentFrame(mock.sent[0]);
+  expect(request).toEqual({
+    type: "chat.update.request",
+    requestId: expect.any(String),
+    chatId: "group",
+    patch,
+  });
+  const payload = { requestId: request.requestId, chat: null, error: null };
+  mock.triggerMessage(wrapSessionMessage({ type: "chat.update.response", payload }));
+  await expect(response).resolves.toEqual(payload);
+});
+
+test.each([undefined, false])(
+  "updateChat rejects unsupported Hosts without a request (feature=%s)",
+  async (supported) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "chat-settings-old",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connecting = client.connect();
+    mock.triggerOpen({
+      features: { bots: true, ...(supported === undefined ? {} : { chatSettings: supported }) },
+    });
+    await connecting;
+    const before = mock.sent.length;
+    expect(() => client.updateChat({ chatId: "group", patch: { requireMention: true } })).toThrow(
+      "This Host does not support editing group settings. Update the Host to continue.",
+    );
+    expect(mock.sent).toHaveLength(before);
+  },
+);
+
 test("Chat pages and live pushes from older Hosts expose flat sender identities", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

@@ -20,3 +20,39 @@ it("isolates users and organizations while preserving pin intent", () => {
   expect(useResourcePinsStore.getState().scopes["bob:org-a"]).toBeUndefined();
   expect(useResourcePinsStore.getState().scopes["alice:org-b"]).toBeUndefined();
 });
+
+const dm = {
+  serverId: "host-a",
+  id: "dm-a",
+  kind: "direct" as const,
+  participants: [{ botId: "bot-a", agentId: null }],
+};
+const botPin = { kind: "bot" as const, serverId: dm.serverId, id: "bot-a" };
+const dmPin = { kind: "chat" as const, serverId: dm.serverId, id: dm.id };
+
+it("pins a DM with the same identity as its bot and unpins from either surface", () => {
+  expect(togglePin([], dmPin, [dm])).toEqual([botPin]);
+  expect(togglePin([botPin], dmPin, [dm])).toEqual([]);
+  expect(togglePin([dmPin], botPin, [dm])).toEqual([]);
+});
+
+it("removes every legacy duplicate while keeping unrelated pins and other Hosts", () => {
+  const otherHost = { ...dmPin, serverId: "host-b" };
+  const groupPin = { ...dmPin, id: "group" };
+  const group = { ...dm, id: "group", kind: "group" as const };
+  const secondDm = { ...dm, id: "dm-second" };
+  const duplicate = { ...dmPin, id: secondDm.id };
+  expect(
+    togglePin([dmPin, botPin, duplicate, otherHost, groupPin], botPin, [dm, group, secondDm]),
+  ).toEqual([otherHost, groupPin]);
+  expect(togglePin([dmPin, botPin], dmPin, [dm])).toEqual([]);
+});
+
+it("keeps persisted aliases intact until toggled and writes only stable identity fields", () => {
+  useResourcePinsStore.setState({ scopes: { owner: [dmPin, botPin] } });
+  useResourcePinsStore.getState().toggle("owner", dmPin, [dm]);
+  expect(useResourcePinsStore.getState().scopes.owner).toEqual([]);
+  const menu = { ...botPin, anchor: { x: 1, y: 2 }, title: "Private bot name" };
+  useResourcePinsStore.getState().toggle("owner", menu, [dm]);
+  expect(useResourcePinsStore.getState().scopes.owner).toEqual([botPin]);
+});

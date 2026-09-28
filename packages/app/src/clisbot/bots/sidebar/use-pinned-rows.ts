@@ -40,10 +40,10 @@ export function usePinnedRows(onBeforeNavigate?: () => void): {
   error: string | null;
 } {
   const { projects } = useSidebarWorkspacesList({ hostFilters: [] });
-  const { pins, toggle } = useResourcePins();
   const { bots, chats } = useBotCatalog();
   const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : [];
   const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : [];
+  const { pins, toggle } = useResourcePins(chatRows);
   const { openBot, error } = useBotSidebarActions(
     chatRows,
     onBeforeNavigate,

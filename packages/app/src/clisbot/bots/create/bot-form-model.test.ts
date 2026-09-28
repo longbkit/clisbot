@@ -232,3 +232,14 @@ describe("openBotForm", () => {
     expect(model.getState().name).toBe("A");
   });
 });
+
+it("keeps the remaining Host selectable when hosts change before a selection", () => {
+  const model = openBotForm(createSnapshot({ hosts: HOSTS }));
+  model.applyHosts([HOSTS[1]]);
+  expect(model.getState().selectedServerId).toBeNull();
+  expect(model.getState().showHostField).toBe(true);
+  model.setHost("host-b");
+  expect(model.getState().showHostField).toBe(false);
+  model.applyHosts([HOSTS[0]]);
+  expect(model.getState().showHostField).toBe(true);
+});

@@ -170,6 +170,8 @@ export class ChatSession {
         };
       case "chat.transcript.fetch.request":
         return { ...(await this.service.fetchTranscript(request.chatId, request)) };
+      case "chat.update.request":
+        return { chat: await this.service.update(request.chatId, request.patch) };
       case "chat.archive.request":
         return { chat: await this.service.archive(request.chatId) };
       case "chat.session.reset.request":
@@ -191,6 +193,7 @@ export function dispatchChatMessage(
     case "chat.participant.remove.request":
     case "chat.message.send.request":
     case "chat.transcript.fetch.request":
+    case "chat.update.request":
     case "chat.archive.request":
     case "chat.session.reset.request":
       if (session) return session.handle(message);

@@ -942,6 +942,9 @@ interface ComposerProps {
   submissionTarget?: "agent" | "conversation";
   showAgentControls?: boolean;
   pendingSessionReason?: string;
+  realtimeVoiceEnabled?: boolean;
+  /** Resolve file references at insertion, before the composer source can change. */
+  resolveWorkspaceFilePath?: (path: string) => string;
   agentId: string;
   serverId: string;
   workspaceId?: string | null;
@@ -1252,6 +1255,8 @@ const ComposerContent = memo(ComposerContentImpl);
 function ComposerContentImpl({
   submissionTarget = "agent",
   showAgentControls = true,
+  realtimeVoiceEnabled = true,
+  resolveWorkspaceFilePath,
   pendingSessionReason,
   agentId,
   serverId,
@@ -1536,14 +1541,19 @@ function ComposerContentImpl({
       if (!workspaceId) {
         return;
       }
-      const attachment = resolveWorkspaceFileDrop({ payload, serverId, workspaceId });
+      const attachment = resolveWorkspaceFileDrop({
+        payload,
+        serverId,
+        workspaceId,
+        resolvePath: resolveWorkspaceFilePath,
+      });
       if (!attachment) {
         return;
       }
       setSelectedAttachments((current) => appendWorkspaceFileAttachment(current, attachment));
       focusInput();
     },
-    [focusInput, serverId, setSelectedAttachments, workspaceId],
+    [focusInput, serverId, setSelectedAttachments, workspaceId, resolveWorkspaceFilePath],
   );
 
   useEffect(() => {
@@ -1941,6 +1951,7 @@ function ComposerContentImpl({
   const isVoiceModeForAgent = resolveIsVoiceModeForAgent(voice, serverId, agentId);
 
   const handleToggleRealtimeVoice = useCallback(() => {
+    if (!realtimeVoiceEnabled) return;
     attemptStartRealtimeVoice({
       voice,
       isConnected,
@@ -1949,7 +1960,7 @@ function ComposerContentImpl({
       agentId,
       toastErrorRef,
     });
-  }, [agentId, hasAgent, isConnected, serverId, voice]);
+  }, [agentId, hasAgent, isConnected, serverId, voice, realtimeVoiceEnabled]);
 
   const handleEditQueuedMessage = useCallback(
     (id: string) => {
@@ -2071,7 +2082,7 @@ function ComposerContentImpl({
         isAgentRunning={isAgentRunning}
         hasSendableContent={hasSendableContent}
         isCompact={isCompactLayout}
-        showVoice={mode.showVoice}
+        showVoice={mode.showVoice && realtimeVoiceEnabled}
         buttonIconSize={buttonIconSize}
         handleToggleRealtimeVoice={handleToggleRealtimeVoice}
         isConnected={isConnected}
@@ -2083,6 +2094,7 @@ function ComposerContentImpl({
     ),
     [
       pendingSessionReason,
+      realtimeVoiceEnabled,
       buttonIconSize,
       handleToggleRealtimeVoice,
       hasAgent,
@@ -2387,6 +2399,7 @@ function ComposerContentImpl({
       serverId,
       agentId,
       draftConfig: commandDraftConfig,
+      resolveWorkspaceFilePath,
       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
       onClientSlashCommand: runClientSlashCommand,
       pluginClientSlashCommands,
@@ -2396,6 +2409,7 @@ function ComposerContentImpl({
       serverId,
       agentId,
       commandDraftConfig,
+      resolveWorkspaceFilePath,
       buildOutgoingAttachments,
       attachments,
       runClientSlashCommand,
@@ -2509,7 +2523,7 @@ function ComposerContentImpl({
                   rightContent={rightContent}
                   activeActionContent={activeActionContent}
                   voiceServerId={serverId}
-                  voiceAgentId={agentId}
+                  voiceAgentId={realtimeVoiceEnabled && !pendingSessionReason ? agentId : undefined}
                   isAgentRunning={isAgentRunning}
                   defaultSendBehavior={activeSendBehavior}
                   onQueue={handleQueue}
