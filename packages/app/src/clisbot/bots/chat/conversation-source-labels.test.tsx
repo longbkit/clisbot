@@ -4,6 +4,7 @@ import { expect, it } from "vitest";
 import type { ReactNode } from "react";
 import {
   ConversationSourceLabelsContext,
+  ConversationGroupContext,
   useConversationSourceLabel,
   useConversationSourceLabelsBridge,
 } from "./conversation-source-labels";
@@ -13,9 +14,11 @@ const labels = new Map([
 ]);
 function Wrapper({ children }: { children: ReactNode }) {
   return (
-    <ConversationSourceLabelsContext.Provider value={labels}>
-      {children}
-    </ConversationSourceLabelsContext.Provider>
+    <ConversationGroupContext.Provider value>
+      <ConversationSourceLabelsContext.Provider value={labels}>
+        {children}
+      </ConversationSourceLabelsContext.Provider>
+    </ConversationGroupContext.Provider>
   );
 }
 function Option({ workspaceId }: { workspaceId: string }) {
@@ -36,4 +39,21 @@ it("preserves bot labels across the mobile sheet's separate rendering root", () 
   );
   expect(screen.getByText("README.md · Analyst QA")).toBeTruthy();
   expect(screen.getByText("README.md · Writer QA")).toBeTruthy();
+});
+
+function MessagesOption() {
+  const label = useConversationSourceLabel({ kind: "conversation", chatId: "group" });
+  return <div>Messages · {label}</div>;
+}
+it("preserves the Messages group label across the sheet root", () => {
+  const { result } = renderHook(useConversationSourceLabelsBridge, { wrapper: Wrapper });
+  render(result.current(<MessagesOption />));
+  expect(screen.getByText("Messages · Group conversation")).toBeTruthy();
+});
+
+it("leaves ordinary workspace tab presentation unchanged", () => {
+  const { result } = renderHook(() =>
+    useConversationSourceLabel({ kind: "file", path: "docs/README.md" }),
+  );
+  expect(result.current).toBeUndefined();
 });

@@ -14,6 +14,8 @@ import {
   ConversationBotChooser,
 } from "./conversation-header";
 import { ConversationContextProviders } from "./conversation-context-providers";
+import { ConversationTabsContext } from "./conversation-tabs-context";
+import { ChatOptionsProvider } from "./chat-options-context";
 import type { ChatBotIdentity } from "./chat-rows";
 interface ConversationWorkspaceProps {
   serverId: string;
@@ -21,6 +23,7 @@ interface ConversationWorkspaceProps {
   accessScope: string;
   title: string;
   bots: readonly ChatBotIdentity[];
+  group: boolean;
   headerActions?: ReactNode;
   children: ReactNode;
 }
@@ -31,6 +34,7 @@ export function ConversationWorkspace({
   accessScope,
   title,
   bots,
+  group,
   headerActions,
   children,
 }: ConversationWorkspaceProps) {
@@ -59,34 +63,45 @@ export function ConversationWorkspace({
   );
   const header = () => (
     <ConversationHeader
-      {...{ serverId, title, project, singlePanel, selector, headerActions, openExplorer }}
+      {...{ serverId, title, project, singlePanel, selector, headerActions, openExplorer, group }}
+      memberCount={bots.length}
+      tabCount={state.mainTabs.length}
     />
   );
   const surface = { serverId, focused, state, actions, header };
+  const tabContext = useMemo(
+    () => ({ tabs: state.mainTabs, activeId: state.active?.tabId, selectTab: actions.selectTab }),
+    [state.mainTabs, state.active?.tabId, actions.selectTab],
+  );
   return (
-    <ConversationContextProviders
-      serverId={serverId}
-      chatId={chatId}
-      bots={bots}
-      project={project}
-      layoutKey={state.layoutKey}
-      open={actions.open}
-      messages={children}
-    >
-      <View style={styles.fill}>
-        {singlePanel ? (
-          <MobileConversationSurface
-            {...surface}
-            project={project}
-            selector={selector}
-            compact={compact}
-          />
-        ) : (
-          <DesktopConversationSurface {...surface} openExplorer={openExplorer} />
-        )}
-        <ConversationBotChooser project={project} bots={bots} />
-      </View>
-    </ConversationContextProviders>
+    <ChatOptionsProvider>
+      <ConversationTabsContext.Provider value={tabContext}>
+        <ConversationContextProviders
+          serverId={serverId}
+          chatId={chatId}
+          bots={bots}
+          group={group}
+          project={project}
+          layoutKey={state.layoutKey}
+          open={actions.open}
+          messages={children}
+        >
+          <View style={styles.fill}>
+            {singlePanel ? (
+              <MobileConversationSurface
+                {...surface}
+                project={project}
+                selector={selector}
+                compact={compact}
+              />
+            ) : (
+              <DesktopConversationSurface {...surface} openExplorer={openExplorer} />
+            )}
+            <ConversationBotChooser project={project} bots={bots} />
+          </View>
+        </ConversationContextProviders>
+      </ConversationTabsContext.Provider>
+    </ChatOptionsProvider>
   );
 }
 const styles = StyleSheet.create((theme) => ({

@@ -34,6 +34,10 @@ vi.mock("@/components/ui/button", () => ({
   ),
 }));
 vi.mock("react-native", () => ({
+  Platform: {
+    OS: "web",
+    select: (values: Record<string, unknown>) => values.web ?? values.default,
+  },
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Pressable: ({
@@ -50,7 +54,7 @@ vi.mock("react-native", () => ({
     </button>
   ),
 }));
-vi.mock("lucide-react-native", () => ({ Monitor: () => <i /> }));
+vi.mock("./cowork-icon", () => ({ CoworkIcon: () => <i /> }));
 afterEach(() => {
   cleanup();
   navigate.mockClear();

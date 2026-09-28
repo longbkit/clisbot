@@ -1,5 +1,6 @@
 import type { MessagePayload } from "@/composer/types";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
+import { ComposerDock } from "@/composer/dock";
 import { useMemo, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -52,22 +53,24 @@ export function ChatScreen({
   return (
     <View style={styles.container} testID={`chat-screen-${chatId}`}>
       {!hideHeader ? <MenuHeader title={title} rightContent={headerRight} /> : null}
-      <ToolCallSheetProvider>
-        <ChatList
-          scrollKey={`${serverId}:${chatId}`}
-          rows={model.rows}
+      <ComposerDock>
+        <ToolCallSheetProvider>
+          <ChatList
+            scrollKey={`${serverId}:${chatId}`}
+            rows={model.rows}
+            serverId={serverId}
+            bots={botsById}
+            onReachTop={onReachTop}
+          />
+        </ToolCallSheetProvider>
+        <ChatComposer
           serverId={serverId}
-          bots={botsById}
-          onReachTop={onReachTop}
+          chatId={chatId}
+          placeholder={placeholder}
+          disabled={!canSend}
+          onSubmitMessage={onSubmitMessage}
         />
-      </ToolCallSheetProvider>
-      <ChatComposer
-        serverId={serverId}
-        chatId={chatId}
-        placeholder={placeholder}
-        disabled={!canSend}
-        onSubmitMessage={onSubmitMessage}
-      />
+      </ComposerDock>
     </View>
   );
 }

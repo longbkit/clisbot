@@ -140,6 +140,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
         </Text>
       ) : null}
       <ConversationWorkspace
+        group={chat.kind === "group" || (!chat.kind && chat.participants.length > 1)}
         serverId={serverId}
         chatId={chatId}
         accessScope={principalScope}
@@ -168,7 +169,7 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
+    gap: theme.spacing[1],
     flexShrink: 0,
   },
   error: { color: theme.colors.foreground, padding: theme.spacing[2] },

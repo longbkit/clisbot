@@ -4,7 +4,7 @@ import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { botsSessionScope } from "../data/session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
-import { Monitor } from "lucide-react-native";
+import { CoworkIcon } from "./cowork-icon";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatParticipantPayload } from "@getpaseo/protocol/chats/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -58,7 +58,13 @@ export function ParticipantActions({
   }, [group, participants, serverId, remember, project?.botId]);
   return (
     <>
-      <ChatHeaderAction label="Open in cowork" text="Cowork" icon={Monitor} onPress={open} />
+      <ChatHeaderAction
+        label="Open in cowork"
+        text="Cowork"
+        icon={CoworkIcon}
+        iconSize={20}
+        onPress={open}
+      />
       <AdaptiveModalSheet visible={visible} onClose={close} header={header}>
         <View style={styles.body}>
           {participants.map((participant) => (

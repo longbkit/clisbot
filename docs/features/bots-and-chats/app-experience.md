@@ -77,17 +77,31 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   A DM resolves its bot project directly. A group adds a bot/context selector; the selected context
   drives Explorer, Git actions and the Cowork action. Preserve backend authority and Git capability
   checks. A project can exist before there is a participant session to open in cowork.
-- Cowork is an explicit compact button with Monitor icon and an Open in cowork tooltip. Group
+- The chat header shows a secondary summary: group member count plus open tab count, or the Host
+  display name plus open tab count for a DM. Both the heading and overflow button open the same
+  Chat options menu. Keep tab count visible when a long Host name truncates.
+- Cowork is an explicit compact button with a folder outline with a simple smiling bot face and an Open in cowork tooltip.
+  Reserve the Monitor icon for remote browser/computer/simulation views. Group
   selection must resolve the intended participant/context. Back to chat returns to the origin DM or
   group, retaining its draft, reading position and document tabs. Do not choose an unrelated session.
 - Mobile reuses the existing left/center/Explorer selection model and tab switcher. Opening a file
   closes Explorer and reveals the file in the center. Selecting Messages returns to chat. No second
   drawer controller, meaningless add-tab button beside Messages, or mobile pane-maximize action.
+- Chat options uses the shared compact action menu. Switch tab searches open conversation tabs by
+  filename, path and source bot, then focuses the existing tab through the layout store. Pin,
+  bot settings and archive stay single-row actions; participants/replies and project controls open
+  separate detail sheets. Archive requires confirmation. The fresh-session entry explains `/new`
+  and returns to Messages without overwriting the draft or sending a command.
+- Both tab pickers keep the tab name on the primary line. DM tabs omit the repeated bot name;
+  group file tabs identify the source bot below the filename and Messages uses “Group conversation”.
+  Nested files show their directory on the secondary line to distinguish duplicate filenames.
+  Tab-type icons distinguish Messages, documents and changes without changing their names.
 
 ## Responsive controls and compatibility
 
 Desktop retains its compact workspace header and tab styling. Mobile uses the existing responsive
-header geometry and enlarges top-header action targets without overlapping adjacent targets. Preserve
+header geometry: shared toolbar button frames, a consistent 4px action gap, and vertical hit slop
+without overlapping adjacent targets. Preserve
 keyboard/safe-area behavior; do not pin the composer to the browser page independently of the pane.
 
 Keep Fusion code under its existing extension/capability boundaries. Ordinary workspace targets,

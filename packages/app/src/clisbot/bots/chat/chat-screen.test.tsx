@@ -52,6 +52,7 @@ vi.mock("@/agent-stream/view", () => ({
 }));
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
+  StyleSheet: { create: (styles: unknown) => styles },
   Platform: { OS: "web" },
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>

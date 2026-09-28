@@ -1,21 +1,47 @@
 import { ConversationProjectActions } from "./conversation-project-actions";
-import { Ellipsis } from "lucide-react-native";
-import { ChatHeaderAction } from "./header-action";
-import { useCallback, useMemo, useState } from "react";
+import { useChatOptionsState } from "./chat-options-context";
+import { Ellipsis, FileText, FileDiff, MessageSquare } from "lucide-react-native";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
-import { Button } from "@/components/ui/button";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { buildHostRootRoute } from "@/utils/host-routes";
-import { SettingsCard, SettingsRow, SettingsSection, SettingsAction } from "@/components/settings";
+import { SettingsCard, SettingsRow, SettingsSection } from "@/components/settings";
 import { ChatParticipantSettings } from "./chat-participant-settings";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins, pinKey } from "../sidebar/pins";
 import type { BotPayload } from "../data/contracts";
 import { refreshBotsAndChats } from "../data/runtime";
+
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSubTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuHint,
+  type DropdownMenuTriggerProps,
+} from "@/components/ui/dropdown-menu";
+import { MenuTextField } from "@/components/ui/menu";
+import { iconButtonChromeStyle, mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
+import { confirmDialog } from "@/utils/confirm-dialog";
+import { useConversationTabsContext } from "./conversation-tabs-context";
+import { ConversationSourceLabelsContext } from "./conversation-source-labels";
+import { useConversationDraftContext } from "./conversation-draft-context";
+import { useConversationProjectContext } from "./conversation-project-context";
+import { buildConversationTabOptions, filterConversationTabs } from "./conversation-tab-options";
+
+const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedMessageSquare = withUnistyles(MessageSquare);
+const ThemedFileText = withUnistyles(FileText);
+const ThemedFileDiff = withUnistyles(FileDiff);
+const TAB_MESSAGE_ICON = <ThemedMessageSquare size={16} uniProps={mutedIconColorMapping} />;
+const TAB_FILE_ICON = <ThemedFileText size={16} uniProps={mutedIconColorMapping} />;
+const TAB_DIFF_ICON = <ThemedFileDiff size={16} uniProps={mutedIconColorMapping} />;
 
 export function ChatOptions({
   serverId,
@@ -28,10 +54,19 @@ export function ChatOptions({
 }) {
   const client = useHostRuntimeClient(serverId);
   const router = useRouter();
-  const [visible, setVisible] = useState(false);
+  const { visible, setVisible } = useChatOptionsState();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [details, setDetails] = useState<"participants" | "project" | null>(null);
+  const tabs = useConversationTabsContext();
+  const labels = useContext(ConversationSourceLabelsContext);
+  const draft = useConversationDraftContext();
+  const project = useConversationProjectContext();
+  const group = chat.kind === "group" || (!chat.kind && chat.participants.length > 1);
+  const tabOptions = useMemo(
+    () => buildConversationTabOptions(tabs?.tabs ?? [], labels, group),
+    [tabs?.tabs, labels, group],
+  );
   const { pins, toggle: togglePin } = useResourcePins();
   const pin = useMemo(
     () => ({ kind: "chat" as const, serverId, id: chat.id }),
@@ -39,22 +74,21 @@ export function ChatOptions({
   );
   const pinned = pins.some((p) => pinKey(p) === pinKey(pin));
   const changePin = useCallback(() => togglePin(pin), [togglePin, pin]);
-  const requestArchive = useCallback(() => setConfirmArchive(true), []);
-  const cancelArchive = useCallback(() => setConfirmArchive(false), []);
-  const group = chat.kind === "group" || (!chat.kind && chat.participants.length > 1);
-  const open = useCallback(() => setVisible(true), []);
   const close = useCallback(() => {
     setVisible(false);
-    setConfirmArchive(false);
+    setDetails(null);
     setError(null);
-  }, []);
+  }, [setVisible]);
   const directBot = !group ? bots.find((bot) => bot.id === chat.participants[0]?.botId) : undefined;
   const configureBot = useCallback(() => {
     if (!directBot?.canConfigure) return;
     close();
     router.push(buildHostBotRoute(serverId, directBot.id));
   }, [directBot, close, router, serverId]);
-  const header = useMemo(() => ({ title: "Chat options" }), []);
+  const header = useMemo(
+    () => ({ title: details === "project" ? "Project" : "Participants and replies" }),
+    [details],
+  );
   const toggleParticipant = useCallback(
     async (botId: string) => {
       if (!client || busy) return;
@@ -79,6 +113,15 @@ export function ChatOptions({
   );
   const archive = useCallback(async () => {
     if (!client || busy) return;
+    if (
+      !(await confirmDialog({
+        title: "Archive this chat?",
+        message: "It will leave the active list. The transcript is kept.",
+        confirmLabel: "Archive chat",
+        destructive: true,
+      }))
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
@@ -92,86 +135,107 @@ export function ChatOptions({
       setBusy(false);
     }
   }, [busy, chat.id, client, router, serverId]);
+  const openParticipants = useCallback(() => setDetails("participants"), []);
+  const openProject = useCallback(() => setDetails("project"), []);
+  const pages = useMemo(
+    () => [
+      {
+        id: "tabs",
+        title: "Switch tab",
+        hoverIntent: false,
+        content: (
+          <ChatTabsPage options={tabOptions} activeId={tabs?.activeId} onSelect={tabs?.selectTab} />
+        ),
+      },
+      {
+        id: "fresh",
+        title: "Start a fresh session",
+        hoverIntent: false,
+        content: (
+          <>
+            <DropdownMenuHint>
+              Send /new in Messages to reset bot context. This chat’s history stays here.
+            </DropdownMenuHint>
+            <DropdownMenuItem disabled={!draft} onSelect={draft?.focusMessages}>
+              Go to Messages
+            </DropdownMenuItem>
+          </>
+        ),
+      },
+    ],
+    [tabOptions, tabs, draft],
+  );
   return (
     <>
-      <ChatHeaderAction label="Chat options" icon={Ellipsis} onPress={open} />
-      <AdaptiveModalSheet visible={visible} header={header} onClose={close}>
+      <DropdownMenu compactMode="sheet" open={visible} onOpenChange={setVisible}>
+        <DropdownMenuTrigger
+          accessibilityLabel="Chat options"
+          testID="chat-options-trigger"
+          hitSlop={HEADER_ACTION_HIT_SLOP}
+          style={triggerStyle}
+        >
+          <ThemedEllipsis size={18} uniProps={mutedIconColorMapping} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent sheetTitle="Chat options" align="end" width={280} pages={pages}>
+          <DropdownMenuSubTrigger
+            id="tabs"
+            disabled={!tabOptions.length}
+            value={String(tabOptions.length)}
+          >
+            Switch tab
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={changePin}>
+            {pinned ? "Unpin chat" : "Pin chat"}
+          </DropdownMenuItem>
+          {directBot?.canConfigure ? (
+            <DropdownMenuItem onSelect={configureBot}>Bot settings</DropdownMenuItem>
+          ) : null}
+          {group ? (
+            <DropdownMenuItem onSelect={openParticipants}>
+              Participants and replies
+            </DropdownMenuItem>
+          ) : null}
+          {project ? (
+            <DropdownMenuItem onSelect={openProject}>Project actions</DropdownMenuItem>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuSubTrigger id="fresh">Start a fresh session</DropdownMenuSubTrigger>
+          <DropdownMenuItem disabled={busy || !client} onSelect={archive}>
+            Archive chat…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AdaptiveModalSheet
+        visible={details !== null || error !== null}
+        header={header}
+        onClose={close}
+      >
         <View style={styles.body}>
-          <ConversationProjectActions onChoose={close} />
-          <SettingsSection title="Conversation">
-            <SettingsCard>
-              <SettingsAction
-                label="Pinned"
-                hint="Keep this chat at the top of the sidebar."
-                actionLabel={pinned ? "Unpin" : "Pin chat"}
-                onPress={changePin}
-              />
-              {directBot?.canConfigure ? (
-                <SettingsAction
-                  label="Bot settings"
-                  hint="Configure this bot across its conversations."
-                  actionLabel="Open"
-                  onPress={configureBot}
-                />
-              ) : null}
-              {!group ? (
-                <SettingsRow
-                  label={chat.participants[0]?.displayName ?? "Bot"}
-                  hint="Direct conversation"
-                />
-              ) : null}
-            </SettingsCard>
-          </SettingsSection>
-          {group ? (
-            <ChatParticipantSettings
-              chat={chat}
-              bots={bots}
-              busy={busy || !client}
-              toggle={toggleParticipant}
-            />
+          {details === "project" && project ? (
+            <ConversationProjectActions project={project} onChoose={close} />
           ) : null}
-          {group ? (
-            <SettingsSection title="Replies">
-              <SettingsCard>
-                <SettingsRow
-                  label={
-                    chat.rules.interaction?.requireMention
-                      ? "Only mentioned bots reply"
-                      : "All bots reply unless you @mention one"
-                  }
-                  hint="Set when this chat was created. Use @mentions to direct your next message."
-                />
-              </SettingsCard>
-            </SettingsSection>
-          ) : null}
-          <SettingsSection title="Chat history" flush>
-            <SettingsCard>
-              <SettingsRow
-                label="Start a fresh session"
-                hint="Send /new in Messages to reset bot context. This chat’s history stays here."
+          {details === "participants" && group ? (
+            <>
+              <ChatParticipantSettings
+                chat={chat}
+                bots={bots}
+                busy={busy || !client}
+                toggle={toggleParticipant}
               />
-              <SettingsAction
-                label="Archive chat"
-                hint="Remove this conversation from the active chat list."
-                actionLabel="Archive…"
-                disabled={busy || !client}
-                onPress={requestArchive}
-              />
-            </SettingsCard>
-          </SettingsSection>
-          {confirmArchive ? (
-            <SettingsCard>
-              <SettingsRow
-                label="Archive this chat?"
-                hint="It will leave the active list. The transcript is kept."
-              />
-              <Button variant="outline" disabled={busy} onPress={cancelArchive}>
-                Cancel
-              </Button>
-              <Button disabled={busy} onPress={archive}>
-                {busy ? "Archiving…" : "Archive chat"}
-              </Button>
-            </SettingsCard>
+              <SettingsSection title="Replies" flush>
+                <SettingsCard>
+                  <SettingsRow
+                    label={
+                      chat.rules.interaction?.requireMention
+                        ? "Only mentioned bots reply"
+                        : "All bots reply unless you @mention one"
+                    }
+                    hint="Set when this chat was created. Use @mentions to direct your next message."
+                  />
+                </SettingsCard>
+              </SettingsSection>
+            </>
           ) : null}
           {error ? (
             <Text accessibilityRole="alert" style={styles.text}>
@@ -183,7 +247,67 @@ export function ChatOptions({
     </>
   );
 }
+
+function ChatTabsPage({
+  options,
+  activeId,
+  onSelect,
+}: {
+  options: ReturnType<typeof buildConversationTabOptions>;
+  activeId?: string;
+  onSelect?: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const matches = filterConversationTabs(options, query);
+  return (
+    <>
+      <View style={styles.tabSearch}>
+        <MenuTextField placeholder="Search tabs" onChangeText={setQuery} />
+      </View>
+      {matches.map((tab) => (
+        <ChatTabItem key={tab.id} tab={tab} selected={tab.id === activeId} onSelect={onSelect} />
+      ))}
+      {!matches.length ? <DropdownMenuHint>No matching tabs</DropdownMenuHint> : null}
+    </>
+  );
+}
+
+function ChatTabItem({
+  tab,
+  selected,
+  onSelect,
+}: {
+  tab: ReturnType<typeof buildConversationTabOptions>[number];
+  selected: boolean;
+  onSelect?: (id: string) => void;
+}) {
+  const select = useCallback(() => onSelect?.(tab.id), [onSelect, tab.id]);
+  let icon = TAB_DIFF_ICON;
+  if (tab.kind === "conversation") icon = TAB_MESSAGE_ICON;
+  if (tab.kind === "file") icon = TAB_FILE_ICON;
+  return (
+    <DropdownMenuItem
+      selected={selected}
+      description={tab.description}
+      onSelect={select}
+      leading={icon}
+    >
+      {tab.label}
+    </DropdownMenuItem>
+  );
+}
+
+const triggerStyle: DropdownMenuTriggerProps["style"] = (state) =>
+  iconButtonChromeStyle({ size: "large", state });
+
+const HEADER_ACTION_HIT_SLOP = { top: 8, bottom: 8 };
+
 const styles = StyleSheet.create((theme) => ({
   body: { gap: theme.spacing[3] },
+  tabSearch: {
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[1],
+    paddingBottom: theme.spacing[2],
+  },
   text: { color: theme.colors.foreground },
 }));

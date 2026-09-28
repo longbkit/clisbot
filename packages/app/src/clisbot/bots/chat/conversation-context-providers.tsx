@@ -1,6 +1,9 @@
 import { ConversationDraftProvider } from "./conversation-draft-provider";
 import { useMemo, type ReactNode } from "react";
-import { ConversationSourceLabelsContext } from "./conversation-source-labels";
+import {
+  ConversationGroupContext,
+  ConversationSourceLabelsContext,
+} from "./conversation-source-labels";
 import { ConversationPanelProviders } from "./conversation-panel-providers";
 import { ConversationContentContext } from "./conversation-panel";
 import { ConversationFileContext, type OpenConversationTarget } from "./conversation-file-context";
@@ -13,6 +16,7 @@ export function ConversationContextProviders({
   serverId,
   chatId,
   bots,
+  group,
   project,
   layoutKey,
   open,
@@ -22,6 +26,7 @@ export function ConversationContextProviders({
   serverId: string;
   chatId: string;
   bots: readonly ChatBotIdentity[];
+  group: boolean;
   project: ReturnType<typeof useConversationProject>;
   layoutKey: string;
   open: OpenConversationTarget;
@@ -65,24 +70,50 @@ export function ConversationContextProviders({
       bots.length,
     ],
   );
-  const content = (
-    <ConversationPanelProviders layoutKey={layoutKey}>{children}</ConversationPanelProviders>
-  );
   return (
     <ConversationDraftProvider serverId={serverId} chatId={chatId} layoutKey={layoutKey}>
       <ConversationSourceLabelsContext.Provider value={labels}>
         <ConversationAccessContext.Provider value={allowed}>
           <ConversationProjectContext.Provider value={context}>
-            <ConversationShellContext.Provider value>
-              <ConversationFileContext.Provider value={open}>
-                <ConversationContentContext.Provider value={messages}>
-                  {content}
-                </ConversationContentContext.Provider>
-              </ConversationFileContext.Provider>
-            </ConversationShellContext.Provider>
+            <ConversationContentProviders
+              open={open}
+              messages={messages}
+              group={group}
+              layoutKey={layoutKey}
+            >
+              {children}
+            </ConversationContentProviders>
           </ConversationProjectContext.Provider>
         </ConversationAccessContext.Provider>
       </ConversationSourceLabelsContext.Provider>
     </ConversationDraftProvider>
+  );
+}
+
+function ConversationContentProviders({
+  open,
+  messages,
+  group,
+  layoutKey,
+  children,
+}: {
+  open: OpenConversationTarget;
+  messages: ReactNode;
+  group: boolean;
+  layoutKey: string;
+  children: ReactNode;
+}) {
+  return (
+    <ConversationShellContext.Provider value>
+      <ConversationFileContext.Provider value={open}>
+        <ConversationContentContext.Provider value={messages}>
+          <ConversationGroupContext.Provider value={group}>
+            <ConversationPanelProviders layoutKey={layoutKey}>
+              {children}
+            </ConversationPanelProviders>
+          </ConversationGroupContext.Provider>
+        </ConversationContentContext.Provider>
+      </ConversationFileContext.Provider>
+    </ConversationShellContext.Provider>
   );
 }

@@ -70,9 +70,9 @@ export const ChatComposer = memo(function ChatComposer({
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create({
   dock: {
-    paddingHorizontal: theme.spacing[4],
-    paddingBottom: theme.spacing[3],
+    width: "100%",
+    flexShrink: 1,
   },
-}));
+});

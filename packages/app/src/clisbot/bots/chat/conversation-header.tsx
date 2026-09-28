@@ -2,7 +2,10 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { View, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { PanelRight } from "lucide-react-native";
-import { MenuHeader } from "@/components/headers/menu-header";
+import { SidebarMenuToggle } from "@/components/headers/menu-header";
+import { ScreenHeader } from "@/components/headers/screen-header";
+import { useHosts } from "@/runtime/host-runtime";
+import { ConversationHeading } from "./conversation-heading";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { WorkspaceActions } from "@/git/workspace-actions";
@@ -18,6 +21,9 @@ export function ConversationHeader({
   selector,
   headerActions,
   openExplorer,
+  group,
+  memberCount,
+  tabCount,
 }: {
   serverId: string;
   title: string;
@@ -26,7 +32,12 @@ export function ConversationHeader({
   selector: ReactNode;
   headerActions: ReactNode;
   openExplorer: () => void;
+  group: boolean;
+  memberCount: number;
+  tabCount: number;
 }) {
+  const hosts = useHosts();
+  const hostName = hosts.find((host) => host.serverId === serverId)?.label ?? "Host";
   const right = useMemo(
     () => (
       <View style={styles.actions}>
@@ -54,7 +65,19 @@ export function ConversationHeader({
       openExplorer,
     ],
   );
-  return <MenuHeader title={title} rightContent={right} />;
+  const left = (
+    <>
+      <SidebarMenuToggle />
+      <ConversationHeading
+        title={title}
+        group={group}
+        memberCount={memberCount}
+        hostName={hostName}
+        tabCount={tabCount}
+      />
+    </>
+  );
+  return <ScreenHeader left={left} right={right} />;
 }
 
 export function ConversationBotSelector({ project }: { project: Project }) {
