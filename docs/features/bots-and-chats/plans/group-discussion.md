@@ -1,6 +1,6 @@
 # Group discussion
 
-Date: 2026-09-28. Status: decided, not implemented. Revises the defaults of README
+Date: 2026-09-28. Status: decided; step 1 of [Order of work](#order-of-work) implemented. Revises the defaults of README
 [D9](../README.md#d9-group-turn-rules-follow-the-channel-route-model) and the "who answers" table in
 [server-chat §2.2](server-chat.md#22-who-answers-turn-rulests-pure). Scope: bots in one Chat on one
 Host. Channels (Slack, Telegram) come later and reuse the same rules through the Hub.
@@ -42,9 +42,10 @@ not official):
 
 ### Room contract in the system prompt
 
-Each (bot, chat) session starts with a system prompt built by a pure function in
-`packages/server/src/server/chats/`, passed as `config.systemPrompt` when `bot-sessions.ts` creates
-the session and rebuilt when the session resumes. It has two parts:
+Each (bot, chat) session in a group starts with a system prompt built by
+`packages/server/src/server/chats/room-contract.ts`, passed as `config.systemPrompt` when
+`bot-sessions.ts` creates the session. The daemon persists it with the agent, so a resumed session
+keeps it. It has two parts:
 
 1. **Fixed frame**, in code, not stored, not editable. It states the bot's display name, slug and
    description; every member as `@slug — display name — description`; and how the room works:
@@ -68,14 +69,17 @@ Group settings shows the full rendered prompt read-only.
 A bot with no description is listed with its display name only. Bot settings and Add Member remind
 the owner that other bots use the description to decide when to tag this one.
 
-Membership or room-instruction changes do not reset sessions. The next wake of each bot starts with
-a `[Room update]` line saying what changed, and a resumed session gets a freshly built prompt.
+Membership, description or room-instruction changes do not reset sessions. Each participant stores
+the fingerprint of the room it was last told (`roomSeen`); when it differs, the bot's next wake
+starts with a `[Room update]` block restating the members and instructions. Sessions created before
+the room contract existed have no fingerprint, so they get the block once on their next wake.
 
 ### Silence is a valid turn
 
-A turn whose final text is empty or exactly `PASS` appends nothing to the transcript. The
-"finished without a reply" notice is removed. Failures still end in a `system` line: silence is
-the bot's choice, a failed delivery is not.
+In a group, a turn whose final text is empty or exactly `PASS` appends nothing to the transcript
+and forwards nothing. Failures still end in a `system` line: silence is the bot's choice, a failed
+delivery is not. A direct chat has no room contract, so a turn there without text still gets the
+"finished without a reply" notice.
 
 ### Turns in rounds
 

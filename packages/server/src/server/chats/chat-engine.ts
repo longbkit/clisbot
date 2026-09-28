@@ -17,6 +17,7 @@ import type { PromptDispatchDisposition } from "../agent/agent-prompt.js";
 import { resolveClientMessageId } from "../client-message-id.js";
 import type { BotSessions } from "./bot-sessions.js";
 import {
+  chatKindOf,
   chatPayload,
   resolveChatRules,
   type ChatBot,
@@ -26,6 +27,14 @@ import {
 import type { ChatStore } from "./chat-store.js";
 import { renderChatPrompt, sessionTitleFor } from "./context-prompt.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
+import {
+  isSilentReply,
+  renderRoomContract,
+  renderRoomUpdate,
+  roomFingerprint,
+  type RoomContractInput,
+  type RoomMember,
+} from "./room-contract.js";
 import type { MentionableParticipant } from "./mentions.js";
 import type { TranscriptLine, TranscriptLineInput, TranscriptLog } from "./transcript-log.js";
 import { inputLimitError, targetsFor, type TurnDecision } from "./turn-rules.js";
@@ -99,7 +108,7 @@ export class ChatEngine implements TurnTrackerHost {
   private readonly finalizing = new KeyedSerialQueue();
   private readonly inFlight = new Set<Promise<unknown>>();
   /** Sender-line names of every bot seen in a chat, so rendering never awaits a lookup. */
-  private readonly botNames = new Map<string, { slug: string; displayName: string }>();
+  private readonly botNames = new Map<string, RoomMember>();
   private readonly logger: Logger;
   private readonly now: () => string;
 
@@ -321,26 +330,50 @@ export class ChatEngine implements TurnTrackerHost {
     if (lines.length === 0) return;
     const rules = resolveChatRules(chat.rules);
     const title = sessionTitleFor(chat.title, lines[0]?.text ?? "");
-    const session = await this.deps.botSessions.resolve(chat, bot, title);
+    await this.rememberBots(chat);
+    const room = this.roomOf(chat, botId);
+    const session = await this.deps.botSessions.resolve(
+      chat,
+      bot,
+      title,
+      room ? renderRoomContract(room) : undefined,
+    );
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
     const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));
-    // A concurrent send can already be in the log. It belongs to its own dispatch,
-    // never this prompt's context or delivery watermark.
-    const page = await this.deps.transcriptOf(chatId).fetch({
-      direction: "before",
-      cursor: { seq: deliveredSeq + 1 },
-      limit: rules.context.maxMessages,
-    });
-    const window = page.lines.filter((entry) => entry.seq > participant.deliveredSeq);
-    await this.rememberBots(chat);
+    const window = await this.windowOf(chatId, participant.deliveredSeq, deliveredSeq, rules);
     const prompt = renderChatPrompt({
       botId,
       window,
       triggering: lines,
       botOf: (id) => this.knownBot(id),
     });
-    if (prompt !== "") await this.prompt(chat, bot, session.agentId, rules, lines, prompt, window);
+    if (prompt !== "") {
+      const update = room && !session.created ? roomUpdateFor(room, participant.roomSeen) : null;
+      const text = update ? `${update}\n\n${prompt}` : prompt;
+      await this.prompt(chat, bot, session.agentId, rules, lines, text, window);
+    }
+    // A new session read the room in its system prompt; a prompted one read it or its update.
+    if (room && (prompt !== "" || session.created))
+      await this.deps.store.setParticipantRoomSeen(chatId, botId, roomFingerprint(room));
     await this.deps.store.markDelivered(chatId, botId, deliveredSeq);
+  }
+
+  /**
+   * Lines after the bot's watermark up to this delivery. A concurrent send can already be in the
+   * log; it belongs to its own dispatch, never this prompt's context or delivery watermark.
+   */
+  private async windowOf(
+    chatId: string,
+    after: number,
+    upTo: number,
+    rules: ResolvedChatRules,
+  ): Promise<TranscriptLine[]> {
+    const page = await this.deps.transcriptOf(chatId).fetch({
+      direction: "before",
+      cursor: { seq: upTo + 1 },
+      limit: rules.context.maxMessages,
+    });
+    return page.lines.filter((entry) => entry.seq > after);
   }
 
   private async prompt(
@@ -381,15 +414,28 @@ export class ChatEngine implements TurnTrackerHost {
     );
   }
 
-  private knownBot(botId: string): { slug: string; displayName: string } | null {
+  private knownBot(botId: string): RoomMember | null {
     return this.botNames.get(botId) ?? null;
   }
 
   private async rememberBots(chat: StoredChat): Promise<void> {
     for (const { botId } of chat.participants) {
       const bot = await this.deps.bots.get(botId);
-      if (bot) this.botNames.set(botId, { slug: bot.slug, displayName: bot.displayName });
+      if (bot)
+        this.botNames.set(botId, {
+          slug: bot.slug,
+          displayName: bot.displayName,
+          description: bot.description ?? null,
+        });
     }
+  }
+
+  /** The room a group-chat bot is told about; a direct chat has none. Needs `rememberBots`. */
+  private roomOf(chat: StoredChat, botId: string): RoomContractInput | null {
+    const self = this.knownBot(botId);
+    if (chatKindOf(chat) !== "group" || !self) return null;
+    const members = chat.participants.flatMap(({ botId: id }) => this.knownBot(id) ?? []);
+    return { chatTitle: chat.title, self, members };
   }
 
   /** §2.7: the turn's final text becomes a bot line, then its mentions are forwarded. */
@@ -425,6 +471,8 @@ export class ChatEngine implements TurnTrackerHost {
       )
         return;
     }
+    // In a group, silence is a valid turn (plans/group-discussion.md); a failure still gets a notice.
+    if (chatKindOf(chat) === "group" && isSilentReply(outcome.text)) return;
     const bot = await this.deps.bots.get(outcome.botId);
     if (outcome.text === null) {
       if (outcome.expectation)
@@ -520,4 +568,9 @@ function messageContent(input: { text: string } & ChatMessageFiles): string {
       a.type === "uploaded_file" ? Object.assign({}, a, { path: undefined }) : a,
     ),
   });
+}
+
+/** What a bot hears first when the room changed since its session last heard about it. */
+function roomUpdateFor(room: RoomContractInput, roomSeen: string | undefined): string | null {
+  return roomSeen === roomFingerprint(room) ? null : renderRoomUpdate(room);
 }

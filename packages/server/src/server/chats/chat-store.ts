@@ -208,6 +208,15 @@ export class ChatStore {
     );
   }
 
+  /** Records which room state this bot's session has been told (plans/group-discussion.md). */
+  setParticipantRoomSeen(chatId: string, botId: string, roomSeen: string): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      mapParticipant(chat, botId, (entry) =>
+        entry.roomSeen === roomSeen ? entry : { ...entry, roomSeen },
+      ),
+    );
+  }
+
   /** `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it. */
   resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat, at) =>

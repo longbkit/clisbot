@@ -62,6 +62,8 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
   ]);
   const agents = new Map<string, StoredAgentRecord>();
   let created = 0;
+  const createInputs: Parameters<ConstructorParameters<typeof BotSessions>[0]["createAgent"]>[0][] =
+    [];
   const botSessions = new BotSessions({
     agentStorage: {
       get: async (id) => agents.get(id) ?? null,
@@ -69,6 +71,7 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
     },
     store,
     createAgent: async (input) => {
+      createInputs.push(input);
       const id = `agent-${input.kind === "mcp" ? input.labels?.["clisbot.bot-id"] : "x"}-${++created}`;
       agents.set(id, {
         id,
@@ -157,6 +160,8 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
     failTurn,
     lines,
     agents,
+    bots,
+    createInputs,
   };
 }
 
@@ -699,4 +704,55 @@ test("updated reply policy applies to subsequent messages without resetting grou
   expect((await h.store.require("editable-group")).participants.map((p) => p.agentId)).toEqual(
     sessions,
   );
+});
+
+describe("group room contract (plans/group-discussion.md)", () => {
+  const systemPromptOf = (input: unknown) =>
+    (input as { config?: { systemPrompt?: string } }).config?.systemPrompt;
+
+  test("a group session starts with the room contract; a direct one does not", async () => {
+    const h = await harness();
+    h.bots.set(beta.id, { ...beta, description: "Owns the numbers" });
+    await h.store.create({ id: "cht_g", title: "Launch", botIds: [alpha.id, beta.id] });
+    await h.store.create({ id: "cht_d", botIds: [alpha.id] });
+    await h.engine.send({ chatId: "cht_g", text: "status?", messageId: "m1" });
+    await h.engine.send({ chatId: "cht_d", text: "hi", messageId: "m2" });
+    await h.engine.idle();
+    const [alphaInGroup, betaInGroup, alphaDirect] = h.createInputs.map(systemPromptOf);
+    expect(alphaInGroup).toContain('You are Alpha (@alpha) in the group chat "Launch".');
+    expect(alphaInGroup).toContain("- @beta — Beta — Owns the numbers");
+    expect(betaInGroup).toContain("You are Beta (@beta)");
+    expect(alphaDirect).toBeUndefined();
+    // A fresh session read the room in its system prompt, so the first prompt is the message.
+    expect(h.sent.every((prompt) => !String(prompt.prompt).includes("[Room update]"))).toBe(true);
+  });
+
+  test("a change to the members is told once, on the next wake of each existing session", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_g", text: "first", messageId: "m1" });
+    await h.engine.idle();
+    h.bots.set(beta.id, { ...beta, description: "Owns the numbers" });
+    await h.engine.send({ chatId: "cht_g", text: "@alpha second", messageId: "m2" });
+    await h.engine.send({ chatId: "cht_g", text: "@alpha third", messageId: "m3" });
+    await h.engine.idle();
+    const alphaPrompts = h.sent
+      .filter((prompt) => prompt.agentId === "agent-bot_a-1")
+      .map((prompt) => String(prompt.prompt));
+    expect(alphaPrompts[1]?.startsWith("[Room update]")).toBe(true);
+    expect(alphaPrompts[1]).toContain("- @beta — Beta — Owns the numbers");
+    expect(alphaPrompts[1]).toContain("user: @alpha second");
+    expect(alphaPrompts[2]).not.toContain("[Room update]");
+  });
+
+  test("PASS and an empty turn are silence in a group: no line, no notice, no forwarding", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_g", text: "@alpha @beta thoughts?", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS");
+    await h.completeTurn("agent-bot_b-2", null);
+    expect((await h.lines("cht_g")).map((line) => line.text)).toEqual(["@alpha @beta thoughts?"]);
+    expect(h.sent).toHaveLength(2);
+  });
 });

@@ -28,14 +28,30 @@ export interface BotSessionsDependencies {
   ensureLoaded: (agentId: string) => Promise<unknown>;
 }
 
+/** What a session created by `resolve` starts with. */
+interface SessionStart {
+  title: string | undefined;
+  systemPrompt: string | undefined;
+}
+
 export class BotSessions {
   private readonly queue = new KeyedSerialQueue();
 
   constructor(private readonly deps: BotSessionsDependencies) {}
 
-  /** The live session for the pair, created when none exists. Serialized per pair. */
-  resolve(chat: StoredChat, bot: ChatBot, title?: string): Promise<ResolvedBotSession> {
-    return this.queue.run(pairKey(chat.id, bot.id), () => this.resolveUnlocked(chat, bot, title));
+  /**
+   * The live session for the pair, created when none exists. Serialized per pair. `systemPrompt`
+   * applies only to a session created here; an existing one keeps what it was created with.
+   */
+  resolve(
+    chat: StoredChat,
+    bot: ChatBot,
+    title?: string,
+    systemPrompt?: string,
+  ): Promise<ResolvedBotSession> {
+    return this.queue.run(pairKey(chat.id, bot.id), () =>
+      this.resolveUnlocked(chat, bot, { title, systemPrompt }),
+    );
   }
 
   /** `/new`: forgets the current session so the next delivery starts a fresh one. */
@@ -48,7 +64,7 @@ export class BotSessions {
   private async resolveUnlocked(
     chat: StoredChat,
     bot: ChatBot,
-    title: string | undefined,
+    start: SessionStart,
   ): Promise<ResolvedBotSession> {
     const current = await this.deps.store.require(chat.id);
     const participant = current.participants.find((entry) => entry.botId === bot.id);
@@ -56,12 +72,12 @@ export class BotSessions {
     const known =
       (await this.cachedSession(cached, chat.id, bot.id)) ??
       (await this.scan(chat.id, bot.id, participant?.resetAt ?? null));
-    if (known?.archivedAt) return this.create(chat, bot, title, "archived");
-    if (!known) return this.create(chat, bot, title, null);
+    if (known?.archivedAt) return this.create(chat, bot, start, "archived");
+    if (!known) return this.create(chat, bot, start, null);
     try {
       await this.deps.ensureLoaded(known.id);
     } catch {
-      return this.create(chat, bot, title, "could_not_resume");
+      return this.create(chat, bot, start, "could_not_resume");
     }
     if (known.id !== cached) await this.deps.store.setParticipantAgent(chat.id, bot.id, known.id);
     return { agentId: known.id, created: false, replaced: null };
@@ -100,7 +116,7 @@ export class BotSessions {
   private async create(
     chat: StoredChat,
     bot: ChatBot,
-    title: string | undefined,
+    { title, systemPrompt }: SessionStart,
     replaced: BotSessionReplacement | null,
   ): Promise<ResolvedBotSession> {
     const { launch } = bot;
@@ -112,6 +128,7 @@ export class BotSessions {
         ...(launch.modeId ? { mode: launch.modeId } : {}),
         ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
         ...(launch.featureValues ? { features: launch.featureValues } : {}),
+        ...(systemPrompt ? { config: { systemPrompt } } : {}),
         cwd: bot.cwd,
         workspaceId: bot.workspaceId,
         labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },

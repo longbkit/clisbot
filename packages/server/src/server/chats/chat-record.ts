@@ -66,6 +66,8 @@ export const StoredChatParticipantSchema = z
     deliveredSeq: z.number().int().nonnegative(),
     /** Durable proof of the most recent completed turn, before transcript projection. */
     completedTurn: ChatCompletedTurnSchema.nullable().optional(),
+    /** `roomFingerprint` of the members and room instructions this bot's session was last told. */
+    roomSeen: z.string().optional(),
   })
   .strict();
 export type StoredChatParticipant = z.infer<typeof StoredChatParticipantSchema>;
@@ -134,6 +136,8 @@ export interface ChatBot {
   id: string;
   slug: string;
   displayName: string;
+  /** What the other bots in a group read to decide when to tag this one. */
+  description?: string | null;
   workspaceId: string;
   cwd: string;
   launch: {
@@ -145,6 +149,11 @@ export interface ChatBot {
   };
 }
 
+/** Records written before `kind` existed are groups when they hold several bots. */
+export function chatKindOf(chat: Pick<StoredChat, "kind" | "participants">): "direct" | "group" {
+  return chat.kind ?? (chat.participants.length > 1 ? "group" : "direct");
+}
+
 /** The record as the app sees it: `deliveredSeq` dropped, the bot's name and slug added. */
 export function chatPayload(
   chat: StoredChat,
@@ -152,7 +161,7 @@ export function chatPayload(
 ): ChatPayload {
   return {
     id: chat.id,
-    kind: chat.kind ?? (chat.participants.length > 1 ? "group" : "direct"),
+    kind: chatKindOf(chat),
     title: chat.title,
     participants: chat.participants.map((participant) => {
       const bot = botOf(participant.botId);
