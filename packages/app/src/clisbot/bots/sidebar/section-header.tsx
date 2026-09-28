@@ -5,7 +5,6 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
-  Folder,
   Layers,
   LayoutGrid,
   ListFilter,
@@ -24,7 +23,7 @@ const icons = {
   Bots: withUnistyles(Bot),
   "Group chats": withUnistyles(ListFilter),
   Projects: withUnistyles(LayoutGrid),
-  "Bot projects": withUnistyles(Folder),
+  "Bot projects": withUnistyles(Bot),
   Pinned: withUnistyles(Pin),
 };
 const Fallback = withUnistyles(Layers);
@@ -47,6 +46,7 @@ export function BotsSectionHeader({
   collapsed = false,
   onToggle,
   actions,
+  nested = false,
 }: {
   label: string;
   testID: string;
@@ -56,6 +56,7 @@ export function BotsSectionHeader({
   collapsed?: boolean;
   onToggle?: () => void;
   actions?: ReactNode;
+  nested?: boolean;
 }) {
   const compact = useIsCompactFormFactor() || isNative;
   const [hovered, setHovered] = useState(false);
@@ -98,9 +99,9 @@ export function BotsSectionHeader({
           return (
             <>
               <View style={styles.iconSlot}>
-                <Leading size={16} uniProps={color} />
+                <Leading size={nested ? 14 : 16} uniProps={color} />
               </View>
-              <Text numberOfLines={1} style={styles.title}>
+              <Text numberOfLines={1} style={[styles.title, nested && styles.nestedTitle]}>
                 {label}
               </Text>
             </>
@@ -155,6 +156,10 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     lineHeight: 20,
     flexShrink: 1,
+  },
+  nestedTitle: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.normal,
   },
   iconSlot: { width: 16, height: 20, alignItems: "center", justifyContent: "center" },
   actionHidden: { opacity: 0 },

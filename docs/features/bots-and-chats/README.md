@@ -88,8 +88,11 @@ inside the Host folder policy's allow set.
 Project root = bot directory, one Workspace of kind `directory`. This is what gives per-bot sharing
 through Project grants and per-bot session storage. One shared "Bots" Project would lose both.
 
-Bot Projects have an always-present **Bot projects** section, initially collapsed. Its expansion state
-is a device view preference. The 2026-09-27 [app experience decision](app-experience.md) supersedes
+Bot Projects have an always-present **Bot projects** subgroup inside **Projects**, initially collapsed.
+Its lighter caption and one 8px inset distinguish the group without adding a full tree level to
+every row. Collapsing Projects hides the whole subgroup while preserving its own expansion
+preference. When there are no ordinary projects, the existing Add project / Import session empty
+state remains available above it. Its expansion state is a device view preference. The 2026-09-27 [app experience decision](app-experience.md) supersedes
 the earlier separate visibility toggle beside Workspaces and under Display → Show. It retains the
 existing Project/workspace/session rows, filters, pins and grants. Mixed multi-Host project entries
 must be split by Host/Project identity before grouping so an ordinary project on another Host is

@@ -2490,21 +2490,21 @@ function ProjectModeList({
   );
   const regularProjects = unpinnedProjects.filter((project) => !isBotProject(project));
   const botProjects = unpinnedProjects.filter((project) => isBotProject(project));
-  const projectBody =
-    projects.length === 0 && !hasBotsFeature ? (
-      <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
-    ) : (
-      <>
-        {hasBotsFeature && projectsCollapsed
-          ? null
-          : renderProjectList(regularProjects, "sidebar-project-list")}
-        {hasBotsFeature ? (
-          <BotProjectsGroup>
-            {renderProjectList(botProjects, "sidebar-bot-project-list")}
-          </BotProjectsGroup>
-        ) : null}
-      </>
-    );
+  const hasRegularProjects = projects.some((project) => !isBotProject(project));
+  const projectBody = (
+    <>
+      {(hasBotsFeature ? !hasRegularProjects : projects.length === 0) ? (
+        <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
+      ) : (
+        renderProjectList(regularProjects, "sidebar-project-list")
+      )}
+      {hasBotsFeature ? (
+        <BotProjectsGroup>
+          {renderProjectList(botProjects, "sidebar-bot-project-list")}
+        </BotProjectsGroup>
+      ) : null}
+    </>
+  );
 
   const content = (
     <>
@@ -2552,14 +2552,15 @@ function ProjectModeList({
       sidebarFilterEmpty
         ? listHeaderComponent
         : null}
-      {sidebarFilterEmpty ? (
-        <>
-          <SidebarFilterEmptyState />
-          {hasBotsFeature ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
-        </>
-      ) : (
-        projectBody
-      )}
+      {!(hasBotsFeature && projectsCollapsed) &&
+        (sidebarFilterEmpty ? (
+          <>
+            <SidebarFilterEmptyState />
+            {hasBotsFeature ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
+          </>
+        ) : (
+          projectBody
+        ))}
       {listFooterComponent}
     </>
   );

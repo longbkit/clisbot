@@ -207,6 +207,7 @@ export function SidebarStatusWorkspaceList({
     ],
   );
   const fusion = useBotsFeatureHosts().length > 0;
+  const [projectsCollapsed] = useSectionCollapsed("projects");
   const content = (
     <>
       {listLeadingComponent}
@@ -239,24 +240,25 @@ export function SidebarStatusWorkspaceList({
         </View>
       ) : null}
       {listHeaderComponent}
-      {sidebarFilterEmpty ? (
-        <>
-          <SidebarFilterEmptyState />
-          {fusion ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
-        </>
-      ) : (
-        <StatusGroupList
-          groups={groups}
-          collapsedWorkspaceGroupKeys={collapsedWorkspaceGroupKeys}
-          projectIconByProjectViewKey={projectIconByProjectViewKey}
-          shortcutIndex={statusShortcutIndex}
-          showShortcutBadges={showShortcutBadges}
-          onWorkspacePress={onWorkspacePress}
-          hostBadgeByServerId={hostBadgeByServerId}
-          supportsPinningByServerId={supportsPinningByServerId}
-          onToggleWorkspacePin={onToggleWorkspacePin}
-        />
-      )}
+      {!(fusion && projectsCollapsed) &&
+        (sidebarFilterEmpty ? (
+          <>
+            <SidebarFilterEmptyState />
+            {fusion ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
+          </>
+        ) : (
+          <StatusGroupList
+            groups={groups}
+            collapsedWorkspaceGroupKeys={collapsedWorkspaceGroupKeys}
+            projectIconByProjectViewKey={projectIconByProjectViewKey}
+            shortcutIndex={statusShortcutIndex}
+            showShortcutBadges={showShortcutBadges}
+            onWorkspacePress={onWorkspacePress}
+            hostBadgeByServerId={hostBadgeByServerId}
+            supportsPinningByServerId={supportsPinningByServerId}
+            onToggleWorkspacePin={onToggleWorkspacePin}
+          />
+        ))}
     </>
   );
 
@@ -307,7 +309,6 @@ function StatusGroupList({
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
   const fusion = useBotsFeatureHosts().length > 0;
-  const [projectsCollapsed] = useSectionCollapsed("projects");
   const sections = splitBotStatusGroups(groups);
   const renderGroup = (group: SidebarWorkspaceGroup) => (
     <StatusGroupRows
@@ -325,7 +326,7 @@ function StatusGroupList({
   );
   return (
     <>
-      {fusion && projectsCollapsed ? null : sections.regular.map(renderGroup)}
+      {sections.regular.map(renderGroup)}
       {fusion || sections.bots.length > 0 ? (
         <BotProjectsGroup>{sections.bots.map(renderGroup)}</BotProjectsGroup>
       ) : null}
