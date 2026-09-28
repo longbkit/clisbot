@@ -74,7 +74,8 @@ that it has none yet.
 Membership, description or room-instruction changes do not reset sessions. Each participant stores
 the fingerprint of the room it was last told (`roomSeen`); when it differs, the bot's next wake
 starts with a `[Room update]` block restating the members and instructions. Sessions created before
-the room contract existed have no fingerprint, so they get the block once on their next wake.
+the room contract existed have no fingerprint, so their next wake starts with the whole contract,
+rules included: a members-only update would never teach them `PASS`.
 
 ### Silence is a valid turn
 
@@ -99,13 +100,19 @@ One bot speaks at a time per Chat. Bots in different Chats still run concurrentl
   the room in unless that bot tags them.
 - **End**: a round in which nobody speaks ends the discussion. `rounds.max` (default 5) is a guard
   rail, not a target: bots are told to stop as soon as the question is settled, and the last round's
-  wake says the room is wrapping up. Reaching the cap appends a `system` line.
-- **Preempt**: a new user line cancels the queue and opens a new discussion; a running turn is
-  steered through the existing `whenBusy: steer`.
+  wake says the room is wrapping up. Reaching the cap appends a `system` line. The daemon runs at
+  most 20 rounds whatever the stored value says.
+- **Preempt**: every user line in a group ends the running discussion. When it names or addresses
+  bots, it opens a new one. A bot still speaking keeps the floor: the new discussion's first bot
+  wakes when that turn ends, and sees what it said.
 - **Stop all**: a header action shown while a group bot is working. `chat.discussion.stop` ends the
-  discussion, interrupts every running participant and appends `⏹ Stopped by the user.`. Stopping
-  one bot from its own session also ends the discussion: the user took the floor. A cancel that a
-  steer caused is not a stop, because a prompt is still waiting for that bot.
+  discussion, interrupts every running or starting participant and appends `⏹ Stopped by the
+user.`. Stopping the bot that holds the floor from its own session also ends the discussion: the
+  user took the floor. Stopping any other bot does not, and a cancel that a steer caused is not a
+  stop, because a prompt is still waiting for that bot.
+- **Every turn ends**: a prompt that binds no turn (a duplicate, an out-of-band command) does not
+  hold the floor, and a turn whose session was replaced still releases it, so a discussion never
+  waits on a turn nothing will finish.
 
 The discussion is held in memory (`packages/server/src/server/chats/discussion.ts`). A daemon
 restart ends it; startup backfill still recovers the reply of a turn that finished while the daemon

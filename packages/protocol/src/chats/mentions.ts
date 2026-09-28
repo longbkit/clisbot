@@ -30,8 +30,3 @@ export function mentionTokens(text: string): MentionToken[] {
 export function isRoomWideMention(token: string): boolean {
   return (ROOM_WIDE_MENTIONS as readonly string[]).includes(token.toLowerCase());
 }
-
-/** Whether `text` addresses the whole room. */
-export function mentionsRoom(text: string): boolean {
-  return mentionTokens(text).some((mention) => isRoomWideMention(mention.token));
-}

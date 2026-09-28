@@ -104,7 +104,13 @@ function instructionsOf(instructions: string | null | undefined): string {
 }
 
 /** A bot without a description is known by its name only. */
+/** How much of a description each member's line carries; every bot's prompt repeats the roster. */
+const ROLE_MAX_CHARS = 280;
+
 function roleOf(member: RoomMember): string {
-  const description = member.description?.trim() ?? "";
-  return description === "" ? member.displayName : description;
+  const description = member.description?.trim().replace(/\s+/gu, " ") ?? "";
+  if (description === "") return member.displayName;
+  return description.length > ROLE_MAX_CHARS
+    ? `${description.slice(0, ROLE_MAX_CHARS)}…`
+    : description;
 }

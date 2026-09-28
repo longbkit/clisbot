@@ -6,3 +6,6 @@ export const DEFAULT_ROOM_INSTRUCTIONS = [
   "Build on what others already said instead of repeating it.",
   "When the question is settled, the member who owns the next step says so briefly and the rest PASS.",
 ].join("\n");
+
+/** Rounds a group discussion may run when the chat sets no `rounds.max`; a guard rail. */
+export const DEFAULT_CHAT_ROUNDS_MAX = 5;

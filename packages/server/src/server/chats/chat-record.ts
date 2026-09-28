@@ -15,6 +15,8 @@ import {
   type ChatWhenBusy,
 } from "@getpaseo/protocol/chats/types";
 import { SessionActorSchema } from "@getpaseo/protocol/session-authorship";
+import { CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/rpc-schemas";
+import { DEFAULT_CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/room";
 
 const StoredChatLimitsSchema = z
   .object(
@@ -111,7 +113,7 @@ export interface ResolvedChatRules {
 export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
   interaction: { requireMention: false, whenBusy: "steer" },
   hops: { max: 3 },
-  rounds: { max: 5 },
+  rounds: { max: DEFAULT_CHAT_ROUNDS_MAX },
   room: { instructions: null },
   context: { maxMessages: 20 },
   limits: { maxInputCharacters: 8_000 },
@@ -125,7 +127,8 @@ export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRule
       whenBusy: rules?.interaction?.whenBusy ?? defaults.interaction.whenBusy,
     },
     hops: { max: rules?.hops?.max ?? defaults.hops.max },
-    rounds: { max: rules?.rounds?.max ?? defaults.rounds.max },
+    // The wire accepts any positive count; the daemon caps what it runs.
+    rounds: { max: Math.min(rules?.rounds?.max ?? defaults.rounds.max, CHAT_ROUNDS_MAX) },
     room: { instructions: roomInstructionsOf(rules) },
     context: { maxMessages: rules?.context?.maxMessages ?? defaults.context.maxMessages },
     limits: { ...defaults.limits, ...rules?.limits },

@@ -45,7 +45,9 @@ interface SentPrompt {
   activeTurnBehavior?: "steer";
 }
 
-async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise<void> } = {}) {
+async function harness(
+  options: { failPromptFor?: string[]; waitPrompt?: Promise<void>; outOfBandFor?: string[] } = {},
+) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "chat-engine-"));
   roots.push(root);
   const logger = createTestLogger();
@@ -120,6 +122,7 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
       if (options.failPromptFor?.includes(params.agentId)) throw new Error("provider is down");
       sent.push(params);
       await options.waitPrompt;
+      if (options.outOfBandFor?.includes(params.agentId)) return { disposition: "out_of_band" };
       return { disposition: "turn_started" };
     },
     publisher: {
@@ -288,17 +291,19 @@ describe("ChatEngine", () => {
     expect(h.sent).toHaveLength(2);
   });
 
-  test("a new user line replaces the discussion; Stop all ends it and interrupts running bots", async () => {
+  test("a new user line waits for the bot that holds the floor; Stop all ends it and interrupts", async () => {
     const h = await harness();
     await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
     await h.engine.send({ chatId: "cht_1", text: "plan?", messageId: "m1" });
     await h.engine.idle();
     await h.engine.send({ chatId: "cht_1", text: "@beta first", messageId: "m2" });
     await h.engine.idle();
-    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
-    // Alpha's late answer lands, but the replaced discussion does not wake anyone for it.
+    // Alpha is still speaking, so Beta waits: one bot speaks at a time.
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1"]);
     await h.completeTurn("agent-bot_a-1", "late plan");
-    expect(h.sent).toHaveLength(2);
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
+    expect(String(h.sent[1]!.prompt)).toContain("late plan");
+    expect(String(h.sent[1]!.prompt)).toContain("@beta first");
     h.liveAgents.set("agent-bot_b-2", {
       lifecycle: "running",
       pendingPermissions: new Map(),
@@ -309,6 +314,25 @@ describe("ChatEngine", () => {
     await h.completeTurn("agent-bot_b-2", "done");
     expect(h.sent).toHaveLength(2);
     expect((await h.lines("cht_1")).at(-2)?.text).toBe("⏹ Stopped by the user.");
+  });
+
+  test("a user line that wakes nobody still ends the running discussion", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_1", text: "plan?", messageId: "m1" });
+    await h.engine.idle();
+    await h.store.updateSettings("cht_1", { requireMention: true });
+    await h.engine.send({ chatId: "cht_1", text: "never mind", messageId: "m2" });
+    await h.completeTurn("agent-bot_a-1", "a plan");
+    expect(h.sent).toHaveLength(1);
+  });
+
+  test("a prompt that binds no turn does not hold the floor", async () => {
+    const h = await harness({ outOfBandFor: ["agent-bot_a-1"] });
+    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_1", text: "plan?", messageId: "m1" });
+    await h.engine.idle();
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
   });
 
   test("the same message id is written once; a different text under it is refused", async () => {
@@ -541,11 +565,13 @@ test("late forwarding does not resend a bot line already consumed as context", a
   await written;
   try {
     await h.engine.send({ chatId: "cht_overtake", text: "@beta next", messageId: "u2" });
-    await expect.poll(() => h.sent.length).toBe(2);
+    // Alpha still holds the floor until its reply is written; Beta waits for it.
+    expect(h.sent).toHaveLength(1);
   } finally {
     release();
     await completion;
   }
+  await h.engine.idle();
   expect(h.sent).toHaveLength(2);
   expect(h.sent[1]!.prompt).toContain("forwarded-once");
   expect(

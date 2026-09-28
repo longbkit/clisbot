@@ -121,7 +121,7 @@ export class TurnTracker {
     agentId: string,
     expectation: Omit<TurnExpectation, "disposition">,
     send: () => Promise<{ disposition: PromptDispatchDisposition }>,
-  ): Promise<void> {
+  ): Promise<PromptDispatchDisposition> {
     const watched = this.agents.get(agentId);
     if (!watched) throw new Error(`Agent ${agentId} is not watched`);
     if (watched.buffered) throw new Error(`Concurrent prompt admission for ${agentId}`);
@@ -130,6 +130,7 @@ export class TurnTracker {
     try {
       const { disposition } = await send();
       this.expect(agentId, { ...expectation, disposition });
+      return disposition;
     } finally {
       watched.buffered = null;
       for (const event of events) this.onEvent(agentId, watched, event);

@@ -8,7 +8,12 @@ import { resolveClientMessageId } from "../client-message-id.js";
 import { wrapSpokenInput } from "../voice-config.js";
 import type { ChatMessageFiles, SendMessageInput, SendMessageResult } from "./chat-engine.js";
 import type { ChatBot } from "./chat-record.js";
-import { renderRoomUpdate, roomFingerprint, type RoomContractInput } from "./room-contract.js";
+import {
+  type RoomContractInput,
+  renderRoomContract,
+  renderRoomUpdate,
+  roomFingerprint,
+} from "./room-contract.js";
 import type { TranscriptLine, TranscriptLineInput } from "./transcript-log.js";
 import type { TurnOutcome } from "./turn-tracker.js";
 
@@ -74,11 +79,15 @@ export function errorLine(error: unknown): string {
   return line.length > NOTICE_ERROR_MAX_CHARS ? `${line.slice(0, NOTICE_ERROR_MAX_CHARS)}…` : line;
 }
 
-/** What a bot hears first when the room changed since its session last heard about it. */
+/**
+ * What a bot hears first when the room changed since its session last heard about it. A session
+ * that predates the room contract has never seen it, so it gets the whole contract, rules included.
+ */
 export function roomUpdateFor(
   room: RoomContractInput,
   roomSeen: string | undefined,
 ): string | null {
+  if (roomSeen === undefined) return renderRoomContract(room);
   return roomSeen === roomFingerprint(room) ? null : renderRoomUpdate(room);
 }
 

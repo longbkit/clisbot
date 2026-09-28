@@ -127,7 +127,6 @@ export class ChatEngine implements TurnTrackerHost {
       members: (chat) => this.members(chat),
       wake: (chatId, botId, lines, cue) => this.wake(chatId, botId, lines, cue),
       notice: (chatId, text) => this.appendSystem(chatId, text),
-      logger: this.logger,
     });
   }
 
@@ -175,9 +174,11 @@ export class ChatEngine implements TurnTrackerHost {
       await files
         .release?.()
         .catch((error) => this.deps.logger.warn({ error }, "Chat upload cleanup failed"));
+      // Every user line in a group takes the floor: it opens a discussion or ends the running one.
       if (discussion && discussion.targets.length > 0)
         this.track(this.discussions.start(chat.id, discussion.mode, discussion.targets));
-      else if (!discussion) this.track(this.fanOut(chat.id, decision, line));
+      else if (discussion) this.discussions.stop(chat.id);
+      else this.track(this.fanOut(chat.id, decision, line));
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
     });
   }
@@ -190,7 +191,8 @@ export class ChatEngine implements TurnTrackerHost {
     const chat = await this.deps.store.require(chatId);
     let stopped = this.discussions.stop(chatId);
     for (const { agentId } of chat.participants) {
-      if (!agentId || this.deps.agentManager.getAgent(agentId)?.lifecycle !== "running") continue;
+      const lifecycle = agentId ? this.deps.agentManager.getAgent(agentId)?.lifecycle : undefined;
+      if (!agentId || (lifecycle !== "running" && lifecycle !== "initializing")) continue;
       await this.deps.agentManager.cancelAgentRun(agentId);
       stopped = true;
     }
@@ -421,16 +423,19 @@ export class ChatEngine implements TurnTrackerHost {
       triggering: lines,
       botOf: (id) => this.knownBot(id),
     });
-    if (prompt !== "") {
+    let started = prompt !== "";
+    if (started) {
       const update = room && !session.created ? roomUpdateFor(room, participant.roomSeen) : null;
       const text = [update, prompt, cue].filter(Boolean).join("\n\n");
-      await this.prompt(chat, bot, session.agentId, rules, lines, text, window);
+      const disposition = await this.prompt(chat, bot, session.agentId, rules, lines, text, window);
+      // A duplicate or out-of-band command binds no turn, so nothing will end it.
+      if (disposition === "out_of_band") started = false;
     }
     // A new session read the room in its system prompt; a prompted one read it or its update.
     if (room && (prompt !== "" || session.created))
       await this.deps.store.setParticipantRoomSeen(chatId, botId, roomFingerprint(room));
     await this.deps.store.markDelivered(chatId, botId, deliveredSeq);
-    return prompt !== "";
+    return started;
   }
 
   /**
@@ -459,9 +464,9 @@ export class ChatEngine implements TurnTrackerHost {
     lines: TranscriptLine[],
     prompt: string,
     window: TranscriptLine[],
-  ): Promise<void> {
+  ): Promise<PromptDispatchDisposition> {
     this.tracker.watch(agentId, chat.id, bot.id);
-    await this.tracker.dispatch(
+    return this.tracker.dispatch(
       agentId,
       {
         messageIds: lines.map((line) => line.id),
@@ -515,7 +520,8 @@ export class ChatEngine implements TurnTrackerHost {
 
   private async appendReply(outcome: TurnOutcome): Promise<void> {
     const chat = await this.currentChatOf(outcome);
-    if (!chat || !(await this.recordCompletedTurn(chat, outcome))) return;
+    if (!chat || !(await this.recordCompletedTurn(chat, outcome)))
+      return this.releaseFloor(outcome);
     if (chatKindOf(chat) === "group") return this.appendGroupReply(chat, outcome);
     if (outcome.text === null) {
       if (outcome.expectation) {
@@ -572,9 +578,17 @@ export class ChatEngine implements TurnTrackerHost {
     this.track(this.discussions.turnEnded(chat.id, outcome.botId, spoke));
   }
 
-  /** Stopping a bot mid-discussion ends the discussion: the user took the floor. */
-  onTurnStopped(chatId: string): void {
-    this.discussions.stop(chatId);
+  /** Stopping the bot that holds the floor ends the discussion: the user took the floor. */
+  onTurnStopped(chatId: string, botId: string): void {
+    this.discussions.stopIfSpeaking(chatId, botId);
+  }
+
+  /**
+   * A turn that ends without a reply line (its session was replaced, or the chat archived) still
+   * ends that bot's turn in the discussion. While it holds the floor it has no newer turn.
+   */
+  private releaseFloor(outcome: TurnOutcome): void {
+    this.track(this.discussions.turnEnded(outcome.chatId, outcome.botId, false));
   }
 
   onTurnFailed(outcome: TurnOutcome, error: string): Promise<void> {
@@ -587,7 +601,7 @@ export class ChatEngine implements TurnTrackerHost {
 
   private async appendFailure(outcome: TurnOutcome, error: string): Promise<void> {
     const chat = await this.currentChatOf(outcome);
-    if (!chat) return;
+    if (!chat) return this.releaseFloor(outcome);
     const bot = await this.deps.bots.get(outcome.botId);
     await this.appendSystem(
       chat.id,
