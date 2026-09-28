@@ -7669,3 +7669,63 @@ test("reviewed plugin updates gate before requests and preserve exact proposal d
     ]);
   }
 });
+
+test("Chat pages and live pushes from older Hosts expose flat sender identities", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "chat-senders",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connecting = client.connect();
+  mock.triggerOpen({ features: { bots: true } });
+  await connecting;
+  const actor = {
+    kind: "user",
+    id: "account",
+    displayName: "Long",
+    hubOrigin: "https://hub.test",
+    organizationId: "org",
+    memberId: "member",
+  };
+  const line = {
+    id: "m1",
+    seq: 1,
+    at: "2026-09-28T00:00:00.000Z",
+    sender: { kind: "user", actor },
+    text: "hello",
+    hop: 0,
+  };
+  const pushed = vi.fn();
+  client.on("chat.transcript.appended", pushed);
+  mock.triggerMessage(
+    wrapSessionMessage({ type: "chat.transcript.appended", payload: { chatId: "chat", line } }),
+  );
+  expect(pushed).toHaveBeenCalledWith({
+    type: "chat.transcript.appended",
+    payload: { chatId: "chat", line: { ...line, sender: actor } },
+  });
+
+  const fetching = client.fetchChatTranscript({ chatId: "chat" });
+  const request = parseSentFrame(mock.sent.at(-1));
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "chat.transcript.fetch.response",
+      payload: {
+        requestId: request.requestId,
+        lines: [line],
+        hasOlder: false,
+        hasNewer: false,
+        startSeq: 1,
+        endSeq: 1,
+        error: null,
+      },
+    }),
+  );
+  const result = await fetching;
+  expect(result.lines[0]?.sender).toEqual(actor);
+  expect(result.lines[0]?.sender).not.toHaveProperty("actor");
+});

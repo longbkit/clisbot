@@ -10,6 +10,7 @@ import { wrapSpokenInput } from "../voice-config.js";
 // in a `system` line, never in silence.
 import type { Logger } from "pino";
 import type { ChatMessagePayload, ChatPayload } from "@getpaseo/protocol/chats/types";
+import { chatUserSender } from "@getpaseo/protocol/chats/sender";
 import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { PromptDispatchDisposition } from "../agent/agent-prompt.js";
@@ -135,7 +136,7 @@ export class ChatEngine implements TurnTrackerHost {
         attachmentContentDigest: createHash("sha256").update(messageContent(input)).digest("hex"),
         id,
         at: this.now(),
-        sender: { kind: "user" as const, ...(input.actor ? { actor: input.actor } : {}) },
+        sender: chatUserSender(input.actor),
         text: input.text,
         ...(input.spokenInputAgentId ? { spokenInputAgentId: input.spokenInputAgentId } : {}),
         hop: 0,

@@ -21,6 +21,39 @@ function userLine(id: string, text = id): TranscriptLineInput {
 }
 
 describe("TranscriptLog", () => {
+  test("reads legacy identities after restart and writes new flat senders without rewriting history", async () => {
+    const directory = await temporary();
+    const actor = {
+      kind: "user" as const,
+      id: "account",
+      displayName: "Long",
+      hubOrigin: "https://hub.test",
+      organizationId: "org",
+      memberId: "member",
+    };
+    const oldLog = SessionEventLog.for(directory, { stem: "transcript" });
+    await oldLog.append("transcript", [
+      { seq: 1, value: { ...userLine("old"), sender: { kind: "user", actor } } },
+    ]);
+    await oldLog.flush();
+    const file = path.join(directory, "transcript.jsonl");
+    const original = await fs.readFile(file, "utf8");
+    SessionEventLog.forgetAll();
+    await fs.rm(path.join(directory, "transcript.index.json"));
+
+    const log = new TranscriptLog(directory);
+    expect((await log.fetch()).lines[0]?.sender).toEqual(actor);
+    expect((await log.since(0, 20))[0]?.sender).toEqual(actor);
+    expect((await log.findById("old"))?.sender).toEqual(actor);
+    await log.append({ ...userLine("new"), sender: actor });
+    await log.flush();
+    const contents = await fs.readFile(file, "utf8");
+    expect(contents.startsWith(original)).toBe(true);
+    const written = JSON.parse(contents.trim().split("\n").at(-1)!);
+    expect(written.value.sender).toEqual(actor);
+    expect(written.value.sender).not.toHaveProperty("actor");
+  });
+
   test("allocates seqs from 1 and writes transcript.jsonl beside its index", async () => {
     const directory = await temporary();
     const log = new TranscriptLog(directory);

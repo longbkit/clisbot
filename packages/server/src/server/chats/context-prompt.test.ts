@@ -18,7 +18,7 @@ const actor = { kind: "user" as const, id: "usr_1", displayName: "Long Luong" };
 
 describe("senderLineOf", () => {
   test("labels a user by actor, a bot by slug, and the system bare", () => {
-    expect(senderLineOf(line({ kind: "user", actor }, "hi"), botOf)).toEqual({
+    expect(senderLineOf(line(actor, "hi"), botOf)).toEqual({
       senderIdentity: "user:usr_1",
       senderName: "Long Luong",
       text: "hi",
@@ -47,17 +47,17 @@ describe("senderLineOf", () => {
 
 describe("renderChatPrompt", () => {
   test("a first message with no context is one sender line", () => {
-    const trigger = line({ kind: "user", actor }, "Find the spec");
+    const trigger = line(actor, "Find the spec");
     expect(
       renderChatPrompt({ botId: "bot_a", window: [trigger], triggering: [trigger], botOf }),
     ).toBe("Long Luong (user:usr_1): Find the spec");
   });
 
   test("earlier user and other-bot lines are context; own identity is excluded", () => {
-    const earlier = line({ kind: "user", actor }, "Any update?");
+    const earlier = line(actor, "Any update?");
     const own = line({ kind: "bot", botId: "bot_a" }, "Still looking", 1);
     const other = line({ kind: "bot", botId: "bot_b" }, "@researcher I drafted the intro", 1);
-    const trigger = line({ kind: "user", actor }, "@researcher status");
+    const trigger = line(actor, "@researcher status");
     expect(
       renderChatPrompt({
         botId: "bot_a",
@@ -78,8 +78,8 @@ describe("renderChatPrompt", () => {
 
   test("a bot's own line is never the message, and a trigger outside the window still renders", () => {
     const own = line({ kind: "bot", botId: "bot_a" }, "done", 1);
-    const cut = line({ kind: "user", actor }, "first");
-    const kept = line({ kind: "user", actor }, "second");
+    const cut = line(actor, "first");
+    const kept = line(actor, "second");
     expect(renderChatPrompt({ botId: "bot_a", window: [own], triggering: [own], botOf })).toBe("");
     expect(
       renderChatPrompt({ botId: "bot_a", window: [kept], triggering: [cut, kept], botOf }),

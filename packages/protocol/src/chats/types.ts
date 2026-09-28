@@ -52,7 +52,14 @@ export const ChatRulesSchema = z.object({
 export type ChatRules = z.infer<typeof ChatRulesSchema>;
 
 export const ChatMessageSenderSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("user"), actor: SessionActorSchema.optional() }),
+  SessionActorSchema.omit({ kind: true })
+    .partial({ id: true })
+    .extend({
+      kind: z.literal("user"),
+      // COMPAT(chatSenderActor): v0.10.0-beta.1; remove after old hosts and transcripts are migrated.
+      // Read-only legacy shape; new messages put identity fields directly on sender.
+      actor: SessionActorSchema.optional(),
+    }),
   z.object({ kind: z.literal("bot"), botId: z.string() }),
   z.object({ kind: z.literal("system") }),
 ]);

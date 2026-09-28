@@ -173,6 +173,7 @@ describe("ChatEngine", () => {
     expect(result).toEqual({ messageId: "m1", seq: 1, targets: [alpha.id], duplicate: false });
     expect(h.appended.map((line) => line.id)).toEqual(["m1"]);
     expect(h.appended[0]?.deliveryBotIds).toEqual([alpha.id]);
+    expect(h.appended[0]?.sender).toEqual(actor);
     await h.engine.idle();
     expect(h.sent).toEqual([
       {

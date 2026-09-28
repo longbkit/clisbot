@@ -3,6 +3,7 @@
 // for the file pair, the fsync'd append, the rebuildable index and seq-window
 // reads; this wrapper owns seq allocation and the id lookup.
 import type { ChatMessagePayload, ChatTranscriptDirection } from "@getpaseo/protocol/chats/types";
+import { normalizeChatSender } from "@getpaseo/protocol/chats/sender";
 import { SessionEventLog } from "../agent/session-storage/session-event-log.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 
@@ -61,6 +62,7 @@ export class TranscriptLog {
     return this.writes.run("append", async () => {
       const seq = (await this.log.state(TRANSCRIPT_KIND)).maxSeq + 1;
       const value = structuredClone(input);
+      value.sender = normalizeChatSender(value.sender);
       await this.log.append(TRANSCRIPT_KIND, [{ seq, value }]);
       await this.log.putId(MESSAGE_ID_NAMESPACE, input.id, seq);
       return { ...value, seq };
@@ -72,7 +74,12 @@ export class TranscriptLog {
     if (end < start) return [];
     const entries = await this.log.read<TranscriptLineInput>(TRANSCRIPT_KIND, start, end);
     // The read parsed a fresh object per entry; giving it the seq in place copies nothing.
-    return entries.map((entry) => Object.assign(entry.value, { seq: entry.seq }));
+    return entries.map((entry) =>
+      Object.assign(entry.value, {
+        seq: entry.seq,
+        sender: normalizeChatSender(entry.value.sender),
+      }),
+    );
   }
 
   /** A seq window in the `fetch_agent_timeline` shape: tail by default, or around a cursor. */

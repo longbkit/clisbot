@@ -32,8 +32,8 @@ function senderOf(
   switch (sender.kind) {
     case "user":
       return {
-        senderIdentity: sender.actor ? `user:${sender.actor.id}` : "user",
-        senderName: sender.actor?.displayName,
+        senderIdentity: sender.id !== undefined ? `user:${sender.id}` : "user",
+        senderName: sender.displayName,
       };
     case "bot": {
       const bot = botOf(sender.botId);

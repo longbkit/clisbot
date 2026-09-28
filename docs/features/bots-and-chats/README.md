@@ -101,9 +101,16 @@ not misclassified. Settings › Projects remains unchanged.
 `transcript.jsonl` (append-only, one line per message), mirroring the
 `session.json` + `events.jsonl` layout of [agent session storage](../agent-session-storage/design.md).
 
-A transcript line: message id, time, sender (`user` or a `botId`), final text, and for a bot reply
+A transcript line: message id, time, sender (`user`, `bot`, or `system`), final text, and for a bot reply
 the `agentId` and timeline item id it came from. Tool calls and progress stay in the bot's
 `events.jsonl`; the chat screen streams them from the session timeline while the turn runs.
+
+User identity fields live directly on `sender`, like an agent timeline user message:
+`{ kind: "user", id, displayName, hubOrigin, organizationId, memberId, ... }`.
+Bot senders use `{ kind: "bot", botId }`; system notices use `{ kind: "system" }`.
+The existing local `owner` fallback is unchanged. Old nested `sender.actor` records are
+normalized on read (including client reads from older Hosts), while new transcript writes
+use only the flat shape. Existing JSONL history is not rewritten.
 
 Accepted duplication: a final answer exists in the transcript and in the timeline, joined by the
 reference. The alternative, merging N timelines at read time, was rejected.

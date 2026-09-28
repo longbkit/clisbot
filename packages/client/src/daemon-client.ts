@@ -1,4 +1,5 @@
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
+import { normalizeChatSenders } from "./normalize-chat-senders.js";
 import { ProviderSnapshotUpdates } from "./provider-snapshots/index.js";
 import {
   ConnectionSubscriptions,
@@ -6966,7 +6967,7 @@ export class DaemonClient {
 
   private deliverSessionMessage(msg: SessionOutboundMessage): void {
     const consumerMessage = normalizeProviderSnapshotUpdateMessage(
-      msg,
+      normalizeChatSenders(msg),
       this.config.providerSnapshots !== "wire",
     );
 
