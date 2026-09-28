@@ -158,6 +158,7 @@ export class ChatStore {
           ...(patch.requireMention !== undefined
             ? { interaction: { ...chat.rules.interaction, requireMention: patch.requireMention } }
             : {}),
+          ...(patch.roundsMax !== undefined ? { rounds: { max: patch.roundsMax } } : {}),
           ...(patch.roomInstructions !== undefined
             ? { room: { ...chat.rules.room, instructions: patch.roomInstructions?.trim() || null } }
             : {}),

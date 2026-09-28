@@ -64,6 +64,8 @@ type ThinkingOption = NonNullable<AgentModelDefinition["thinkingOptions"]>[numbe
 export interface BotFormState {
   mode: "create" | "edit";
   name: string;
+  /** What other bots in a group read to decide when to tag this one; empty = none. */
+  description: string;
   /** The directory name the daemon will derive (README D3); the record's slug in edit mode. */
   slugPreview: string;
   kind: BotKind;
@@ -93,6 +95,7 @@ export interface BotCreateRequest {
   serverId: string;
   name: string;
   kind: BotKind;
+  description?: string;
   launch: BotLaunchDefaults;
 }
 
@@ -100,6 +103,7 @@ export interface BotUpdateRequest {
   serverId: string;
   botId: string;
   name: string;
+  description: string | null;
   launch: BotLaunchDefaults;
 }
 
@@ -112,6 +116,7 @@ export interface BotFormModel {
   applyProviderSnapshot: (serverId: string, snapshot: BotFormProviderSnapshot) => void;
   applyProfile: (profile: AgentProfile) => void;
   setName: (value: string) => void;
+  setDescription: (value: string) => void;
   setKind: (value: BotKind) => void;
   setHost: (serverId: string | null, display?: BotFormDisplay | null) => void;
   setProvider: (provider: AgentProvider) => void;
@@ -281,6 +286,7 @@ function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
   return {
     mode: snapshot.mode,
     name: snapshot.bot?.name ?? snapshot.defaults.name ?? "",
+    description: snapshot.bot?.description ?? "",
     slugPreview: "",
     kind: snapshot.bot?.kind ?? "personal",
     hosts: [],
@@ -322,6 +328,7 @@ export function toCreateRequest(state: BotFormState): BotCreateRequest {
     serverId: state.selectedServerId,
     name: state.name.trim(),
     kind: state.kind,
+    ...(state.description.trim() ? { description: state.description.trim() } : {}),
     launch: launchOf(state),
   };
 }
@@ -332,6 +339,7 @@ export function toUpdateRequest(state: BotFormState, botId: string): BotUpdateRe
     serverId: state.selectedServerId,
     botId,
     name: state.name.trim(),
+    description: state.description.trim() || null,
     launch: launchOf(state),
   };
 }
@@ -429,6 +437,9 @@ export function openBotForm(snapshot: BotFormSnapshot): BotFormModel {
     },
     setName(value) {
       publish({ ...state, name: value });
+    },
+    setDescription(value) {
+      publish({ ...state, description: value });
     },
     setKind(value) {
       publish({ ...state, kind: value });

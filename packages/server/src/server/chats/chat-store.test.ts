@@ -281,6 +281,8 @@ test("group settings persist without replacing internal limits or session bindin
   expect(withRoom.rules.room).toEqual({ instructions: "Be brief." });
   expect(withRoom.rules.interaction).toEqual(updated.rules.interaction);
   expect(withRoom.title).toBe("Launch");
+  expect((await store.updateSettings(chat.id, { roundsMax: 3 })).rules.rounds).toEqual({ max: 3 });
+  expect(() => store.updateSettings(chat.id, { roundsMax: 21 })).toThrow();
   const cleared = await store.updateSettings(chat.id, { roomInstructions: " " });
   expect(cleared.rules.room).toEqual({ instructions: null });
   expect((await store.updateSettings(chat.id, { title: " " })).title).toBeNull();

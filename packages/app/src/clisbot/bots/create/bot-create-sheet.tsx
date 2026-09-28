@@ -5,6 +5,7 @@ import { FormTextInput } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
 import { BotFormLayout } from "./form-layout";
 import { BotTemplateField } from "./bot-template-field";
+import { BotDescriptionField } from "./bot-description-field";
 import { BotConfiguration } from "./bot-configuration";
 import { botFormStyles as styles } from "./bot-form-styles";
 import { useBotForm, type BotCreateFormProps } from "./use-bot-form";
@@ -54,6 +55,7 @@ export function BotCreateForm(props: BotCreateFormProps) {
             onChangeText={model.setName}
             placeholder="For example, Research assistant"
           />
+          <BotDescriptionField state={state} model={model} size={size} />
           <BotTemplateField state={state} model={model} editing={Boolean(bot)} />
         </>
       ) : (

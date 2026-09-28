@@ -222,6 +222,8 @@ export type ChatUpdatedMessage = z.infer<typeof ChatUpdatedSchema>;
 
 /** The longest room instructions a chat owner may write. */
 export const CHAT_ROOM_INSTRUCTIONS_MAX_CHARS = 4000;
+/** The most rounds a group discussion may be allowed; a guard rail, not a budget. */
+export const CHAT_ROUNDS_MAX = 20;
 
 /** Group name, the everyday reply policy and the room instructions are editable here. */
 export const ChatUpdatePatchSchema = z
@@ -229,13 +231,15 @@ export const ChatUpdatePatchSchema = z
     title: z.string().max(256).nullable().optional(),
     requireMention: z.boolean().optional(),
     roomInstructions: z.string().max(CHAT_ROOM_INSTRUCTIONS_MAX_CHARS).nullable().optional(),
+    roundsMax: z.number().int().positive().max(CHAT_ROUNDS_MAX).optional(),
   })
   .strict()
   .refine(
     (patch) =>
       patch.title !== undefined ||
       patch.requireMention !== undefined ||
-      patch.roomInstructions !== undefined,
+      patch.roomInstructions !== undefined ||
+      patch.roundsMax !== undefined,
     "Choose a group setting to update",
   );
 export const ChatUpdateRequestSchema = z.object({

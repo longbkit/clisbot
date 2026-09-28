@@ -16,6 +16,7 @@ import {
   openGroupSettingsDraft,
 } from "./group-settings-model";
 import { RoomInstructionsField } from "./room-instructions-field";
+import { RoundsField } from "./rounds-field";
 const ALL = { label: "Everyone, one at a time, unless you @mention a bot" };
 const MENTIONED = { label: "Only bots you @mention" };
 const OPTIONS = [
@@ -43,6 +44,10 @@ export function GroupChatSettings({
   const [error, setError] = useState<string | null>(null);
   const size = useIsCompactFormFactor() ? "md" : "sm";
   const setTitle = useCallback((title: string) => setDraft((value) => ({ ...value, title })), []);
+  const setRoundsMax = useCallback(
+    (roundsMax: number) => setDraft((value) => ({ ...value, roundsMax })),
+    [],
+  );
   const setRoomInstructions = useCallback(
     (roomInstructions: string) => setDraft((value) => ({ ...value, roomInstructions })),
     [],
@@ -104,6 +109,12 @@ export function GroupChatSettings({
         disabled={disabled}
         placeholder="Choose who replies"
         emptyText="No reply options"
+        size={size}
+      />
+      <RoundsField
+        value={draft.roundsMax}
+        onChange={setRoundsMax}
+        disabled={disabled}
         size={size}
       />
       <RoomInstructionsField

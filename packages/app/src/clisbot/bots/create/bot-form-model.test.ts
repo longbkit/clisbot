@@ -176,6 +176,25 @@ describe("openBotForm", () => {
     });
   });
 
+  it("sends the role on create only when written, and keeps or clears it on save", () => {
+    const create = openBotForm(createSnapshot());
+    create.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    create.setProvider("mock");
+    expect(toCreateRequest(create.getState())).not.toHaveProperty("description");
+    create.setDescription("  Owns the numbers  ");
+    expect(toCreateRequest(create.getState()).description).toBe("Owns the numbers");
+    const edit = openBotForm({
+      mode: "edit",
+      bot: { ...BOT, description: "Owns research" },
+      hosts: HOSTS,
+      defaults: {},
+    });
+    expect(edit.getState().description).toBe("Owns research");
+    expect(toUpdateRequest(edit.getState(), BOT.id).description).toBe("Owns research");
+    edit.setDescription(" ");
+    expect(toUpdateRequest(edit.getState(), BOT.id).description).toBeNull();
+  });
+
   it("applies a profile as one copy", () => {
     const model = openBotForm(createSnapshot());
     model.applyProfile({

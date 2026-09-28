@@ -8,12 +8,18 @@ export interface GroupSettingsDraft {
   requireMention: boolean;
   /** Empty = the built-in default instructions. */
   roomInstructions: string;
+  /** How many rounds a discussion may run before the daemon stops it. */
+  roundsMax: number;
 }
+
+/** The daemon's default when a chat sets no `rounds.max`. */
+export const DEFAULT_ROUNDS_MAX = 5;
 export function openGroupSettingsDraft(chat: ChatPayload): GroupSettingsDraft {
   return {
     title: chat.title ?? "",
     requireMention: chat.rules.interaction?.requireMention ?? false,
     roomInstructions: chat.rules.room?.instructions ?? "",
+    roundsMax: chat.rules.rounds?.max ?? DEFAULT_ROUNDS_MAX,
   };
 }
 export function groupSettingsPatch(
@@ -32,6 +38,7 @@ export function groupSettingsPatch(
   if (draft.requireMention !== original.requireMention) patch.requireMention = draft.requireMention;
   if (instructions !== original.roomInstructions.trim())
     patch.roomInstructions = instructions || null;
+  if (draft.roundsMax !== original.roundsMax) patch.roundsMax = draft.roundsMax;
   return Object.keys(patch).length ? patch : null;
 }
 /** Whether saving would change anything; an over-limit draft counts as a change to report. */

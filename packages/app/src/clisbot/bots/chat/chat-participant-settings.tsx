@@ -16,6 +16,7 @@ export function ChatParticipantSettings({
   toggle: (id: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
+  const roleOf = (botId: string) => bots.find((bot) => bot.id === botId)?.description;
   const selected = new Set(chat.participants.map((p) => p.botId));
   const available = bots.filter(
     (bot) => !selected.has(bot.id) && bot.name.toLowerCase().includes(search.toLowerCase()),
@@ -29,6 +30,7 @@ export function ChatParticipantSettings({
               key={p.botId}
               id={p.botId}
               name={p.displayName}
+              role={roleOf(p.botId)}
               selected
               busy={busy || selected.size === 1}
               toggle={toggle}
@@ -49,6 +51,7 @@ export function ChatParticipantSettings({
               key={bot.id}
               id={bot.id}
               name={bot.name}
+              role={bot.description}
               selected={false}
               busy={busy}
               toggle={toggle}
@@ -66,15 +69,26 @@ export function ChatParticipantSettings({
     </>
   );
 }
+/** Other bots read the role to decide when to tag this one, so a missing role is called out. */
+function roleHint(role: string | null | undefined, selected: boolean): string {
+  const place = selected ? "In this chat" : "Add to this chat";
+  const text = role?.trim();
+  return text
+    ? `${place} · ${text}`
+    : `${place} · No role yet: other bots only know its name. Add one in Bot settings.`;
+}
+
 function Participant({
   id,
   name,
+  role,
   selected,
   busy,
   toggle,
 }: {
   id: string;
   name: string;
+  role?: string | null;
   selected: boolean;
   busy: boolean;
   toggle: (id: string) => Promise<void>;
@@ -85,7 +99,7 @@ function Participant({
   return (
     <SettingsSwitch
       label={name}
-      hint={selected ? "In this chat" : "Add to this chat"}
+      hint={roleHint(role, selected)}
       value={selected}
       disabled={busy}
       onValueChange={change}

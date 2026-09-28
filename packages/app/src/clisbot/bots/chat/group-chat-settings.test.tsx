@@ -47,11 +47,15 @@ vi.mock("@/components/ui/form-field", () => ({
 }));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: ({
+    label,
     value,
+    options,
     onChange,
     disabled,
   }: {
+    label: string;
     value: string;
+    options: { id: string; value: string; label: string }[];
     onChange: (s: string) => void;
     disabled: boolean;
   }) => {
@@ -60,9 +64,12 @@ vi.mock("@/components/ui/select-field", () => ({
       [onChange],
     );
     return (
-      <select aria-label="Who replies?" value={value} onChange={change} disabled={disabled}>
-        <option value="all">All</option>
-        <option value="mentioned">Mentioned</option>
+      <select aria-label={label} value={value} onChange={change} disabled={disabled}>
+        {options.map((option) => (
+          <option key={option.id} value={option.value}>
+            {option.label}
+          </option>
+        ))}
       </select>
     );
   },
@@ -86,7 +93,7 @@ const chat = {
   id: "group",
   kind: "group",
   title: "Launch",
-  rules: { interaction: { requireMention: false } },
+  rules: { interaction: { requireMention: false }, rounds: { max: 5 } },
 } as ChatPayload;
 beforeEach(() => {
   state.supported = true;
@@ -158,4 +165,14 @@ test("room instructions save with the other settings and keep unchanged ones out
     chatId: "group",
     patch: { roomInstructions: "Answer in Vietnamese." },
   });
+});
+
+test("the discussion limit saves as roundsMax", async () => {
+  const saved = vi.fn();
+  state.update.mockResolvedValueOnce({ error: null });
+  render(<GroupChatSettings serverId="host" chat={chat} onSaved={saved} />);
+  fireEvent.change(screen.getByLabelText("Discussion limit"), { target: { value: "3" } });
+  fireEvent.click(screen.getByText("Save changes"));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(state.update).toHaveBeenLastCalledWith({ chatId: "group", patch: { roundsMax: 3 } });
 });

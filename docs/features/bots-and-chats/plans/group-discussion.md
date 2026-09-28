@@ -67,7 +67,9 @@ whole block and Codex answered into silence ([codex-channel](../../channels/code
 The default text lives in `packages/protocol/src/chats/room.ts`, so the daemon's prompt and the
 field's placeholder in Group settings are the same words.
 
-A bot with no description is listed with its display name as its role.
+A bot with no description is listed with its display name as its role. The bot form calls the
+field **Role** and says other bots read it; Add bots and Participants show each bot's role, or
+that it has none yet.
 
 Membership, description or room-instruction changes do not reset sessions. Each participant stores
 the fingerprint of the room it was last told (`roomSeen`); when it differs, the bot's next wake
@@ -130,9 +132,10 @@ each bot answering with the others' words in view is the point.
 ### Wire and flag
 
 One capability flag, `server_info.features.bots` (README D10). Protocol additions are optional
-fields: `rules.room.instructions` and `rules.rounds.max`, the `roomInstructions` key of the
-`chat.update` patch, and the `chat.discussion.stop` request. `rounds.max` has no app control yet;
-it is set on create or left at the default.
+fields: `rules.room.instructions` and `rules.rounds.max`, the `roomInstructions` and `roundsMax`
+keys of the `chat.update` patch, and the `chat.discussion.stop` request. Group settings edits both
+(**Discussion limit**, 1 to 20 rounds). Creating a group keeps the default, like the other numeric
+limits ([app experience](../app-experience.md)).
 
 ## Implementation
 
@@ -142,6 +145,7 @@ it is set on create or left at the default.
 | Turns in rounds, preempt, Stop all      | `7f335a8f6` | `discussion.ts`, `mentions.ts`, protocol `chats/mentions.ts`, `chat.discussion.stop` |
 | Room instructions, Stop all action      | `f84df1c90` | `room-instructions-field.tsx`, `stop-all-action.tsx`                                 |
 | `@` picker and mention display          | `520084d0c` | `member-mentions.ts`, `use-agent-autocomplete.ts`, `chat-rows.tsx`                   |
+| Discussion limit, bot Role              | this change | `rounds-field.tsx`, `bot-description-field.tsx`, `chat-participant-settings.tsx`     |
 
 ## Later
 
@@ -151,6 +155,4 @@ it is set on create or left at the default.
 - An asynchronous bot-to-bot handoff tool (Grok's `SendToAgent`) and a member lookup tool.
 - Named room presets and saving a group's instructions as one.
 - A read-only view of the whole rendered prompt in Group settings.
-- A reminder in Bot settings and Add Member that other bots read the description to decide when to
-  tag this bot.
-- Mention chips with the bot's face instead of bold names, and an app control for `rounds.max`.
+- Mention chips with the bot's face instead of bold names.

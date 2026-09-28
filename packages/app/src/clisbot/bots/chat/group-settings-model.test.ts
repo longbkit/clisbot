@@ -10,7 +10,13 @@ test("settings open from the current chat and save only changed fields", () => {
     title: "Launch",
     rules: { interaction: { requireMention: true } },
   } as ChatPayload);
-  expect(original).toEqual({ title: "Launch", requireMention: true, roomInstructions: "" });
+  expect(original).toEqual({
+    title: "Launch",
+    requireMention: true,
+    roomInstructions: "",
+    roundsMax: 5,
+  });
+  expect(groupSettingsPatch({ ...original, roundsMax: 8 }, original)).toEqual({ roundsMax: 8 });
   expect(groupSettingsPatch(original, original)).toBeNull();
   expect(groupSettingsPatch({ ...original, title: "  New name  " }, original)).toEqual({
     title: "New name",

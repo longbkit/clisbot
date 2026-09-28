@@ -189,6 +189,7 @@ describe("useBotForm saved defaults", () => {
       serverId: "host-a",
       botId: bot.id,
       name: "Existing bot",
+      description: null,
       launch: bot.launchDefaults,
     });
   });
