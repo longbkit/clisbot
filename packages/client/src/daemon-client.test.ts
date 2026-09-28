@@ -1262,6 +1262,157 @@ test("uses the saved host password when the desktop bridge has no credential for
   });
 });
 
+test("shares one pending credential resolution between connect and ensureConnected", async () => {
+  let resolveCredential!: (credential: string) => void;
+  const localCredential = vi.fn(
+    () =>
+      new Promise<string>((resolve) => {
+        resolveCredential = resolve;
+      }),
+  );
+  const mock = createMockTransport();
+  const transportFactory = vi.fn(() => mock.transport);
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "pending-credential",
+    localCredential,
+    reconnect: { enabled: false },
+    transportFactory,
+  });
+  clients.push(client);
+
+  const connected = client.connect();
+  const alsoConnected = client.connect();
+  client.ensureConnected();
+  client.ensureConnected({ verify: true });
+  expect(localCredential).toHaveBeenCalledOnce();
+  expect(transportFactory).not.toHaveBeenCalled();
+
+  resolveCredential("current-token");
+  await vi.waitFor(() => expect(transportFactory).toHaveBeenCalledOnce());
+  mock.triggerOpen({ preserveSent: true });
+  await Promise.all([connected, alsoConnected]);
+  expect(JSON.parse(assertStr(mock.sent[0]))).toMatchObject({
+    type: "hello",
+    auth: { kind: "localCredential", token: "current-token" },
+  });
+});
+
+test.each(["resolve", "reject"] as const)(
+  "ignores credential %s after close even when ensureConnected races with cleanup",
+  async (outcome) => {
+    let resolveCredential!: (credential: string) => void;
+    let rejectCredential!: (error: Error) => void;
+    const localCredential = vi.fn(
+      () =>
+        new Promise<string>((resolve, reject) => {
+          resolveCredential = resolve;
+          rejectCredential = reject;
+        }),
+    );
+    const transportFactory = vi.fn(() => createMockTransport().transport);
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "closed-pending-credential",
+      localCredential,
+      reconnect: { enabled: false },
+      transportFactory,
+    });
+    clients.push(client);
+    void client.connect().catch(() => {});
+
+    const closing = client.close();
+    client.ensureConnected();
+    if (outcome === "resolve") resolveCredential("stale-token");
+    else rejectCredential(new Error("stale credential failure"));
+    await closing;
+    // Flush both the credential resolver and connection continuation.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(localCredential).toHaveBeenCalledOnce();
+    expect(transportFactory).not.toHaveBeenCalled();
+    expect(client.getConnectionState().status).toBe("disposed");
+    expect(client.lastError).toBeNull();
+    await expect(client.connect()).rejects.toThrow("Daemon client is disposed");
+  },
+);
+
+test.each(["resolve", "reject"] as const)(
+  "ignores a superseded reconnect credential %s without disrupting the current handshake",
+  async (outcome) => {
+    vi.useFakeTimers();
+    let resolveOld!: (credential: string) => void;
+    let rejectOld!: (error: Error) => void;
+    let resolveCurrent!: (credential: string) => void;
+    const oldCredential = new Promise<string>((resolve, reject) => {
+      resolveOld = resolve;
+      rejectOld = reject;
+    });
+    const currentCredential = new Promise<string>((resolve) => {
+      resolveCurrent = resolve;
+    });
+    const localCredential = vi
+      .fn<() => string | Promise<string>>()
+      .mockReturnValueOnce("initial-token")
+      .mockReturnValueOnce(oldCredential)
+      .mockReturnValueOnce(currentCredential);
+    const first = createMockTransport();
+    const current = createMockTransport();
+    const closeCurrent = vi.spyOn(current.transport, "close");
+    const transportFactory = vi
+      .fn()
+      .mockReturnValueOnce(first.transport)
+      .mockReturnValue(current.transport);
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "superseded-credential",
+      localCredential,
+      connectTimeoutMs: 1_000,
+      reconnect: { enabled: true, baseDelayMs: 10_000 },
+      transportFactory,
+    });
+    clients.push(client);
+    const initial = client.connect();
+    first.triggerOpen();
+    await initial;
+
+    first.triggerClose({ code: 1001, reason: "restarting" });
+    const connecting = client.connect();
+    const rejected = vi.fn();
+    void connecting.catch(rejected);
+    // Browser close/error notifications can arrive separately while credentials resolve.
+    first.triggerError(new Error("connection closed"));
+    client.ensureConnected();
+    expect(localCredential).toHaveBeenCalledTimes(3);
+    resolveCurrent("current-token");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transportFactory).toHaveBeenCalledTimes(2);
+
+    if (outcome === "resolve") resolveOld("stale-token");
+    else rejectOld(new Error("stale credential failure"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transportFactory).toHaveBeenCalledTimes(2);
+    expect(closeCurrent).not.toHaveBeenCalled();
+    expect(rejected).not.toHaveBeenCalled();
+    expect(client.getConnectionState().status).toBe("connecting");
+    expect(client.lastError).not.toBe("stale credential failure");
+    current.triggerOpen({ preserveSent: true, deferServerInfo: true });
+    expect(JSON.parse(assertStr(current.sent[0]))).toMatchObject({
+      type: "hello",
+      auth: { kind: "localCredential", token: "current-token" },
+    });
+
+    // The newer handshake keeps its timeout and promise after the stale result.
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(closeCurrent).toHaveBeenCalledWith(1001, "Connection timed out");
+    expect(client.lastError).toBe("Connection timed out");
+    client.ensureConnected();
+    current.triggerOpen({ preserveSent: true });
+    await connecting;
+    expect(rejected).not.toHaveBeenCalled();
+  },
+);
+
 test("advertises client capabilities in hello", async () => {
   const logger = createMockLogger();
   const mock = createMockTransport();

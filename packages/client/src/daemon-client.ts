@@ -1272,6 +1272,7 @@ export class DaemonClient {
   private pendingGenericTransportErrorTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private shouldReconnect = true;
+  private connectionAttempt: symbol | null = null;
   private connectPromise: Promise<void> | null = null;
   private connectResolve: (() => void) | null = null;
   private connectReject: ((error: Error) => void) | null = null;
@@ -1368,19 +1369,24 @@ export class DaemonClient {
     return this.connectPromise;
   }
 
-  private async attemptConnect(): Promise<void> {
+  private canAttemptConnect(): boolean {
     if (this.connectionState.status === "disposed") {
       this.rejectConnect(new Error("Daemon client is disposed"));
-      return;
+      return false;
     }
     if (!this.shouldReconnect) {
       this.rejectConnect(new Error("Daemon client is closed"));
-      return;
+      return false;
     }
+    return this.connectionState.status !== "connecting" && this.connectionAttempt === null;
+  }
 
-    if (this.connectionState.status === "connecting") {
-      return;
-    }
+  private async attemptConnect(): Promise<void> {
+    if (!this.canAttemptConnect()) return;
+    // Claim the attempt before resolving asynchronous desktop credentials. Foreground
+    // ensureConnected calls must share this attempt until it completes or is invalidated.
+    const attempt = Symbol();
+    this.connectionAttempt = attempt;
     // This attempt supersedes any retry the last disconnect scheduled. Left
     // armed, that retry would tear down the connection this attempt opens.
     if (this.reconnectTimeout) {
@@ -1391,7 +1397,7 @@ export class DaemonClient {
     try {
       const resolution = resolveConnectionAuth(this.config);
       const selected = resolution instanceof Promise ? await resolution : resolution;
-      if (!this.shouldReconnect) return;
+      if (this.connectionAttempt !== attempt) return;
       this.helloAuth = selected.helloAuth;
       // Reconnect can overlap with browser close/error delivery ordering.
       // Always dispose previous transport before constructing the next one.
@@ -1546,6 +1552,7 @@ export class DaemonClient {
         }),
       ];
     } catch (error) {
+      if (this.connectionAttempt !== attempt) return;
       this.resetConnectTimeout();
       const message = error instanceof Error ? error.message : "Failed to connect";
       this.lastErrorValue = message;
@@ -1555,6 +1562,8 @@ export class DaemonClient {
         reasonCode: "connect_failed",
       });
       this.rejectConnect(error instanceof Error ? error : new Error(message));
+    } finally {
+      if (this.connectionAttempt === attempt) this.connectionAttempt = null;
     }
   }
 
@@ -1587,6 +1596,11 @@ export class DaemonClient {
       return;
     }
     this.shouldReconnect = false;
+    this.connectionAttempt = null;
+    this.updateConnectionState(
+      { status: "disposed" },
+      { event: "DISPOSE", reason: "Client closed", reasonCode: "disposed" },
+    );
     this.connectPromise = null;
     this.connectResolve = null;
     this.connectReject = null;
@@ -1610,10 +1624,6 @@ export class DaemonClient {
       this.runtimeMetrics?.flush({ final: true });
       this.runtimeMetrics = null;
     }
-    this.updateConnectionState(
-      { status: "disposed" },
-      { event: "DISPOSE", reason: "Client closed", reasonCode: "disposed" },
-    );
   }
 
   ensureConnected(options?: { verify?: boolean }): void {
@@ -6820,6 +6830,9 @@ export class DaemonClient {
     event?: string;
     reasonCode?: string;
   }): void {
+    // A late credential result from the interrupted attempt must not replace or
+    // reject a connection started by this retry.
+    this.connectionAttempt = null;
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;

@@ -124,3 +124,9 @@ This follow-up is implementation/verification, separate from the rehearsal above
 - Validation evidence is local under `/tmp/bots-beta-*`; screenshot artifacts include desktop split panes, mobile creation and mobile chat. No real user bot was created, edited, archived or messaged during merge QA.
 
 Limitations: browser providers are deterministic fixtures, not live LLM services. This pass does not exercise native iOS/Android builds, microphone/STT/TTS, a live Hub Automation execution, or Nix builds. The Nix hash from upstream is not proof that the extended Fusion workspace builds under Nix.
+
+### Post-merge review corrections
+
+- Fixed overlapping client connection attempts while asynchronous desktop credentials resolve. An attempt is claimed before awaiting credentials; close or reconnect invalidates it. Late success or failure cannot replace a newer transport, clear its timeout, or reject its handshake. Disposal now becomes visible before asynchronous cleanup, preventing foreground reconnect during close.
+- Startup notices now check existing canonical timeline availability before requesting provider history. Explicit disk refresh still replays history and uses the existing atomic replacement path when supported, preserving saved rows if provider history fails. Registration publication, restored timestamps, and storage-disabled replay remain unchanged.
+- Verification: all 252 client tests and 209 agent-manager tests pass. Five new client regression cases cover concurrent connect/ensureConnected, close, and superseded credential success/failure; a real file-backed timeline regression covers canonical reopen, successful forced refresh, and failed refresh preservation.

@@ -12261,3 +12261,87 @@ test("failed startup history closes the session without registering an agent", a
     for (const agent of manager.listAgents()) await manager.closeAgent(agent.id);
   }
 });
+
+test("startup notices reuse durable history while explicit disk refresh still replays", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-startup-durable-history-"));
+  const store = new FileAgentTimelineStore(async () => join(workdir, "journal"));
+  const agentId = randomUUID();
+  const oldHistory: AgentTimelineItem = { type: "assistant_message", text: "Canonical history" };
+  const refreshedHistory: AgentTimelineItem = {
+    type: "assistant_message",
+    text: "Refreshed history",
+  };
+  const notice: AgentTimelineItem = { type: "notification", level: "info", message: "Runtime v2" };
+  let replayCount = 0;
+  let failReplay = true;
+  let closedCount = 0;
+  class NotifyingSession extends TestAgentSession {
+    readonly initialTimeline = [{ item: notice, timestamp: "2026-09-22T00:00:00.000Z" }];
+    override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      replayCount += 1;
+      if (failReplay) throw new Error("Provider history unavailable");
+      yield {
+        type: "timeline",
+        provider: "codex",
+        item: refreshedHistory,
+        timestamp: "2026-09-21T00:00:00.000Z",
+      };
+      yield { type: "timeline", provider: "codex", ...this.initialTimeline[0] };
+    }
+    override async close() {
+      closedCount += 1;
+      await super.close();
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async resumeSession() {
+      return new NotifyingSession({ provider: "codex", cwd: workdir });
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: store,
+    logger,
+  });
+  try {
+    await store.appendCommitted(agentId, oldHistory);
+    await manager.resumeAgentFromPersistence(
+      { provider: "codex", sessionId: "existing", metadata: { cwd: workdir } },
+      undefined,
+      agentId,
+    );
+    await manager.hydrateTimelineFromProvider(agentId);
+    await manager.flush();
+    expect(replayCount).toBe(0);
+    expect((await store.getCommittedRows(agentId)).map((row) => row.item)).toEqual([
+      oldHistory,
+      notice,
+    ]);
+
+    failReplay = false;
+    await manager.reloadAgentSession(agentId, undefined, { rehydrateFromDisk: true });
+    await manager.hydrateTimelineFromProvider(agentId);
+    await manager.flush();
+    expect(replayCount).toBe(1);
+    expect((await store.getCommittedRows(agentId)).map((row) => row.item)).toEqual([
+      refreshedHistory,
+      notice,
+    ]);
+
+    failReplay = true;
+    await expect(
+      manager.reloadAgentSession(agentId, undefined, { rehydrateFromDisk: true }),
+    ).rejects.toThrow("Provider history unavailable");
+    expect(replayCount).toBe(2);
+    expect(closedCount).toBe(3);
+    expect(manager.listAgents()).toEqual([]);
+    expect((await store.getCommittedRows(agentId)).map((row) => row.item)).toEqual([
+      refreshedHistory,
+      notice,
+    ]);
+  } finally {
+    for (const agent of manager.listAgents()) await manager.closeAgent(agent.id);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
