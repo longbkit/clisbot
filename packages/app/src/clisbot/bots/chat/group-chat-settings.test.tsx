@@ -7,7 +7,7 @@ import { GroupChatSettings } from "./group-chat-settings";
 const state = vi.hoisted(() => ({ supported: true, online: true, update: vi.fn() }));
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: (select: (state: unknown) => unknown) =>
-    select({ sessions: { host: { serverInfo: { features: { chatSettings: state.supported } } } } }),
+    select({ sessions: { host: { serverInfo: { features: { bots: state.supported } } } } }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => ({ updateChat: state.update }),

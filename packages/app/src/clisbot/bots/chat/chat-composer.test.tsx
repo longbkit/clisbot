@@ -20,7 +20,7 @@ vi.mock("@/components/retained-panel", () => ({ useRetainedPanelActive: () => tr
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: (select: (state: unknown) => unknown) =>
     select({
-      sessions: { host: { serverInfo: { features: { chatAttachments: mocks.supported } } } },
+      sessions: { host: { serverInfo: { features: { bots: mocks.supported } } } },
     }),
 }));
 vi.mock("./conversation-project-context", () => ({

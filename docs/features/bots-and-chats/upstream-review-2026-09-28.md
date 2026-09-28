@@ -49,12 +49,12 @@ TARGET: keep public defaults and extract the submission decision into a small pu
 
 `messages.ts` moves attachment schemas to a leaf `agent-attachments.ts` and re-exports them. This avoids a messages → chat RPC → messages cycle while allowing chat to use the same validation contracts. Upstream's current messages changes merged textually in the rehearsal.
 
-Keep the extraction, with unchanged exports and validation semantics; isolate it as a mechanical prerequisite commit. Future upstream attachment changes must be applied to the leaf, not restored as duplicate definitions inside messages.ts. Move the existing githubAttachmentKinds COMPAT comments beside the corresponding definitions (they currently remain at the re-export site). Add provenance/lifecycle documentation for the optional chatAttachments capability rather than leaving that field unexplained.
+Keep the extraction, with unchanged exports and validation semantics; isolate it as a mechanical prerequisite commit. Future upstream attachment changes must be applied to the leaf, not restored as duplicate definitions inside messages.ts. Move the existing githubAttachmentKinds COMPAT comments beside the corresponding definitions (they currently remain at the re-export site). The former `chatAttachments` field was folded into the single `bots` capability (README D10).
 
 ## Owners and feature boundaries
 
 - Chat submit: chat adapter → existing daemon client chat RPC → daemon ChatSession admission → ChatService/engine → ordinary agent lifecycle/provider. No parallel provider implementation.
-- Attachments: existing upload ownership check/staging → durable chat transcript attachment metadata → existing agent prompt assembly. `chatAttachments` is optional; daemon advertises it only with Bot service. Old hosts are rejected by the app attachment path rather than silently losing files.
+- Attachments: existing upload ownership check/staging → durable chat transcript attachment metadata → existing agent prompt assembly. Gated by the single `bots` capability, which the daemon advertises only with Bot service. Old hosts are rejected by the app attachment path rather than silently losing files.
 - Voice: shared voice session dispatch delegates chat-bound input to isolated `session/chats/spoken-input`; ordinary unbound agent input follows the old path.
 - Bot UI capability: `useBotsFeatureHosts`/per-Host `bots` flag. Automations landing falls back to ordinary Schedules when neither Hub nor Bot capability is enabled; the route replacement is not by itself a feature-off regression.
 - Generic touch targets and shared-component exports are intentionally not Bot-only behavior. Separate them from feature work so upstream can adopt/review them independently.

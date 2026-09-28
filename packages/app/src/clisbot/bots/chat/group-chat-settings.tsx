@@ -30,7 +30,7 @@ export function GroupChatSettings({
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const supported = useSessionStore(
-    (state) => state.sessions[serverId]?.serverInfo?.features?.chatSettings === true,
+    (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
   const [original] = useState(() => openGroupSettingsDraft(chat));
   const [draft, setDraft] = useState(original);

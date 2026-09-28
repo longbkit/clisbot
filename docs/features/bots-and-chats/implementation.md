@@ -277,9 +277,8 @@ behavioral parity. The following defects were identified from source before regr
   interpreted against another bot's workspace when sent. Resolve paths at insertion time.
 - Realtime voice supplied a selected agent, but mentions-only group routing ignored that selection.
 - Old Hosts lacked a gate preventing voice from bypassing canonical conversation delivery. The
-  existing `chatAttachments` capability and chat-aware spoken-input routing were introduced together
-  in `f08392764`; reuse that cohort gate without adding another protocol field. Dictation remains
-  ordinary draft input.
+  `bots` capability (README D10) now covers chat-aware spoken-input routing; no separate protocol
+  field. Dictation remains ordinary draft input.
 
 Changes reuse the existing retained-panel, keyboard and explorer machinery. Shared Composer
 extension points are optional and preserve ordinary agent-session behavior. The forms and pin

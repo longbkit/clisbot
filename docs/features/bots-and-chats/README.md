@@ -172,7 +172,7 @@ user message. The context handed to a bot is the transcript since its last turn,
 message with a sender line, the same shape channels use ([conversation flow](../channels/conversation-flow.md)).
 
 The chat owner can change a group's name and everyday reply policy in **Chat options → Group
-settings**. The `chat.update` RPC is gated by `server_info.features.chatSettings` and checks current
+settings**. The `chat.update` RPC is gated by `server_info.features.bots` (D10) and checks current
 Project access. Changes affect subsequent messages without resetting sessions or altering internal
 limits. Participant changes apply immediately; name/reply edits use Save. Older Hosts expose the
 current values with an update hint. Direct and archived chats cannot use this operation.
@@ -184,6 +184,11 @@ with a `COMPAT` tag; the app gates on `useHostFeature`. Off: no RPC registered, 
 no sidebar entry; the daemon behaves byte-for-byte as upstream. The app is behavior-equivalent: its
 two route files and three sidebar insertion points exist in the bundle and return nothing while the
 Host reports no `bots` feature. That is the one recorded exception to byte-equivalence.
+
+`bots` is the only capability flag for the whole feature: bots, chats, attachments, voice routing,
+group settings and whatever ships on this branch later. Do not add per-capability flags
+(`chatAttachments` and `chatSettings` were folded into it on 2026-09-28, before any release carried
+them). A Host either runs Bots & Chats at the version the app expects or reports no `bots`.
 
 ### D11. Templates move into the daemon
 

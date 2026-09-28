@@ -2181,7 +2181,7 @@ export class DaemonClient {
       "type" | "requestId"
     >,
   ) {
-    if (!this.lastServerInfoMessage?.features?.chatSettings)
+    if (!this.lastServerInfoMessage?.features?.bots)
       throw new Error(
         "This Host does not support editing group settings. Update the Host to continue.",
       );

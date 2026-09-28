@@ -66,8 +66,8 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   existing upload/image pipeline and canonical chat submission. The selected bot's current session
   supplies model controls, voice and Stop; the draft remains owned by the chat. Conversation submits
   never enter the ordinary agent message queue. Before a first session exists, voice remains visible
-  with an explanation; attachments and dictation are already usable. Older Hosts without the
-  `chatAttachments` capability cannot silently accept and discard attachment payloads.
+  with an explanation; attachments and dictation are already usable. Hosts without the
+  `bots` capability (README D10) cannot silently accept and discard attachment payloads.
 - Opening an artifact does not navigate to cowork. Desktop uses the existing ordinary side-pane
   opener: create a right split on first open; reuse the remembered pane for subsequent opens; reveal
   an already-open file without overriding a tab the user moved. Explorer is a separate dock.

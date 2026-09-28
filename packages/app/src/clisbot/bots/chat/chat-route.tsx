@@ -97,7 +97,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     [identities],
   );
   const attachmentsSupported = useSessionStore(
-    (state) => state.sessions[serverId]?.serverInfo?.features?.chatAttachments === true,
+    (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
   const { send, sending } = useChatSend(
     client,

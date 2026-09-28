@@ -36,7 +36,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSubmitMessage,
 }: ChatComposerProps) {
   const attachmentsSupported = useSessionStore(
-    (state) => state.sessions[serverId]?.serverInfo?.features?.chatAttachments === true,
+    (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
   const active = useRetainedPanelActive();
   const draftKey = buildChatDraftKey(serverId, chatId);
@@ -53,7 +53,7 @@ export const ChatComposer = memo(function ChatComposer({
         workspaceId={project?.workspaceId}
         submissionTarget="conversation"
         resolveWorkspaceFilePath={resolveWorkspaceFilePath}
-        // f08392764 introduced chatAttachments and canonical spoken-input routing together.
+        // One `bots` gate covers attachments and canonical spoken-input routing.
         realtimeVoiceEnabled={attachmentsSupported}
         showAgentControls={project?.canConfigure === true}
         pendingSessionReason={

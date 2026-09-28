@@ -7681,7 +7681,7 @@ test("updateChat sends and correlates group settings when the Host advertises su
   });
   clients.push(client);
   const connecting = client.connect();
-  mock.triggerOpen({ features: { bots: true, chatSettings: true } });
+  mock.triggerOpen({ features: { bots: true } });
   await connecting;
   const patch = { title: "Launch", requireMention: true };
   const response = client.updateChat({ chatId: "group", patch });
@@ -7711,7 +7711,7 @@ test.each([undefined, false])(
     clients.push(client);
     const connecting = client.connect();
     mock.triggerOpen({
-      features: { bots: true, ...(supported === undefined ? {} : { chatSettings: supported }) },
+      features: supported === undefined ? {} : { bots: supported },
     });
     await connecting;
     const before = mock.sent.length;
