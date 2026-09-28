@@ -141,7 +141,7 @@ it is set on create or left at the default.
 | Room contract, silence, `[Room update]` | `adba04aa5` | `room-contract.ts`, `bot-sessions.ts`, `chat-engine.ts`                              |
 | Turns in rounds, preempt, Stop all      | `7f335a8f6` | `discussion.ts`, `mentions.ts`, protocol `chats/mentions.ts`, `chat.discussion.stop` |
 | Room instructions, Stop all action      | `f84df1c90` | `room-instructions-field.tsx`, `stop-all-action.tsx`                                 |
-| `@` picker and mention display          | this change | `member-mentions.ts`, `use-agent-autocomplete.ts`, `chat-rows.tsx`                   |
+| `@` picker and mention display          | `520084d0c` | `member-mentions.ts`, `use-agent-autocomplete.ts`, `chat-rows.tsx`                   |
 
 ## Later
 
