@@ -1,3 +1,4 @@
+import { AgentAttachmentSchema, ImageAttachmentSchema } from "../agent-attachments.js";
 // Wire-facing shapes of a Chat and its transcript
 // (docs/features/bots-and-chats/README.md, D5–D9). The daemon's `chat.json`
 // record adds `deliveredSeq` per participant and applies the rule defaults;
@@ -73,6 +74,8 @@ export const ChatMessagePayloadSchema = z.object({
   at: z.string(),
   sender: ChatMessageSenderSchema,
   text: z.string(),
+  images: z.array(ImageAttachmentSchema).optional(),
+  attachments: z.array(AgentAttachmentSchema).optional(),
   reply: ChatMessageReplySchema.optional(),
   inReplyTo: z.string().optional(),
   /** Accepted target snapshot, persisted before dispatch for restart recovery. */

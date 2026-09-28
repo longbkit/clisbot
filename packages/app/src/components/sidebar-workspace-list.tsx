@@ -1,3 +1,6 @@
+import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
+import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
+import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
 import { isBotProject } from "@/clisbot/bot-projects/projection";
 import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
@@ -552,6 +555,22 @@ function ProjectMenuItems({
     if (!settingsTarget) return;
     router.navigate(buildProjectSettingsRoute(settingsTarget.serverId, settingsTarget.projectId));
   }, [settingsTarget]);
+  const { pins, toggle: togglePin } = useResourcePins();
+  const fusion = useBotsFeatureHosts().length > 0;
+  const projectPin = useMemo(
+    () =>
+      settingsTarget
+        ? {
+            kind: "project" as const,
+            serverId: settingsTarget.serverId,
+            id: settingsTarget.projectId,
+          }
+        : null,
+    [settingsTarget],
+  );
+  const onToggleProjectPin = useCallback(() => {
+    if (projectPin) togglePin(projectPin);
+  }, [projectPin, togglePin]);
   const canOpenInNewWindow = getIsElectron() && projectPath.trim().length > 0;
   const handleOpenInNewWindow = useCallback(() => {
     const trimmedPath = projectPath.trim();
@@ -566,6 +585,11 @@ function ProjectMenuItems({
 
   return (
     <>
+      {fusion && projectPin ? (
+        <ProjectMenuItem surface={surface} onSelect={onToggleProjectPin}>
+          {pins.some((pin) => pinKey(pin) === pinKey(projectPin)) ? "Unpin project" : "Pin project"}
+        </ProjectMenuItem>
+      ) : null}
       {settingsTarget ? (
         <ProjectMenuItem
           surface={surface}
@@ -1948,6 +1972,11 @@ export function SidebarWorkspaceList({
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const supportsMultiplicityByServerId = useHostFeatureMap(serverIds, "workspaceMultiplicity");
   const supportsPinningByServerId = useHostFeatureMap(serverIds, "workspacePinning");
+  const fusion = useBotsFeatureHosts().length > 0;
+  const effectivePinnedGroups = useMemo(
+    () => (fusion ? { ...pinnedGroups, pinnedChats: [] } : pinnedGroups),
+    [fusion, pinnedGroups],
+  );
   const onToggleWorkspacePin = useSidebarWorkspacePinController();
   const getPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.getPinnedWorkspaceOrder);
   const setPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.setPinnedWorkspaceOrder);
@@ -1997,11 +2026,17 @@ export function SidebarWorkspaceList({
   // Project mode is the one that keeps its project headers; every other grouping mode is a flat
   // list of grouped rows, so a new mode lands in the grouped branch rather than silently in this
   // one's `else`.
+  const leading = (
+    <>
+      {fusion ? <FusionPinnedSection onBeforeNavigate={onWorkspacePress} /> : null}
+      {listLeadingComponent}
+    </>
+  );
   const content =
     groupMode !== "project" ? (
       <SidebarGroupedModeList
         workspaceGroups={workspaceGroups}
-        pinnedGroups={pinnedGroups}
+        pinnedGroups={effectivePinnedGroups}
         workspaceEntriesByKey={workspaceEntriesByKey}
         projectIconByProjectViewKey={projectIconByProjectViewKey}
         shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
@@ -2010,6 +2045,7 @@ export function SidebarWorkspaceList({
         supportsPinningByServerId={supportsPinningByServerId}
         onToggleWorkspacePin={onToggleWorkspacePin}
         onPinnedWorkspaceReorder={handlePinnedWorkspaceReorder}
+        listLeadingComponent={leading}
         listHeaderComponent={listHeaderComponent}
         sidebarFilterEmpty={sidebarFilterEmpty}
         parentGestureRef={parentGestureRef}
@@ -2018,7 +2054,7 @@ export function SidebarWorkspaceList({
     ) : (
       <ProjectModeList
         projects={projects}
-        pinnedGroups={pinnedGroups}
+        pinnedGroups={effectivePinnedGroups}
         workspaceEntriesByKey={workspaceEntriesByKey}
         projectIconByProjectViewKey={projectIconByProjectViewKey}
         collapsedProjectKeys={collapsedProjectKeys}
@@ -2028,6 +2064,7 @@ export function SidebarWorkspaceList({
         onAddProject={onAddProject}
         onImportSession={onImportSession}
         listFooterComponent={listFooterComponent}
+        listLeadingComponent={leading}
         listHeaderComponent={listHeaderComponent}
         sidebarFilterEmpty={sidebarFilterEmpty}
         hasActiveProjectFilter={hasActiveProjectFilter}
@@ -2042,12 +2079,7 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return (
-    <>
-      {listLeadingComponent}
-      {content}
-    </>
-  );
+  return content;
 }
 
 /**
@@ -2067,6 +2099,7 @@ function SidebarGroupedModeList({
   supportsPinningByServerId,
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
+  listLeadingComponent,
   listHeaderComponent,
   sidebarFilterEmpty,
   parentGestureRef,
@@ -2082,6 +2115,7 @@ function SidebarGroupedModeList({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspacePlacement[]) => void;
+  listLeadingComponent?: ReactElement | null;
   listHeaderComponent?: ReactElement | null;
   sidebarFilterEmpty: boolean;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
@@ -2109,6 +2143,7 @@ function SidebarGroupedModeList({
       supportsPinningByServerId={supportsPinningByServerId}
       onToggleWorkspacePin={onToggleWorkspacePin}
       onPinnedWorkspaceReorder={onPinnedWorkspaceReorder}
+      listLeadingComponent={listLeadingComponent}
       listHeaderComponent={listHeaderComponent}
       sidebarFilterEmpty={sidebarFilterEmpty}
       parentGestureRef={parentGestureRef}
@@ -2129,6 +2164,7 @@ function ProjectModeList({
   onAddProject,
   onImportSession,
   listFooterComponent,
+  listLeadingComponent,
   listHeaderComponent,
   sidebarFilterEmpty,
   hasActiveProjectFilter,
@@ -2183,6 +2219,7 @@ function ProjectModeList({
   const activeWorkspaceSelection = useActiveWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
   const hasBotsFeature = useBotsFeatureHosts().length > 0;
+  const [projectsCollapsed] = useSectionCollapsed("projects");
   const {
     visibleItems: visiblePinnedChats,
     expanded: pinnedChatsExpanded,
@@ -2454,12 +2491,14 @@ function ProjectModeList({
   const regularProjects = unpinnedProjects.filter((project) => !isBotProject(project));
   const botProjects = unpinnedProjects.filter((project) => isBotProject(project));
   const projectBody =
-    projects.length === 0 ? (
+    projects.length === 0 && !hasBotsFeature ? (
       <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
     ) : (
       <>
-        {renderProjectList(regularProjects, "sidebar-project-list")}
-        {botProjects.length > 0 ? (
+        {hasBotsFeature && projectsCollapsed
+          ? null
+          : renderProjectList(regularProjects, "sidebar-project-list")}
+        {hasBotsFeature ? (
           <BotProjectsGroup>
             {renderProjectList(botProjects, "sidebar-bot-project-list")}
           </BotProjectsGroup>
@@ -2469,6 +2508,7 @@ function ProjectModeList({
 
   const content = (
     <>
+      {listLeadingComponent}
       {pinnedChats.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
           <PinnedSectionHeader collapsed={pinnedCollapsed} onToggle={togglePinnedCollapsed} />
@@ -2512,7 +2552,14 @@ function ProjectModeList({
       sidebarFilterEmpty
         ? listHeaderComponent
         : null}
-      {sidebarFilterEmpty ? <SidebarFilterEmptyState /> : projectBody}
+      {sidebarFilterEmpty ? (
+        <>
+          <SidebarFilterEmptyState />
+          {hasBotsFeature ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
+        </>
+      ) : (
+        projectBody
+      )}
       {listFooterComponent}
     </>
   );

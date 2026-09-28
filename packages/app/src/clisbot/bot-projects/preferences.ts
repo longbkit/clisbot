@@ -14,7 +14,7 @@ export const useBotProjectsPreference = create<{
   persist(
     (set) => ({
       showBotProjects: false,
-      botProjectsCollapsed: false,
+      botProjectsCollapsed: true,
       toggleBotProjectsCollapsed: () =>
         set((state) => ({ botProjectsCollapsed: !state.botProjectsCollapsed })),
       toggleBotProjects: () => set((state) => ({ showBotProjects: !state.showBotProjects })),
@@ -25,7 +25,7 @@ export const useBotProjectsPreference = create<{
         AsyncStorage,
         z.object({
           showBotProjects: z.boolean().catch(false),
-          botProjectsCollapsed: z.boolean().catch(false),
+          botProjectsCollapsed: z.boolean().catch(true),
         }),
       ),
       partialize: (state) => ({

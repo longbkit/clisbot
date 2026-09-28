@@ -161,6 +161,7 @@ function getCloseButtonTestId(tab: WorkspaceTabDescriptor): string {
   if (tab.target.kind === "new_tab") {
     return `workspace-new-tab-close-${tab.tabId}`;
   }
+  if (tab.target.kind === "conversation") return `conversation-${tab.target.chatId}`;
   return `workspace-file-close-${encodeFilePathForPathSegment(tab.target.path)}`;
 }
 
@@ -319,7 +320,9 @@ export function buildWorkspaceTabMenuEntries(
     },
   });
 
-  return entries;
+  return tab.target.kind === "conversation"
+    ? entries.filter((entry) => entry.kind !== "item" || !["close", "rename"].includes(entry.key))
+    : entries;
 }
 
 export function buildWorkspaceDesktopTabActions(

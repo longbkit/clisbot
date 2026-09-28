@@ -1,6 +1,6 @@
 import type pino from "pino";
 import type { StoredBot } from "@getpaseo/protocol/bots/types";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import { BotRequestError } from "../../bots/bot-creation.js";
 import type { BotService } from "../../bots/index.js";
@@ -194,6 +194,9 @@ export class BotSession {
   private project(bot: StoredBot) {
     return {
       ...bot,
+      isOwner:
+        sessionParticipantKey(bot.owner) ===
+        sessionParticipantKey(this.host.actor() ?? LOCAL_OWNER),
       canConfigure:
         this.host.authority.allowsProject(bot.projectId, "project.use") &&
         this.host.authority.allowsProject(bot.projectId, "workspace.manage"),

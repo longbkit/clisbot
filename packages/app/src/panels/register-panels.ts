@@ -1,3 +1,4 @@
+import { conversationPanelRegistration } from "@/clisbot/bots/chat/conversation-panel";
 import { userProfilePanelRegistration } from "@/clisbot/session-storage/profile-panel";
 import { agentPanelRegistration } from "@/panels/agent-panel";
 import { browserPanelRegistration } from "@/desktop/browser/panel";
@@ -23,6 +24,7 @@ export function ensurePanelsRegistered(): void {
   if (panelsRegistered) {
     return;
   }
+  registerPanel(conversationPanelRegistration);
   registerPanel(userProfilePanelRegistration);
   registerPanel(draftPanelRegistration);
   registerPanel(newTabPanelRegistration);

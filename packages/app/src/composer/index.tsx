@@ -938,6 +938,10 @@ function GithubPickerOption({
 }
 
 interface ComposerProps {
+  /** Conversation submits must never enter the ordinary agent queue. */
+  submissionTarget?: "agent" | "conversation";
+  showAgentControls?: boolean;
+  pendingSessionReason?: string;
   agentId: string;
   serverId: string;
   workspaceId?: string | null;
@@ -1145,6 +1149,7 @@ function ComposerCancelButton({
 }
 
 interface ComposerVoiceModeButtonProps {
+  pendingSessionReason?: string;
   buttonIconSize: number;
   handleToggleRealtimeVoice: () => void;
   isConnected: boolean;
@@ -1186,6 +1191,7 @@ function ComposerRightControlsSlot({
 }
 
 function ComposerVoiceModeButton({
+  pendingSessionReason,
   buttonIconSize,
   handleToggleRealtimeVoice,
   isConnected,
@@ -1209,8 +1215,8 @@ function ComposerVoiceModeButton({
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger
         onPress={handleToggleRealtimeVoice}
-        disabled={!isConnected || isVoiceSwitching}
-        accessibilityLabel={t("composer.voice.enableVoiceMode")}
+        disabled={!isConnected || isVoiceSwitching || !!pendingSessionReason}
+        accessibilityLabel={pendingSessionReason ?? t("composer.voice.enableVoiceMode")}
         accessibilityRole="button"
         style={realtimeVoiceButtonStyle}
       >
@@ -1218,7 +1224,9 @@ function ComposerVoiceModeButton({
       </TooltipTrigger>
       <TooltipContent side="top" align="center" offset={8}>
         <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipText}>{t("composer.voice.voiceMode")}</Text>
+          <Text style={styles.tooltipText}>
+            {pendingSessionReason ?? t("composer.voice.voiceMode")}
+          </Text>
           {shortcutNode}
         </View>
       </TooltipContent>
@@ -1242,6 +1250,9 @@ const ComposerContent = memo(ComposerContentImpl);
 
 // oxlint-disable-next-line complexity
 function ComposerContentImpl({
+  submissionTarget = "agent",
+  showAgentControls = true,
+  pendingSessionReason,
   agentId,
   serverId,
   workspaceId,
@@ -1309,7 +1320,8 @@ function ComposerContentImpl({
   const queuedMessagesRaw = useSessionStore((state) =>
     state.sessions[serverId]?.queuedMessages?.get(agentId),
   );
-  const queuedMessages = queuedMessagesRaw ?? EMPTY_ARRAY;
+  const queuedMessages =
+    submissionTarget === "conversation" ? EMPTY_ARRAY : (queuedMessagesRaw ?? EMPTY_ARRAY);
 
   const setQueuedMessages = useSessionStore((state) => state.setQueuedMessages);
 
@@ -1668,7 +1680,7 @@ function ComposerContentImpl({
         allowEmptySubmit,
         forceSend,
         submitBehavior,
-        isAgentRunning,
+        isAgentRunning: submissionTarget === "agent" && isAgentRunning,
         // Parent-managed submits are still valid submit paths even when the
         // transport is disconnected, because the parent decides the failure mode.
         canSubmit: Boolean(sendAgentMessageRef.current || onSubmitMessageRef.current),
@@ -1699,6 +1711,7 @@ function ComposerContentImpl({
       });
     },
     [
+      submissionTarget,
       allowEmptySubmit,
       beginSubmit,
       clearDraft,
@@ -1987,9 +2000,15 @@ function ComposerContentImpl({
         commands: pluginClientSlashCommands,
       });
       if (pluginSlashCommand && runPluginClientSlashCommand(pluginSlashCommand)) return;
+      if (submissionTarget === "conversation") {
+        void sendMessageWithContent(payload.text, outgoingAttachments, true);
+        return;
+      }
       queueMessage(payload.text, outgoingAttachments);
     },
     [
+      submissionTarget,
+      sendMessageWithContent,
       attachments,
       buildOutgoingAttachments,
       pluginClientSlashCommands,
@@ -2047,7 +2066,8 @@ function ComposerContentImpl({
     () => (
       <ComposerRightControlsSlot
         isVoiceModeForAgent={isVoiceModeForAgent}
-        hasAgent={hasAgent}
+        hasAgent={hasAgent || !!pendingSessionReason}
+        pendingSessionReason={pendingSessionReason}
         isAgentRunning={isAgentRunning}
         hasSendableContent={hasSendableContent}
         isCompact={isCompactLayout}
@@ -2062,6 +2082,7 @@ function ComposerContentImpl({
       />
     ),
     [
+      pendingSessionReason,
       buttonIconSize,
       handleToggleRealtimeVoice,
       hasAgent,
@@ -2237,9 +2258,17 @@ function ComposerContentImpl({
         serverId,
         focusInput,
         isCompactLayout,
-        showAgentControls: mode.showAgentControls,
+        showAgentControls: mode.showAgentControls && showAgentControls,
       }),
-    [agentControls, agentId, focusInput, isCompactLayout, mode.showAgentControls, serverId],
+    [
+      agentControls,
+      agentId,
+      focusInput,
+      isCompactLayout,
+      mode.showAgentControls,
+      showAgentControls,
+      serverId,
+    ],
   );
 
   const handleAttachButtonRef = useCallback((node: View | null) => {
@@ -2426,6 +2455,9 @@ function ComposerContentImpl({
           <View style={styles.inputAreaContent}>
             {queueList}
             {sendErrorNode}
+            {pendingSessionReason ? (
+              <Text style={styles.pendingSessionHint}>{pendingSessionReason}</Text>
+            ) : null}
 
             <View ref={messageInputContainerRef} style={styles.messageInputContainer}>
               <ComposerAutocompleteBinding
@@ -2533,6 +2565,11 @@ const animatedStaticStyles = RNStyleSheet.create({
 });
 
 const styles = StyleSheet.create((theme: Theme) => ({
+  pendingSessionHint: {
+    fontSize: 12,
+    color: theme.colors.foregroundMuted,
+    paddingBottom: theme.spacing[1],
+  },
   borderSeparator: {
     height: theme.borderWidth[1],
     backgroundColor: theme.colors.border,

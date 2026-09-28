@@ -2,11 +2,31 @@ import { SessionActorSchema, sessionParticipantKey } from "@getpaseo/protocol/se
 import { normalizeWorkspaceFileLocation, workspaceFileLocationsEqual } from "@/workspace/file-open";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
+/** Optional source context is used only by multi-workspace conversation layouts. */
 export function normalizeWorkspaceTabTarget(
+  value: WorkspaceTabTarget | null | undefined,
+): WorkspaceTabTarget | null {
+  const normalized = normalizeUnscopedWorkspaceTabTarget(value);
+  if (!normalized) return null;
+  const layoutScope = typeof value?.layoutScope === "string" ? value.layoutScope.trim() : "";
+  const scoped = layoutScope ? { ...normalized, layoutScope } : normalized;
+  if (!value?.workspaceContext) return scoped;
+  const serverId = trimNonEmpty(value.workspaceContext.serverId);
+  const workspaceId = trimNonEmpty(value.workspaceContext.workspaceId);
+  return serverId && workspaceId
+    ? { ...scoped, workspaceContext: { serverId, workspaceId } }
+    : null;
+}
+
+function normalizeUnscopedWorkspaceTabTarget(
   value: WorkspaceTabTarget | null | undefined,
 ): WorkspaceTabTarget | null {
   if (!value || typeof value !== "object" || typeof value.kind !== "string") {
     return null;
+  }
+  if (value.kind === "conversation") {
+    const chatId = trimNonEmpty(value.chatId);
+    return chatId ? { kind: "conversation", chatId } : null;
   }
   if (value.kind === "user_profile") {
     const actor = SessionActorSchema.safeParse(value.actor);
@@ -105,6 +125,21 @@ export function workspaceTabTargetsEqual(
   left: WorkspaceTabTarget,
   right: WorkspaceTabTarget,
 ): boolean {
+  if (left.layoutScope !== right.layoutScope) return false;
+  if (
+    left.workspaceContext?.serverId !== right.workspaceContext?.serverId ||
+    left.workspaceContext?.workspaceId !== right.workspaceContext?.workspaceId
+  )
+    return false;
+  if (left.kind === "conversation" && right.kind === "conversation")
+    return left.chatId === right.chatId;
+  return unscopedWorkspaceTabTargetsEqual(left, right);
+}
+
+function unscopedWorkspaceTabTargetsEqual(
+  left: WorkspaceTabTarget,
+  right: WorkspaceTabTarget,
+): boolean {
   if (left.kind !== right.kind) {
     return false;
   }
@@ -200,6 +235,15 @@ function recordsShallowEqual(
 }
 
 export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): string {
+  if (target.layoutScope) {
+    const { layoutScope, ...unscoped } = target;
+    return `layout_${JSON.stringify(layoutScope)}_${buildDeterministicWorkspaceTabId(unscoped)}`;
+  }
+  if (target.workspaceContext) {
+    const { workspaceContext, ...unscoped } = target;
+    return `source_${JSON.stringify([workspaceContext.serverId, workspaceContext.workspaceId])}_${buildDeterministicWorkspaceTabId(unscoped)}`;
+  }
+  if (target.kind === "conversation") return `conversation_${target.chatId}`;
   if (target.kind === "new_tab") {
     throw new Error("New tabs do not have deterministic target identities");
   }

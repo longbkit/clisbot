@@ -1,3 +1,4 @@
+import type { PrepareChatMessageFiles } from "../../chats/chat-engine.js";
 import { sessionActorKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import type { ChatService } from "../../chats/chat-service.js";
@@ -22,6 +23,7 @@ export class ChatSession {
       >,
     private readonly actor: () => SessionActor | undefined,
     private readonly emit: (message: SessionOutboundMessage) => void,
+    private readonly prepareFiles?: PrepareChatMessageFiles,
   ) {
     this.ready = bots.list(true).then((records) => {
       for (const bot of records) this.projects.set(bot.id, bot.projectId);
@@ -104,6 +106,22 @@ export class ChatSession {
     } as SessionOutboundMessage);
   }
 
+  /** Voice uses the same transcript, authority and fan-out as a typed Chat message. */
+  async sendSpokenInput(chatId: string, agentId: string, text: string): Promise<void> {
+    await this.ready;
+    if (!this.allows(chatId)) throw new Error("Chat not found or access denied");
+    const chat = this.service.record(chatId);
+    if (!chat?.participants.some((participant) => participant.agentId === agentId))
+      throw new Error("Voice session is no longer an active Chat participant");
+    await this.requireRun(chatId);
+    await this.service.send({
+      chatId,
+      text,
+      actor: this.actor() ?? LOCAL_OWNER,
+      spokenInputAgentId: agentId,
+    });
+  }
+
   private async create(
     request: Extract<Request, { type: "chat.create.request" }>,
   ): Promise<Record<string, unknown>> {
@@ -119,6 +137,7 @@ export class ChatSession {
       result.sent = await this.service.send({
         chatId: result.chat.id,
         ...request.firstMessage,
+        prepareFiles: this.prepareFiles,
         actor: this.actor() ?? LOCAL_OWNER,
       });
     }
@@ -142,7 +161,13 @@ export class ChatSession {
         return { chat: await this.service.removeParticipant(request.chatId, request.botId) };
       case "chat.message.send.request":
         await this.requireRun(request.chatId);
-        return { ...(await this.service.send({ ...request, actor: this.actor() ?? LOCAL_OWNER })) };
+        return {
+          ...(await this.service.send({
+            ...request,
+            prepareFiles: this.prepareFiles,
+            actor: this.actor() ?? LOCAL_OWNER,
+          })),
+        };
       case "chat.transcript.fetch.request":
         return { ...(await this.service.fetchTranscript(request.chatId, request)) };
       case "chat.archive.request":
@@ -205,6 +230,9 @@ export function createChatSession(
   authority: ConstructorParameters<typeof ChatSession>[2],
   actor: () => SessionActor | undefined,
   emit: (message: SessionOutboundMessage) => void,
+  prepareFiles?: PrepareChatMessageFiles,
 ): ChatSession | null {
-  return service && bots ? new ChatSession(service, bots, authority, actor, emit) : null;
+  return service && bots
+    ? new ChatSession(service, bots, authority, actor, emit, prepareFiles)
+    : null;
 }

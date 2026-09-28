@@ -1,3 +1,5 @@
+vi.mock("./use-chat-message-images", () => ({ useChatMessageImages: () => [] }));
+vi.mock("@/components/retained-panel", () => ({ useRetainedPanelActive: () => true }));
 import { useToolCallSheet } from "@/components/tool-call-sheet";
 import { useAssistantFileLinkResolverContext } from "@/assistant-file-links/provider";
 // @vitest-environment jsdom
@@ -24,6 +26,14 @@ vi.mock("@gorhom/bottom-sheet", () => ({
 }));
 vi.mock("@/components/tool-call-details", () => ({ ToolCallDetailsContent: () => null }));
 vi.mock("@/stores/navigation-active-workspace-store", () => ({ navigateToWorkspace: vi.fn() }));
+vi.mock("@/agent-stream/turn-footer", () => ({
+  RunningTurnFooter: ({ inFlightTurnStartedAt }: { inFlightTurnStartedAt: Date | null }) => (
+    <div
+      data-testid="turn-working-indicator"
+      data-started-at={inFlightTurnStartedAt?.toISOString()}
+    />
+  ),
+}));
 vi.mock("@/agent-stream/view", () => ({
   PermissionRequestCard: ({
     permission,
@@ -42,6 +52,7 @@ vi.mock("@/agent-stream/view", () => ({
 }));
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
+  Platform: { OS: "web" },
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
   ),
@@ -201,6 +212,7 @@ describe("ChatScreen", () => {
           agentId: "agent-w",
           turnActive: true,
           permissions: [],
+          startedAt: new Date("2026-09-28T00:00:00Z"),
           items: [
             toolItem("w-tool", 9000),
             { kind: "assistant_message", id: "w-2", text: "Working on", timestamp: new Date(9500) },
@@ -224,6 +236,9 @@ describe("ChatScreen", () => {
     // Inverted list: the newest row renders first.
     const order = items.map((item) => item.textContent);
     expect(order[0]).toContain("Working on");
+    expect(screen.getByTestId("turn-working-indicator").getAttribute("data-started-at")).toBe(
+      "2026-09-28T00:00:00.000Z",
+    );
     expect(order[order.length - 1]).toBe("Plan the launch");
     expect(screen.getAllByText("Research")).toHaveLength(1);
     expect(screen.getAllByText("Writer")).toHaveLength(2);
@@ -304,6 +319,7 @@ it("routes question permissions through the shared receipt-aware, pending-state 
       onSubmitMessage={vi.fn(async () => {})}
     />,
   );
+  expect(screen.queryByTestId("turn-working-indicator")).toBeNull();
   const card = screen.getByTestId("permission-card");
   expect(card.getAttribute("data-kind")).toBe("question");
   expect(card.getAttribute("data-agent")).toBe("agent-r");

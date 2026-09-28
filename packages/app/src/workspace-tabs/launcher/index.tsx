@@ -35,6 +35,8 @@ export type WorkspaceTabLaunchDestination =
   | { kind: "replace"; tabId: string };
 
 export interface NewTabLauncher {
+  supportedKinds?: readonly WorkspaceTabTarget["kind"][];
+  scopeTarget?: (target: WorkspaceTabTarget) => WorkspaceTabTarget;
   showChanges: boolean;
   showPullRequest: boolean;
   showBrowser: boolean;
@@ -256,7 +258,26 @@ export function useWorkspaceTabLaunchCatalog(input: {
           : {}),
       });
     }
-    return groups;
+    if (!launcher.supportedKinds && !launcher.scopeTarget) return groups;
+    return groups
+      .map((group) =>
+        Object.assign({}, group, {
+          items: group.items
+            .filter(
+              (item) =>
+                !launcher.supportedKinds || launcher.supportedKinds.includes(item.panelKind),
+            )
+            .map((item) =>
+              Object.assign({}, item, {
+                toggleTarget:
+                  item.toggleTarget && launcher.scopeTarget
+                    ? launcher.scopeTarget(item.toggleTarget)
+                    : item.toggleTarget,
+              }),
+            ),
+        }),
+      )
+      .filter((group) => group.items.length > 0);
   }, [
     terminalAccess,
     editTerminalProfiles,

@@ -11,6 +11,7 @@ export interface ChatLiveHead {
   agentId: string;
   items: readonly StreamItem[];
   turnActive: boolean;
+  startedAt?: Date | null;
   permissions: readonly PendingPermission[];
 }
 
@@ -27,6 +28,7 @@ export type ChatRenderRow =
       permissions: PendingPermission[];
       /** The turn is still running; false when only unreferenced tail items remain. */
       inProgress: boolean;
+      startedAt?: Date | null;
       opensGroup: boolean;
     };
 
@@ -123,6 +125,7 @@ function liveRow(
     items,
     permissions,
     inProgress: head.turnActive,
+    startedAt: head.startedAt ?? null,
     opensGroup: senderOf(previous) !== `bot:${botId}`,
   };
 }

@@ -1,23 +1,13 @@
+import { useIsCompactFormFactor } from "@/constants/layout";
 import type { StyleProp, ViewStyle } from "react-native";
 import { View } from "react-native";
 import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
-import { AutomationSidebarItem } from "./automation-sidebar-item";
+import { HubSidebarAccountButton } from "./sidebar-account";
 import { OrganizationSidebarItem } from "./organization-sidebar-item";
 import { useHubAccount } from "./account-provider";
 
-/**
- * Upstream's nav rows plus the fusion Automations row, in one bordered group.
- *
- * `SidebarNavRows` deliberately renders nothing — not even the group wrapper — once every
- * item is hidden, so the wrapper has to be owned here: appending a row inside it would
- * otherwise leave an empty bordered box when the user hides everything and Hub is signed out.
- *
- * Automations is not a registry item, so it does not take part in the reordering and
- * visibility controls the builtin rows have. Making it one means adding a member to the
- * closed `BuiltinSidebarNavId` union and its three exhaustive records in upstream files;
- * a generic host-contributed item would be the thing to ask upstream for instead.
- */
+/** Account and organization share the top area; Automations uses the existing schedules nav slot. */
 export function SidebarNavGroup({
   style,
   onBeforeNavigate,
@@ -25,15 +15,32 @@ export function SidebarNavGroup({
   style?: StyleProp<ViewStyle>;
   onBeforeNavigate?: () => void;
 }) {
+  const compact = useIsCompactFormFactor();
   const { items } = useSidebarNavItems();
   const hub = useHubAccount();
-  const showsAutomations = hub.enabled && Boolean(hub.signedIn);
-  if (!items.some((item) => item.visible) && !showsAutomations) return null;
+  if (!items.some((item) => item.visible) && !hub.enabled) return null;
   return (
     <View style={style}>
-      <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
+      {hub.enabled && (
+        <View style={[accountRowStyle, compact && accountRowCompactStyle]}>
+          {hub.signedIn && (
+            <View style={organizationStyle}>
+              <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
+            </View>
+          )}
+          <HubSidebarAccountButton />
+        </View>
+      )}
       <SidebarNavRows onBeforeNavigate={onBeforeNavigate} />
-      <AutomationSidebarItem onBeforeNavigate={onBeforeNavigate} />
     </View>
   );
 }
+
+const accountRowStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 8,
+} as const;
+const organizationStyle = { flex: 1 };
+
+const accountRowCompactStyle = { paddingRight: 52 };

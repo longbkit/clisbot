@@ -1,4 +1,3 @@
-import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import {
   workspaceSessionsMenuPage,
@@ -670,7 +669,6 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
   const { t } = useTranslation();
   return (
     <>
-      <BotProjectsToggle menu />
       <WorkspaceSessionsSubTrigger />
       <MenuSeparator />
       {SIDEBAR_ROW_ITEMS.map((item) => (

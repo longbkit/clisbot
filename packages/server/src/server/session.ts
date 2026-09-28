@@ -1,3 +1,4 @@
+import { routeChatSpokenInput } from "./session/chats/spoken-input.js";
 import { isBotChatEvent } from "./session/chats/chat-events.js";
 import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { withoutPermissionGeneration } from "./agent/permission-generation-projection.js";
@@ -631,6 +632,9 @@ function sessionRequestId(message: SessionInboundMessage): string | null {
 }
 
 function messageAttachments(message: SessionInboundMessage): AgentAttachment[] {
+  // Chat admission validates and durably stages uploads after its idempotency check.
+  if (message.type === "chat.message.send.request" || message.type === "chat.create.request")
+    return [];
   const direct =
     "attachments" in message && Array.isArray(message.attachments) ? message.attachments : [];
   const firstAgentContext =
@@ -1198,6 +1202,8 @@ export class Session {
       this.resourceAuthorizer,
       () => this.accountActor,
       (msg) => this.emit(msg),
+      (directory, messageId, files) =>
+        this.workspaceFilesSession.attachChatMessageFiles(directory, messageId, files),
     );
     this.botSession = createBotSession(
       options.botService,
@@ -1317,6 +1323,8 @@ export class Session {
           reloadAgentSession: (agentId, overrides) =>
             this.agentManager.reloadAgentSession(agentId, overrides),
           sendSpokenInput: async (agentId, text) => {
+            if (await routeChatSpokenInput(this.agentStorage, this.chatSession, agentId, text))
+              return;
             await this.handleSendAgentMessage(
               agentId,
               text,

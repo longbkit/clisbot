@@ -7,20 +7,23 @@ import { useHubAccount } from "./account-provider";
 import { HubSettingsContent } from "./settings/screen";
 import { HubSettingsDetailScrollProvider } from "./settings/detail-scroll";
 
-export function AutomationsScreen() {
+export function AutomationsScreen({
+  embedded = false,
+  initialCreate = false,
+}: { embedded?: boolean; initialCreate?: boolean } = {}) {
   const hub = useHubAccount();
   const scroll = useRef<ScrollView>(null);
   const scrollToTop = useCallback(() => scroll.current?.scrollTo({ y: 0, animated: false }), []);
   return (
     <View style={styles.container}>
-      <MenuHeader title="Automations" />
+      {!embedded ? <MenuHeader title="Automations" /> : null}
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
         <View style={styles.detail}>
           {!hub.enabled ? (
             <Text style={settingsStyles.rowHint}>Hub is not enabled in this build.</Text>
           ) : null}
           <HubSettingsDetailScrollProvider onNavigate={scrollToTop}>
-            <HubSettingsContent section="automations" />
+            <HubSettingsContent section="automations" initialAutomationCreate={initialCreate} />
           </HubSettingsDetailScrollProvider>
         </View>
       </ScrollView>

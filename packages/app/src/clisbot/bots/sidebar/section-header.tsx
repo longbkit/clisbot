@@ -1,13 +1,42 @@
-import { useCallback } from "react";
-import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
+import { useCallback, useState, useMemo, type ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Plus } from "lucide-react-native";
+import {
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  Layers,
+  LayoutGrid,
+  ListFilter,
+  Pin,
+  Plus,
+} from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
 import type { Theme } from "@/styles/theme";
 const ThemedPlus = withUnistyles(Plus);
+const Down = withUnistyles(ChevronDown);
+const Right = withUnistyles(ChevronRight);
+const icons = {
+  Bots: withUnistyles(Bot),
+  "Group chats": withUnistyles(ListFilter),
+  Projects: withUnistyles(LayoutGrid),
+  "Bot projects": withUnistyles(Folder),
+  Pinned: withUnistyles(Pin),
+};
+const Fallback = withUnistyles(Layers);
 const color = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+
+export function useSectionCollapsed(key: string) {
+  const collapsed = useSidebarCollapsedSectionsStore((state) =>
+    state.collapsedWorkspaceGroupKeys.has(`fusion:${key}`),
+  );
+  const toggle = useSidebarCollapsedSectionsStore((state) => state.toggleWorkspaceGroupCollapsed);
+  return [collapsed, useCallback(() => toggle(`fusion:${key}`), [key, toggle])] as const;
+}
 
 export function BotsSectionHeader({
   label,
@@ -15,45 +44,91 @@ export function BotsSectionHeader({
   createLabel,
   onCreate,
   disabled = false,
+  collapsed = false,
+  onToggle,
+  actions,
 }: {
   label: string;
   testID: string;
-  createLabel: string;
-  onCreate: () => void;
+  createLabel?: string;
+  onCreate?: () => void;
   disabled?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  actions?: ReactNode;
 }) {
-  const compact = useIsCompactFormFactor();
+  const compact = useIsCompactFormFactor() || isNative;
+  const [hovered, setHovered] = useState(false);
+  const [createFocused, setCreateFocused] = useState(false);
+  const accessibilityState = useMemo(() => ({ expanded: !collapsed }), [collapsed]);
+  const onPointerEnter = useCallback(() => setHovered(true), []);
+  const onPointerLeave = useCallback(() => setHovered(false), []);
+  const onCreateFocus = useCallback(() => setCreateFocused(true), []);
+  const onCreateBlur = useCallback(() => setCreateFocused(false), []);
   const buttonStyle = useCallback(
-    ({ hovered, pressed }: PressableStateCallbackType) => [
+    ({ hovered: buttonHovered, pressed }: import("react-native").PressableStateCallbackType) => [
       styles.button,
+      compact && styles.touch,
       disabled && styles.disabled,
-      (compact || isNative) && styles.touchButton,
-      (hovered || pressed) && styles.hovered,
+      !(hovered || createFocused || compact) && styles.actionHidden,
+      (buttonHovered || pressed) && styles.hovered,
     ],
-    [compact, disabled],
+    [compact, disabled, hovered, createFocused],
   );
+  const Icon = icons[label as keyof typeof icons] ?? Fallback;
   return (
-    <View style={styles.header} testID={testID}>
-      <Text style={styles.title}>{label}</Text>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <View>
+    <View
+      style={styles.header}
+      testID={testID}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <Pressable
+        style={[styles.heading, compact && styles.touch]}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={accessibilityState}
+        aria-expanded={!collapsed}
+        testID={`${testID}-toggle`}
+      >
+        {() => {
+          const Chevron = collapsed ? Right : Down;
+          const Leading = hovered && !compact ? Chevron : Icon;
+          return (
+            <>
+              <View style={styles.iconSlot}>
+                <Leading size={16} uniProps={color} />
+              </View>
+              <Text numberOfLines={1} style={styles.title}>
+                {label}
+              </Text>
+            </>
+          );
+        }}
+      </Pressable>
+      {actions}
+      {onCreate ? (
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
             <Pressable
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel={createLabel}
               testID={`${testID}-create`}
               onPress={onCreate}
+              onFocus={onCreateFocus}
+              onBlur={onCreateBlur}
               style={buttonStyle}
             >
               <ThemedPlus size={16} uniProps={color} />
             </Pressable>
-          </View>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="end">
-          <Text>{createLabel}</Text>
-        </TooltipContent>
-      </Tooltip>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end">
+            <Text>{createLabel}</Text>
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
     </View>
   );
 }
@@ -62,15 +137,27 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: theme.spacing[2],
+    paddingLeft: theme.spacing[2],
+    paddingRight: theme.spacing[1],
     userSelect: "none",
+  },
+  heading: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   title: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
+    lineHeight: 20,
+    flexShrink: 1,
   },
+  iconSlot: { width: 16, height: 20, alignItems: "center", justifyContent: "center" },
+  actionHidden: { opacity: 0 },
   button: {
     width: 32,
     height: 32,
@@ -79,6 +166,6 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.md,
   },
   disabled: { opacity: 0.4 },
-  touchButton: { width: 44, height: 44 },
+  touch: { minWidth: 44, minHeight: 44 },
   hovered: { backgroundColor: theme.colors.surfaceSidebarHover },
 }));

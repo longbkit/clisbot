@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
@@ -58,6 +58,7 @@ interface ExplorerSidebarProps {
   workspaceRoot: string;
   isGit: boolean;
   onOpenFile?: (filePath: string) => void;
+  contextControls?: ReactNode;
 }
 
 interface ExplorerSidebarSharedState {
@@ -88,6 +89,7 @@ export function CompactExplorerSidebar({
   workspaceRoot,
   isGit,
   onOpenFile,
+  contextControls,
 }: ExplorerSidebarProps) {
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
@@ -143,6 +145,7 @@ export function CompactExplorerSidebar({
         closeGesture={closeGesture}
         panelStyle={mobileSidebarStyle}
       >
+        {contextControls}
         <ExplorerSidebarContent
           activeTab={explorerTab}
           onTabPress={handleTabPress}
@@ -170,6 +173,7 @@ export function NativeExplorerSidebarDock({
   workspaceRoot,
   isGit,
   onOpenFile,
+  contextControls,
   persistenceKey,
   containerWidth,
 }: NativeExplorerSidebarDockProps) {
@@ -254,6 +258,7 @@ export function NativeExplorerSidebarDock({
             pressed={resizePressed}
             testID="native-explorer-sidebar-resize-handle"
           />
+          {contextControls}
           <ExplorerSidebarContent
             activeTab={explorerTab}
             onTabPress={handleTabPress}

@@ -96,7 +96,7 @@ describe("BotSession", () => {
     ).toBeUndefined();
     expect(findByType(emitted, "bot.create.response")?.payload).toEqual({
       requestId: "c1",
-      bot: { ...bot, canConfigure: true },
+      bot: { ...bot, canConfigure: true, isOwner: false },
       reused: false,
       template: { created: ["AGENTS.md"], skipped: [] },
       error: null,
@@ -231,7 +231,7 @@ describe("BotSession", () => {
     expect(listeners).toHaveLength(0);
     expect(findByType(emitted, "bot.updated")?.payload).toEqual({
       kind: "upsert",
-      bot: { ...bot, canConfigure: true },
+      bot: { ...bot, canConfigure: true, isOwner: true },
     });
   });
 });
@@ -279,4 +279,69 @@ it("projects configuration capability from the current Project grant, never the 
   expect(findByType(emitted, "bot.list.response")?.payload.bots[0]?.canConfigure).toBe(true);
   expect(bot).not.toHaveProperty("canConfigure");
   session.dispose();
+});
+
+describe("Bot ownership projection", () => {
+  it.each([
+    {
+      label: "local owner",
+      owner: { kind: "user", id: "owner" },
+      actor: undefined,
+      expected: true,
+    },
+    {
+      label: "different user with manage access",
+      owner: { kind: "user", id: "author" },
+      actor: { kind: "user", id: "admin" },
+      expected: false,
+    },
+    {
+      label: "same user",
+      owner: { kind: "user", id: "author" },
+      actor: { kind: "user", id: "author" },
+      expected: true,
+    },
+    {
+      label: "same id in another organization",
+      owner: { kind: "user", id: "u", hubOrigin: "https://hub", organizationId: "a" },
+      actor: { kind: "user", id: "u", hubOrigin: "https://hub", organizationId: "b" },
+      expected: false,
+    },
+    {
+      label: "verified member across app and channel",
+      owner: {
+        kind: "user",
+        id: "slack-u",
+        connectionId: "slack",
+        memberId: "m",
+        hubOrigin: "https://hub",
+        organizationId: "a",
+      },
+      actor: {
+        kind: "user",
+        id: "account",
+        memberId: "m",
+        hubOrigin: "https://hub",
+        organizationId: "a",
+      },
+      expected: true,
+    },
+  ])("$label", async ({ owner, actor, expected }) => {
+    const owned = { ...bot, owner: owner as SessionActor };
+    const { session, emitted, listeners } = makeSession(
+      { list: async () => [owned] },
+      { actor: actor as SessionActor | undefined },
+    );
+    await session.handleList({ type: "bot.list.request", requestId: "owner" });
+    expect(findByType(emitted, "bot.list.response")?.payload.bots[0]).toMatchObject({
+      isOwner: expected,
+      canConfigure: true,
+    });
+    listeners[0]!({ kind: "upsert", bot: owned });
+    expect(findByType(emitted, "bot.updated")?.payload).toMatchObject({
+      bot: { isOwner: expected },
+    });
+    expect(owned).not.toHaveProperty("isOwner");
+    session.dispose();
+  });
 });

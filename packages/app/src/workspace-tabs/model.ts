@@ -33,7 +33,13 @@ export type PluginWorkspaceTabTarget =
       agentId: string;
     };
 
-export type WorkspaceTabTarget =
+export interface WorkspaceTargetContext {
+  serverId: string;
+  workspaceId: string;
+}
+
+export type WorkspaceTabTarget = (
+  | { kind: "conversation"; chatId: string }
   | { kind: "new_tab" }
   | { kind: "draft"; draftId: string; setup?: WorkspaceDraftTabSetup }
   | { kind: "agent"; agentId: string }
@@ -48,7 +54,8 @@ export type WorkspaceTabTarget =
   | WorkspaceWorkingDiffTabTarget
   | PluginWorkspaceTabTarget
   | { kind: "setup"; workspaceId: string }
-  | { kind: "commit_diff"; sha: string };
+  | { kind: "commit_diff"; sha: string }
+) & { workspaceContext?: WorkspaceTargetContext; layoutScope?: string };
 
 export interface WorkspaceTab {
   tabId: string;

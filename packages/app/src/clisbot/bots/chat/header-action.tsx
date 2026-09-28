@@ -18,24 +18,28 @@ const ThemedIcon = withUnistyles(function ActionIcon({
 });
 export function ChatHeaderAction({
   label,
+  text,
   icon,
   onPress,
   disabled = false,
 }: {
   label: string;
+  text?: string;
   icon: ComponentType<LucideProps>;
   onPress: () => void;
   disabled?: boolean;
 }) {
   const compact = useIsCompactFormFactor();
+  const showText = Boolean(text) && !compact;
   const buttonStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType) => [
       styles.button,
+      showText ? styles.withText : null,
       (compact || isNative) && styles.touch,
       (hovered || pressed) && styles.hovered,
       disabled && styles.disabled,
     ],
-    [compact, disabled],
+    [compact, disabled, showText],
   );
   return (
     <Tooltip delayDuration={300}>
@@ -49,6 +53,7 @@ export function ChatHeaderAction({
             style={buttonStyle}
           >
             <ThemedIcon icon={icon} uniProps={iconColor} />
+            {showText ? <Text style={styles.text}>{text}</Text> : null}
           </Pressable>
         </View>
       </TooltipTrigger>
@@ -66,7 +71,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     borderRadius: theme.borderRadius.md,
   },
-  touch: { width: 44, height: 44 },
+  touch: { minWidth: 48, height: 48 },
+  withText: { width: "auto", flexDirection: "row", gap: 4, paddingHorizontal: 8 },
+  text: { color: theme.colors.foregroundMuted, fontSize: 14 },
   hovered: { backgroundColor: theme.colors.surface2 },
   disabled: { opacity: 0.4 },
 }));

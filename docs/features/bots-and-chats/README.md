@@ -1,10 +1,12 @@
 # Bots and Chats
 
+App interaction contract: [2026-09-27 navigation, creation and shared panes](app-experience.md).
+
 Date: 2026-09-26. Status: implementation in progress; see [verification and remaining work](implementation.md). Names decided 2026-09-26: **Bot** and
 **Chat**, with **Bot kind** and **Transcript**, in [the glossary](../../glossary.md).
 
 Grok-style teammates inside the Paseo app: create a bot by name, chat with it, put several bots in
-one chat, open any bot's work in the cowork view. The bot layer lives on the daemon and the app;
+one chat, inspect files beside the chat, and explicitly open a bot session in the cowork view. The bot layer lives on the daemon and the app;
 the Hub adds external channels, cross-Host chats, and chats with several humans later.
 
 Context that led here: [the product vision](../../overview/product-vision.md) directions 2, 11, 12;
@@ -86,12 +88,12 @@ inside the Host folder policy's allow set.
 Project root = bot directory, one Workspace of kind `directory`. This is what gives per-bot sharing
 through Project grants and per-bot session storage. One shared "Bots" Project would lose both.
 
-Bot Projects are hidden from the cowork sidebar by default. A device-local **Bot projects** toggle
-beside **Workspaces**, mirrored in Display preferences → Show, reveals a separate collapsible group.
-It reuses the existing Project/workspace/session rows and respects Project/Status grouping, filters,
-pins and grants. The heading remains reachable when hidden Bot Projects are the only projects.
-Mixed multi-Host project entries must be split by Host/Project identity before filtering so an
-ordinary project on another Host is not hidden. Settings › Projects remains unchanged.
+Bot Projects have an always-present **Bot projects** section, initially collapsed. Its expansion state
+is a device view preference. The 2026-09-27 [app experience decision](app-experience.md) supersedes
+the earlier separate visibility toggle beside Workspaces and under Display → Show. It retains the
+existing Project/workspace/session rows, filters, pins and grants. Mixed multi-Host project entries
+must be split by Host/Project identity before grouping so an ordinary project on another Host is
+not misclassified. Settings › Projects remains unchanged.
 
 ### D5. Transcript is separate from timelines
 

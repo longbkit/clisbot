@@ -15,6 +15,7 @@ function sameHeads(
       !other ||
       head.agentId !== other.agentId ||
       head.turnActive !== other.turnActive ||
+      head.startedAt?.getTime() !== other.startedAt?.getTime() ||
       head.items !== other.items ||
       head.permissions.length !== other.permissions.length
     )
@@ -35,10 +36,12 @@ export function useChatLiveHeads(
       const heads = new Map<string, ChatLiveHead>();
       for (const participant of participants) {
         if (!participant.agentId) continue;
+        const turn = selectAgentTurnPresentation(session, participant.agentId);
         heads.set(participant.botId, {
           agentId: participant.agentId,
           items: session?.agentStreamTail?.get(participant.agentId) ?? EMPTY_ITEMS,
-          turnActive: selectAgentTurnPresentation(session, participant.agentId).isActive,
+          turnActive: turn.isActive,
+          startedAt: turn.startedAt,
           permissions: [...(session?.pendingPermissions?.values() ?? [])].filter(
             (permission) => permission.agentId === participant.agentId,
           ),

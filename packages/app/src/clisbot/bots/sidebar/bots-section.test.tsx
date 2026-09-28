@@ -9,8 +9,11 @@ vi.mock("react-native", () => ({
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
   ),
+  TextInput: () => <input />,
+  FlatList: () => null,
   Text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
   Pressable: ({
+    ref,
     children,
     onPress,
     accessibilityLabel,
@@ -18,28 +21,57 @@ vi.mock("react-native", () => ({
     ...rest
   }: {
     children?: ReactNode | ((state: { hovered: boolean; pressed: boolean }) => ReactNode);
+    ref?: React.Ref<{
+      measureInWindow: (
+        callback: (x: number, y: number, width: number, height: number) => void,
+      ) => void;
+    }>;
     onPress?: () => void;
     accessibilityLabel?: string;
     testID?: string;
     "aria-selected"?: boolean;
-  }) => (
-    <button
-      type="button"
-      aria-label={accessibilityLabel}
-      aria-selected={rest["aria-selected"]}
-      data-testid={testID}
-      onClick={onPress}
-    >
-      {typeof children === "function" ? children({ hovered: false, pressed: false }) : children}
-    </button>
-  ),
+  }) => {
+    const attachRef = React.useCallback(() => {
+      const handle = {
+        measureInWindow: (
+          callback: (x: number, y: number, width: number, height: number) => void,
+        ) => callback(100, 200, 32, 32),
+      };
+      if (typeof ref === "function") ref(handle);
+      else if (ref) ref.current = handle;
+    }, [ref]);
+    return (
+      <button
+        ref={attachRef}
+        type="button"
+        aria-label={accessibilityLabel}
+        aria-selected={rest["aria-selected"]}
+        data-testid={testID}
+        onClick={onPress}
+      >
+        {typeof children === "function" ? children({ hovered: false, pressed: false }) : children}
+      </button>
+    );
+  },
 }));
 vi.mock("@/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
   TooltipTrigger: ({ children }: { children: ReactNode }) => children,
   TooltipContent: () => null,
 }));
-vi.mock("lucide-react-native", () => ({ Ellipsis: () => <i />, Plus: () => <i /> }));
+vi.mock("lucide-react-native", () => ({
+  ChevronDown: () => <i />,
+  ChevronRight: () => <i />,
+  Bot: () => <i />,
+  Folder: () => <i />,
+  Layers: () => <i />,
+  LayoutGrid: () => <i />,
+  ListFilter: () => <i />,
+  Pin: () => <i />,
+  Hash: () => <i />,
+  MoreVertical: () => <i />,
+  Plus: () => <i />,
+}));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
 vi.mock("@/constants/platform", () => ({ isNative: false, isWeb: true }));
 vi.mock("../chat/bot-face", () => ({
@@ -96,8 +128,13 @@ describe("BotsSection", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Bot a" }));
     expect(onPressBot).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }));
-    fireEvent.click(screen.getByRole("button", { name: "Bot settings" }));
-    expect(onOpenBotMenu).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bot options" }));
+    expect(onOpenBotMenu).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }), {
+      x: 100,
+      y: 200,
+      width: 32,
+      height: 32,
+    });
   });
 
   it("always offers Create bot in the header without a bottom create row", () => {
@@ -107,7 +144,7 @@ describe("BotsSection", () => {
     expect(onCreateBot).toHaveBeenCalledOnce();
     expect(screen.queryByText("New bot")).toBeNull();
   });
-  it("hides settings for use-only or unknown authority and shows private chat time", () => {
+  it("offers pin options for use-only bots and shows private chat time", () => {
     render(
       <BotsSection
         bots={[bot("a", { updatedAt: "2026-09-26T01:00:00Z" })]}
@@ -116,7 +153,24 @@ describe("BotsSection", () => {
         onCreateBot={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("button", { name: "Bot settings" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Bot options" })).toBeTruthy();
     expect(screen.getByText("2m")).toBeTruthy();
   });
 });
+
+vi.mock("@/stores/sidebar-collapsed-sections-store", () => ({
+  useSidebarCollapsedSectionsStore: (
+    select: (state: {
+      collapsedWorkspaceGroupKeys: Set<string>;
+      toggleWorkspaceGroupCollapsed: () => void;
+    }) => unknown,
+  ) => select({ collapsedWorkspaceGroupKeys: new Set(), toggleWorkspaceGroupCollapsed: () => {} }),
+}));
+
+vi.mock("@/components/adaptive-modal-sheet", () => ({ AdaptiveModalSheet: () => null }));
+
+vi.mock("@/components/ui/form-field", () => ({ FormTextInput: () => <input /> }));
+vi.mock("@/components/ui/scroll-view", () => ({ FlatList: () => null }));
+
+vi.mock("./directory-controls", () => ({ DirectoryControls: () => null }));
+vi.mock("@/components/ui/loading-spinner", () => ({ LoadingSpinner: () => null }));

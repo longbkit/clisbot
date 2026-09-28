@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from "react";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { Button } from "@/components/ui/button";
 
 export function ChoiceButton<T extends string>({
@@ -12,9 +13,10 @@ export function ChoiceButton<T extends string>({
   onSelect: (value: T) => void;
   children: ReactNode;
 }) {
+  const compact = useIsCompactFormFactor();
   const press = useCallback(() => onSelect(value), [onSelect, value]);
   return (
-    <Button variant={selected ? "default" : "outline"} onPress={press}>
+    <Button size={compact ? "md" : "sm"} variant={selected ? "default" : "outline"} onPress={press}>
       {children}
     </Button>
   );

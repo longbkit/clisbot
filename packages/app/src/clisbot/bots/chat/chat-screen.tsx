@@ -1,3 +1,4 @@
+import type { MessagePayload } from "@/composer/types";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { useMemo, type ReactNode } from "react";
 import { View } from "react-native";
@@ -20,9 +21,10 @@ export interface ChatScreenProps {
   liveHeads: ReadonlyMap<string, ChatLiveHead>;
   /** False while the host is offline: the composer will not send. */
   canSend?: boolean;
-  onSubmitMessage: (text: string) => Promise<void>;
+  onSubmitMessage: (payload: MessagePayload) => Promise<void>;
   onReachTop?: () => void;
   headerRight?: ReactNode;
+  hideHeader?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export function ChatScreen({
   onSubmitMessage,
   onReachTop,
   headerRight,
+  hideHeader = false,
 }: ChatScreenProps) {
   const model = useMemo(() => buildChatRenderModel(transcript, liveHeads), [liveHeads, transcript]);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
@@ -48,9 +51,15 @@ export function ChatScreen({
     bots.length === 1 && bots[0] ? botsCopy.messageBot(bots[0].name) : botsCopy.messagePlaceholder;
   return (
     <View style={styles.container} testID={`chat-screen-${chatId}`}>
-      <MenuHeader title={title} rightContent={headerRight} />
+      {!hideHeader ? <MenuHeader title={title} rightContent={headerRight} /> : null}
       <ToolCallSheetProvider>
-        <ChatList rows={model.rows} serverId={serverId} bots={botsById} onReachTop={onReachTop} />
+        <ChatList
+          scrollKey={`${serverId}:${chatId}`}
+          rows={model.rows}
+          serverId={serverId}
+          bots={botsById}
+          onReachTop={onReachTop}
+        />
       </ToolCallSheetProvider>
       <ChatComposer
         serverId={serverId}

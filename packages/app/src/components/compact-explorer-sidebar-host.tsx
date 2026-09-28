@@ -1,3 +1,4 @@
+import { useConversationExplorerOwner } from "@/clisbot/bots/chat/explorer-owner";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -52,6 +53,7 @@ function useActiveCompactExplorerSidebarModel(
   enabled: boolean,
 ): CompactExplorerSidebarHostModel | null {
   const selection = useActiveWorkspaceSelection();
+  const conversationOwnsExplorer = useConversationExplorerOwner((state) => state.owner !== null);
   const workspace = useWorkspace(selection?.serverId ?? null, selection?.workspaceId ?? null);
   const isExplorerActive = useIsMobilePanelActive("file-explorer");
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
@@ -80,7 +82,7 @@ function useActiveCompactExplorerSidebarModel(
   useEffect(() => {
     if (!selection) {
       retainedModelRef.current = null;
-      if (enabled && isExplorerActive) {
+      if (enabled && isExplorerActive && !conversationOwnsExplorer) {
         showMobileAgent();
       }
       return;
@@ -92,7 +94,14 @@ function useActiveCompactExplorerSidebarModel(
     if (resolvedModel) {
       retainedModelRef.current = resolvedModel;
     }
-  }, [enabled, isExplorerActive, resolvedModel, selection, showMobileAgent]);
+  }, [
+    enabled,
+    isExplorerActive,
+    resolvedModel,
+    selection,
+    showMobileAgent,
+    conversationOwnsExplorer,
+  ]);
 
   return selection ? (resolvedModel ?? (isExplorerActive ? retainedModelRef.current : null)) : null;
 }

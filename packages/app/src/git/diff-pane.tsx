@@ -1,3 +1,4 @@
+import { useDiffTabNavigation } from "./use-diff-tab-navigation";
 import { useState, useCallback, useMemo, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -84,10 +85,6 @@ import {
   toolbarLabelTriggerTextStyle,
   toolbarLabelTriggerStyle,
 } from "@/components/ui/toolbar-label-trigger";
-import { FOCUSED_PANE_PLACEMENT, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
-import type { WorkspaceTabPlacement } from "@/stores/workspace-layout-actions";
-import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
-import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { isWeb } from "@/constants/platform";
 import { usePublishWorkingDiffAttachment, useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
@@ -95,8 +92,6 @@ import { DiffTooLargeState } from "@/git/diff-too-large-state";
 import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { openExternalUrl } from "@/utils/open-external-url";
-import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
-import type { PullRequestOpenLocation } from "@/hooks/use-settings";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -1380,59 +1375,6 @@ function ChangesCommits({
       onCollapsedChange={onCollapsedChange}
     />
   );
-}
-
-function useDiffTabNavigation({
-  serverId,
-  workspaceId,
-  cwd,
-  isMobile,
-  pullRequestOpenLocation,
-}: {
-  serverId: string;
-  workspaceId?: string | null;
-  cwd: string;
-  isMobile: boolean;
-  pullRequestOpenLocation: PullRequestOpenLocation;
-}) {
-  const openTab = useWorkspaceLayoutStore((state) => state.openTab);
-  const openWorkspaceTab = useCallback(
-    (workspaceKey: string, target: WorkspaceTabTarget, placement?: WorkspaceTabPlacement) =>
-      openTab({ workspaceKey, target, intent: "reveal", placement }),
-    [openTab],
-  );
-  const persistenceKey = useMemo(
-    () => buildWorkspaceTabPersistenceKey({ serverId, workspaceId: workspaceId ?? cwd }),
-    [cwd, serverId, workspaceId],
-  );
-  const openDiff = useCallback(() => {
-    if (!persistenceKey || isMobile) {
-      return;
-    }
-    openWorkspaceTab(persistenceKey, { kind: "working_diff" }, FOCUSED_PANE_PLACEMENT);
-  }, [isMobile, openWorkspaceTab, persistenceKey]);
-  const openCommit = useCallback(
-    (sha: string) => {
-      if (persistenceKey) {
-        openWorkspaceTab(persistenceKey, { kind: "commit_diff", sha }, FOCUSED_PANE_PLACEMENT);
-      }
-    },
-    [openWorkspaceTab, persistenceKey],
-  );
-  const openPullRequest = useCallback(() => {
-    if (!persistenceKey) return;
-    openWorkspacePullRequest({
-      isCompact: isMobile,
-      workspaceKey: persistenceKey,
-      checkout: { serverId, cwd, isGit: true },
-      destination: pullRequestOpenLocation,
-    });
-  }, [cwd, isMobile, persistenceKey, pullRequestOpenLocation, serverId]);
-  return {
-    openDiff,
-    openCommit,
-    openPullRequest,
-  };
 }
 
 export function ChangesSurface({

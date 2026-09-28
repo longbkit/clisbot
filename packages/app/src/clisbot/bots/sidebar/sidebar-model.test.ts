@@ -3,6 +3,7 @@ import type { HostTagged } from "../data/aggregate";
 import type { BotPayload, ChatPayload } from "../data/contracts";
 import {
   directChatForBot,
+  recentSidebarBots,
   isDirectChat,
   projectBotSidebar,
   selectedDirectBotKey,
@@ -69,4 +70,13 @@ it("selects the Bot row for any of its accessible direct chats, but never a grou
   expect(selectedDirectBotKey(chats, { serverId: "host-a", chatId: "old-dm" })).toBe("host-a:bot");
   expect(selectedDirectBotKey(chats, { serverId: "host-a", chatId: "group" })).toBeNull();
   expect(selectedDirectBotKey(chats, { serverId: "host-b", chatId: "dm" })).toBeNull();
+});
+
+it("caps recent bots while keeping a selected sixth bot discoverable", () => {
+  const rows = Array.from({ length: 8 }, (_, index) => ({
+    key: String(index),
+    updatedAt: `2026-09-${String(28 - index).padStart(2, "0")}`,
+  }));
+  expect(recentSidebarBots(rows, "6").map((row) => row.key)).toEqual(["0", "1", "2", "3", "6"]);
+  expect(recentSidebarBots(rows, null).map((row) => row.key)).toEqual(["0", "1", "2", "3", "4"]);
 });

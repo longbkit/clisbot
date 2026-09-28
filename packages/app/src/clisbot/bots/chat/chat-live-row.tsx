@@ -2,12 +2,10 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { PermissionRequestCard } from "@/agent-stream/view";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo, type ReactNode } from "react";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { AssistantMessage, Notification, ToolCall } from "@/components/message";
 import type { StreamItem } from "@/types/stream";
-import { botsCopy } from "../copy";
+import { RunningTurnFooter } from "@/agent-stream/turn-footer";
 import { BotFace } from "./bot-face";
 import type { ChatBotIdentity } from "./chat-rows";
 import type { ChatRenderRow } from "./render-model";
@@ -90,7 +88,7 @@ export const ChatLiveRow = memo(function ChatLiveRow({
     () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
     [bot.avatar, bot.botId, bot.name],
   );
-  const showWorking = row.inProgress && row.items.length === 0 && row.permissions.length === 0;
+  const showWorking = row.inProgress && row.permissions.length === 0;
   return (
     <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
       {row.items.map((item, index) =>
@@ -104,19 +102,7 @@ export const ChatLiveRow = memo(function ChatLiveRow({
           client={client}
         />
       ))}
-      {showWorking ? (
-        <Text style={styles.working} testID={`chat-live-working-${row.botId}`}>
-          {botsCopy.working}
-        </Text>
-      ) : null}
+      {showWorking ? <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} /> : null}
     </ActorResponseRow>
   );
 });
-
-const styles = StyleSheet.create((theme) => ({
-  working: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    paddingVertical: theme.spacing[2],
-  },
-}));

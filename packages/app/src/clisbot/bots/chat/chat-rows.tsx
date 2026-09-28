@@ -1,3 +1,4 @@
+import { useChatMessageImages } from "./use-chat-message-images";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo } from "react";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
@@ -13,6 +14,8 @@ export interface ChatBotIdentity {
   avatar?: string | null;
   cwd?: string;
   workspaceId?: string;
+  agentId?: string;
+  canConfigure?: boolean;
 }
 
 export function botIdentity(
@@ -31,11 +34,14 @@ export const ChatUserRow = memo(function ChatUserRow({
   serverId: string;
   closesGroup: boolean;
 }) {
+  const images = useChatMessageImages(serverId, row.line);
   return (
     <UserMessage
       serverId={serverId}
       messageId={row.line.id}
       message={row.line.text}
+      images={images}
+      attachments={row.line.attachments}
       timestamp={Date.parse(row.line.at)}
       isFirstInGroup={row.opensGroup}
       isLastInGroup={closesGroup}

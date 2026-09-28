@@ -149,11 +149,15 @@ const INPUT_TYPE_OPTIONS: SelectFieldOption<AutomationInputValue["type"]>[] = [
 ];
 
 export interface AutomationSettingsProps {
+  initialCreate?: boolean;
   ChannelInputs?: ComponentType<{ automationName: string; embedded?: boolean }>;
 }
 
 // eslint-disable-next-line complexity -- one settings coordinator owns the query/load/detail states.
-export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = {}) {
+export function AutomationSettings({
+  ChannelInputs,
+  initialCreate = false,
+}: AutomationSettingsProps = {}) {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
@@ -203,7 +207,7 @@ export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = 
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(initialCreate);
   const creationProgress = useRef<AutomationInputSaveProgress>({});
   const startCreate = useCallback(() => {
     creationProgress.current = {};

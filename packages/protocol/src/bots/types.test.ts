@@ -60,3 +60,9 @@ test("Bot authority is optional on old hosts and not persisted", () => {
     "canConfigure",
   );
 });
+
+test("Bot ownership projection stays optional and is never persisted", () => {
+  expect(BotPayloadSchema.parse(stored).isOwner).toBeUndefined();
+  expect(BotPayloadSchema.parse({ ...stored, isOwner: false }).isOwner).toBe(false);
+  expect(StoredBotSchema.parse({ ...stored, isOwner: true })).not.toHaveProperty("isOwner");
+});

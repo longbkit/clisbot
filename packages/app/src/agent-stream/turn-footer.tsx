@@ -140,7 +140,7 @@ const WorkingIndicator = memo(function WorkingIndicator({
   );
 });
 
-function RunningTurnFooter({
+export function RunningTurnFooter({
   inFlightTurnStartedAt,
   onForkInFlightTurn,
 }: {

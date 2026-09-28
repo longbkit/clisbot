@@ -1,3 +1,6 @@
+import { useSessionStore } from "@/stores/session-store";
+import { useResourcePrincipalScope } from "../data/resource-principal-scope";
+import { ConversationWorkspace } from "./conversation-workspace";
 import { useChatVisibility } from "./use-chat-visibility";
 import { useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
@@ -57,6 +60,7 @@ function Gate() {
 function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: string }) {
   const snapshot = useHostRuntimeSnapshot(serverId);
   const key = scopedTranscriptKey(serverId, chatId, snapshot);
+  const principalScope = useResourcePrincipalScope();
   const focused = useIsFocused();
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
@@ -72,14 +76,38 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
         : [],
     [bots.loadState, serverId],
   );
-  const identities = (chat?.participants ?? []).map((p) => ({
-    botId: p.botId,
-    name: p.displayName,
-    avatar: botRows.find((b) => b.id === p.botId)?.avatar,
-    cwd: botRows.find((b) => b.id === p.botId)?.cwd,
-    workspaceId: botRows.find((b) => b.id === p.botId)?.workspaceId,
-  }));
-  const { send, sending } = useChatSend(client, online, chatId, chat, setChat, setError);
+  const identities = useMemo(
+    () =>
+      (chat?.participants ?? []).map((p) => ({
+        botId: p.botId,
+        agentId: p.agentId ?? undefined,
+        canConfigure: botRows.find((b) => b.id === p.botId)?.canConfigure,
+        name: p.displayName,
+        avatar: botRows.find((b) => b.id === p.botId)?.avatar,
+        cwd: botRows.find((b) => b.id === p.botId)?.cwd,
+        workspaceId: botRows.find((b) => b.id === p.botId)?.workspaceId,
+      })),
+    [chat?.participants, botRows],
+  );
+  const workspaceByBotId = useMemo(
+    () =>
+      new Map(
+        identities.filter((bot) => bot.workspaceId).map((bot) => [bot.botId, bot.workspaceId!]),
+      ),
+    [identities],
+  );
+  const attachmentsSupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.chatAttachments === true,
+  );
+  const { send, sending } = useChatSend(
+    client,
+    online,
+    chatId,
+    chat,
+    setChat,
+    setError,
+    attachmentsSupported,
+  );
   const { loadOlder } = transcript;
   const reachTop = useCallback(() => {
     void loadOlder().catch((e) => setError(String(e)));
@@ -89,6 +117,8 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
       chat ? (
         <View style={styles.actions}>
           <ParticipantActions
+            workspaceByBotId={workspaceByBotId}
+            chatId={chatId}
             serverId={serverId}
             participants={chat.participants}
             group={chat.kind === "group"}
@@ -96,7 +126,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
         </View>
       ) : null,
-    [botRows, chat, serverId],
+    [botRows, chat, chatId, serverId, workspaceByBotId],
   );
   if (transcript.loadState.status === "error")
     return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
@@ -109,18 +139,27 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           {error}
         </Text>
       ) : null}
-      <ChatScreen
-        headerRight={options}
+      <ConversationWorkspace
         serverId={serverId}
         chatId={chatId}
+        accessScope={principalScope}
         title={chat.title ?? identities.map((b) => b.name).join(", ")}
         bots={identities}
-        transcript={transcript.transcript.messages}
-        liveHeads={heads}
-        canSend={online && !sending}
-        onSubmitMessage={send}
-        onReachTop={reachTop}
-      />
+        headerActions={options}
+      >
+        <ChatScreen
+          hideHeader
+          serverId={serverId}
+          chatId={chatId}
+          title={chat.title ?? identities.map((b) => b.name).join(", ")}
+          bots={identities}
+          transcript={transcript.transcript.messages}
+          liveHeads={heads}
+          canSend={online && !sending}
+          onSubmitMessage={send}
+          onReachTop={reachTop}
+        />
+      </ConversationWorkspace>
     </View>
   );
 }

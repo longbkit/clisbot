@@ -63,7 +63,9 @@ export function SchedulesScreen(): ReactElement {
   return <SchedulesScreenContent />;
 }
 
-function SchedulesScreenContent(): ReactElement {
+export function SchedulesScreenContent({
+  embedded = false,
+}: { embedded?: boolean } = {}): ReactElement {
   const { loadState, hostErrors, isError, refetch } = useSchedules();
   const schedules = loadState.status === "loaded" ? loadState.data : EMPTY_SCHEDULES;
   const { agents } = useAggregatedAgents({ includeArchived: true });
@@ -166,7 +168,7 @@ function SchedulesScreenContent(): ReactElement {
 
   return (
     <View style={styles.container}>
-      <MenuHeader title="Schedules" />
+      {!embedded ? <MenuHeader title="Schedules" /> : null}
       <SchedulesScreenBody
         rows={visibleRows}
         loadState={loadState}

@@ -1,3 +1,4 @@
+import { useIsConversationShell } from "@/clisbot/bots/chat/conversation-shell-context";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
   useCallback,
@@ -1205,6 +1206,7 @@ function ResolvedWorkspaceDesktopTabsRow({
     });
   }, [paneId]);
 
+  const isConversationShell = useIsConversationShell();
   const createNewTab = useCallback(() => onCreateNewTab({ paneId }), [onCreateNewTab, paneId]);
 
   const handleNewTabKeyboardAction = useCallback(
@@ -1239,7 +1241,8 @@ function ResolvedWorkspaceDesktopTabsRow({
       dragHandleProps,
       isActive,
     }: DraggableRenderItemInfo<ResolvedWorkspaceDesktopTabRowItem>) => {
-      const shouldShowCloseButton = layout.closeButtonPolicy === "all";
+      const shouldShowCloseButton =
+        layout.closeButtonPolicy === "all" && item.tab.kind !== "conversation";
       const layoutItem = layout.items[index] ?? null;
       const resolvedTabWidth = layoutItem?.width ?? 150;
       const showLabel = layoutItem?.showLabel ?? true;
@@ -1364,7 +1367,7 @@ function ResolvedWorkspaceDesktopTabsRow({
             getItemData={getTabDragData}
             renderItem={renderTab}
           />
-          {!layout.requiresHorizontalScrollFallback ? (
+          {!isConversationShell && !layout.requiresHorizontalScrollFallback ? (
             <WorkspaceNewTabButton
               placement="inline"
               serverId={normalizedServerId}
@@ -1382,7 +1385,7 @@ function ResolvedWorkspaceDesktopTabsRow({
         />
       </View>
       <WorkspacePaneToolbarActions
-        showNewTabButton={layout.requiresHorizontalScrollFallback}
+        showNewTabButton={!isConversationShell && layout.requiresHorizontalScrollFallback}
         showSplitActions={showPaneSplitActions}
         showMaximizeAction={showPaneMaximizeAction}
         paneMaximized={paneMaximized}

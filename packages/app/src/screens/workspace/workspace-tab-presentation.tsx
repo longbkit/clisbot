@@ -1,3 +1,4 @@
+import { useConversationSourceLabel } from "@/clisbot/bots/chat/conversation-source-labels";
 import { useCallback, useMemo, type ReactElement, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { Check, CircleAlert } from "lucide-react-native";
@@ -24,6 +25,7 @@ export interface WorkspaceTabPresentation {
   kind: WorkspaceTabDescriptor["kind"];
   label: string;
   subtitle: string;
+  sourceLabel?: string;
   tooltip: string;
   modified: boolean;
   titleState: "ready" | "loading";
@@ -60,8 +62,8 @@ export function WorkspaceTabPresentationResolver({
       key={`${tab.key}:${tab.kind}`}
       registration={registration}
       tab={tab}
-      serverId={serverId}
-      workspaceId={workspaceId}
+      serverId={tab.target.workspaceContext?.serverId ?? serverId}
+      workspaceId={tab.target.workspaceContext?.workspaceId ?? workspaceId}
     >
       {children}
     </WorkspaceTabPresentationResolverInner>
@@ -75,6 +77,7 @@ function WorkspaceTabPresentationResolverInner({
   workspaceId,
   children,
 }: WorkspaceTabPresentationResolverInnerProps): ReactElement {
+  const sourceLabel = useConversationSourceLabel(tab.target);
   const descriptor = registration.useDescriptor(tab.target as never, {
     serverId,
     workspaceId,
@@ -88,13 +91,15 @@ function WorkspaceTabPresentationResolverInner({
       kind: tab.kind,
       label: descriptor.label,
       subtitle: descriptor.subtitle,
-      tooltip: descriptor.tooltip,
+      sourceLabel,
+      tooltip: sourceLabel ? `${sourceLabel} · ${descriptor.tooltip}` : descriptor.tooltip,
       modified: attributes.modified,
       titleState: descriptor.titleState,
       icon: descriptor.icon,
       statusBucket: descriptor.statusBucket,
     }),
     [
+      sourceLabel,
       descriptor.icon,
       descriptor.label,
       descriptor.tooltip,
@@ -238,6 +243,11 @@ export function WorkspaceTabOptionRow({
                     ? t("workspace.tabs.loading")
                     : presentation.label}
                 </Text>
+                {presentation.sourceLabel ? (
+                  <Text numberOfLines={1} style={styles.optionSource}>
+                    {presentation.sourceLabel}
+                  </Text>
+                ) : null}
               </View>
             </>
           );
@@ -334,6 +344,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     flexShrink: 1,
   },
+  optionSource: { fontSize: 12, color: theme.colors.foregroundMuted },
   optionLabel: {
     fontSize: theme.fontSize.base,
     color: theme.colors.foreground,

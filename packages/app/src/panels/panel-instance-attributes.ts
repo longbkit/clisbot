@@ -51,6 +51,7 @@ export function useModifiedPanelTabIds(input: {
   serverId: string;
   workspaceId: string;
   tabIds: string[];
+  sourceByTabId?: ReadonlyMap<string, { serverId: string; workspaceId: string }>;
 }): Set<string> {
   const revision = useSyncExternalStore(
     useCallback((listener: () => void) => {
@@ -66,13 +67,13 @@ export function useModifiedPanelTabIds(input: {
       input.tabIds.filter(
         (tabId) =>
           getPanelInstanceAttributes({
-            serverId: input.serverId,
-            workspaceId: input.workspaceId,
+            serverId: input.sourceByTabId?.get(tabId)?.serverId ?? input.serverId,
+            workspaceId: input.sourceByTabId?.get(tabId)?.workspaceId ?? input.workspaceId,
             tabId,
           }).modified,
       ),
     );
-  }, [input.serverId, input.tabIds, input.workspaceId, revision]);
+  }, [input.serverId, input.tabIds, input.workspaceId, input.sourceByTabId, revision]);
 }
 
 export function subscribePanelInstanceAttributes(

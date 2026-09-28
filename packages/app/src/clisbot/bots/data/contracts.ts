@@ -24,13 +24,17 @@ export type BotPayload = Pick<
   | "cwd"
   | "kind"
   | "canConfigure"
+  | "isOwner"
 > & { launchDefaults: BotLaunchDefaults };
 export type ChatParticipant = Pick<WireChat["participants"][number], "botId" | "agentId">;
 export type ChatPayload = Pick<WireChat, "id" | "kind" | "rules" | "createdAt" | "updatedAt"> & {
   title: string;
   participants: ChatParticipant[];
 };
-export type ChatMessage = Pick<ChatMessagePayload, "id" | "seq" | "at" | "sender" | "text"> & {
+export type ChatMessage = Pick<
+  ChatMessagePayload,
+  "id" | "seq" | "at" | "sender" | "text" | "images" | "attachments"
+> & {
   agentId?: string;
   timelineItemId?: string;
   reply?: ChatMessagePayload["reply"];

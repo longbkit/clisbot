@@ -19,6 +19,7 @@ vi.mock("react-native", () => ({
   ),
   Text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
   Pressable: ({
+    ref,
     children,
     onPress,
     disabled,
@@ -27,23 +28,40 @@ vi.mock("react-native", () => ({
     ...rest
   }: {
     children?: ReactNode | ((state: { hovered: boolean; pressed: boolean }) => ReactNode);
+    ref?: React.Ref<{
+      measureInWindow: (
+        callback: (x: number, y: number, width: number, height: number) => void,
+      ) => void;
+    }>;
     onPress?: () => void;
     disabled?: boolean;
     accessibilityLabel?: string;
     testID?: string;
     "aria-selected"?: boolean;
-  }) => (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-label={accessibilityLabel}
-      aria-selected={rest["aria-selected"]}
-      data-testid={testID}
-      onClick={onPress}
-    >
-      {typeof children === "function" ? children({ hovered: false, pressed: false }) : children}
-    </button>
-  ),
+  }) => {
+    const attachRef = React.useCallback(() => {
+      const handle = {
+        measureInWindow: (
+          callback: (x: number, y: number, width: number, height: number) => void,
+        ) => callback(100, 200, 32, 32),
+      };
+      if (typeof ref === "function") ref(handle);
+      else if (ref) ref.current = handle;
+    }, [ref]);
+    return (
+      <button
+        ref={attachRef}
+        type="button"
+        disabled={disabled}
+        aria-label={accessibilityLabel}
+        aria-selected={rest["aria-selected"]}
+        data-testid={testID}
+        onClick={onPress}
+      >
+        {typeof children === "function" ? children({ hovered: false, pressed: false }) : children}
+      </button>
+    );
+  },
 }));
 vi.mock("@/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
@@ -54,7 +72,19 @@ vi.mock("@/stores/session-store", () => ({
   useSessionStore: () => false,
   selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
-vi.mock("lucide-react-native", () => ({ Ellipsis: () => <i />, Plus: () => <i /> }));
+vi.mock("lucide-react-native", () => ({
+  ChevronDown: () => <i />,
+  ChevronRight: () => <i />,
+  Bot: () => <i />,
+  Folder: () => <i />,
+  Layers: () => <i />,
+  LayoutGrid: () => <i />,
+  ListFilter: () => <i />,
+  Pin: () => <i />,
+  Hash: () => <i />,
+  MoreVertical: () => <i />,
+  Plus: () => <i />,
+}));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
 vi.mock("@/constants/platform", () => ({ isNative: false, isWeb: true }));
 vi.mock("@/hooks/use-compact-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
@@ -137,7 +167,12 @@ describe("ChatsSection", () => {
     const openMenu = vi.fn();
     rerender(<ChatsSection onCreateChat={vi.fn()} chats={[chat(1)]} onOpenChatMenu={openMenu} />);
     fireEvent.click(screen.getByTestId("sidebar-chat-chat-1-menu"));
-    expect(openMenu).toHaveBeenCalledWith(expect.objectContaining({ chatId: "chat-1" }));
+    expect(openMenu).toHaveBeenCalledWith(expect.objectContaining({ chatId: "chat-1" }), {
+      x: 100,
+      y: 200,
+      width: 32,
+      height: 32,
+    });
   });
 });
 
@@ -150,3 +185,12 @@ it("keeps group creation discoverable but disabled until a bot exists", () => {
   expect(create).not.toHaveBeenCalled();
   expect(screen.getByText("Add at least two bots on one Host to start a group chat.")).toBeTruthy();
 });
+
+vi.mock("@/stores/sidebar-collapsed-sections-store", () => ({
+  useSidebarCollapsedSectionsStore: (
+    select: (state: {
+      collapsedWorkspaceGroupKeys: Set<string>;
+      toggleWorkspaceGroupCollapsed: () => void;
+    }) => unknown,
+  ) => select({ collapsedWorkspaceGroupKeys: new Set(), toggleWorkspaceGroupCollapsed: () => {} }),
+}));

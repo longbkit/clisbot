@@ -132,3 +132,45 @@ test("denies a reused session whose effective configuration is no longer allowed
     h.session.dispose();
   }
 });
+
+test("voice sends once through Chat with the current actor and spoken delivery metadata", async () => {
+  const h = harness("alice");
+  const original = chat.participants[0]!.agentId;
+  chat.participants[0]!.agentId = "voice-agent";
+  try {
+    await h.session.sendSpokenInput(chat.id, "voice-agent", "Hello");
+    expect(h.service.send).toHaveBeenCalledExactlyOnceWith({
+      chatId: chat.id,
+      text: "Hello",
+      spokenInputAgentId: "voice-agent",
+      actor: { kind: "user", id: "alice", organizationId: "org" },
+    });
+    h.revoke();
+    await expect(h.session.sendSpokenInput(chat.id, "voice-agent", "Denied")).rejects.toThrow();
+    expect(h.service.send).toHaveBeenCalledTimes(1);
+  } finally {
+    chat.participants[0]!.agentId = original;
+    h.session.dispose();
+  }
+});
+
+test("voice rejects another actor, stale binding and forbidden effective configuration", async () => {
+  const alice = harness("alice");
+  const bob = harness("bob");
+  const original = chat.participants[0]!.agentId;
+  chat.participants[0]!.agentId = "current-agent";
+  try {
+    await expect(bob.session.sendSpokenInput(chat.id, "current-agent", "Denied")).rejects.toThrow();
+    await expect(alice.session.sendSpokenInput(chat.id, "old-agent", "Denied")).rejects.toThrow();
+    alice.denyExistingSession();
+    await expect(
+      alice.session.sendSpokenInput(chat.id, "current-agent", "Denied"),
+    ).rejects.toThrow();
+    expect(alice.service.send).not.toHaveBeenCalled();
+    expect(bob.service.send).not.toHaveBeenCalled();
+  } finally {
+    chat.participants[0]!.agentId = original;
+    alice.session.dispose();
+    bob.session.dispose();
+  }
+});

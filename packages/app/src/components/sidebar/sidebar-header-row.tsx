@@ -1,3 +1,5 @@
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { isNative } from "@/constants/platform";
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -42,6 +44,7 @@ export function SidebarHeaderRow({
   variant = "header",
   shortcutKeys = null,
 }: SidebarHeaderRowProps) {
+  const touch = useIsCompactFormFactor() || isNative;
   const ThemedIcon = useMemo(() => withUnistyles(Icon), [Icon]);
 
   const containerStyle = useMemo(
@@ -53,9 +56,10 @@ export function SidebarHeaderRow({
     ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.button,
       variant === "compact" && styles.buttonCompact,
+      touch && styles.buttonTouch,
       (Boolean(hovered) || isActive) && styles.buttonHovered,
     ],
-    [isActive, variant],
+    [isActive, variant, touch],
   );
 
   const renderChildren = useCallback(
@@ -138,6 +142,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Compact header entries (New workspace / History) sit tighter than the
   // workspace-row shape the base button mirrors.
+  buttonTouch: { minHeight: 44 },
   buttonCompact: {
     minHeight: 32,
     paddingVertical: theme.spacing[1.5],

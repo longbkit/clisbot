@@ -1,5 +1,4 @@
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
-import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
 import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
@@ -151,7 +150,7 @@ export function useSidebarWorkspacesList(options?: {
 
   const hostProjects = useHostProjects(directoryServerIds);
   const botProjectKeys = useSidebarBotProjectKeys();
-  const showBotProjects = useBotProjectsPreference((state) => state.showBotProjects);
+  const showBotProjects = true;
 
   const sidebarModel = useMemo(
     () =>

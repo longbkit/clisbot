@@ -1,3 +1,5 @@
+import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
+import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { splitBotStatusGroups } from "@/clisbot/bot-projects/projection";
 import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
 import {
@@ -127,6 +129,7 @@ interface StatusWorkspaceListProps {
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspaceEntry[]) => void;
+  listLeadingComponent?: ReactNode;
   listHeaderComponent?: ReactNode;
   /** Swaps the group list for the label filter's empty state. Never the header above it. */
   sidebarFilterEmpty?: boolean;
@@ -145,6 +148,7 @@ export function SidebarStatusWorkspaceList({
   supportsPinningByServerId,
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
+  listLeadingComponent,
   listHeaderComponent,
   sidebarFilterEmpty = false,
   parentGestureRef,
@@ -202,8 +206,10 @@ export function SidebarStatusWorkspaceList({
       supportsPinningByServerId,
     ],
   );
+  const fusion = useBotsFeatureHosts().length > 0;
   const content = (
     <>
+      {listLeadingComponent}
       {pinnedWorkspaces.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
           <PinnedSectionHeader collapsed={pinnedCollapsed} onToggle={togglePinnedCollapsed} />
@@ -234,7 +240,10 @@ export function SidebarStatusWorkspaceList({
       ) : null}
       {listHeaderComponent}
       {sidebarFilterEmpty ? (
-        <SidebarFilterEmptyState />
+        <>
+          <SidebarFilterEmptyState />
+          {fusion ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
+        </>
       ) : (
         <StatusGroupList
           groups={groups}
@@ -297,6 +306,8 @@ function StatusGroupList({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
+  const fusion = useBotsFeatureHosts().length > 0;
+  const [projectsCollapsed] = useSectionCollapsed("projects");
   const sections = splitBotStatusGroups(groups);
   const renderGroup = (group: SidebarWorkspaceGroup) => (
     <StatusGroupRows
@@ -314,8 +325,8 @@ function StatusGroupList({
   );
   return (
     <>
-      {sections.regular.map(renderGroup)}
-      {sections.bots.length > 0 ? (
+      {fusion && projectsCollapsed ? null : sections.regular.map(renderGroup)}
+      {fusion || sections.bots.length > 0 ? (
         <BotProjectsGroup>{sections.bots.map(renderGroup)}</BotProjectsGroup>
       ) : null}
     </>

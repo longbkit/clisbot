@@ -1,3 +1,6 @@
+import { useWorkspaceDirectory } from "@/stores/session-store-hooks";
+import { useConversationDraftContext } from "@/clisbot/bots/chat/conversation-draft-context";
+import { useIsConversationShell } from "@/clisbot/bots/chat/conversation-shell-context";
 import { useCallback, useMemo } from "react";
 import { createWorkspaceFileAttachment } from "@/attachments/workspace-file";
 import { resolveFocusedChatTarget } from "@/composer/focused-chat-target";
@@ -6,6 +9,9 @@ import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 
 export function useAddFileToChat(input: { serverId: string; workspaceId?: string | null }) {
+  const sourceDirectory = useWorkspaceDirectory(input.serverId, input.workspaceId ?? null);
+  const conversation = useConversationDraftContext();
+  const inConversation = useIsConversationShell();
   const workspaceKey = input.workspaceId
     ? buildWorkspaceTabPersistenceKey({ serverId: input.serverId, workspaceId: input.workspaceId })
     : null;
@@ -19,7 +25,20 @@ export function useAddFileToChat(input: { serverId: string; workspaceId?: string
   );
   const addFile = useCallback(
     async (filePath: string) => {
-      if (!focusedChat || !workspaceKey) {
+      if (conversation) {
+        await useDraftStore.getState().attachWorkspaceFile({
+          draftKey: conversation.draftKey,
+          attachment: createWorkspaceFileAttachment({
+            path:
+              /^(?:\/|[A-Za-z]:[\\/])/.test(filePath) || !sourceDirectory
+                ? filePath
+                : `${sourceDirectory.replace(/[\\/]$/, "")}/${filePath}`,
+          }),
+        });
+        conversation.focusMessages();
+        return;
+      }
+      if (inConversation || !focusedChat || !workspaceKey) {
         return;
       }
       await useDraftStore.getState().attachWorkspaceFile({
@@ -28,7 +47,10 @@ export function useAddFileToChat(input: { serverId: string; workspaceId?: string
       });
       focusTab(workspaceKey, focusedChat.tabId);
     },
-    [focusTab, focusedChat, workspaceKey],
+    [focusTab, focusedChat, workspaceKey, inConversation, conversation, sourceDirectory],
   );
-  return { addFile, canAddToChat: focusedChat !== null };
+  return {
+    addFile,
+    canAddToChat: conversation !== null || (!inConversation && focusedChat !== null),
+  };
 }

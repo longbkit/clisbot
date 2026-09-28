@@ -1,148 +1,174 @@
-import { ChoiceButton } from "./choice-button";
+import { useMemo } from "react";
+import { BotFormLayout } from "./form-layout";
+import { useCallback } from "react";
+import { SettingsCard, SettingsSwitch } from "@/components/settings";
 import { FormTextInput } from "@/components/ui/form-field";
-import { useCallback, useState } from "react";
-import { View, Text, Switch } from "react-native";
+import { SelectField } from "@/components/ui/select-field";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
-import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import type { AggregatedBot } from "../data/use-bots";
-import { refreshBotsAndChats } from "../data/runtime";
-
-export function GroupChatForm({
-  bots,
-  hosts,
-  onCreated,
-}: {
-  bots: AggregatedBot[];
-  hosts: { serverId: string; label: string }[];
-  onCreated: (serverId: string, chatId: string) => void;
-}) {
-  const [serverId, setServerId] = useState(hosts.length === 1 ? hosts[0]!.serverId : "");
-  const [ids, setIds] = useState<string[]>([]);
-  const [title, setTitle] = useState("");
-  const [mention, setMention] = useState(false);
-  const [hops, setHops] = useState("3");
-  const [limit, setLimit] = useState("8000");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const submit = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const max = Number(hops),
-        maxInputCharacters = Number(limit);
-      if (
-        !Number.isInteger(max) ||
-        max < 0 ||
-        !Number.isInteger(maxInputCharacters) ||
-        maxInputCharacters < 1
-      )
-        throw new Error("Enter a non-negative hop limit and positive message limit");
-      const client = getHostRuntimeStore().getClient(serverId);
-      if (!client) throw new Error("Host is disconnected");
-      const r = await client.createChat({
-        kind: "group",
-        botIds: ids,
-        title: title.trim() || undefined,
-        rules: {
-          interaction: { requireMention: mention },
-          hops: { max },
-          limits: { maxInputCharacters },
-        },
-      });
-      if (r.error || !r.chat) throw new Error(r.error ?? "Could not create chat");
-      refreshBotsAndChats();
-      onCreated(serverId, r.chat.id);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [serverId, ids, title, mention, hops, limit, onCreated]);
-  const selectHost = useCallback((id: string) => {
-    setServerId(id);
-    setIds([]);
-  }, []);
-  const selectBot = useCallback(
-    (id: string) =>
-      setIds((current) =>
-        current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
-      ),
-    [],
+import { useGroupChatForm, type GroupChatFormProps } from "./use-group-chat-form";
+const ALL_REPLY = { label: "All bots unless you @mention one" };
+const MENTION_REPLY = { label: "Only bots you @mention" };
+export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
+  const {
+    draft,
+    hostBots,
+    visible,
+    error,
+    busy,
+    selectHost,
+    selectBot,
+    setTitle,
+    setSearch,
+    setReply,
+    submit,
+  } = useGroupChatForm({ bots, hosts, onCreated });
+  const compact = useIsCompactFormFactor();
+  const size = compact ? "md" : "sm";
+  const footer = useMemo(
+    () => (
+      <Button
+        size={size}
+        disabled={
+          !hosts.some((host) => host.serverId === draft.serverId) ||
+          draft.botIds.filter((id) => hostBots.some((bot) => bot.id === id)).length < 2 ||
+          busy
+        }
+        onPress={submit}
+      >
+        {busy ? "Creating…" : "Create group chat"}
+      </Button>
+    ),
+    [size, hosts, draft.serverId, draft.botIds, hostBots, busy, submit],
   );
-  const submitAction = useCallback(() => {
-    void submit();
-  }, [submit]);
   return (
-    <View style={styles.form}>
+    <BotFormLayout footer={footer}>
+      <GroupBotPicker
+        hosts={hosts}
+        draft={draft}
+        visible={visible}
+        size={size}
+        selectHost={selectHost}
+        selectBot={selectBot}
+        setSearch={setSearch}
+      />
+      <Text style={styles.label}>Group name · optional</Text>
       <FormTextInput
+        size={size}
         accessibilityLabel="Chat name"
-        style={styles.input}
-        initialValue={title}
+        initialValue={draft.title}
         onChangeText={setTitle}
-        placeholder="Chat name (optional)"
+        placeholder="For example, Product launch"
       />
-      {hosts.length > 1
-        ? hosts.map((host) => (
-            <ChoiceButton
-              key={host.serverId}
-              value={host.serverId}
-              selected={serverId === host.serverId}
-              onSelect={selectHost}
-            >
-              {host.label}
-            </ChoiceButton>
-          ))
-        : null}
-      {bots
-        .filter((bot) => bot.serverId === serverId)
-        .map((bot) => (
-          <ChoiceButton
-            key={bot.id}
-            value={bot.id}
-            selected={ids.includes(bot.id)}
-            onSelect={selectBot}
-          >
-            {bot.name}
-          </ChoiceButton>
-        ))}
-      <Text style={styles.text}>Reply only when mentioned</Text>
-      <Switch accessibilityLabel="Require mention" value={mention} onValueChange={setMention} />
-      <Text style={styles.text}>Bot-to-bot hop limit (0 disables forwarding)</Text>
-      <FormTextInput
-        accessibilityLabel="Hop limit"
-        style={styles.input}
-        keyboardType="number-pad"
-        initialValue={hops}
-        onChangeText={setHops}
-      />
-      <Text style={styles.text}>Maximum message characters</Text>
-      <FormTextInput
-        accessibilityLabel="Maximum message characters"
-        style={styles.input}
-        keyboardType="number-pad"
-        initialValue={limit}
-        onChangeText={setLimit}
+      <SelectField
+        label="Who replies?"
+        value={draft.requireMention ? "mentioned" : "all"}
+        selectedDisplay={draft.requireMention ? MENTION_REPLY : ALL_REPLY}
+        options={[
+          {
+            id: "all",
+            value: "all",
+            label: "All bots unless you @mention one",
+          },
+          {
+            id: "mentioned",
+            value: "mentioned",
+            label: "Only bots you @mention",
+          },
+        ]}
+        onChange={setReply}
+        placeholder="Choose who replies"
+        emptyText="No reply options"
+        size={size}
       />
       {error ? (
-        <Text accessibilityRole="alert" style={styles.text}>
+        <Text accessibilityRole="alert" style={styles.label}>
           {error}
         </Text>
       ) : null}
-      <Button disabled={!serverId || ids.length < 2 || busy} onPress={submitAction}>
-        {busy ? "Creating…" : "Create group chat"}
-      </Button>
-    </View>
+    </BotFormLayout>
   );
+}
+function GroupBotPicker({
+  hosts,
+  draft,
+  visible,
+  size,
+  selectHost,
+  selectBot,
+  setSearch,
+}: Pick<
+  ReturnType<typeof useGroupChatForm>,
+  "draft" | "visible" | "selectHost" | "selectBot" | "setSearch"
+> & { hosts: GroupChatFormProps["hosts"]; size: "sm" | "md" }) {
+  return (
+    <>
+      {hosts.length !== 1 ? (
+        <SelectField
+          label="Host"
+          value={draft.serverId}
+          selectedDisplay={hosts.find((host) => host.serverId === draft.serverId) ?? null}
+          options={hosts.map((host) => ({
+            id: host.serverId,
+            value: host.serverId,
+            label: host.label,
+          }))}
+          onChange={selectHost}
+          placeholder="Choose a Host"
+          emptyText="No eligible Hosts connected"
+          size={size}
+        />
+      ) : null}
+      {hosts.length > 1 && draft.botIds.length > 0 ? (
+        <Text style={styles.hint}>Changing Host clears the selected bots.</Text>
+      ) : null}
+      <Text style={styles.label}>
+        Choose bots
+        {draft.botIds.length ? ` · ${draft.botIds.length} selected` : ""}
+      </Text>
+      <FormTextInput
+        key={draft.serverId}
+        size={size}
+        accessibilityLabel="Search bots"
+        initialValue={draft.search}
+        onChangeText={setSearch}
+        placeholder="Search bots…"
+      />
+      <SettingsCard>
+        {visible.map((bot) => (
+          <GroupParticipant
+            key={bot.id}
+            id={bot.id}
+            name={bot.name}
+            selected={draft.botIds.includes(bot.id)}
+            select={selectBot}
+          />
+        ))}
+      </SettingsCard>
+      {draft.serverId && visible.length === 0 ? (
+        <Text style={styles.hint}>No bots match your search.</Text>
+      ) : null}
+    </>
+  );
+}
+function GroupParticipant({
+  id,
+  name,
+  selected,
+  select,
+}: {
+  id: string;
+  name: string;
+  selected: boolean;
+  select: (id: string) => void;
+}) {
+  const toggle = useCallback(() => select(id), [id, select]);
+  return <SettingsSwitch label={name} value={selected} onValueChange={toggle} />;
 }
 const styles = StyleSheet.create((theme) => ({
   form: { padding: theme.spacing[4], gap: theme.spacing[3] },
-  text: { color: theme.colors.foreground },
-  input: {
-    color: theme.colors.foreground,
-    borderWidth: 1,
-    borderColor: theme.colors.surface2,
-    borderRadius: 8,
-    padding: theme.spacing[3],
-  },
+  label: { color: theme.colors.foreground },
+  hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
 }));

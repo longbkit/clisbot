@@ -40,7 +40,7 @@ const actor = { kind: "user" as const, id: "usr_1", displayName: "Long Luong" };
 
 interface SentPrompt {
   agentId: string;
-  prompt: string;
+  prompt: import("../agent/agent-sdk-types.js").AgentPromptInput;
   messageId: string;
   activeTurnBehavior?: "steer";
 }
@@ -522,4 +522,149 @@ test("late forwarding does not resend a bot line already consumed as context", a
     (await h.store.require("cht_overtake")).participants.find((p) => p.botId === beta.id)
       ?.deliveredSeq,
   ).toBe(3);
+});
+
+test("spoken Chat input persists once and wraps only the selected voice bot prompt", async () => {
+  const h = await harness();
+  await h.store.create({ id: "cht_voice", botIds: [alpha.id, beta.id] });
+  await h.engine.send({
+    chatId: "cht_voice",
+    text: "@alpha @beta hello",
+    messageId: "voice-1",
+    actor,
+    spokenInputAgentId: "agent-bot_a-1",
+  });
+  await h.engine.idle();
+  expect((await h.lines("cht_voice")).filter((line) => line.sender.kind === "user")).toHaveLength(
+    1,
+  );
+  expect((await h.lines("cht_voice"))[0]).toMatchObject({
+    text: "@alpha @beta hello",
+    spokenInputAgentId: "agent-bot_a-1",
+  });
+  expect(h.sent.find((prompt) => prompt.agentId === "agent-bot_a-1")?.prompt).toContain(
+    "<spoken-input>",
+  );
+  expect(h.sent.find((prompt) => prompt.agentId !== "agent-bot_a-1")?.prompt).not.toContain(
+    "<spoken-input>",
+  );
+  expect(h.sent).toHaveLength(2);
+});
+
+test("chat attachments persist, fan out once, and full-payload retries conflict", async () => {
+  const h = await harness();
+  await h.store.create({ id: "files", botIds: [alpha.id, beta.id] });
+  const input = {
+    chatId: "files",
+    text: "",
+    messageId: "f1",
+    images: [{ data: "aGVsbG8=", mimeType: "image/png" }],
+    attachments: [
+      { type: "text" as const, mimeType: "text/plain" as const, text: "spec", title: "Spec" },
+    ],
+  };
+  await h.engine.send(input);
+  await h.engine.idle();
+  expect(h.sent).toHaveLength(2);
+  for (const sent of h.sent)
+    expect(sent.prompt).toEqual(
+      expect.arrayContaining([{ type: "image", ...input.images[0] }, input.attachments[0]]),
+    );
+  expect((await h.lines("files"))[0]).toMatchObject({
+    images: input.images,
+    attachments: input.attachments,
+  });
+  expect((await h.engine.send(input)).duplicate).toBe(true);
+  await expect(
+    h.engine.send({ ...input, images: [{ data: "b3RoZXI=", mimeType: "image/png" }] }),
+  ).rejects.toThrow("different text or attachments");
+  await h.engine.send({ chatId: "files", text: "Next", messageId: "f2" });
+  await h.engine.idle();
+  expect(h.sent.slice(2).every((sent) => typeof sent.prompt === "string")).toBe(true);
+});
+
+test("chat upload preparation rejects before accepting a transcript", async () => {
+  const h = await harness();
+  await h.store.create({ id: "denied-files", botIds: [alpha.id] });
+  await expect(
+    h.engine.send({
+      chatId: "denied-files",
+      text: "file",
+      prepareFiles: async () => {
+        throw new Error("Upload owner denied");
+      },
+    }),
+  ).rejects.toThrow("Upload owner denied");
+  expect(await h.lines("denied-files")).toEqual([]);
+  expect(h.sent).toEqual([]);
+});
+
+test("uploaded chat files use existing durable staging before fanout and survive log reopen", async () => {
+  const { attachSessionFiles } = await import("../file-upload/session-files.js");
+  const h = await harness();
+  await h.store.create({ id: "durable-files", botIds: [alpha.id, beta.id] });
+  const source = path.join(roots.at(-1)!, "upload.txt");
+  await fs.writeFile(source, "durable content");
+  const attachment = {
+    type: "uploaded_file" as const,
+    id: "file_1",
+    fileName: "upload.txt",
+    mimeType: "text/plain",
+    size: 15,
+    path: source,
+  };
+  const input = {
+    chatId: "durable-files",
+    messageId: "upload1",
+    text: "Read",
+    attachments: [attachment],
+  };
+  await expect(
+    h.engine.send({
+      ...input,
+      prepareFiles: async (directory, messageId, files) =>
+        attachSessionFiles({ directory, messageId, ...files, ownsUpload: () => false }),
+    }),
+  ).rejects.toThrow("does not belong");
+  expect(await h.lines("durable-files")).toEqual([]);
+  await h.engine.send({
+    ...input,
+    prepareFiles: async (directory, messageId, files) =>
+      attachSessionFiles({
+        directory,
+        messageId,
+        ...files,
+        ownsUpload: (file) => file.id === attachment.id && file.path === source,
+      }),
+  });
+  await h.engine.idle();
+  await fs.unlink(source);
+  const log = new TranscriptLog(h.store.directory("durable-files"));
+  const line = (await log.fetch({ limit: 0 })).lines[0]!;
+  const stored = line.attachments![0];
+  expect(stored.type).toBe("uploaded_file");
+  if (stored.type !== "uploaded_file") throw new Error("Expected file");
+  expect(await fs.readFile(stored.path, "utf8")).toBe("durable content");
+  expect(h.sent).toHaveLength(2);
+  for (const sent of h.sent) expect(sent.prompt).toEqual(expect.arrayContaining([stored]));
+  expect((await h.engine.send(input)).duplicate).toBe(true);
+});
+
+test("chat releases upload ownership only after transcript acceptance", async () => {
+  const h = await harness();
+  await h.store.create({ id: "release-files", botIds: [alpha.id] });
+  let released = false;
+  await h.engine.send({
+    chatId: "release-files",
+    text: "Ready",
+    messageId: "r1",
+    prepareFiles: async () => ({
+      release: async () => {
+        expect((await h.lines("release-files"))[0]?.id).toBe("r1");
+        released = true;
+      },
+    }),
+  });
+  await h.engine.idle();
+  expect(released).toBe(true);
 });

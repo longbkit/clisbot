@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Shortcut } from "@/components/ui/shortcut";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { isWeb } from "@/constants/platform";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   iconButtonChromeFrameStyle,
   iconButtonChromeStyle,
@@ -36,6 +37,7 @@ export function HeaderToggleButton({
   children,
   ...props
 }: HeaderToggleButtonProps): ReactElement {
+  const compact = useIsCompactFormFactor();
   const tooltipTestID =
     typeof props.testID === "string" && props.testID.length > 0
       ? `${props.testID}-tooltip`
@@ -53,9 +55,9 @@ export function HeaderToggleButton({
           size: "large",
           state: { hovered: Boolean(hovered), pressed },
           disabled: Boolean(disabled),
-          style,
+          style: [style, compact && styles.mobileTouchTarget],
         }),
-    [disabled, style],
+    [compact, disabled, style],
   );
 
   return (
@@ -83,6 +85,10 @@ export function HeaderToggleButton({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  mobileTouchTarget: {
+    width: 48,
+    height: 48,
+  },
   tooltipRow: {
     flexDirection: "row",
     alignItems: "center",

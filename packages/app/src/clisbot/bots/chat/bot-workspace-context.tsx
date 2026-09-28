@@ -2,7 +2,7 @@ import { useCallback, type ReactNode } from "react";
 import { AssistantFileLinkResolverProvider } from "@/assistant-file-links/provider";
 import { normalizeInlinePathTarget, type InlinePathTarget } from "@/assistant-file-links/parse";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
-import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
+import { useOpenConversationTarget } from "./conversation-file-context";
 import {
   createWorkspaceFileTabTarget,
   normalizeWorkspaceFileLocation,
@@ -20,6 +20,7 @@ export function BotWorkspaceContext({
   children: ReactNode;
 }) {
   const client = useHostRuntimeClient(serverId);
+  const openInConversation = useOpenConversationTarget();
   const open = useCallback(
     (target: InlinePathTarget) => {
       if (!bot.cwd || !bot.workspaceId) return;
@@ -32,13 +33,12 @@ export function BotWorkspaceContext({
             lineEnd: target.lineEnd,
           })
         : null;
-      navigateToWorkspace({
-        serverId,
-        workspaceId: bot.workspaceId,
-        target: location ? createWorkspaceFileTabTarget(location) : undefined,
-      });
+      openInConversation?.(
+        { serverId, workspaceId: bot.workspaceId },
+        location ? createWorkspaceFileTabTarget(location) : { kind: "files" },
+      );
     },
-    [bot.cwd, bot.workspaceId, serverId],
+    [bot.cwd, bot.workspaceId, serverId, openInConversation],
   );
   return (
     <AssistantFileLinkResolverProvider

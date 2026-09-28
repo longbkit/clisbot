@@ -136,6 +136,12 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.spacing[SHEET_HEADER_CLOSE_PADDING_SCALE],
     borderRadius: theme.borderRadius.lg,
   },
+  mobileHeaderTarget: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -306,6 +312,7 @@ export function SheetHeaderView({
   showCloseButton?: boolean;
   testID?: string;
 }) {
+  const compact = useIsCompactFormFactor();
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const titleStyle = useMemo(
@@ -328,8 +335,8 @@ export function SheetHeaderView({
         {handleBackPress ? (
           <Pressable
             onPress={handleBackPress}
-            hitSlop={8}
-            style={styles.headerBackButton}
+            hitSlop={compact ? undefined : 8}
+            style={[styles.headerBackButton, compact && styles.mobileHeaderTarget]}
             accessibilityRole="button"
             accessibilityLabel={back?.accessibilityLabel ?? back?.label ?? t("common.actions.back")}
             testID="sheet-header-back"
@@ -354,7 +361,7 @@ export function SheetHeaderView({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("common.actions.close")}
-            style={styles.closeButton}
+            style={[styles.closeButton, compact && styles.mobileHeaderTarget]}
             onPress={onClose}
           >
             {({ pressed }) => (

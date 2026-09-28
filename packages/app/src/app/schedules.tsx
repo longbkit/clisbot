@@ -1,10 +1,10 @@
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
-import { SchedulesScreen } from "@/screens/schedules-screen";
+import { AutomationsLandingScreen } from "@/clisbot/automations/screen";
 
 export default function SchedulesRoute() {
   return (
     <HostRouteBootstrapBoundary>
-      <SchedulesScreen />
+      <AutomationsLandingScreen />
     </HostRouteBootstrapBoundary>
   );
 }

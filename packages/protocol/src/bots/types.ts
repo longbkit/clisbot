@@ -59,6 +59,9 @@ export type StoredBot = z.infer<typeof StoredBotSchema>;
 export const BotPayloadSchema = StoredBotSchema.extend({
   // COMPAT(botConfigureAuthority): older hosts omit; configuration UI fails closed.
   canConfigure: z.boolean().optional(),
+  // COMPAT(botOwnerProjection): older hosts omit; client ownership filters keep unknown in All.
+  // Session-relative display metadata, never an authorization grant.
+  isOwner: z.boolean().optional(),
 });
 export type BotPayload = z.infer<typeof BotPayloadSchema>;
 

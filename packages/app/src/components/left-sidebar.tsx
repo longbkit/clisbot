@@ -1,4 +1,5 @@
-import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
+import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
+import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
 import { FolderPlus, GitBranch, Import, Server, Settings, X } from "lucide-react-native";
@@ -60,7 +61,6 @@ import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarMetadataNotice } from "./sidebar/empty-states";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
 import { SidebarNavGroup } from "@/clisbot/hub/sidebar-nav-group";
-import { HubSidebarAccountButton } from "@/clisbot/hub/sidebar-account";
 
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 
@@ -530,7 +530,7 @@ function SidebarFooter({
           theme={theme}
         />
         <SidebarHelpMenu />
-        <HubSidebarAccountButton />
+
         <FooterIconButton
           onPress={handleSettings}
           testID="sidebar-settings"
@@ -601,7 +601,11 @@ function MobileSidebar({
       <View style={styles.sidebarContent} pointerEvents="auto">
         <WindowChromeSafeArea placement="below" />
         <SidebarNavGroup style={styles.sidebarHeaderGroup} onBeforeNavigate={closeSidebar} />
-        <WindowChromeSafeArea placement="inline" style={styles.mobileCloseButtonRow}>
+        <WindowChromeSafeArea
+          pointerEvents="box-none"
+          placement="inline"
+          style={styles.mobileCloseButtonRow}
+        >
           <Pressable
             style={styles.mobileCloseButton}
             onPress={closeSidebar}
@@ -850,12 +854,35 @@ function DesktopSidebar({
 }
 
 function WorkspacesSectionHeader() {
+  const fusion = useBotsFeatureHosts().length > 0;
+  const openProjectPicker = useOpenAddProject();
+  const compact = useIsCompactFormFactor();
+  const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
+  const addProject = useCallback(() => {
+    if (compact) showMobileAgent();
+    void openProjectPicker();
+  }, [compact, showMobileAgent, openProjectPicker]);
+  const [collapsed, toggle] = useSectionCollapsed("projects");
+  if (fusion)
+    return (
+      <View>
+        <BotsSectionHeader
+          label="Projects"
+          onCreate={addProject}
+          createLabel="Add project"
+          testID="sidebar-projects-header"
+          collapsed={collapsed}
+          onToggle={toggle}
+          actions={displayPreferencesMenuElement}
+        />
+        <SidebarActiveFilters />
+      </View>
+    );
   return (
     <View style={styles.workspacesSectionHeader}>
       <View style={styles.workspacesSectionTitleRow}>
         <Text style={styles.workspacesSectionTitle}>Workspaces</Text>
         <View style={styles.workspacesSectionActions}>
-          <BotProjectsToggle />
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
               <View>
@@ -1058,3 +1085,5 @@ const styles = StyleSheet.create((theme) => ({
 }));
 
 const botsAndChatsSectionsElement = <BotsAndChatsSidebarSections />;
+
+const displayPreferencesMenuElement = <SidebarDisplayPreferencesMenu />;

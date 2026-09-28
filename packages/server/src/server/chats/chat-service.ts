@@ -47,7 +47,7 @@ export interface CreateChatServiceInput {
   rules?: ChatRules;
   createdBy?: SessionActor;
   /** Sent after the record is written, so "create by typing" is one round trip. */
-  firstMessage?: { text: string; messageId?: string };
+  firstMessage?: Omit<SendMessageInput, "chatId" | "actor">;
 }
 
 export interface ChatService {

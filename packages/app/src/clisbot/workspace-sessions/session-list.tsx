@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useRef, type ReactElement } from "react";
+import { SessionPinButton } from "@/clisbot/bots/sidebar/session-pin";
+import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -129,6 +130,9 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   onPress?: () => void;
 }): ReactElement {
   const { t } = useTranslation();
+  const [rowHovered, setRowHovered] = useState(false);
+  const hoverIn = useCallback(() => setRowHovered(true), []);
+  const hoverOut = useCallback(() => setRowHovered(false), []);
   const { agent } = session;
   const label = session.title ?? t("workspace.tabs.fallback.newAgent");
   const selected = state === "selected";
@@ -142,45 +146,51 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
     ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
       indented && styles.rowIndented,
-      hovered && styles.rowHovered,
+      (hovered || rowHovered) && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
     ],
-    [indented, selected],
+    [indented, selected, rowHovered],
   );
 
   const row = (
-    <Pressable
-      accessibilityRole={isWeb ? undefined : "button"}
-      accessibilityLabel={label}
-      accessibilityState={accessibilityState}
-      aria-selected={selected}
-      onPress={handlePress}
-      style={rowStyle}
-      testID={`sidebar-workspace-session-${agent.id}`}
-    >
-      {({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => (
-        <>
-          <View style={styles.titleLine}>
-            <SessionMark
-              session={session}
-              serverId={serverId}
-              active={state !== "idle"}
-              backdrop={resolveBackdrop(selected, hovered)}
-            />
-            <Text
-              ref={titleRef}
-              style={titleStyle(state)}
-              numberOfLines={fullTitles ? undefined : 1}
-            >
-              {label}
-            </Text>
-            {details.lastActivity ? <LastActivity agent={agent} /> : null}
-          </View>
-          <SessionDetailLine serverId={serverId} session={session} details={details} />
-        </>
-      )}
-    </Pressable>
+    <View style={sessionWrapper} onPointerEnter={hoverIn} onPointerLeave={hoverOut}>
+      <View style={sessionContent}>
+        <Pressable
+          accessibilityRole={isWeb ? undefined : "button"}
+          accessibilityLabel={label}
+          accessibilityState={accessibilityState}
+          aria-selected={selected}
+          onPress={handlePress}
+          style={rowStyle}
+          testID={`sidebar-workspace-session-${agent.id}`}
+        >
+          {({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => (
+            <>
+              <View style={styles.titleLine}>
+                <SessionMark
+                  session={session}
+                  serverId={serverId}
+                  active={state !== "idle"}
+                  backdrop={resolveBackdrop(selected, hovered)}
+                />
+                <Text
+                  ref={titleRef}
+                  style={titleStyle(state)}
+                  numberOfLines={fullTitles ? undefined : 1}
+                >
+                  {label}
+                </Text>
+                <SessionPinButton serverId={serverId} agentId={agent.id} hovered={rowHovered}>
+                  {details.lastActivity ? <LastActivity agent={agent} /> : null}
+                </SessionPinButton>
+              </View>
+              <SessionDetailLine serverId={serverId} session={session} details={details} />
+            </>
+          )}
+        </Pressable>
+      </View>
+    </View>
   );
   if (fullTitles) return row;
   return (
@@ -350,3 +360,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
   },
 }));
+
+const sessionWrapper = { position: "relative" } as const;
+const sessionContent = { minWidth: 0 };

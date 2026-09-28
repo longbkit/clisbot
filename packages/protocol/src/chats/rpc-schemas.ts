@@ -1,3 +1,4 @@
+import { AgentAttachmentSchema, ImageAttachmentSchema } from "../agent-attachments.js";
 import { z } from "zod";
 import {
   ChatMessagePayloadSchema,
@@ -15,6 +16,8 @@ import {
 /** A first message sent right after the record is written, so "create by typing" is one round trip. */
 export const ChatFirstMessageSchema = z.object({
   text: z.string(),
+  images: z.array(ImageAttachmentSchema).optional(),
+  attachments: z.array(AgentAttachmentSchema).optional(),
   messageId: z.string().optional(),
 });
 
@@ -105,6 +108,8 @@ export const ChatMessageSendRequestSchema = z.object({
   requestId: z.string(),
   chatId: z.string(),
   text: z.string(),
+  images: z.array(ImageAttachmentSchema).optional(),
+  attachments: z.array(AgentAttachmentSchema).optional(),
   /** Client-chosen id; a resend with the same id is answered `duplicate: true`. */
   messageId: z.string().optional(),
 });

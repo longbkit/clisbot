@@ -101,16 +101,34 @@ export function WorkspacePanelHost({
   buildPaneContentModel,
 }: WorkspacePanelHostProps) {
   const tabIds = useMemo(() => tabs.map((tab) => tab.tabId), [tabs]);
+  const sourceByTabId = useMemo(
+    () =>
+      new Map(
+        tabs.flatMap((tab) =>
+          tab.target.workspaceContext ? [[tab.tabId, tab.target.workspaceContext] as const] : [],
+        ),
+      ),
+    [tabs],
+  );
   const retainedTabIds = useModifiedPanelTabIds({
     serverId: normalizedServerId,
     workspaceId: normalizedWorkspaceId,
     tabIds,
+    sourceByTabId,
   });
   const stableTabs = useStableTabs(tabs);
+  const retainedContentIds = useMemo(
+    () =>
+      new Set([
+        ...retainedTabIds,
+        ...tabs.filter((tab) => tab.kind === "conversation").map((tab) => tab.tabId),
+      ]),
+    [retainedTabIds, tabs],
+  );
   const { mountedTabIds } = useMountedTabSet({
     activeTabId,
     allTabIds: tabIds,
-    retainedTabIds,
+    retainedTabIds: retainedContentIds,
     cap: 3,
   });
   const mountedIds = useMemo(

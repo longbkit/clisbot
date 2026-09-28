@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ParticipantActions } from "./participant-actions";
 const navigate = vi.hoisted(() => vi.fn());
+vi.mock("./cowork-return", () => ({ rememberCoworkOrigin: vi.fn() }));
+vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeSnapshot: () => null }));
 vi.mock("@/utils/navigate-to-agent", () => ({ navigateToAgent: navigate }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("@/constants/platform", () => ({ isNative: false }));

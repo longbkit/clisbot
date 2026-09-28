@@ -30,18 +30,31 @@ import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
 import { BackLink } from "./back-link";
 
-export function HubSettingsContent({ section }: { section: HubSectionSlug }) {
+export function HubSettingsContent({
+  section,
+  initialAutomationCreate = false,
+}: {
+  section: HubSectionSlug;
+  initialAutomationCreate?: boolean;
+}) {
   const hub = useHubAccount();
   if (section === "account") return <HubAccountSettings />;
   return (
     <SignedInHubSettings
       key={JSON.stringify([hub.origin, hub.signedIn?.account.id, hub.signedIn?.organization.id])}
       section={section}
+      initialAutomationCreate={initialAutomationCreate}
     />
   );
 }
 
-function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "account"> }) {
+function SignedInHubSettings({
+  section,
+  initialAutomationCreate,
+}: {
+  section: Exclude<HubSectionSlug, "account">;
+  initialAutomationCreate?: boolean;
+}) {
   const account = useHubAccount();
   if (!account.enabled) return null;
   if (account.loading) return <StateMessage message="Loading Hub account…" />;
@@ -53,7 +66,12 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
     case "channels":
       return <ChannelSettings />;
     case "automations":
-      return <AutomationSettings ChannelInputs={ChannelSettings} />;
+      return (
+        <AutomationSettings
+          ChannelInputs={ChannelSettings}
+          initialCreate={initialAutomationCreate}
+        />
+      );
     case "team":
       return <TeamSettings />;
     case "hosts":

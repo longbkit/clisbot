@@ -69,6 +69,48 @@ the plan gets corrected in the same commit.
   Both header actions measure 44×44px on the same row. These checks do not substitute for
   testing on the user's physical Android device.
 
+## Unified app experience (2026-09-27)
+
+The current app contract is [app-experience.md](app-experience.md); it supersedes the earlier
+hidden Bot projects toggle and automatic file-to-cowork navigation described above.
+
+- Desktop and mobile share New workspace → Search → History → Automations navigation. Account
+  access moved beside organization context. Pinned combines resource types; section collapse
+  persists. Bot projects is always a group, initially collapsed. Native project/session rows,
+  filters and workspace pin mutations remain in use. Additional pins are scoped device preferences,
+  resolved against live accessible resources rather than stored display metadata.
+- Bots shows a short recent list, preserves the selected bot, and opens a searchable directory.
+  Group rows use channel icons; parent sections have distinct resting icons and interaction chevrons.
+- The combined Automations destination has Home, Schedules and Automations. It reuses the existing
+  Host schedule form and Hub automation editor/access checks, preserving drafts across tab switches.
+  Ordinary clients without Fusion capabilities retain the original schedules screen.
+- Bot creation foregrounds templates and summarizes AI configuration. Missing required configuration
+  is disclosed automatically. Saved agent profiles are apply-once presets. Group creation uses
+  searchable same-Host participants and plain reply choices; server safety defaults are unchanged.
+- Conversations reuse workspace splits, tab state, Files/Changes, preview and diff panels. Artifact
+  opens remain in chat. Source Host/workspace and conversation UI-instance identities are separate,
+  preventing same-path files from different bots or conversations from sharing editor state.
+  Diff, commit and PR opens use the conversation destination with ordinary cowork behavior as fallback.
+- Cowork is explicit and has a return action. Group project selection drives Explorer and Git context.
+  Mobile uses the existing Explorer/tab-switch interaction and shared composer; top-header controls
+  have 48px touch targets. Files/Changes Add to chat uses the conversation draft and preserves the
+  source workspace, including when the group's selected bot changes.
+
+Verification in this iteration includes app typechecking, lint across all changed TypeScript files and 306 passing app tests across
+42 files covering Bot/Chat models, forms, navigation, tab identity, pane placement, source ownership,
+diff navigation and existing workspace layout behavior. Additional navigation/automation checks are
+recorded in their focused suites. Browser QA uses the isolated fake-provider Host on port 6799 and
+separate Chrome contexts: desktop bot creation, mobile group creation, schedule-form opening,
+collapse/reload/pinning, desktop right-pane reuse, mobile file tabs with distinct bot sources,
+Changes → Diff without route changes, and Cowork → Chat with retained draft, scroll position and
+bottom composer. Full reload retains Messages and both same-name file tabs with their bot-source
+labels; layout persistence uses stable principal scope and the strict storage schema includes the
+new targets. A second feature-off Host verifies ordinary workspace/file navigation. Protocol
+and daemon ownership projection checks add 20 passing tests; protocol/server typechecks pass.
+Mine/Shared uses optional Host-projected ownership, with an explicit unknown state for older Hosts.
+Native keyboard/gesture behavior and authenticated live Hub automation execution have not been
+validated by this browser run.
+
 ## Verification recorded
 
 Targeted protocol, daemon, CLI, Hub and app checks passed during integration. Socket E2Es cover
@@ -144,3 +186,39 @@ directory, and for daemon tasks the flag-off byte-equivalence check.
   otherwise show a scoped interrupted/unknown outcome without blindly retrying work.
 - A Member with a Project grant on the bot opens it and gets their own session; a Member without
   the grant does not see it.
+
+## Composer parity correction (2026-09-28)
+
+The initial text-only Chat composer integration omitted existing attachment and session actions.
+It now reuses the complete Composer with a chat-owned draft and the selected participant's real
+session context. Attachments/images, model controls, dictation, voice and Stop use the existing UI.
+Typed submission and explicit queue gestures route through Chat rather than bypassing it through
+an agent queue. File Add to chat resolves its source workspace before adding to the chat draft.
+
+Chat attachment support uses the existing upload ownership checks and agent prompt builder. Files
+are staged durably under the chat before transcript acceptance; temporary uploads are released
+only after acceptance. Full-payload deduplication distinguishes changed attachments, and each bot's
+unread watermark controls attachment delivery. The optional Host capability gates older servers.
+Uploaded file pills retain their existing nonclickable behavior; images use the existing lightbox.
+
+Spoken input from a bound chat agent now uses canonical chat authority and routing. Stale bindings,
+revoked access and another user's chat cannot fall through to direct-agent delivery. Voice wrapping
+applies to the selected voice bot; ordinary agent voice remains unchanged.
+
+Browser QA on an isolated fake-provider Host sent a file-only message and an image with text to a
+group: both bots responded and persisted transcript attachments survived. The image lightbox opened.
+Desktop restored attachment/model/dictation/voice controls; the compact composer remains docked at
+the bottom. Real microphone, STT/TTS providers and native-device behavior were not exercised.
+
+Validation: 115 app tests across 32 files pass, plus focused protocol/server attachment and voice
+suites (35 attachment checks and 30 voice checks, with shared engine coverage). App/server
+typechecks and scoped lint pass; protocol distribution and outbound validators rebuilt.
+
+### Bot UI consistency review (2026-09-28)
+
+- Bot settings now keeps its header outside the scroller, uses the shared content-width limit, and groups Project/access and archive actions into Settings cards. The inline edit form shares their left/right edges.
+- Fixed edit-form Host initialization: pass the route's Host as `defaultServerId`, and display its catalog label. Previously the edit model had no Host, leaving Save disabled and provider controls unhydrated.
+- Bot archive uses the shared confirmation flow. Browser review verified cancel without archiving.
+- Group creation uses Settings switch rows for membership and a SelectField for reply policy. Search preserves selected bot IDs; compact creation sheets use a large initial snap and a fixed submit footer.
+- Agent profiles use the searchable SelectField instead of a separate button list. Unresolved AI setup has an explicit Choose setup action.
+- Validation: 28 focused tests passed; app typecheck and changed-file lint passed. Browser review covered mobile group selection/search, desktop/mobile Bot settings, Customize/Done, archive cancellation, Chat → Cowork → Chat, and Files/Changes staying on the chat route. No production bot was created, edited, or archived during review.

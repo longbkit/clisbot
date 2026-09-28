@@ -1,4 +1,7 @@
-import { memo, useCallback } from "react";
+import { useSessionStore } from "@/stores/session-store";
+import { useConversationProjectContext } from "./conversation-project-context";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { memo } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Composer } from "@/composer";
@@ -17,13 +20,12 @@ interface ChatComposerProps {
   placeholder: string;
   /** Sending is disabled while the host is not online or a send is in flight. */
   disabled?: boolean;
-  onSubmitMessage: (text: string) => Promise<void>;
+  onSubmitMessage: (payload: MessagePayload) => Promise<void>;
 }
 
 /**
- * The cowork composer without a live agent: the draft key stands in for the agent id, as the
- * draft launcher does (`screens/new-workspace-screen.tsx`), and the submit goes to the chat
- * (`chat.message.send`) instead of an agent. Agent controls arrive with the direct-chat session.
+ * Shared composer with a conversation-owned draft and canonical chat submit.
+ * Session controls refer to the explicitly selected participant.
  */
 export const ChatComposer = memo(function ChatComposer({
   serverId,
@@ -32,35 +34,36 @@ export const ChatComposer = memo(function ChatComposer({
   disabled = false,
   onSubmitMessage,
 }: ChatComposerProps) {
+  const attachmentsSupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.chatAttachments === true,
+  );
+  const active = useRetainedPanelActive();
   const draftKey = buildChatDraftKey(serverId, chatId);
   const draft = useAgentInputDraft({ draftKey });
-  const handleSubmit = useCallback(
-    async (payload: MessagePayload) => {
-      if (payload.attachments?.length)
-        throw new Error(
-          "Attachments are not supported in Chat yet. Open this bot in cowork to send files.",
-        );
-      await onSubmitMessage(payload.text);
-    },
-    [onSubmitMessage],
-  );
+  const project = useConversationProjectContext();
   return (
     <View style={styles.dock} testID="chat-composer">
       <Composer
-        agentId={draftKey}
+        agentId={project?.agentId ?? draftKey}
+        workspaceId={project?.workspaceId}
+        submissionTarget="conversation"
+        showAgentControls={project?.canConfigure === true}
+        pendingSessionReason={
+          !project?.agentId ? "Send a message to start this bot session." : undefined
+        }
         serverId={serverId}
-        isPaneFocused
+        isPaneFocused={active}
         placeholder={placeholder}
-        onSubmitMessage={handleSubmit}
+        onSubmitMessage={onSubmitMessage}
         isSubmitLoading={disabled}
         blurOnSubmit={isNative}
         textSource={draft.textSource}
         onChangeText={draft.editText}
         textReplacement={draft.textReplacement}
-        attachmentsEnabled={false}
+        attachmentsEnabled={attachmentsSupported}
         attachments={draft.attachments}
         onChangeAttachments={draft.setAttachments}
-        cwd=""
+        cwd={project?.cwd ?? ""}
         clearDraft={draft.clear}
       />
     </View>

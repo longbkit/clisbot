@@ -1,3 +1,6 @@
+import { useConversationSourceLabelsBridge } from "@/clisbot/bots/chat/conversation-source-labels";
+import { confirmPanelClose } from "@/panels/confirm-panel-close";
+import { BackToChatAction } from "@/clisbot/bots/chat/cowork-return";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import { getOpenAgentTabLabel } from "@getpaseo/protocol/agent-labels";
@@ -402,6 +405,7 @@ function getFallbackTabOptionDescription(
   if (tab.target.kind === "plugin") {
     return tab.target.panelId;
   }
+  if (tab.target.kind === "conversation") return "Messages";
   return tab.target.path;
 }
 
@@ -640,7 +644,7 @@ function MobileWorkspaceTabOption({
   );
 }
 
-const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
+export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
   tabs,
   activeTabKey,
   activeTab,
@@ -660,6 +664,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
   onCloseTabsBelow,
   onCloseOtherTabs,
 }: MobileWorkspaceTabSwitcherProps) {
+  const bridgeSourceLabels = useConversationSourceLabelsBridge();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<View>(null);
@@ -696,7 +701,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
       if (tabIndex < 0) {
         return <View />;
       }
-      return (
+      return bridgeSourceLabels(
         <MobileWorkspaceTabOption
           tab={tab}
           tabIndex={tabIndex}
@@ -716,10 +721,11 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
           onCloseTabsAbove={onCloseTabsAbove}
           onCloseTabsBelow={onCloseTabsBelow}
           onCloseOtherTabs={onCloseOtherTabs}
-        />
+        />,
       );
     },
     [
+      bridgeSourceLabels,
       tabByKey,
       tabIndexByKey,
       tabs.length,
@@ -2637,22 +2643,16 @@ function WorkspaceScreenContent({
 
   const confirmDiscardModifiedTab = useCallback(
     async (tabId: string): Promise<boolean> => {
-      const attributes = getPanelInstanceAttributes({
-        serverId: normalizedServerId,
-        workspaceId: normalizedWorkspaceId,
-        tabId,
-      });
-      if (!attributes.modified) return true;
-      const resumePendingSave = attributes.suspendPendingSave?.();
-      const confirmed = await confirmDialog({
-        title: t("workspace.tabs.confirmations.unsavedTitle"),
-        message: t("workspace.tabs.confirmations.unsavedMessage"),
-        confirmLabel: t("workspace.tabs.confirmations.closeWithoutSaving"),
-        cancelLabel: t("workspace.tabs.confirmations.cancel"),
-        destructive: true,
-      });
-      if (!confirmed) resumePendingSave?.();
-      return confirmed;
+      return confirmPanelClose(
+        { serverId: normalizedServerId, workspaceId: normalizedWorkspaceId, tabId },
+        {
+          title: t("workspace.tabs.confirmations.unsavedTitle"),
+          message: t("workspace.tabs.confirmations.unsavedMessage"),
+          confirmLabel: t("workspace.tabs.confirmations.closeWithoutSaving"),
+          cancelLabel: t("workspace.tabs.confirmations.cancel"),
+          destructive: true,
+        },
+      );
     },
     [normalizedServerId, normalizedWorkspaceId, t],
   );
@@ -3769,6 +3769,7 @@ function WorkspaceScreenContent({
   const headerRight = useMemo(
     () => (
       <View style={styles.headerRight}>
+        <BackToChatAction serverId={normalizedServerId} workspaceId={normalizedWorkspaceId} />
         <PluginHeaderButtons serverId={normalizedServerId} workspaceId={normalizedWorkspaceId} />
         {!isMobile && workspaceDescriptor && workspaceDescriptor.scripts.length > 0 ? (
           <WorkspaceScriptsButton

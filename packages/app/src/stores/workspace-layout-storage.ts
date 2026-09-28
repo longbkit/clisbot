@@ -9,31 +9,57 @@ const WorkspaceDraftTabSetupStorageSchema = z.strictObject({
   thinkingOptionId: z.string().nullable(),
   featureValues: z.record(z.string(), z.union([z.boolean(), z.string(), z.null()])),
 });
+// Optional client-only origin and UI scope; ordinary workspace targets remain unchanged.
+const WorkspaceTabSourceStorageShape = {
+  workspaceContext: z.strictObject({ serverId: z.string(), workspaceId: z.string() }).optional(),
+  layoutScope: z.string().optional(),
+};
 const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("new_tab") }),
   z.strictObject({
+    kind: z.literal("conversation"),
+    chatId: z.string(),
+    ...WorkspaceTabSourceStorageShape,
+  }),
+  z.strictObject({ ...WorkspaceTabSourceStorageShape, kind: z.literal("new_tab") }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
     kind: z.literal("draft"),
     draftId: z.string(),
     setup: WorkspaceDraftTabSetupStorageSchema.optional(),
   }),
-  z.strictObject({ kind: z.literal("agent"), agentId: z.string() }),
   z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
+    kind: z.literal("agent"),
+    agentId: z.string(),
+  }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
     kind: z.literal("provider_subagent"),
     parentAgentId: z.string(),
     subagentId: z.string(),
   }),
-  z.strictObject({ kind: z.literal("terminal"), terminalId: z.string() }),
-  z.strictObject({ kind: z.literal("browser"), browserId: z.string() }),
-  z.strictObject({ kind: z.literal("changes_tree") }),
-  z.strictObject({ kind: z.literal("files") }),
-  z.strictObject({ kind: z.literal("pull_request") }),
   z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
+    kind: z.literal("terminal"),
+    terminalId: z.string(),
+  }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
+    kind: z.literal("browser"),
+    browserId: z.string(),
+  }),
+  z.strictObject({ ...WorkspaceTabSourceStorageShape, kind: z.literal("changes_tree") }),
+  z.strictObject({ ...WorkspaceTabSourceStorageShape, kind: z.literal("files") }),
+  z.strictObject({ ...WorkspaceTabSourceStorageShape, kind: z.literal("pull_request") }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
     kind: z.literal("file"),
     path: z.string(),
     lineStart: z.number().int().positive().optional(),
     lineEnd: z.number().int().positive().optional(),
   }),
   z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
     kind: z.literal("working_diff"),
     focusPath: z.string().optional(),
     focusRequestId: z.number().optional(),
@@ -42,16 +68,26 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
     baseRef: z.string().nullable().optional(),
     ignoreWhitespace: z.boolean().optional(),
   }),
-  z.strictObject({ kind: z.literal("setup"), workspaceId: z.string() }),
-  z.strictObject({ kind: z.literal("commit_diff"), sha: z.string() }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
+    kind: z.literal("setup"),
+    workspaceId: z.string(),
+  }),
+  z.strictObject({
+    ...WorkspaceTabSourceStorageShape,
+    kind: z.literal("commit_diff"),
+    sha: z.string(),
+  }),
   z.discriminatedUnion("context", [
     z.strictObject({
+      ...WorkspaceTabSourceStorageShape,
       kind: z.literal("plugin"),
       pluginId: z.string(),
       panelId: z.string(),
       context: z.literal("workspace"),
     }),
     z.strictObject({
+      ...WorkspaceTabSourceStorageShape,
       kind: z.literal("plugin"),
       pluginId: z.string(),
       panelId: z.string(),

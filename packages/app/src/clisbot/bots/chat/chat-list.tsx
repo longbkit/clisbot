@@ -1,7 +1,9 @@
+import { useChatScrollPosition } from "./use-chat-scroll-position";
 import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
-import { FlatList, type ListRenderItemInfo } from "react-native";
+import { FlatList, View, type ListRenderItemInfo } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { MAX_CONTENT_WIDTH } from "@/constants/layout";
 import { ChatLiveRow } from "./chat-live-row";
 import {
   botIdentity,
@@ -15,6 +17,7 @@ import { chatRowSender, type ChatRenderRow } from "./render-model";
 interface ChatListProps {
   rows: readonly ChatRenderRow[];
   serverId: string;
+  scrollKey?: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
   /** The top of the transcript came into view: load the older page. */
   onReachTop?: () => void;
@@ -35,20 +38,27 @@ export const ChatList = memo(function ChatList({
   rows,
   serverId,
   bots,
+  scrollKey = serverId,
   onReachTop,
 }: ChatListProps) {
+  const scrollPosition = useChatScrollPosition<ChatRenderRow>(scrollKey);
   const data = useMemo(() => rows.toReversed(), [rows]);
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatRenderRow>) => {
       // Inverted: the row after this one in reading order sits at `index - 1`.
       const next = data[index - 1];
       const closesGroup = chatRowSender(next) !== chatRowSender(item);
-      return <ChatRowView row={item} serverId={serverId} bots={bots} closesGroup={closesGroup} />;
+      return (
+        <View style={styles.row}>
+          <ChatRowView row={item} serverId={serverId} bots={bots} closesGroup={closesGroup} />
+        </View>
+      );
     },
     [bots, data, serverId],
   );
   return (
     <FlatList
+      {...scrollPosition}
       inverted
       data={data}
       keyExtractor={keyExtractor}
@@ -94,8 +104,15 @@ function ChatRowView({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  // Match the agent stream's item wrapper, including its inner reading gutter.
+  row: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
+    paddingHorizontal: theme.spacing[2],
+  },
   content: {
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: { xs: theme.spacing[3], md: theme.spacing[4] },
     paddingVertical: theme.spacing[3],
   },
 }));

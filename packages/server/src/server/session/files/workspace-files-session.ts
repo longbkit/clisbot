@@ -449,6 +449,32 @@ export class WorkspaceFilesSession {
     return result;
   }
 
+  async attachChatMessageFiles(
+    directory: string,
+    messageId: string,
+    files: { attachments?: AgentAttachment[]; images?: { data: string; mimeType: string }[] },
+  ) {
+    if (
+      !files.images?.length &&
+      !files.attachments?.some(
+        (file) => file.type === "uploaded_file" || (file.type === "text" && file.sourceSession),
+      )
+    )
+      return files;
+    const result = await attachSessionFiles({
+      directory,
+      messageId,
+      ...files,
+      ownsUpload: (file) => this.fileUploads.ownsUploadedFile(file),
+      resolveForkSource: this.options.resolveForkSource,
+    });
+    return {
+      attachments: result.attachments,
+      images: result.images,
+      release: () => this.fileUploads.releaseLinkedUploads(files.attachments ?? []),
+    };
+  }
+
   ownsUploadedFileAttachments(attachments: readonly AgentAttachment[]): boolean {
     return attachments.every(
       (attachment) =>

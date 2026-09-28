@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import { buildAgentPrompt } from "../agent/prompt-attachments.js";
+import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
+import { wrapSpokenInput } from "../voice-config.js";
 // `ChatEngine`: a user line is written, then fanned out; a bot's turn end is
 // written as a bot line, then forwarded to the bots it mentions
 // (docs/features/bots-and-chats/README.md, D5, D9; plans/server-chat.md §2).
@@ -32,7 +37,7 @@ export interface BotLookup {
 /** The one prompt path (`sendPromptToAgent`), narrowed to what a delivery needs. */
 export type ChatPromptSender = (params: {
   agentId: string;
-  prompt: string;
+  prompt: AgentPromptInput;
   messageId: string;
   activeTurnBehavior?: "steer";
 }) => Promise<{ disposition: PromptDispatchDisposition }>;
@@ -55,7 +60,19 @@ export interface ChatEngineDependencies {
   now?: () => string;
 }
 
-export interface SendMessageInput {
+export interface ChatMessageFiles {
+  images?: { data: string; mimeType: string }[];
+  attachments?: AgentAttachment[];
+}
+export type PrepareChatMessageFiles = (
+  directory: string,
+  messageId: string,
+  files: ChatMessageFiles,
+) => Promise<ChatMessageFiles & { release?: () => Promise<void> }>;
+
+export interface SendMessageInput extends ChatMessageFiles {
+  prepareFiles?: PrepareChatMessageFiles;
+  spokenInputAgentId?: string;
   chatId: string;
   text: string;
   messageId?: string;
@@ -101,12 +118,26 @@ export class ChatEngine implements TurnTrackerHost {
       if (refusal) throw new Error(refusal);
       const id = resolveClientMessageId(input.messageId);
       const existing = await this.deps.transcriptOf(chat.id).findById(id);
-      if (existing) return duplicateSend(existing, input.text);
+      if (existing) return duplicateSend(existing, input);
+      const files = input.prepareFiles
+        ? await input.prepareFiles(this.deps.transcriptOf(chat.id).directory, id, input)
+        : { images: input.images, attachments: input.attachments, release: undefined };
+      if (
+        !input.prepareFiles &&
+        input.attachments?.some(
+          (a) => a.type === "uploaded_file" || (a.type === "text" && a.sourceSession),
+        )
+      )
+        throw new Error("Attachment preparation is unavailable");
       const inputLine = {
+        images: files.images,
+        attachments: files.attachments,
+        attachmentContentDigest: createHash("sha256").update(messageContent(input)).digest("hex"),
         id,
         at: this.now(),
         sender: { kind: "user" as const, ...(input.actor ? { actor: input.actor } : {}) },
         text: input.text,
+        ...(input.spokenInputAgentId ? { spokenInputAgentId: input.spokenInputAgentId } : {}),
         hop: 0,
       };
       const decision = await this.decide(chat, rules, { ...inputLine, seq: 0 });
@@ -114,6 +145,9 @@ export class ChatEngine implements TurnTrackerHost {
         ...inputLine,
         deliveryBotIds: decision.targets,
       });
+      await files
+        .release?.()
+        .catch((error) => this.deps.logger.warn({ error }, "Chat upload cleanup failed"));
       this.track(this.fanOut(chat.id, decision, line));
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
     });
@@ -295,7 +329,7 @@ export class ChatEngine implements TurnTrackerHost {
       triggering: lines,
       botOf: (id) => this.knownBot(id),
     });
-    if (prompt !== "") await this.prompt(chat, bot, session.agentId, rules, lines, prompt);
+    if (prompt !== "") await this.prompt(chat, bot, session.agentId, rules, lines, prompt, window);
     await this.deps.store.markDelivered(chatId, botId, deliveredSeq);
   }
 
@@ -306,6 +340,7 @@ export class ChatEngine implements TurnTrackerHost {
     rules: ResolvedChatRules,
     lines: TranscriptLine[],
     prompt: string,
+    window: TranscriptLine[],
   ): Promise<void> {
     this.tracker.watch(agentId, chat.id, bot.id);
     await this.tracker.dispatch(
@@ -317,7 +352,17 @@ export class ChatEngine implements TurnTrackerHost {
       () =>
         this.deps.sendPrompt({
           agentId,
-          prompt,
+          prompt: buildAgentPrompt(
+            lines.some((line) => line.spokenInputAgentId === agentId)
+              ? wrapSpokenInput(prompt)
+              : prompt,
+            window
+              .filter((line) => line.sender.kind === "user")
+              .flatMap((line) => line.images ?? []),
+            window
+              .filter((line) => line.sender.kind === "user")
+              .flatMap((line) => line.attachments ?? []),
+          ),
           messageId: lines.at(-1)!.id,
           ...(rules.interaction.whenBusy === "steer"
             ? { activeTurnBehavior: "steer" as const }
@@ -433,9 +478,14 @@ export class ChatEngine implements TurnTrackerHost {
   }
 }
 
-function duplicateSend(existing: TranscriptLine, text: string): SendMessageResult {
-  if (existing.text !== text)
-    throw new Error(`Message ${existing.id} already exists with different text`);
+function duplicateSend(existing: TranscriptLine, input: SendMessageInput): SendMessageResult {
+  if (
+    existing.attachmentContentDigest
+      ? existing.attachmentContentDigest !==
+        createHash("sha256").update(messageContent(input)).digest("hex")
+      : messageContent(existing) !== messageContent(input)
+  )
+    throw new Error(`Message ${existing.id} already exists with different text or attachments`);
   return { messageId: existing.id, seq: existing.seq, targets: [], duplicate: true };
 }
 
@@ -450,4 +500,14 @@ function errorLine(error: unknown): string {
   const line = message.replace(/\s+/gu, " ").trim();
   if (line === "") return "unknown error";
   return line.length > NOTICE_ERROR_MAX_CHARS ? `${line.slice(0, NOTICE_ERROR_MAX_CHARS)}…` : line;
+}
+
+function messageContent(input: { text: string } & ChatMessageFiles): string {
+  return JSON.stringify({
+    text: input.text,
+    images: input.images ?? [],
+    attachments: (input.attachments ?? []).map((a) =>
+      a.type === "uploaded_file" ? Object.assign({}, a, { path: undefined }) : a,
+    ),
+  });
 }

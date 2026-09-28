@@ -1,187 +1,73 @@
-import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
-import type { BotPayload } from "../data/contracts";
-import { CombinedModelSelector } from "@/components/combined-model-selector";
-import { ChoiceButton } from "./choice-button";
-import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
-import { FormTextInput } from "@/components/ui/form-field";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { FormTextInput } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
-import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { openBotForm, toCreateRequest, toUpdateRequest } from "./bot-form-model";
-import { refreshBotsAndChats } from "../data/runtime";
-
-export function BotCreateForm({
-  name,
-  defaultServerId,
-  bot,
-  hosts,
-  onCreated,
-  onCancel,
-}: {
-  name: string;
-  defaultServerId?: string;
-  bot?: BotPayload;
-  hosts: { serverId: string; label: string }[];
-  onCreated: (serverId: string, botId: string) => void;
-  onCancel: () => void;
-}) {
-  const [model] = useState(() =>
-    openBotForm({
-      mode: bot ? "edit" : "create",
-      bot,
-      hosts,
-      defaults: { name, ...(defaultServerId ? { serverId: defaultServerId } : {}) },
-    }),
-  );
-  const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
-  const providerSnapshot = useBotProviderSnapshot(model, state, bot?.cwd);
-  const [profiles, setProfiles] = useState<AgentProfile[]>([]);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => () => model.close(), [model]);
-  useEffect(() => model.applyHosts(hosts), [hosts, model]);
-  useEffect(() => {
-    const serverId = state.selectedServerId;
-    if (!serverId) return;
-    let current = true;
-    const client = getHostRuntimeStore().getClient(serverId);
-    setProfiles([]);
-    if (client)
-      void client
-        .getDaemonConfig()
-        .then((result) => {
-          if (current) setProfiles(result.config.agentProfiles ?? []);
-          return undefined;
-        })
-        .catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, [model, state.selectedServerId]);
-  const submit = useCallback(async () => {
-    setBusy(true);
-    model.setSubmitError(null);
-    try {
-      const { serverId, ...request } = toCreateRequest(state);
-      const client = getHostRuntimeStore().getClient(serverId);
-      if (!client) throw new Error("Host is disconnected");
-      const { serverId: _serverId, ...update } = toUpdateRequest(state, bot?.id ?? "");
-      const result = bot ? await client.updateBot(update) : await client.createBot(request);
-      if (result.error || !result.bot) throw new Error(result.error ?? "Bot could not be created");
-      refreshBotsAndChats();
-      onCreated(serverId, result.bot.id);
-    } catch (error) {
-      model.setSubmitError(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }, [state, model, onCreated, bot]);
-  const selectProfile = useCallback(
-    (id: string) => {
-      const profile = profiles.find((p) => p.id === id);
-      if (profile) model.applyProfile(profile);
-    },
-    [model, profiles],
-  );
-  const submitAction = useCallback(() => {
-    void submit();
-  }, [submit]);
+import { BotFormLayout } from "./form-layout";
+import { BotTemplateField } from "./bot-template-field";
+import { BotConfiguration } from "./bot-configuration";
+import { botFormStyles as styles } from "./bot-form-styles";
+import { useBotForm, type BotCreateFormProps } from "./use-bot-form";
+export function BotCreateForm(props: BotCreateFormProps) {
+  const { bot, hosts, onCancel } = props;
+  const { state, model, providerSnapshot, busy, submitAction } = useBotForm(props);
+  const [customize, setCustomize] = useState(false);
+  const openCustomize = useCallback(() => setCustomize(true), []);
+  const done = useCallback(() => setCustomize(false), []);
+  const compact = useIsCompactFormFactor();
+  const size = compact ? "md" : "sm";
   const submitLabel = bot ? "Save bot" : "Create bot";
+  const footer = useMemo(
+    () =>
+      customize ? (
+        <Button size={size} onPress={done}>
+          Done
+        </Button>
+      ) : (
+        <View style={compact ? styles.footerMobile : styles.footerDesktop}>
+          <Button size={size} disabled={!state.canSubmit || busy} onPress={submitAction}>
+            {busy ? "Saving…" : submitLabel}
+          </Button>
+          <Button size={size} variant="ghost" onPress={onCancel}>
+            Cancel
+          </Button>
+        </View>
+      ),
+    [customize, done, compact, size, state.canSubmit, busy, submitAction, submitLabel, onCancel],
+  );
   return (
-    <View style={styles.form}>
-      <Text style={styles.title}>{bot ? "Bot settings" : "New bot"}</Text>
-      <FormTextInput
-        accessibilityLabel="Bot name"
-        autoFocus={!bot}
-        style={styles.input}
-        initialValue={state.name}
-        onChangeText={model.setName}
-        placeholder="Name"
+    <BotFormLayout inline={Boolean(bot)} footer={footer}>
+      {!customize ? (
+        <>
+          {!bot ? (
+            <View>
+              <Text style={styles.title}>Give your bot a name</Text>
+              <Text style={styles.hint}>Create it now. Give it a task in chat.</Text>
+            </View>
+          ) : null}
+          <Text style={styles.text}>Bot name</Text>
+          <FormTextInput
+            accessibilityLabel="Bot name"
+            autoFocus={!bot && !compact}
+            size={size}
+            initialValue={state.name}
+            onChangeText={model.setName}
+            placeholder="For example, Research assistant"
+          />
+          <BotTemplateField state={state} model={model} editing={Boolean(bot)} />
+        </>
+      ) : (
+        <Text style={styles.title}>Customize bot</Text>
+      )}
+      <BotConfiguration
+        expanded={customize}
+        onCustomize={openCustomize}
+        state={state}
+        model={model}
+        providerSnapshot={providerSnapshot}
+        size={size}
+        hosts={hosts}
       />
-      {state.showHostField ? (
-        <View style={styles.row}>
-          {hosts.map((host) => (
-            <ChoiceButton
-              key={host.serverId}
-              value={host.serverId}
-              selected={state.selectedServerId === host.serverId}
-              onSelect={model.setHost}
-            >
-              {host.label}
-            </ChoiceButton>
-          ))}
-        </View>
-      ) : null}
-      <View style={styles.row}>
-        {profiles.map((profile) => (
-          <ChoiceButton key={profile.id} value={profile.id} onSelect={selectProfile}>
-            {profile.name}
-          </ChoiceButton>
-        ))}
-      </View>
-      <Text style={styles.text}>Provider</Text>
-      <View style={styles.row}>
-        {state.modelSelectorProviders.map((provider) => (
-          <ChoiceButton
-            key={provider.id}
-            value={provider.id}
-            selected={state.selectedProvider === provider.id}
-            onSelect={model.setProvider}
-          >
-            {provider.label}
-          </ChoiceButton>
-        ))}
-      </View>
-      <CombinedModelSelector
-        providers={state.modelSelectorProviders}
-        selectedProvider={state.selectedProvider ?? ""}
-        selectedModel={state.selectedModel}
-        onSelect={model.setModel}
-        isLoading={providerSnapshot.isLoading}
-        onOpen={providerSnapshot.onOpen}
-        onRetryProvider={providerSnapshot.onRetryProvider}
-        isRetryingProvider={providerSnapshot.isRefreshing}
-        serverId={state.selectedServerId}
-      />
-      <View style={styles.row}>
-        {state.modeOptions.map((mode) => (
-          <ChoiceButton
-            key={mode.id}
-            value={mode.id}
-            selected={state.selectedMode === mode.id}
-            onSelect={model.setMode}
-          >
-            {mode.label}
-          </ChoiceButton>
-        ))}
-      </View>
-      <View style={styles.row}>
-        {state.availableThinkingOptions.map((option) => (
-          <ChoiceButton
-            key={option.id}
-            value={option.id}
-            selected={state.selectedThinkingOptionId === option.id}
-            onSelect={model.setThinkingOption}
-          >
-            {option.label ?? option.id}
-          </ChoiceButton>
-        ))}
-      </View>
-      {!bot ? (
-        <View style={styles.row}>
-          {(["personal", "team"] as const).map((kind) => (
-            <ChoiceButton
-              key={kind}
-              value={kind}
-              selected={state.kind === kind}
-              onSelect={model.setKind}
-            >
-              {kind === "personal" ? "Personal memory" : "Team memory"}
-            </ChoiceButton>
-          ))}
-        </View>
-      ) : null}
       {providerSnapshot.error ? (
         <Text accessibilityRole="alert" style={styles.text}>
           {providerSnapshot.error}
@@ -192,27 +78,6 @@ export function BotCreateForm({
           {state.submitError}
         </Text>
       ) : null}
-      <View style={styles.row}>
-        <Button disabled={!state.canSubmit || busy} onPress={submitAction}>
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-        <Button variant="ghost" onPress={onCancel}>
-          Cancel
-        </Button>
-      </View>
-    </View>
+    </BotFormLayout>
   );
 }
-const styles = StyleSheet.create((theme) => ({
-  form: { padding: theme.spacing[4], gap: theme.spacing[3] },
-  title: { color: theme.colors.foreground, fontSize: theme.fontSize.lg },
-  text: { color: theme.colors.foreground },
-  input: {
-    color: theme.colors.foreground,
-    borderColor: theme.colors.surface2,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: theme.spacing[3],
-  },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
-}));

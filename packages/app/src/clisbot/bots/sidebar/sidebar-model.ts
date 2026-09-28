@@ -31,7 +31,10 @@ export function projectBotSidebar(
       name: bot.name,
       avatar: bot.avatar,
       hostLabel: multipleHosts ? bot.serverName : null,
+      hostName: bot.serverName,
+      description: bot.description,
       canConfigure: bot.canConfigure === true,
+      isOwner: bot.isOwner,
       updatedAt: direct?.updatedAt,
       chatId: direct?.id,
       agentId: direct?.participants[0]?.agentId,
@@ -66,4 +69,17 @@ export function projectGroupSidebar(
       updatedAt: chat.updatedAt,
       hostLabel: multipleHosts ? chat.serverName : null,
     }));
+}
+
+/** Chat metadata drives recency; streaming timeline deltas do not enter this projection. */
+export function recentSidebarBots<T extends { key: string; updatedAt?: string }>(
+  bots: readonly T[],
+  selectedKey: string | null,
+  limit = 5,
+): T[] {
+  const sorted = [...bots].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  const recent = sorted.slice(0, limit);
+  const selected = sorted.find((bot) => bot.key === selectedKey);
+  if (selected && !recent.includes(selected)) return [...recent.slice(0, limit - 1), selected];
+  return recent;
 }

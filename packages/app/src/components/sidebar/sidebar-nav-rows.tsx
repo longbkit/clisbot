@@ -1,3 +1,5 @@
+import { useHubAccount } from "@/clisbot/hub/account-provider";
+import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { router, usePathname } from "expo-router";
 import { CalendarClock, History, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, type ComponentType } from "react";
@@ -39,7 +41,17 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
  */
 export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems();
-  const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
+  const fusion = useBotsFeatureHosts().length > 0;
+  const visibleItems = useMemo(() => {
+    const visible = items.filter((item) => item.visible);
+    if (!fusion) return visible;
+    const order = ["new-workspace", "search", "history", "schedules"];
+    return visible.sort(
+      (a, b) =>
+        (a.kind === "builtin" ? order.indexOf(a.id) : 4) -
+        (b.kind === "builtin" ? order.indexOf(b.id) : 4),
+    );
+  }, [items, fusion]);
 
   if (visibleItems.length === 0) return null;
 
@@ -151,6 +163,8 @@ function SidebarSearchRow({ onBeforeNavigate }: SidebarNavRowProps) {
 }
 
 function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const hub = useHubAccount();
+  const botsEnabled = useBotsFeatureHosts().length > 0;
   const { t } = useTranslation();
   const pathname = usePathname();
   const handlePress = useCallback(() => {
@@ -161,7 +175,7 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
   return (
     <SidebarHeaderRow
       icon={CalendarClock}
-      label={t(builtinSidebarNavLabelKey("schedules"))}
+      label={hub.enabled || botsEnabled ? "Automations" : t(builtinSidebarNavLabelKey("schedules"))}
       onPress={handlePress}
       isActive={pathname.includes("/schedules")}
       testID="sidebar-schedules"

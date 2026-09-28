@@ -21,3 +21,15 @@ it("defaults off and persists the same preference for both controls on this devi
   useBotProjectsPreference.getState().toggleBotProjects();
   expect(useBotProjectsPreference.getState().showBotProjects).toBe(false);
 });
+
+it("defaults the always-visible Bot projects section closed and persists expansion separately", () => {
+  useBotProjectsPreference.setState({ botProjectsCollapsed: true });
+  useBotProjectsPreference.getState().toggleBotProjectsCollapsed();
+  expect(useBotProjectsPreference.getState().botProjectsCollapsed).toBe(false);
+  expect(storage.setItem).toHaveBeenCalledWith(
+    "sidebar-bot-projects",
+    expect.stringContaining('"botProjectsCollapsed":false'),
+  );
+  useBotProjectsPreference.getState().toggleBotProjectsCollapsed();
+  expect(useBotProjectsPreference.getState().botProjectsCollapsed).toBe(true);
+});

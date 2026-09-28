@@ -1,3 +1,7 @@
+import { useConversationProjectContext } from "./conversation-project-context";
+import { rememberCoworkOrigin } from "./cowork-return";
+import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
+import { botsSessionScope } from "../data/session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { Monitor } from "lucide-react-native";
@@ -10,25 +14,51 @@ import { ChatHeaderAction } from "./header-action";
 
 export function ParticipantActions({
   serverId,
+  chatId,
   participants,
+  workspaceByBotId,
   group = false,
 }: {
   serverId: string;
+  chatId?: string;
   participants: readonly ChatParticipantPayload[];
+  workspaceByBotId?: ReadonlyMap<string, string>;
   group?: boolean;
 }) {
+  const project = useConversationProjectContext();
+  const snapshot = useHostRuntimeSnapshot(serverId);
+  const scope = botsSessionScope(snapshot);
+  const remember = useCallback(
+    (agentId: string) => {
+      if (chatId)
+        rememberCoworkOrigin({
+          serverId,
+          chatId,
+          agentId,
+          scope,
+          workspaceId:
+            workspaceByBotId?.get(
+              participants.find((participant) => participant.agentId === agentId)?.botId ?? "",
+            ) ?? project?.workspaceId,
+        });
+    },
+    [chatId, scope, serverId, project?.workspaceId, participants, workspaceByBotId],
+  );
   const [visible, setVisible] = useState(false);
   const close = useCallback(() => setVisible(false), []);
   const header = useMemo(() => ({ title: "Open in cowork" }), []);
   const open = useCallback(() => {
-    const direct = participants[0];
-    if (!group && participants.length === 1 && direct?.agentId) {
+    const direct = project?.botId
+      ? participants.find((p) => p.botId === project.botId)
+      : participants[0];
+    if ((project?.botId || (!group && participants.length === 1)) && direct?.agentId) {
+      remember(direct.agentId);
       navigateToAgent({ serverId, agentId: direct.agentId });
     } else setVisible(true);
-  }, [group, participants, serverId]);
+  }, [group, participants, serverId, remember, project?.botId]);
   return (
     <>
-      <ChatHeaderAction label="Open in cowork" icon={Monitor} onPress={open} />
+      <ChatHeaderAction label="Open in cowork" text="Cowork" icon={Monitor} onPress={open} />
       <AdaptiveModalSheet visible={visible} onClose={close} header={header}>
         <View style={styles.body}>
           {participants.map((participant) => (
@@ -37,6 +67,7 @@ export function ParticipantActions({
               serverId={serverId}
               participant={participant}
               onOpen={close}
+              onRemember={remember}
             />
           ))}
         </View>
@@ -48,16 +79,19 @@ function CoworkParticipant({
   serverId,
   participant,
   onOpen,
+  onRemember,
 }: {
   serverId: string;
   participant: ChatParticipantPayload;
   onOpen: () => void;
+  onRemember: (agentId: string) => void;
 }) {
   const open = useCallback(() => {
     if (!participant.agentId) return;
+    onRemember(participant.agentId);
     onOpen();
     navigateToAgent({ serverId, agentId: participant.agentId });
-  }, [onOpen, participant.agentId, serverId]);
+  }, [onOpen, onRemember, participant.agentId, serverId]);
   return (
     <View>
       <Button variant="ghost" disabled={!participant.agentId} onPress={open}>

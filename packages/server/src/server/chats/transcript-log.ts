@@ -6,9 +6,13 @@ import type { ChatMessagePayload, ChatTranscriptDirection } from "@getpaseo/prot
 import { SessionEventLog } from "../agent/session-storage/session-event-log.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 
-export type TranscriptLine = ChatMessagePayload;
+export type TranscriptLine = ChatMessagePayload & {
+  attachmentContentDigest?: string;
+  /** Internal durable delivery metadata; never included in the rendered user text. */
+  spokenInputAgentId?: string;
+};
 /** What a caller appends: the line without the seq the log allocates. */
-export type TranscriptLineInput = Omit<ChatMessagePayload, "seq">;
+export type TranscriptLineInput = Omit<TranscriptLine, "seq">;
 
 export interface TranscriptWindow {
   lines: TranscriptLine[];

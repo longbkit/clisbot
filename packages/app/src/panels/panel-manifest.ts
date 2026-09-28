@@ -14,6 +14,11 @@ type PanelManifestByKind = {
 };
 
 const manifests = {
+  conversation: {
+    kind: "conversation",
+    supportedHosts: ["main"],
+    resourceKey: (target) => target.chatId,
+  },
   user_profile: {
     kind: "user_profile",
     supportedHosts: ["main", "explorer"],
@@ -106,5 +111,6 @@ export function panelSupportsHost(kind: WorkspaceTabTarget["kind"], host: PaneHo
 
 export function panelResourceKey(target: WorkspaceTabTarget): string {
   const manifest = getPanelManifest(target.kind);
-  return `${target.kind}:${manifest.resourceKey(target as never)}`;
+  const key = `${target.kind}:${manifest.resourceKey(target as never)}`;
+  return target.workspaceContext ? `${JSON.stringify(target.workspaceContext)}:${key}` : key;
 }
