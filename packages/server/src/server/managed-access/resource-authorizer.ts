@@ -217,6 +217,22 @@ export class ManagedResourceAuthorizer {
     return this.allowsWorkspace(record.workspaceId, privilege);
   }
 
+  /**
+   * An agent record already in hand (a list entry): its own workspace and labels decide, with no
+   * lookup, so a record the cache has not seen is judged exactly as the workspace check would.
+   */
+  allowsAgentRecordSync(record: {
+    workspaceId?: string | null;
+    labels?: Record<string, string>;
+  }): boolean {
+    if (!this.isRestricted()) return true;
+    return (
+      typeof record.workspaceId === "string" &&
+      this.allowsWorkspaceSync(record.workspaceId) &&
+      this.allowsPrivateAgent(record.labels)
+    );
+  }
+
   allowsAgentSync(agentId: string, privilege: ProjectPrivilege = "project.use"): boolean {
     if (!this.isRestricted()) return true;
     const record = this.agentManager.getAgent(agentId) ?? this.storedAgents.get(agentId);

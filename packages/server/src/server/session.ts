@@ -5633,11 +5633,7 @@ export class Session {
 
     agents = agents.filter((agent) => this.isProviderVisibleToClient(agent.provider));
     if (this.resourceAuthorizer.isRestricted()) {
-      agents = agents.filter(
-        (agent) =>
-          typeof agent.workspaceId === "string" &&
-          this.resourceAuthorizer.allowsAgentSync(agent.id),
-      );
+      agents = agents.filter((agent) => this.resourceAuthorizer.allowsAgentRecordSync(agent));
     }
     if (!includeArchived) {
       agents = agents.filter((agent) => !agent.archivedAt);

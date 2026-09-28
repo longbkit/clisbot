@@ -241,6 +241,30 @@ describe("ManagedResourceAuthorizer", () => {
     ).resolves.toBe(false);
   });
 
+  it("judges an agent record in hand by its own workspace and labels, with no cache lookup", async () => {
+    const authorizer = createHarness(["project.use"]);
+    await authorizer.allowsInbound({
+      type: "fetch_agent_request",
+      requestId: "warm",
+      agentId: "agent-a",
+    });
+    // An id the authorizer has never seen is judged by its workspace, as the workspace check would.
+    expect(authorizer.allowsAgentRecordSync({ workspaceId: "workspace-a", labels: {} })).toBe(true);
+    expect(authorizer.allowsAgentRecordSync({ workspaceId: "workspace-b", labels: {} })).toBe(
+      false,
+    );
+    expect(authorizer.allowsAgentRecordSync({ labels: {} })).toBe(false);
+    const privateDenied = createHarness(["project.use"], {}, {}, () => false);
+    await privateDenied.allowsInbound({
+      type: "fetch_agent_request",
+      requestId: "w",
+      agentId: "agent-a",
+    });
+    expect(privateDenied.allowsAgentRecordSync({ workspaceId: "workspace-a", labels: {} })).toBe(
+      false,
+    );
+  });
+
   it("checks explicit Agent configuration and Fast mode at creation", async () => {
     const authorizer = createHarness(["project.use", "agent.create"]);
     await expect(

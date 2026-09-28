@@ -199,6 +199,20 @@ group settings and whatever ships on this branch later. Do not add per-capabilit
 (`chatAttachments` and `chatSettings` were folded into it on 2026-09-28, before any release carried
 them). A Host either runs Bots & Chats at the version the app expects or reports no `bots`.
 
+Three changes on this branch apply whether or not `bots` is on; each is deliberate:
+
+- **Web notifications never throw.** `packages/app/src/utils/os-notifications.ts` returns `false`
+  when a browser exposes `Notification` but rejects it (mobile browsers without a service worker).
+  A plain bug fix; a candidate to send upstream.
+- **Managed agent lists judge the record in hand.** `ManagedResourceAuthorizer.allowsAgentRecordSync`
+  checks the listed agent's own workspace and labels. With `bots` off the label check always
+  passes, so the result equals upstream's workspace check.
+- **One persisted layout blob.** Conversation layouts add the `conversation` tab kind and
+  `workspaceContext`/`layoutScope` to `workspace-layout-state`. Ordinary workspace tabs are stored
+  unchanged, but a build older than this branch discards the whole blob once a Chat layout is in
+  it, so a user who opened Chats and then downgrades loses remembered tab layouts. Accepted: tab
+  layouts are recoverable UI state; moving Chat layouts to their own key is the fix if it matters.
+
 ### D11. Templates move into the daemon
 
 Today the catalog lives in the CLI package (`packages/cli/src/commands/bot/templates`) and
