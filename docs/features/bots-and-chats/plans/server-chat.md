@@ -145,6 +145,11 @@ Hub's "a bound that runs out ends in a notice, never in silence"
 
 ### 2.2 Who answers (`turn-rules.ts`, pure)
 
+> Superseded for group chats by [group discussion](group-discussion.md) (2026-09-28): unaddressed
+> lines wake members one at a time in rounds, a mention invites rather than forces an answer, and
+> `rounds.max` replaces `hops.max`. The table below is the first implementation, kept until that
+> change lands.
+
 Vocabulary is the Route's: `interaction.requireMention` (`packages/hub/src/channels/config/schema.ts:73`,
 default there `true` for groups `:288`; the Chat default is `false` per D9), `interaction.whenBusy`
 (`steer | queue`, conversation-flow.md:185), `context.maxMessages` (default 20, `:188`), limit leaf

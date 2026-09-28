@@ -164,12 +164,14 @@ A per-bot queue was rejected: it breaks the native feel and Paseo runs sessions 
 ### D9. Group turn rules follow the channel Route model
 
 Who answers is configuration on the Chat, with the same vocabulary and guard rails as a Route:
-mention required or anyone-may-answer, a hop limit on bot-to-bot mentions, and limits with defaults
+mention required or anyone-may-answer, a cap on discussion rounds, and limits with defaults
 but no ceiling ([2026-09-18 decision](../../audits/2026-09-18-channel-chat-authority-and-limits.md)).
-Defaults for a new Chat: a mentioned bot answers; without a mention every bot in the chat receives
-the message and they run in parallel; a bot mentioning another bot is forwarded up to 3 hops per
-user message. The context handed to a bot is the transcript since its last turn, one line per
-message with a sender line, the same shape channels use ([conversation flow](../channels/conversation-flow.md)).
+How a group discusses is decided in [group discussion](plans/group-discussion.md) (2026-09-28):
+a room contract in each bot's system prompt, silence as a valid turn, and one bot speaking at a time
+in rounds capped by `rounds.max` (default 5). It replaces the first defaults, where an unaddressed
+message reached every bot in parallel and bot mentions were forwarded up to 3 hops. The context
+handed to a bot is the transcript since its last turn, one line per message with a sender line, the
+same shape channels use ([conversation flow](../channels/conversation-flow.md)).
 
 The chat owner can change a group's name and everyday reply policy in **Chat options → Group
 settings**. The `chat.update` RPC is gated by `server_info.features.bots` (D10) and checks current
@@ -253,6 +255,7 @@ the Project's `customName` to the display name, so Access pickers show the bot's
 The initial idle agent the CLI created is gone: sessions start per (bot, chat) on the first message.
 
 Per-area plans: [server-bot](plans/server-bot.md), [server-chat](plans/server-chat.md),
+[group-discussion](plans/group-discussion.md),
 [app](plans/app.md), [cli-hub-naming](plans/cli-hub-naming.md).
 
 ## Phases
