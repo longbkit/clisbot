@@ -10,7 +10,12 @@ import { SelectField } from "@/components/ui/select-field";
 import { Button } from "@/components/ui/button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { refreshBotsAndChats } from "../data/runtime";
-import { groupSettingsPatch, openGroupSettingsDraft } from "./group-settings-model";
+import {
+  groupSettingsPatch,
+  hasGroupSettingsChanges,
+  openGroupSettingsDraft,
+} from "./group-settings-model";
+import { RoomInstructionsField } from "./room-instructions-field";
 const ALL = { label: "All bots unless you @mention one" };
 const MENTIONED = { label: "Only bots you @mention" };
 const OPTIONS = [
@@ -38,6 +43,10 @@ export function GroupChatSettings({
   const [error, setError] = useState<string | null>(null);
   const size = useIsCompactFormFactor() ? "md" : "sm";
   const setTitle = useCallback((title: string) => setDraft((value) => ({ ...value, title })), []);
+  const setRoomInstructions = useCallback(
+    (roomInstructions: string) => setDraft((value) => ({ ...value, roomInstructions })),
+    [],
+  );
   const setReply = useCallback(
     (value: string) =>
       setDraft((current) => ({ ...current, requireMention: value === "mentioned" })),
@@ -97,6 +106,11 @@ export function GroupChatSettings({
         emptyText="No reply options"
         size={size}
       />
+      <RoomInstructionsField
+        initialValue={draft.roomInstructions}
+        onChangeText={setRoomInstructions}
+        editable={!disabled}
+      />
       <Text style={styles.hint}>Applies to new messages. Current replies continue.</Text>
       {!online ? <Text style={styles.hint}>Connect to this Host to save changes.</Text> : null}
       {error ? (
@@ -106,11 +120,7 @@ export function GroupChatSettings({
       ) : null}
       <Button
         size={size}
-        disabled={
-          disabled ||
-          (draft.title.trim() === original.title.trim() &&
-            draft.requireMention === original.requireMention)
-        }
+        disabled={disabled || !hasGroupSettingsChanges(draft, original)}
         onPress={save}
       >
         {busy ? "Saving…" : "Save changes"}

@@ -24,10 +24,12 @@ vi.mock("@/components/ui/form-field", () => ({
     initialValue,
     onChangeText,
     editable,
+    accessibilityLabel,
   }: {
     initialValue: string;
     onChangeText: (s: string) => void;
     editable: boolean;
+    accessibilityLabel: string;
   }) => {
     const change = React.useCallback(
       (event: React.ChangeEvent<HTMLInputElement>) => onChangeText(event.target.value),
@@ -35,7 +37,7 @@ vi.mock("@/components/ui/form-field", () => ({
     );
     return (
       <input
-        aria-label="Group name"
+        aria-label={accessibilityLabel}
         defaultValue={initialValue}
         onChange={change}
         disabled={!editable}
@@ -141,4 +143,19 @@ test("a dismissed settings form cannot close a later dialog when its save finish
     finish({ error: null });
   });
   expect(saved).not.toHaveBeenCalled();
+});
+
+test("room instructions save with the other settings and keep unchanged ones out", async () => {
+  const saved = vi.fn();
+  state.update.mockResolvedValueOnce({ error: null });
+  render(<GroupChatSettings serverId="host" chat={chat} onSaved={saved} />);
+  fireEvent.change(screen.getByLabelText("Room instructions"), {
+    target: { value: "  Answer in Vietnamese.  " },
+  });
+  fireEvent.click(screen.getByText("Save changes"));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(state.update).toHaveBeenLastCalledWith({
+    chatId: "group",
+    patch: { roomInstructions: "Answer in Vietnamese." },
+  });
 });

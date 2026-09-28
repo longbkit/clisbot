@@ -3,16 +3,10 @@
 // fixed because the engine reads its output: `PASS` is silence and `@slug` decides who
 // wakes. Room instructions are the part the chat owner may change. Pure.
 import { createHash } from "node:crypto";
+import { DEFAULT_ROOM_INSTRUCTIONS } from "@getpaseo/protocol/chats/room";
 
 /** The reply that means "nothing to add"; the engine appends no line for it. */
 export const PASS_REPLY = "PASS";
-
-/** Room instructions when the chat owner has written none. */
-export const DEFAULT_ROOM_INSTRUCTIONS = [
-  "Work toward the outcome the user asked for, each member from their own role.",
-  "Build on what others already said instead of repeating it.",
-  "When the question is settled, the member who owns the next step says so briefly and the rest PASS.",
-].join("\n");
 
 export interface RoomMember {
   slug: string;

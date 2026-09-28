@@ -9,6 +9,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
 import { ParticipantActions } from "./participant-actions";
+import { StopAllAction } from "./stop-all-action";
 import { useCallback, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { View, Text } from "react-native";
@@ -112,10 +113,13 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const reachTop = useCallback(() => {
     void loadOlder().catch((e) => setError(String(e)));
   }, [loadOlder, setError]);
+  const group = chat?.kind === "group" || (!chat?.kind && (chat?.participants.length ?? 0) > 1);
+  const working = group && [...heads.values()].some((head) => head.turnActive);
   const options = useMemo(
     () =>
       chat ? (
         <View style={styles.actions}>
+          <StopAllAction serverId={serverId} chatId={chatId} working={working} onError={setError} />
           <ParticipantActions
             workspaceByBotId={workspaceByBotId}
             chatId={chatId}
@@ -126,7 +130,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
         </View>
       ) : null,
-    [botRows, chat, chatId, serverId, workspaceByBotId],
+    [botRows, chat, chatId, serverId, workspaceByBotId, working, setError],
   );
   if (transcript.loadState.status === "error")
     return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
@@ -140,7 +144,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
         </Text>
       ) : null}
       <ConversationWorkspace
-        group={chat.kind === "group" || (!chat.kind && chat.participants.length > 1)}
+        group={group}
         serverId={serverId}
         chatId={chatId}
         accessScope={principalScope}
