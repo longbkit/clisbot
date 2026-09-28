@@ -41,9 +41,9 @@ export function ChatHeaderAction({
         size: "large",
         state,
         disabled,
-        style: showText ? styles.withText : undefined,
+        style: [compact && styles.touchTarget, showText && styles.withText],
       }),
-    [disabled, showText],
+    [compact, disabled, showText],
   );
   return (
     <Tooltip delayDuration={300}>
@@ -52,7 +52,6 @@ export function ChatHeaderAction({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={label}
-            hitSlop={HEADER_ACTION_HIT_SLOP}
             disabled={disabled}
             onPress={onPress}
             style={buttonStyle}
@@ -68,9 +67,8 @@ export function ChatHeaderAction({
     </Tooltip>
   );
 }
-const HEADER_ACTION_HIT_SLOP = { top: 8, bottom: 8 };
-
 const styles = StyleSheet.create((theme) => ({
+  touchTarget: { width: 44, height: 44 },
   withText: { width: "auto", flexDirection: "row", gap: 4, paddingHorizontal: 8 },
   text: { color: theme.colors.foregroundMuted, fontSize: 14 },
 }));

@@ -4078,6 +4078,20 @@ export class AgentManager {
         managed.participantActors = identity?.actor ? [identity.actor] : undefined;
         managed.channels = identity?.channel ? [identity.channel] : undefined;
       }
+      // Read history before publishing the agent: a provider failure must leave the
+      // session unregistered so the registration catch closes it.
+      const startupHistory: AgentStreamEvent[] = [];
+      if (session.initialTimeline?.length && !managed.historyPrimed) {
+        for await (const event of session.streamHistory()) {
+          startupHistory.push(
+            limitAgentStreamEventContent(
+              event,
+              Boolean(this.durableTimelineStore) && !managed.internal,
+            ),
+          );
+        }
+      }
+
       this.assertAcceptingAgentRegistrations();
       this.agents.set(resolvedAgentId, managed);
       registered = true;
@@ -4098,6 +4112,18 @@ export class AgentManager {
       // durable store still holds the previous committed timeline.
       if (options?.historyPrimed === undefined) {
         managed.historyPrimed ||= durableTimelineHasRows;
+      }
+      // Fusion initializes its canonical timeline before any startup rows are written.
+      if (session.initialTimeline?.length) {
+        if (!managed.historyPrimed) {
+          // Legacy/imported chats need their existing history before startup rows.
+          await this.primeTimelineFromLegacyProviderHistory(managed, false, startupHistory);
+        } else {
+          for (const entry of session.initialTimeline) {
+            this.recordTimeline(managed.id, entry.item, { timestamp: entry.timestamp });
+          }
+        }
+        this.refreshSessionPersistence(managed);
       }
       this.assertAgentRegistrationActive(managed);
       if (!options?.publishWhenReady) {
@@ -4863,6 +4889,9 @@ export class AgentManager {
   private async primeTimelineFromLegacyProviderHistory(
     agent: ActiveManagedAgent,
     broadcast: boolean | (() => boolean),
+    history:
+      | AsyncIterable<AgentStreamEvent>
+      | Iterable<AgentStreamEvent> = agent.session.streamHistory(),
   ): Promise<void> {
     const deferredBroadcast = typeof broadcast === "function";
     const historyEvents: Extract<AgentStreamEvent, { type: "timeline" }>[] = [];
@@ -4872,7 +4901,7 @@ export class AgentManager {
       // Collect the whole replay before touching either store. A stream that fails
       // halfway then leaves the committed timeline as it was, instead of a partial
       // copy the next attempt would append to.
-      for await (const rawEvent of agent.session.streamHistory()) {
+      for await (const rawEvent of history) {
         const event = limitAgentStreamEventContent(
           rawEvent,
           this.preserveCanonicalContent(agent.id),

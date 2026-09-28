@@ -4,7 +4,7 @@ import {
 } from "@getpaseo/protocol/daemon-endpoints";
 import {
   DirectTcpHostConnectionSchema,
-  type DirectTcpHostConnection,
+  type DirectTcpHostConnection as WireDirectTcpHostConnection,
 } from "@getpaseo/protocol/host-connection-schema";
 import {
   DEFAULT_SSH_DAEMON_PORT,
@@ -18,7 +18,8 @@ import {
 } from "@/hosts/appearance";
 import { z } from "zod";
 
-export { DirectTcpHostConnectionSchema, type DirectTcpHostConnection };
+export { DirectTcpHostConnectionSchema };
+export type DirectTcpHostConnection = Omit<WireDirectTcpHostConnection, "password">;
 
 export interface DirectSocketHostConnection {
   id: string;
@@ -74,6 +75,7 @@ export interface HubHostManagement {
 
 export interface HostProfile {
   serverId: string;
+  password?: string;
   label: string;
   appearance: HostAppearance;
   lifecycle: HostLifecycle;
@@ -146,11 +148,7 @@ function hostConnectionEquals(left: HostConnection, right: HostConnection): bool
   }
 
   if (left.type === "directTcp" && right.type === "directTcp") {
-    return (
-      left.endpoint === right.endpoint &&
-      (left.useTls ?? false) === (right.useTls ?? false) &&
-      left.password === right.password
-    );
+    return left.endpoint === right.endpoint && (left.useTls ?? false) === (right.useTls ?? false);
   }
   if (left.type === "directSocket" && right.type === "directSocket") {
     return left.path === right.path;
@@ -223,39 +221,59 @@ function matchingHostProfileIndexes(
   }, []);
 }
 
-function hostProfileNeedsUpdate(input: {
+function hasProfileChanged(input: {
   matchingCount: number;
   previous: HostProfile;
   serverId: string;
-  label: string;
+  password?: string;
   management?: HubHostManagement;
-  connections: readonly HostConnection[];
-  preferredConnectionId: string;
   createdAt: string;
+  label: string;
+  preferredConnectionId: string;
+  lifecycle: HostLifecycle;
+  connections: HostConnection[];
 }): boolean {
-  const previous = input.previous;
+  const { previous, connections } = input;
   return (
     input.matchingCount > 1 ||
     previous.serverId !== input.serverId ||
+    (input.password !== undefined && input.password !== previous.password) ||
+    JSON.stringify(previous.management) !== JSON.stringify(input.management) ||
     input.createdAt !== previous.createdAt ||
     input.label !== previous.label ||
     input.preferredConnectionId !== previous.preferredConnectionId ||
-    JSON.stringify(previous.management) !== JSON.stringify(input.management) ||
-    input.connections.length !== previous.connections.length ||
-    input.connections.some((connection, index) => {
-      const previousConnection = previous.connections[index];
-      return !previousConnection || !hostConnectionEquals(connection, previousConnection);
+    !hostLifecycleEquals(previous.lifecycle, input.lifecycle) ||
+    connections.length !== previous.connections.length ||
+    connections.some((candidate, index) => {
+      const old = previous.connections[index];
+      return !old || !hostConnectionEquals(candidate, old);
     })
   );
 }
 
-// eslint-disable-next-line complexity -- upstream merge of one connection into possibly several matching profiles.
+function resolveUpdatedHostLabel(
+  previous: HostProfile,
+  management: HubHostManagement | undefined,
+  label: string,
+  serverId: string,
+): string {
+  const followsHubName =
+    label.length > 0 &&
+    previous.management?.daemonSlug !== undefined &&
+    previous.label === previous.management.daemonSlug &&
+    management?.daemonSlug !== undefined;
+  return previous.label === previous.serverId || followsHubName
+    ? label || serverId
+    : previous.label;
+}
+
 export function upsertHostConnectionInProfiles(input: {
   profiles: HostProfile[];
   serverId: string;
   label?: string;
   connection: HostConnection;
   management?: HubHostManagement;
+  password?: string;
   now?: string;
 }): HostProfile[] {
   const serverId = input.serverId.trim();
@@ -264,20 +282,23 @@ export function upsertHostConnectionInProfiles(input: {
   }
 
   const now = input.now ?? new Date().toISOString();
+  const password = input.password;
+  const normalizedConnection = input.connection;
   const labelTrimmed = input.label?.trim() ?? "";
   const derivedLabel = labelTrimmed || serverId;
   const existing = input.profiles;
-  const matchingIndexes = matchingHostProfileIndexes(existing, serverId, input.connection);
+  const matchingIndexes = matchingHostProfileIndexes(existing, serverId, normalizedConnection);
 
   if (matchingIndexes.length === 0) {
     const profile: HostProfile = {
       serverId,
+      ...(password ? { password } : {}),
       label: derivedLabel,
       appearance: defaultHostAppearance(),
       lifecycle: defaultLifecycle(),
       ...(input.management ? { management: input.management } : {}),
-      connections: [input.connection],
-      preferredConnectionId: input.connection.id,
+      connections: [normalizedConnection],
+      preferredConnectionId: normalizedConnection.id,
       createdAt: now,
       updatedAt: now,
     };
@@ -288,37 +309,32 @@ export function upsertHostConnectionInProfiles(input: {
   const prev = matchedProfiles.find((daemon) => daemon.serverId === serverId) ?? matchedProfiles[0];
   const nextConnections = upsertHostConnectionById(
     matchedProfiles.flatMap((daemon) => daemon.connections),
-    input.connection,
+    normalizedConnection,
   );
   const nextLifecycle = prev.lifecycle;
   const nextManagement = input.management ?? prev.management;
-  const followsHubName =
-    labelTrimmed.length > 0 &&
-    prev.management?.daemonSlug !== undefined &&
-    prev.label === prev.management.daemonSlug &&
-    nextManagement?.daemonSlug !== undefined;
-  const nextLabel = prev.label === prev.serverId || followsHubName ? derivedLabel : prev.label;
+  const nextLabel = resolveUpdatedHostLabel(prev, nextManagement, labelTrimmed, serverId);
   const nextPreferredConnectionId =
     prev.preferredConnectionId &&
     nextConnections.some((connection) => connection.id === prev.preferredConnectionId)
       ? prev.preferredConnectionId
-      : input.connection.id;
+      : normalizedConnection.id;
   const nextCreatedAt = matchedProfiles.reduce(
     (earliest, daemon) => (daemon.createdAt < earliest ? daemon.createdAt : earliest),
     prev.createdAt,
   );
-  const changed =
-    !hostLifecycleEquals(prev.lifecycle, nextLifecycle) ||
-    hostProfileNeedsUpdate({
-      matchingCount: matchingIndexes.length,
-      previous: prev,
-      serverId,
-      label: nextLabel,
-      ...(nextManagement === undefined ? {} : { management: nextManagement }),
-      connections: nextConnections,
-      preferredConnectionId: nextPreferredConnectionId,
-      createdAt: nextCreatedAt,
-    });
+  const changed = hasProfileChanged({
+    matchingCount: matchingIndexes.length,
+    previous: prev,
+    serverId,
+    password,
+    management: nextManagement,
+    createdAt: nextCreatedAt,
+    label: nextLabel,
+    preferredConnectionId: nextPreferredConnectionId,
+    lifecycle: nextLifecycle,
+    connections: nextConnections,
+  });
 
   if (!changed) {
     return existing;
@@ -326,6 +342,7 @@ export function upsertHostConnectionInProfiles(input: {
 
   const nextProfile: HostProfile = {
     ...prev,
+    ...(password ? { password } : {}),
     serverId,
     label: nextLabel,
     lifecycle: nextLifecycle,
@@ -451,6 +468,7 @@ const StoredHostConnectionSchema = z.discriminatedUnion("type", [
 ]);
 const StoredHostProfileSchema = z.strictObject({
   serverId: z.string().trim().min(1),
+  password: z.string().optional(),
   label: z.string().optional(),
   appearance: HostAppearanceSchema.optional(),
   lifecycle: z.strictObject({}).optional(),
@@ -477,13 +495,13 @@ function normalizeStoredConnection(connection: StoredHostConnection): HostConnec
   if (connection.type === "directTcp") {
     try {
       const endpoint = normalizeLoopbackToLocalhost(normalizeHostPort(connection.endpoint));
-      return DirectTcpHostConnectionSchema.parse({
+      const parsed = DirectTcpHostConnectionSchema.parse({
         id: `direct:${endpoint}`,
         type: "directTcp",
         endpoint,
         useTls: connection.useTls,
-        ...(connection.password !== undefined ? { password: connection.password } : {}),
       });
+      return { id: parsed.id, type: parsed.type, endpoint: parsed.endpoint, useTls: parsed.useTls };
     } catch {
       return null;
     }
@@ -535,6 +553,12 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
   }
   const record = result.data;
   const serverId = record.serverId;
+  // COMPAT(connectionPassword): added in v0.9.1, remove after 2027-03-24 once stored direct passwords have migrated.
+  const legacyPassword = record.connections.find(
+    (connection) => connection.type === "directTcp" && connection.password,
+  );
+  const password =
+    record.password ?? (legacyPassword?.type === "directTcp" ? legacyPassword.password : undefined);
 
   const connections = record.connections
     .map((connection) => normalizeStoredConnection(connection))
@@ -554,6 +578,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
 
   return {
     serverId,
+    ...(password ? { password } : {}),
     label,
     appearance: record.appearance ?? defaultHostAppearance(),
     lifecycle: defaultLifecycle(),

@@ -1,6 +1,7 @@
 export const CLIENT_CAPS = {
   // COMPAT(agentSessionStorage): unreleased Fusion; keep optional fields and capability gates until supported peers explicitly negotiate session storage (review 2027-03-11).
   agentSessionStorage: "agent_session_storage",
+  helloRejection: "hello_rejection",
   // COMPAT(ownedSubscriptions): added in v0.8.0, remove legacy ownership after 2027-03-09.
   ownedSubscriptions: "owned_subscriptions",
   // Clients outside the Paseo app version series can explicitly accept provider IDs.

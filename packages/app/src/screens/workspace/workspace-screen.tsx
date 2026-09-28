@@ -4293,6 +4293,7 @@ const styles = StyleSheet.create((theme) => ({
     borderBottomColor: theme.colors.border,
   },
   switcherTrigger: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],

@@ -24,9 +24,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSeparator,
   DropdownMenuHint,
-  type DropdownMenuTriggerProps,
 } from "@/components/ui/dropdown-menu";
-import { MenuTextField } from "@/components/ui/menu";
+import { MenuTextField, type MenuTriggerState } from "@/components/ui/menu";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { iconButtonChromeStyle, mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useConversationTabsContext } from "./conversation-tabs-context";
@@ -52,6 +52,12 @@ export function ChatOptions({
   chat: ChatPayload;
   bots: BotPayload[];
 }) {
+  const compact = useIsCompactFormFactor();
+  const triggerStyle = useCallback(
+    (state: MenuTriggerState) =>
+      iconButtonChromeStyle({ size: "large", state, style: compact && styles.touchTarget }),
+    [compact],
+  );
   const client = useHostRuntimeClient(serverId);
   const router = useRouter();
   const { visible, setVisible } = useChatOptionsState();
@@ -171,7 +177,6 @@ export function ChatOptions({
         <DropdownMenuTrigger
           accessibilityLabel="Chat options"
           testID="chat-options-trigger"
-          hitSlop={HEADER_ACTION_HIT_SLOP}
           style={triggerStyle}
         >
           <ThemedEllipsis size={18} uniProps={mutedIconColorMapping} />
@@ -297,12 +302,8 @@ function ChatTabItem({
   );
 }
 
-const triggerStyle: DropdownMenuTriggerProps["style"] = (state) =>
-  iconButtonChromeStyle({ size: "large", state });
-
-const HEADER_ACTION_HIT_SLOP = { top: 8, bottom: 8 };
-
 const styles = StyleSheet.create((theme) => ({
+  touchTarget: { width: 44, height: 44 },
   body: { gap: theme.spacing[3] },
   tabSearch: {
     paddingHorizontal: theme.spacing[2],

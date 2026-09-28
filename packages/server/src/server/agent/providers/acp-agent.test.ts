@@ -2,6 +2,9 @@ import { type ChildProcess, type ChildProcessWithoutNullStreams } from "node:chi
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import pino from "pino";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   AgentSideConnection,
@@ -3782,6 +3785,34 @@ describe("ACPAgentSession close() tree-kill", () => {
 });
 
 describe("ACPAgentSession initialization cleanup", () => {
+  test("rejects a resume whose working directory was deleted instead of crashing", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "paseo-acp-deleted-cwd-"));
+    const deletedCwd = path.join(root, "worktree");
+    const terminator = new FakeTerminator();
+    const session = new ACPAgentSession(
+      { provider: "test-acp", cwd: deletedCwd },
+      {
+        provider: "test-acp",
+        logger: createTestLogger(),
+        defaultCommand: [process.execPath, "-e", "process.stdin.resume()"],
+        defaultModes: [],
+        capabilities: {
+          supportsStreaming: true,
+          supportsSessionPersistence: true,
+        },
+        handle: { provider: "test-acp", sessionId: "archived-session" },
+        terminateProcess: terminator.terminate,
+      },
+    );
+
+    try {
+      await expect(session.initializeResumedSession()).rejects.toThrow("ENOENT");
+      expect(terminator.terminated).toHaveLength(1);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("terminates the ACP process when session/new fails", async () => {
     const terminator = new FakeTerminator();
     const child = createProbeChildStub();
@@ -4430,7 +4461,7 @@ describe("ACP process release when the agent stops answering", () => {
   test("close() terminates the child when session/cancel and session/close never answer", async () => {
     vi.useFakeTimers();
     const terminator = new FakeTerminator();
-    const session = createSession(terminator.terminate);
+    const session = createSession({ terminateProcess: terminator.terminate });
     const child = createTerminalChildStub();
     const never = () => new Promise<void>(() => {});
     Object.assign(asInternals<Record<string, unknown>>(session), {

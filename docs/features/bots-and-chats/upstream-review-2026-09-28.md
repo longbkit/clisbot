@@ -94,3 +94,33 @@ Not verified here: resolved upstream merge build/dependencies, native iOS/Androi
 - `packages/server/src/server/bootstrap.ts`
 - `packages/server/src/server/websocket-server.relay-reconnect.test.ts`
 - `packages/server/src/server/websocket-server.ts`
+
+## Release merge follow-up — v0.10.0-beta.1
+
+This follow-up is implementation/verification, separate from the rehearsal above.
+
+- Target worktree: `feat/bots-and-chats`, starting at `8a540760f` (includes the latest chat layout and compact tab work).
+- Source: `https://github.com/getpaseo/paseo.git`, fetched as `refs/upstream-releases/v0.10.0-beta.1`, commit `52d345db7f271251787c1099a2fe48fde515f012`.
+- Merged the release, not moving `upstream/main`. The reviewed main tip is one Nix dependency-hash commit beyond this tag.
+- Git reported 17 conflicted paths. All were resolved while retaining the bot/chat implementation; automatic merges were also checked for contract drift.
+
+### Integration decisions
+
+- Keep upstream's single hello admission flow and `authenticating` state. Credential admission and Fusion managed access are separate gates: a valid password/local credential does not elevate a ticket holder to owner. Keep lease renewal, actor binding, fresh post-open ticket resolution, and structured password rejection. Password failures must not revoke Hub authorization or endlessly reconnect a managed Host.
+- Adapt the existing CLI retry wrapper to the new credential contract, retaining the selected Paseo home and refreshed local credential across ticket refresh. Regression tests cover both credential and ticket together.
+- Initialize the canonical timeline store before upstream startup notices are emitted. Preserve canonical tool content and authorship; test storage enabled and disabled. This was a semantic bug in an otherwise cleanly merged part of agent registration.
+- Preserve ACP lifecycle timeouts while adding upstream spawn-error rejection; retain both cleanup paths in daemon shutdown.
+- Reuse upstream settings categorization, Host password storage and dropdown trigger contract. Keep Fusion account/access sections, wide table layout and management metadata. Extract only the small Host label decision to keep the combined upsert readable.
+- Reuse upstream desktop sidebar geometry/icon sizing plus the generic 44px compact/native overlay. Do not fork the sidebar component. Bot header actions and overflow now have actual 44px compact targets; the shared mobile tab switcher has a 44px minimum height. Desktop sizes remain unchanged.
+- Reconcile the merged lock without resetting unrelated dependencies. Align Hub's exact protocol/relay pins with the release; otherwise npm installs registry packages that shadow the local Fusion contracts. A final clean `npm ci` removes those stale nested copies. Hub's own version remains unchanged.
+
+### Verification
+
+- Final clean `npm ci` with lifecycle scripts and `npm ls --workspaces --depth=0` pass. Protocol/client/server-dependency builds and the server build pass. Full workspace typecheck passes after rebuilding server exports and removing stale nested Hub dependencies.
+- Focused suites: 195 bot/chat/layout app tests; 321 shared composer/stream/layout app tests; 222 runtime/settings tests; 176 client/CLI tests; 388 lifecycle/provider/auth server tests; 134 bot/chat backend tests; 46 protocol tests; 8 Hub session-registry tests. Follow-up mobile tests (14) and Host tests (115) pass; these reruns overlap the earlier suites and are not additional coverage totals.
+- Browser QA uses isolated fake-provider Hosts, restarted from merged sources, with desktop 1440×1000 and mobile 390×844 views. Created a bot through the model picker, completed a DM message/reply, created a two-bot group with search-preserved selection, and verified a group broadcast returns both replies in the persisted transcript.
+- Desktop: searchable bot project switching; Files stays on the chat route; first document opens beside Messages and a second document reuses that pane; explicit Cowork and Back to chat preserve the draft. Mobile: file explorer and bot picker remain in the conversation; compact header actions/overflow measure 44×44 and tab switcher height is 44px. Automations Home shows its three tabs and opens the existing New schedule form.
+- Feature off: restarted a separate Host with bots disabled, verified no bot feature advertised, and observed the existing workspace/sidebar experience.
+- Validation evidence is local under `/tmp/bots-beta-*`; screenshot artifacts include desktop split panes, mobile creation and mobile chat. No real user bot was created, edited, archived or messaged during merge QA.
+
+Limitations: browser providers are deterministic fixtures, not live LLM services. This pass does not exercise native iOS/Android builds, microphone/STT/TTS, a live Hub Automation execution, or Nix builds. The Nix hash from upstream is not proof that the extended Fusion workspace builds under Nix.
