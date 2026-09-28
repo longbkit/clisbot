@@ -118,20 +118,26 @@ export async function loadChannelControlPlane(
   );
 }
 
-/** P0 is single-operator: exactly one provisioned organization. Zero or
- * several is a misconfiguration the operator must fix, not a guess. */
+/** P0 runs one channel operator: the only organization, or, when several are
+ * provisioned, the only one with a channel configuration. Other organizations
+ * (a test sign-up, a domain registration) do not stop it. Zero, or several
+ * configured, is a misconfiguration the operator must fix, not a guess. */
 async function resolveDefaultOrganization(database: Database): Promise<OperatorOrganizationRecord> {
   const organizations = await database.listOrganizationsForOperator();
   if (organizations.length === 0) {
     throw new ChannelControlPlaneError("organization_not_found", "no organization is provisioned");
   }
-  if (organizations.length > 1) {
-    throw new ChannelControlPlaneError(
-      "organization_ambiguous",
-      `P0 supports a single organization; ${organizations.length} are provisioned`,
-    );
+  if (organizations.length === 1) return organizations[0]!;
+  const configured: OperatorOrganizationRecord[] = [];
+  for (const organization of organizations) {
+    if (await database.findActiveChannelConfiguration(organization.id))
+      configured.push(organization);
   }
-  return organizations[0]!;
+  if (configured.length === 1) return configured[0]!;
+  throw new ChannelControlPlaneError(
+    "organization_ambiguous",
+    `P0 runs channels for one organization; ${configured.length} of ${organizations.length} provisioned organizations have a channel configuration`,
+  );
 }
 
 async function compileControlPlaneSnapshot(

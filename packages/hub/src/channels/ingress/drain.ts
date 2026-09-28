@@ -8,8 +8,8 @@
  * here. What is portable is the policy it applies, and that is imported
  * verbatim from `@getpaseo/channels-core`
  * (`channels/message/ingress-retry-policy.ts`): backoff schedule, attempt
- * ceiling, dead-letter minimum age and the non-retryable hook. This module owns
- * only the loop: recover, claim, keep the lease alive, dispatch, settle.
+ * ceiling and the non-retryable hook. The Hub removes the 24-hour age floor so
+ * eight failed attempts actually end a poison row and free its lane.
  *
  * Lifecycle: `start()` drains at once (the restart drain), then wakes on a
  * timer; `requestDrain()` wakes it when an event is admitted; `stop()` clears
@@ -22,12 +22,19 @@
  */
 import type { InboundQueueClaim, InboundQueueSink } from "@getpaseo/channels-shared";
 import {
+  DEFAULT_INGRESS_RETRY_MAX_ATTEMPTS,
   resolveIngressFailureDisposition,
   resolveIngressRetryDelayMs,
   type IngressNonRetryableFailure,
   type IngressRetryPolicyConfig,
 } from "@getpaseo/channels-core/channels/message/ingress-retry-policy";
 import { ChannelIngressQueueClaimConflictError } from "../../db/channels.js";
+import { CHANNEL_INGRESS_MAX_AGE_MS, CHANNEL_INGRESS_DISPATCH_TIMEOUT_MS } from "./budget.js";
+import {
+  ingressAttempt,
+  INGRESS_OUTCOME_UNKNOWN,
+  ChannelIngressDispatchInterruptedError,
+} from "./attempt.js";
 
 /** Claim lease. Refreshed at a third of it while a dispatch is in flight. */
 export const DEFAULT_INGRESS_CLAIM_LEASE_MS = 30_000;
@@ -81,9 +88,9 @@ export interface ChannelIngressDrainOptions {
   /**
    * Hand the stored payload to the plane. A throw drives the retry policy; a
    * returned deferral releases the row as back-pressure; anything else
-   * completes it. `signal` aborts when the account stops or when this claim's
-   * lease is lost — a dispatch that keeps running past it writes on behalf of a
-   * claim another worker now owns.
+   * completes it. `signal` aborts at the deadline, when the account stops or
+   * when this claim's lease is lost. Late continuations must not start new
+   * side effects after that point.
    */
   dispatch: (
     payload: unknown,
@@ -93,6 +100,8 @@ export interface ChannelIngressDrainOptions {
   abortSignal: AbortSignal;
   log?: ChannelIngressDrainLog;
   retryPolicy?: IngressRetryPolicyConfig;
+  maxEventAgeMs?: number;
+  dispatchTimeoutMs?: number;
   resolveNonRetryableFailure?: (error: unknown) => IngressNonRetryableFailure | null;
   leaseMs?: number;
   intervalMs?: number;
@@ -134,10 +143,11 @@ export interface ChannelIngressDrain {
 
 /** One claim's lease keeper: the refresh timer plus the dispatch's abort. */
 interface ClaimLease {
-  /** Aborts when the account stops or when this claim's lease is lost. */
+  /** Aborts at the deadline, on account stop, or when this claim's lease is lost. */
   signal: AbortSignal;
   /** True once a refresh reported the row is no longer this worker's. */
   lost: boolean;
+  abort(reason: Error): void;
   release(): void;
 }
 
@@ -167,15 +177,19 @@ function armLeaseRefresh(
 ): ClaimLease {
   const leaseMs = options.leaseMs ?? DEFAULT_INGRESS_CLAIM_LEASE_MS;
   const controller = new AbortController();
-  const stopWithAccount = () => controller.abort();
+  const stopWithAccount = () =>
+    controller.abort(new ChannelIngressDispatchInterruptedError("account stopped during dispatch"));
   options.abortSignal.addEventListener("abort", stopWithAccount, { once: true });
+  if (options.abortSignal.aborted) stopWithAccount();
   const lease: ClaimLease = {
     signal: controller.signal,
     lost: false,
+    abort: (reason) => controller.abort(reason),
     release: () => options.abortSignal.removeEventListener("abort", stopWithAccount),
   };
   const refresh = options.queue.refresh;
   if (refresh === undefined) return lease;
+  let released = false;
   const timer = setInterval(
     () => {
       const held = refresh.call(options.queue, {
@@ -186,9 +200,10 @@ function armLeaseRefresh(
       });
       void held
         .then((stillOurs) => {
+          if (released) return;
           if (!stillOurs) {
             lease.lost = true;
-            controller.abort();
+            controller.abort(new ChannelIngressDispatchInterruptedError("claim lease lost"));
           }
           return undefined;
         })
@@ -200,6 +215,7 @@ function armLeaseRefresh(
   );
   timer.unref?.();
   lease.release = () => {
+    released = true;
     clearInterval(timer);
     options.abortSignal.removeEventListener("abort", stopWithAccount);
   };
@@ -255,6 +271,27 @@ async function settleCompleted(
   options.log?.drained?.(claim);
 }
 
+async function settleDeadLetter(
+  options: DrainRun,
+  claim: InboundQueueClaim,
+  pass: ChannelIngressDrainPass,
+  detail: IngressNonRetryableFailure,
+): Promise<void> {
+  const settled = await settleFenced(options, claim, pass, () =>
+    options.queue.fail({
+      id: claim.id,
+      workerId: options.workerId,
+      claimToken: claim.claimToken,
+      disposition: "dead-letter",
+      reason: detail.reason,
+      error: detail.message,
+    }),
+  );
+  if (!settled) return;
+  pass.deadLettered += 1;
+  options.log?.deadLettered?.(claim, detail);
+}
+
 /** Back-pressure: hand the row back with its attempt, due again shortly. */
 async function settleDeferral(
   options: DrainRun,
@@ -263,7 +300,16 @@ async function settleDeferral(
   pass: ChannelIngressDrainPass,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
-  const retryAt = new Date(now + Math.max(0, deferral.retryAfterMs));
+  const expiresAt =
+    claim.receivedAt.getTime() + (options.maxEventAgeMs ?? CHANNEL_INGRESS_MAX_AGE_MS);
+  if (now >= expiresAt) {
+    await settleDeadLetter(options, claim, pass, {
+      reason: "ingress-age-exceeded",
+      message: "message expired while deferred",
+    });
+    return;
+  }
+  const retryAt = new Date(Math.min(expiresAt, now + Math.max(0, deferral.retryAfterMs)));
   const settled = await settleFenced(options, claim, pass, () =>
     options.queue.fail({
       id: claim.id,
@@ -293,6 +339,7 @@ async function settleFailure(
   pass: ChannelIngressDrainPass,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
+  const retryPolicy = { deadLetterMinAgeMs: 0, ...options.retryPolicy };
   const event = {
     receivedAt: claim.receivedAt.getTime(),
     attempts: Math.max(0, claim.attempts - 1),
@@ -306,30 +353,22 @@ async function settleFailure(
     ...(options.resolveNonRetryableFailure === undefined
       ? {}
       : { resolveNonRetryableFailure: options.resolveNonRetryableFailure }),
-    ...(options.retryPolicy === undefined ? {} : { config: options.retryPolicy }),
+    config: retryPolicy,
     now,
   });
   const settle = { id: claim.id, workerId: options.workerId, claimToken: claim.claimToken };
   if (disposition.kind === "fail") {
-    const settled = await settleFenced(options, claim, pass, () =>
-      options.queue.fail({
-        ...settle,
-        error: disposition.message,
-        disposition: "dead-letter",
-        reason: disposition.reason,
-      }),
-    );
-    if (!settled) return;
-    pass.deadLettered += 1;
-    options.log?.deadLettered?.(claim, disposition);
+    await settleDeadLetter(options, claim, pass, disposition);
     return;
   }
   const delayMs = resolveIngressRetryDelayMs(
     { ...event, attempts: disposition.attempt },
-    options.retryPolicy,
+    retryPolicy,
     now,
   );
-  const retryAt = new Date(now + delayMs);
+  const expiresAt =
+    claim.receivedAt.getTime() + (options.maxEventAgeMs ?? CHANNEL_INGRESS_MAX_AGE_MS);
+  const retryAt = new Date(Math.min(expiresAt, now + delayMs));
   const settled = await settleFenced(options, claim, pass, () =>
     options.queue.fail({ ...settle, error: disposition.message, disposition: "retry", retryAt }),
   );
@@ -339,20 +378,85 @@ async function settleFailure(
   options.log?.retried?.(claim, { message: disposition.message, retryAt });
 }
 
+/** A deadline ends the wait even when a dependency ignores cancellation. */
+async function dispatchWithDeadline(
+  options: DrainRun,
+  claim: InboundQueueClaim,
+  lease: ClaimLease,
+): Promise<ChannelIngressDeferral | void> {
+  const age = (options.now?.() ?? Date.now()) - claim.receivedAt.getTime();
+  const remaining = (options.maxEventAgeMs ?? CHANNEL_INGRESS_MAX_AGE_MS) - age;
+  const timeoutMs = Math.min(
+    options.dispatchTimeoutMs ?? CHANNEL_INGRESS_DISPATCH_TIMEOUT_MS,
+    remaining,
+  );
+  const timer = setTimeout(
+    () =>
+      lease.abort(
+        new ChannelIngressDispatchInterruptedError("dispatch deadline exceeded; outcome unknown"),
+      ),
+    Math.max(0, timeoutMs),
+  );
+  timer.unref?.();
+  let onAbort: () => void = () => undefined;
+  const interrupted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(lease.signal.reason);
+    lease.signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    lease.signal.throwIfAborted();
+    return await Promise.race([
+      Promise.resolve().then(() =>
+        ingressAttempt.run(lease.signal, () => {
+          lease.signal.throwIfAborted();
+          return options.dispatch(claim.payload, claim, lease.signal);
+        }),
+      ),
+      interrupted,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    lease.signal.removeEventListener("abort", onAbort);
+  }
+}
+
 /** Dispatch one claim under a live lease and settle it exactly once. */
 async function processClaim(
   options: DrainRun,
   claim: InboundQueueClaim,
   pass: ChannelIngressDrainPass,
 ): Promise<void> {
+  const maxAttempts = options.retryPolicy?.maxAttempts ?? DEFAULT_INGRESS_RETRY_MAX_ATTEMPTS;
+  // Claiming increments attempts. An exhausted recovered claim gets settled
+  // here without performing the ninth dispatch.
+  if (claim.attempts > maxAttempts) {
+    await settleDeadLetter(options, claim, pass, {
+      reason: "retry-limit-exceeded",
+      message: "dispatch attempt budget exhausted before dispatch",
+    });
+    return;
+  }
+  const age = (options.now?.() ?? Date.now()) - claim.receivedAt.getTime();
+  if (age >= (options.maxEventAgeMs ?? CHANNEL_INGRESS_MAX_AGE_MS)) {
+    await settleDeadLetter(options, claim, pass, {
+      reason: "ingress-age-exceeded",
+      message: "message expired before dispatch",
+    });
+    return;
+  }
   const lease = armLeaseRefresh(options, claim);
   let deferral: ChannelIngressDeferral | void;
   try {
-    deferral = await options.dispatch(claim.payload, claim, lease.signal);
+    deferral = await dispatchWithDeadline(options, claim, lease);
   } catch (error) {
     lease.release();
     if (lease.lost) abandonClaim(options, claim, pass, "claim lease lost");
-    else await settleFailure(options, claim, error, pass);
+    else if (error instanceof ChannelIngressDispatchInterruptedError) {
+      await settleDeadLetter(options, claim, pass, {
+        reason: INGRESS_OUTCOME_UNKNOWN,
+        message: error.message,
+      });
+    } else await settleFailure(options, claim, error, pass);
     return;
   }
   lease.release();
@@ -461,7 +565,10 @@ class IngressDrain implements ChannelIngressDrain {
 
   constructor(private readonly options: ChannelIngressDrainOptions) {
     this.batchSize = options.batchLimit ?? DEFAULT_INGRESS_DRAIN_BATCH;
-    this.run = { ...options, handedBack: (retryAt) => this.armDueTimer(retryAt.getTime()) };
+    this.run = {
+      ...options,
+      handedBack: (retryAt) => this.armDueTimer(retryAt.getTime()),
+    };
   }
 
   start(): void {
@@ -501,7 +608,11 @@ class IngressDrain implements ChannelIngressDrain {
   private spawnWorker(): void {
     if (this.isStopped() || this.active >= workerCount(this.options)) return;
     this.active += 1;
-    const worker: Promise<void> = this.work().finally(() => this.workers.delete(worker));
+    // A held-flush admission can wake us from another dispatch. Pool workers
+    // belong to the account, not to the lifetime of the dispatch that woke them.
+    const worker: Promise<void> = ingressAttempt
+      .exit(() => this.work())
+      .finally(() => this.workers.delete(worker));
     this.workers.add(worker);
   }
 

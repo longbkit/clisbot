@@ -226,9 +226,8 @@ describe("createInboundEventProcessor", () => {
     expect(payload.ctxPayload["MessageSid"]).toBe("msg-1");
     // The family + facts are durable too: the drain routes off the stored copy.
     expect(payload.ctxPayload["EventKind"]).toBe("message");
-    // The ledger row is an audit join written after admission; the drain, not
-    // the monitor, consume-marks it when the dispatch settles.
-    expect(rows.get("msg-1")).toEqual({ created: true, consumed: false });
+    // The drain owns the audit too; transport admission must not race it.
+    expect(rows.size).toBe(0);
   });
 
   it("drops an in-flight transport redelivery before it reaches the queue", async () => {

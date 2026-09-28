@@ -1,3 +1,4 @@
+import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
 import { createServer, type Server } from "node:http";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
@@ -6,6 +7,35 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 import { connectChannelDaemon, type DaemonConnection } from "./client.js";
 import type { AgentSnapshot } from "./types.js";
 import { AgentRequestRefusedError } from "./agent-request-refusal.js";
+import { DaemonSessionProtocol } from "./session-protocol.js";
+import { ingressAttempt } from "../ingress/attempt.js";
+
+describe("expired ingress RPC boundary", () => {
+  it("blocks a late continuation without blocking another dispatch", async () => {
+    const written: string[] = [];
+    const protocol = new DaemonSessionProtocol({
+      write: async (frame) => {
+        written.push(frame);
+      },
+    });
+    const attempt = new AbortController();
+    const gate = createDeferredCore<void>();
+    const expired = new Error("dispatch expired");
+    const late = ingressAttempt.run(attempt.signal, async () => {
+      await gate.promise;
+      await assert.rejects(protocol.call("create_agent_request", {}), expired);
+      await assert.rejects(protocol.send({ type: "send_agent_message_request" }), expired);
+    });
+    attempt.abort(expired);
+    gate.resolve();
+    await late;
+    assert.deepEqual(written, []);
+    await ingressAttempt.run(new AbortController().signal, () =>
+      protocol.send({ type: "healthy" }),
+    );
+    assert.equal(written.length, 1);
+  });
+});
 
 // A minimal fake daemon speaking the stock local-client wire: hello ->
 // server_info, then the four trusted-client RPCs plus the selective timeline

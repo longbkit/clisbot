@@ -65,7 +65,7 @@ import {
   type ChannelIngressRetentionSweep,
 } from "../ingress/retention.js";
 import { createChannelIngressQueueSink } from "../ingress/queue-sink.js";
-import { claimedInbound } from "../ingress/claimed-inbound.js";
+import { dispatchQueuedInbound } from "../ingress/dispatch.js";
 import { dispatchIfHeldFlush, heldFlushAdmitter } from "../bindings/held-flush.js";
 import {
   createHostRuntime,
@@ -100,7 +100,6 @@ import type {
   UpdateFn,
   TypingFn,
 } from "../plane/types.js";
-import { planeInboundDeferral } from "../plane/types.js";
 import { OutboundPacer } from "../plane/outbound-pacer.js";
 import { trackDeliveredParts } from "../plane/outbound-failure.js";
 import { FinalAnswerRetrier } from "../relay/final-retry.js";
@@ -2270,25 +2269,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   ): Promise<ChannelIngressDeferral | undefined> {
     const flush = dispatchIfHeldFlush(handle.plane, payload, ingressId);
     if (flush !== undefined) return flush;
-    const params = claimedInbound(payload, ingressId);
-    const result = await hostRuntime.onInboundReply(params);
-    if (!result.dispatched) {
-      const deferral = planeInboundDeferral(result);
-      if (deferral !== undefined) return { kind: "deferred", ...deferral };
-    }
-    if (!result.dispatched || hostRuntime.inboundLedger === undefined) return undefined;
-    const context = params.ctxPayload;
-    const conversationId = context?.["ChatId"];
-    const messageId = context?.["MessageSid"];
-    if (typeof conversationId !== "string" || typeof messageId !== "string") return undefined;
-    await hostRuntime.inboundLedger.consume({
+    return dispatchQueuedInbound({
       channel: handle.channel,
       accountId: handle.accountId,
-      externalConversationId: conversationId,
-      externalMessageId: messageId,
-      turnId: `${handle.channel}:${messageId}`,
+      hostRuntime,
+      payload,
+      ingressId,
+      logger: this.logger,
     });
-    return undefined;
   }
 
   /**
@@ -2400,12 +2388,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   }
 
   /**
-   * The inbound ledger sink the shared L3 processor records into (blueprint
-   * §2.4 / §6 item 7). An adapter over the channel event ledger: `record`
+   * The inbound audit sink the durable drain records into. An adapter over
+   * the channel event ledger: `record`
    * writes the pre-handoff `in` row (dedupe on the external message id) and
    * `consume` marks it consumed when the dispatch settles, referencing the
    * plane's turn. `orgId` comes from the account's row; `consumedAt` is now.
-   * A ledger fault is logged, not thrown into the transport (P13).
+   * Queued dispatch owns audit failure handling (`ingress/dispatch.ts`).
    */
   private inboundLedgerSink(
     organizationId: string,

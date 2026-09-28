@@ -10,6 +10,7 @@ import { conversationSettings } from "../config/conversation.js";
 import type { InboundMessage } from "../plane/types.js";
 import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
 import { deriveBindingKey, type ThreadKey } from "./stored-route.js";
+import { ingressAttempt } from "../ingress/attempt.js";
 
 /** One send into a binding's session. */
 export interface Delivery {
@@ -106,7 +107,10 @@ export class BindingInbox {
     return {
       prompt: prompt(this.read(context)),
       messageId,
-      markSent: () => this.deps.store.markSent(scope, carried, messageId),
+      markSent: () => {
+        ingressAttempt.getStore()?.throwIfAborted();
+        return this.deps.store.markSent(scope, carried, messageId);
+      },
       settle: () => this.deps.store.file(scope, [...carried, ...older], "delivered"),
     };
   }
@@ -149,6 +153,7 @@ export class BindingInbox {
     const { unmentioned } = conversationSettings(route.defaults).context;
     if (unmentioned === "none") return;
     if (unmentioned === "allowed-senders" && !(await senderAdmitted())) return;
+    ingressAttempt.getStore()?.throwIfAborted();
     await this.deps.store.file(this.scopeOf(message, route), [message.ingressId], "context");
   }
 
@@ -161,7 +166,19 @@ export class BindingInbox {
   async fileUndelivered(
     scope: ChannelInboxScope,
     rows: readonly Pick<ChannelIngressQueueRecord, "id" | "sentIn">[],
+    options: { outcomeUnknown?: boolean } = {},
   ): Promise<void> {
+    // A timed-out continuation may not have written sentIn yet. Do not turn
+    // uncertainty into an automatic replay in the next prompt.
+    if (options.outcomeUnknown) {
+      await this.deps.store.file(
+        scope,
+        rows.map((row) => row.id),
+        "delivered",
+      );
+      return;
+    }
+    ingressAttempt.getStore()?.throwIfAborted();
     const unsent = rows.filter((row) => row.sentIn === null).map((row) => row.id);
     const sent = rows.filter((row) => row.sentIn !== null).map((row) => row.id);
     await this.deps.store.file(scope, unsent, "context");
@@ -183,6 +200,7 @@ export class BindingInbox {
   /** Hold a message back until its binding's batch or running turn lets it go. */
   async hold(message: InboundMessage, route: CompiledRoute): Promise<ChannelInboxScope> {
     const scope = this.scopeOf(message, route);
+    ingressAttempt.getStore()?.throwIfAborted();
     await this.deps.store.file(scope, ingressIds([message]), "held");
     return scope;
   }
