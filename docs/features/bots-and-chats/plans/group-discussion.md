@@ -145,7 +145,7 @@ limits ([app experience](../app-experience.md)).
 | Turns in rounds, preempt, Stop all      | `7f335a8f6` | `discussion.ts`, `mentions.ts`, protocol `chats/mentions.ts`, `chat.discussion.stop` |
 | Room instructions, Stop all action      | `f84df1c90` | `room-instructions-field.tsx`, `stop-all-action.tsx`                                 |
 | `@` picker and mention display          | `520084d0c` | `member-mentions.ts`, `use-agent-autocomplete.ts`, `chat-rows.tsx`                   |
-| Discussion limit, bot Role              | this change | `rounds-field.tsx`, `bot-description-field.tsx`, `chat-participant-settings.tsx`     |
+| Discussion limit, bot Role              | `4fe0a5d4d` | `rounds-field.tsx`, `bot-description-field.tsx`, `chat-participant-settings.tsx`     |
 
 ## Later
 
