@@ -4078,6 +4078,31 @@ export class AgentManager {
         managed.participantActors = identity?.actor ? [identity.actor] : undefined;
         managed.channels = identity?.channel ? [identity.channel] : undefined;
       }
+      // A startup notice must not make canonical sessions depend on provider history.
+      // Inspect availability without initializing/mutating stores before registration;
+      // an explicit false still requests a provider replay for disk refresh.
+      if (session.initialTimeline?.length && options?.historyPrimed === undefined) {
+        managed.historyPrimed =
+          this.timelineStore.has(resolvedAgentId) ||
+          (!buildExplicitTimelineSeedForRegister(now, options) &&
+            !managed.internal &&
+            this.durableTimelineStore !== undefined &&
+            (await this.durableTimelineStore.getLatestCommittedSeq(resolvedAgentId)) > 0);
+      }
+      // Read history before publishing the agent: a provider failure must leave the
+      // session unregistered so the registration catch closes it.
+      const startupHistory: AgentStreamEvent[] = [];
+      if (session.initialTimeline?.length && !managed.historyPrimed) {
+        for await (const event of session.streamHistory()) {
+          startupHistory.push(
+            limitAgentStreamEventContent(
+              event,
+              Boolean(this.durableTimelineStore) && !managed.internal,
+            ),
+          );
+        }
+      }
+
       this.assertAcceptingAgentRegistrations();
       this.agents.set(resolvedAgentId, managed);
       registered = true;
@@ -4098,6 +4123,27 @@ export class AgentManager {
       // durable store still holds the previous committed timeline.
       if (options?.historyPrimed === undefined) {
         managed.historyPrimed ||= durableTimelineHasRows;
+      }
+      // Fusion initializes its canonical timeline before any startup rows are written.
+      if (session.initialTimeline?.length) {
+        if (!managed.historyPrimed) {
+          // Legacy/imported chats need their existing history before startup rows.
+          if (this.durableTimelineStore?.replaceCommitted && !managed.internal) {
+            await this.forceHydrateTimelineFromLegacyProviderHistory(
+              managed,
+              false,
+              false,
+              startupHistory,
+            );
+          } else {
+            await this.primeTimelineFromLegacyProviderHistory(managed, false, startupHistory);
+          }
+        } else {
+          for (const entry of session.initialTimeline) {
+            this.recordTimeline(managed.id, entry.item, { timestamp: entry.timestamp });
+          }
+        }
+        this.refreshSessionPersistence(managed);
       }
       this.assertAgentRegistrationActive(managed);
       if (!options?.publishWhenReady) {
@@ -4737,6 +4783,8 @@ export class AgentManager {
         typeof broadcast === "function" ? broadcast() : broadcast,
         typeof broadcastTimeline === "function" ? broadcastTimeline() : broadcastTimeline,
       );
+      this.touchUpdatedAt(agent);
+      this.emitState(agent);
       return;
     }
 
@@ -4780,10 +4828,13 @@ export class AgentManager {
     agent: ActiveManagedAgent,
     broadcast: boolean,
     broadcastTimeline: boolean,
+    history:
+      | AsyncIterable<AgentStreamEvent>
+      | Iterable<AgentStreamEvent> = agent.session.streamHistory(),
   ): Promise<void> {
     const historyEvents: Extract<AgentStreamEvent, { type: "timeline" }>[] = [];
     const providerSubagentEvents: Extract<AgentStreamEvent, { type: "provider_subagent" }>[] = [];
-    for await (const rawEvent of agent.session.streamHistory()) {
+    for await (const rawEvent of history) {
       const event = limitAgentStreamEventContent(rawEvent, this.preserveCanonicalContent(agent.id));
       if (event.type === "timeline") {
         if (event.item.type === "user_message" && isSystemInjectedEnvelope(event.item.text)) {
@@ -4856,13 +4907,14 @@ export class AgentManager {
         );
       }
     }
-    this.touchUpdatedAt(agent);
-    this.emitState(agent);
   }
 
   private async primeTimelineFromLegacyProviderHistory(
     agent: ActiveManagedAgent,
     broadcast: boolean | (() => boolean),
+    history:
+      | AsyncIterable<AgentStreamEvent>
+      | Iterable<AgentStreamEvent> = agent.session.streamHistory(),
   ): Promise<void> {
     const deferredBroadcast = typeof broadcast === "function";
     const historyEvents: Extract<AgentStreamEvent, { type: "timeline" }>[] = [];
@@ -4872,7 +4924,7 @@ export class AgentManager {
       // Collect the whole replay before touching either store. A stream that fails
       // halfway then leaves the committed timeline as it was, instead of a partial
       // copy the next attempt would append to.
-      for await (const rawEvent of agent.session.streamHistory()) {
+      for await (const rawEvent of history) {
         const event = limitAgentStreamEventContent(
           rawEvent,
           this.preserveCanonicalContent(agent.id),

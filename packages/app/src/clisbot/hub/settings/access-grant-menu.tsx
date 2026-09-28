@@ -1,7 +1,4 @@
 import { useCallback } from "react";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { createControlGeometry } from "@/components/ui/control-geometry";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,16 +7,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
-import type { MenuTriggerState } from "@/components/ui/menu";
 
 /** Someone a grant can go to: an Access entry, or a Team or Member from People. */
 export interface GrantChoice {
   key: string;
   title: string;
-}
-
-function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
-  return [styles.trigger, (hovered || pressed || open) && styles.highlight];
 }
 
 /**
@@ -44,9 +36,8 @@ export function GrantAccessMenu<T extends GrantChoice>({
         accessibilityRole="button"
         accessibilityLabel="Grant access…"
         disabled={disabled}
-        style={triggerStyle}
       >
-        <Text style={styles.label}>Grant access…</Text>
+        Grant access…
       </DropdownTrigger>
       <DropdownMenuContent align="end" width={300} sheetTitle="Grant access">
         <DropdownMenuLabel>Recommended: grant to a Team</DropdownMenuLabel>
@@ -89,21 +80,3 @@ function GrantItem<T extends GrantChoice>({
     </DropdownMenuItem>
   );
 }
-
-// Drawn as the outline button it replaces, so the header does not change shape.
-const styles = StyleSheet.create((theme) => {
-  const geometry = createControlGeometry(theme);
-  return {
-    trigger: {
-      ...geometry.buttonSm,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.borderAccent,
-    },
-    highlight: { backgroundColor: theme.colors.interactionHighlight },
-    label: { color: theme.colors.foreground, ...geometry.buttonText },
-  };
-});

@@ -42,7 +42,7 @@ import { GenericACPAgentClient } from "./providers/generic-acp-agent.js";
 import { ACPExactMcpPreapprovalSchema } from "./providers/acp-exact-mcp-preapproval.js";
 import { KimiACPAgentClient } from "./providers/kimi-acp-agent.js";
 import { KiroACPAgentClient } from "./providers/kiro-acp-agent.js";
-import { OpenCodeAgentClient } from "./providers/opencode-agent.js";
+import { OpenCodeRuntimeClient } from "./providers/opencode/runtime-client.js";
 import type { OpenCodeBridge } from "./providers/opencode/bridge.js";
 import { OmpAgentClient } from "./providers/omp/agent.js";
 import type { OmpRuntime } from "./providers/omp/runtime.js";
@@ -238,7 +238,7 @@ const PROVIDER_CLIENT_FACTORIES: Record<string, ProviderClientFactory> = {
       env: runtimeSettings?.env,
     }),
   opencode: (logger, runtimeSettings, options) =>
-    new OpenCodeAgentClient(logger, runtimeSettings, {
+    new OpenCodeRuntimeClient(logger, runtimeSettings, {
       managedProcesses: options?.managedProcesses,
       bridge: options?.openCodeBridge,
     }),

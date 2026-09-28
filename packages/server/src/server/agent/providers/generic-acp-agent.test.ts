@@ -63,6 +63,7 @@ describe("GenericACPAgentClient", () => {
           supportsRewindFiles: false,
           supportsRewindBoth: false,
         },
+        waitForInitialCommands: true,
       },
     ]);
   });

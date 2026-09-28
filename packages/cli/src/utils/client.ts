@@ -2,6 +2,7 @@ import {
   waitForDaemonReady,
   resolvePaseoHome,
   type DaemonInstance,
+  readLocalCredentialForTarget,
 } from "@getpaseo/server/daemon-control";
 import { describeDaemonTarget, type DaemonTarget } from "./daemon-target.js";
 export type { DaemonTarget } from "./daemon-target.js";
@@ -31,6 +32,12 @@ export interface ConnectOptions {
   target: DaemonTarget;
   timeout?: number;
   instance?: DaemonInstance;
+}
+export function resolveClientPaseoHome(
+  target: DaemonTarget,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  return target.kind === "instance" ? target.home : resolvePaseoHome(env);
 }
 const DEFAULT_TIMEOUT = 15000;
 type TransportTarget =
@@ -176,6 +183,16 @@ export function resolveDaemonPassword(host: string): string | undefined {
   return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
 }
 
+export function resolveDaemonCredential(
+  host: string,
+  home: string,
+): { kind: "password"; password: string } | { kind: "localCredential"; token: string } | null {
+  const password = resolveDaemonPassword(host);
+  if (password) return { kind: "password", password };
+  const token = readLocalCredentialForTarget(home, host);
+  return token ? { kind: "localCredential", token } : null;
+}
+
 /**
  * Create a WebSocket factory that works in Node.js
  */
@@ -197,7 +214,8 @@ function createNodeWebSocketFactory() {
  */
 async function tryConnectHost(
   host: string,
-  password: string | undefined,
+  credential: ReturnType<typeof resolveDaemonCredential>,
+  home: string,
   clientId: string,
   timeout: number,
   nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
@@ -209,7 +227,10 @@ async function tryConnectHost(
     clientId,
     clientType: "cli",
     appVersion: resolveCliVersion(),
-    password,
+    ...(credential?.kind === "password" ? { password: credential.password } : {}),
+    ...(credential?.kind === "localCredential"
+      ? { localCredential: () => readLocalCredentialForTarget(home, host) ?? undefined }
+      : {}),
     ...(resolveAccessTicket ? { resolveAccessTicket } : {}),
     connectTimeoutMs: timeout,
     webSocketFactory: (
@@ -293,7 +314,8 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
             instance: options.instance,
           })
         ).listen;
-  const clientId = await getOrCreateCliClientId(resolvePaseoHome({}));
+  const home = resolveClientPaseoHome(options.target);
+  const clientId = await getOrCreateCliClientId(home);
   const nodeWebSocketFactory = createNodeWebSocketFactory();
 
   if (explicitHost?.trim().startsWith("ssh://")) {
@@ -302,7 +324,8 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
     const password = resolveDaemonPassword(explicitHost);
     const result = await tryConnectHost(
       tunnel.endpoint,
-      password,
+      password ? { kind: "password", password } : null,
+      home,
       clientId,
       Math.max(1, deadline - Date.now()),
       nodeWebSocketFactory,
@@ -336,7 +359,8 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
 
   const result = await tryConnectHostWithAccessTicket(
     explicitHost,
-    resolveDaemonPassword(explicitHost),
+    resolveDaemonCredential(explicitHost, home),
+    home,
     clientId,
     Math.max(1, deadline - Date.now()),
     nodeWebSocketFactory,
@@ -359,15 +383,23 @@ export async function connectToDaemon(options: ConnectOptions): Promise<DaemonCl
  */
 async function tryConnectHostWithAccessTicket(
   host: string,
-  password: string | undefined,
+  credential: ReturnType<typeof resolveDaemonCredential>,
+  home: string,
   clientId: string,
   timeout: number,
   nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
 ): Promise<{ client: DaemonClient } | { error: unknown }> {
-  const result = await tryConnectHost(host, password, clientId, timeout, nodeWebSocketFactory);
+  const result = await tryConnectHost(
+    host,
+    credential,
+    home,
+    clientId,
+    timeout,
+    nodeWebSocketFactory,
+  );
   if (!("error" in result) || !requiresDaemonAccessTicket(result.error)) return result;
   const resolveAccessTicket = createDaemonAccessTicketResolver({
-    paseoHome: resolvePaseoHome(process.env),
+    paseoHome: home,
     clientId,
   });
   if (resolveAccessTicket === null) {
@@ -380,7 +412,8 @@ async function tryConnectHostWithAccessTicket(
   }
   return tryConnectHost(
     host,
-    password,
+    credential,
+    home,
     clientId,
     timeout,
     nodeWebSocketFactory,
