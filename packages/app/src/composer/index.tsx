@@ -1,3 +1,4 @@
+import type { MentionMember } from "@/clisbot/bots/chat/member-mentions";
 import type { ComposerTextSource } from "./text-source";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
@@ -945,6 +946,8 @@ interface ComposerProps {
   realtimeVoiceEnabled?: boolean;
   /** Resolve file references at insertion, before the composer source can change. */
   resolveWorkspaceFilePath?: (path: string) => string;
+  /** Group chat members the `@` picker offers before files. */
+  mentionMembers?: readonly MentionMember[];
   agentId: string;
   serverId: string;
   workspaceId?: string | null;
@@ -1257,6 +1260,7 @@ function ComposerContentImpl({
   showAgentControls = true,
   realtimeVoiceEnabled = true,
   resolveWorkspaceFilePath,
+  mentionMembers,
   pendingSessionReason,
   agentId,
   serverId,
@@ -2403,6 +2407,7 @@ function ComposerContentImpl({
       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
       onClientSlashCommand: runClientSlashCommand,
       pluginClientSlashCommands,
+      mentionMembers,
     }),
     [
       replaceUserInput,
@@ -2414,6 +2419,7 @@ function ComposerContentImpl({
       attachments,
       runClientSlashCommand,
       pluginClientSlashCommands,
+      mentionMembers,
     ],
   );
   const messageInputContainerRef = useRef<View>(null);

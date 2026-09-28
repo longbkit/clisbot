@@ -9,7 +9,7 @@ import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { useGroupChatForm, type GroupChatFormProps } from "./use-group-chat-form";
-const ALL_REPLY = { label: "All bots unless you @mention one" };
+const ALL_REPLY = { label: "Everyone, one at a time, unless you @mention a bot" };
 const MENTION_REPLY = { label: "Only bots you @mention" };
 export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
   const {
@@ -70,7 +70,7 @@ export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
           {
             id: "all",
             value: "all",
-            label: "All bots unless you @mention one",
+            label: "Everyone, one at a time, unless you @mention a bot",
           },
           {
             id: "mentioned",

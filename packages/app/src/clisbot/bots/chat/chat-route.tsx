@@ -81,6 +81,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     () =>
       (chat?.participants ?? []).map((p) => ({
         botId: p.botId,
+        slug: p.slug,
         agentId: p.agentId ?? undefined,
         canConfigure: botRows.find((b) => b.id === p.botId)?.canConfigure,
         name: p.displayName,

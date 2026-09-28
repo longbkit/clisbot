@@ -51,8 +51,8 @@ or default profile binding; see [the glossary](../../glossary.md). Reuse existin
 and validate the selected Host/provider. Do not introduce a hidden Full access default.
 
 New group foregrounds choosing at least two bots on the same Host, an optional name, and **Who
-replies?**. The default remains all bots when no one is mentioned; an explicit mention addresses only
-the mentioned bots. Mention-only is the alternative. Hide numeric hop and input-length limits from
+replies?**. The default is every bot, one at a time, when no one is mentioned; an explicit mention
+addresses only the mentioned bots ([group discussion](plans/group-discussion.md)). Mention-only is the alternative. Hide numeric hop and input-length limits from
 ordinary creation without changing server defaults. Host changes reset incompatible bot selections;
 retain other draft fields. Create failures retain input and do not show success prematurely.
 

@@ -27,6 +27,11 @@ import {
   findActiveFileMention,
   type FileMentionRange,
 } from "@/utils/file-mention-autocomplete";
+import {
+  applyMemberMention,
+  memberMentionOptions,
+  type MentionMember,
+} from "@/clisbot/bots/chat/member-mentions";
 
 interface UseAgentAutocompleteInput {
   userInput: string;
@@ -40,6 +45,8 @@ interface UseAgentAutocompleteInput {
   onClientSlashCommand?: (command: ClientSlashCommand) => void;
   canExecuteClientSlashCommand?: boolean;
   pluginClientSlashCommands?: readonly PluginClientSlashCommand[];
+  /** Group chat members offered before files when typing `@` (Clisbot Bots & Chats). */
+  mentionMembers?: readonly MentionMember[];
 }
 
 interface AgentAutocompleteKeyPressEvent {
@@ -64,7 +71,8 @@ type AgentAutocompleteOption =
       type: "workspace_entry";
       entryPath: string;
       mention: FileMentionRange;
-    });
+    })
+  | (AutocompleteOption & { type: "chat_member"; token: string });
 
 interface AgentAutocompleteResult {
   isVisible: boolean;
@@ -279,12 +287,13 @@ function resolveAutocompleteIsVisible(args: {
   canLoadCommands: boolean;
   serverId: string;
   autocompleteCwd: string;
+  hasMembers: boolean;
 }): boolean {
   if (args.mode === "command") {
     return args.canLoadCommands;
   }
   if (args.mode === "file") {
-    return Boolean(args.serverId) && args.autocompleteCwd.length > 0;
+    return args.hasMembers || (Boolean(args.serverId) && args.autocompleteCwd.length > 0);
   }
   return false;
 }
@@ -306,11 +315,14 @@ function resolveAutocompleteIsLoading(args: {
   fileSuggestionsIsPending: boolean;
   fileSuggestionsIsLoading: boolean;
   optionsLength: number;
+  /** Members are ready at once; a pending file search must not hide them behind a spinner. */
+  memberOptionsLength: number;
 }): boolean {
   if (args.mode === "command") {
     return args.isCommandsLoading && args.optionsLength === 0;
   }
   if (args.mode === "file") {
+    if (args.memberOptionsLength > 0) return false;
     return (
       args.fileSuggestionsIsPending || (args.fileSuggestionsIsLoading && args.optionsLength === 0)
     );
@@ -338,6 +350,8 @@ function resolveAutocompleteErrorMessage(args: {
   return undefined;
 }
 
+const EMPTY_MEMBERS: readonly MentionMember[] = [];
+
 export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAutocompleteResult {
   const { t } = useTranslation();
   const {
@@ -353,6 +367,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     canExecuteClientSlashCommand,
     pluginClientSlashCommands = [],
   } = input;
+  const mentionMembers = input.mentionMembers ?? EMPTY_MEMBERS;
 
   const activeSlashCommand = useMemo(
     () =>
@@ -410,6 +425,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     canLoadCommands,
     serverId,
     autocompleteCwd,
+    hasMembers: mentionMembers.length > 0,
   });
 
   const {
@@ -462,7 +478,12 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     placeholderData: keepPreviousData,
   });
 
-  const options = useMemo<AgentAutocompleteOption[]>(
+  const memberOptions = useMemo<AgentAutocompleteOption[]>(
+    () =>
+      mode === "file" && isVisible ? memberMentionOptions(mentionMembers, fileFilterQuery) : [],
+    [fileFilterQuery, isVisible, mentionMembers, mode],
+  );
+  const commandOptions = useMemo<AgentAutocompleteOption[]>(
     () =>
       buildCommandAutocompleteOptions({
         activeFileMention,
@@ -488,6 +509,10 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       mode,
       t,
     ],
+  );
+  const options = useMemo(
+    () => (memberOptions.length > 0 ? [...memberOptions, ...commandOptions] : commandOptions),
+    [commandOptions, memberOptions],
   );
 
   const onSelectOption = useCallback(
@@ -533,6 +558,11 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       }
 
       if (!current.fileMention) return;
+      if (selected.type === "chat_member") {
+        setUserInput(applyMemberMention(current.text, current.fileMention, selected.token));
+        onAutocompleteApplied?.();
+        return;
+      }
       const nextInput = applyFileMentionReplacement({
         text: current.text,
         mention: current.fileMention,
@@ -575,6 +605,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     mode,
     isCommandsLoading,
     fileSuggestionsIsPending: fileSuggestionsQuery.isPending,
+    memberOptionsLength: memberOptions.length,
     fileSuggestionsIsLoading: fileSuggestionsQuery.isLoading,
     optionsLength: options.length,
   });

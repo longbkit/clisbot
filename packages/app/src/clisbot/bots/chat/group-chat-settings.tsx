@@ -16,7 +16,7 @@ import {
   openGroupSettingsDraft,
 } from "./group-settings-model";
 import { RoomInstructionsField } from "./room-instructions-field";
-const ALL = { label: "All bots unless you @mention one" };
+const ALL = { label: "Everyone, one at a time, unless you @mention a bot" };
 const MENTIONED = { label: "Only bots you @mention" };
 const OPTIONS = [
   { id: "all", value: "all", ...ALL },

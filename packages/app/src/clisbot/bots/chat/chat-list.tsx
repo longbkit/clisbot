@@ -14,6 +14,7 @@ import {
   ChatUserRow,
   type ChatBotIdentity,
 } from "./chat-rows";
+import { mentionMembersOf, type MentionMember } from "./member-mentions";
 import { chatRowSender, type ChatRenderRow } from "./render-model";
 
 interface ChatListProps {
@@ -56,6 +57,7 @@ export const ChatList = memo(function ChatList({
     },
   );
   const data = useMemo(() => rows.toReversed(), [rows]);
+  const members = useMemo(() => mentionMembersOf(bots.values()), [bots]);
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatRenderRow>) => {
       // Inverted: the row after this one in reading order sits at `index - 1`.
@@ -63,11 +65,17 @@ export const ChatList = memo(function ChatList({
       const closesGroup = chatRowSender(next) !== chatRowSender(item);
       return (
         <View style={styles.row}>
-          <ChatRowView row={item} serverId={serverId} bots={bots} closesGroup={closesGroup} />
+          <ChatRowView
+            row={item}
+            serverId={serverId}
+            bots={bots}
+            members={members}
+            closesGroup={closesGroup}
+          />
         </View>
       );
     },
-    [bots, data, serverId],
+    [bots, data, members, serverId],
   );
   return (
     <FlatList
@@ -93,20 +101,29 @@ function ChatRowView({
   row,
   serverId,
   bots,
+  members,
   closesGroup,
 }: {
   row: ChatRenderRow;
   serverId: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
+  members: readonly MentionMember[];
   closesGroup: boolean;
 }) {
   switch (row.kind) {
     case "user":
-      return <ChatUserRow row={row} serverId={serverId} closesGroup={closesGroup} />;
+      return (
+        <ChatUserRow row={row} serverId={serverId} closesGroup={closesGroup} members={members} />
+      );
     case "bot":
       return (
         <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>
-          <ChatBotRow row={row} bot={botIdentity(bots, row.botId)} serverId={serverId} />
+          <ChatBotRow
+            row={row}
+            bot={botIdentity(bots, row.botId)}
+            serverId={serverId}
+            members={members}
+          />
         </BotWorkspaceContext>
       );
     case "system":

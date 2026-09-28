@@ -8,6 +8,7 @@ import { MenuHeader } from "@/components/headers/menu-header";
 import { botsCopy } from "../copy";
 import type { ChatMessage } from "../data/contracts";
 import { ChatComposer } from "./chat-composer";
+import { mentionMembersOf } from "./member-mentions";
 import { ChatList } from "./chat-list";
 import type { ChatBotIdentity } from "./chat-rows";
 import { buildChatRenderModel, type ChatLiveHead } from "./render-model";
@@ -48,6 +49,10 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const model = useMemo(() => buildChatRenderModel(transcript, liveHeads), [liveHeads, transcript]);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
+  const mentionMembers = useMemo(
+    () => (bots.length > 1 ? mentionMembersOf(bots) : undefined),
+    [bots],
+  );
   const placeholder =
     bots.length === 1 && bots[0] ? botsCopy.messageBot(bots[0].name) : botsCopy.messagePlaceholder;
   return (
@@ -69,6 +74,7 @@ export function ChatScreen({
           placeholder={placeholder}
           disabled={!canSend}
           onSubmitMessage={onSubmitMessage}
+          mentionMembers={mentionMembers}
         />
       </ComposerDock>
     </View>

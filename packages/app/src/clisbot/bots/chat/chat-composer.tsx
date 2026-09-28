@@ -8,6 +8,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Composer } from "@/composer";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import type { MessagePayload } from "@/composer/types";
+import type { MentionMember } from "./member-mentions";
 import { isNative } from "@/constants/platform";
 
 /** `useAgentInputDraft` takes any string key (plans/app.md R5); one draft per chat per host. */
@@ -22,6 +23,8 @@ interface ChatComposerProps {
   /** Sending is disabled while the host is not online or a send is in flight. */
   disabled?: boolean;
   onSubmitMessage: (payload: MessagePayload) => Promise<void>;
+  /** Group members the `@` picker offers; none in a direct chat. */
+  mentionMembers?: readonly MentionMember[];
 }
 
 /**
@@ -34,6 +37,7 @@ export const ChatComposer = memo(function ChatComposer({
   placeholder,
   disabled = false,
   onSubmitMessage,
+  mentionMembers,
 }: ChatComposerProps) {
   const attachmentsSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
@@ -53,6 +57,7 @@ export const ChatComposer = memo(function ChatComposer({
         workspaceId={project?.workspaceId}
         submissionTarget="conversation"
         resolveWorkspaceFilePath={resolveWorkspaceFilePath}
+        mentionMembers={mentionMembers}
         // One `bots` gate covers attachments and canonical spoken-input routing.
         realtimeVoiceEnabled={attachmentsSupported}
         showAgentControls={project?.canConfigure === true}
