@@ -8,6 +8,8 @@ export type ChatResourceActionId = "pin" | "bot-settings" | "group-settings" | "
 export interface ChatResourceAction {
   id: ChatResourceActionId;
   label: string;
+  /** Set on the pin action only: whether the resource is pinned now (the action unpins it). */
+  pinned?: boolean;
 }
 
 export interface ChatResourceActionsInput {
@@ -28,5 +30,5 @@ export function chatResourceActions(input: ChatResourceActionsInput): ChatResour
 }
 
 export function pinAction(pinned: boolean): ChatResourceAction {
-  return { id: "pin", label: pinned ? "Unpin" : "Pin to sidebar" };
+  return { id: "pin", label: pinned ? "Unpin" : "Pin to sidebar", pinned };
 }

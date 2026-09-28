@@ -14,7 +14,7 @@ import {
   ChatUserRow,
   type ChatBotIdentity,
 } from "./chat-rows";
-import { mentionMembersOf, type MentionMember } from "./member-mentions";
+import type { MentionMember } from "./member-mentions";
 import { chatRowSender, type ChatRenderRow } from "./render-model";
 
 interface ChatListProps {
@@ -22,10 +22,13 @@ interface ChatListProps {
   serverId: string;
   scrollKey?: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
+  /** The participants a transcript line's `@slug` names. */
+  members?: readonly MentionMember[];
   /** The top of the transcript came into view: load the older page. */
   onReachTop?: () => void;
 }
 
+const NO_MEMBERS: readonly MentionMember[] = [];
 const MAINTAIN_VISIBLE_POSITION = { minIndexForVisible: 0 } as const;
 
 function keyExtractor(row: ChatRenderRow): string {
@@ -41,6 +44,7 @@ export const ChatList = memo(function ChatList({
   rows,
   serverId,
   bots,
+  members = NO_MEMBERS,
   scrollKey = serverId,
   onReachTop,
 }: ChatListProps) {
@@ -57,7 +61,6 @@ export const ChatList = memo(function ChatList({
     },
   );
   const data = useMemo(() => rows.toReversed(), [rows]);
-  const members = useMemo(() => mentionMembersOf(bots.values()), [bots]);
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatRenderRow>) => {
       // Inverted: the row after this one in reading order sits at `index - 1`.

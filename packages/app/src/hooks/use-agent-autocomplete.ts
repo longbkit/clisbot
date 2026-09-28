@@ -27,11 +27,13 @@ import {
   findActiveFileMention,
   type FileMentionRange,
 } from "@/utils/file-mention-autocomplete";
-import {
-  applyMemberMention,
-  memberMentionOptions,
-  type MentionMember,
-} from "@/clisbot/bots/chat/member-mentions";
+import { applyMemberMention, memberMentionOptions } from "@/clisbot/bots/chat/member-mentions";
+
+/** A chat member the `@` picker can insert as `@slug` (Clisbot Bots & Chats). */
+export interface AutocompleteMentionMember {
+  slug: string;
+  displayName: string;
+}
 
 interface UseAgentAutocompleteInput {
   userInput: string;
@@ -46,7 +48,7 @@ interface UseAgentAutocompleteInput {
   canExecuteClientSlashCommand?: boolean;
   pluginClientSlashCommands?: readonly PluginClientSlashCommand[];
   /** Group chat members offered before files when typing `@` (Clisbot Bots & Chats). */
-  mentionMembers?: readonly MentionMember[];
+  mentionMembers?: readonly AutocompleteMentionMember[];
 }
 
 interface AgentAutocompleteKeyPressEvent {
@@ -309,6 +311,18 @@ function resolveCanLoadCommands(args: {
   return Boolean(args.agentId) || args.isDraftContext;
 }
 
+/**
+ * A disabled query stays pending. With members offered (a group chat without a cwd) that would
+ * spin forever, so there it counts only while enabled; without members it is upstream's check.
+ */
+function isFileQueryPending(args: {
+  enabled: boolean;
+  hasMembers: boolean;
+  isPending: boolean;
+}): boolean {
+  return (args.enabled || !args.hasMembers) && args.isPending;
+}
+
 function resolveAutocompleteIsLoading(args: {
   mode: AutocompleteMode;
   isCommandsLoading: boolean;
@@ -350,7 +364,7 @@ function resolveAutocompleteErrorMessage(args: {
   return undefined;
 }
 
-const EMPTY_MEMBERS: readonly MentionMember[] = [];
+const EMPTY_MEMBERS: readonly AutocompleteMentionMember[] = [];
 
 export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAutocompleteResult {
   const { t } = useTranslation();
@@ -442,6 +456,12 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
 
   const isVisible = canShowAutocomplete && !(mode === "command" && isCommandsLoading);
 
+  const fileQueryEnabled =
+    mode === "file" &&
+    Boolean(serverId) &&
+    autocompleteCwd.length > 0 &&
+    Boolean(client) &&
+    isConnected;
   const fileSuggestionsQuery = useQuery({
     queryKey: [
       "directorySuggestions",
@@ -467,12 +487,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       }
       return mapDirectorySuggestionsToEntries(response);
     },
-    enabled:
-      mode === "file" &&
-      Boolean(serverId) &&
-      autocompleteCwd.length > 0 &&
-      Boolean(client) &&
-      isConnected,
+    enabled: fileQueryEnabled,
     retry: false,
     staleTime: 15_000,
     placeholderData: keepPreviousData,
@@ -604,7 +619,11 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const isLoading = resolveAutocompleteIsLoading({
     mode,
     isCommandsLoading,
-    fileSuggestionsIsPending: fileSuggestionsQuery.isPending,
+    fileSuggestionsIsPending: isFileQueryPending({
+      enabled: fileQueryEnabled,
+      hasMembers: mentionMembers.length > 0,
+      isPending: fileSuggestionsQuery.isPending,
+    }),
     memberOptionsLength: memberOptions.length,
     fileSuggestionsIsLoading: fileSuggestionsQuery.isLoading,
     optionsLength: options.length,

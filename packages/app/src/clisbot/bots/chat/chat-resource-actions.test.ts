@@ -6,7 +6,10 @@ const ids = (input: Parameters<typeof chatResourceActions>[0]) =>
 
 test("a group offers pin, group settings and archive in that order", () => {
   expect(ids({ target: "group", pinned: false })).toEqual(["pin", "group-settings", "archive"]);
-  expect(chatResourceActions({ target: "group", pinned: true })[0]?.label).toBe("Unpin");
+  expect(chatResourceActions({ target: "group", pinned: true })[0]).toMatchObject({
+    label: "Unpin",
+    pinned: true,
+  });
 });
 
 test("a direct chat offers bot settings only with configuration authority", () => {

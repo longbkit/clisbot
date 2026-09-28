@@ -19,6 +19,8 @@ export interface ChatScreenProps {
   title: string;
   /** The chat's participants, in order. */
   bots: readonly ChatBotIdentity[];
+  /** A group chat: the composer's `@` picker offers the members. */
+  group?: boolean;
   transcript: readonly ChatMessage[];
   liveHeads: ReadonlyMap<string, ChatLiveHead>;
   /** False while the host is offline: the composer will not send. */
@@ -39,6 +41,7 @@ export function ChatScreen({
   chatId,
   title,
   bots,
+  group = false,
   transcript,
   liveHeads,
   canSend = true,
@@ -49,10 +52,7 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const model = useMemo(() => buildChatRenderModel(transcript, liveHeads), [liveHeads, transcript]);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
-  const mentionMembers = useMemo(
-    () => (bots.length > 1 ? mentionMembersOf(bots) : undefined),
-    [bots],
-  );
+  const members = useMemo(() => mentionMembersOf(bots), [bots]);
   const placeholder =
     bots.length === 1 && bots[0] ? botsCopy.messageBot(bots[0].name) : botsCopy.messagePlaceholder;
   return (
@@ -65,6 +65,7 @@ export function ChatScreen({
             rows={model.rows}
             serverId={serverId}
             bots={botsById}
+            members={members}
             onReachTop={onReachTop}
           />
         </ToolCallSheetProvider>
@@ -74,7 +75,7 @@ export function ChatScreen({
           placeholder={placeholder}
           disabled={!canSend}
           onSubmitMessage={onSubmitMessage}
-          mentionMembers={mentionMembers}
+          mentionMembers={group ? members : undefined}
         />
       </ComposerDock>
     </View>

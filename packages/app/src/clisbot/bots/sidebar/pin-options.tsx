@@ -71,7 +71,7 @@ function RowOption({
   onSelect: (id: ChatResourceActionId) => void;
 }) {
   const select = useCallback(() => onSelect(action.id), [action.id, onSelect]);
-  const icon = action.id === "pin" && action.label === "Unpin" ? ICONS.unpin : ICONS[action.id];
+  const icon = action.pinned ? ICONS.unpin : ICONS[action.id];
   return (
     <DropdownMenuItem onSelect={select} leading={icon}>
       {action.label}

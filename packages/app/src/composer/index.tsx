@@ -1,4 +1,4 @@
-import type { MentionMember } from "@/clisbot/bots/chat/member-mentions";
+import type { AutocompleteMentionMember } from "@/hooks/use-agent-autocomplete";
 import type { ComposerTextSource } from "./text-source";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
@@ -947,7 +947,7 @@ interface ComposerProps {
   /** Resolve file references at insertion, before the composer source can change. */
   resolveWorkspaceFilePath?: (path: string) => string;
   /** Group chat members the `@` picker offers before files. */
-  mentionMembers?: readonly MentionMember[];
+  mentionMembers?: readonly AutocompleteMentionMember[];
   agentId: string;
   serverId: string;
   workspaceId?: string | null;

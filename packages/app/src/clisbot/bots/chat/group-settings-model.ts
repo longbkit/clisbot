@@ -3,6 +3,7 @@ import {
   CHAT_ROOM_INSTRUCTIONS_MAX_CHARS,
   type ChatUpdatePatch,
 } from "@getpaseo/protocol/chats/rpc-schemas";
+import { DEFAULT_CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/room";
 export interface GroupSettingsDraft {
   title: string;
   requireMention: boolean;
@@ -12,14 +13,12 @@ export interface GroupSettingsDraft {
   roundsMax: number;
 }
 
-/** The daemon's default when a chat sets no `rounds.max`. */
-export const DEFAULT_ROUNDS_MAX = 5;
 export function openGroupSettingsDraft(chat: ChatPayload): GroupSettingsDraft {
   return {
     title: chat.title ?? "",
     requireMention: chat.rules.interaction?.requireMention ?? false,
     roomInstructions: chat.rules.room?.instructions ?? "",
-    roundsMax: chat.rules.rounds?.max ?? DEFAULT_ROUNDS_MAX,
+    roundsMax: chat.rules.rounds?.max ?? DEFAULT_CHAT_ROUNDS_MAX,
   };
 }
 export function groupSettingsPatch(

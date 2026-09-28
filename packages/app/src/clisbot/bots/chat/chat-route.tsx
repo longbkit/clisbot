@@ -8,6 +8,7 @@ import { botsSessionScope, scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
+import { isGroupChat } from "./chat-kind";
 import { ParticipantActions } from "./participant-actions";
 import { StopAllAction } from "./stop-all-action";
 import { useCallback, useMemo } from "react";
@@ -86,7 +87,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const reachTop = useCallback(() => {
     void loadOlder().catch((e) => setError(String(e)));
   }, [loadOlder, setError]);
-  const group = chat?.kind === "group" || (!chat?.kind && (chat?.participants.length ?? 0) > 1);
+  const group = chat ? isGroupChat(chat) : false;
   const working = group && [...heads.values()].some((head) => head.turnActive);
   const options = useChatHeaderOptions({
     chat,
@@ -124,6 +125,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           chatId={chatId}
           title={title}
           bots={identities}
+          group={group}
           transcript={transcript.transcript.messages}
           liveHeads={heads}
           canSend={online && !sending}
@@ -199,7 +201,7 @@ function useChatHeaderOptions({
             chatId={chatId}
             serverId={serverId}
             participants={chat.participants}
-            group={chat.kind === "group"}
+            group={isGroupChat(chat)}
           />
           <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
         </View>
