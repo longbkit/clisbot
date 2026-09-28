@@ -46,7 +46,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
     () => (chats.loadState.status === "loaded" ? chats.loadState.data : []),
     [chats.loadState],
   );
-  const { menu, pinned, onBotMenu, onChatMenu, closeMenu, toggleMenuPin, configureMenuBot } =
+  const { menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, ...menuState } =
     useSidebarPinMenu(onBeforeNavigate, chatRows);
   const { openBot, navigate, error } = useBotSidebarActions(
     chatRows,
@@ -71,9 +71,9 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
   const groupHeader = useMemo(() => ({ title: "New group chat" }), []);
   return (
     <View>
-      {error || bots.error || chats.error ? (
+      {error || menuState.error || bots.error || chats.error ? (
         <Text accessibilityRole="alert">
-          {error ?? bots.error?.message ?? chats.error?.message}
+          {error ?? menuState.error ?? bots.error?.message ?? chats.error?.message}
         </Text>
       ) : null}
       <ChatsSection
@@ -105,10 +105,9 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         anchor={menu?.anchor}
         visible={menu !== null}
         title={menu?.kind === "bot" ? "Bot" : "Group chat"}
-        pinned={!!menu && pinned(menu.kind, menu.serverId, menu.id)}
-        onToggle={toggleMenuPin}
+        actions={actions}
+        onSelect={selectAction}
         onClose={closeMenu}
-        onConfigure={menu?.kind === "bot" && menu.canConfigure ? configureMenuBot : undefined}
       />
       <CreationSheets
         createName={createName}

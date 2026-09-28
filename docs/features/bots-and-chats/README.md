@@ -136,6 +136,13 @@ a separate options action exposes Bot settings only with configuration authority
 there belongs to that user's DM, not to other people's sessions of a shared Bot. Group chats does
 not repeat DMs. The selected fill follows the open DM's Bot row or the active group row.
 
+A sidebar row's menu and the open chat's options menu list the same resource actions, in the same
+order and words, from `chatResourceActions` (`packages/app/src/clisbot/bots/chat/chat-resource-actions.ts`):
+**Pin to sidebar**/**Unpin**, then **Bot settings** (a Bot row or DM, with configuration authority)
+or **Group settings** (a group), then **Archive chat…** (a chat, never a Bot row). Group settings from
+the sidebar opens the chat with `?panel=group-settings`, which opens the chat's own settings sheet.
+Page actions (Switch tab, Project actions, Start a fresh session) stay in the chat options menu.
+
 Pinning a DM or its Bot represents the same sidebar item. Existing duplicate pins are resolved
 when the chat catalog loads; unpinning either surface removes the known aliases. Unknown/offline
 pins stay intact, and Host/account scopes remain separate. A one-bot group retains its own pin.

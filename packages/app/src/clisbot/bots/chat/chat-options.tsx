@@ -6,17 +6,23 @@ import { Ellipsis, FileText, FileDiff, MessageSquare } from "lucide-react-native
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { View, Text } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
-import { buildHostRootRoute } from "@/utils/host-routes";
 import { ChatParticipantSettings } from "./chat-participant-settings";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins } from "../sidebar/pins";
 import type { BotPayload } from "../data/contracts";
 import { refreshBotsAndChats } from "../data/runtime";
+import {
+  chatResourceActions,
+  type ChatResourceAction,
+  type ChatResourceActionId,
+} from "./chat-resource-actions";
+import { GROUP_SETTINGS_PANEL } from "./chat-panel-param";
+import { useArchiveChat } from "./use-archive-chat";
 
 import {
   DropdownMenu,
@@ -30,7 +36,6 @@ import {
 import { MenuTextField, type MenuTriggerState } from "@/components/ui/menu";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { iconButtonChromeStyle, mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
-import { confirmDialog } from "@/utils/confirm-dialog";
 import { useConversationTabsContext } from "./conversation-tabs-context";
 import { ConversationSourceLabelsContext } from "./conversation-source-labels";
 import { useConversationDraftContext } from "./conversation-draft-context";
@@ -124,31 +129,40 @@ export function ChatOptions({
     },
     [busy, chat, client],
   );
+  const archiveChat = useArchiveChat();
   const archive = useCallback(async () => {
     if (!client || busy) return;
-    if (
-      !(await confirmDialog({
-        title: "Archive this chat?",
-        message: "It will leave the active list. The transcript is kept.",
-        confirmLabel: "Archive chat",
-        destructive: true,
-      }))
-    )
-      return;
     setBusy(true);
     setError(null);
     try {
-      const r = await client.archiveChat({ chatId: chat.id });
-      if (r.error) throw new Error(r.error);
-      refreshBotsAndChats();
-      router.replace(buildHostRootRoute(serverId));
+      await archiveChat(serverId, chat.id);
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
-  }, [busy, chat.id, client, router, serverId]);
+  }, [archiveChat, busy, chat.id, client, serverId]);
   const openParticipants = useCallback(() => setDetails("participants"), []);
+  useGroupSettingsPanel(group, openParticipants);
+  const resourceActions = useMemo(
+    () =>
+      chatResourceActions({
+        target: group ? "group" : "direct",
+        pinned,
+        canConfigureBot: directBot?.canConfigure,
+      }),
+    [group, pinned, directBot?.canConfigure],
+  );
+  const runAction = useCallback(
+    (id: ChatResourceActionId) => {
+      if (id === "pin") return changePin();
+      if (id === "bot-settings") return configureBot();
+      if (id === "group-settings") return openParticipants();
+      void archive();
+    },
+    [archive, changePin, configureBot, openParticipants],
+  );
+  const archiveAction = resourceActions.find((action) => action.id === "archive");
   const openProject = useCallback(() => setDetails("project"), []);
   const pages = useMemo(
     () => [
@@ -197,23 +211,23 @@ export function ChatOptions({
             Switch tab
           </DropdownMenuSubTrigger>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={changePin}>
-            {pinned ? "Unpin chat" : "Pin chat"}
-          </DropdownMenuItem>
-          {directBot?.canConfigure ? (
-            <DropdownMenuItem onSelect={configureBot}>Bot settings</DropdownMenuItem>
-          ) : null}
-          {group ? (
-            <DropdownMenuItem onSelect={openParticipants}>Group settings</DropdownMenuItem>
-          ) : null}
+          {resourceActions
+            .filter((action) => action.id !== "archive")
+            .map((action) => (
+              <ResourceActionItem key={action.id} action={action} onSelect={runAction} />
+            ))}
           {project ? (
             <DropdownMenuItem onSelect={openProject}>Project actions</DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuSubTrigger id="fresh">Start a fresh session</DropdownMenuSubTrigger>
-          <DropdownMenuItem disabled={busy || !client} onSelect={archive}>
-            Archive chat…
-          </DropdownMenuItem>
+          {archiveAction ? (
+            <ResourceActionItem
+              action={archiveAction}
+              onSelect={runAction}
+              disabled={busy || !client}
+            />
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <AdaptiveModalSheet
@@ -255,6 +269,36 @@ export function ChatOptions({
       </AdaptiveModalSheet>
     </>
   );
+}
+
+function ResourceActionItem({
+  action,
+  onSelect,
+  disabled,
+}: {
+  action: ChatResourceAction;
+  onSelect: (id: ChatResourceActionId) => void;
+  disabled?: boolean;
+}) {
+  const select = useCallback(() => onSelect(action.id), [action.id, onSelect]);
+  return (
+    <DropdownMenuItem disabled={disabled} onSelect={select}>
+      {action.label}
+    </DropdownMenuItem>
+  );
+}
+
+/** Opens Group settings once when the route asks for it (`?panel=group-settings`). */
+function useGroupSettingsPanel(group: boolean, open: () => void) {
+  const { panel } = useLocalSearchParams<{ panel?: string }>();
+  const router = useRouter();
+  const { setVisible } = useChatOptionsState();
+  useEffect(() => {
+    if (panel !== GROUP_SETTINGS_PANEL || !group) return;
+    setVisible(false);
+    open();
+    router.setParams({ panel: undefined });
+  }, [panel, group, open, router, setVisible]);
 }
 
 function ChatTabsPage({

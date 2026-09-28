@@ -4,6 +4,9 @@ import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins, type ResourcePin } from "./pins";
+import { chatResourceActions, type ChatResourceActionId } from "../chat/chat-resource-actions";
+import { useArchiveChat } from "../chat/use-archive-chat";
+import { buildGroupSettingsRoute } from "../chat/chat-panel-param";
 export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonly PinChat[]) {
   const router = useRouter();
   const { pins, toggle: togglePin, isPinned } = useResourcePins(chats);
@@ -29,17 +32,32 @@ export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonl
   const pinned = (kind: ResourcePin["kind"], serverId: string, id: string) =>
     isPinned({ kind, serverId, id });
   const closeMenu = useCallback(() => setMenu(null), []);
-  const toggleMenuPin = useCallback(() => {
-    if (menu) togglePin(menu);
-    closeMenu();
-  }, [menu, togglePin, closeMenu]);
-  const configureMenuBot = useCallback(() => {
-    if (!menu || menu.kind !== "bot" || !menu.canConfigure) return;
-    closeMenu();
-    onBeforeNavigate?.();
-    router.push(buildHostBotRoute(menu.serverId, menu.id));
-  }, [menu, closeMenu, onBeforeNavigate, router]);
-  return { pins, menu, pinned, onBotMenu, onChatMenu, closeMenu, toggleMenuPin, configureMenuBot };
+  const archiveChat = useArchiveChat();
+  const [error, setError] = useState<string | null>(null);
+  const actions = menu
+    ? chatResourceActions({
+        target: menu.kind === "bot" ? "bot" : "group",
+        pinned: isPinned(menu),
+        canConfigureBot: menu.canConfigure,
+      })
+    : [];
+  const selectAction = useCallback(
+    (id: ChatResourceActionId) => {
+      if (!menu) return;
+      closeMenu();
+      setError(null);
+      if (id === "pin") return togglePin(menu);
+      if (id === "archive")
+        return void archiveChat(menu.serverId, menu.id).catch((cause: unknown) =>
+          setError(cause instanceof Error ? cause.message : String(cause)),
+        );
+      onBeforeNavigate?.();
+      if (id === "bot-settings") return router.push(buildHostBotRoute(menu.serverId, menu.id));
+      router.push(buildGroupSettingsRoute(menu.serverId, menu.id));
+    },
+    [menu, closeMenu, togglePin, archiveChat, onBeforeNavigate, router],
+  );
+  return { pins, menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, error };
 }
 export function useCreationActions(
   openBot: (serverId: string, botId: string) => unknown,

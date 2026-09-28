@@ -7,6 +7,9 @@ import { usePathname, useRouter } from "expo-router";
 import { Bot, Folder, Hash, Pin, MessageSquare } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
+import { pinAction } from "../chat/chat-resource-actions";
+
+const UNPIN_ACTIONS = [pinAction(true)];
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
 import { BotsSidebarRow } from "./row";
 import { usePinnedRows, type PinRow } from "./use-pinned-rows";
@@ -64,8 +67,8 @@ export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: (
         anchor={menu?.anchor}
         visible={menu !== null}
         title={menu?.title ?? "Pinned item"}
-        pinned
-        onToggle={removePin}
+        actions={UNPIN_ACTIONS}
+        onSelect={removePin}
         onClose={closeMenu}
       />
     </>

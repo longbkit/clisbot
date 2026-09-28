@@ -40,7 +40,11 @@ vi.mock("@/components/ui/icon-button-chrome", () => ({
   mutedIconColorMapping: {},
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
-vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ setParams: vi.fn() }),
+  usePathname: () => "/",
+  useLocalSearchParams: () => ({}),
+}));
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn() }));
 vi.mock("../sidebar/pins", () => ({
