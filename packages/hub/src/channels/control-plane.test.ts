@@ -142,6 +142,29 @@ function memoryDatabase(): Database {
   });
 }
 
+function twoOrganizations(): Database {
+  return createMemoryDatabase({
+    memberships: [
+      {
+        userId: "user-1",
+        organizationId: ORG_ID,
+        organizationName: "Operator",
+        organizationSlug: "operator",
+        membershipId: "member-1",
+        role: "owner",
+      },
+      {
+        userId: "user-2",
+        organizationId: "org-other",
+        organizationName: "Other",
+        organizationSlug: "other",
+        membershipId: "member-2",
+        role: "owner",
+      },
+    ],
+  });
+}
+
 async function withActiveConfiguration(database: Database): Promise<ChannelControlPlaneSnapshot> {
   await enrollTestDaemon(database, ORG_ID);
   await new OrganizationTriggerStore(database, ORG_ID).save({
@@ -307,7 +330,7 @@ describe("loadChannelControlPlane", () => {
     );
   });
 
-  it("fails closed on two provisioned organizations (P0 is single-operator)", async () => {
+  it("fails closed on two provisioned organizations with no channel configuration", async () => {
     const database = createMemoryDatabase({
       memberships: [
         {
@@ -327,6 +350,28 @@ describe("loadChannelControlPlane", () => {
           role: "owner",
         },
       ],
+    });
+    await assert.rejects(
+      loadChannelControlPlane(database),
+      (error: unknown) =>
+        error instanceof ChannelControlPlaneError && error.code === "organization_ambiguous",
+    );
+  });
+
+  it("runs channels for the one organization with a channel configuration among several", async () => {
+    const database = twoOrganizations();
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files: [{ path: ".paseo/hub.yml", content: HUB_YAML }],
+      contentHash: "only-configured",
+      createdByUserId: null,
+    });
+    assert.equal((await loadChannelControlPlane(database)).organizationId, ORG_ID);
+    await database.saveChannelConfiguration({
+      organizationId: "org-other",
+      files: [{ path: ".paseo/hub.yml", content: HUB_YAML }],
+      contentHash: "second-configured",
+      createdByUserId: null,
     });
     await assert.rejects(
       loadChannelControlPlane(database),
