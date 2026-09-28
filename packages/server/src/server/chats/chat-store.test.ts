@@ -38,6 +38,8 @@ describe("chat record", () => {
     expect(resolved).toEqual({
       interaction: { requireMention: true, whenBusy: "steer" },
       hops: { max: 3 },
+      rounds: { max: 5 },
+      room: { instructions: null },
       context: { maxMessages: 20 },
       limits: { maxInputCharacters: "off", maxRuntimeSeconds: 60 },
     });
@@ -275,6 +277,12 @@ test("group settings persist without replacing internal limits or session bindin
   });
   expect(updated.participants).toEqual(chat.participants);
   expect(await new ChatStore(root, logger).get(chat.id)).toEqual(updated);
+  const withRoom = await store.updateSettings(chat.id, { roomInstructions: "  Be brief.  " });
+  expect(withRoom.rules.room).toEqual({ instructions: "Be brief." });
+  expect(withRoom.rules.interaction).toEqual(updated.rules.interaction);
+  expect(withRoom.title).toBe("Launch");
+  const cleared = await store.updateSettings(chat.id, { roomInstructions: " " });
+  expect(cleared.rules.room).toEqual({ instructions: null });
   expect((await store.updateSettings(chat.id, { title: " " })).title).toBeNull();
   expect(() => store.updateSettings(chat.id, { title: "x".repeat(257) })).toThrow();
 });

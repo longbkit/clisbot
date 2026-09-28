@@ -34,6 +34,11 @@ export interface TurnOutcome {
 export interface TurnTrackerHost {
   onTurnCompleted(outcome: TurnOutcome): Promise<void>;
   onTurnFailed(outcome: TurnOutcome, error: string): Promise<void>;
+  /**
+   * A turn was cancelled with no prompt waiting to replace it, so someone stopped the bot rather
+   * than a steer superseding its turn.
+   */
+  onTurnStopped?(chatId: string, botId: string): void;
 }
 
 interface OpenTurn {
@@ -152,7 +157,9 @@ export class TurnTracker {
       case "turn_failed":
         return this.close(agentId, watched, stream.turnId, stream.error);
       case "turn_canceled":
-        return this.discard(watched, stream.turnId);
+        this.discard(watched, stream.turnId);
+        if (watched.pending.length === 0) this.host.onTurnStopped?.(watched.chatId, watched.botId);
+        return;
       default:
         return;
     }

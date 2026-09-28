@@ -15,6 +15,7 @@ const INBOUND_PERMISSION = {
   "chat.archive.request": "workspace.write",
   "chat.update.request": "workspace.write",
   "chat.session.reset.request": "workspace.write",
+  "chat.discussion.stop.request": "workspace.write",
 
   "channel.file.read.request": "hub.execute",
   abort_request: "workspace.write",
@@ -244,6 +245,7 @@ const OUTBOUND_PERMISSION = {
   "chat.archive.response": "workspace.read",
   "chat.update.response": "workspace.read",
   "chat.session.reset.response": "workspace.read",
+  "chat.discussion.stop.response": "workspace.read",
   "chat.updated": "workspace.read",
   "chat.transcript.appended": "workspace.read",
   "channel.file.read.response": "hub.execute",

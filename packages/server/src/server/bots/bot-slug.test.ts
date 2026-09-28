@@ -25,3 +25,8 @@ describe("uniqueBotSlug", () => {
     );
   });
 });
+
+test("a room-wide mention is never a bot slug", async () => {
+  expect(await uniqueBotSlug("Everyone", new Set(), async () => false)).toBe("everyone-2");
+  expect(await uniqueBotSlug("All", new Set(), async () => false)).toBe("all-2");
+});

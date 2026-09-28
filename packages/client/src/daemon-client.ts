@@ -2266,6 +2266,12 @@ export class DaemonClient {
       message: { ...params, type: "chat.session.reset.request" },
     });
   }
+  /** Stop all: ends the group discussion and interrupts every bot turn running in the chat. */
+  stopChatDiscussion(chatId: string) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.discussion.stop.response">({
+      message: { chatId, type: "chat.discussion.stop.request" },
+    });
+  }
 
   async clearAgentAttention(agentId: string | string[]): Promise<void> {
     const requestId = this.createRequestId();

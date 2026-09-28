@@ -34,7 +34,10 @@ export const StoredChatRulesSchema = z
       })
       .strict()
       .optional(),
+    // COMPAT(chatHops): read and ignored for groups since 2026-09-28; remove after 2027-03-31.
     hops: z.object({ max: z.number().int().nonnegative().optional() }).strict().optional(),
+    rounds: z.object({ max: z.number().int().positive().optional() }).strict().optional(),
+    room: z.object({ instructions: z.string().nullable().optional() }).strict().optional(),
     context: z.object({ maxMessages: z.number().int().positive().optional() }).strict().optional(),
     limits: StoredChatLimitsSchema.optional(),
   })
@@ -92,6 +95,10 @@ export type StoredChat = z.infer<typeof StoredChatSchema>;
 export interface ResolvedChatRules {
   interaction: { requireMention: boolean; whenBusy: ChatWhenBusy };
   hops: { max: number };
+  /** A guard rail on a group discussion; bots are told to stop earlier (plans/group-discussion.md). */
+  rounds: { max: number };
+  /** `null` = the built-in default instructions. */
+  room: { instructions: string | null };
   context: { maxMessages: number };
   /**
    * Every leaf resolved; unset = no limit. Phase 1 enforces `maxInputCharacters` only; the
@@ -104,6 +111,8 @@ export interface ResolvedChatRules {
 export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
   interaction: { requireMention: false, whenBusy: "steer" },
   hops: { max: 3 },
+  rounds: { max: 5 },
+  room: { instructions: null },
   context: { maxMessages: 20 },
   limits: { maxInputCharacters: 8_000 },
 };
@@ -116,9 +125,16 @@ export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRule
       whenBusy: rules?.interaction?.whenBusy ?? defaults.interaction.whenBusy,
     },
     hops: { max: rules?.hops?.max ?? defaults.hops.max },
+    rounds: { max: rules?.rounds?.max ?? defaults.rounds.max },
+    room: { instructions: roomInstructionsOf(rules) },
     context: { maxMessages: rules?.context?.maxMessages ?? defaults.context.maxMessages },
     limits: { ...defaults.limits, ...rules?.limits },
   };
+}
+
+/** Blank instructions are no instructions: the built-in default applies. */
+function roomInstructionsOf(rules: ChatRules | undefined): string | null {
+  return rules?.room?.instructions?.trim() || null;
 }
 
 /** A limit leaf as a number, or `null` when unset or `off`. */

@@ -220,15 +220,22 @@ export type ChatSessionResetResponse = z.infer<typeof ChatSessionResetResponseSc
 export type ChatTranscriptAppendedMessage = z.infer<typeof ChatTranscriptAppendedSchema>;
 export type ChatUpdatedMessage = z.infer<typeof ChatUpdatedSchema>;
 
-/** Only group name and the everyday reply policy are editable here. */
+/** The longest room instructions a chat owner may write. */
+export const CHAT_ROOM_INSTRUCTIONS_MAX_CHARS = 4000;
+
+/** Group name, the everyday reply policy and the room instructions are editable here. */
 export const ChatUpdatePatchSchema = z
   .object({
     title: z.string().max(256).nullable().optional(),
     requireMention: z.boolean().optional(),
+    roomInstructions: z.string().max(CHAT_ROOM_INSTRUCTIONS_MAX_CHARS).nullable().optional(),
   })
   .strict()
   .refine(
-    (patch) => patch.title !== undefined || patch.requireMention !== undefined,
+    (patch) =>
+      patch.title !== undefined ||
+      patch.requireMention !== undefined ||
+      patch.roomInstructions !== undefined,
     "Choose a group setting to update",
   );
 export const ChatUpdateRequestSchema = z.object({
@@ -249,3 +256,21 @@ export const ChatUpdateResponseSchema = z.object({
 export type ChatUpdatePatch = z.infer<typeof ChatUpdatePatchSchema>;
 export type ChatUpdateRequest = z.infer<typeof ChatUpdateRequestSchema>;
 export type ChatUpdateResponse = z.infer<typeof ChatUpdateResponseSchema>;
+
+/** Stop all: ends the group discussion and interrupts every bot turn running in the chat. */
+export const ChatDiscussionStopRequestSchema = z.object({
+  type: z.literal("chat.discussion.stop.request"),
+  requestId: z.string(),
+  chatId: z.string(),
+});
+export const ChatDiscussionStopResponseSchema = z.object({
+  type: z.literal("chat.discussion.stop.response"),
+  payload: z.object({
+    requestId: z.string(),
+    chatId: z.string(),
+    error: z.string().nullable(),
+    errorCode: z.string().optional(),
+  }),
+});
+export type ChatDiscussionStopRequest = z.infer<typeof ChatDiscussionStopRequestSchema>;
+export type ChatDiscussionStopResponse = z.infer<typeof ChatDiscussionStopResponseSchema>;

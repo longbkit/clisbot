@@ -45,7 +45,13 @@ export const ChatRulesSchema = z.object({
       whenBusy: ChatWhenBusySchema.optional(),
     })
     .optional(),
+  // COMPAT(chatHops): group chats use `rounds` since 2026-09-28; `hops` is still accepted and
+  // ignored so older records and clients parse. Remove after 2027-03-31.
   hops: z.object({ max: z.number().int().nonnegative().optional() }).optional(),
+  /** How many rounds a group discussion may run before the daemon stops it; a guard rail. */
+  rounds: z.object({ max: z.number().int().positive().optional() }).optional(),
+  /** The chat owner's room instructions for group bots; unset or empty = the built-in default. */
+  room: z.object({ instructions: z.string().nullable().optional() }).optional(),
   context: z.object({ maxMessages: z.number().int().positive().optional() }).optional(),
   limits: ChatLimitsSchema.optional(),
 });

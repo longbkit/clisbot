@@ -1,4 +1,5 @@
 import { slugify } from "@getpaseo/protocol/branch-slug";
+import { isRoomWideMention } from "@getpaseo/protocol/chats/mentions";
 
 /**
  * The bot directory name (docs/features/bots-and-chats/README.md, D3): derived from
@@ -21,7 +22,8 @@ export async function uniqueBotSlug(
   directoryExists: (slug: string) => Promise<boolean>,
 ): Promise<string> {
   const base = botSlug(name);
-  for (let suffix = 1; ; suffix += 1) {
+  // `@everyone`, `@all` and `@here` address the whole room, so no bot may take them.
+  for (let suffix = isRoomWideMention(base) ? 2 : 1; ; suffix += 1) {
     const candidate = suffix === 1 ? base : `${base}-${suffix}`;
     if (!taken.has(candidate) && !(await directoryExists(candidate))) return candidate;
   }

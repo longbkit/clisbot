@@ -35,6 +35,7 @@ import {
   type RoomContractInput,
   type RoomMember,
 } from "./room-contract.js";
+import { ChatDiscussions, discussionOpening } from "./discussion.js";
 import type { MentionableParticipant } from "./mentions.js";
 import type { TranscriptLine, TranscriptLineInput, TranscriptLog } from "./transcript-log.js";
 import { inputLimitError, targetsFor, type TurnDecision } from "./turn-rules.js";
@@ -63,7 +64,7 @@ export interface ChatEngineDependencies {
   transcriptOf: (chatId: string) => TranscriptLog;
   bots: BotLookup;
   botSessions: BotSessions;
-  agentManager: Pick<AgentManager, "subscribe" | "getAgent">;
+  agentManager: Pick<AgentManager, "subscribe" | "getAgent" | "cancelAgentRun">;
   sendPrompt: ChatPromptSender;
   publisher: ChatPublisher;
   logger: Logger;
@@ -102,6 +103,7 @@ const NOTICE_ERROR_MAX_CHARS = 300;
 
 export class ChatEngine implements TurnTrackerHost {
   readonly tracker: TurnTracker;
+  private readonly discussions: ChatDiscussions;
   private readonly queue = new KeyedSerialQueue();
   // Serialize prompt admission per session, never the running turn or the whole bot.
   private readonly deliveries = new KeyedSerialQueue();
@@ -116,6 +118,15 @@ export class ChatEngine implements TurnTrackerHost {
     this.logger = deps.logger.child({ module: "chats", component: "chat-engine" });
     this.now = deps.now ?? (() => new Date().toISOString());
     this.tracker = new TurnTracker(deps.agentManager, this, this.logger);
+    this.discussions = new ChatDiscussions({
+      store: deps.store,
+      transcriptOf: deps.transcriptOf,
+      rulesOf: (chat) => resolveChatRules(chat.rules),
+      members: (chat) => this.members(chat),
+      wake: (chatId, botId, lines, cue) => this.wake(chatId, botId, lines, cue),
+      notice: (chatId, text) => this.appendSystem(chatId, text),
+      logger: this.logger,
+    });
   }
 
   /** Appends the user line, decides who answers, and returns before any bot is prompted. */
@@ -150,7 +161,11 @@ export class ChatEngine implements TurnTrackerHost {
         ...(input.spokenInputAgentId ? { spokenInputAgentId: input.spokenInputAgentId } : {}),
         hop: 0,
       };
-      const decision = await this.decide(chat, rules, { ...inputLine, seq: 0 });
+      const discussion =
+        chatKindOf(chat) === "group" && !input.spokenInputAgentId
+          ? discussionOpening(await this.members(chat), rules, input.text)
+          : null;
+      const decision = discussion ?? (await this.decide(chat, rules, { ...inputLine, seq: 0 }));
       const line = await this.appendLine(chat.id, {
         ...inputLine,
         deliveryBotIds: decision.targets,
@@ -158,9 +173,27 @@ export class ChatEngine implements TurnTrackerHost {
       await files
         .release?.()
         .catch((error) => this.deps.logger.warn({ error }, "Chat upload cleanup failed"));
-      this.track(this.fanOut(chat.id, decision, line));
+      if (discussion && discussion.targets.length > 0)
+        this.track(this.discussions.start(chat.id, discussion.mode, discussion.targets));
+      else if (!discussion) this.track(this.fanOut(chat.id, decision, line));
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
     });
+  }
+
+  /**
+   * Stop all: ends the discussion and interrupts every bot turn running in the chat. Returns
+   * whether anything was stopped.
+   */
+  async stopDiscussion(chatId: string): Promise<boolean> {
+    const chat = await this.deps.store.require(chatId);
+    let stopped = this.discussions.stop(chatId);
+    for (const { agentId } of chat.participants) {
+      if (!agentId || this.deps.agentManager.getAgent(agentId)?.lifecycle !== "running") continue;
+      await this.deps.agentManager.cancelAgentRun(agentId);
+      stopped = true;
+    }
+    if (stopped) await this.appendSystem(chatId, "⏹ Stopped by the user.");
+    return stopped;
   }
 
   /** `/new` (D7): the next delivery to this bot starts a fresh session. */
@@ -262,10 +295,16 @@ export class ChatEngine implements TurnTrackerHost {
     });
   }
 
+  private async members(chat: StoredChat): Promise<MentionableParticipant[]> {
+    await this.rememberBots(chat);
+    return this.participantsOf(chat);
+  }
+
   private participantsOf(chat: StoredChat): MentionableParticipant[] {
     return chat.participants.map(({ botId }) => ({
       botId,
       slug: this.knownBot(botId)?.slug ?? botId,
+      displayName: this.knownBot(botId)?.displayName,
     }));
   }
 
@@ -317,8 +356,39 @@ export class ChatEngine implements TurnTrackerHost {
     }
   }
 
-  /** §2.6: resolve the session, render the window, prompt, expect the turn, mark delivered. */
-  private async deliver(chatId: string, botId: string, lines: TranscriptLine[]): Promise<void> {
+  /** A discussion turn; a bot that cannot take it leaves a notice and the room moves on. */
+  private async wake(
+    chatId: string,
+    botId: string,
+    lines: TranscriptLine[],
+    cue: string,
+  ): Promise<boolean> {
+    try {
+      return await this.deliveries.run(`${chatId}:${botId}`, () =>
+        this.deliver(chatId, botId, lines, cue),
+      );
+    } catch (error) {
+      const bot = await this.deps.bots.get(botId);
+      this.logger.warn({ chatId, botId, err: error }, "chat.delivery.failed");
+      await this.appendSystem(
+        chatId,
+        `⚠️ ${bot?.displayName ?? botId} could not take the message: ${errorLine(error)}`,
+        { deliveryBotIds: [botId], inReplyTo: lines.at(-1)?.id },
+      );
+      return false;
+    }
+  }
+
+  /**
+   * §2.6: resolve the session, render the window, prompt, expect the turn, mark delivered.
+   * Resolves `true` when a turn was started; `cue` ends the prompt of a discussion turn.
+   */
+  private async deliver(
+    chatId: string,
+    botId: string,
+    lines: TranscriptLine[],
+    cue?: string,
+  ): Promise<boolean> {
     const chat = await this.deps.store.require(chatId);
     if (chat.archivedAt) throw new Error(`Chat ${chatId} is archived`);
     const participant = chat.participants.find((entry) => entry.botId === botId);
@@ -327,7 +397,7 @@ export class ChatEngine implements TurnTrackerHost {
     // A later queued delivery may already have included this trigger as context.
     // The per-pair queue makes the persisted watermark authoritative at admission.
     lines = lines.filter((line) => line.seq > participant.deliveredSeq);
-    if (lines.length === 0) return;
+    if (lines.length === 0) return false;
     const rules = resolveChatRules(chat.rules);
     const title = sessionTitleFor(chat.title, lines[0]?.text ?? "");
     await this.rememberBots(chat);
@@ -349,13 +419,14 @@ export class ChatEngine implements TurnTrackerHost {
     });
     if (prompt !== "") {
       const update = room && !session.created ? roomUpdateFor(room, participant.roomSeen) : null;
-      const text = update ? `${update}\n\n${prompt}` : prompt;
+      const text = [update, prompt, cue].filter(Boolean).join("\n\n");
       await this.prompt(chat, bot, session.agentId, rules, lines, text, window);
     }
     // A new session read the room in its system prompt; a prompted one read it or its update.
     if (room && (prompt !== "" || session.created))
       await this.deps.store.setParticipantRoomSeen(chatId, botId, roomFingerprint(room));
     await this.deps.store.markDelivered(chatId, botId, deliveredSeq);
+    return prompt !== "";
   }
 
   /**
@@ -435,7 +506,8 @@ export class ChatEngine implements TurnTrackerHost {
     const self = this.knownBot(botId);
     if (chatKindOf(chat) !== "group" || !self) return null;
     const members = chat.participants.flatMap(({ botId: id }) => this.knownBot(id) ?? []);
-    return { chatTitle: chat.title, self, members };
+    const { instructions } = resolveChatRules(chat.rules).room;
+    return { chatTitle: chat.title, self, members, instructions };
   }
 
   /** §2.7: the turn's final text becomes a bot line, then its mentions are forwarded. */
@@ -471,8 +543,7 @@ export class ChatEngine implements TurnTrackerHost {
       )
         return;
     }
-    // In a group, silence is a valid turn (plans/group-discussion.md); a failure still gets a notice.
-    if (chatKindOf(chat) === "group" && isSilentReply(outcome.text)) return;
+    if (chatKindOf(chat) === "group") return this.appendGroupReply(chat, outcome);
     const bot = await this.deps.bots.get(outcome.botId);
     if (outcome.text === null) {
       if (outcome.expectation)
@@ -503,6 +574,31 @@ export class ChatEngine implements TurnTrackerHost {
     this.track(this.fanOut(chat.id, decision, line));
   }
 
+  /**
+   * In a group, silence is a valid turn and the discussion, not the reply's mentions, decides
+   * who speaks next (plans/group-discussion.md).
+   */
+  private async appendGroupReply(chat: StoredChat, outcome: TurnOutcome): Promise<void> {
+    const spoke = !isSilentReply(outcome.text);
+    if (spoke)
+      await this.appendLine(chat.id, {
+        id: resolveClientMessageId(undefined),
+        at: this.now(),
+        sender: { kind: "bot", botId: outcome.botId },
+        text: outcome.text!,
+        reply: { agentId: outcome.agentId, turnId: outcome.turnId, ...outcome.lastRow },
+        ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1)! } : {}),
+        hop: (outcome.expectation?.hop ?? 0) + 1,
+        deliveryBotIds: [],
+      });
+    this.track(this.discussions.turnEnded(chat.id, outcome.botId, spoke));
+  }
+
+  /** Stopping a bot mid-discussion ends the discussion: the user took the floor. */
+  onTurnStopped(chatId: string): void {
+    this.discussions.stop(chatId);
+  }
+
   onTurnFailed(outcome: TurnOutcome, error: string): Promise<void> {
     const work = this.finalizing.run(`${outcome.chatId}:${outcome.botId}`, () =>
       this.appendFailure(outcome, error),
@@ -527,6 +623,7 @@ export class ChatEngine implements TurnTrackerHost {
       `⚠️ ${bot?.displayName ?? outcome.botId} stopped with an error: ${errorLine(error)}`,
       this.outcomeScope(outcome),
     );
+    this.track(this.discussions.turnEnded(chat.id, outcome.botId, false));
   }
 
   /** The record as the app sees it. */

@@ -177,6 +177,10 @@ export class ChatSession {
       case "chat.session.reset.request":
         await this.service.newSession(request.chatId, request.botId);
         return { chatId: request.chatId, botId: request.botId };
+      case "chat.discussion.stop.request":
+        await this.requireRun(request.chatId);
+        await this.service.stopDiscussion(request.chatId);
+        return { chatId: request.chatId };
     }
   }
 }
@@ -196,6 +200,7 @@ export function dispatchChatMessage(
     case "chat.update.request":
     case "chat.archive.request":
     case "chat.session.reset.request":
+    case "chat.discussion.stop.request":
       if (session) return session.handle(message);
       emit({
         type: "rpc_error",
@@ -222,6 +227,8 @@ function errorDefaults(request: Request): Record<string, unknown> {
       return { messageId: null, seq: null, targets: [] };
     case "chat.session.reset.request":
       return { chatId: request.chatId, botId: request.botId };
+    case "chat.discussion.stop.request":
+      return { chatId: request.chatId };
     default:
       return { chat: null };
   }

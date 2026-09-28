@@ -368,3 +368,21 @@ test("repairs the newest positive receipt only, excluding own output and pre-res
   expect(h.repaired).toEqual([2]);
   expect(h.appended).toEqual([]);
 });
+
+test("a discussion reply to a later line answers the earlier delivery", async () => {
+  const h = harness({
+    lines: [
+      line(1, { deliveryBotIds: [alpha.id, "bot_b"] }),
+      line(2, { sender: { kind: "bot", botId: "bot_b" }, deliveryBotIds: [] }),
+      line(3, {
+        sender: { kind: "bot", botId: alpha.id },
+        reply: { agentId: "agent-a" },
+        inReplyTo: "m2",
+        deliveryBotIds: [],
+      }),
+    ],
+    submitted: { m2: { epoch: "ep", seq: 10 } },
+  });
+  await reconcileChats(h.deps);
+  expect(h.appended).toEqual([]);
+});

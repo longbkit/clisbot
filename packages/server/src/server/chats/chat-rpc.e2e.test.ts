@@ -69,7 +69,11 @@ test("real socket: bot homes, direct and group transcripts, mentions and restart
     await expect
       .poll(async () => (await client.fetchChatTranscript({ chatId: group.chat!.id })).lines.length)
       .toBe(2);
-    const all = await client.sendChatMessage({ chatId: group.chat!.id, text: "both respond" });
+    // The fake provider always answers, so address both: an open discussion would run every round.
+    const all = await client.sendChatMessage({
+      chatId: group.chat!.id,
+      text: `@${analyst.slug} @${writer.slug} both respond`,
+    });
     expect(all.targets.sort()).toEqual([analyst.id, writer.id].sort());
     await expect
       .poll(async () => (await client.fetchChatTranscript({ chatId: group.chat!.id })).lines.length)

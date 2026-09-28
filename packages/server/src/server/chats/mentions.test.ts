@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseMentions } from "./mentions.js";
+import { parseMentions, parseMessageMentions } from "./mentions.js";
 
 const participants = [
   { botId: "bot_a", slug: "alpha" },
@@ -28,5 +28,34 @@ describe("parseMentions", () => {
 
   test("each bot once, case-insensitively", () => {
     expect(parseMentions("@Alpha then @ALPHA again", participants)).toEqual(["bot_a"]);
+  });
+});
+
+describe("parseMessageMentions", () => {
+  const named = [
+    { botId: "bot_a", slug: "head-of-product", displayName: "Head of Product" },
+    { botId: "bot_b", slug: "cto", displayName: "CTO" },
+  ];
+
+  test("@everyone and its aliases address the room", () => {
+    expect(parseMessageMentions("@everyone thoughts?", named)).toEqual({ botIds: [], room: true });
+    expect(parseMessageMentions("@All go", named).room).toBe(true);
+    expect(parseMessageMentions("@here and @cto", named)).toEqual({
+      botIds: ["bot_b"],
+      room: true,
+    });
+    expect(parseMessageMentions("mail me@here.dev", named).room).toBe(false);
+  });
+
+  test("display names count only when asked, in order of appearance", () => {
+    const text = "@CTO then @Head of Product, please";
+    expect(parseMessageMentions(text, named).botIds).toEqual(["bot_b"]);
+    expect(parseMessageMentions(text, named, { displayNames: true }).botIds).toEqual([
+      "bot_b",
+      "bot_a",
+    ]);
+    expect(
+      parseMessageMentions("@Head of Productivity", named, { displayNames: true }).botIds,
+    ).toEqual([]);
   });
 });

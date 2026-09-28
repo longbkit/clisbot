@@ -3,13 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ChatMessagePayload, ChatPayload } from "@getpaseo/protocol/chats/types";
-import { CONTEXT_HEADER, MESSAGE_HEADER } from "@getpaseo/protocol/conversation-prompt";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentSubscriber } from "../agent/agent-manager.js";
 import type { AgentStreamEvent } from "../agent/agent-sdk-types.js";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 import { BotSessions } from "./bot-sessions.js";
 import { ChatEngine } from "./chat-engine.js";
+import { renderTurnCue } from "./room-contract.js";
 import type { ChatBot } from "./chat-record.js";
 import { ChatStore } from "./chat-store.js";
 import { SessionEventLog } from "../agent/session-storage/session-event-log.js";
@@ -97,6 +97,7 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
     }
   >();
   const sent: SentPrompt[] = [];
+  const cancelled: string[] = [];
   const appended: ChatMessagePayload[] = [];
   const updated: ChatPayload[] = [];
   const engine = new ChatEngine({
@@ -106,6 +107,10 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
     botSessions,
     agentManager: {
       getAgent: (id) => liveAgents.get(id) as never,
+      cancelAgentRun: async (id) => {
+        cancelled.push(id);
+        return {} as never;
+      },
       subscribe: (callback, subscribeOptions) => {
         subscribers.set(subscribeOptions?.agentId ?? "*", callback);
         return () => subscribers.delete(subscribeOptions?.agentId ?? "*");
@@ -162,6 +167,7 @@ async function harness(options: { failPromptFor?: string[]; waitPrompt?: Promise
     agents,
     bots,
     createInputs,
+    cancelled,
   };
 }
 
@@ -230,16 +236,23 @@ describe("ChatEngine", () => {
     expect((await h.store.require("cht_1")).participants[0]?.deliveredSeq).toBe(2);
   });
 
-  test("a group: no mention reaches every bot in parallel, a mention reaches one and leaves the other's mark alone", async () => {
+  test("a group: no mention wakes members one at a time; a mention wakes only that bot", async () => {
     const h = await harness();
     await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
-    await h.engine.send({ chatId: "cht_1", text: "status?", messageId: "m1" });
+    const first = await h.engine.send({ chatId: "cht_1", text: "status?", messageId: "m1" });
     await h.engine.idle();
-    expect(h.sent.map((prompt) => prompt.agentId).sort()).toEqual([
-      "agent-bot_a-1",
-      "agent-bot_b-2",
-    ]);
-    expect(h.sent.every((prompt) => prompt.prompt === "user: status?")).toBe(true);
+    expect(first.targets).toEqual([alpha.id, beta.id]);
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1"]);
+    expect(h.sent[0]!.prompt).toBe(`user: status?\n\n${renderTurnCue(1, 5)}`);
+    await h.completeTurn("agent-bot_a-1", "green");
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
+    // Beta sees the user and Alpha's answer as new messages, in order.
+    expect(h.sent[1]!.prompt).toBe(
+      ["user: status?", "Alpha (bot:alpha): green", "", renderTurnCue(1, 5)].join("\n"),
+    );
+    await h.completeTurn("agent-bot_b-2", "PASS");
+    // Round two: Alpha has Beta's silence only, so nothing new; the discussion ends.
+    expect(h.sent).toHaveLength(2);
 
     const second = await h.engine.send({
       chatId: "cht_1",
@@ -249,48 +262,53 @@ describe("ChatEngine", () => {
     await h.engine.idle();
     expect(second.targets).toEqual([beta.id]);
     expect(h.sent).toHaveLength(3);
-    expect(h.sent[2]).toMatchObject({ agentId: "agent-bot_b-2", prompt: "user: @beta only you" });
-    const chat = await h.store.require("cht_1");
-    expect(chat.participants.map((entry) => [entry.botId, entry.deliveredSeq])).toEqual([
-      [alpha.id, 1],
-      [beta.id, 2],
-    ]);
+    expect(h.sent[2]!.agentId).toBe("agent-bot_b-2");
   });
 
-  test("a bot mentioning another bot is forwarded once, and the chain ends at the hop limit with a notice", async () => {
+  test("an addressed bot can bring in another; the discussion stops at rounds.max with a notice", async () => {
     const h = await harness();
-    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id], rules: { hops: { max: 1 } } });
-    await h.engine.send({
-      chatId: "cht_1",
-      text: "@alpha ask beta for the numbers",
-      messageId: "m1",
+    await h.store.create({
+      id: "cht_1",
+      botIds: [alpha.id, beta.id],
+      rules: { rounds: { max: 2 } },
     });
+    await h.engine.send({ chatId: "cht_1", text: "@alpha ask for the numbers", messageId: "m1" });
     await h.engine.idle();
-    await h.completeTurn("agent-bot_a-1", "@beta what are the numbers?");
-    expect(h.sent[1]).toMatchObject({
-      agentId: "agent-bot_b-2",
-      prompt: [
-        CONTEXT_HEADER,
-        "user: @alpha ask beta for the numbers",
-        MESSAGE_HEADER,
-        "Alpha (bot:alpha): @beta what are the numbers?",
-      ].join("\n"),
-    });
+    await h.completeTurn("agent-bot_a-1", "@Beta what are the numbers?");
+    expect(h.sent[1]!.agentId).toBe("agent-bot_b-2");
+    expect(String(h.sent[1]!.prompt)).toContain(renderTurnCue(2, 2));
     await h.completeTurn("agent-bot_b-2", "@alpha 42");
-    await h.engine.idle();
     const lines = await h.lines("cht_1");
-    expect(lines.map((line) => [line.sender.kind, line.hop, line.text])).toEqual([
-      ["user", 0, "@alpha ask beta for the numbers"],
-      ["bot", 1, "@beta what are the numbers?"],
-      ["bot", 2, "@alpha 42"],
-      [
-        "system",
-        0,
-        "⚠️ Beta mentioned @alpha, but the hop limit (1) was reached; nothing was forwarded.",
-      ],
+    expect(lines.map((line) => `${line.sender.kind}: ${line.text}`)).toEqual([
+      "user: @alpha ask for the numbers",
+      "bot: @Beta what are the numbers?",
+      "bot: @alpha 42",
+      "system: The discussion stopped after 2 rounds.",
     ]);
-    expect(lines[2]?.inReplyTo).toBe(lines[1]?.id);
     expect(h.sent).toHaveLength(2);
+  });
+
+  test("a new user line replaces the discussion; Stop all ends it and interrupts running bots", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_1", text: "plan?", messageId: "m1" });
+    await h.engine.idle();
+    await h.engine.send({ chatId: "cht_1", text: "@beta first", messageId: "m2" });
+    await h.engine.idle();
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
+    // Alpha's late answer lands, but the replaced discussion does not wake anyone for it.
+    await h.completeTurn("agent-bot_a-1", "late plan");
+    expect(h.sent).toHaveLength(2);
+    h.liveAgents.set("agent-bot_b-2", {
+      lifecycle: "running",
+      pendingPermissions: new Map(),
+      inFlightPermissionResponses: new Set(),
+    });
+    expect(await h.engine.stopDiscussion("cht_1")).toBe(true);
+    expect(h.cancelled).toEqual(["agent-bot_b-2"]);
+    await h.completeTurn("agent-bot_b-2", "done");
+    expect(h.sent).toHaveLength(2);
+    expect((await h.lines("cht_1")).at(-2)?.text).toBe("⏹ Stopped by the user.");
   });
 
   test("the same message id is written once; a different text under it is refused", async () => {
@@ -307,7 +325,7 @@ describe("ChatEngine", () => {
     expect(h.sent).toHaveLength(1);
   });
 
-  test("a failed turn, a delivery failure and a reply-less turn each leave a system line", async () => {
+  test("a failed turn and a delivery failure each leave a system line and the room moves on", async () => {
     const h = await harness({ failPromptFor: ["agent-bot_b-2"] });
     await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
     await h.engine.send({ chatId: "cht_1", text: "go", messageId: "m1" });
@@ -317,10 +335,19 @@ describe("ChatEngine", () => {
     const texts = (await h.lines("cht_1")).map((line) => `${line.sender.kind}: ${line.text}`);
     expect(texts).toEqual([
       "user: go",
-      "system: ⚠️ Beta could not take the message: provider is down",
       "system: ⚠️ Alpha stopped with an error: rate limited by provider",
+      "system: ⚠️ Beta could not take the message: provider is down",
     ]);
     expect(h.sent).toHaveLength(1);
+  });
+
+  test("a reply-less turn in a direct chat leaves a system line", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id] });
+    await h.engine.send({ chatId: "cht_1", text: "go", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", null);
+    expect((await h.lines("cht_1")).at(-1)?.text).toBe("⚠️ Alpha finished without a reply.");
   });
 
   test("/new leaves a system line and the next delivery goes to a fresh session", async () => {
@@ -473,22 +500,19 @@ test("group input contains other bot output once, never own output", async () =>
   await h.store.create({ id: "cht_ingress", botIds: [alpha.id, beta.id] });
   await h.engine.send({ chatId: "cht_ingress", text: "round-one", messageId: "u1" });
   await h.engine.idle();
-  const a = h.sent.find((p) => p.agentId.includes(alpha.id))!.agentId;
-  const b = h.sent.find((p) => p.agentId.includes(beta.id))!.agentId;
-  await h.completeTurn(a, "alpha-answer");
-  await h.completeTurn(b, "beta-answer");
-  await h.engine.send({ chatId: "cht_ingress", text: "round-two", messageId: "u2" });
-  await h.engine.idle();
-  const ap = h.sent.filter((p) => p.agentId === a)[1]!.prompt;
-  const bp = h.sent.filter((p) => p.agentId === b)[1]!.prompt;
+  await h.completeTurn("agent-bot_a-1", "alpha-answer");
+  await h.completeTurn("agent-bot_b-2", "beta-answer");
+  // Round two: Alpha hears Beta's answer, never its own.
+  const ap = String(h.sent[2]!.prompt);
+  expect(h.sent[2]!.agentId).toBe("agent-bot_a-1");
   expect(ap).toContain("beta-answer");
   expect(ap).not.toContain("alpha-answer");
+  expect(ap).not.toContain("round-one");
+  await h.completeTurn("agent-bot_a-1", "PASS");
+  const bp = String(h.sent[1]!.prompt);
   expect(bp).toContain("alpha-answer");
   expect(bp).not.toContain("beta-answer");
-  expect(ap + bp).not.toContain("round-one");
-  await h.engine.send({ chatId: "cht_ingress", text: "round-three", messageId: "u3" });
-  await h.engine.idle();
-  expect(h.sent.slice(-2).map((p) => p.prompt)).toEqual(["user: round-three", "user: round-three"]);
+  expect(h.sent).toHaveLength(3);
 });
 
 test("late forwarding does not resend a bot line already consumed as context", async () => {
@@ -580,6 +604,7 @@ test("chat attachments persist, fan out once, and full-payload retries conflict"
   };
   await h.engine.send(input);
   await h.engine.idle();
+  await h.completeTurn(h.sent[0]!.agentId, "PASS");
   expect(h.sent).toHaveLength(2);
   for (const sent of h.sent)
     expect(sent.prompt).toEqual(
@@ -660,6 +685,7 @@ test("uploaded chat files use existing durable staging before fanout and survive
   expect(stored.type).toBe("uploaded_file");
   if (stored.type !== "uploaded_file") throw new Error("Expected file");
   expect(await fs.readFile(stored.path, "utf8")).toBe("durable content");
+  await h.completeTurn(h.sent[0]!.agentId, "PASS");
   expect(h.sent).toHaveLength(2);
   for (const sent of h.sent) expect(sent.prompt).toEqual(expect.arrayContaining([stored]));
   expect((await h.engine.send(input)).duplicate).toBe(true);
@@ -716,6 +742,8 @@ describe("group room contract (plans/group-discussion.md)", () => {
     await h.store.create({ id: "cht_g", title: "Launch", botIds: [alpha.id, beta.id] });
     await h.store.create({ id: "cht_d", botIds: [alpha.id] });
     await h.engine.send({ chatId: "cht_g", text: "status?", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS");
     await h.engine.send({ chatId: "cht_d", text: "hi", messageId: "m2" });
     await h.engine.idle();
     const [alphaInGroup, betaInGroup, alphaDirect] = h.createInputs.map(systemPromptOf);
@@ -732,8 +760,12 @@ describe("group room contract (plans/group-discussion.md)", () => {
     await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id] });
     await h.engine.send({ chatId: "cht_g", text: "first", messageId: "m1" });
     await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS");
+    await h.completeTurn("agent-bot_b-2", "PASS");
     h.bots.set(beta.id, { ...beta, description: "Owns the numbers" });
     await h.engine.send({ chatId: "cht_g", text: "@alpha second", messageId: "m2" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS");
     await h.engine.send({ chatId: "cht_g", text: "@alpha third", messageId: "m3" });
     await h.engine.idle();
     const alphaPrompts = h.sent
@@ -743,6 +775,13 @@ describe("group room contract (plans/group-discussion.md)", () => {
     expect(alphaPrompts[1]).toContain("- @beta — Beta — Owns the numbers");
     expect(alphaPrompts[1]).toContain("user: @alpha second");
     expect(alphaPrompts[2]).not.toContain("[Room update]");
+    await h.store.updateSettings("cht_g", { roomInstructions: "Answer in Vietnamese." });
+    await h.completeTurn("agent-bot_a-1", "PASS");
+    await h.engine.send({ chatId: "cht_g", text: "@alpha fourth", messageId: "m4" });
+    await h.engine.idle();
+    const fourth = String(h.sent.at(-1)!.prompt);
+    expect(fourth.startsWith("[Room update]")).toBe(true);
+    expect(fourth).toContain("<<<\nAnswer in Vietnamese.\n>>>");
   });
 
   test("PASS and an empty turn are silence in a group: no line, no notice, no forwarding", async () => {

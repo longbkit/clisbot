@@ -64,6 +64,13 @@ export function roomFingerprint(input: RoomContractInput): string {
     .slice(0, 16);
 }
 
+/** Ends every wake in a discussion; the last round tells the room it is wrapping up. */
+export function renderTurnCue(round: number, maxRounds: number): string {
+  if (round >= maxRounds)
+    return `[Your turn — last round] The discussion is wrapping up: reply only if it is essential, otherwise reply ${PASS_REPLY}.`;
+  return `[Your turn — round ${round} of at most ${maxRounds}] Reply if you have something worth adding, otherwise reply ${PASS_REPLY}.`;
+}
+
 /** A turn that chose silence: no text, or exactly `PASS`. */
 export function isSilentReply(text: string | null): boolean {
   return text === null || text.trim() === "" || text.trim() === PASS_REPLY;

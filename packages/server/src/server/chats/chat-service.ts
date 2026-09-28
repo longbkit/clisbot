@@ -75,6 +75,8 @@ export interface ChatService {
   fetchTranscript(chatId: string, options?: TranscriptFetchOptions): Promise<TranscriptWindow>;
   /** `/new` for one bot in one chat (D7). */
   newSession(chatId: string, botId: string): Promise<void>;
+  /** Stop all (plans/group-discussion.md): ends the discussion and interrupts running turns. */
+  stopDiscussion(chatId: string): Promise<boolean>;
 }
 
 export function createChatService(options: ChatServiceOptions): ChatService {
@@ -238,5 +240,6 @@ export function createChatService(options: ChatServiceOptions): ChatService {
       return transcriptOf(chatId).fetch(fetchOptions);
     },
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
+    stopDiscussion: (chatId) => engine.stopDiscussion(chatId),
   };
 }

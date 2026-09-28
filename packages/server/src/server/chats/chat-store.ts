@@ -153,14 +153,15 @@ export class ChatStore {
       return {
         ...chat,
         ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
-        ...(patch.requireMention !== undefined
-          ? {
-              rules: {
-                ...chat.rules,
-                interaction: { ...chat.rules.interaction, requireMention: patch.requireMention },
-              },
-            }
-          : {}),
+        rules: {
+          ...chat.rules,
+          ...(patch.requireMention !== undefined
+            ? { interaction: { ...chat.rules.interaction, requireMention: patch.requireMention } }
+            : {}),
+          ...(patch.roomInstructions !== undefined
+            ? { room: { ...chat.rules.room, instructions: patch.roomInstructions?.trim() || null } }
+            : {}),
+        },
       };
     });
   }

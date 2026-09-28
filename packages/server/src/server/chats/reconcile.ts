@@ -117,12 +117,17 @@ function missingReply(
   );
   const newest = delivered.at(-1);
   if (!newest) return null;
+  // A group discussion wakes a bot with every line it has not seen, so its reply can answer a
+  // later line than the newest one addressed to it; that reply answers the earlier one too.
+  const seqOf = new Map(lines.map((line) => [line.id, line.seq]));
+  const answersNewest = (line: TranscriptLine) =>
+    line.inReplyTo
+      ? line.inReplyTo === newest.id || (seqOf.get(line.inReplyTo) ?? 0) > newest.seq
+      : !line.deliveryBotIds;
   const answered = lines.some(
     (line) =>
       line.seq > newest.seq &&
-      ((own(line) &&
-        line.reply?.agentId === participant.agentId &&
-        (line.inReplyTo === newest.id || (!line.inReplyTo && !line.deliveryBotIds))) ||
+      ((own(line) && line.reply?.agentId === participant.agentId && answersNewest(line)) ||
         (line.sender.kind === "system" &&
           line.inReplyTo === newest.id &&
           (line.deliveryBotIds?.includes(participant.botId) ||
