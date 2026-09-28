@@ -26,6 +26,8 @@ export default function BotRoute() {
     </HostRouteBootstrapBoundary>
   );
 }
+type HostRuntimeClient = ReturnType<typeof useHostRuntimeClient>;
+
 function Gate() {
   const { serverId = "", botId = "" } = useLocalSearchParams<{
     serverId: string;
@@ -54,10 +56,43 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
   const client = useHostRuntimeClient(serverId);
   const hosts = useBotsFeatureHosts();
   const hostLabel = hosts.find((host) => host.serverId === serverId)?.label ?? "Current Host";
-  const router = useRouter();
+  const { bot, error, setError } = useBotRecord(client, botId);
+  const actions = useBotSettingsActions({ client, serverId, botId, bot, setError });
+  return (
+    <View style={styles.screen}>
+      <MenuHeader title="Bot settings" />
+      <ScrollView>
+        <View style={styles.content}>
+          {error ? (
+            <Text style={styles.text} accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
+          {bot && bot.canConfigure !== true ? (
+            <Text style={styles.text}>You do not have permission to configure this bot.</Text>
+          ) : null}
+          {bot?.canConfigure === true ? (
+            <>
+              <BotCreateForm
+                defaultServerId={serverId}
+                name={bot.name}
+                bot={botView(bot)}
+                hosts={[{ serverId, label: hostLabel }]}
+                onCreated={actions.onSaved}
+                onCancel={actions.cancel}
+              />
+              <BotManagementSections actions={actions} />
+            </>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function useBotRecord(client: HostRuntimeClient, botId: string) {
   const [bot, setBot] = useState<BotPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
     if (client)
@@ -77,6 +112,56 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
       active = false;
     };
   }, [botId, client]);
+  return { bot, error, setError };
+}
+
+type BotSettingsActions = ReturnType<typeof useBotSettingsActions>;
+
+function useBotSettingsActions({
+  client,
+  serverId,
+  botId,
+  bot,
+  setError,
+}: {
+  client: HostRuntimeClient;
+  serverId: string;
+  botId: string;
+  bot: BotPayload | null;
+  setError: (value: string | null) => void;
+}) {
+  const router = useRouter();
+  const { busy, archiveAction } = useArchiveBot({ client, botId, bot, setError });
+  const projectAction = useCallback(() => {
+    if (bot)
+      router.push(
+        `/settings/hosts/${encodeURIComponent(
+          serverId,
+        )}/projects/${encodeURIComponent(bot.projectId)}`,
+      );
+  }, [bot, router, serverId]);
+  const accessAction = useCallback(() => router.push("/settings/hub/access"), [router]);
+  const onSaved = useCallback(() => {
+    refreshBotsAndChats();
+    router.back();
+  }, [router]);
+  const cancel = useCallback(() => router.back(), [router]);
+  return { busy, archiveAction, projectAction, accessAction, onSaved, cancel };
+}
+
+function useArchiveBot({
+  client,
+  botId,
+  bot,
+  setError,
+}: {
+  client: HostRuntimeClient;
+  botId: string;
+  bot: BotPayload | null;
+  setError: (value: string | null) => void;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
   const archive = useCallback(async () => {
     if (!client || bot?.canConfigure !== true) return;
     if (
@@ -100,79 +185,44 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
     } finally {
       setBusy(false);
     }
-  }, [client, botId, router, bot?.canConfigure]);
+  }, [client, botId, router, bot?.canConfigure, setError]);
   const archiveAction = useCallback(() => {
     void archive();
   }, [archive]);
-  const projectAction = useCallback(() => {
-    if (bot)
-      router.push(
-        `/settings/hosts/${encodeURIComponent(
-          serverId,
-        )}/projects/${encodeURIComponent(bot.projectId)}`,
-      );
-  }, [bot, router, serverId]);
-  const accessAction = useCallback(() => router.push("/settings/hub/access"), [router]);
-  const onSaved = useCallback(() => {
-    refreshBotsAndChats();
-    router.back();
-  }, [router]);
-  const cancel = useCallback(() => router.back(), [router]);
+  return { busy, archiveAction };
+}
+
+function BotManagementSections({ actions }: { actions: BotSettingsActions }) {
   return (
-    <View style={styles.screen}>
-      <MenuHeader title="Bot settings" />
-      <ScrollView>
-        <View style={styles.content}>
-          {error ? (
-            <Text style={styles.text} accessibilityRole="alert">
-              {error}
-            </Text>
-          ) : null}
-          {bot && bot.canConfigure !== true ? (
-            <Text style={styles.text}>You do not have permission to configure this bot.</Text>
-          ) : null}
-          {bot?.canConfigure === true ? (
-            <>
-              <BotCreateForm
-                defaultServerId={serverId}
-                name={bot.name}
-                bot={botView(bot)}
-                hosts={[{ serverId, label: hostLabel }]}
-                onCreated={onSaved}
-                onCancel={cancel}
-              />
-              <SettingsSection title="Project and access">
-                <SettingsCard>
-                  <SettingsAction
-                    label="Project settings"
-                    hint="Manage the workspace this bot works in."
-                    actionLabel="Open"
-                    onPress={projectAction}
-                  />
-                  <SettingsAction
-                    label="Team access"
-                    hint="Share through Project Access. Each person’s chat history stays private."
-                    actionLabel="Manage"
-                    onPress={accessAction}
-                  />
-                </SettingsCard>
-              </SettingsSection>
-              <SettingsSection title="Archive" flush>
-                <SettingsCard>
-                  <SettingsAction
-                    label="Archive bot"
-                    hint="Keep its workspace and memory while removing it from the active list."
-                    actionLabel="Archive…"
-                    disabled={busy}
-                    onPress={archiveAction}
-                  />
-                </SettingsCard>
-              </SettingsSection>
-            </>
-          ) : null}
-        </View>
-      </ScrollView>
-    </View>
+    <>
+      <SettingsSection title="Project and access">
+        <SettingsCard>
+          <SettingsAction
+            label="Project settings"
+            hint="Manage the workspace this bot works in."
+            actionLabel="Open"
+            onPress={actions.projectAction}
+          />
+          <SettingsAction
+            label="Team access"
+            hint="Share through Project Access. Each person’s chat history stays private."
+            actionLabel="Manage"
+            onPress={actions.accessAction}
+          />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title="Archive" flush>
+        <SettingsCard>
+          <SettingsAction
+            label="Archive bot"
+            hint="Keep its workspace and memory while removing it from the active list."
+            actionLabel="Archive…"
+            disabled={actions.busy}
+            onPress={actions.archiveAction}
+          />
+        </SettingsCard>
+      </SettingsSection>
+    </>
   );
 }
 const styles = StyleSheet.create((theme) => ({

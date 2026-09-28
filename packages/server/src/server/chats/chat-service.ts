@@ -79,21 +79,56 @@ export interface ChatService {
   stopDiscussion(chatId: string): Promise<boolean>;
 }
 
+type ChatServiceListener = (message: import("../messages.js").SessionOutboundMessage) => void;
+
+/** The pieces every method reaches; built once per service. */
+interface ChatServiceParts {
+  options: ChatServiceOptions;
+  store: ChatStore;
+  engine: ChatEngine;
+  publisher: ChatPublisher;
+  transcriptOf: (chatId: string) => TranscriptLog;
+  transcripts: Map<string, TranscriptLog>;
+}
+
 export function createChatService(options: ChatServiceOptions): ChatService {
-  const { agentManager, agentStorage, logger } = options;
-  const listeners = new Set<(message: import("../messages.js").SessionOutboundMessage) => void>();
-  const publisher: ChatPublisher = {
-    chatUpdated(chat) {
-      options.publisher.chatUpdated(chat);
-      for (const listener of listeners) listener({ type: "chat.updated", payload: { chat } });
+  const listeners = new Set<ChatServiceListener>();
+  const parts = createChatServiceParts(options, listeners);
+  let unsubscribe: (() => void) | null = null;
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
-    transcriptAppended(chatId, line) {
-      options.publisher.transcriptAppended(chatId, line);
-      for (const listener of listeners)
-        listener({ type: "chat.transcript.appended", payload: { chatId, line } });
+    async start() {
+      await parts.store.load();
+      unsubscribe ??= publishStoreChanges(parts);
+      await watchParticipants(parts);
+      await reconcile(parts).catch((error: unknown) =>
+        options.logger.warn({ err: error }, "chat.reconcile.failed"),
+      );
     },
+    async stop() {
+      unsubscribe?.();
+      unsubscribe = null;
+      parts.engine.stop();
+      await parts.engine.idle();
+      await parts.store.idle();
+      await Promise.all(Array.from(parts.transcripts.values()).map((log) => log.flush()));
+    },
+    ...chatReads(parts),
+    ...chatWrites(parts),
   };
-  const store = new ChatStore(options.rootDir, logger);
+}
+
+function createChatServiceParts(
+  options: ChatServiceOptions,
+  listeners: ReadonlySet<ChatServiceListener>,
+): ChatServiceParts {
+  const store = new ChatStore(options.rootDir, options.logger);
   const transcripts = new Map<string, TranscriptLog>();
   const transcriptOf = (chatId: string): TranscriptLog => {
     let log = transcripts.get(chatId);
@@ -103,13 +138,43 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     }
     return log;
   };
+  const publisher = fanOutPublisher(options.publisher, listeners);
+  const engine = createEngine(options, store, transcriptOf, publisher);
+  return { options, store, engine, publisher, transcriptOf, transcripts };
+}
+
+/** Every push reaches the Session wiring and every in-process subscriber. */
+function fanOutPublisher(
+  sessions: ChatPublisher,
+  listeners: ReadonlySet<ChatServiceListener>,
+): ChatPublisher {
+  return {
+    chatUpdated(chat) {
+      sessions.chatUpdated(chat);
+      for (const listener of listeners) listener({ type: "chat.updated", payload: { chat } });
+    },
+    transcriptAppended(chatId, line) {
+      sessions.transcriptAppended(chatId, line);
+      for (const listener of listeners)
+        listener({ type: "chat.transcript.appended", payload: { chatId, line } });
+    },
+  };
+}
+
+function createEngine(
+  options: ChatServiceOptions,
+  store: ChatStore,
+  transcriptOf: (chatId: string) => TranscriptLog,
+  publisher: ChatPublisher,
+): ChatEngine {
+  const { agentManager, agentStorage, logger } = options;
   const botSessions = new BotSessions({
     agentStorage,
     store,
     createAgent: options.createAgent,
     ensureLoaded: (agentId) => ensureAgentLoaded(agentId, { agentManager, agentStorage, logger }),
   });
-  const engine = new ChatEngine({
+  return new ChatEngine({
     store,
     transcriptOf,
     bots: options.bots,
@@ -130,85 +195,60 @@ export function createChatService(options: ChatServiceOptions): ChatService {
         logger,
       }),
   });
-  let unsubscribe: (() => void) | null = null;
+}
 
-  const payload = async (chatId: string): Promise<ChatPayload> =>
-    engine.payload(await store.require(chatId));
+/** Republishes every stored change as the app sees it; returns the unsubscribe. */
+function publishStoreChanges({ store, engine, publisher, options }: ChatServiceParts): () => void {
+  return store.subscribe((chat) => {
+    void engine
+      .payload(chat)
+      .then((summary) => publisher.chatUpdated(summary))
+      .catch((error: unknown) =>
+        options.logger.warn({ chatId: chat.id, err: error }, "chat.updated.publish_failed"),
+      );
+  });
+}
 
-  /** §3: replies that ended while the daemon was down, backfilled in the background. */
-  const reconcile = (): Promise<void> =>
-    reconcileChats({
-      store,
-      transcriptOf,
-      bots: options.bots,
-      appendLine: (chatId, input) => engine.appendLine(chatId, input),
-      isRunning: (agentId) => agentManager.getAgent(agentId)?.lifecycle === "running",
-      findSubmittedRow: async (agentId, messageId) => {
-        const durable = options.durableTimelineStore;
-        const row = await durable?.getSubmittedUserMessage?.(agentId, messageId);
-        const epoch = row ? await durable?.getEpoch?.(agentId) : undefined;
-        return row && epoch ? { epoch, seq: row.seq } : null;
-      },
-      rowsAfter: async (agentId, cursor) =>
-        (await agentManager.fetchTimelineForRead(agentId, { direction: "after", cursor, limit: 0 }))
-          .rows,
-      logger,
-    });
+/** Turns of known sessions that end from now on become transcript lines. */
+async function watchParticipants({ store, engine }: ChatServiceParts): Promise<void> {
+  for (const chat of await store.list()) {
+    for (const participant of chat.participants) {
+      if (participant.agentId)
+        engine.tracker.watch(participant.agentId, chat.id, participant.botId);
+    }
+  }
+}
 
+/** §3: replies that ended while the daemon was down, backfilled in the background. */
+function reconcile({ options, store, engine, transcriptOf }: ChatServiceParts): Promise<void> {
+  const { agentManager, logger } = options;
+  return reconcileChats({
+    store,
+    transcriptOf,
+    bots: options.bots,
+    appendLine: (chatId, input) => engine.appendLine(chatId, input),
+    isRunning: (agentId) => agentManager.getAgent(agentId)?.lifecycle === "running",
+    findSubmittedRow: async (agentId, messageId) => {
+      const durable = options.durableTimelineStore;
+      const row = await durable?.getSubmittedUserMessage?.(agentId, messageId);
+      const epoch = row ? await durable?.getEpoch?.(agentId) : undefined;
+      return row && epoch ? { epoch, seq: row.seq } : null;
+    },
+    rowsAfter: async (agentId, cursor) =>
+      (await agentManager.fetchTimelineForRead(agentId, { direction: "after", cursor, limit: 0 }))
+        .rows,
+    logger,
+  });
+}
+
+type ChatReads = Pick<
+  ChatService,
+  "record" | "list" | "get" | "participantBotIds" | "fetchTranscript"
+>;
+
+function chatReads({ store, engine, transcriptOf }: ChatServiceParts): ChatReads {
   return {
     record: (chatId) => store.getCached(chatId),
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    async start() {
-      await store.load();
-      unsubscribe ??= store.subscribe((chat) => {
-        void engine
-          .payload(chat)
-          .then((summary) => publisher.chatUpdated(summary))
-          .catch((error: unknown) =>
-            logger.warn({ chatId: chat.id, err: error }, "chat.updated.publish_failed"),
-          );
-      });
-      for (const chat of await store.list()) {
-        for (const participant of chat.participants) {
-          if (participant.agentId)
-            engine.tracker.watch(participant.agentId, chat.id, participant.botId);
-        }
-      }
-      await reconcile().catch((error: unknown) =>
-        logger.warn({ err: error }, "chat.reconcile.failed"),
-      );
-    },
-    async stop() {
-      unsubscribe?.();
-      unsubscribe = null;
-      engine.stop();
-      await engine.idle();
-      await store.idle();
-      await Promise.all(Array.from(transcripts.values()).map((log) => log.flush()));
-    },
-    async create(input) {
-      const chat = await store.create({
-        botIds: input.botIds,
-        kind: input.kind,
-        ...(input.title !== undefined ? { title: input.title } : {}),
-        ...(input.rules ? { rules: input.rules } : {}),
-        ...(input.createdBy ? { createdBy: input.createdBy } : {}),
-      });
-      const sent = input.firstMessage
-        ? await engine.send({
-            chatId: chat.id,
-            text: input.firstMessage.text,
-            ...(input.firstMessage.messageId ? { messageId: input.firstMessage.messageId } : {}),
-            ...(input.createdBy ? { actor: input.createdBy } : {}),
-          })
-        : null;
-      return { chat: await payload(chat.id), sent };
-    },
     async list(includeArchived = false) {
       const chats = (await store.list()).filter((chat) => includeArchived || !chat.archivedAt);
       return Promise.all(chats.map((chat) => engine.payload(chat)));
@@ -217,12 +257,24 @@ export function createChatService(options: ChatServiceOptions): ChatService {
       const chat = await store.get(chatId);
       return chat ? engine.payload(chat) : null;
     },
-    async update(chatId, patch) {
-      return engine.payload(await store.updateSettings(chatId, patch));
-    },
     async participantBotIds(chatId) {
       const chat = await store.get(chatId);
       return chat ? chat.participants.map((entry) => entry.botId) : null;
+    },
+    fetchTranscript: async (chatId, fetchOptions) => {
+      await store.require(chatId);
+      return transcriptOf(chatId).fetch(fetchOptions);
+    },
+  };
+}
+
+type ChatWrites = Omit<ChatService, keyof ChatReads | "subscribe" | "start" | "stop">;
+
+function chatWrites({ options, store, engine }: ChatServiceParts): ChatWrites {
+  return {
+    create: (input) => createChat(store, engine, input),
+    async update(chatId, patch) {
+      return engine.payload(await store.updateSettings(chatId, patch));
     },
     async addParticipant(chatId, botId) {
       if (!(await options.bots.get(botId))) throw new Error(`Bot ${botId} not found`);
@@ -235,11 +287,30 @@ export function createChatService(options: ChatServiceOptions): ChatService {
       return engine.payload(await store.archive(chatId));
     },
     send: (input) => engine.send(input),
-    fetchTranscript: async (chatId, fetchOptions) => {
-      await store.require(chatId);
-      return transcriptOf(chatId).fetch(fetchOptions);
-    },
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
     stopDiscussion: (chatId) => engine.stopDiscussion(chatId),
   };
+}
+
+async function createChat(
+  store: ChatStore,
+  engine: ChatEngine,
+  input: CreateChatServiceInput,
+): Promise<{ chat: ChatPayload; sent: SendMessageResult | null }> {
+  const chat = await store.create({
+    botIds: input.botIds,
+    kind: input.kind,
+    ...(input.title !== undefined ? { title: input.title } : {}),
+    ...(input.rules ? { rules: input.rules } : {}),
+    ...(input.createdBy ? { createdBy: input.createdBy } : {}),
+  });
+  const sent = input.firstMessage
+    ? await engine.send({
+        chatId: chat.id,
+        text: input.firstMessage.text,
+        ...(input.firstMessage.messageId ? { messageId: input.firstMessage.messageId } : {}),
+        ...(input.createdBy ? { actor: input.createdBy } : {}),
+      })
+    : null;
+  return { chat: await engine.payload(await store.require(chat.id)), sent };
 }

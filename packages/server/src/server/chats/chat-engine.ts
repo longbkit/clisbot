@@ -1,8 +1,5 @@
-import { createHash } from "node:crypto";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
-import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
-import { wrapSpokenInput } from "../voice-config.js";
 // `ChatEngine`: a user line is written, then fanned out; a bot's turn end is
 // written as a bot line, then forwarded to the bots it mentions
 // (docs/features/bots-and-chats/README.md, D5, D9; plans/server-chat.md §2).
@@ -30,11 +27,19 @@ import { KeyedSerialQueue } from "./keyed-queue.js";
 import {
   isSilentReply,
   renderRoomContract,
-  renderRoomUpdate,
   roomFingerprint,
   type RoomContractInput,
   type RoomMember,
 } from "./room-contract.js";
+import {
+  agentPromptFor,
+  botReplyLine,
+  duplicateSend,
+  errorLine,
+  messageContentDigest,
+  replacementNotice,
+  roomUpdateFor,
+} from "./chat-engine-lines.js";
 import { ChatDiscussions, discussionOpening } from "./discussion.js";
 import type { MentionableParticipant } from "./mentions.js";
 import type { TranscriptLine, TranscriptLineInput, TranscriptLog } from "./transcript-log.js";
@@ -98,9 +103,6 @@ export interface SendMessageResult {
   duplicate: boolean;
 }
 
-/** How much of a failure's error text reaches the transcript. */
-const NOTICE_ERROR_MAX_CHARS = 300;
-
 export class ChatEngine implements TurnTrackerHost {
   readonly tracker: TurnTracker;
   private readonly discussions: ChatDiscussions;
@@ -153,7 +155,7 @@ export class ChatEngine implements TurnTrackerHost {
       const inputLine = {
         images: files.images,
         attachments: files.attachments,
-        attachmentContentDigest: createHash("sha256").update(messageContent(input)).digest("hex"),
+        attachmentContentDigest: messageContentDigest(input),
         id,
         at: this.now(),
         sender: chatUserSender(input.actor),
@@ -345,14 +347,7 @@ export class ChatEngine implements TurnTrackerHost {
     );
     for (const [index, result] of results.entries()) {
       if (result.status === "fulfilled") continue;
-      const botId = decision.targets[index]!;
-      const bot = await this.deps.bots.get(botId);
-      this.logger.warn({ chatId, botId, err: result.reason }, "chat.delivery.failed");
-      await this.appendSystem(
-        chatId,
-        `⚠️ ${bot?.displayName ?? botId} could not take the message: ${errorLine(result.reason)}`,
-        { deliveryBotIds: [botId], inReplyTo: line.id },
-      );
+      await this.appendDeliveryFailure(chatId, decision.targets[index]!, result.reason, line.id);
     }
   }
 
@@ -368,15 +363,24 @@ export class ChatEngine implements TurnTrackerHost {
         this.deliver(chatId, botId, lines, cue),
       );
     } catch (error) {
-      const bot = await this.deps.bots.get(botId);
-      this.logger.warn({ chatId, botId, err: error }, "chat.delivery.failed");
-      await this.appendSystem(
-        chatId,
-        `⚠️ ${bot?.displayName ?? botId} could not take the message: ${errorLine(error)}`,
-        { deliveryBotIds: [botId], inReplyTo: lines.at(-1)?.id },
-      );
+      await this.appendDeliveryFailure(chatId, botId, error, lines.at(-1)?.id);
       return false;
     }
+  }
+
+  private async appendDeliveryFailure(
+    chatId: string,
+    botId: string,
+    error: unknown,
+    inReplyTo: string | undefined,
+  ): Promise<void> {
+    const bot = await this.deps.bots.get(botId);
+    this.logger.warn({ chatId, botId, err: error }, "chat.delivery.failed");
+    await this.appendSystem(
+      chatId,
+      `⚠️ ${bot?.displayName ?? botId} could not take the message: ${errorLine(error)}`,
+      { deliveryBotIds: [botId], inReplyTo },
+    );
   }
 
   /**
@@ -466,17 +470,7 @@ export class ChatEngine implements TurnTrackerHost {
       () =>
         this.deps.sendPrompt({
           agentId,
-          prompt: buildAgentPrompt(
-            lines.some((line) => line.spokenInputAgentId === agentId)
-              ? wrapSpokenInput(prompt)
-              : prompt,
-            window
-              .filter((line) => line.sender.kind === "user")
-              .flatMap((line) => line.images ?? []),
-            window
-              .filter((line) => line.sender.kind === "user")
-              .flatMap((line) => line.attachments ?? []),
-          ),
+          prompt: agentPromptFor(agentId, prompt, lines, window),
           messageId: lines.at(-1)!.id,
           ...(rules.interaction.whenBusy === "steer"
             ? { activeTurnBehavior: "steer" as const }
@@ -520,49 +514,21 @@ export class ChatEngine implements TurnTrackerHost {
   }
 
   private async appendReply(outcome: TurnOutcome): Promise<void> {
-    const chat = await this.deps.store.get(outcome.chatId);
-    if (
-      !chat ||
-      chat.archivedAt ||
-      !chat.participants.some(
-        (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
-      )
-    )
-      return;
-    if (outcome.expectation) {
-      const recorded = await this.deps.store.recordCompletedTurn(chat.id, outcome.botId, {
-        agentId: outcome.agentId,
-        turnId: outcome.turnId,
-        messageIds: outcome.expectation.messageIds,
-        lastRow: outcome.lastRow,
-      });
-      if (
-        !recorded.participants.some(
-          (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
-        )
-      )
-        return;
-    }
+    const chat = await this.currentChatOf(outcome);
+    if (!chat || !(await this.recordCompletedTurn(chat, outcome))) return;
     if (chatKindOf(chat) === "group") return this.appendGroupReply(chat, outcome);
-    const bot = await this.deps.bots.get(outcome.botId);
     if (outcome.text === null) {
-      if (outcome.expectation)
+      if (outcome.expectation) {
+        const bot = await this.deps.bots.get(outcome.botId);
         await this.appendSystem(
           chat.id,
           `⚠️ ${bot?.displayName ?? outcome.botId} finished without a reply.`,
           this.outcomeScope(outcome),
         );
+      }
       return;
     }
-    const replyInput: TranscriptLineInput = {
-      id: resolveClientMessageId(undefined),
-      at: this.now(),
-      sender: { kind: "bot", botId: outcome.botId },
-      text: outcome.text,
-      reply: { agentId: outcome.agentId, turnId: outcome.turnId, ...outcome.lastRow },
-      ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1)! } : {}),
-      hop: (outcome.expectation?.hop ?? 0) + 1,
-    };
+    const replyInput = botReplyLine(outcome, outcome.text, this.now());
     const decision = await this.decide(chat, resolveChatRules(chat.rules), {
       ...replyInput,
       seq: 0,
@@ -574,6 +540,24 @@ export class ChatEngine implements TurnTrackerHost {
     this.track(this.fanOut(chat.id, decision, line));
   }
 
+  /** The outcome's chat, unless it was archived or the bot's session is no longer its own. */
+  private async currentChatOf(outcome: TurnOutcome): Promise<StoredChat | null> {
+    const chat = await this.deps.store.get(outcome.chatId);
+    return chat && !chat.archivedAt && isCurrentSession(chat, outcome) ? chat : null;
+  }
+
+  /** Records an expected turn; `false` when the session was replaced while it was recorded. */
+  private async recordCompletedTurn(chat: StoredChat, outcome: TurnOutcome): Promise<boolean> {
+    if (!outcome.expectation) return true;
+    const recorded = await this.deps.store.recordCompletedTurn(chat.id, outcome.botId, {
+      agentId: outcome.agentId,
+      turnId: outcome.turnId,
+      messageIds: outcome.expectation.messageIds,
+      lastRow: outcome.lastRow,
+    });
+    return isCurrentSession(recorded, outcome);
+  }
+
   /**
    * In a group, silence is a valid turn and the discussion, not the reply's mentions, decides
    * who speaks next (plans/group-discussion.md).
@@ -582,13 +566,7 @@ export class ChatEngine implements TurnTrackerHost {
     const spoke = !isSilentReply(outcome.text);
     if (spoke)
       await this.appendLine(chat.id, {
-        id: resolveClientMessageId(undefined),
-        at: this.now(),
-        sender: { kind: "bot", botId: outcome.botId },
-        text: outcome.text!,
-        reply: { agentId: outcome.agentId, turnId: outcome.turnId, ...outcome.lastRow },
-        ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1)! } : {}),
-        hop: (outcome.expectation?.hop ?? 0) + 1,
+        ...botReplyLine(outcome, outcome.text!, this.now()),
         deliveryBotIds: [],
       });
     this.track(this.discussions.turnEnded(chat.id, outcome.botId, spoke));
@@ -608,15 +586,8 @@ export class ChatEngine implements TurnTrackerHost {
   }
 
   private async appendFailure(outcome: TurnOutcome, error: string): Promise<void> {
-    const chat = await this.deps.store.get(outcome.chatId);
-    if (
-      !chat ||
-      chat.archivedAt ||
-      !chat.participants.some(
-        (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
-      )
-    )
-      return;
+    const chat = await this.currentChatOf(outcome);
+    if (!chat) return;
     const bot = await this.deps.bots.get(outcome.botId);
     await this.appendSystem(
       chat.id,
@@ -633,41 +604,9 @@ export class ChatEngine implements TurnTrackerHost {
   }
 }
 
-function duplicateSend(existing: TranscriptLine, input: SendMessageInput): SendMessageResult {
-  if (
-    existing.attachmentContentDigest
-      ? existing.attachmentContentDigest !==
-        createHash("sha256").update(messageContent(input)).digest("hex")
-      : messageContent(existing) !== messageContent(input)
-  )
-    throw new Error(`Message ${existing.id} already exists with different text or attachments`);
-  return { messageId: existing.id, seq: existing.seq, targets: [], duplicate: true };
-}
-
-function replacementNotice(bot: ChatBot, reason: "could_not_resume" | "archived"): string {
-  return reason === "archived"
-    ? `${bot.displayName}'s previous session was archived; a new one starts here.`
-    : `${bot.displayName}'s previous session could not resume; a new one starts here.`;
-}
-
-function errorLine(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  const line = message.replace(/\s+/gu, " ").trim();
-  if (line === "") return "unknown error";
-  return line.length > NOTICE_ERROR_MAX_CHARS ? `${line.slice(0, NOTICE_ERROR_MAX_CHARS)}…` : line;
-}
-
-function messageContent(input: { text: string } & ChatMessageFiles): string {
-  return JSON.stringify({
-    text: input.text,
-    images: input.images ?? [],
-    attachments: (input.attachments ?? []).map((a) =>
-      a.type === "uploaded_file" ? Object.assign({}, a, { path: undefined }) : a,
-    ),
-  });
-}
-
-/** What a bot hears first when the room changed since its session last heard about it. */
-function roomUpdateFor(room: RoomContractInput, roomSeen: string | undefined): string | null {
-  return roomSeen === roomFingerprint(room) ? null : renderRoomUpdate(room);
+/** Whether the outcome's session is still the one this bot uses in the chat. */
+function isCurrentSession(chat: StoredChat, outcome: TurnOutcome): boolean {
+  return chat.participants.some(
+    (entry) => entry.botId === outcome.botId && entry.agentId === outcome.agentId,
+  );
 }

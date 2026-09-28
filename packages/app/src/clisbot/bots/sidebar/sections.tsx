@@ -26,26 +26,10 @@ export function BotsAndChatsSidebarSections({
   return hosts.length ? <EnabledSections onBeforeNavigate={onBeforeNavigate} /> : null;
 }
 function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
-  const { hosts, bots, chats } = useBotCatalog();
-  const directoryHosts = useMemo(
-    () =>
-      hosts.map((host) => ({
-        serverId: host.serverId,
-        serverName: host.label,
-      })),
-    [hosts],
-  );
+  const { hosts, bots, chats, botRows, chatRows, directoryHosts } = useSidebarCatalog();
   const directoryStatus = directoryLoadStatus(bots);
   const creationHosts = useBotCreationHosts();
-  const params = useGlobalSearchParams<{ serverId?: string }>();
-  const defaultServerId = creationHosts.some((host) => host.serverId === params.serverId)
-    ? params.serverId
-    : undefined;
-  const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : [];
-  const chatRows = useMemo(
-    () => (chats.loadState.status === "loaded" ? chats.loadState.data : []),
-    [chats.loadState],
-  );
+  const defaultServerId = useDefaultCreationServerId(creationHosts);
   const { menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, ...menuState } =
     useSidebarPinMenu(onBeforeNavigate, chatRows);
   const { openBot, navigate, error } = useBotSidebarActions(
@@ -53,22 +37,10 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
     onBeforeNavigate,
     chats.loadState.status === "loaded",
   );
-  const {
-    createName,
-    groupOpen,
-    openCreate,
-    closeCreate,
-    closeGroup,
-    openGroup,
-    onBotCreated,
-    onGroupCreated,
-    onPressBot,
-  } = useCreationActions(openBot, navigate);
+  const { openCreate, openGroup, onPressBot, ...creation } = useCreationActions(openBot, navigate);
   const current = parseChatRouteFromPathname(usePathname());
   const projectedBots = projectBotSidebar(botRows, chatRows, hosts.length > 1);
   const selectedBotKey = selectedDirectBotKey(chatRows, current);
-  const botHeader = useMemo(() => ({ title: "New bot" }), []);
-  const groupHeader = useMemo(() => ({ title: "New group chat" }), []);
   return (
     <View>
       {error || menuState.error || bots.error || chats.error ? (
@@ -110,28 +82,46 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         onClose={closeMenu}
       />
       <CreationSheets
-        createName={createName}
-        groupOpen={groupOpen}
-        botHeader={botHeader}
-        groupHeader={groupHeader}
-        closeCreate={closeCreate}
-        closeGroup={closeGroup}
+        {...creation}
         defaultServerId={defaultServerId}
         hosts={hosts}
         creationHosts={creationHosts}
         botRows={botRows}
-        onBotCreated={onBotCreated}
-        onGroupCreated={onGroupCreated}
       />
     </View>
   );
 }
 
+/** The bot catalog as the sidebar reads it: loaded rows and the directory's Host list. */
+function useSidebarCatalog() {
+  const { hosts, bots, chats } = useBotCatalog();
+  const directoryHosts = useMemo(
+    () =>
+      hosts.map((host) => ({
+        serverId: host.serverId,
+        serverName: host.label,
+      })),
+    [hosts],
+  );
+  const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : [];
+  const chatRows = useMemo(
+    () => (chats.loadState.status === "loaded" ? chats.loadState.data : []),
+    [chats.loadState],
+  );
+  return { hosts, bots, chats, botRows, chatRows, directoryHosts };
+}
+
+/** The route's Host when a bot can be created there, so the create form starts on it. */
+function useDefaultCreationServerId(creationHosts: { serverId: string }[]): string | undefined {
+  const params = useGlobalSearchParams<{ serverId?: string }>();
+  return creationHosts.some((host) => host.serverId === params.serverId)
+    ? params.serverId
+    : undefined;
+}
+
 function CreationSheets({
   createName,
   groupOpen,
-  botHeader,
-  groupHeader,
   closeCreate,
   closeGroup,
   defaultServerId,
@@ -143,8 +133,6 @@ function CreationSheets({
 }: {
   createName: string | null;
   groupOpen: boolean;
-  botHeader: { title: string };
-  groupHeader: { title: string };
   closeCreate: () => void;
   closeGroup: () => void;
   defaultServerId?: string;
@@ -154,6 +142,8 @@ function CreationSheets({
   onBotCreated: (serverId: string, botId: string) => void;
   onGroupCreated: (serverId: string, chatId: string) => void;
 }) {
+  const botHeader = useMemo(() => ({ title: "New bot" }), []);
+  const groupHeader = useMemo(() => ({ title: "New group chat" }), []);
   return (
     <>
       <AdaptiveModalSheet

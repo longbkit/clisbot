@@ -74,15 +74,6 @@ export function createBotService(deps: BotServiceDeps): BotService {
   // `bot.create` calls cannot pick the same home.
   let creations: Promise<unknown> = Promise.resolve();
 
-  async function requireActive(botId: string): Promise<StoredBot> {
-    const bot = await store.get(botId);
-    if (!bot) throw new BotRequestError("bot_not_found", `Bot ${botId} does not exist.`);
-    if (bot.archivedAt !== null) {
-      throw new BotRequestError("bot_archived", `Bot ${botId} is archived.`);
-    }
-    return bot;
-  }
-
   return {
     root: deps.root,
     list: async (includeArchived = false) =>
@@ -95,54 +86,84 @@ export function createBotService(deps: BotServiceDeps): BotService {
       creations = next;
       return next;
     },
-    async update(botId, patch) {
-      const bot = await requireActive(botId);
-      const name = patch.name?.trim();
-      if (patch.name !== undefined && !name) {
-        throw new BotRequestError("invalid_request", "A bot needs a name.");
-      }
-      const updated = await store.update(bot.id, (current) => ({
-        ...current,
-        ...(name ? { name } : {}),
-        ...(patch.title !== undefined ? { title: patch.title } : {}),
-        ...(patch.description !== undefined ? { description: patch.description } : {}),
-        ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
-        ...(patch.launch !== undefined ? { launch: patch.launch } : {}),
-        updatedAt: new Date().toISOString(),
-      }));
-      if (!updated) throw new BotRequestError("bot_not_found", `Bot ${botId} does not exist.`);
-      if (name && name !== bot.name) {
-        await deps.projectRegistry.update(bot.projectId, (record) => ({
-          ...record,
-          customName: name,
-        }));
-      }
-      return updated;
-    },
-    async archive(botId) {
-      const bot = await store.get(botId);
-      if (!bot) throw new BotRequestError("bot_not_found", `Bot ${botId} does not exist.`);
-      if (bot.archivedAt !== null) return bot;
-      await deps.archiveWorkspace(bot.workspaceId);
-      const now = new Date().toISOString();
-      const archived = await store.update(bot.id, (current) => ({
-        ...current,
-        archivedAt: now,
-        updatedAt: now,
-      }));
-      return archived ?? bot;
-    },
-    async seedTemplate(botId, overwrite) {
-      const bot = await requireActive(botId);
-      const template = await seedBotTemplate(bot.cwd, bot.kind, overwrite, bot.launch.provider);
-      const now = new Date().toISOString();
-      const seeded = await store.update(bot.id, (current) => ({
-        ...current,
-        template: { id: current.template?.id ?? botTemplateId(current.kind), seededAt: now },
-        updatedAt: now,
-      }));
-      return { bot: seeded ?? bot, template };
-    },
+    update: (botId, patch) => updateBot(store, deps.projectRegistry, botId, patch),
+    archive: (botId) => archiveBot(store, (id) => deps.archiveWorkspace(id), botId),
+    seedTemplate: (botId, overwrite) => seedTemplateForBot(store, botId, overwrite),
     subscribe: (listener) => store.subscribe(listener),
   };
+}
+
+function botNotFound(botId: string): BotRequestError {
+  return new BotRequestError("bot_not_found", `Bot ${botId} does not exist.`);
+}
+
+async function requireActive(store: BotStore, botId: string): Promise<StoredBot> {
+  const bot = await store.get(botId);
+  if (!bot) throw botNotFound(botId);
+  if (bot.archivedAt !== null) {
+    throw new BotRequestError("bot_archived", `Bot ${botId} is archived.`);
+  }
+  return bot;
+}
+
+/** A rename also becomes the custom name of the bot's Project. */
+async function updateBot(
+  store: BotStore,
+  projectRegistry: ProjectRegistry,
+  botId: string,
+  patch: BotUpdatePatch,
+): Promise<StoredBot> {
+  const bot = await requireActive(store, botId);
+  const name = patch.name?.trim();
+  if (patch.name !== undefined && !name) {
+    throw new BotRequestError("invalid_request", "A bot needs a name.");
+  }
+  const updated = await store.update(bot.id, (current) => ({
+    ...current,
+    ...(name ? { name } : {}),
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
+    ...(patch.launch !== undefined ? { launch: patch.launch } : {}),
+    updatedAt: new Date().toISOString(),
+  }));
+  if (!updated) throw botNotFound(botId);
+  if (name && name !== bot.name) {
+    await projectRegistry.update(bot.projectId, (record) => ({ ...record, customName: name }));
+  }
+  return updated;
+}
+
+async function archiveBot(
+  store: BotStore,
+  archiveWorkspace: BotServiceDeps["archiveWorkspace"],
+  botId: string,
+): Promise<StoredBot> {
+  const bot = await store.get(botId);
+  if (!bot) throw botNotFound(botId);
+  if (bot.archivedAt !== null) return bot;
+  await archiveWorkspace(bot.workspaceId);
+  const now = new Date().toISOString();
+  const archived = await store.update(bot.id, (current) => ({
+    ...current,
+    archivedAt: now,
+    updatedAt: now,
+  }));
+  return archived ?? bot;
+}
+
+async function seedTemplateForBot(
+  store: BotStore,
+  botId: string,
+  overwrite: boolean,
+): Promise<{ bot: StoredBot; template: BotTemplateSeedResult }> {
+  const bot = await requireActive(store, botId);
+  const template = await seedBotTemplate(bot.cwd, bot.kind, overwrite, bot.launch.provider);
+  const now = new Date().toISOString();
+  const seeded = await store.update(bot.id, (current) => ({
+    ...current,
+    template: { id: current.template?.id ?? botTemplateId(current.kind), seededAt: now },
+    updatedAt: now,
+  }));
+  return { bot: seeded ?? bot, template };
 }

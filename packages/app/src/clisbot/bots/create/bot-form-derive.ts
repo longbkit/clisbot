@@ -1,0 +1,219 @@
+import type {
+  AgentMode,
+  AgentModelDefinition,
+  AgentProvider,
+  ProviderSnapshotEntry,
+} from "@getpaseo/protocol/agent-types";
+import { slugify } from "@getpaseo/protocol/branch-slug";
+import { formatThinkingOptionLabel } from "@/agent-controls/labels";
+import type { FormPreferences } from "@/create-agent-preferences/preferences";
+import { filterSelectableModels } from "@/provider-selection/model-catalog";
+import {
+  buildProviderDefinitionMapForStatuses,
+  RESOLVABLE_PROVIDER_STATUSES,
+  resolveDefaultModelId,
+  resolveFormStateFromProviderModels,
+  type FormInitialValues,
+  type FormState,
+  type ProviderModelsByProvider,
+  type UserModifiedFields,
+} from "@/provider-selection/resolve-agent-form";
+import { buildProviderDefinitions } from "@/utils/provider-definitions";
+import { botsCopy } from "../copy";
+import type { BotFormDisplay, BotFormHost, BotFormSnapshot, BotFormState } from "./bot-form-model";
+
+/**
+ * Pure state derivation for the bot form model: the initial state, the provider/model/mode
+ * selection resolved against a Host's provider snapshot, and the display fields derived from it.
+ */
+type ThinkingOption = BotFormState["availableThinkingOptions"][number];
+
+const FALLBACK_SLUG = "bot";
+
+export function previewBotSlug(name: string): string {
+  return slugify(name) || FALLBACK_SLUG;
+}
+
+function resolveInitialServerId(snapshot: BotFormSnapshot): string | null {
+  if (snapshot.mode === "edit") return snapshot.bot?.serverId ?? snapshot.defaults.serverId ?? null;
+  if (snapshot.defaults.serverId !== undefined) return snapshot.defaults.serverId;
+  return snapshot.hosts.length === 1 ? (snapshot.hosts[0]?.serverId ?? null) : null;
+}
+
+export function hostDisplay(
+  hosts: readonly BotFormHost[],
+  serverId: string | null,
+): BotFormDisplay | null {
+  const host = hosts.find((entry) => entry.serverId === serverId);
+  return host ? { label: host.label } : null;
+}
+
+export function initialValuesOf(snapshot: BotFormSnapshot): FormInitialValues | undefined {
+  const launch = snapshot.bot?.launchDefaults;
+  if (!launch) return undefined;
+  return {
+    provider: launch.provider,
+    model: launch.model ?? null,
+    modeId: launch.modeId ?? null,
+    thinkingOptionId: launch.thinkingOptionId ?? null,
+  };
+}
+
+export function entryFor(
+  entries: readonly ProviderSnapshotEntry[],
+  provider: AgentProvider | null,
+) {
+  return provider ? (entries.find((entry) => entry.provider === provider) ?? null) : null;
+}
+
+export function modelsFor(
+  entries: readonly ProviderSnapshotEntry[],
+  provider: AgentProvider | null,
+) {
+  return filterSelectableModels(entryFor(entries, provider)?.models ?? null);
+}
+
+function effectiveModel(models: AgentModelDefinition[] | null, modelId: string) {
+  const id = modelId.trim();
+  if (!models || !id) return null;
+  return models.find((model) => model.id === id) ?? models.find((model) => model.isDefault) ?? null;
+}
+
+function modelDisplay(
+  models: AgentModelDefinition[] | null,
+  modelId: string,
+): BotFormDisplay | null {
+  const id = modelId.trim();
+  if (!id) return null;
+  return { label: effectiveModel(models, id)?.label ?? id };
+}
+
+function modeDisplay(modes: readonly AgentMode[], modeId: string): BotFormDisplay {
+  const id = modeId.trim();
+  if (!id) return { label: botsCopy.form.defaultMode };
+  return { label: modes.find((mode) => mode.id === id)?.label ?? id };
+}
+
+function thinkingDisplay(options: readonly ThinkingOption[], id: string): BotFormDisplay | null {
+  const trimmed = id.trim();
+  if (!trimmed) return null;
+  const option = options.find((entry) => entry.id === trimmed) ?? { id: trimmed };
+  return { label: formatThinkingOptionLabel(option) };
+}
+
+function toFormState(state: BotFormState): FormState {
+  return {
+    provider: state.selectedProvider,
+    modeId: state.selectedMode,
+    model: state.selectedModel,
+    thinkingOptionId: state.selectedThinkingOptionId,
+  };
+}
+
+function providerModelsByProvider(entries: ProviderSnapshotEntry[]): ProviderModelsByProvider {
+  const map: ProviderModelsByProvider = new Map();
+  for (const entry of entries)
+    map.set(entry.provider, filterSelectableModels(entry.models ?? null));
+  return map;
+}
+
+export function resolveSelection(input: {
+  state: BotFormState;
+  initialValues: FormInitialValues | undefined;
+  preferences: FormPreferences | null;
+  entries: ProviderSnapshotEntry[];
+  userModified: UserModifiedFields;
+}): BotFormState {
+  const allowed = buildProviderDefinitionMapForStatuses({
+    snapshotEntries: input.entries,
+    providerDefinitions: buildProviderDefinitions(input.entries),
+    statuses: RESOLVABLE_PROVIDER_STATUSES,
+  });
+  const resolved = resolveFormStateFromProviderModels(
+    input.initialValues,
+    input.preferences,
+    providerModelsByProvider(input.entries),
+    input.userModified,
+    toFormState(input.state),
+    allowed,
+  );
+  // An empty model after resolution means "the provider's default"; name it, as `setProvider` does.
+  const selectedModel =
+    resolved.provider && !resolved.model
+      ? resolveDefaultModelId(modelsFor(input.entries, resolved.provider))
+      : resolved.model;
+  return {
+    ...input.state,
+    selectedProvider: resolved.provider,
+    selectedMode: resolved.modeId,
+    selectedModel,
+    selectedThinkingOptionId: resolved.thinkingOptionId,
+  };
+}
+
+export function updateDerivedState(input: {
+  state: BotFormState;
+  hosts: readonly BotFormHost[];
+  entries: readonly ProviderSnapshotEntry[];
+  slug: string | null;
+}): BotFormState {
+  const { state } = input;
+  const models = modelsFor(input.entries, state.selectedProvider);
+  const modeOptions = entryFor(input.entries, state.selectedProvider)?.modes ?? [];
+  const thinkingOptions = effectiveModel(models, state.selectedModel)?.thinkingOptions ?? [];
+  const resolution = state.selectedServerId
+    ? (state.providerResolutionByServerId[state.selectedServerId] ?? "idle")
+    : "idle";
+  return {
+    ...state,
+    slugPreview: input.slug ?? previewBotSlug(state.name),
+    hosts: [...input.hosts],
+    selectedHostDisplay:
+      state.selectedHostDisplay ?? hostDisplay(input.hosts, state.selectedServerId),
+    showHostField: input.hosts.length !== 1 || input.hosts[0]?.serverId !== state.selectedServerId,
+    selectedModelDisplay: modelDisplay(models, state.selectedModel),
+    selectedModeDisplay: modeDisplay(modeOptions, state.selectedMode),
+    selectedThinkingDisplay: thinkingDisplay(thinkingOptions, state.selectedThinkingOptionId),
+    modeOptions,
+    availableThinkingOptions: thinkingOptions,
+    providerSnapshotRequest:
+      state.selectedServerId && resolution !== "complete"
+        ? { serverId: state.selectedServerId }
+        : null,
+    canSubmit: Boolean(state.name.trim() && state.selectedServerId && state.selectedProvider),
+  };
+}
+
+export function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
+  const selectedServerId = resolveInitialServerId(snapshot);
+  const launch = snapshot.bot?.launchDefaults;
+  const model = launch?.model ?? "";
+  const mode = launch?.modeId ?? "";
+  const thinking = launch?.thinkingOptionId ?? "";
+  return {
+    mode: snapshot.mode,
+    name: snapshot.bot?.name ?? snapshot.defaults.name ?? "",
+    description: snapshot.bot?.description ?? "",
+    slugPreview: "",
+    kind: snapshot.bot?.kind ?? "personal",
+    hosts: [],
+    selectedServerId,
+    selectedHostDisplay: null,
+    showHostField: false,
+    selectedProvider: launch?.provider ?? null,
+    selectedModel: model,
+    selectedMode: mode,
+    selectedThinkingOptionId: thinking,
+    featureValues: { ...launch?.featureValues },
+    selectedModelDisplay: model ? { label: model } : null,
+    selectedModeDisplay: modeDisplay([], mode),
+    selectedThinkingDisplay: thinkingDisplay([], thinking),
+    modelSelectorProviders: [],
+    modeOptions: [],
+    availableThinkingOptions: [],
+    providerResolutionByServerId: selectedServerId ? { [selectedServerId]: "pending" } : {},
+    providerSnapshotRequest: null,
+    canSubmit: false,
+    submitError: null,
+  };
+}

@@ -65,39 +65,11 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const focused = useIsFocused();
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
-  const { bots } = useBotCatalog();
   const { chat, setChat, error, setError } = useChatRecord(client, online, chatId, key);
   const transcript = useChatTranscriptQuery({ serverId, chatId, runtime: botsRuntime });
   useChatVisibility(serverId, chatId, chat, focused);
   const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
-  const botRows = useMemo(
-    () =>
-      bots.loadState.status === "loaded"
-        ? bots.loadState.data.filter((b) => b.serverId === serverId)
-        : [],
-    [bots.loadState, serverId],
-  );
-  const identities = useMemo(
-    () =>
-      (chat?.participants ?? []).map((p) => ({
-        botId: p.botId,
-        slug: p.slug,
-        agentId: p.agentId ?? undefined,
-        canConfigure: botRows.find((b) => b.id === p.botId)?.canConfigure,
-        name: p.displayName,
-        avatar: botRows.find((b) => b.id === p.botId)?.avatar,
-        cwd: botRows.find((b) => b.id === p.botId)?.cwd,
-        workspaceId: botRows.find((b) => b.id === p.botId)?.workspaceId,
-      })),
-    [chat?.participants, botRows],
-  );
-  const workspaceByBotId = useMemo(
-    () =>
-      new Map(
-        identities.filter((bot) => bot.workspaceId).map((bot) => [bot.botId, bot.workspaceId!]),
-      ),
-    [identities],
-  );
+  const { botRows, identities, workspaceByBotId } = useChatIdentities(serverId, chat?.participants);
   const attachmentsSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
@@ -116,7 +88,108 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   }, [loadOlder, setError]);
   const group = chat?.kind === "group" || (!chat?.kind && (chat?.participants.length ?? 0) > 1);
   const working = group && [...heads.values()].some((head) => head.turnActive);
-  const options = useMemo(
+  const options = useChatHeaderOptions({
+    chat,
+    chatId,
+    serverId,
+    botRows,
+    workspaceByBotId,
+    working,
+    setError,
+  });
+  if (transcript.loadState.status === "error")
+    return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
+  if (!chat) return <Text>{error ?? (online ? "Loading chat…" : "Connecting to Host…")}</Text>;
+  const title = chat.title ?? identities.map((b) => b.name).join(", ");
+  return (
+    <View style={styles.root}>
+      {!online ? <Text style={styles.error}>Host is offline. Your draft is saved.</Text> : null}
+      {error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+      <ConversationWorkspace
+        group={group}
+        serverId={serverId}
+        chatId={chatId}
+        accessScope={principalScope}
+        title={title}
+        bots={identities}
+        headerActions={options}
+      >
+        <ChatScreen
+          hideHeader
+          serverId={serverId}
+          chatId={chatId}
+          title={title}
+          bots={identities}
+          transcript={transcript.transcript.messages}
+          liveHeads={heads}
+          canSend={online && !sending}
+          onSubmitMessage={send}
+          onReachTop={reachTop}
+        />
+      </ConversationWorkspace>
+    </View>
+  );
+}
+
+/** The chat's participants joined with this Host's bot rows: what the header and screen show. */
+function useChatIdentities(
+  serverId: string,
+  participants: ChatPayload["participants"] | undefined,
+) {
+  const { bots } = useBotCatalog();
+  const botRows = useMemo(
+    () =>
+      bots.loadState.status === "loaded"
+        ? bots.loadState.data.filter((b) => b.serverId === serverId)
+        : [],
+    [bots.loadState, serverId],
+  );
+  const identities = useMemo(
+    () =>
+      (participants ?? []).map((p) => ({
+        botId: p.botId,
+        slug: p.slug,
+        agentId: p.agentId ?? undefined,
+        canConfigure: botRows.find((b) => b.id === p.botId)?.canConfigure,
+        name: p.displayName,
+        avatar: botRows.find((b) => b.id === p.botId)?.avatar,
+        cwd: botRows.find((b) => b.id === p.botId)?.cwd,
+        workspaceId: botRows.find((b) => b.id === p.botId)?.workspaceId,
+      })),
+    [participants, botRows],
+  );
+  const workspaceByBotId = useMemo(
+    () =>
+      new Map(
+        identities.filter((bot) => bot.workspaceId).map((bot) => [bot.botId, bot.workspaceId!]),
+      ),
+    [identities],
+  );
+  return { botRows, identities, workspaceByBotId };
+}
+
+function useChatHeaderOptions({
+  chat,
+  chatId,
+  serverId,
+  botRows,
+  workspaceByBotId,
+  working,
+  setError,
+}: {
+  chat: ChatPayload | null;
+  chatId: string;
+  serverId: string;
+  botRows: ChatIdentities["botRows"];
+  workspaceByBotId: ChatIdentities["workspaceByBotId"];
+  working: boolean;
+  setError: (value: string | null) => void;
+}) {
+  return useMemo(
     () =>
       chat ? (
         <View style={styles.actions}>
@@ -133,42 +206,10 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
       ) : null,
     [botRows, chat, chatId, serverId, workspaceByBotId, working, setError],
   );
-  if (transcript.loadState.status === "error")
-    return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
-  if (!chat) return <Text>{error ?? (online ? "Loading chat…" : "Connecting to Host…")}</Text>;
-  return (
-    <View style={styles.root}>
-      {!online ? <Text style={styles.error}>Host is offline. Your draft is saved.</Text> : null}
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
-      <ConversationWorkspace
-        group={group}
-        serverId={serverId}
-        chatId={chatId}
-        accessScope={principalScope}
-        title={chat.title ?? identities.map((b) => b.name).join(", ")}
-        bots={identities}
-        headerActions={options}
-      >
-        <ChatScreen
-          hideHeader
-          serverId={serverId}
-          chatId={chatId}
-          title={chat.title ?? identities.map((b) => b.name).join(", ")}
-          bots={identities}
-          transcript={transcript.transcript.messages}
-          liveHeads={heads}
-          canSend={online && !sending}
-          onSubmitMessage={send}
-          onReachTop={reachTop}
-        />
-      </ConversationWorkspace>
-    </View>
-  );
 }
+
+type ChatIdentities = ReturnType<typeof useChatIdentities>;
+
 const styles = StyleSheet.create((theme) => ({
   root: { flex: 1, backgroundColor: theme.colors.surface0 },
   actions: {
