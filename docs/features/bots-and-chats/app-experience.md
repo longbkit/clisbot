@@ -52,7 +52,12 @@ and permission mode the bot will run with even when there is one choice; a row w
 chevron and opens its own picker, a row without shows the value it will use. The Model row names
 provider and model with the provider's icon. An unlabeled summary ("Grok · Grok 4.6 / Default mode
 · High") behind a Customize button did not say which value was which or that it could be changed,
-and splitting the settings into separate fields lost the grouping and hid rows with one choice. **Apply
+and splitting the settings into separate fields lost the grouping and hid rows with one choice. Every default is filled so Name and Enter create the bot: the Host in the route, else the Host of
+the most recent chat, else the only Host; the device's saved AI choices, else the Host's first
+ready provider and its default model. Creating a bot saves its AI choices for the next one
+([README D11, D12](README.md#d11-templates-move-into-the-daemon)).
+
+**Apply
 agent profile** is a one-time action copying a saved launch bundle into those controls. There is no
 selected or default profile binding; see [the glossary](../../glossary.md). Reuse existing
 preference resolution and validate the selected Host/provider. Do not introduce a hidden Full access default.

@@ -117,6 +117,28 @@ function providerModelsByProvider(entries: ProviderSnapshotEntry[]): ProviderMod
   return map;
 }
 
+/**
+ * The preferences the selection starts from, so a new bot never opens without a model: when
+ * nothing chose a provider yet, or the remembered one is not on this Host, the first provider the
+ * Host reports ready stands in. The stored preferences are not changed.
+ */
+function withAvailableProvider(
+  input: {
+    state: BotFormState;
+    initialValues: FormInitialValues | undefined;
+    preferences: FormPreferences | null;
+    entries: readonly ProviderSnapshotEntry[];
+    userModified: UserModifiedFields;
+  },
+  allowed: ReadonlyMap<AgentProvider, unknown>,
+): FormPreferences | null {
+  if (input.userModified.provider || input.initialValues?.provider) return input.preferences;
+  const chosen = input.preferences?.provider ?? input.state.selectedProvider;
+  if (chosen && allowed.has(chosen)) return input.preferences;
+  const ready = input.entries.find((entry) => entry.enabled && entry.status === "ready");
+  return ready ? { ...input.preferences, provider: ready.provider } : input.preferences;
+}
+
 export function resolveSelection(input: {
   state: BotFormState;
   initialValues: FormInitialValues | undefined;
@@ -131,7 +153,7 @@ export function resolveSelection(input: {
   });
   const resolved = resolveFormStateFromProviderModels(
     input.initialValues,
-    input.preferences,
+    withAvailableProvider(input, allowed),
     providerModelsByProvider(input.entries),
     input.userModified,
     toFormState(input.state),

@@ -91,20 +91,45 @@ describe("openBotForm", () => {
     expect(model.getState().providerSnapshotRequest).toEqual({ serverId: "host-b" });
   });
 
-  it("never picks a provider on its own (README D11)", () => {
+  it("starts on the first ready provider when nothing chose one (README D11)", () => {
     const model = openBotForm(createSnapshot());
-    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
     expect(model.getState().selectedProvider).toBeNull();
-    expect(model.getState().modelSelectorProviders.map((provider) => provider.id)).toEqual([
-      "mock",
-    ]);
-    expect(model.getState().canSubmit).toBe(false);
-    model.setProvider("mock");
+    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
     expect(model.getState()).toMatchObject({
+      selectedProvider: "mock",
       selectedModel: "model-a",
       selectedMode: "build",
       canSubmit: true,
     });
+  });
+
+  it("replaces a remembered provider the Host does not have", () => {
+    const model = openBotForm(
+      createSnapshot({ defaults: { name: "Ops", preferences: { provider: "grok" } } }),
+    );
+    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    expect(model.getState().selectedProvider).toBe("mock");
+  });
+
+  it("lets saved preferences that arrive late replace the stand-in provider", () => {
+    const other = {
+      ...ENTRIES[0]!,
+      provider: "other",
+      label: "Other",
+      models: [{ provider: "other", id: "other-a", label: "Other A", isDefault: true }],
+    };
+    const model = openBotForm(createSnapshot());
+    model.applyProviderSnapshot("host-a", { entries: [...ENTRIES, other] });
+    expect(model.getState().selectedProvider).toBe("mock");
+    model.applyPreferences({ provider: "other" });
+    expect(model.getState().selectedProvider).toBe("other");
+  });
+
+  it("does not replace a provider the user chose", () => {
+    const model = openBotForm(createSnapshot());
+    model.setProvider("grok");
+    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    expect(model.getState().selectedProvider).toBe("grok");
   });
 
   it("applies a provider snapshot only for the selected host and resolves the preferred defaults", () => {

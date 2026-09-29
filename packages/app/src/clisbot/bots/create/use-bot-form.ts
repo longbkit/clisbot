@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { BotPayload } from "../data/contracts";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useFormPreferences } from "@/hooks/use-form-preferences";
+import { mergeCreateAgentSelectionPreferences } from "@/create-agent-preferences/preferences";
 import { refreshBotsAndChats } from "../data/runtime";
-import { openBotForm, toCreateRequest, toUpdateRequest } from "./bot-form-model";
+import { openBotForm, toCreateRequest, toUpdateRequest, type BotFormState } from "./bot-form-model";
 import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
 export interface BotCreateFormProps {
   name: string;
@@ -16,7 +17,7 @@ export interface BotCreateFormProps {
 }
 export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: BotCreateFormProps) {
   const isCurrent = useFormLifetime();
-  const { preferences } = useFormPreferences();
+  const { preferences, updatePreferences } = useFormPreferences();
   const [model] = useState(() =>
     openBotForm({
       mode: bot ? "edit" : "create",
@@ -47,15 +48,35 @@ export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: Bot
       const result = bot ? await client.updateBot(update) : await client.createBot(request);
       if (result.error || !result.bot) throw new Error(result.error ?? "Bot could not be created");
       refreshBotsAndChats();
+      if (!bot) void rememberSelection(state, updatePreferences);
       if (isCurrent()) onCreated(serverId, result.bot.id);
     } catch (error) {
       if (isCurrent()) model.setSubmitError(String(error));
     } finally {
       if (isCurrent()) setBusy(false);
     }
-  }, [state, model, onCreated, bot, isCurrent]);
+  }, [state, model, onCreated, bot, isCurrent, updatePreferences]);
   const submitAction = useCallback(() => {
-    void submit();
-  }, [submit]);
+    if (state.canSubmit && !busy) void submit();
+  }, [submit, state.canSubmit, busy]);
   return { model, state, providerSnapshot, busy, submitAction };
+}
+
+/**
+ * A created bot's AI choices become where the next New bot starts, through the same stored
+ * preferences New agent uses. A failed write only loses the hint.
+ */
+function rememberSelection(
+  state: BotFormState,
+  update: ReturnType<typeof useFormPreferences>["updatePreferences"],
+): Promise<unknown> {
+  return update((current) =>
+    mergeCreateAgentSelectionPreferences({
+      preferences: current,
+      provider: state.selectedProvider,
+      modelId: state.selectedModel,
+      modeId: state.selectedMode,
+      thinkingOptionId: state.selectedThinkingOptionId,
+    }),
+  ).catch(() => undefined);
 }

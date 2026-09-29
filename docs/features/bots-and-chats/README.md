@@ -227,10 +227,22 @@ existing files are kept, symlinks are never followed, never seed into the OS hom
 A new bot's launch defaults come from the Agent profile or controls chosen at creation. There is no
 hidden default provider.
 
+Revised 2026-09-29: the New bot form now starts filled so Name and Enter create a bot. Provider,
+model, mode and thinking come from the choices this device last saved (a created bot saves its
+choices, as New agent does); when nothing is saved or the saved provider is not on the Host, the
+Host's first ready provider with its default model stands in. The default is not hidden: the AI
+configuration card always shows Host, Model, Permissions and Thinking as labeled rows. The earlier
+rule left Model empty and Create disabled on a fresh device, one extra pick per bot. The CLI
+(`hub init`) still asks or fails instead of assuming a provider.
+
 ### D12. Host choice is explicit
 
 A bot is created on the Host selected in the sidebar. With several Hosts the create form shows a
 Host picker; nothing guesses.
+
+Revised 2026-09-29: when no Host is selected in the sidebar, the form starts on the Host of the
+most recent chat, else the only Host. The Host row is always shown and can be changed before
+creating, so the guess is visible, not silent.
 
 ### D13. Sharing is a Project grant
 

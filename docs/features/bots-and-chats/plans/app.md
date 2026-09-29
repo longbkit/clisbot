@@ -250,8 +250,8 @@ cowork, a Sharing row that navigates to `buildProjectSettingsRoute(serverId, bot
 
 Entry: the `NewBotRow` in the sidebar (§1) and a "New bot" item in the chat header's Add bot
 picker. Typing a name and pressing Enter opens `BotFormSheet` with the name filled. There is no
-silent create: launch defaults are chosen at creation (README D11) and the Host is explicit when
-several exist (README D12).
+silent create: the form starts filled, every default shown in the AI configuration card, and
+Enter in Name creates (README D11, D12 as revised 2026-09-29).
 
 ### Model — `clisbot/bots/create/bot-form-model.ts` (zero React imports)
 

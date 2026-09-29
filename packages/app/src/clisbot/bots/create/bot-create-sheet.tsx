@@ -42,6 +42,8 @@ export function BotCreateForm(props: BotCreateFormProps) {
           size={size}
           initialValue={state.name}
           onChangeText={model.setName}
+          onSubmitEditing={submitAction}
+          returnKeyType="done"
           placeholder="For example, Research assistant"
         />
       </Field>

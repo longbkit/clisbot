@@ -29,7 +29,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
   const { hosts, bots, chats, botRows, chatRows, directoryHosts } = useSidebarCatalog();
   const directoryStatus = directoryLoadStatus(bots);
   const creationHosts = useBotCreationHosts();
-  const defaultServerId = useDefaultCreationServerId(creationHosts);
+  const defaultServerId = useDefaultCreationServerId(creationHosts, chatRows);
   const { menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, ...menuState } =
     useSidebarPinMenu(onBeforeNavigate, chatRows);
   const { openBot, navigate, error } = useBotSidebarActions(
@@ -108,12 +108,19 @@ function useSidebarCatalog() {
   return { hosts, bots, chats, botRows, chatRows, directoryHosts };
 }
 
-/** The route's Host when a bot can be created there, so the create form starts on it. */
-function useDefaultCreationServerId(creationHosts: { serverId: string }[]): string | undefined {
+/**
+ * Where New bot starts: the route's Host, else the Host of the most recent chat, when a bot can be
+ * created there. Undefined leaves the choice to the form, which takes the only Host when there is one.
+ */
+function useDefaultCreationServerId(
+  creationHosts: { serverId: string }[],
+  recentChats: readonly { serverId: string }[],
+): string | undefined {
   const params = useGlobalSearchParams<{ serverId?: string }>();
-  return creationHosts.some((host) => host.serverId === params.serverId)
-    ? params.serverId
-    : undefined;
+  const eligible = (serverId: string | undefined) =>
+    creationHosts.some((host) => host.serverId === serverId);
+  if (eligible(params.serverId)) return params.serverId;
+  return recentChats.find((chat) => eligible(chat.serverId))?.serverId;
 }
 
 function CreationSheets({

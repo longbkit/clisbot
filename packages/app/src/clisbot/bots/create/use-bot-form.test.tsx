@@ -83,7 +83,8 @@ describe("useBotForm saved defaults", () => {
       model.setName("My assistant");
       model.setKind("team");
     });
-    expect(result.current.state.selectedProvider).toBeNull();
+    // The Host's first ready provider stands in until the saved choice arrives.
+    expect(result.current.state.selectedProvider).toBe("mock");
     inputs.preferences = SAVED;
     rerender();
     expect(result.current.model).toBe(model);
