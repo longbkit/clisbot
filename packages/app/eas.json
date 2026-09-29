@@ -39,7 +39,8 @@
         "CLISBOT_HUB_ORIGIN": "https://longpro2max.taile33b14.ts.net:8444"
       },
       "android": {
-        "resourceClass": "medium"
+        "resourceClass": "medium",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease -x generateReleaseLintModel -x generateReleaseLintVitalModel"
       }
     }
   },
