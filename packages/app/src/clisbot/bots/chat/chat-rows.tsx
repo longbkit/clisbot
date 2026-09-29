@@ -1,9 +1,11 @@
 import { displayMentions, type MentionMember } from "./member-mentions";
 import { useChatMessageImages } from "./use-chat-message-images";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { isNative } from "@/constants/platform";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import {
   AssistantMessage,
@@ -95,20 +97,29 @@ export const ChatBotRow = memo(function ChatBotRow({
     () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
     [bot.avatar, bot.botId, bot.name],
   );
+  // Copy and time show on hover, as under a user message; touch has no hover, so they stay.
+  const compact = useIsCompactFormFactor();
+  const [hovered, setHovered] = useState(false);
+  const onPointerEnter = useCallback(() => setHovered(true), []);
+  const onPointerLeave = useCallback(() => setHovered(false), []);
   return (
-    <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
-      <AssistantMessage
-        occurrenceKey={row.key}
-        message={message}
-        timestamp={Date.parse(row.line.at)}
-        serverId={serverId}
-        phase="complete"
-        client={client}
-        workspaceRoot={bot.cwd}
-        underSenderName={row.opensGroup}
-      />
-      <BotLineFooter line={row.line} text={copyText} />
-    </ActorResponseRow>
+    <View onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+      <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
+        <AssistantMessage
+          occurrenceKey={row.key}
+          message={message}
+          timestamp={Date.parse(row.line.at)}
+          serverId={serverId}
+          phase="complete"
+          client={client}
+          workspaceRoot={bot.cwd}
+          underSenderName={row.opensGroup}
+          // The footer below owns the gap, as a user message's time row does.
+          spacing="compactBottom"
+        />
+        <BotLineFooter line={row.line} text={copyText} visible={hovered || compact || isNative} />
+      </ActorResponseRow>
+    </View>
   );
 });
 
@@ -119,9 +130,12 @@ export const ChatBotRow = memo(function ChatBotRow({
 function BotLineFooter({
   line,
   text,
+  visible,
 }: {
   line: Extract<ChatRenderRow, { kind: "bot" }>["line"];
   text: string;
+  /** Hidden keeps its height, so a line does not shift when the pointer moves over it. */
+  visible: boolean;
 }) {
   const getContent = useCallback(() => text, [text]);
   const completedAt = useMemo(() => new Date(line.at), [line.at]);
@@ -130,7 +144,10 @@ function BotLineFooter({
     ? Math.max(0, completedAt.getTime() - startedAt)
     : null;
   return (
-    <View style={styles.footer}>
+    <View
+      style={[styles.footer, !visible && styles.footerHidden]}
+      pointerEvents={visible ? "auto" : "none"}
+    >
       <AssistantTurnFooter
         getContent={getContent}
         completedAt={completedAt}
@@ -149,5 +166,7 @@ export const ChatSystemRow = memo(function ChatSystemRow({
 });
 
 const styles = StyleSheet.create((theme) => ({
-  footer: { marginTop: theme.spacing[2], alignSelf: "flex-start" },
+  // The same 8pt from the text as a user message's time row, and room before the next line.
+  footer: { alignSelf: "flex-start", marginTop: theme.spacing[2], marginBottom: theme.spacing[4] },
+  footerHidden: { opacity: 0 },
 }));
