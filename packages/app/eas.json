@@ -31,6 +31,16 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease -x generateReleaseLintModel -x generateReleaseLintVitalModel"
       }
+    },
+    "tailnet-test-apk": {
+      "extends": "production-apk",
+      "env": {
+        "APP_VARIANT": "development",
+        "CLISBOT_HUB_ORIGIN": "https://longpro2max.taile33b14.ts.net:8444"
+      },
+      "android": {
+        "resourceClass": "medium"
+      }
     }
   },
   "submit": {
