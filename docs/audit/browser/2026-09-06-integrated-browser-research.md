@@ -1,4 +1,4 @@
-# Integrated Browser Research: Claude, Codex, T3 Code, and Paseo
+# Integrated Browser Research: Claude, Codex, T3 Code, and Clisbot
 
 ## Working conclusion: four promising directions
 
@@ -14,9 +14,9 @@ The detailed research below records the preceding comparison. It does **not** es
 ## Scope and evidence boundary
 
 - Research date: **2026-09-06**.
-- Products: Claude Code Desktop and its Chrome integration; Codex desktop browser capabilities; T3 Code desktop and web; Paseo desktop, web, and mobile implications.
+- Products: Claude Code Desktop and its Chrome integration; Codex desktop browser capabilities; T3 Code desktop and web; Clisbot desktop, web, and mobile implications.
 - T3 Code upstream source inspected at commit [`223ff4490f764a74ff911589e97b9bbcd595fee8`](https://github.com/pingdotgg/t3code/commit/223ff4490f764a74ff911589e97b9bbcd595fee8).
-- Paseo evidence comes from the local Fusion working tree with HEAD `557502e7eb25c8bb3a8c2b2ebf314bf878edef33`. The tree contained uncommitted changes, so findings describe the inspected working tree, not a certified released build or the commit alone.
+- Clisbot evidence comes from the local Fusion working tree with HEAD `557502e7eb25c8bb3a8c2b2ebf314bf878edef33`. The tree contained uncommitted changes, so findings describe the inspected working tree, not a certified released build or the commit alone.
 - Method: official documentation and source inspection. No comparative live-product benchmark, performance measurement, or end-to-end integration validation was performed.
 - **CURRENT** means supported by the inspected documentation or implementation. **INFERENCE** means a conclusion derived from those paths without a live test. **PROPOSED** means additional work, not an existing product capability.
 
@@ -54,7 +54,7 @@ Sources: [Claude Desktop Browser](https://code.claude.com/docs/en/desktop#previe
 
 **CURRENT:** The desktop browser provides a shared view of websites and local applications, agent interaction, and visual annotations. Its profile is separate from the user's regular browser. The browser extension supplies access to supported personal-browser tabs and signed-in sessions.
 
-The official documentation explicitly distinguishes the built-in browser from Codex CLI and IDE, where that browser is unavailable. Running a Codex provider inside T3 Code or Paseo does not automatically attach the official desktop browser.
+The official documentation explicitly distinguishes the built-in browser from Codex CLI and IDE, where that browser is unavailable. Running a Codex provider inside T3 Code or Clisbot does not automatically attach the official desktop browser.
 
 - **Pros:** precise visual feedback and a shared page context for coding and web tasks.
 - **Cons:** the surrounding application owns the integration; provider/model compatibility alone does not provide it. Existing login state requires the appropriate profile or extension path.
@@ -74,13 +74,13 @@ The tool descriptions distinguish viewport resizing from changing the browser us
 
 Sources: [Preview tools](https://github.com/pingdotgg/t3code/blob/223ff4490f764a74ff911589e97b9bbcd595fee8/apps/server/src/mcp/toolkits/preview/tools.ts), [Preview panel](https://github.com/pingdotgg/t3code/blob/223ff4490f764a74ff911589e97b9bbcd595fee8/apps/web/src/components/preview/PreviewPanel.tsx).
 
-### Paseo
+### Clisbot
 
 **CURRENT:** The inspected Fusion tree contains real browser automation, not just preview. The command contract covers tab listing/creation, snapshots, clicks, form input, navigation, screenshots, uploads, selection, hovering, dragging, logs, evaluation, scrolling, resizing, and tab closure. The desktop pane supports element selection, screenshots, and annotations attached to the composer.
 
 The runtime is an Electron browser guest. The daemon exposes browser tools and routes their commands through a broker to connected browser hosts.
 
-- **Pros:** a transport-neutral Paseo tool catalog and an existing broker seam; workspace-aware targeting; background automation; persistent browser login state.
+- **Pros:** a transport-neutral Clisbot tool catalog and an existing broker seam; workspace-aware targeting; background automation; persistent browser login state.
 - **Cons:** automation currently requires an eligible connected browser host. Web/native panes are unavailable placeholders. The desktop profile is shared across tabs, workspaces, and windows, so workspace separation does not imply account separation.
 
 Browser logs are also narrower than full DevTools diagnostics: the inspected network path reads page Performance API entries, rather than exposing a complete request/response inspector.
@@ -115,16 +115,16 @@ Browser automation supplies primitives. Product integration supplies continuity:
 
 ## Alternatives and tradeoffs
 
-| Alternative                      | Best fit                                             | Advantages                                                                  | Gaps and costs                                                                                                    |
-| -------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Playwright MCP                   | Interactive agent exploration and UI workflows       | Structured page inspection, actions, and browser-state support through MCP. | Does not create a native preview pane, annotations, or takeover in T3/Paseo. Large snapshots can consume context. |
-| Playwright CLI plus skills       | Coding loops, repeatable tests, CI                   | Scriptable; discoveries can become repeatable checks.                       | Needs conventions for sessions, URLs, evidence, and agent usage.                                                  |
-| Chrome DevTools MCP              | Console, network, performance, and Chrome debugging  | Traces and diagnostics beyond basic preview tools.                          | No automatic harness review UI; official browser support focuses on Chrome.                                       |
-| agent-browser with streaming     | Agent automation with a human watching from web      | CLI sessions plus viewport streaming and mouse/keyboard/touch input.        | Authentication, routing, lifecycle, and frontend integration remain application work.                             |
-| Extension bridge                 | Existing personal-browser tabs and accounts          | Human and agent can use the same real session.                              | Requires installation and a running browser; a remote daemon still needs a connection bridge.                     |
-| Managed cloud browser            | Remotely hosted sessions with less runtime operation | Embeddable live views and persistent context options.                       | Service fees, latency, provider-held session data, and private-network reachability.                              |
-| Preview URL with a tab or iframe | Quickly viewing a development app                    | Small initial implementation; direct web interaction.                       | Does not itself add agent control, shared session state, or cross-origin DOM access.                              |
-| Service-specific API/CLI/MCP     | Structured operations with an adequate API           | Often easier to validate and more stable than navigating UI.                | Cannot establish that the rendered user interface works; limited to the API's coverage.                           |
+| Alternative                      | Best fit                                             | Advantages                                                                  | Gaps and costs                                                                                                      |
+| -------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Playwright MCP                   | Interactive agent exploration and UI workflows       | Structured page inspection, actions, and browser-state support through MCP. | Does not create a native preview pane, annotations, or takeover in T3/Clisbot. Large snapshots can consume context. |
+| Playwright CLI plus skills       | Coding loops, repeatable tests, CI                   | Scriptable; discoveries can become repeatable checks.                       | Needs conventions for sessions, URLs, evidence, and agent usage.                                                    |
+| Chrome DevTools MCP              | Console, network, performance, and Chrome debugging  | Traces and diagnostics beyond basic preview tools.                          | No automatic harness review UI; official browser support focuses on Chrome.                                         |
+| agent-browser with streaming     | Agent automation with a human watching from web      | CLI sessions plus viewport streaming and mouse/keyboard/touch input.        | Authentication, routing, lifecycle, and frontend integration remain application work.                               |
+| Extension bridge                 | Existing personal-browser tabs and accounts          | Human and agent can use the same real session.                              | Requires installation and a running browser; a remote daemon still needs a connection bridge.                       |
+| Managed cloud browser            | Remotely hosted sessions with less runtime operation | Embeddable live views and persistent context options.                       | Service fees, latency, provider-held session data, and private-network reachability.                                |
+| Preview URL with a tab or iframe | Quickly viewing a development app                    | Small initial implementation; direct web interaction.                       | Does not itself add agent control, shared session state, or cross-origin DOM access.                                |
+| Service-specific API/CLI/MCP     | Structured operations with an adequate API           | Often easier to validate and more stable than navigating UI.                | Cannot establish that the rendered user interface works; limited to the API's coverage.                             |
 
 Sources:
 
@@ -155,11 +155,11 @@ The full-desktop direction was added to the shortlist after this comparison. It 
 
 Opening the same URL in two browsers does not make them the same session. Likewise, multiple automation sessions attached to one Chrome instance are not necessarily isolated accounts. See [agent-browser session and CDP isolation behavior](https://agent-browser.dev/sessions).
 
-## T3 Code web and Paseo web feasibility
+## T3 Code web and Clisbot web feasibility
 
 ### Current support matrix
 
-| Scenario                                                     | T3 Code web                                                                                    | Paseo web                                                                                   |
+| Scenario                                                     | T3 Code web                                                                                    | Clisbot web                                                                                 |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Web client and backend only, without a desktop browser host  | No equivalent integrated preview runtime.                                                      | No equivalent integrated browser runtime.                                                   |
 | Display the desktop-style browser pane                       | Not supported by the inspected web runtime.                                                    | Not supported by the inspected web pane.                                                    |
@@ -180,14 +180,14 @@ For external MCP/CLI tooling, provider configuration, permissions, executable av
 
 The request for an authenticated served-web preview gateway is useful context, but it is a proposal rather than implementation proof: [issue #5101](https://github.com/pingdotgg/t3code/issues/5101).
 
-### Paseo evidence and owner chain
+### Clisbot evidence and owner chain
 
 **CURRENT:** The web and native BrowserPane implementations display unavailable states. The host runtime advertises browser-host capability only when the desktop automation bridge exists. Browser tools are enabled through daemon configuration; the broker routes commands rather than launching Chromium itself.
 
 ```text
 User prompt from desktop, web, or mobile
   -> daemon agent session
-  -> provider execution and Paseo browser tool invocation
+  -> provider execution and Clisbot browser tool invocation
   -> daemon browser-tools broker
   -> browser.automation.execute.request to an eligible connected host
   -> desktop bridge / Electron browser guest
@@ -200,7 +200,7 @@ The browser host is subject to session authorization. In the inspected code, hos
 - [Native fallback pane](../../../packages/app/src/desktop/browser/pane/index.tsx)
 - [Host runtime capability registration](../../../packages/app/src/runtime/host-runtime.ts)
 - [Browser tool policy](../../../packages/server/src/server/browser-tools/policy.ts)
-- [Tool catalog registration](../../../packages/server/src/server/agent/tools/paseo-tools.ts)
+- [Tool catalog registration](../../../packages/server/src/server/agent/tools/clisbot-tools.ts)
 - [Session authorization](../../../packages/server/src/server/session.ts)
 
 **INFERENCE:** A prompt sent from a phone can lead an agent to operate a connected desktop browser. This does not mean the phone can see or directly interact with that browser today.
@@ -212,7 +212,7 @@ The browser host is subject to session authorization. In the inspected code, hos
 3. **A browser stream shares a remote session, but creates input and transport work.** The target page loads in the remote browser; the local web app displays its stream. Coordinates, scaling, latency, keyboard input, and control ownership need explicit handling.
 4. **Mobile needs its own verification.** Test touch, Vietnamese text/IME, clipboard, uploads/downloads, and virtual keyboards. Browserbase documents additional mobile-keyboard handling; a mobile-sized desktop viewport is not real Safari/iOS validation. Source: [mobile live view](https://docs.browserbase.com/platform/browser/observability/session-live-view#mobile).
 
-## Preliminary Paseo integration approach
+## Preliminary Clisbot integration approach
 
 The following **PROPOSED** sequence was the initial recommendation before the user expanded the shortlist. Keep it as a candidate approach rather than the final selection.
 
@@ -220,11 +220,11 @@ The following **PROPOSED** sequence was the initial recommendation before the us
 2. **Add a browser runtime independent of the desktop app.** Reuse the existing broker/catalog through an isolated adapter. Run the browser near the daemon and expose an authenticated live view and input path to web/mobile.
 3. **Add collaboration UX.** Integrate annotations, takeover/resume, explicit host selection, account/profile ownership, and evidence in the timeline.
 
-agent-browser is a useful spike candidate because it already supplies viewport streaming and input events. Its documented streaming endpoint restricts non-local browser origins and requires a proxy for those clients; it is not a turnkey authenticated Paseo gateway. Source: [streaming protocol](https://agent-browser.dev/streaming).
+agent-browser is a useful spike candidate because it already supplies viewport streaming and input events. Its documented streaming endpoint restricts non-local browser origins and requires a proxy for those clients; it is not a turnkey authenticated Clisbot gateway. Source: [streaming protocol](https://agent-browser.dev/streaming).
 
 ```mermaid
 flowchart LR
-    U["Paseo web / mobile"] -->|"Prompt and review"| D["Paseo daemon"]
+    U["Clisbot web / mobile"] -->|"Prompt and review"| D["Clisbot daemon"]
     D --> A["Agent provider"]
     A -->|"Browser tools"| B["Browser broker"]
     B --> R["Browser runtime near daemon"]
@@ -244,7 +244,7 @@ Prefer an isolated Clisbot adapter with a feature toggle defaulting to off. Reus
 
 This follows the [product vision's upstream-friendly principle](../../overview/product-vision.md) and [protocol compatibility guidance](../../protocol-compatibility.md). No merge-conflict or implementation-cost estimate has been validated.
 
-Two current Paseo boundaries matter for shared deployments:
+Two current Clisbot boundaries matter for shared deployments:
 
 - The desktop's persistent profile is shared across workspaces. Browser account access needs explicit ownership; workspace identity alone is not sufficient isolation.
 - The service proxy does not inherit daemon password protection for proxied development services. A preview URL is not automatically a private browser session or an authorized stream. See [service proxy documentation](../../service-proxy.md).

@@ -4,7 +4,7 @@ import type { RequestListener } from "node:http";
 // Adapted: upstream resets OpenClaw's global plugin registry between cases
 // because `registerZaloWebhookTarget` can bind a gateway HTTP route. That branch
 // is dropped in this port (D-ZL-010), so there is no registry to reset.
-import { withServer } from "@getpaseo/channels-core/plugin-sdk/test-env";
+import { withServer } from "@clisbot/channels-core/plugin-sdk/test-env";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "./runtime-api.js";
 import type { ZaloRuntimeEnv } from "./monitor.types.js";

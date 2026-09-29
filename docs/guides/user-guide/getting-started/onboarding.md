@@ -31,16 +31,16 @@ set +a
 ```bash
 npm run build:server
 npm run build:hub
-npm run build:daemon-web-ui  # nếu cần mở Paseo app bằng trình duyệt
-paseo() { ./packages/cli/bin/paseo "$@"; }
+npm run build:daemon-web-ui  # nếu cần mở Clisbot app bằng trình duyệt
+clisbot() { ./packages/cli/bin/clisbot "$@"; }
 ```
 
-Hàm `paseo` dùng bản vừa build, tránh gọi nhầm bản cài global. Giữ terminal này để chạy tiếp. Nếu dùng bản đã đóng gói có đủ tính năng thì không cần tự build. Cài dependencies lần đầu theo [development](../../../development.md).
+Hàm `clisbot` dùng bản vừa build, tránh gọi nhầm bản cài global. Giữ terminal này để chạy tiếp. Nếu dùng bản đã đóng gói có đủ tính năng thì không cần tự build. Cài dependencies lần đầu theo [development](../../../development.md).
 
 ## 2. Onboard
 
 ```bash
-PASEO_WEB_UI_ENABLED=true paseo hub init \
+CLISBOT_WEB_UI_ENABLED=true clisbot hub init \
   --home "$HOME/.clisbot-dev-01" \
   --bot-type personal \
   --provider codex \
@@ -66,7 +66,7 @@ Nếu đã biết chắc Slack Member ID của owner, có thể thêm `--owner-i
 
 | Mục                                           | Mặc định                                                    |
 | --------------------------------------------- | ----------------------------------------------------------- |
-| Hub home: dữ liệu và cấu hình của lần cài đặt | `--home` → `CLISBOT_HOME` → `PASEO_HOME` → `~/.clisbot`     |
+| Hub home: dữ liệu và cấu hình của lần cài đặt | `--home` → `CLISBOT_HOME` → `CLISBOT_HOME` → `~/.clisbot`   |
 | Bot personal                                  | `personal-assistant`; workspace `<home>/workspaces/default` |
 | Bot team (`--bot-type team`)                  | `team-assistant`; workspace `<home>/workspaces/team`        |
 | Thư mục khác                                  | Chọn bằng `--workspace /absolute/path`                      |
@@ -78,22 +78,22 @@ Onboarding dùng bộ Markdown từ `clisbot main`: lớp `default`, `customized
 ## Chạy lại, kiểm tra, dừng
 
 ```bash
-paseo bot start --home "$HOME/.clisbot-dev-01"
-paseo bot status personal-assistant --home "$HOME/.clisbot-dev-01"
-paseo bot stop --home "$HOME/.clisbot-dev-01"
+clisbot bot start --home "$HOME/.clisbot-dev-01"
+clisbot bot status personal-assistant --home "$HOME/.clisbot-dev-01"
+clisbot bot stop --home "$HOME/.clisbot-dev-01"
 ```
 
 - **Tự lưu**, không cần và không có flag `--persist` trong flow này. Chạy lại không cần token/password; dùng lại bot, workspace và Connection đã lưu. `hub init` cũng resume bot đã lưu.
 - Bỏ `--bot-name` chọn `personal-assistant`; bot team dùng `--bot-type team`, bot đặt tên khác phải truyền đúng `--bot-name`.
 - Bỏ `--owner-email` chỉ được tự chọn khi tổ chức có đúng một owner. Home mới chưa có account: truyền email/password như trên hoặc hoàn tất Account setup tại URL Hub.
-- `bot stop` dừng **Hub và các bot dùng chung Hub home đó**; daemon vẫn chạy, dữ liệu giữ nguyên. Dừng cả daemon bằng `paseo daemon stop --home "$HOME/.clisbot-dev-01"`.
+- `bot stop` dừng **Hub và các bot dùng chung Hub home đó**; daemon vẫn chạy, dữ liệu giữ nguyên. Dừng cả daemon bằng `clisbot daemon stop --home "$HOME/.clisbot-dev-01"`.
 
 ## Mở app, cấu hình và biến thể
 
-- **URL Hub** trong output dùng cho Account/cấu hình. **URL daemon** phục vụ Paseo web app khi bật web UI và có web assets. Init không tự dựng dev server Expo hay cấu hình Tailscale/reverse proxy.
+- **URL Hub** trong output dùng cho Account/cấu hình. **URL daemon** phục vụ Clisbot web app khi bật web UI và có web assets. Init không tự dựng dev server Expo hay cấu hình Tailscale/reverse proxy.
 - Đổi cấu hình qua UI/API. Restart không tự ghi đè template hay mật khẩu owner.
 - Telegram: thay hai flag Slack bằng `--telegram-bot-token '${TELEGRAM_BOT_TOKEN}'`; owner identity là Telegram user ID. Nạp biến này vào shell trước.
-- Chỉ cần workspace, chưa dùng chat: `paseo hub init --home "$HOME/.clisbot-dev-01" --provider codex`; thêm channel sau.
+- Chỉ cần workspace, chưa dùng chat: `clisbot hub init --home "$HOME/.clisbot-dev-01" --provider codex`; thêm channel sau.
 - Thử lần cài mới: chọn **home khác chưa dùng**, ví dụ `~/.clisbot-dev-02`; không xóa home cũ.
 
 ## Dùng Hub có sẵn hoặc được mời vào tổ chức

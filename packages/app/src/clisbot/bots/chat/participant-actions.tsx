@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { CoworkIcon } from "./cowork-icon";
 import { StyleSheet } from "react-native-unistyles";
-import type { ChatParticipantPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatParticipantPayload } from "@clisbot/protocol/chats/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { navigateToAgent } from "@/utils/navigate-to-agent";

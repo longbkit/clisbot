@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import {
   groupSettingsPatch,
   hasGroupSettingsChanges,

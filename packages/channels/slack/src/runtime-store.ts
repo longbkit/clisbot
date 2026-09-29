@@ -21,7 +21,7 @@
 // `runtime.ts` / `runtime.types.ts`, and `fusion/runtime.ts` fills it from the
 // same HostRuntime this module receives (D-036), keyed by the same account id.
 
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { disposeSlackRuntime, installSlackRuntime } from "./fusion/runtime.js";
 import { currentSlackAccountId, withSlackAccount } from "./runtime.js";
 

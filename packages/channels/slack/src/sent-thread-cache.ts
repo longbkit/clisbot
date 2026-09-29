@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/sent-thread-cache.ts@5d8067a4483
 // Slack plugin module implements sent thread cache behavior.
-import { createPersistentDedupeCache } from "@getpaseo/channels-core/plugin-sdk/dedupe-runtime";
-import { resolveGlobalSingleton } from "@getpaseo/channels-core/plugin-sdk/global-singleton";
-import { createPluginStateErrorReporter } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
+import { createPersistentDedupeCache } from "@clisbot/channels-core/plugin-sdk/dedupe-runtime";
+import { resolveGlobalSingleton } from "@clisbot/channels-core/plugin-sdk/global-singleton";
+import { createPluginStateErrorReporter } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
 import { getOptionalSlackRuntime } from "./runtime.js";
 
 /**

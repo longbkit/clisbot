@@ -1,6 +1,6 @@
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import { normalizeChatSender } from "@getpaseo/protocol/chats/sender";
-import type { ChatMessagePayload } from "@getpaseo/protocol/chats/types";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
+import { normalizeChatSender } from "@clisbot/protocol/chats/sender";
+import type { ChatMessagePayload } from "@clisbot/protocol/chats/types";
 
 /** Normalize both transcript pages and live pushes before notifying client consumers. */
 export function normalizeChatSenders(message: SessionOutboundMessage): SessionOutboundMessage {

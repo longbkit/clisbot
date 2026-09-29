@@ -8,7 +8,7 @@ you type them in. The full list and what each needs is the
 ## The short version
 
 - `/help` shows every command in the conversation you're in.
-- Outside a DM, mention the bot with the command (`@paseo /status`). Several bots
+- Outside a DM, mention the bot with the command (`@clisbot /status`). Several bots
   can share a group, so a command that names no bot is ignored.
 - Most commands act on **this conversation's** agent. `/new` starts one, `/stop`
   stops it, `/cowork` opens it in the Clisbot app.
@@ -25,7 +25,7 @@ is the same on both sides.
 You get two links and pick the one that suits where you are — **Open in the web
 app** opens a browser, **Open in the Clisbot app** opens the installed app. Both
 need your Hub operator to have set the web origin; without it you get one bare
-`paseo://` URL to copy, because a channel will not linkify that scheme.
+`clisbot://` URL to copy, because a channel will not linkify that scheme.
 
 Both are posted in the conversation you asked from, including a public channel.
 You need `agent.interact` access there to get them, and opening one still
@@ -188,7 +188,7 @@ summarize what changed today and what's blocked`, then later just `/standup`.
 
 ## Who you are here
 
-- `/status` — the bound session, its Paseo link, how much context is left, and
+- `/status` — the bound session, its Clisbot link, how much context is left, and
   your access in this conversation.
 - `/me` — your public identity and what you're allowed to do here. An identity that is not linked to a Hub Member
   uses the organization's Guest grants; Guest has no permissions by default.
@@ -220,18 +220,18 @@ these fixes works and reaches the same command:
 
 - **Slack** — if `/status` collides with one of Slack's or another app's slash
   commands, use the backslash form instead: `\status`, `\approve`. In a channel,
-  address the bot first: `@paseo status`.
+  address the bot first: `@clisbot status`.
 - **Telegram** — on mobile, tapping the bot then typing can produce
-  `@paseo/status` glued together; that still works. So does `/status@paseo`,
+  `@clisbot/status` glued together; that still works. So does `/status@clisbot`,
   which the command menu inserts when you pick the bot's line. In a group a plain
   `/status` names no bot and is ignored; in a DM it works.
 - **Feishu / Lark** — there are no slash menus; type the command as text and
   @mention the bot in a group so it sees the message. `@everyone` alone does not
   count as addressing the bot.
-- **Discord** — the bot registers one `/paseo` command with a text option named
+- **Discord** — the bot registers one `/clisbot` command with a text option named
   `command`; supply `status` there. The interaction is acknowledged privately.
-- **Google Chat** — an operator registers one `/paseo` command in the app
-  console. `/paseo status` is normalized to the shared `status` command.
+- **Google Chat** — an operator registers one `/clisbot` command in the app
+  console. `/clisbot status` is normalized to the shared `status` command.
 
 If a bare word isn't recognized, prefix it with `/` (or `\` on Slack) and send it
 on its own line — commands match the whole message, so extra text around them

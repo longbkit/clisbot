@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/types.ts@5d8067a4483
 // Zalouser type declarations define plugin contracts.
-import type { MessageReceipt } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+import type { MessageReceipt } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import type { Style } from "./zca-constants.js";
 
 export type ZcaFriend = {

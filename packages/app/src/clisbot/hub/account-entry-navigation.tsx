@@ -5,7 +5,7 @@ import { isWeb } from "@/constants/platform";
 import { useHubAccount } from "./account-provider";
 import { hubAccountEntryRoute, hubClientAuthorizationContinuation } from "./account-entry-route";
 
-/** Routes Hub account-entry links into the shared Paseo Settings shell. */
+/** Routes Hub account-entry links into the shared Clisbot Settings shell. */
 export function HubAccountEntryNavigation({ navigationReady }: { navigationReady: boolean }) {
   const hub = useHubAccount();
   const router = useRouter();

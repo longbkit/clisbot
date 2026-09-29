@@ -4,13 +4,13 @@ import {
   applyChannelMatchMeta,
   buildChannelKeyCandidates,
   type ChannelMatchSource,
-} from "@getpaseo/channels-core/plugin-sdk/channel-targets";
+} from "@clisbot/channels-core/plugin-sdk/channel-targets";
 import type {
   ChannelBotLoopProtectionConfig,
   ReplyToMode,
   SlackChannelConfig,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { mergePairLoopGuardConfig } from "@getpaseo/channels-core/plugin-sdk/pair-loop-guard-runtime";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { mergePairLoopGuardConfig } from "@clisbot/channels-core/plugin-sdk/pair-loop-guard-runtime";
 import { buildSlackChannelIdCandidates, buildSlackChannelPolicyScope } from "../group-policy.js";
 import { normalizeSlackSlug, resolveSlackUserAllowListForTeam } from "./allow-list.js";
 

@@ -14,7 +14,7 @@ environments:
     cwd: /workspace/company
     worktree:
       mode: branch-off
-      newBranch: trigger-\${{ paseo.execution.id }}
+      newBranch: trigger-\${{ clisbot.execution.id }}
       base: main
 agents:
   codex:
@@ -57,7 +57,7 @@ filters:
   label: support
   labels: [bug, urgent]
   repo: getpaseo/hub
-  guild: paseo
+  guild: clisbot
   workspace: acme
   project: linear-project
   states: [started]
@@ -71,7 +71,7 @@ steps:
     environment: runner
     max_runtime: 90m
     idle_timeout: 7m
-    agent: "\${{ paseo.inputs.agent }}"
+    agent: "\${{ clisbot.inputs.agent }}"
     env: { NODE_ENV: production }
     github:
       connection: getpaseo
@@ -80,7 +80,7 @@ steps:
       duration: 30m
     prompt:
       - include: partials/safety.md
-      - text: "Request: \${{ paseo.prompt }}"
+      - text: "Request: \${{ clisbot.prompt }}"
     output:
       schema:
         type: object
@@ -94,10 +94,10 @@ steps:
 
 function exhaustiveFiles(): HubBundleFile[] {
   return [
-    { path: ".paseo/hub.yml", content: exhaustiveHub },
-    { path: ".paseo/workflows/exhaustive.yml", content: exhaustiveWorkflow },
+    { path: ".clisbot/hub.yml", content: exhaustiveHub },
+    { path: ".clisbot/workflows/exhaustive.yml", content: exhaustiveWorkflow },
     {
-      path: ".paseo/workflows/partials/safety.md",
+      path: ".clisbot/workflows/partials/safety.md",
       content: "Never disclose secrets.",
     },
   ];
@@ -117,7 +117,7 @@ describe("legacy migration compatibility matrix", () => {
       executionSemantics(before.triggers[0]!, before.environments[0]!),
     );
     assert.match(trigger.yaml, /max_runtime: 2h/u);
-    assert.match(trigger.yaml, /select: \$\{\{ paseo\.inputs\.agent \}\}/u);
+    assert.match(trigger.yaml, /select: \$\{\{ clisbot\.inputs\.agent \}\}/u);
     assert.match(trigger.yaml, /network_access: false/u);
     assert.doesNotMatch(trigger.yaml, /include:|partials:|steps:|environments:/u);
   });
@@ -130,7 +130,7 @@ describe("legacy migration compatibility matrix", () => {
       [
         { name: "discord-request", format: "legacy_multistep" },
         { name: "github-hub", format: "single_run" },
-        { name: "github-paseo", format: "single_run" },
+        { name: "github-clisbot", format: "single_run" },
         { name: "slack-request", format: "legacy_multistep" },
       ],
     );
@@ -216,21 +216,23 @@ function blockerFixture(variant: string): HubBundleFile[] {
     variant === "multiple steps"
       ? "\n  - id: later\n    environment: runner\n    max_runtime: 5m\n    idle_timeout: 1m\n    agent: { provider: codex }\n    prompt: [{ text: later }]\n"
       : "";
-  const values = variant === "workflow values" ? 'values: { answer: "${{ paseo.prompt }}" }\n' : "";
+  const values =
+    variant === "workflow values" ? 'values: { answer: "${{ clisbot.prompt }}" }\n' : "";
   const dynamicInput =
     variant === "dynamic target"
       ? "inputs:\n  target: { type: string, required: true, choices: [runner] }\n"
       : "";
-  const target = variant === "dynamic target" ? "${{ paseo.inputs.target }}" : "runner";
-  const condition = variant === "conditional run" ? "    if: \"${{ paseo.prompt != '' }}\"\n" : "";
+  const target = variant === "dynamic target" ? "${{ clisbot.inputs.target }}" : "runner";
+  const condition =
+    variant === "conditional run" ? "    if: \"${{ clisbot.prompt != '' }}\"\n" : "";
   const outputs =
     variant === "duplicate outputs"
       ? "    allow_outputs:\n      - { type: slack.reply, max: 1 }\n      - { type: slack.reply, max: 2 }\n"
       : "";
   return [
-    { path: ".paseo/hub.yml", content: environment },
+    { path: ".clisbot/hub.yml", content: environment },
     {
-      path: ".paseo/workflows/test.yml",
+      path: ".clisbot/workflows/test.yml",
       content: `name: test\non: slack.mention\nmax_runtime: 1h\nfilters: { from_users: [U123] }\n${dynamicInput}${values}steps:\n  - id: work\n    environment: "${target}"\n    max_runtime: 1h\n    idle_timeout: 5m\n    agent: { provider: codex }\n${condition}    prompt: [{ text: work }]\n${outputs}${extraStep}`,
     },
   ];

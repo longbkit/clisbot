@@ -5,7 +5,7 @@
 // SQLite-backed `openChannelIngressQueue`, serializes the raw envelope into it
 // and runs its own drain: in Fusion the Hub owns the durable queue
 // (`channel_ingress_queue`) and one drain per account, and the shared inbound
-// processor (`@getpaseo/channels-shared` `createInboundEventProcessor`)
+// processor (`@clisbot/channels-shared` `createInboundEventProcessor`)
 // persists the normalized event before it returns.
 //
 // Two callers, one rule.
@@ -21,7 +21,7 @@
 //                        and Feishu redelivers.
 import { AsyncLocalStorage } from "node:async_hooks";
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import type { FeishuBotAddedEvent, FeishuMessageEvent } from "../event-types.js";
 import {
   buildFeishuBotMemberEvent,

@@ -20,7 +20,7 @@ const VERBATIM_SOURCE =
 
 /** The same file as ported: both specifiers rewritten, one onto a vendored file. */
 const LOCAL_A =
-  `import { helper } from "@getpaseo/channels-shared";\n` +
+  `import { helper } from "@clisbot/channels-shared";\n` +
   `import { expectDefined } from "./vendor/expect.js";\n\n\n` +
   `export function greet(name) {\n  return expectDefined(helper(\`hi \${name}\`));   \n}\n`;
 
@@ -326,7 +326,7 @@ test("apply lands a clean delta, keeping the header and the import rewrite", () 
       applied.split("\n")[0],
       `// upstream: extensions/demo/src/a.ts@${fixture.headCommit}`,
     );
-    assert.match(applied, /from "@getpaseo\/channels-shared"/);
+    assert.match(applied, /from "@clisbot\/channels-shared"/);
     assert.match(applied, /export const extra = 1;/);
     assert.doesNotMatch(applied, /<<<<<<</);
     assert.deepEqual(result.newUpstreamFiles, ["extensions/demo/src/d.ts"]);
@@ -351,10 +351,10 @@ test("apply rewrites an import the delta introduces from the package's own evide
     // `src/a.ts` is the only evidence for either rewrite, and it is enough. The
     // vendored one is re-derived for `src/sub/`, not copied from `src/`.
     const applied = readFileSync(path.join(fixture.pkg, "src/sub/f.ts"), "utf8");
-    assert.match(applied, /from "@getpaseo\/channels-shared"/);
+    assert.match(applied, /from "@clisbot\/channels-shared"/);
     assert.match(applied, /from "\.\.\/vendor\/expect\.js"/);
     assert.deepEqual(rowFor(result, "src/sub/f.ts").notes, [
-      'rewrote new import "openclaw/plugin-sdk/runtime" → "@getpaseo/channels-shared"',
+      'rewrote new import "openclaw/plugin-sdk/runtime" → "@clisbot/channels-shared"',
       'rewrote new import "@openclaw/normalization-core/expect" → "../vendor/expect.js"',
     ]);
   });
@@ -455,11 +455,11 @@ test("restoreVerbatimFile rebuilds a reflowed verbatim file with local specifier
   const { restoreVerbatimFile } = await import("./channel-upstream-sync.mjs");
   const upstream = 'import { a, b } from "openclaw/x";\nexport const v = a + b;\n';
   const local =
-    '// upstream: src/f.ts@abc\nimport {\n  a,\n  b,\n} from "@getpaseo/channels-core/x";\nexport const v = a + b;\n';
+    '// upstream: src/f.ts@abc\nimport {\n  a,\n  b,\n} from "@clisbot/channels-core/x";\nexport const v = a + b;\n';
   const result = restoreVerbatimFile(local, upstream, "// upstream: src/f.ts@abc");
   assert.equal(result.ok, true);
   assert.equal(
     result.text,
-    '// upstream: src/f.ts@abc\nimport { a, b } from "@getpaseo/channels-core/x";\nexport const v = a + b;\n',
+    '// upstream: src/f.ts@abc\nimport { a, b } from "@clisbot/channels-core/x";\nexport const v = a + b;\n',
   );
 });

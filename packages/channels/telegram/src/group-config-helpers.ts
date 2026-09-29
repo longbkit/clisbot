@@ -6,9 +6,9 @@
 // OpenClaw's account-lookup and session-key routing) and feed the inbound turn's
 // skill/tool policy, which the Hub owns in Fusion. The scoped-config reader the send
 // path calls is verbatim.
-import type { ScopeTree } from "@getpaseo/channels-core/plugin-sdk/channel-policy";
+import type { ScopeTree } from "@clisbot/channels-core/plugin-sdk/channel-policy";
 // Telegram helper module supports group config helpers behavior.
-import type { TelegramAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { TelegramAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 export function resolveTelegramScopedGroupConfig(
   telegramCfg: TelegramAccountConfig,

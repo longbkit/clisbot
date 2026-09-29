@@ -10,7 +10,7 @@
 // Hub owns routing, the queue, the agent and the lifecycle, so the L4 here does
 // only what the seam contract asks (D-FS-019).
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
 import { resolveFeishuDriveAccount } from "../fusion/account-config.js";
 import type { FeishuAdmissionOptions } from "../fusion/admission.js";
 import { setFeishuMediaDownloadDir } from "../fusion/media-resource.js";

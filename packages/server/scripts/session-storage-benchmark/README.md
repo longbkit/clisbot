@@ -9,7 +9,7 @@ node --expose-gc --import tsx packages/server/scripts/session-storage-benchmark/
   --baseline-root /tmp/session-storage-baseline-3e4df80
 ```
 
-The data directory must be empty. No developer Paseo home is read or modified. `--smoke` reduces the datasets and must never be presented as the full benchmark. `--samples`, `--writer-rows`, and `--cycles` override their default values of 20, 1,000, and 6. Keep these values identical for comparisons.
+The data directory must be empty. No developer Clisbot home is read or modified. `--smoke` reduces the datasets and must never be presented as the full benchmark. `--samples`, `--writer-rows`, and `--cycles` override their default values of 20, 1,000, and 6. Keep these values identical for comparisons.
 
 Iteration acceptance uses fixed practical workloads: **1,000 canonical rows is the required gate**, **10,000 rows is the required stress gate**, and **100,000 rows is an optional ceiling diagnostic** with a hard timeout of about five minutes. A timeout at 100,000 rows records the stress limit and does not fail the iteration. Each 20-row block contains a user with a sender snapshot and attachment reference, an overlapping running/completed tool, reasoning, and assistant chunks with shared message IDs. A real 1 KiB attachment fixture is present. Upload authorization, ownership linking, copying, and download latency are separate workloads.
 

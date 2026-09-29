@@ -14,7 +14,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@clisbot/channels-shared";
 import { setChannelHostRuntime } from "./runtime-store.js";
 import { sendMedia, sendText, updateText } from "./outbound.js";
 

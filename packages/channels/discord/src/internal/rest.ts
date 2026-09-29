@@ -6,8 +6,8 @@ import {
   clampTimerTimeoutMs,
   resolveIntegerOption as normalizeIntegerOption,
   resolveTimerTimeoutMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { readResponseWithLimit } from "@getpaseo/channels-core/plugin-sdk/response-limit-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { readResponseWithLimit } from "@clisbot/channels-core/plugin-sdk/response-limit-runtime";
 import { serializeRequestBody } from "./rest-body.js";
 import {
   DiscordError,

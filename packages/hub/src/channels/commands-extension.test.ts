@@ -51,7 +51,7 @@ it("roundtrips commands and isolates accounts", async () => {
 });
 it("refuses reserved aliases and requires approval.config", async () => {
   const input = fixture();
-  for (const name of ["status", "state", "approve", "deny", "paseo"]) {
+  for (const name of ["status", "state", "approve", "deny", "clisbot"]) {
     input.command.value = `add ${name} prompt`;
     expect((await runExtensionCommand(input)).text).toContain("reserved");
   }
@@ -83,7 +83,7 @@ it("expands an account command through the same mention and umbrella normalizati
   for (const text of [
     "@bot /review-code",
     "/review-code@bot",
-    "/paseo review-code",
+    "/clisbot review-code",
     "<@123456789> /review-code",
   ]) {
     expect(

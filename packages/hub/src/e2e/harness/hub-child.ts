@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   );
   await runtime.query(
     `insert into "user" (id, name, email, email_verified)
-     values ('hub-e2e', 'Hub E2E', 'hub-e2e@paseo.test', true)
+     values ('hub-e2e', 'Hub E2E', 'hub-e2e@clisbot.test', true)
      on conflict (id) do nothing`,
   );
   await runtime.query(
@@ -69,8 +69,8 @@ async function main(): Promise<void> {
     database: runtime,
     locks,
     entitlements: entitlements.service,
-    baseURL: requiredEnvironment("PASEO_HUB_APP_URL"),
-    secret: requiredEnvironment("PASEO_HUB_AUTH_SECRET"),
+    baseURL: requiredEnvironment("CLISBOT_HUB_APP_URL"),
+    secret: requiredEnvironment("CLISBOT_HUB_AUTH_SECRET"),
     policy: readInstanceAuthPolicy(process.env),
   });
   await auth.initialize?.();
@@ -197,8 +197,8 @@ async function main(): Promise<void> {
         },
       },
     ],
-    publicBaseUrl: requiredEnvironment("PASEO_HUB_APP_URL"),
-    completionTokenSecret: requiredEnvironment("PASEO_HUB_AUTH_SECRET"),
+    publicBaseUrl: requiredEnvironment("CLISBOT_HUB_APP_URL"),
+    completionTokenSecret: requiredEnvironment("CLISBOT_HUB_AUTH_SECRET"),
     browserOrganizationAccess: auth,
   });
   const hub = application.hub;

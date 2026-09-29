@@ -58,8 +58,8 @@ describe("credential cipher", () => {
 
   it("loads one external base64 key from environment", async () => {
     const cipher = await readCredentialCipherEnvironment({
-      PASEO_HUB_CREDENTIAL_MASTER_KEY: key.toString("base64"),
-      PASEO_HUB_CREDENTIAL_KEY_ID: "deployment-v3",
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY: key.toString("base64"),
+      CLISBOT_HUB_CREDENTIAL_KEY_ID: "deployment-v3",
     });
 
     assert.equal(cipher.keyId, "deployment-v3");
@@ -74,7 +74,7 @@ describe("credential cipher", () => {
     await writeFile(keyFile, `${key.toString("base64")}\n`, { mode: 0o400 });
 
     const cipher = await readCredentialCipherEnvironment(
-      { PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile },
+      { CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile },
       { hubDataDirectory: dataDirectory },
     );
 
@@ -94,8 +94,8 @@ describe("credential cipher", () => {
     const sealed = before.encrypt("owner", { token: "canary" });
 
     const rotated = await readCredentialCipherEnvironment({
-      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
-      PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
     });
     assert.deepEqual(rotated.decrypt("owner", sealed), { token: "canary" });
     // The re-seal is a plain write, and it lands under the current key alone.
@@ -105,7 +105,7 @@ describe("credential cipher", () => {
     assert.throws(() => currentOnly.decrypt("owner", sealed), CredentialCipherError);
     // Retiring the previous key retires the rows nobody rewrote.
     const currentAlone = await readCredentialCipherEnvironment({
-      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
     });
     assert.throws(() => currentAlone.decrypt("owner", sealed), CredentialCipherError);
   });
@@ -129,19 +129,19 @@ describe("credential cipher", () => {
 
     await assert.rejects(
       readCredentialCipherEnvironment({
-        PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
-        PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
-        PASEO_HUB_CREDENTIAL_KEY_ID: "2026-09",
+        CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+        CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+        CLISBOT_HUB_CREDENTIAL_KEY_ID: "2026-09",
       }),
       CredentialCipherError,
       "a named current key with no named retired key is a boot failure, not a read failure",
     );
 
     const named = await readCredentialCipherEnvironment({
-      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
-      PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
-      PASEO_HUB_CREDENTIAL_KEY_ID: "2026-09",
-      PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS: "2026-08",
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+      CLISBOT_HUB_CREDENTIAL_KEY_ID: "2026-09",
+      CLISBOT_HUB_CREDENTIAL_KEY_ID_PREVIOUS: "2026-08",
     });
     assert.deepEqual(named.decrypt("owner", sealed), { token: "canary" });
     assert.equal(named.keyId, "2026-09");
@@ -156,18 +156,18 @@ describe("credential cipher", () => {
     await assert.rejects(readCredentialCipherEnvironment({}), CredentialCipherError);
     await assert.rejects(
       readCredentialCipherEnvironment({
-        PASEO_HUB_CREDENTIAL_MASTER_KEY: key.toString("base64"),
-        PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile,
+        CLISBOT_HUB_CREDENTIAL_MASTER_KEY: key.toString("base64"),
+        CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile,
       }),
       CredentialCipherError,
     );
     await assert.rejects(
-      readCredentialCipherEnvironment({ PASEO_HUB_CREDENTIAL_MASTER_KEY: "not-base64" }),
+      readCredentialCipherEnvironment({ CLISBOT_HUB_CREDENTIAL_MASTER_KEY: "not-base64" }),
       CredentialCipherError,
     );
     await assert.rejects(
       readCredentialCipherEnvironment(
-        { PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile },
+        { CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: keyFile },
         { hubDataDirectory: root },
       ),
       CredentialCipherError,

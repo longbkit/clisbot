@@ -10,9 +10,9 @@
 // The Hub owns routing, the queue and the lifecycle, so the L4 here does only
 // what the seam contract asks (D-GC-015).
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { probeGoogleChat } from "../api.js";
 import type { GoogleChatAudienceType } from "../auth.js";
 import { createGoogleChatAdmission } from "../fusion/admission.js";

@@ -183,7 +183,7 @@ export class HubHttpClient {
   describeCredential(origin: string, credential: string): Promise<HubCredentialIdentity> {
     return requestHub({
       origin,
-      path: "/api/auth/paseo/credential",
+      path: "/api/auth/clisbot/credential",
       method: "GET",
       apiKey: credential,
       successStatus: 200,

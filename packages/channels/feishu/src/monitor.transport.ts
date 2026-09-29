@@ -3,9 +3,9 @@
 import crypto from "node:crypto";
 import * as http from "node:http";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { channelBlockedPatch, channelReadyPatch } from "@getpaseo/channels-core/plugin-sdk/gateway-runtime";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { channelBlockedPatch, channelReadyPatch } from "@clisbot/channels-core/plugin-sdk/gateway-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { waitForAbortableDelay } from "./async.js";
 import { createFeishuWSClient } from "./client.js";
 import type { FeishuWebhookInvoker } from "./fusion/webhook-invoker.js";

@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { AssistantMessage, UserMessage } from "@/components/message";
 import { AssistantFileLinkResolverProvider } from "@/assistant-file-links/provider";
 import { ACTOR_AVATAR_SIZE } from "./actor-metrics";

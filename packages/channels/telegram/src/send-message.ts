@@ -1,14 +1,14 @@
 // upstream: extensions/telegram/src/send-message.ts@5d8067a4483
 import type { Message } from "grammy/types";
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
 import {
   createChannelPartialDeliveryError,
   isChannelPartialDeliveryError,
-} from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import { createMessageReceiptFromOutboundResults } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import { isSingleUseReplyToMode } from "@getpaseo/channels-core/plugin-sdk/reply-reference";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import { createMessageReceiptFromOutboundResults } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import { isSingleUseReplyToMode } from "@clisbot/channels-core/plugin-sdk/reply-reference";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 import { telegramCaptionDeliveryMetadata } from "./caption.js";
 import { renderTelegramHtmlText } from "./format.js";
 import { buildInlineKeyboard } from "./inline-keyboard.js";

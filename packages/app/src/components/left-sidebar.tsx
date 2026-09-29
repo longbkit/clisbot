@@ -64,7 +64,7 @@ import { SidebarNavGroup } from "@/clisbot/hub/sidebar-nav-group";
 
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 
-const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_PASEO_DEV_BUILD_LABEL?.trim() || null;
+const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_CLISBOT_DEV_BUILD_LABEL?.trim() || null;
 
 interface SidebarSharedProps {
   theme: SidebarTheme;

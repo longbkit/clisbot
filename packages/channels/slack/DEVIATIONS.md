@@ -228,7 +228,7 @@ before the seam). The second live failure that day: `parseApprovalCardClick` rea
 - effect: an approver's button click reaches the hub's exactly-once
   resolver as `cardValue` + sender + conversation location.
 - reason: channel-open typing — the hub package keeps zero
-  `@getpaseo/channels-*` imports, so the payload crosses the plane as a plain
+  `@clisbot/channels-*` imports, so the payload crosses the plane as a plain
   record and the wire-specific parsing stays in the vertical.
 - upstream status: in-repo decision (P0 slice; the pinned vertical has no
   card surface — it is the OpenClaw plugin host's, out of scope here).

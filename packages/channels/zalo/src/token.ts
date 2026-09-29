@@ -1,8 +1,8 @@
 // upstream: extensions/zalo/src/token.ts@5d8067a4483
 // Zalo plugin module implements token behavior.
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
-import type { BaseTokenResolution } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { resolveAccountEntry } from "@getpaseo/channels-core/plugin-sdk/routing";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
+import type { BaseTokenResolution } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { resolveAccountEntry } from "@clisbot/channels-core/plugin-sdk/routing";
 import { tryReadSecretFileSync } from "./fusion/secret-file.js";
 import { resolveSecretInputString, type SecretInputStringResolutionMode } from "./secret-input.js";
 import type { ResolvedZaloAccount, ZaloConfig, ZaloTokenStatus } from "./types.js";

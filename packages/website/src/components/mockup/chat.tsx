@@ -65,12 +65,12 @@ export function AgentTranscript() {
   return (
     <div className="space-y-[13px] pt-[2px]">
       <Para>
-        The homepage is built. It leads with Paseo&rsquo;s actual value, then uses the product
+        The homepage is built. It leads with Clisbot&rsquo;s actual value, then uses the product
         itself to prove the story instead of falling back to generic dashboard art.
       </Para>
       <div>
         <Bullet>Reworked the hero around &ldquo;The control plane for coding agents.&rdquo;</Bullet>
-        <Bullet>Built desktop and mobile scenes from real Paseo workflows and assets.</Bullet>
+        <Bullet>Built desktop and mobile scenes from real Clisbot workflows and assets.</Bullet>
         <Bullet>Added believable agent, review, plugin, shipping, and host states.</Bullet>
         <Bullet>
           Matched the app&rsquo;s tabs, explorer, diff tree, controls, and layout rails.
@@ -78,9 +78,9 @@ export function AgentTranscript() {
       </div>
       <TurnFooter duration="31m 46s" />
       <UserBubble>Create a PR</UserBubble>
-      <Para>PR opened: Rebuild the homepage around live Paseo workflows.</Para>
+      <Para>PR opened: Rebuild the homepage around live Clisbot workflows.</Para>
       <span className="block text-[13.5px] text-mock-accent-bright">
-        https://github.com/getpaseo/paseo/pull/3981
+        https://github.com/longbkit/clisbot/pull/3981
       </span>
       <div>
         <Bullet>Ships the new product-led hero and interactive desktop mockup.</Bullet>
@@ -100,11 +100,11 @@ interface PluginToolCall {
 }
 
 const PLUGIN_TOOL_CALLS: PluginToolCall[] = [
-  { kind: "read", label: "Read", detail: "paseo-plugin/SKILL.md" },
+  { kind: "read", label: "Read", detail: "clisbot-plugin/SKILL.md" },
   {
     kind: "shell",
     label: "Shell",
-    detail: "paseo plugin init ~/dev/release-radar",
+    detail: "clisbot plugin init ~/dev/release-radar",
   },
   {
     kind: "write",
@@ -124,7 +124,7 @@ const PLUGIN_TOOL_CALLS: PluginToolCall[] = [
   {
     kind: "shell",
     label: "Shell",
-    detail: "paseo plugin install ~/dev/release-radar",
+    detail: "clisbot plugin install ~/dev/release-radar",
   },
 ];
 
@@ -166,15 +166,15 @@ export function PluginBuildTranscript() {
   return (
     <div className="space-y-[13px] pt-[2px]">
       <UserBubble>
-        Build me a release radar for Paseo. I want an explorer panel showing merged PRs, changes in
-        review, failing checks, and seven-day activity, accessible from the sidebar.
+        Build me a release radar for Clisbot. I want an explorer panel showing merged PRs, changes
+        in review, failing checks, and seven-day activity, accessible from the sidebar.
       </UserBubble>
       <Para>
         I&rsquo;ll scaffold a local plugin, add the explorer surface, and wire it into the sidebar.
       </Para>
       <PluginToolGroup calls={PLUGIN_DISCOVERY_CALLS} />
       <Para>
-        The plugin API exposes Paseo&rsquo;s live project and workspace state, so the radar
+        The plugin API exposes Clisbot&rsquo;s live project and workspace state, so the radar
         doesn&rsquo;t need a separate service.
       </Para>
       <PluginToolGroup calls={PLUGIN_BUILD_CALLS} />

@@ -8,7 +8,7 @@ import { Session, type SessionOptions } from "../session.js";
 import type { SessionOutboundMessage } from "../messages.js";
 import { FileBackedProjectRegistry, FileBackedWorkspaceRegistry } from "../workspace-registry.js";
 import { WorkspaceGitServiceImpl } from "../workspace-git-service.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { createStub } from "../test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "../test-utils/session-stubs.js";
 
@@ -33,7 +33,7 @@ test("Project authority creates a real worktree then an Agent without Project ad
     ],
     { cwd: repo, stdio: "pipe" },
   );
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const logger = pino({ level: "silent" });
   const projects = new FileBackedProjectRegistry(path.join(root, "projects.json"), logger);
   const workspaces = new FileBackedWorkspaceRegistry(path.join(root, "workspaces.json"), logger);
@@ -46,7 +46,7 @@ test("Project authority creates a real worktree then an Agent without Project ad
   });
   const workspaceGitService = new WorkspaceGitServiceImpl({
     logger,
-    paseoHome: daemon.paseoHome,
+    clisbotHome: daemon.clisbotHome,
   });
   const messages: SessionOutboundMessage[] = [];
   const snapshot = createProviderSnapshotManagerStub();
@@ -74,7 +74,7 @@ test("Project authority creates a real worktree then an Agent without Project ad
       ]),
     },
     logger,
-    paseoHome: daemon.paseoHome,
+    clisbotHome: daemon.clisbotHome,
     onMessage: (message) => messages.push(message),
     downloadTokenStore: createStub<SessionOptions["downloadTokenStore"]>({}),
     pushNotifications: createStub<SessionOptions["pushNotifications"]>({}),

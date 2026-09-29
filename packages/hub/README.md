@@ -1,40 +1,40 @@
 <p align="center">
-  <img src="https://paseo.sh/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="https://clisbot.com/logo.svg" width="64" height="64" alt="Clisbot logo">
 </p>
 
-<h1 align="center">Paseo Hub</h1>
+<h1 align="center">Clisbot Hub</h1>
 
-<p align="center">Run coding agents from GitHub, Linear, Slack, and Discord on your own Paseo daemons.</p>
+<p align="center">Run coding agents from GitHub, Linear, Slack, and Discord on your own Clisbot daemons.</p>
 
 <p align="center">
-  <a href="https://paseo.sh/docs/hub">Docs</a> ·
-  <a href="https://github.com/getpaseo/paseo">Paseo</a> ·
+  <a href="https://clisbot.com/docs/hub">Docs</a> ·
+  <a href="https://github.com/longbkit/clisbot">Clisbot</a> ·
   <a href="LICENSE">Apache 2.0</a>
 </p>
 
 > [!WARNING]
-> Paseo Hub is in early development. Expect breaking changes and data loss. [Join the Paseo Discord](https://discord.gg/jz8T2uahpH) to learn more about the project.
+> Clisbot Hub is in early development. Expect breaking changes and data loss. [Join the Clisbot Discord](https://discord.gg/jz8T2uahpH) to learn more about the project.
 
-Paseo Hub is the self-hosted automation layer for [Paseo](https://paseo.sh). Connect the services where work arrives and run agents on the machines where your development environments already live.
+Clisbot Hub is the self-hosted automation layer for [Clisbot](https://clisbot.com). Connect the services where work arrives and run agents on the machines where your development environments already live.
 
-- **Your machines:** Hub dispatches to Paseo daemons on your laptop, devbox, or build server.
+- **Your machines:** Hub dispatches to Clisbot daemons on your laptop, devbox, or build server.
 - **Your configuration:** Update resources through Hub APIs or the UI; export when you need a portable copy.
 - **Your services:** Start agents from GitHub, Linear, Slack, Discord, or manual runs.
 - **One audit trail:** See every event, configuration revision, execution, and result.
 
 ```text
  GitHub ─┐                 ┌─ laptop
- Linear ─┼─ Paseo Hub ────┼─ devbox
+ Linear ─┼─ Clisbot Hub ────┼─ devbox
  Slack  ─┤                 └─ build server
  Discord ┘
 ```
 
 ## Quick start
 
-You need Node.js, Paseo, and an available agent provider on the daemon.
+You need Node.js, Clisbot, and an available agent provider on the daemon.
 
 ```sh
-paseo hub init --provider codex
+clisbot hub init --provider codex
 ```
 
 This creates a seeded local assistant Workspace and its daemon Project, then starts
@@ -53,7 +53,7 @@ Hub has no Project to create or select. Export/edit/deploy is not required by th
 normal configuration flow. The inherited CLI scaffold/project/deploy surface is
 available only when `CLISBOT_ONBOARDING_ENABLED=0` is explicitly selected.
 
-See the [Hub documentation](https://paseo.sh/docs/hub) for PostgreSQL, Docker, public URLs, environment-managed configuration, and production deployment.
+See the [Hub documentation](https://clisbot.com/docs/hub) for PostgreSQL, Docker, public URLs, environment-managed configuration, and production deployment.
 
 ## Develop locally
 
@@ -64,10 +64,10 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. Hub stores the embedded database and its generated authentication secret under `$XDG_DATA_HOME/paseo-hub`, falling back to `~/.local/share/paseo-hub`, and keeps both across restarts. Set `PASEO_HUB_DATA_DIR` to use a different directory, or set `DATABASE_URL` to use PostgreSQL instead:
+Open <http://localhost:3000>. Hub stores the embedded database and its generated authentication secret under `$XDG_DATA_HOME/clisbot-hub`, falling back to `~/.local/share/clisbot-hub`, and keeps both across restarts. Set `CLISBOT_HUB_DATA_DIR` to use a different directory, or set `DATABASE_URL` to use PostgreSQL instead:
 
 ```sh
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/paseo_hub npm run dev
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/clisbot_hub npm run dev
 ```
 
 Embedded mode supports one Hub process per data directory. Docker Compose continues to run Hub with PostgreSQL.
@@ -85,14 +85,14 @@ cp .env.example .env
 Set these values in `.env`:
 
 ```dotenv
-PASEO_HUB_APP_URL=https://hub.example.com
-PASEO_BOOTSTRAP_ORGANIZATION=My organization
-PASEO_BOOTSTRAP_OWNER_EMAIL=me@example.com
-PASEO_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
+CLISBOT_HUB_APP_URL=https://hub.example.com
+CLISBOT_BOOTSTRAP_ORGANIZATION=My organization
+CLISBOT_BOOTSTRAP_OWNER_EMAIL=me@example.com
+CLISBOT_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
 ```
 
 Hub generates and stores its authentication secret in the database. Advanced deployments may set
-`PASEO_HUB_AUTH_SECRET` to override it without replacing the stored secret.
+`CLISBOT_HUB_AUTH_SECRET` to override it without replacing the stored secret.
 
 Billing is optional: leave `STRIPE_SECRET_KEY` unset and Hub runs with no billing surface at all. See [docs/billing.md](docs/billing.md).
 
@@ -108,21 +108,21 @@ Then start Hub and PostgreSQL:
 docker compose up -d
 ```
 
-Open `PASEO_HUB_APP_URL`, sign in with the bootstrap account, and replace its temporary password. Connect a daemon with:
+Open `CLISBOT_HUB_APP_URL`, sign in with the bootstrap account, and replace its temporary password. Connect a daemon with:
 
 ```sh
-paseo hub connect https://hub.example.com
+clisbot hub connect https://hub.example.com
 ```
 
 The image is published as `ghcr.io/getpaseo/hub:latest`.
 
-See the [self-hosting guide](https://paseo.sh/docs/hub/self-hosting) for production deployment details.
-For Linear setup and workflows, see the public [Linear app](https://paseo.sh/docs/hub/self-hosting/linear-app) and [Linear triggers](https://paseo.sh/docs/hub/triggers/linear) guides.
+See the [self-hosting guide](https://clisbot.com/docs/hub/self-hosting) for production deployment details.
+For Linear setup and workflows, see the public [Linear app](https://clisbot.com/docs/hub/self-hosting/linear-app) and [Linear triggers](https://clisbot.com/docs/hub/triggers/linear) guides.
 
 ## Provider options and Hub tools
 
 Workflow steps may pass a JSON-compatible, provider-native `agent.options` object. Hub preserves
-the names and nesting exactly; the selected Paseo provider validates and applies them:
+the names and nesting exactly; the selected Clisbot provider validates and applies them:
 
 ```yaml
 agent:

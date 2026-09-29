@@ -216,7 +216,7 @@ BEGIN
     IF legacy_organization_count = 0 THEN
       legacy_organization_id := 'org_1';
       INSERT INTO "organization" ("id", "name", "slug")
-      VALUES (legacy_organization_id, 'Paseo', 'paseo');
+      VALUES (legacy_organization_id, 'Clisbot', 'clisbot');
     ELSIF legacy_organization_count <> 1 THEN
       RAISE EXCEPTION 'legacy enrollment-token organization is ambiguous';
     END IF;
@@ -248,12 +248,12 @@ CREATE INDEX IF NOT EXISTS "agent_executions_status_idx" ON "agent_executions" (
 --> statement-breakpoint
 DROP TABLE IF EXISTS "registered_daemons" CASCADE;
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "paseo_hub_migrations" (
+CREATE TABLE IF NOT EXISTS "clisbot_hub_migrations" (
   "filename" text PRIMARY KEY,
   "applied_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO "paseo_hub_migrations" ("filename") VALUES
+INSERT INTO "clisbot_hub_migrations" ("filename") VALUES
   ('0000_calm_songbird.sql'),
   ('0001_machine_model.sql'),
   ('0003_hub_configs.sql'),

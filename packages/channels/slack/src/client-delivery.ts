@@ -6,15 +6,15 @@ import {
   extractErrorCode,
   PlatformMessageNotDispatchedError,
   readErrorName,
-} from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { buildTimeoutAbortSignal } from "@getpaseo/channels-core/plugin-sdk/extension-shared";
+} from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { buildTimeoutAbortSignal } from "@clisbot/channels-core/plugin-sdk/extension-shared";
 import { withTrustedEnvProxyGuardedFetchMode } from "./fusion/fetch.js";
-import { extensionForMime } from "@getpaseo/channels-core/plugin-sdk/media-mime";
-import { loadOutboundMediaFromUrl } from "@getpaseo/channels-core/plugin-sdk/outbound-media";
-import { retryAsync } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { logVerbose, sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { extensionForMime } from "@clisbot/channels-core/plugin-sdk/media-mime";
+import { loadOutboundMediaFromUrl } from "@clisbot/channels-core/plugin-sdk/outbound-media";
+import { retryAsync } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { logVerbose, sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { fetchWithSsrFGuard, type SsrFPolicy } from "./fusion/fetch.js";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { formatSlackError } from "./errors.js";
 import {
   postSlackMessageWithIdentityFallback,

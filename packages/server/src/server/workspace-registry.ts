@@ -1,5 +1,5 @@
 import { currentSessionOperationIdentity } from "./agent/session-operation-context.js";
-import { SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
+import { SessionAuthorshipShape } from "@clisbot/protocol/session-authorship";
 import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
@@ -86,7 +86,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
-  isPaseoOwnedWorktree: z.boolean().default(false),
+  isClisbotOwnedWorktree: z.boolean().default(false),
   mainRepoRoot: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -678,7 +678,7 @@ export function createPersistedWorkspaceRecord(input: {
   branch?: string | null;
   worktreeRoot?: string | null;
   baseBranch?: string | null;
-  isPaseoOwnedWorktree?: boolean;
+  isClisbotOwnedWorktree?: boolean;
   mainRepoRoot?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -698,7 +698,7 @@ export function createPersistedWorkspaceRecord(input: {
     branch: input.branch ?? null,
     worktreeRoot: input.worktreeRoot ?? null,
     baseBranch: input.baseBranch ?? null,
-    isPaseoOwnedWorktree: input.isPaseoOwnedWorktree ?? false,
+    isClisbotOwnedWorktree: input.isClisbotOwnedWorktree ?? false,
     mainRepoRoot: input.mainRepoRoot ?? null,
     archivedAt: input.archivedAt ?? null,
     autoArchivedChangeRequestUrl: input.autoArchivedChangeRequestUrl ?? null,

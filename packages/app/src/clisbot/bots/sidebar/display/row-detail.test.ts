@@ -1,4 +1,4 @@
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_BOT_ROW_ITEMS, DEFAULT_CHAT_ROW_ITEMS } from "./preferences";
 import { botRowDetail, chatRowDetail } from "./row-detail";

@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/update-offset-store.ts@5d8067a4483
 // Telegram plugin module implements update offset store behavior.
-import { readJsonFileWithFallback } from "@getpaseo/channels-core/plugin-sdk/json-store";
-import type { PluginStateKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
+import { readJsonFileWithFallback } from "@clisbot/channels-core/plugin-sdk/json-store";
+import type { PluginStateKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
 import { getTelegramRuntime } from "./runtime.js";
 import { normalizeTelegramStateAccountId } from "./state-account-id.js";
 import {

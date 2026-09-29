@@ -70,7 +70,7 @@ const SETUP_GUIDES: readonly ProviderGuide[] = [
 
 /**
  * Serializes the existing Hub setup guide into a provider-neutral management response. Functions
- * stay server-side; the Paseo client receives only resolved copy, URLs, fields, and manifests.
+ * stay server-side; the Clisbot client receives only resolved copy, URLs, fields, and manifests.
  */
 export function providerApplicationSetupGuides(
   callbackOrigin: string,

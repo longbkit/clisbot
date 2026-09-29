@@ -33,7 +33,7 @@ test("refuses to move a database whose Hub lock owner is running", async (t) => 
   const home = await mkdtemp(join(tmpdir(), "clisbot-hub-running-"));
   t.after(() => rm(home, { recursive: true, force: true }));
   await writeFile(join(home, "PG_VERSION"), "17\n");
-  await writeFile(join(home, ".paseo-hub.lock"), JSON.stringify({ pid: 42 }));
+  await writeFile(join(home, ".clisbot-hub.lock"), JSON.stringify({ pid: 42 }));
 
   await assert.rejects(
     migrateDevHubData(home, { isRunning: (pid) => pid === 42 }),

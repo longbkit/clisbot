@@ -11,7 +11,7 @@ import { SherpaOnnxTTS } from "./sherpa-tts.js";
 import { SherpaOfflineRecognizerEngine } from "./sherpa-offline-recognizer.js";
 import { SherpaOnnxParakeetSTT } from "./sherpa-parakeet-stt.js";
 
-const RUN = process.env.PASEO_SPEECH_E2E_DOWNLOAD === "1";
+const RUN = process.env.CLISBOT_SPEECH_E2E_DOWNLOAD === "1";
 const downloadTest = RUN ? test : test.skip;
 
 async function readFixtureWav(): Promise<Buffer> {
@@ -87,8 +87,8 @@ downloadTest(
   async () => {
     const logger = pino({ level: "silent" });
 
-    const paseoHomeRoot = mkdtempSync(path.join(tmpdir(), "paseo-speech-download-"));
-    const modelsDir = path.join(paseoHomeRoot, ".paseo", "models", "local-speech");
+    const clisbotHomeRoot = mkdtempSync(path.join(tmpdir(), "clisbot-speech-download-"));
+    const modelsDir = path.join(clisbotHomeRoot, ".clisbot", "models", "local-speech");
 
     await ensureSherpaOnnxModels({
       modelsDir,
@@ -97,7 +97,7 @@ downloadTest(
     });
 
     const ctx = await createDaemonTestContext({
-      paseoHomeRoot,
+      clisbotHomeRoot,
       dictationFinalTimeoutMs: 8000,
       speech: {
         providers: {

@@ -2,7 +2,7 @@
 import {
   scanReasoningTags,
   stripReasoningTagsFromMarkdown,
-} from "@getpaseo/channels-markdown-core/reasoning-tags";
+} from "@clisbot/channels-markdown-core/reasoning-tags";
 // Reasoning tag helpers find and remove model reasoning tag blocks from text.
 import { findCodeRegions, isInsideCode } from "./code-regions.js";
 import { findFinalTagMatches } from "./final-tags.js";

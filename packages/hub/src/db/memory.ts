@@ -1809,8 +1809,8 @@ class MemoryDatabase implements Database {
   }
   async setDaemonConnectionOffer(
     id: string,
-    connectionOffer: import("@getpaseo/protocol/connection-offer").ConnectionOffer | null,
-    managedAccessMode: import("@getpaseo/protocol/managed-access").ManagedAccessMode,
+    connectionOffer: import("@clisbot/protocol/connection-offer").ConnectionOffer | null,
+    managedAccessMode: import("@clisbot/protocol/managed-access").ManagedAccessMode,
   ) {
     const value = this.daemons.get(id);
     if (!value || value.status !== "active") return undefined;
@@ -3159,7 +3159,7 @@ class MemoryDatabase implements Database {
     operation: LinearConnectionRefreshOperation<T>,
   ): Promise<T> {
     return this.withAdvisoryLock(
-      JSON.stringify(["paseo-connection", "linear", "external", linearOrganizationId]),
+      JSON.stringify(["clisbot-connection", "linear", "external", linearOrganizationId]),
       async () => {
         const connection = this.linearConnections.get(linearOrganizationId);
         return operation(connection, async (input) => {

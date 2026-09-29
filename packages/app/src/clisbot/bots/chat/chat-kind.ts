@@ -1,4 +1,4 @@
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 
 /**
  * Whether a chat is a group. Chats created before `kind` existed carry no kind: more than one

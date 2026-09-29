@@ -1,6 +1,6 @@
 // COMPAT(clisbot-channels): fork-owned channel control plane status enums (schema.ts).
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import type {
   AgentExecutionStatus,
   ChannelLedgerDirection,
@@ -205,7 +205,7 @@ export interface DaemonSlugConflict {
 
 export type DaemonWriteResult = DaemonRecord | DaemonSlugConflict | undefined;
 
-/** Another active daemon in the organization already uses this server ID (a copied Paseo home). */
+/** Another active daemon in the organization already uses this server ID (a copied Clisbot home). */
 export interface DaemonServerIdConflict {
   status: "server_id_conflict";
   slug: string;
@@ -1490,7 +1490,7 @@ export interface Database {
   syncBillingPlan(input: SyncBillingPlanInput): Promise<BillingPlanRecord>;
   /**
    * Deactivates every synced plan whose id is not in `activeIds` — the sync applies its catalog as
-   * one reconciled snapshot, so a product that lost its `paseo_plan` tag or was deleted stops being
+   * one reconciled snapshot, so a product that lost its `clisbot_plan` tag or was deleted stops being
    * active and selectable rather than lingering. `src/billing/` only.
    */
   deactivateBillingPlansExcept(activeIds: readonly string[]): Promise<void>;
@@ -2009,7 +2009,7 @@ export interface RefreshChannelIngressInput {
 
 /**
  * Settle a claim that did not deliver. The caller decides between retry and
- * dead-letter with the upstream ingress retry policy (`@getpaseo/channels-core`
+ * dead-letter with the upstream ingress retry policy (`@clisbot/channels-core`
  * `resolveIngressFailureDisposition`), or releases the row when the refusal was
  * back-pressure rather than a failure; the store only writes the decision, so
  * one policy owns both surfaces.

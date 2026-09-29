@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/approval-callback-data.ts@5d8067a4483
 // Telegram plugin module implements approval callback data behavior.
-import { buildApprovalResolutionRef } from "@getpaseo/channels-core/plugin-sdk/approval-reference-runtime";
-import type { MessagePresentationAction } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import { buildApprovalResolutionRef } from "@clisbot/channels-core/plugin-sdk/approval-reference-runtime";
+import type { MessagePresentationAction } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 
 export const TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64;
 const TELEGRAM_APPROVAL_CALLBACK_PREFIX = "tga1:";

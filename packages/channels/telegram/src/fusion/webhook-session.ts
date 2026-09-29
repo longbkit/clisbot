@@ -27,15 +27,15 @@
 //     cannot stream an unbounded body into the Hub's heap.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import {
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
   WEBHOOK_BODY_READ_DEFAULTS,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
-import { safeEqualSecret } from "@getpaseo/channels-core/security/secret-equal";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+} from "@clisbot/channels-core/plugin-sdk/webhook-ingress";
+import { safeEqualSecret } from "@clisbot/channels-core/security/secret-equal";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import type { CallbackQuery, Update } from "grammy/types";
 import { resolveTelegramAllowedUpdates } from "../allowed-updates.js";
 import type { TelegramApi } from "../client/bot-api.js";

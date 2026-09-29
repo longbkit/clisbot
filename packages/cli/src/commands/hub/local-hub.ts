@@ -1,7 +1,7 @@
 import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import { selectLocalPort } from "./local-port.js";
 // COMPAT(clisbot-hub-local): local lifecycle + discovery for the fork's embedded
-// Hub. `hub start` spawns the `@getpaseo/hub` bin detached (default loopback :6868,
+// Hub. `hub start` spawns the `@clisbot/hub` bin detached (default loopback :6868,
 // the fork default distinct from upstream's :3000) and records url + pid in
 // `hub-local.json` under the shared Clisbot home ($CLISBOT_HOME, default ~/.clisbot);
 // the `channels`/`users` verbs read that file to reach the control plane without
@@ -23,7 +23,7 @@ import fs, {
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { spawnProcess } from "@getpaseo/server";
+import { spawnProcess } from "@clisbot/server";
 
 const require = createRequire(import.meta.url);
 
@@ -151,7 +151,7 @@ function isSet(value: string | undefined): value is string {
 /**
  * The shared Clisbot home. `hub start` records `hub-local.json` here so the local
  * verbs discover the running Hub. Resolution mirrors the fork's env-alias
- * precedence: explicit flag (handled by callers), `CLISBOT_HOME`, `PASEO_HOME`,
+ * precedence: explicit flag (handled by callers), `CLISBOT_HOME`, `CLISBOT_HOME`,
  * then the default `~/.clisbot` (implementation doc §4.5 / plan §14.8).
  */
 export function resolveLocalHubHome(
@@ -161,7 +161,6 @@ export function resolveLocalHubHome(
   const selected =
     options.home?.trim() ||
     env.CLISBOT_HOME?.trim() ||
-    env.PASEO_HOME?.trim() ||
     path.join(os.homedir(), FORK_DEFAULT_HOME_DIRECTORY_NAME);
   const expanded =
     selected === "~" ? os.homedir() : selected.replace(/^~[\\/]/, `${os.homedir()}${path.sep}`);
@@ -284,11 +283,11 @@ function hubUrlFor(port: number): string {
 }
 
 function resolveHubBin(): string {
-  // @getpaseo/hub has no main/exports entry; resolve the package root via its
+  // @clisbot/hub has no main/exports entry; resolve the package root via its
   // package.json subpath and use the documented bin entry.
-  const packageJsonPath = require.resolve("@getpaseo/hub/package.json");
+  const packageJsonPath = require.resolve("@clisbot/hub/package.json");
   const packageRoot = path.dirname(packageJsonPath);
-  const binPath = path.join(packageRoot, "bin", "paseo-hub.js");
+  const binPath = path.join(packageRoot, "bin", "clisbot-hub.js");
   if (!existsSync(binPath)) {
     throw new Error(`Hub bin entry not found at ${binPath}. Run \`npm run build:hub\` first.`);
   }
@@ -368,7 +367,7 @@ export function localHubMasterKeyPath(home: string, hubDataDirectory = home): st
 /**
  * The local-only Hub master key file, as a sibling of — never inside — the
  * effective Hub data directory. Hosted deployments keep using their externally
- * managed env/file secret; this helper only makes `paseo hub start`
+ * managed env/file secret; this helper only makes `clisbot hub start`
  * secure-by-default locally.
  *
  * Absent, it is NOT regenerated. A silently minted key starts a Hub that cannot
@@ -395,7 +394,7 @@ export function resolveLocalHubMasterKeyFile(
     throw new Error(
       [
         `No Hub credential master key at ${keyPath}.`,
-        "Restore it from your backup, or run `paseo hub start --init-master-key` to mint a new one.",
+        "Restore it from your backup, or run `clisbot hub start --init-master-key` to mint a new one.",
         "Minting a new key makes every credential already stored in this Hub unreadable.",
       ].join(" "),
     );
@@ -432,9 +431,8 @@ function buildChildEnv(
     ...inherited,
     CLISBOT_HOME: home,
     PORT: String(port),
-    PASEO_HUB_BIND: FORK_HUB_BIND,
-    PASEO_HUB_APP_URL: inherited.PASEO_HUB_APP_URL?.trim() || `http://${FORK_HUB_BIND}:${port}`,
-    PASEO_HOME: home,
+    CLISBOT_HUB_BIND: FORK_HUB_BIND,
+    CLISBOT_HUB_APP_URL: inherited.CLISBOT_HUB_APP_URL?.trim() || `http://${FORK_HUB_BIND}:${port}`,
   };
   // A token reference for CLI onboarding is not an environment-managed Application.
   // Preserve explicit legacy Application configuration, but keep bare input tokens local to the CLI.
@@ -452,24 +450,24 @@ function buildChildEnv(
     delete env.SLACK_BOT_TOKEN;
   }
   if (
-    !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY) &&
-    !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE) &&
+    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY) &&
+    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE) &&
     !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY) &&
     !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE)
   ) {
     const hubDataDirectory =
-      (isSet(env.PASEO_HUB_DATA_DIR) ? env.PASEO_HUB_DATA_DIR : undefined) ??
+      (isSet(env.CLISBOT_HUB_DATA_DIR) ? env.CLISBOT_HUB_DATA_DIR : undefined) ??
       (isSet(env.CLISBOT_HUB_DATA_DIR) ? env.CLISBOT_HUB_DATA_DIR : undefined) ??
       home;
     // The path, never the key: an env var is readable from the process table
     // and lands verbatim in any log that dumps the child's environment.
-    env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE = resolveLocalHubMasterKeyFile(home, {
+    env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE = resolveLocalHubMasterKeyFile(home, {
       hubDataDirectory,
       ...(options.initMasterKey === true ? { initialize: true } : {}),
     });
   }
   const password = readDaemonPasswordFile(home);
-  if (password !== undefined) env.PASEO_PASSWORD = password;
+  if (password !== undefined) env.CLISBOT_PASSWORD = password;
   return env;
 }
 
@@ -477,7 +475,7 @@ function buildChildEnv(
  * The daemon's WS-auth password, when the home carries `<home>/.daemon-password`.
  * Without it a password-protected daemon rejects the Hub's trusted session at
  * the WS upgrade ("started" hub, dead daemon link). The file is a single
- * `PASEO_PASSWORD=<value>` line (the repo .env shape), not a bare value — split
+ * `CLISBOT_PASSWORD=<value>` line (the repo .env shape), not a bare value — split
  * on the first `=`. An absent or unreadable file returns undefined: a daemon
  * without a password needs none.
  */

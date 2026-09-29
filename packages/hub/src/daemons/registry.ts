@@ -3,7 +3,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { z } from "zod";
-import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@clisbot/protocol/client-capabilities";
 import type { Logger } from "pino";
 import type { Database, DaemonRecord } from "../db/types.js";
 import { reportFailure, type FailureKind } from "../failures/index.js";
@@ -77,7 +77,7 @@ interface ActiveSocket {
 
 export type DaemonSessionProtocol = "legacy" | "session-v1";
 
-const DAEMON_SESSION_PROTOCOL_HEADER = "x-paseo-session-protocol";
+const DAEMON_SESSION_PROTOCOL_HEADER = "x-clisbot-session-protocol";
 const DAEMON_SESSION_PROTOCOL_VERSION = "1";
 
 type DaemonConnectedHandler = (daemon: DaemonRecord) => void | Promise<void>;
@@ -607,7 +607,7 @@ export class ActiveDaemonRegistry {
       for (const [, request] of related) {
         request.reject(
           new DaemonCreateRejectedError(
-            "The connected Paseo daemon did not confirm Hub MCP preapproval; update Paseo before running this workflow",
+            "The connected Clisbot daemon did not confirm Hub MCP preapproval; update Clisbot before running this workflow",
             "tool_policy_not_confirmed",
           ),
         );
@@ -626,7 +626,7 @@ export class ActiveDaemonRegistry {
                 "issues" in error ? error.issues : undefined,
               )
             : new DaemonCreateRejectedError(
-                "The connected Paseo daemon returned the legacy Hub create error contract; update Paseo before running this workflow",
+                "The connected Clisbot daemon returned the legacy Hub create error contract; update Clisbot before running this workflow",
                 "tool_policy_not_confirmed",
               ),
         );
@@ -728,7 +728,7 @@ export function createDaemonUpgradeHandler(
       socket.destroy();
       return;
     }
-    const daemonId = request.headers["x-paseo-daemon-id"];
+    const daemonId = request.headers["x-clisbot-daemon-id"];
     const credential = bearer(request.headers.authorization);
     if (typeof daemonId !== "string" || !credential) return rejectUpgrade(socket, 401);
     const daemon = await database.findDaemonById(daemonId);

@@ -1,10 +1,10 @@
 // upstream: extensions/telegram/src/polling-status.ts@5d8067a4483
 // Telegram plugin module implements polling status behavior.
-import type { ChannelAccountSnapshot } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelAccountSnapshot } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   channelReadyPatch,
   createTransportActivityStatusPatch,
-} from "@getpaseo/channels-core/plugin-sdk/gateway-runtime";
+} from "@clisbot/channels-core/plugin-sdk/gateway-runtime";
 
 type TelegramPollingStatusSink = (patch: Omit<ChannelAccountSnapshot, "accountId">) => void;
 

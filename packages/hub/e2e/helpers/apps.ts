@@ -36,7 +36,7 @@ export const WORKING_CREDENTIALS: Readonly<Record<AppProvider, Readonly<Record<s
   {
     GitHub: {
       "App ID": "42",
-      "App slug": "paseo",
+      "App slug": "clisbot",
       "Client ID": "client",
       "Client secret": "secret",
       "Private key": "fixture-private-key",
@@ -487,7 +487,7 @@ export class AppSetupSurface {
     await expect(this.page.getByRole("heading", { name: "Set up your apps" })).toBeVisible();
     await expect(
       this.page.getByText(
-        "Paseo Hub talks to GitHub, Slack, Discord, and Linear through apps you create and own.",
+        "Clisbot Hub talks to GitHub, Slack, Discord, and Linear through apps you create and own.",
         { exact: false },
       ),
     ).toBeVisible();
@@ -598,7 +598,7 @@ export class AppSetupSurface {
   }
 
   /**
-   * Paseo's own vocabulary never reaches this surface. "Restart" is the one exception and it is
+   * Clisbot's own vocabulary never reaches this surface. "Restart" is the one exception and it is
    * not a general one: an environment-managed app genuinely cannot be changed without restarting
    * Hub, so that alert says so and is measured separately.
    */

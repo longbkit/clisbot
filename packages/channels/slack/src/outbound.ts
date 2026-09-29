@@ -11,15 +11,15 @@
 // `telegram.sent-messages` (state-store-namespaces.md §Slack; D-001).
 
 import { statSync } from "node:fs";
-import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
+import type { HostRuntime, SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
+import { evaluateOutboundMedia, mediaFileName } from "@clisbot/channels-shared";
 import { getSlackWriteClient, isSilentReplyText } from "./client/web-api.js";
 import { sendMessageSlack } from "./send.js";
 import { resolveSlackOutboundPresentationMessages } from "./presentation-outbound.js";
-import type { MessagePresentationBlockNote } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentationBlockNote } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import type { SlackReplyDeliveryMessage } from "./reply-blocks.js";
 import { rememberSlackDriveConfig } from "./fusion/plugin-config.js";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
 import { refreshSlackTypingAfterPost } from "./typing.js";
 import { getSlackHostRuntime } from "./runtime-store.js";
@@ -28,7 +28,7 @@ import {
   editSlackMarkdownTableMessage,
   resolveSlackMarkdownTableMessages,
 } from "./markdown-tables.js";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
 import { uploadSlackFile } from "./outbound-media.js";
 
 /** The upstream send's config and block argument types, named locally so the

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { parseServerInfoStatusPayload } from "@getpaseo/protocol/messages";
+import { parseServerInfoStatusPayload } from "@clisbot/protocol/messages";
 import { toSessionServerInfo } from "./session-server-info";
 
 it("keeps wire session authority through the shared handshake replay/live projection", () => {

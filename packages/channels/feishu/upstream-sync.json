@@ -537,7 +537,7 @@
     },
     {
       "upstream": "extensions/feishu/src/dynamic-agent.ts",
-      "reason": "Creates OpenClaw agents for DM users; agent lifecycle is Paseo/Hub-owned."
+      "reason": "Creates OpenClaw agents for DM users; agent lifecycle is Clisbot/Hub-owned."
     },
     {
       "upstream": "extensions/feishu/src/subagent-hooks.ts",
@@ -733,7 +733,7 @@
     {
       "id": "D-FS-002",
       "file": "src/fusion/runtime-api.ts",
-      "reason": "The extension private runtime barrel re-exports ~30 members of the OpenClaw plugin host. Only the members the ported files read are declared, sourced from @getpaseo/channels-core."
+      "reason": "The extension private runtime barrel re-exports ~30 members of the OpenClaw plugin host. Only the members the ported files read are declared, sourced from @clisbot/channels-core."
     },
     {
       "id": "D-FS-003",

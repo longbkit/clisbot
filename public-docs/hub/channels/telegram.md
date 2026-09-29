@@ -27,11 +27,11 @@ The file may also be JSON with a `botToken` key.
 ## Add it to Hub
 
 ```sh
-paseo channels add telegram --account main --secret-file /tmp/telegram-token
+clisbot channels add telegram --account main --secret-file /tmp/telegram-token
 rm /tmp/telegram-token
 ```
 
-Hub probes the token with `getMe` before storing it, encrypts it into a Connection, and starts the account. `paseo channels ls` shows the transport state.
+Hub probes the token with `getMe` before storing it, encrypts it into a Connection, and starts the account. `clisbot channels ls` shows the transport state.
 
 In the app: **Channels → Connections → Add Route**, choose **Connect a new one**, pick Telegram, paste the token into the credential form, then finish the Route.
 
@@ -90,4 +90,4 @@ The running record with message ids is `docs/tests/channels/p0-live-scenarios.md
 
 **`Unauthorized` in the account detail.** The token was revoked or regenerated in BotFather. Add the account again with the new token.
 
-**A quiet chat goes silent for minutes.** Older builds escalated the poll backoff after an idle long-poll timeout. Check `paseo channels status`; a healthy account reports `started` and the poll loop resets on every completed poll, empty batches included.
+**A quiet chat goes silent for minutes.** Older builds escalated the poll backoff after an idle long-poll timeout. Check `clisbot channels status`; a healthy account reports `started` and the poll loop resets on every completed poll, empty batches included.

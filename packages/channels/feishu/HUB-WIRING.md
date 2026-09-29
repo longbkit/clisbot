@@ -1,4 +1,4 @@
-# Hub wiring for `@getpaseo/channels-feishu`
+# Hub wiring for `@clisbot/channels-feishu`
 
 Slice 15 built the vertical; **slice 15b wired it into the Hub** (2026-09-07).
 The sections below are the contract that wiring was written against, kept as the
@@ -23,7 +23,7 @@ reference for the next change. Three things ended up different from the text:
   and reads `/open-apis/bot/v3/info`, pinned to this package's `probe.ts` by a
   differential test that drives both over the same fake open platform.
 
-Install: `paseo channels add feishu --account <id> --secret-file <path>`, where
+Install: `clisbot channels add feishu --account <id> --secret-file <path>`, where
 the file is `{"appId": "…", "appSecret": "…", "verificationToken": "…",
 "encryptKey": "…", "domain": "feishu|lark"}`.
 
@@ -82,14 +82,14 @@ Add, mirroring the Discord and Google Chat entries:
     "dist": { "integrity": "sha512-…", "gitHead": "…" }   // sync reference only
   },
   "loadMode": "in-repo",
-  "inRepoPackage": "@getpaseo/channels-feishu",
+  "inRepoPackage": "@clisbot/channels-feishu",
   "entry": "./dist/index.js",
   "plugin": { "specifier": "./dist/plugin.js", "exportName": "feishuPlugin" },
   "notices": "feishu"
 }
 ```
 
-Also add `@getpaseo/channels-feishu` to the loader's in-repo allowlist
+Also add `@clisbot/channels-feishu` to the loader's in-repo allowlist
 (`packages/hub/src/channels/loader/`), where `channels-discord` was added in 13b.
 
 ## 4. Config enum, schema and compile
@@ -168,7 +168,7 @@ agentTools: { names: FEISHU_TOOL_NAMES, collect: collectFeishuToolRegistrations,
   has one.
 - A registration is either a tool or a **factory** `(ctx) => tool | tool[]`.
   The Hub must call the factory per execution with an
-  `OpenClawPluginToolContext` (`@getpaseo/channels-core/plugin-sdk/plugin-entry`);
+  `OpenClawPluginToolContext` (`@clisbot/channels-core/plugin-sdk/plugin-entry`);
   the members the ported executors read are `config`, `fsPolicy`,
   `workspaceDir`, `messageChannel`, `agentAccountId`, `deliveryContext`,
   `nativeChannelId`, `requesterSenderId`, `conversationReadOrigin`.

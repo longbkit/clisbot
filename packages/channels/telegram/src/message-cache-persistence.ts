@@ -2,7 +2,7 @@
 // Lightweight Telegram message-cache persistence contract shared with doctor migrations.
 import { createHash } from "node:crypto";
 import type { Message } from "grammy/types";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { TelegramMediaKind } from "./bot/body-helpers.js";
 import type { StickerMetadata } from "./bot/types.js";
 import type {

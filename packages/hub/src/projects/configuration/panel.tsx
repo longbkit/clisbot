@@ -402,7 +402,7 @@ function FileList({
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        Workflow YAML lives directly under <span className="font-mono">.paseo/workflows/</span>;
+        Workflow YAML lives directly under <span className="font-mono">.clisbot/workflows/</span>;
         shared prompt files live under <span className="font-mono">partials/</span>. Saving
         activates the complete bundle.
       </p>

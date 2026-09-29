@@ -98,7 +98,7 @@ function HubWelcomeCardHeader({
 }) {
   return (
     <View style={styles.headerRow}>
-      <Text style={styles.title}>Paseo Hub</Text>
+      <Text style={styles.title}>Clisbot Hub</Text>
       {badge ? <StatusBadge label={badge} variant={badgeVariant(tone)} /> : null}
     </View>
   );

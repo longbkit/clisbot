@@ -178,7 +178,7 @@ describe("Automation configuration", () => {
         outputs: { "slack.reply": { max: 2 } },
       },
     });
-    expect(yaml).toContain("${{ paseo.prompt }}");
+    expect(yaml).toContain("${{ clisbot.prompt }}");
     expect(parseSingleAgentAutomationYaml(yaml)).toEqual({
       name: "customer-handoff",
       description: "Triage incoming customer requests.",
@@ -242,7 +242,7 @@ describe("Automation configuration", () => {
       "    custom_target_option: true",
       "  agent:",
       "    provider: codex",
-      "  prompt: ${{ paseo.prompt }}",
+      "  prompt: ${{ clisbot.prompt }}",
       "  max_runtime: 2h",
       "  idle_timeout: 10m",
       "  auto_archive: true",

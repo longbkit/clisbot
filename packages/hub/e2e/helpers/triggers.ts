@@ -126,8 +126,8 @@ export class OrganizationTriggers {
     const instructions = this.page.getByLabel("Instructions", { exact: true });
     await instructions.fill("Start  finish");
     await instructions.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(6, 6));
-    await this.page.getByRole("button", { name: "${{ paseo.prompt }}", exact: true }).click();
-    await expect(instructions).toHaveValue("Start ${{ paseo.prompt }} finish");
+    await this.page.getByRole("button", { name: "${{ clisbot.prompt }}", exact: true }).click();
+    await expect(instructions).toHaveValue("Start ${{ clisbot.prompt }} finish");
     await instructions.fill(
       Array.from({ length: 24 }, (_, index) => `Line ${index + 1}`).join("\n"),
     );

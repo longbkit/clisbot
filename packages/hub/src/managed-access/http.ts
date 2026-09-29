@@ -17,7 +17,7 @@ export async function consumeDaemonAccessTicket(
   database: Database,
   tickets: AccessTicketService,
 ): Promise<Response> {
-  const daemonId = request.headers.get("x-paseo-daemon-id");
+  const daemonId = request.headers.get("x-clisbot-daemon-id");
   if (daemonId === null) return Response.json({ error: "unauthorized" }, { status: 401 });
   const daemon = await authenticateDaemonRequest(request, daemonId, database);
   if (daemon instanceof Response) return daemon;
@@ -75,7 +75,7 @@ export async function refreshDaemonAccessLease(
   database: Database,
   tickets: AccessTicketService,
 ): Promise<Response> {
-  const daemonId = request.headers.get("x-paseo-daemon-id");
+  const daemonId = request.headers.get("x-clisbot-daemon-id");
   if (daemonId === null) return Response.json({ error: "unauthorized" }, { status: 401 });
   const daemon = await authenticateDaemonRequest(request, daemonId, database);
   if (daemon instanceof Response) return daemon;

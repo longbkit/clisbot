@@ -38,7 +38,7 @@ test("profile tab preserves chat draft and reading position in the workspace rou
 }) => {
   test.setTimeout(240_000);
   expect(
-    process.env.PASEO_AGENT_SESSION_STORAGE,
+    process.env.CLISBOT_AGENT_SESSION_STORAGE,
     "Run this contract with the actual durable backend enabled",
   ).toBe("1");
   const session = await seedLongMockAgentTimeline({ turns: 30 });

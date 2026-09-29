@@ -9,8 +9,8 @@
 // and the session-store-derived cache scope (Fusion keys observations by
 // account, `fusion/message-thread-observation.ts`) are not.
 import type { Message } from "grammy/types";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import type { TelegramThreadSpec } from "./bot/helpers.js";
 import { recordTelegramMessageObservation } from "./fusion/message-thread-observation.js";
 import type { TelegramPromptContextProjection } from "./prompt-context-projection.js";

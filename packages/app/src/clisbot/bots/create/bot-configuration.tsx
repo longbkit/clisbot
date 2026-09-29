@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
+import type { AgentProfile } from "@clisbot/protocol/agent-profile";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Field } from "@/components/ui/form-field";
 import { SelectField } from "@/components/ui/select-field";

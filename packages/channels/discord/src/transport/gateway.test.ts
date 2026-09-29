@@ -11,8 +11,8 @@ import type {
   HostRuntime,
   InboundQueueSink,
   KeyedStoreEntry,
-} from "@getpaseo/channels-shared";
-import { createInboundEventProcessor } from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
+import { createInboundEventProcessor } from "@clisbot/channels-shared";
 import { Client } from "../internal/client.js";
 import type { DiscordMessageDispatchData } from "../internal/listeners.js";
 import { Guild, Message, User } from "../internal/structures.js";
@@ -25,7 +25,7 @@ import {
 
 vi.mock("../fusion/commands.js", async (importOriginal) => ({
   ...await importOriginal<typeof import("../fusion/commands.js")>(),
-  registerDiscordPaseoCommand: vi.fn(async () => undefined),
+  registerDiscordClisbotCommand: vi.fn(async () => undefined),
 }));
 
 const BOT_ID = "900000000000000001";

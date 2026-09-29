@@ -1,4 +1,4 @@
-# Hub wiring for `@getpaseo/channels-googlechat`
+# Hub wiring for `@clisbot/channels-googlechat`
 
 Slice 14 built the vertical; **slice 14b wired it into the Hub** (2026-09-07).
 The sections below are the contract that wiring was written against, kept as the
@@ -8,7 +8,7 @@ reference for the next change. Two things to know before reading them:
   carries `webhookUrl` / `webhookPath` / `webhookPort` / `webhookHost` through
   the compiled config to the vertical's own `node:http` listener, and that is
   all: the operator terminates TLS in front of it and forwards the Chat app's
-  request URL to `webhookHost:webhookPort` (option 1 in §6). The Paseo
+  request URL to `webhookHost:webhookPort` (option 1 in §6). The Clisbot
   service-proxy integration (option 2) is NOT in this slice, so live E2E stays
   blocked on the operator's proxy.
 - **The credential is probed before it is stored.**
@@ -19,7 +19,7 @@ reference for the next change. Two things to know before reading them:
   requires them to accept and refuse the same ones. `AccountCarrierInput` no
   longer requires a bot token (§4): every credential field on it is optional now.
 
-Install: `paseo channels add googlechat --account <id> --secret-file <path>`,
+Install: `clisbot channels add googlechat --account <id> --secret-file <path>`,
 where the file is the service-account JSON the Google Cloud console downloads, or
 `{"serviceAccountFile": "/run/secrets/googlechat.json"}` for a secret mount.
 
@@ -54,14 +54,14 @@ Add, mirroring the Discord entry:
     "dist": { "integrity": "sha512-…", "gitHead": "…" }   // sync reference only
   },
   "loadMode": "in-repo",
-  "inRepoPackage": "@getpaseo/channels-googlechat",
+  "inRepoPackage": "@clisbot/channels-googlechat",
   "entry": "./dist/index.js",
   "plugin": { "specifier": "./dist/plugin.js", "exportName": "googlechatPlugin" },
   "notices": "googlechat"
 }
 ```
 
-Also add `@getpaseo/channels-googlechat` to the loader's in-repo allowlist
+Also add `@clisbot/channels-googlechat` to the loader's in-repo allowlist
 (`packages/hub/src/channels/loader/`), the same place `channels-discord` was
 added in 13b.
 
@@ -166,11 +166,11 @@ Two options, in order of preference:
    ip instead of the proxy's — with no `trustedProxies`, headers are ignored and
    the socket address is used, which collapses every request into one bucket.
 
-2. **The Paseo service proxy** ([docs/service-proxy.md](../../../docs/service-proxy.md)).
+2. **The Clisbot service proxy** ([docs/service-proxy.md](../../../docs/service-proxy.md)).
    It already does hostname-routed public exposure with a `publicBaseUrl` and
    wildcard DNS, and it forwards `Host` / `X-Forwarded-Proto` / `X-Forwarded-For`
    correctly. Two gaps to close before it can serve this:
-   - It routes to **workspace scripts** (`paseo.json` `"type": "service"`),
+   - It routes to **workspace scripts** (`clisbot.json` `"type": "service"`),
      keyed on `<script>--<branch>--<project>`. A channel webhook is a Hub-owned
      listener, not a workspace script, so it needs a route source the Hub can
      register — e.g. a channel-account route whose hostname label is

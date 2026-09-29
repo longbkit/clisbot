@@ -2,8 +2,8 @@ import type {
   AgentStreamEventPayload,
   ProviderSubagentDescriptorPayload,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
-import { DaemonConnectionError, type DaemonClient } from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/protocol/messages";
+import { DaemonConnectionError, type DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { create } from "zustand";
 import {
   processTimelineResponse,
@@ -17,7 +17,7 @@ import {
 import { ProviderSubagentTimelineRetention, trimSubagentTimeline } from "./timeline-retention";
 import { applyStreamEvent } from "@/types/stream";
 import type { StreamItem } from "@/types/stream";
-import type { AgentLifecycleStatus } from "@getpaseo/protocol/agent-lifecycle";
+import type { AgentLifecycleStatus } from "@clisbot/protocol/agent-lifecycle";
 
 type ProviderSubagentTimelineItem = Extract<
   Extract<SessionOutboundMessage, { type: "agent.provider_subagents.update" }>["payload"],

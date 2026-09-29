@@ -15,8 +15,8 @@
 // The sticker *cache* itself — `searchStickers`, `getCacheStats`, `cacheSticker`
 // and the store — is carried verbatim from `./sticker-cache-store.js`, which is
 // what the `sticker-search` message action reads.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 export {
   cacheSticker,
   getAllCachedStickers,

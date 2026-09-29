@@ -11,7 +11,7 @@
 // here), a per-account throttler (grammy stack kept as pinned deps, §7.2),
 // and the pinned retry/timeout policy re-implemented at its boundary.
 
-import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@clisbot/channels-shared";
 import {
   GrammyError,
   type GrammyError as GrammyErrorType,
@@ -37,7 +37,7 @@ import {
 } from "../leaves/coerce.js";
 import { resolveTelegramOutboundClientTimeoutFloorSeconds } from "../client-fetch.js";
 import { mergeTelegramAccountConfig } from "../accounts.js";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 /** The plane's config record (`ctx.cfg`) — `channels.telegram.accounts.<id>`
  * carries the token strings the outbound path reads (start-account.md). */

@@ -84,9 +84,9 @@ export async function prepareChannelConfigurationCandidate(
   if (!isChannelsEnabled()) throw channelPlaneAbsent();
   try {
     const candidateResourceFiles = [...files];
-    if (!candidateResourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
+    if (!candidateResourceFiles.some(({ path }) => path === ".clisbot/hub.yml")) {
       candidateResourceFiles.push({
-        path: ".paseo/hub.yml",
+        path: ".clisbot/hub.yml",
         content: "environments: {}\nagents: {}\n",
       });
     }

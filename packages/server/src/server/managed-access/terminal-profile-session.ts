@@ -8,13 +8,13 @@ import type {
   SessionOutboundMessage,
   TerminalProfile,
   TerminalProfileListRequest,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   PROMPT_SENTINEL,
   resolveTerminalProfileLaunch,
   resolveTerminalProfiles,
   type TerminalProfileLaunch,
-} from "@getpaseo/protocol/terminal-profiles";
+} from "@clisbot/protocol/terminal-profiles";
 import type { TerminalSession } from "../../terminal/terminal.js";
 import { launchableTerminalProfiles } from "./terminal-access.js";
 import { trackTerminalLaunch } from "./terminal-launches.js";

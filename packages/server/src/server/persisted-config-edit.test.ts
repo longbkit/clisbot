@@ -10,7 +10,7 @@ import {
 } from "./persisted-config.js";
 
 test("configuration edits validate before writing and preserve unrelated settings", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-config-edit-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-config-edit-"));
   const home = path.join(root, "home");
   try {
     expect(readPersistedConfig(home)).toEqual({});

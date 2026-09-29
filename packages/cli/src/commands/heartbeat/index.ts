@@ -33,9 +33,9 @@ const heartbeatDeleteSchema: OutputSchema<HeartbeatDeleteRow> = {
 };
 
 function requireCallerAgentId(): string {
-  const agentId = process.env.PASEO_AGENT_ID?.trim();
+  const agentId = process.env.CLISBOT_AGENT_ID?.trim();
   if (!agentId) {
-    throw new Error("Heartbeat commands must run inside a Paseo agent");
+    throw new Error("Heartbeat commands must run inside a Clisbot agent");
   }
   return agentId;
 }

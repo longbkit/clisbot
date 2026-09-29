@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/normalize.ts@5d8067a4483
 // Discord helper module supports normalize behavior.
-import { resolveAllowlistMatchByCandidates } from "@getpaseo/channels-core/plugin-sdk/allow-from";
+import { resolveAllowlistMatchByCandidates } from "@clisbot/channels-core/plugin-sdk/allow-from";
 import { parseDiscordTarget } from "./target-parsing.js";
 
 export function normalizeDiscordMessagingTarget(raw: string): string | undefined {

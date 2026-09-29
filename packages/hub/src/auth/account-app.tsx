@@ -10,7 +10,7 @@ import { InstanceSetupEntry } from "./instance-setup-entry.js";
 import { AppSetupEntry } from "../provider-applications/panel.js";
 import { PasswordChangeEntry } from "./password-change.js";
 import { EmailRegistrationComplete, readRegistrationToken } from "./registration-entry.js";
-import { PASEO_CLIENT_ID } from "./client-authorization.js";
+import { CLISBOT_CLIENT_ID } from "./client-authorization.js";
 import type { AccountState } from "./organization-contract.js";
 
 const AUTHORIZATION_QUERY_FIELDS = [
@@ -130,7 +130,7 @@ function ClientAuthorizationContinuation({ query }: { query: string }) {
 function readClientAuthorizationQuery(): string | null {
   if (typeof window === "undefined") return null;
   const current = new URLSearchParams(window.location.search);
-  if (current.get("client_id") !== PASEO_CLIENT_ID) return null;
+  if (current.get("client_id") !== CLISBOT_CLIENT_ID) return null;
   const query = new URLSearchParams();
   for (const field of AUTHORIZATION_QUERY_FIELDS) {
     for (const value of current.getAll(field)) query.append(field, value);

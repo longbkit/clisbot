@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useTranscriptStore } from "../data/transcript-store";
 export function useChatRecord(
   client: DaemonClient | null,

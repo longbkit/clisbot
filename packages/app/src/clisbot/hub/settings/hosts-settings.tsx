@@ -87,7 +87,7 @@ export function HostsSettings() {
             key={item.daemonId}
             item={item}
             bordered={index > 0}
-            cliCommand={DEV_CLI_COMMAND ?? "paseo"}
+            cliCommand={DEV_CLI_COMMAND ?? "clisbot"}
             openAddProject={openAddProject}
           />
         ))}
@@ -110,7 +110,7 @@ export function HostsSettings() {
           <Alert
             variant="error"
             title="Hosts unavailable"
-            description="Paseo could not refresh your Hosts. Check your connection and use Refresh Hosts to try again."
+            description="Clisbot could not refresh your Hosts. Check your connection and use Refresh Hosts to try again."
           />
         ) : null}
         {content}

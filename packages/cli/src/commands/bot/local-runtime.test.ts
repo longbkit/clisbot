@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { selectLocalPort } from "../hub/local-port.js";
 import {
   assertLocalOnboardingAccess,
@@ -49,7 +49,7 @@ it("rejects managed TCP onboarding before connection while preserving policy and
     "select an empty --home",
   );
   await expect(
-    assertLocalOnboardingAccess(directory, { PASEO_LISTEN: "unix:///tmp/recovery.sock" }),
+    assertLocalOnboardingAccess(directory, { CLISBOT_LISTEN: "unix:///tmp/recovery.sock" }),
   ).resolves.toBeUndefined();
   await expect(assertLocalOnboardingAccess(directory, {})).rejects.toThrow("Hub-managed access");
   expect(await readFile(configPath, "utf8")).toBe(config);
@@ -102,14 +102,14 @@ it("avoids a colliding persisted daemon port, but refuses a colliding explicit e
   );
   expect(await onboardingDaemonListen(directory, {})).not.toBe(`127.0.0.1:${occupied.port}`);
   await expect(
-    onboardingDaemonListen(directory, { PASEO_LISTEN: `127.0.0.1:${occupied.port}` }),
+    onboardingDaemonListen(directory, { CLISBOT_LISTEN: `127.0.0.1:${occupied.port}` }),
   ).rejects.toThrow("already in use");
 });
 
 it("does not treat a live supervisor without a listener as a ready daemon", async () => {
   const directory = await createHome();
   await writeFile(
-    path.join(directory, "paseo.pid"),
+    path.join(directory, "clisbot.pid"),
     JSON.stringify({
       pid: process.pid,
       startedAt: new Date().toISOString(),

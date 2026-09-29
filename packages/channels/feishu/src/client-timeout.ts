@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/client-timeout.ts@5d8067a4483
 // Feishu plugin module implements client timeout behavior.
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import type { FeishuConfig } from "./types.js";
 
 /** Default HTTP timeout for Feishu API requests (30 seconds). */

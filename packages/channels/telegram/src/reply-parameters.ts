@@ -2,8 +2,8 @@
 // Telegram plugin module implements reply parameters behavior.
 import { GrammyError } from "grammy";
 import type { MessageEntity } from "grammy/types";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
-import { asFiniteNumber } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
+import { asFiniteNumber } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { buildTelegramThreadParams, type TelegramThreadSpec } from "./bot/helpers.js";
 import { normalizeTelegramReplyToMessageId } from "./outbound-params.js";
 

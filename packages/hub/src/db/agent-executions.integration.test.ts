@@ -96,7 +96,7 @@ describe("agent execution PostgreSQL repository", () => {
         configurationRevisionId: fixture.execution.configurationRevisionId,
         providerEventReceiptId: receipt.event.providerEventReceiptId,
         configuredTriggerName: "one-step",
-        prompt: "@Paseo repo=hub investigate",
+        prompt: "@Clisbot repo=hub investigate",
         inputs: { repo: "hub" },
         triggerContext: baseIntent.triggerContext,
         outputContext: baseIntent.outputContext,
@@ -116,7 +116,7 @@ describe("agent execution PostgreSQL repository", () => {
         )[0],
         {
           ...created.run,
-          prompt: "@Paseo repo=hub investigate",
+          prompt: "@Clisbot repo=hub investigate",
           inputs: { repo: "hub" },
         },
       );
@@ -1536,7 +1536,7 @@ function restartWorkflowConfiguration(): CompiledHubConfig {
             },
             {
               id: "downstream",
-              if: "${{ paseo.inputs.repo == 'hub' }}",
+              if: "${{ clisbot.inputs.repo == 'hub' }}",
               environment: "work",
               max_runtime: "30s",
               idle_timeout: "5s",

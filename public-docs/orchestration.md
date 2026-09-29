@@ -8,7 +8,7 @@ category: Orchestration
 
 # Orchestration
 
-Paseo lets your coding agents coordinate other agents, split work across providers and machines, and keep tasks moving automatically.
+Clisbot lets your coding agents coordinate other agents, split work across providers and machines, and keep tasks moving automatically.
 
 ## What your agents can do
 
@@ -17,25 +17,25 @@ Paseo lets your coding agents coordinate other agents, split work across provide
 - **Communicate with each other:** agents can [send prompts to other agents by ID](/docs/orchestration-workflows#send-a-prompt-to-another-agent) to ask questions, share findings, or request work.
 - **Coordinate ongoing work:** check progress, stop tasks, and collect results.
 - **Create workspaces and worktrees:** give independent changes their own [working directories](/docs/worktrees).
-- **Work across machines:** use the [CLI](/docs/cli#connecting-to-a-remote-daemon) to launch and manage agents on another reachable Paseo host.
+- **Work across machines:** use the [CLI](/docs/cli#connecting-to-a-remote-daemon) to launch and manage agents on another reachable Clisbot host.
 - **Choose by specialty:** use [agent profiles](/docs/agent-profiles) and their notes to select settings for UI work, planning, or reviews.
 - **Create schedules:** run a prompt in a new agent at [specified times](/docs/schedules).
 - **Create heartbeats:** prompt the same agent periodically to [continue its task](/docs/orchestration-workflows#keep-an-agent-working-with-a-heartbeat).
 
 ## Get started
 
-Use built-in Paseo tools or the CLI. Both let an agent launch and coordinate workers.
+Use built-in Clisbot tools or the CLI. Both let an agent launch and coordinate workers.
 
-### Built-in Paseo tools (MCP)
+### Built-in Clisbot tools (MCP)
 
-Enable Paseo tools so agents running inside Paseo can manage agents and workspaces on their host directly.
+Enable Clisbot tools so agents running inside Clisbot can manage agents and workspaces on their host directly.
 
 1. Open **Settings → your host → Agents**.
-2. Turn on **Enable Paseo tools**. Tool injection is off by default.
+2. Turn on **Enable Clisbot tools**. Tool injection is off by default.
 3. Start a new agent, or reload an existing agent so it receives the tools.
 4. Ask:
 
-> Use Paseo to launch a second agent to review this branch. Have it report potential bugs without changing files, then summarize its findings.
+> Use Clisbot to launch a second agent to review this branch. Have it report potential bugs without changing files, then summarize its findings.
 
 The worker appears in the **Subagents track** near the composer. Open it to follow the conversation. Your main agent receives a notification when the worker finishes, and you can keep talking while it works.
 
@@ -43,15 +43,15 @@ See the [MCP reference](/docs/mcp) for tool configuration and the full catalog. 
 
 ### CLI
 
-Agents with shell access can also use the Paseo CLI. This route does not require enabling tool injection. With Paseo installed, a running host, and Codex configured:
+Agents with shell access can also use the Clisbot CLI. This route does not require enabling tool injection. With Clisbot installed, a running host, and Codex configured:
 
 ```bash
-paseo run --provider codex --background \
+clisbot run --provider codex --background \
   "Review this branch without changing files"
-paseo ls -a
+clisbot ls -a
 ```
 
-The first command starts a worker and returns immediately; the second lists agents from active workspaces, including archived agents. When a Paseo agent runs the command, the worker becomes its subagent in the same workspace. From your own terminal, it starts in a new local workspace.
+The first command starts a worker and returns immediately; the second lists agents from active workspaces, including archived agents. When a Clisbot agent runs the command, the worker becomes its subagent in the same workspace. From your own terminal, it starts in a new local workspace.
 
 See the [CLI reference](/docs/cli) for follow-ups, output, worktrees, and remote hosts.
 

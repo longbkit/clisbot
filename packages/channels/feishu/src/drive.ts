@@ -1,9 +1,9 @@
 // upstream: extensions/feishu/src/drive.ts@5d8067a4483
 // Feishu plugin module implements drive behavior.
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { readPositiveIntegerParam } from "@getpaseo/channels-core/plugin-sdk/param-readers";
-import { isRecord, readStringValue as readString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { readPositiveIntegerParam } from "@clisbot/channels-core/plugin-sdk/param-readers";
+import { isRecord, readStringValue as readString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { OpenClawPluginApi } from "./fusion/runtime-api.js";
 import { cleanupAmbientCommentTypingReaction } from "./comment-reaction.js";
 import { encodeQuery, extractReplyText, formatFeishuApiError } from "./comment-shared.js";

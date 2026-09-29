@@ -17,7 +17,7 @@ describe("prompt partial resolution", () => {
         triggers: [{ steps: [{ prompt: [{ include: "partials/docs/safety.md" }] }] }],
       },
       read: async (path) => {
-        assert.equal(path, ".paseo/workflows/partials/docs/safety.md");
+        assert.equal(path, ".clisbot/workflows/partials/docs/safety.md");
         return { kind: "file", content };
       },
     });
@@ -26,7 +26,7 @@ describe("prompt partial resolution", () => {
       [...resolved.values()],
       [
         {
-          path: ".paseo/workflows/partials/docs/safety.md",
+          path: ".clisbot/workflows/partials/docs/safety.md",
           content,
           contentHash: hashPromptPartialContent(content),
         },
@@ -86,7 +86,7 @@ describe("prompt partial resolution", () => {
       [...resolved.values()],
       [
         {
-          path: ".paseo/workflows/partials/docs/safety.md",
+          path: ".clisbot/workflows/partials/docs/safety.md",
           content,
           contentHash: hashPromptPartialContent(content),
         },
@@ -99,7 +99,7 @@ describe("prompt partial resolution", () => {
       name: "missing",
       configuration: { triggers: [{ steps: [{ prompt: [{ include: "partials/missing.md" }] }] }] },
       files: [],
-      path: ["partials", ".paseo/workflows/partials/missing.md"],
+      path: ["partials", ".clisbot/workflows/partials/missing.md"],
     },
     {
       name: "unsafe",

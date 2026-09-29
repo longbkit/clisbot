@@ -57,7 +57,7 @@ function intentPath(directory: string, target: string): string {
 }
 export async function assertSessionNotDeleted(directory: string): Promise<void> {
   try {
-    // Temporary uploads also lease the configured PASEO_HOME (often `.paseo`).
+    // Temporary uploads also lease the configured CLISBOT_HOME (often `.clisbot`).
     // Looking for a fence does not authorize deleting that non-agent directory.
     await fs.access(intentPath(directory, path.basename(path.resolve(directory))));
   } catch (error) {

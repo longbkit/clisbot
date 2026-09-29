@@ -1,8 +1,8 @@
 // upstream: extensions/feishu/src/chat.ts@5d8067a4483
 // Feishu plugin module implements chat behavior.
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { readPositiveIntegerParam } from "@getpaseo/channels-core/plugin-sdk/param-readers";
-import type { OpenClawPluginToolContext } from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
+import { readPositiveIntegerParam } from "@clisbot/channels-core/plugin-sdk/param-readers";
+import type { OpenClawPluginToolContext } from "@clisbot/channels-core/plugin-sdk/plugin-entry";
 import type { OpenClawPluginApi } from "./fusion/runtime-api.js";
 import { FeishuChatSchema, type FeishuChatParams } from "./chat-schema.js";
 import { resolveFeishuChatType } from "./chat-type.js";

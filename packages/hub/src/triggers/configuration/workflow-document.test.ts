@@ -19,7 +19,7 @@ const workflow = {
       id: "classify",
       environment: "target",
       agent: "safe",
-      prompt: [{ text: "Classify ${{ paseo.prompt }}" }],
+      prompt: [{ text: "Classify ${{ clisbot.prompt }}" }],
       max_runtime: "10m",
       idle_timeout: "5m",
       output: {
@@ -83,7 +83,7 @@ describe("workflow authoring", () => {
       compileAutomationDocument(
         dump({
           ...workflow,
-          steps: [workflow.steps[0], { ...workflow.steps[1], agent: "${{ paseo.prompt }}" }],
+          steps: [workflow.steps[0], { ...workflow.steps[1], agent: "${{ clisbot.prompt }}" }],
         }),
       ),
     ).toThrow();

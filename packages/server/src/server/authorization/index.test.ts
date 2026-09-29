@@ -178,13 +178,13 @@ describe("Project workspace creation", () => {
       "project.remove.request",
       "project.create_directory.request",
       "archive_workspace_request",
-      "create_paseo_worktree_request",
+      "create_clisbot_worktree_request",
     ] as const) {
       expect(authorization.allowsInbound(inboundMessage(type))).toBe(false);
     }
   });
 
-  test("does not widen existing Project grants, expired leases, or ordinary Paseo clients", () => {
+  test("does not widen existing Project grants, expired leases, or ordinary Clisbot clients", () => {
     for (const authorization of [
       managed(["project.use"]),
       managed(["workspace.create"]),

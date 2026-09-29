@@ -6,18 +6,18 @@ import {
   hasConfiguredAccountValue,
   normalizeAccountId,
   type OpenClawConfig,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
 import {
   mapAllowFromEntries,
   normalizeChannelDmPolicy,
   type ChannelDmPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/channel-config-helpers";
-import type { SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveAccountEntry } from "@getpaseo/channels-core/plugin-sdk/routing";
+} from "@clisbot/channels-core/plugin-sdk/channel-config-helpers";
+import type { SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveAccountEntry } from "@clisbot/channels-core/plugin-sdk/routing";
 import {
   asOptionalRecord,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { hasSlackAccountCredentials } from "./account-configured.js";
 import type { SlackAccountSurfaceFields } from "./account-surface-fields.js";
 import { resolveSlackAppToken, resolveSlackBotToken, resolveSlackUserToken } from "./token.js";

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { Alert } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
@@ -113,8 +113,8 @@ function ManagedAccessNotice({ transition }: { transition: ManagedAccessTransiti
         }
         description={
           transition.target === "external"
-            ? "The Host closes sessions without a Hub ticket, including this one. Paseo reconnects with a ticket from Hub."
-            : "Paseo reconnects to the Host."
+            ? "The Host closes sessions without a Hub ticket, including this one. Clisbot reconnects with a ticket from Hub."
+            : "Clisbot reconnects to the Host."
         }
       />
     );
@@ -142,8 +142,8 @@ function confirmModeChange(enabled: boolean): Promise<boolean> {
   return confirmDialog({
     title: enabled ? "Require Hub access?" : "Turn off managed access?",
     message: enabled
-      ? "External TCP, relay, LAN, Tailscale, and tunnel connections will need a current Hub sign-in and access grant. Sessions without a Hub ticket close, including this one; Paseo reconnects it with a ticket."
-      : "External clients will regain the ordinary trusted-operator access used by upstream Paseo.",
+      ? "External TCP, relay, LAN, Tailscale, and tunnel connections will need a current Hub sign-in and access grant. Sessions without a Hub ticket close, including this one; Clisbot reconnects it with a ticket."
+      : "External clients will regain the ordinary trusted-operator access used by upstream Clisbot.",
     confirmLabel: enabled ? "Require Hub access" : "Turn off",
     destructive: !enabled,
   });

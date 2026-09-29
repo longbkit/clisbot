@@ -3,11 +3,11 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: paseo_hub
-      POSTGRES_USER: paseo
-      POSTGRES_PASSWORD: paseo
+      POSTGRES_DB: clisbot_hub
+      POSTGRES_USER: clisbot
+      POSTGRES_PASSWORD: clisbot
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U paseo -d paseo_hub"]
+      test: ["CMD-SHELL", "pg_isready -U clisbot -d clisbot_hub"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     env_file: .env
     environment:
-      DATABASE_URL: postgres://paseo:paseo@postgres:5432/paseo_hub
+      DATABASE_URL: postgres://clisbot:clisbot@postgres:5432/clisbot_hub
       PORT: 3000
     ports:
       - "3000:3000"

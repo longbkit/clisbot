@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import { timelinePageRetention, timelineRetentionKey } from "@/timeline/timeline-page-retention";
 import { mergePermissionHistory } from "./permission-history";
 

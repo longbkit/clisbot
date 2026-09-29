@@ -7,7 +7,7 @@
 // `globals.ts` is Fusion-owned and exports them as logger calls instead
 // (D-CORE-203). This module keeps the barrel's shape for the Discord files that
 // use the formatter spelling — the same adapter the Slack vertical ships.
-export * from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+export * from "@clisbot/channels-core/plugin-sdk/runtime-env";
 
 /** Theme formatter. The Hub's logger owns presentation, so the text passes through. */
 export function warn(text: string): string {

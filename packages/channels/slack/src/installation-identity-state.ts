@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/installation-identity-state.ts@5d8067a4483
 // Slack plugin module owns authenticated installation identity state.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { resolveGlobalMap } from "@getpaseo/channels-core/plugin-sdk/global-singleton";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { resolveGlobalMap } from "@clisbot/channels-core/plugin-sdk/global-singleton";
 
 type SlackInstallationKind = "workspace" | "enterprise" | "degraded";
 

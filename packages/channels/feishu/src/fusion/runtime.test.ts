@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { getFeishuRuntime } from "../runtime.js";
 import { disposeFeishuRuntime, installFeishuRuntime } from "./runtime.js";
 import { setGuardedFetchImplementation } from "./ssrf-fetch.js";

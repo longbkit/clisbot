@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   SessionActorSchema,
   SessionChannelReferenceSchema,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 import type { SessionOperationIdentity } from "../session-authorship.js";
 import { randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";

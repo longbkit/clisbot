@@ -77,7 +77,7 @@ teams still see their own limits and usage.
 
 ### Granting operator
 
-The bootstrap owner (`PASEO_BOOTSTRAP_OWNER_EMAIL`) is the first operator. Every other operator is
+The bootstrap owner (`CLISBOT_BOOTSTRAP_OWNER_EMAIL`) is the first operator. Every other operator is
 granted by one SQL statement — no UI, no env var, no invite flow:
 
 ```sql

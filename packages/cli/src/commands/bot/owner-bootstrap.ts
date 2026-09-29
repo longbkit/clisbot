@@ -14,9 +14,6 @@ export function ownerBootstrapEnvironment(
     throw new Error("The initial owner password must contain at least 12 characters");
   return {
     ...env,
-    PASEO_BOOTSTRAP_ORGANIZATION: options.organizationName ?? "Clisbot",
-    PASEO_BOOTSTRAP_OWNER_EMAIL: options.ownerEmail,
-    PASEO_BOOTSTRAP_OWNER_PASSWORD: password,
     CLISBOT_BOOTSTRAP_ORGANIZATION: options.organizationName ?? "Clisbot",
     CLISBOT_BOOTSTRAP_OWNER_EMAIL: options.ownerEmail,
     CLISBOT_BOOTSTRAP_OWNER_PASSWORD: password,

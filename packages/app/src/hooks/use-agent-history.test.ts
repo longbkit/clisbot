@@ -3,7 +3,7 @@ import type {
   DaemonClient,
   FetchAgentHistoryEntry,
   FetchAgentHistoryOptions,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 import type { AgentHistoryClient, AgentHistoryHost } from "./use-agent-history";
 import { allAgentHistoryQueryKey } from "./agent-history-query-key";
 
@@ -131,7 +131,7 @@ function historyEntry(input: {
         currentBranch: null,
         remoteUrl: null,
         worktreeRoot: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     },

@@ -189,13 +189,13 @@ describe("workspace.manage operations in a Project-restricted session", () => {
 
   test("worktree operations follow the workspace, then the path, and fail closed without either", async () => {
     const archive = (fields: Record<string, unknown>) =>
-      allowsWorkspaceManagement(message("paseo_worktree_archive_request", fields), authority());
+      allowsWorkspaceManagement(message("clisbot_worktree_archive_request", fields), authority());
     expect(await archive({ workspaceId: "workspace-a" })).toBe(true);
     expect(await archive({ workspaceId: "workspace-b", deleteWorktreeFromDisk: true })).toBe(false);
     expect(await archive({ worktreePath: "/work/b/.worktrees/x" })).toBe(false);
     expect(await archive({})).toBe(false);
     const worktree = (fields: Record<string, unknown>) =>
-      allowsWorkspaceManagement(message("create_paseo_worktree_request", fields), authority());
+      allowsWorkspaceManagement(message("create_clisbot_worktree_request", fields), authority());
     expect(await worktree({ cwd: "/work/a", projectId: "project-a" })).toBe(true);
     expect(await worktree({ cwd: "/work/a", projectId: "project-b" })).toBe(false);
     expect(await worktree({ cwd: "/work/b" })).toBe(false);
@@ -205,7 +205,7 @@ describe("workspace.manage operations in a Project-restricted session", () => {
     // The archive acts on worktreePath first, so an allowed workspaceId must not cover it.
     expect(
       await allowsWorkspaceManagement(
-        message("paseo_worktree_archive_request", {
+        message("clisbot_worktree_archive_request", {
           workspaceId: "workspace-a",
           worktreePath: "/work/b/.worktrees/x",
           scope: "worktree",
@@ -217,13 +217,13 @@ describe("workspace.manage operations in a Project-restricted session", () => {
     // A worktree made from another Project's repository must not land in a managed one.
     expect(
       await allowsWorkspaceManagement(
-        message("create_paseo_worktree_request", { projectId: "project-a", cwd: "/work/b" }),
+        message("create_clisbot_worktree_request", { projectId: "project-a", cwd: "/work/b" }),
         authority(),
       ),
     ).toBe(false);
     expect(
       await allowsWorkspaceManagement(
-        message("paseo_worktree_archive_request", {
+        message("clisbot_worktree_archive_request", {
           workspaceId: "workspace-a",
           worktreePath: "/work/a/.worktrees/x",
         }),

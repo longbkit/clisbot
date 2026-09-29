@@ -1,14 +1,14 @@
 // upstream: extensions/googlechat/src/api.ts@5d8067a4483
 // Googlechat API module exposes the plugin public contract.
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { redactToolPayloadText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { redactToolPayloadText } from "@clisbot/channels-core/plugin-sdk/logging-core";
 import {
   MediaFetchError,
   parseMediaContentLength,
   readResponseTextSnippet,
-} from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import { readProviderJsonResponse } from "@getpaseo/channels-core/plugin-sdk/provider-http";
-import { readResponseWithLimit } from "@getpaseo/channels-core/plugin-sdk/response-limit-runtime";
+} from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import { readProviderJsonResponse } from "@clisbot/channels-core/plugin-sdk/provider-http";
+import { readResponseWithLimit } from "@clisbot/channels-core/plugin-sdk/response-limit-runtime";
 import { fetchWithSsrFGuard } from "./fusion/ssrf-fetch.js";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import { getGoogleChatAccessToken } from "./auth.js";

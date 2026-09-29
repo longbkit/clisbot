@@ -1,7 +1,7 @@
 import os from "node:os";
 import nodePath from "node:path";
-import { parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
-import { expandHomePath } from "@getpaseo/protocol/project-folders";
+import { parseGitRemoteLocation } from "@clisbot/protocol/git-remote";
+import { expandHomePath } from "@clisbot/protocol/project-folders";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import type { ProjectPrivilege } from "./types.js";
 
@@ -79,12 +79,12 @@ export function workspaceManagementTarget(
     case "workspace.title.set.request":
     case "workspace.pin.set.request":
       return existing({ workspaceId: message.workspaceId });
-    case "paseo_worktree_archive_request":
+    case "clisbot_worktree_archive_request":
       return existing({
         workspaceId: message.workspaceId,
         paths: [message.worktreePath, message.repoRoot],
       });
-    case "create_paseo_worktree_request":
+    case "create_clisbot_worktree_request":
       // The worktree is made from `cwd` and attached to `projectId`.
       return existing({ projectId: message.projectId, paths: [message.cwd] });
     default:

@@ -6,7 +6,7 @@
 // primitives by their upstream names so the message-action runner can dispatch
 // every native action without re-deriving a send path.
 
-import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { discordMessageActions } from "./channel-actions.js";
 import { disposeDiscordRuntime } from "./fusion/runtime.js";
 import { startDiscordAccount } from "./lifecycle/start-account.js";

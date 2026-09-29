@@ -14,13 +14,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() ?? "";
+    return process.env.CLISBOT_PASSWORD?.trim() ?? "";
   }
 }
 const t0 = Date.now();
 const st = (x) => console.log(`[t+${Date.now() - t0}ms] ${x}`);
 const pw = password();
-const sock = new WebSocket(URL, pw ? [`paseo.bearer.${pw}`] : undefined);
+const sock = new WebSocket(URL, pw ? [`clisbot.bearer.${pw}`] : undefined);
 let settled = false;
 function done(c = 0) {
   if (settled) return;

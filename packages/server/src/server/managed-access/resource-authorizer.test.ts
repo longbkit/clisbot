@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { getPaseoWorktreesRoot } from "../../utils/worktree.js";
+import { getClisbotWorktreesRoot } from "../../utils/worktree.js";
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -45,7 +45,7 @@ function workspace(workspaceId: string, projectId: string, cwd: string): Persist
     branch: null,
     worktreeRoot: cwd,
     baseBranch: null,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: cwd,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -575,7 +575,7 @@ describe("ManagedResourceAuthorizer", () => {
   });
 
   it("rejects a managed cwd whose symlink resolves into another Project", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-managed-cwd-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-managed-cwd-"));
     const projectA = path.join(root, "project-a");
     const projectB = path.join(root, "project-b");
     await Promise.all([mkdir(projectA), mkdir(projectB)]);
@@ -934,8 +934,8 @@ describe("managed workspace.create", () => {
     const root = await mkdtemp(path.join(tmpdir(), "managed-workspace-create-"));
     const projectA = path.join(root, "project-a");
     const projectB = path.join(root, "project-b");
-    const paseoHome = path.join(root, "paseo");
-    await Promise.all([mkdir(projectA), mkdir(projectB), mkdir(paseoHome)]);
+    const clisbotHome = path.join(root, "clisbot");
+    await Promise.all([mkdir(projectA), mkdir(projectB), mkdir(clisbotHome)]);
     execFileSync("git", ["init", "-b", "main"], { cwd: projectA, stdio: "pipe" });
     const link = path.join(projectA, "foreign-link");
     await symlink(projectB, link, process.platform === "win32" ? "junction" : "dir");
@@ -951,11 +951,13 @@ describe("managed workspace.create", () => {
           source: { kind: "directory", projectId: "project-a", path: link },
         }),
       ).resolves.toBe(false);
-      await expect(authorizer.allowsWorktreeDestination(projectA, paseoHome)).resolves.toBe(true);
-      const destination = await getPaseoWorktreesRoot(projectA, paseoHome);
+      await expect(authorizer.allowsWorktreeDestination(projectA, clisbotHome)).resolves.toBe(true);
+      const destination = await getClisbotWorktreesRoot(projectA, clisbotHome);
       await mkdir(path.dirname(destination), { recursive: true });
       await symlink(projectB, destination, process.platform === "win32" ? "junction" : "dir");
-      await expect(authorizer.allowsWorktreeDestination(projectA, paseoHome)).resolves.toBe(false);
+      await expect(authorizer.allowsWorktreeDestination(projectA, clisbotHome)).resolves.toBe(
+        false,
+      );
     } finally {
       authorizer.dispose();
       await rm(root, { recursive: true, force: true });
@@ -1117,17 +1119,17 @@ describe("Project creation and Add project folder search", () => {
     daemonPrivileges: ["project.use", "workspace.manage"] as ProjectPrivilege[],
   };
   const previous = {
-    allow: process.env.PASEO_PROJECT_FOLDERS_ALLOW,
-    deny: process.env.PASEO_PROJECT_FOLDERS_DENY,
+    allow: process.env.CLISBOT_PROJECT_FOLDERS_ALLOW,
+    deny: process.env.CLISBOT_PROJECT_FOLDERS_DENY,
   };
   beforeEach(() => {
-    process.env.PASEO_PROJECT_FOLDERS_ALLOW = "/free/**";
-    process.env.PASEO_PROJECT_FOLDERS_DENY = "/free/secret/**";
+    process.env.CLISBOT_PROJECT_FOLDERS_ALLOW = "/free/**";
+    process.env.CLISBOT_PROJECT_FOLDERS_DENY = "/free/secret/**";
   });
   afterEach(() => {
     for (const [key, value] of [
-      ["PASEO_PROJECT_FOLDERS_ALLOW", previous.allow],
-      ["PASEO_PROJECT_FOLDERS_DENY", previous.deny],
+      ["CLISBOT_PROJECT_FOLDERS_ALLOW", previous.allow],
+      ["CLISBOT_PROJECT_FOLDERS_DENY", previous.deny],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

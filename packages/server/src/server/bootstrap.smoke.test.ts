@@ -9,16 +9,16 @@ import { WebSocket } from "ws";
 
 import {
   createHubAgentConfigurationCatalog,
-  createPaseoDaemon,
+  createClisbotDaemon,
   parseListenString,
-  type PaseoDaemonConfig,
+  type ClisbotDaemonConfig,
 } from "./bootstrap.js";
 import type { ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
 import { loadConfig } from "./config.js";
 import { AgentManagerShuttingDownError } from "./agent/agent-manager.js";
 import { hashDaemonPassword } from "./auth.js";
 import { generateLocalPairingOffer } from "./pairing-offer.js";
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 import { createTestAgentClients } from "./test-utils/fake-agent-client.js";
 import { DaemonClient } from "./test-utils/daemon-client.js";
 import { isPlatform } from "../test-utils/platform.js";
@@ -55,7 +55,7 @@ type WebSocketProbeResult =
   | { status: "connected" }
   | { status: "rejected"; statusCode: number | null };
 
-describe("paseo daemon bootstrap", () => {
+describe("clisbot daemon bootstrap", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -107,7 +107,7 @@ describe("paseo daemon bootstrap", () => {
   });
 
   test("starts and serves health endpoint", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       openai: {
         stt: { apiKey: "test-openai-api-key" },
         tts: { apiKey: "test-openai-api-key" },
@@ -136,15 +136,15 @@ describe("paseo daemon bootstrap", () => {
   });
 
   test("keeps timeline activity in memory and removes obsolete timeline files at startup", async () => {
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-cleanup-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const obsoleteTimelineDirectory = path.join(paseoHome, "agent-timelines");
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-agent-"));
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-timeline-cleanup-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const obsoleteTimelineDirectory = path.join(clisbotHome, "agent-timelines");
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-timeline-agent-"));
     await mkdir(obsoleteTimelineDirectory, { recursive: true });
     await writeFile(path.join(obsoleteTimelineDirectory, "obsolete.json"), "{}\n", "utf-8");
 
-    const daemonHandle = await createTestPaseoDaemon({
-      paseoHomeRoot,
+    const daemonHandle = await createTestClisbotDaemon({
+      clisbotHomeRoot,
       cleanup: false,
     });
     try {
@@ -169,20 +169,20 @@ describe("paseo daemon bootstrap", () => {
     } finally {
       await daemonHandle.close();
       await Promise.all([
-        rm(paseoHomeRoot, { recursive: true, force: true }),
+        rm(clisbotHomeRoot, { recursive: true, force: true }),
         rm(agentCwd, { recursive: true, force: true }),
       ]);
     }
   });
 
   test("does not create a timeline directory for live timeline activity", async () => {
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-memory-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-agent-"));
-    const daemonHandle = await createTestPaseoDaemon({
-      paseoHomeRoot,
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-timeline-memory-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-timeline-agent-"));
+    const daemonHandle = await createTestClisbotDaemon({
+      clisbotHomeRoot,
       cleanup: false,
     });
-    const timelineDirectory = path.join(daemonHandle.paseoHome, "agent-timelines");
+    const timelineDirectory = path.join(daemonHandle.clisbotHome, "agent-timelines");
     try {
       const agent = await daemonHandle.daemon.agentManager.createAgent(
         { provider: "codex", cwd: agentCwd },
@@ -201,19 +201,19 @@ describe("paseo daemon bootstrap", () => {
     } finally {
       await daemonHandle.close();
       await Promise.all([
-        rm(paseoHomeRoot, { recursive: true, force: true }),
+        rm(clisbotHomeRoot, { recursive: true, force: true }),
         rm(agentCwd, { recursive: true, force: true }),
       ]);
     }
   });
 
   test("reload applies live HTTP, MCP, Git, provider, relay, and app policies", async () => {
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-config-reload-runtime-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-config-reload-agent-"));
-    await mkdir(paseoHome, { recursive: true });
-    const configPath = path.join(paseoHome, "config.json");
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-reload-runtime-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-reload-agent-"));
+    await mkdir(clisbotHome, { recursive: true });
+    const configPath = path.join(clisbotHome, "config.json");
     const initialPersisted = {
       version: 1 as const,
       daemon: {
@@ -234,10 +234,10 @@ describe("paseo daemon bootstrap", () => {
       app: { baseUrl: "https://before.example.test" },
     };
     await writeFile(configPath, `${JSON.stringify(initialPersisted, null, 2)}\n`, "utf-8");
-    const config = loadConfig(paseoHome, { env: {} });
+    const config = loadConfig(clisbotHome, { env: {} });
     config.staticDir = staticDir;
     config.agentClients = createTestAgentClients();
-    config.agentStoragePath = path.join(paseoHome, "agents");
+    config.agentStoragePath = path.join(clisbotHome, "agents");
     config.isDev = true;
     config.speech = {
       providers: {
@@ -251,7 +251,7 @@ describe("paseo daemon bootstrap", () => {
         voiceTts: { provider: "local", explicit: true, enabled: false },
       },
     };
-    const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(config, pino({ level: "silent" }));
     let client: DaemonClient | null = null;
     let proxyUpstream: http.Server | null = null;
 
@@ -397,7 +397,7 @@ describe("paseo daemon bootstrap", () => {
         await new Promise<void>((resolve) => proxyUpstream?.close(() => resolve()));
       }
       await Promise.all([
-        rm(paseoHomeRoot, { recursive: true, force: true }),
+        rm(clisbotHomeRoot, { recursive: true, force: true }),
         rm(staticDir, { recursive: true, force: true }),
         rm(agentCwd, { recursive: true, force: true }),
       ]);
@@ -446,7 +446,7 @@ describe("paseo daemon bootstrap", () => {
       throw new Error("Expected upstream TCP address");
     }
 
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: hashDaemonPassword("secret") },
     });
     try {
@@ -479,7 +479,7 @@ describe("paseo daemon bootstrap", () => {
   });
 
   test("configured public service namespace misses never reach daemon APIs", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       serviceProxy: {
         publicBaseUrl: "https://services.example.com",
         standaloneListen: null,
@@ -508,20 +508,20 @@ describe("paseo daemon bootstrap", () => {
       throw new Error("Expected occupied TCP address");
     }
 
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-standalone-rollback-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    await mkdir(paseoHome, { recursive: true });
-    const config: PaseoDaemonConfig = {
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-standalone-rollback-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    await mkdir(clisbotHome, { recursive: true });
+    const config: ClisbotDaemonConfig = {
       listen: "127.0.0.1:0",
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: false,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
       relayEnabled: false,
       appBaseUrl: "https://app.paseo.sh",
       openai: undefined,
@@ -530,7 +530,7 @@ describe("paseo daemon bootstrap", () => {
         standaloneListen: `127.0.0.1:${address.port}`,
       },
     };
-    const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(config, pino({ level: "silent" }));
 
     try {
       await expect(daemon.start()).rejects.toThrow();
@@ -538,13 +538,13 @@ describe("paseo daemon bootstrap", () => {
     } finally {
       await daemon.stop().catch(() => undefined);
       await new Promise<void>((resolve) => occupiedServer.close(() => resolve()));
-      await rm(paseoHomeRoot, { recursive: true, force: true });
+      await rm(clisbotHomeRoot, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
     }
   });
 
   test("local service namespace misses never reach daemon APIs", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: hashDaemonPassword("secret") },
     });
     try {
@@ -561,7 +561,7 @@ describe("paseo daemon bootstrap", () => {
   });
 
   test("daemon websocket still upgrades when service proxy upgrade handler is mounted", async () => {
-    const daemonHandle = await createTestPaseoDaemon();
+    const daemonHandle = await createTestClisbotDaemon();
     const ws = new WebSocket(`ws://127.0.0.1:${daemonHandle.port}/ws`);
     try {
       await new Promise<void>((resolve, reject) => {
@@ -576,12 +576,12 @@ describe("paseo daemon bootstrap", () => {
   });
 
   test("relay config changes during Hub enrollment reach the live runtime", async () => {
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-relay-startup-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    await mkdir(paseoHome, { recursive: true });
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-relay-startup-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    await mkdir(clisbotHome, { recursive: true });
     await writeFile(
-      path.join(paseoHome, "hub-relationship.json"),
+      path.join(clisbotHome, "hub-relationship.json"),
       `${JSON.stringify({
         version: 1,
         state: "pending",
@@ -636,16 +636,16 @@ describe("paseo daemon bootstrap", () => {
         return { close: () => undefined };
       },
     };
-    const config: PaseoDaemonConfig = {
+    const config: ClisbotDaemonConfig = {
       listen: "127.0.0.1:0",
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: false,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
       relayEnabled: false,
       relayEndpoint: "127.0.0.1:9",
       relayUseTls: false,
@@ -653,7 +653,7 @@ describe("paseo daemon bootstrap", () => {
       openai: undefined,
       speech: undefined,
     };
-    const daemon = await createPaseoDaemon(config, pino({ level: "silent" }), {
+    const daemon = await createClisbotDaemon(config, pino({ level: "silent" }), {
       hubRelationshipRemote: remote,
     });
     const starting = daemon.start();
@@ -681,7 +681,7 @@ describe("paseo daemon bootstrap", () => {
       await starting.catch(() => undefined);
       await client?.close().catch(() => undefined);
       await daemon.stop().catch(() => undefined);
-      await rm(paseoHomeRoot, { recursive: true, force: true });
+      await rm(clisbotHomeRoot, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
     }
   });
@@ -708,7 +708,7 @@ describe("paseo daemon bootstrap", () => {
       throw new Error("Expected upstream TCP address");
     }
 
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       serviceProxy: { standaloneListen: `127.0.0.1:${standalonePort}` },
     });
     try {
@@ -750,19 +750,19 @@ describe("paseo daemon bootstrap", () => {
     });
     await new Promise<void>((resolve) => occupiedMain.listen(mainPort, "127.0.0.1", resolve));
 
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-main-rollback-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const pluginDirectory = path.join(paseoHomeRoot, "plugin");
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-main-rollback-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const pluginDirectory = path.join(clisbotHomeRoot, "plugin");
     const pluginPidPath = path.join(pluginDirectory, "plugin.pid");
-    await mkdir(paseoHome, { recursive: true });
+    await mkdir(clisbotHome, { recursive: true });
     if (!isPlatform("win32")) {
       await mkdir(pluginDirectory);
       await writeFile(
-        path.join(pluginDirectory, "paseo-plugin.json"),
+        path.join(pluginDirectory, "clisbot-plugin.json"),
         JSON.stringify({
           id: "startup-rollback",
-          requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+          requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
         }),
       );
       await writeFile(
@@ -774,16 +774,16 @@ export default function contribute(plugin: unknown) {
 }`,
       );
     }
-    const config: PaseoDaemonConfig = {
+    const config: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${mainPort}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: false,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
       relayEnabled: false,
       appBaseUrl: "https://app.paseo.sh",
       openai: undefined,
@@ -796,7 +796,7 @@ export default function contribute(plugin: unknown) {
             "startup-rollback": { source: "directory", path: pluginDirectory },
           },
     };
-    const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(config, pino({ level: "silent" }));
 
     try {
       await expect(daemon.start()).rejects.toThrow();
@@ -809,7 +809,7 @@ export default function contribute(plugin: unknown) {
     } finally {
       await daemon.stop().catch(() => undefined);
       await new Promise<void>((resolve) => occupiedMain.close(() => resolve()));
-      await rm(paseoHomeRoot, { recursive: true, force: true });
+      await rm(clisbotHomeRoot, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
     }
   });
@@ -824,7 +824,7 @@ export default function contribute(plugin: unknown) {
         },
       },
     );
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       logger,
       mcpDebug: true,
     });
@@ -862,21 +862,21 @@ export default function contribute(plugin: unknown) {
   });
 
   test("starts when OpenAI speech provider is configured without credentials", async () => {
-    const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-openai-config-"));
-    const paseoHome = path.join(paseoHomeRoot, ".paseo");
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    await mkdir(paseoHome, { recursive: true });
+    const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-openai-config-"));
+    const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    await mkdir(clisbotHome, { recursive: true });
 
-    const config: PaseoDaemonConfig = {
+    const config: ClisbotDaemonConfig = {
       listen: "127.0.0.1:0",
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: false,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
       relayEnabled: false,
       appBaseUrl: "https://app.paseo.sh",
       openai: undefined,
@@ -890,7 +890,7 @@ export default function contribute(plugin: unknown) {
     };
 
     try {
-      const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
+      const daemon = await createClisbotDaemon(config, pino({ level: "silent" }));
       try {
         await daemon.start();
         expect(daemon.getListenTarget()).toBeDefined();
@@ -899,7 +899,7 @@ export default function contribute(plugin: unknown) {
         await daemon.stop();
       }
     } finally {
-      await rm(paseoHomeRoot, { recursive: true, force: true });
+      await rm(clisbotHomeRoot, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
     }
   });
@@ -915,7 +915,7 @@ export default function contribute(plugin: unknown) {
       vi.fn(() => fetchGate),
     );
 
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       speech: {
         providers: {
           dictationStt: { provider: "local", explicit: true, enabled: true },
@@ -928,7 +928,7 @@ export default function contribute(plugin: unknown) {
           voiceTts: { provider: "local", explicit: true, enabled: false },
         },
         local: {
-          modelsDir: path.join(os.tmpdir(), `paseo-missing-models-${Date.now()}`),
+          modelsDir: path.join(os.tmpdir(), `clisbot-missing-models-${Date.now()}`),
           models: {
             dictationStt: "parakeet-tdt-0.6b-v2-int8",
             voiceStt: "parakeet-tdt-0.6b-v2-int8",
@@ -979,19 +979,19 @@ export default function contribute(plugin: unknown) {
     // A Windows drive path like C:\daemon must NOT be silently parsed as TCP
     // (split(":") would yield host="C" and port="\\daemon" which is nonsensical).
     expect(() => parseListenString(String.raw`C:\daemon`)).toThrow();
-    expect(() => parseListenString(String.raw`D:\Users\foo\.paseo\daemon.sock`)).toThrow();
+    expect(() => parseListenString(String.raw`D:\Users\foo\.clisbot\daemon.sock`)).toThrow();
     // Single-letter "host" with no valid port is not a valid listen string
     expect(() => parseListenString(String.raw`C:\some\path`)).toThrow();
   });
 
   test("parses Windows named pipes as managed IPC listen targets", () => {
-    expect(parseListenString(String.raw`\\.\pipe\paseo-managed-test`)).toEqual({
+    expect(parseListenString(String.raw`\\.\pipe\clisbot-managed-test`)).toEqual({
       type: "pipe",
-      path: String.raw`\\.\pipe\paseo-managed-test`,
+      path: String.raw`\\.\pipe\clisbot-managed-test`,
     });
-    expect(parseListenString(`pipe://${String.raw`\\.\pipe\paseo-managed-test`}`)).toEqual({
+    expect(parseListenString(`pipe://${String.raw`\\.\pipe\clisbot-managed-test`}`)).toEqual({
       type: "pipe",
-      path: String.raw`\\.\pipe\paseo-managed-test`,
+      path: String.raw`\\.\pipe\clisbot-managed-test`,
     });
   });
 
@@ -999,24 +999,24 @@ export default function contribute(plugin: unknown) {
   test.skipIf(isPlatform("win32"))(
     "generates a relay pairing offer for unix socket listeners",
     async () => {
-      const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-socket-relay-"));
-      const paseoHome = path.join(paseoHomeRoot, ".paseo");
-      const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-      const socketPath = path.join(paseoHomeRoot, "run", "paseo.sock");
+      const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-socket-relay-"));
+      const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+      const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+      const socketPath = path.join(clisbotHomeRoot, "run", "clisbot.sock");
       await mkdir(path.dirname(socketPath), { recursive: true });
-      await mkdir(paseoHome, { recursive: true });
+      await mkdir(clisbotHome, { recursive: true });
       const logger = pino({ level: "silent" });
 
-      const config: PaseoDaemonConfig = {
+      const config: ClisbotDaemonConfig = {
         listen: socketPath,
-        paseoHome,
+        clisbotHome,
         corsAllowedOrigins: [],
         hostnames: true,
         mcpEnabled: false,
         staticDir,
         mcpDebug: false,
         agentClients: createTestAgentClients(),
-        agentStoragePath: path.join(paseoHome, "agents"),
+        agentStoragePath: path.join(clisbotHome, "agents"),
         relayEnabled: true,
         relayEndpoint: "127.0.0.1:9",
         relayPublicEndpoint: "127.0.0.1:9",
@@ -1025,12 +1025,12 @@ export default function contribute(plugin: unknown) {
         speech: undefined,
       };
 
-      const daemon = await createPaseoDaemon(config, logger);
+      const daemon = await createClisbotDaemon(config, logger);
 
       try {
         await daemon.start();
         const pairing = await generateLocalPairingOffer({
-          paseoHome,
+          clisbotHome,
           relayEnabled: true,
           relayEndpoint: "127.0.0.1:9",
           relayPublicEndpoint: "127.0.0.1:9",
@@ -1042,7 +1042,7 @@ export default function contribute(plugin: unknown) {
       } finally {
         await daemon.stop().catch(() => undefined);
         await daemon.agentManager.flush().catch(() => undefined);
-        await rm(paseoHomeRoot, { recursive: true, force: true });
+        await rm(clisbotHomeRoot, { recursive: true, force: true });
         await rm(staticDir, { recursive: true, force: true });
       }
     },
@@ -1077,13 +1077,13 @@ function holdAgentClose(): HeldAgentClose {
 
 async function beginDaemonShutdownWithAgentClosing(): Promise<BlockedDaemonShutdown> {
   const heldAgentClose = holdAgentClose();
-  const daemonHandle = await createTestPaseoDaemon({
+  const daemonHandle = await createTestClisbotDaemon({
     cleanup: false,
     agentClients: createTestAgentClients({
       closeSession: heldAgentClose.closeSession,
     }),
   });
-  const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-shutdown-agent-"));
+  const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-shutdown-agent-"));
   await daemonHandle.daemon.agentManager.createAgent(
     {
       provider: "codex",
@@ -1122,7 +1122,7 @@ async function beginDaemonShutdownWithAgentClosing(): Promise<BlockedDaemonShutd
       await stopPromise;
       await daemonHandle.daemon.agentManager.flush().catch(() => undefined);
       await Promise.all([
-        rm(path.dirname(daemonHandle.paseoHome), {
+        rm(path.dirname(daemonHandle.clisbotHome), {
           recursive: true,
           force: true,
         }),

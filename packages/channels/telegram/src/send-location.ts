@@ -3,7 +3,7 @@ import {
   formatLocationText,
   normalizeOutboundLocation,
   type OutboundLocation,
-} from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import { buildInlineKeyboard } from "./inline-keyboard.js";
 import {
   logTelegramOutboundSendOk,

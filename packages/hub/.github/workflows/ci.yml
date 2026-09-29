@@ -16,7 +16,7 @@ permissions:
 # companion PR creator commits it. Source-built jobs deliberately fail until it
 # is one exact 40-character SHA; mutable refs and repository variables are forbidden.
 env:
-  PASEO_E2E_COMMIT: 5f127d1b4a2c8d98fa18ef2b9c82309ab0d39750
+  CLISBOT_E2E_COMMIT: 5f127d1b4a2c8d98fa18ef2b9c82309ab0d39750
 
 jobs:
   typecheck:
@@ -102,7 +102,7 @@ jobs:
         run: npm ci
 
       - name: Install E2E agent CLIs
-        run: npm install -g @getpaseo/cli opencode-ai
+        run: npm install -g @clisbot/cli opencode-ai
 
       - name: Run tests
         run: npm test
@@ -134,31 +134,31 @@ jobs:
   browser-e2e:
     runs-on: ubuntu-latest
     env:
-      PASEO_E2E_WORKTREE: ${{ github.workspace }}/paseo-source
+      CLISBOT_E2E_WORKTREE: ${{ github.workspace }}/clisbot-source
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Require the exact Paseo companion commit
+      - name: Require the exact Clisbot companion commit
         run: |
-          [[ "$PASEO_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Fill PASEO_E2E_COMMIT with the accepted companion commit before review"
+          [[ "$CLISBOT_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Fill CLISBOT_E2E_COMMIT with the accepted companion commit before review"
             exit 1
           }
 
-      - name: Check out exact Paseo source
+      - name: Check out exact Clisbot source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: getpaseo/paseo
-          ref: ${{ env.PASEO_E2E_COMMIT }}
-          path: paseo-source
+          repository: longbkit/clisbot
+          ref: ${{ env.CLISBOT_E2E_COMMIT }}
+          path: clisbot-source
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: "npm"
 
-      - name: Build exact Paseo source
-        working-directory: paseo-source
+      - name: Build exact Clisbot source
+        working-directory: clisbot-source
         run: |
           npm ci
           npm run build:server
@@ -179,31 +179,31 @@ jobs:
   hub-e2e:
     runs-on: ubuntu-latest
     env:
-      PASEO_E2E_WORKTREE: ${{ github.workspace }}/paseo-source
+      CLISBOT_E2E_WORKTREE: ${{ github.workspace }}/clisbot-source
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Require the exact Paseo companion commit
+      - name: Require the exact Clisbot companion commit
         run: |
-          [[ "$PASEO_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Fill PASEO_E2E_COMMIT with the accepted companion commit before review"
+          [[ "$CLISBOT_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Fill CLISBOT_E2E_COMMIT with the accepted companion commit before review"
             exit 1
           }
 
-      - name: Check out exact Paseo source
+      - name: Check out exact Clisbot source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: getpaseo/paseo
-          ref: ${{ env.PASEO_E2E_COMMIT }}
-          path: paseo-source
+          repository: longbkit/clisbot
+          ref: ${{ env.CLISBOT_E2E_COMMIT }}
+          path: clisbot-source
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: "npm"
 
-      - name: Build exact Paseo source
-        working-directory: paseo-source
+      - name: Build exact Clisbot source
+        working-directory: clisbot-source
         run: |
           npm ci
           npm run build:server
@@ -220,5 +220,5 @@ jobs:
       - name: Build Hub production application
         run: npm run build
 
-      - name: Run Hub E2E against source-built Paseo
+      - name: Run Hub E2E against source-built Clisbot
         run: npm run test:e2e:hub:source

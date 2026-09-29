@@ -459,12 +459,12 @@ describe("Discord Phase 1 trigger provider", () => {
         {
           channelId: "200",
           threadId: "207",
-          content: "Paseo agent failed: boom",
+          content: "Clisbot agent failed: boom",
         },
         {
           channelId: "200",
           threadId: "207",
-          content: "Paseo machine terminated before the agent could complete: launch_failed",
+          content: "Clisbot machine terminated before the agent could complete: launch_failed",
         },
       ],
     );
@@ -589,7 +589,7 @@ function inputConfiguration() {
       {
         ...trigger,
         inputs: {
-          repo: { type: "string", choices: ["paseo", "hub"] },
+          repo: { type: "string", choices: ["clisbot", "hub"] },
           agent: { type: "string", default: "codex", choices: ["codex", "opus"] },
         },
         filters: {
@@ -602,7 +602,7 @@ function inputConfiguration() {
           {
             ...trigger.steps[0]!,
             agent: { provider: "codex", mode: "bypassPermissions" },
-            prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+            prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
           },
         ],
       },

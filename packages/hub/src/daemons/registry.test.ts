@@ -83,12 +83,12 @@ describe("daemon socket protocol negotiation", () => {
       const client = new WebSocket(`ws://127.0.0.1:${address.port}/api/daemons/socket`, {
         headers: {
           authorization: `Bearer ${secret}`,
-          "x-paseo-daemon-id": daemon.id,
-          ...(offered ? { "x-paseo-session-protocol": "1" } : {}),
+          "x-clisbot-daemon-id": daemon.id,
+          ...(offered ? { "x-clisbot-session-protocol": "1" } : {}),
         },
       });
       client.on("upgrade", (response) => {
-        negotiatedProtocol = response.headers["x-paseo-session-protocol"];
+        negotiatedProtocol = response.headers["x-clisbot-session-protocol"];
       });
       client.on("message", (data: RawData) => {
         messages.push(rawDataToText(data));
@@ -226,7 +226,7 @@ describe("daemon socket generations", () => {
     await assert.rejects(daemon.completeCreateWithoutContract("legacy-create"), {
       name: DaemonCreateRejectedError.name,
       message:
-        "The connected Paseo daemon did not confirm Hub MCP preapproval; update Paseo before running this workflow",
+        "The connected Clisbot daemon did not confirm Hub MCP preapproval; update Clisbot before running this workflow",
     });
   });
 

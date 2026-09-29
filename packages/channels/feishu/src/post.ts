@@ -3,7 +3,7 @@
 import {
   isRecord,
   normalizeLowercaseStringOrEmpty,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { normalizeFeishuExternalKey } from "./external-keys.js";
 
 const FALLBACK_POST_TEXT = "[Rich text message]";

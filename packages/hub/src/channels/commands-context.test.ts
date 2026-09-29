@@ -54,7 +54,7 @@ describe("command replies", () => {
   });
   it("uses the host identity and escapes path segments for both app and web links", () => {
     expect(channelSessionLinks("host/name", "agent id")).toEqual({
-      app: "paseo://h/host%2Fname/agent/agent%20id",
+      app: "clisbot://h/host%2Fname/agent/agent%20id",
     });
     expect(channelSessionLinks("host", "agent", "https://app.example.test/base")).toEqual({
       app: "https://app.example.test/api/open/agent/agent?host=host",
@@ -72,8 +72,8 @@ describe("command replies", () => {
     ).toBe(
       "[Open in the web app](https://app.test/h/host/agent/a)\n[Open in the Clisbot app](https://app.test/api/open/agent/a?host=host)",
     );
-    expect(channelSessionLinkText({ app: "paseo://h/host/agent/a" })).toBe(
-      "Open in the Clisbot app: paseo://h/host/agent/a",
+    expect(channelSessionLinkText({ app: "clisbot://h/host/agent/a" })).toBe(
+      "Open in the Clisbot app: clisbot://h/host/agent/a",
     );
   });
 });

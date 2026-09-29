@@ -8,7 +8,7 @@ import type {
   PluginStateKeyedStore,
   PluginStateStoreOptions,
   PluginStateSyncKeyedStore,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
+} from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
 
 export type SlackRuntimeState = {
   openSyncKeyedStore<TValue>(options: PluginStateStoreOptions): PluginStateSyncKeyedStore<TValue>;

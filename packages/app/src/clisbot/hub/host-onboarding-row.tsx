@@ -30,7 +30,7 @@ interface SynchronizationFailure {
 
 /**
  * One Hub Host: name and status on the first line, what to do next under it, then actions in a
- * single row. A Host Paseo cannot reach also shows the command that checks its daemon.
+ * single row. A Host Clisbot cannot reach also shows the command that checks its daemon.
  */
 export function HubHostOnboardingRow({
   item,

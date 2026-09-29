@@ -24,7 +24,7 @@ import type { HostRuntime } from "./host.js";
 // per process no matter how many copies of this module are loaded; per-account
 // isolation is preserved by the key, not by module identity.
 
-const RUNTIMES = Symbol.for("@getpaseo/hub/channel-runtimes");
+const RUNTIMES = Symbol.for("@clisbot/hub/channel-runtimes");
 
 type RuntimesGlobal = typeof globalThis & { [RUNTIMES]?: Map<string, HostRuntime> };
 

@@ -1,13 +1,13 @@
 // upstream: extensions/discord/src/actions/runtime.messaging.send.ts@5d8067a4483
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
 // D-DC-004: `assertMediaNotDataUrl` guarded the omitted voice-message branch.
 import {
   jsonResult,
   readPositiveIntegerParam,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import { isDiscordThreadChannelType } from "../channel-type.js";
 import { coerceDiscordComponentParam } from "../components.js";
 import {

@@ -17,7 +17,7 @@
 // tests install. This mirrors the Discord vertical's `runtime.ts` (D-DC-003)
 // and the Telegram one's (D-TG-046).
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { PluginRuntime } from "@getpaseo/channels-core/plugin-sdk/channel-core";
+import type { PluginRuntime } from "@clisbot/channels-core/plugin-sdk/channel-core";
 
 /** One inbound/outbound media blob as the host's media services return it. */
 export interface FeishuSavedMediaHandle {

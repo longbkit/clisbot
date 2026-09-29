@@ -1,5 +1,5 @@
 // Authored YAML shapes for the channel control plane (implementation doc §4.3.2,
-// §4.3.3, §4.3.6). These parse the files under `.paseo/channels/`; cross-reference
+// §4.3.3, §4.3.6). These parse the files under `.clisbot/channels/`; cross-reference
 // validation (agents/environments/workflows/users) happens in `compile.ts`.
 
 import { z } from "zod";
@@ -422,9 +422,9 @@ function buttonedTransportSchema<Mode extends z.ZodTypeAny>(mode: Mode) {
 export const SlackTransportSchema = buttonedTransportSchema(SlackTransportModeSchema).extend({
   // P0.5: per-account ingress route, auto-registered by the control plane.
   webhookPath: z.string().min(1).optional(),
-  // The app-manifest-registered NATIVE slash command name (e.g. `/paseo`)
+  // The app-manifest-registered NATIVE slash command name (e.g. `/clisbot`)
   // whose Socket Mode `slash_commands` events the vertical rewrites to the
-  // shared plain-text commands (`/paseo approve` → `approve`). Absent =
+  // shared plain-text commands (`/clisbot approve` → `approve`). Absent =
   // native slash ingestion off; the in-message `/approve` + `\approve`
   // text spellings always work with zero app setup (commands.ts).
   slashCommand: z

@@ -74,14 +74,14 @@ async function openWorkspaceHoverCard(page: import("@playwright/test").Page, wor
   return hoverCard;
 }
 
-interface PaseoOwnedWorktree {
+interface ClisbotOwnedWorktree {
   projectName: string;
   workspaceId: string;
   worktreeSlug: string;
 }
 
-async function withPaseoOwnedWorktree(
-  run: (workspace: PaseoOwnedWorktree) => Promise<void>,
+async function withClisbotOwnedWorktree(
+  run: (workspace: ClisbotOwnedWorktree) => Promise<void>,
 ): Promise<void> {
   const project = await seedWorkspace({ repoPrefix: "sidebar-hover-owned-worktree-" });
   const worktreeSlug = "hover-card-owned-worktree";
@@ -96,7 +96,7 @@ async function withPaseoOwnedWorktree(
       },
     });
     if (!created.workspace) {
-      throw new Error(created.error ?? "Failed to create Paseo-owned worktree");
+      throw new Error(created.error ?? "Failed to create Clisbot-owned worktree");
     }
     expect(path.basename(created.workspace.workspaceDirectory)).toBe(worktreeSlug);
 
@@ -117,7 +117,7 @@ async function readCachedRowIds(
   return page.evaluate(
     async ({ serverId, kind }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open("paseo-replica-row-store");
+        const request = indexedDB.open("clisbot-replica-row-store");
         request.addEventListener("success", () => resolve(request.result));
         request.addEventListener("error", () => reject(request.error));
       });
@@ -158,7 +158,7 @@ async function simulateDamagedLegacyDirectoryCache(
   await page.evaluate(
     async ({ serverId, missingWorkspaceId }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open("paseo-replica-row-store");
+        const request = indexedDB.open("clisbot-replica-row-store");
         request.addEventListener("success", () => resolve(request.result));
         request.addEventListener("error", () => reject(request.error));
       });
@@ -430,8 +430,8 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
-  test("Paseo-owned worktree hover card shows the worktree directory name", async ({ page }) => {
-    await withPaseoOwnedWorktree(async ({ projectName, workspaceId, worktreeSlug }) => {
+  test("Clisbot-owned worktree hover card shows the worktree directory name", async ({ page }) => {
+    await withClisbotOwnedWorktree(async ({ projectName, workspaceId, worktreeSlug }) => {
       await gotoAppShell(page);
       await waitForSidebarProject(page, projectName);
       await openWorkspaceHoverCard(page, workspaceId);

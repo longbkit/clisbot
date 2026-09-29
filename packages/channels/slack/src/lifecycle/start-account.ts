@@ -19,7 +19,7 @@ import {
   type HostChildLogger,
   type HostRuntime,
   type StartAccountContext,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import { resolveSlackWebClientOptions } from "../client-options.js";
 import {
   probeSlackAuth,
@@ -256,7 +256,7 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
   // the inbound body before admission (the mirror of the Telegram vertical's
   // `downloadDir`). Absent (unit posture) = text-only.
   // COMPAT(clisbot-control-plane): the account's registered native slash
-  // command (`transport.slashCommand`, e.g. `/paseo`). Set = the provider
+  // command (`transport.slashCommand`, e.g. `/clisbot`). Set = the provider
   // rewrites matching `slash_commands` payloads to the shared plain-text
   // command form (the hub's commands.ts owns the verbs); absent = native
   // ingestion off.

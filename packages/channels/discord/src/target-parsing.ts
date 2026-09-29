@@ -7,7 +7,7 @@ import {
   type MessagingTarget,
   type MessagingTargetKind,
   type MessagingTargetParseOptions,
-} from "@getpaseo/channels-core/plugin-sdk/channel-targets";
+} from "@clisbot/channels-core/plugin-sdk/channel-targets";
 
 export type DiscordTargetKind = MessagingTargetKind;
 

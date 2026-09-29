@@ -65,7 +65,7 @@ const internalFreePlan: SyncBillingPlanInput = {
 const hostedPlan: SyncBillingPlanInput = {
   id: "prod_hosted",
   slug: "hosted",
-  name: "Paseo Hub",
+  name: "Clisbot Hub",
   template: {
     seats: { max: null },
     canInviteMembers: true,
@@ -97,7 +97,7 @@ describe("BillingRuntime.publicCatalog", () => {
     assert.deepEqual(catalog, [
       {
         slug: "hosted",
-        name: "Paseo Hub",
+        name: "Clisbot Hub",
         marketingFeatures: ["Unlimited daemons"],
         prices: { monthly: { unitAmount: 1500, currency: "eur" }, annual: null },
       },

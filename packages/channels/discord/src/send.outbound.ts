@@ -1,15 +1,15 @@
 // upstream: extensions/discord/src/send.outbound.ts@5d8067a4483
 import type { APIChannel, APIGuildForumChannel, APIGuildMediaChannel } from "discord-api-types/v10";
 import { ChannelType } from "discord-api-types/v10";
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
-import type { MarkdownTableMode, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
-import type { OutboundMediaAccess, PollInput } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
-import { resolveChunkMode, type ChunkMode } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
-import type { RetryConfig } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
+import type { MarkdownTableMode, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
+import type { OutboundMediaAccess, PollInput } from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
+import { resolveChunkMode, type ChunkMode } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
+import type { RetryConfig } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { createChannelMessage, createThread, type RequestClient } from "./internal/discord.js";
 import { renderDiscordMarkdown } from "./markdown.js";
 import { rewriteDiscordKnownMentions } from "./mentions.js";

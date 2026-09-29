@@ -25,7 +25,7 @@
 // Hub's breaker stops the calls instead of warning on every turn.
 
 import { getSlackWriteClient } from "./client/web-api.js";
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
 import { getSlackHostRuntime } from "./runtime-store.js";
 

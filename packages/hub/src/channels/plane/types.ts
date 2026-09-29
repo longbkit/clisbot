@@ -21,7 +21,7 @@ import type { RecordChannelInboundActivityInput } from "../../db/channels.js";
 import type { ChannelStreamingDriver } from "../streaming/types.js";
 import type { SupportedChannelName } from "../catalog.js";
 import type { OutboundFailure } from "./outbound-failure.js";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 
 // The channel-name vocabulary is catalog-owned (`catalog.ts`
 // SUPPORTED_CHANNEL_NAMES); re-exported here because the plane is where the
@@ -422,7 +422,7 @@ export type ChannelIdentityChallengeConsumer = (input: {
 export interface ChannelPlaneDeps {
   resolveSessionIdentity?: (
     source: InboundMessage,
-  ) => Promise<import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity>;
+  ) => Promise<import("@clisbot/protocol/session-operation").VerifiedSessionOperationIdentity>;
   organizationId: string;
   /** Immutable Channel configuration revision backing this plane. */
   channelRevisionId?: string | null | undefined;

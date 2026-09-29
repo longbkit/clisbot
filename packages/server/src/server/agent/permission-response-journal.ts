@@ -9,7 +9,7 @@ import type {
   AgentPermissionResponseRecord,
   SessionActor,
   SessionChannelReference,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 
 export interface PermissionResponseJournal {
   readPermissionResponse(
@@ -93,7 +93,8 @@ export class PermissionResponseAdmission {
         if (existing) {
           if (
             (params.requestGeneration !== undefined &&
-              existing.request.metadata?.paseoPermissionGeneration !== params.requestGeneration) ||
+              existing.request.metadata?.clisbotPermissionGeneration !==
+                params.requestGeneration) ||
             existing.request.id !== params.requestId ||
             !isDeepStrictEqual(existing.response, response) ||
             !isDeepStrictEqual(existing.respondedBy, respondedBy)
@@ -109,7 +110,7 @@ export class PermissionResponseAdmission {
         if (!request) throw new Error("Permission request is no longer pending");
         if (
           params.requestGeneration !== undefined &&
-          request.metadata?.paseoPermissionGeneration !== params.requestGeneration
+          request.metadata?.clisbotPermissionGeneration !== params.requestGeneration
         )
           throw new Error("Permission request generation changed before response admission");
         if (request !== observedRequest || !requestSnapshot) {

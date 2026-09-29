@@ -1,7 +1,7 @@
 // upstream: extensions/googlechat/src/monitor-types.ts@5d8067a4483
-import type { ChannelAccountSnapshot } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelAccountSnapshot } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 // Googlechat plugin module implements monitor types behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import type { GoogleChatAudienceType } from "./auth.js";
 import type { GoogleChatWebhookAdmission } from "./fusion/admission.js";

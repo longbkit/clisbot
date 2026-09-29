@@ -1,4 +1,4 @@
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { expect, type Page } from "@playwright/test";
 import { daemonWsRoutePattern } from "./daemon-port";
 import type { SeededWorkspace } from "./seed-client";

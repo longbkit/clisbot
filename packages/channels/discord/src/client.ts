@@ -1,11 +1,11 @@
 // upstream: extensions/discord/src/client.ts@5d8067a4483
 // Discord plugin module implements client behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
-import type { RetryConfig } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/routing";
-import type { RuntimeEnv } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
+import type { RetryConfig } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/routing";
+import type { RuntimeEnv } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   mergeDiscordAccountConfig,
   resolveDiscordAccount,

@@ -21,9 +21,9 @@ describe("hostProjectFolderPolicy", () => {
       deny: ["/", "~", "~/.ssh/**", "/etc/**"],
     });
     expect(
-      hostProjectFolderPolicy({ PASEO_PROJECT_FOLDERS_ALLOW: "/workspace/**, ~/code/**" }),
+      hostProjectFolderPolicy({ CLISBOT_PROJECT_FOLDERS_ALLOW: "/workspace/**, ~/code/**" }),
     ).toEqual({ allow: ["/workspace/**", "~/code/**"], deny: ["/", "~", "~/.ssh/**", "/etc/**"] });
-    expect(hostProjectFolderPolicy({ PASEO_PROJECT_FOLDERS_DENY: "" }).deny).toEqual([]);
+    expect(hostProjectFolderPolicy({ CLISBOT_PROJECT_FOLDERS_DENY: "" }).deny).toEqual([]);
   });
 });
 

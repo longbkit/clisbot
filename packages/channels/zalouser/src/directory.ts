@@ -1,7 +1,7 @@
 // upstream: extensions/zalouser/src/directory.ts@5d8067a4483
 // Zalouser plugin module implements directory behavior.
-import type { ChannelDirectoryEntry } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { ChannelDirectoryEntry } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveZalouserAccountSync } from "./accounts.js";
 import { parseZalouserDirectoryGroupId } from "./session-route.js";
 

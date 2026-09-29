@@ -34,7 +34,7 @@ import { ChannelStreamingProducer, createStreamingDriver } from "./index.js";
 import {
   sendText as telegramSendText,
   updateText as telegramUpdateText,
-} from "@getpaseo/channels-telegram/dist/outbound.js";
+} from "@clisbot/channels-telegram/dist/outbound.js";
 
 const ORGANIZATION_ID = "streaming-org";
 const AGENT_ID = "agent-stream";

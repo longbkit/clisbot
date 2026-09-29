@@ -1,5 +1,5 @@
 // upstream: extensions/feishu/src/sticker-catalog.ts@5d8067a4483
-import { readStringParam } from "@getpaseo/channels-core/plugin-sdk/param-readers";
+import { readStringParam } from "@clisbot/channels-core/plugin-sdk/param-readers";
 import type { ClawdbotConfig } from "./fusion/runtime-api.js";
 import type { FeishuConfig, ResolvedFeishuAccount } from "./types.js";
 

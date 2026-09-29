@@ -13,7 +13,7 @@ import {
 
 export function startCommand(): Command {
   return new Command("start")
-    .description("Start the local Paseo Hub (embedded channel control plane)")
+    .description("Start the local Clisbot Hub (embedded channel control plane)")
     .option("--port <port>", "Fixed port (background default: saved port, or 6868 when available)")
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--foreground", "Run in foreground (don't detach)")

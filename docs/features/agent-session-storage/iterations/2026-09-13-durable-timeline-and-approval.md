@@ -3,7 +3,7 @@
 The contract for this iteration. Status and evidence: [implementation.md](../implementation.md).
 Point-by-point acceptance: [2026-09-13-acceptance-matrix.md](2026-09-13-acceptance-matrix.md).
 
-A reduced scope that makes session storage better than old Paseo without making the frontend
+A reduced scope that makes session storage better than old Clisbot without making the frontend
 depend on the on-disk layout.
 
 **The scope has two halves, not just the timeline.** The first is the durable timeline and fast
@@ -21,7 +21,7 @@ so nothing is approved twice and no decision already taken is lost:
 Both halves share one substrate: the same `events.jsonl`, the same writer lock, and the same
 `operationOrder` — which is why message and approval ordering is still correct after recovery.
 
-**Goal:** a running timeline keeps its rows in RAM and streams live exactly as old Paseo did;
+**Goal:** a running timeline keeps its rows in RAM and streams live exactly as old Clisbot did;
 on restart, or when opening an old session, the daemon loads only the page it needs into RAM;
 the user-message list carries a light anchor (`messageId`, preview, `epoch`, `seq`) so a jump
 can reach a message that is not resident.
@@ -87,7 +87,7 @@ correct after the assistant streams more chunks.
 ## Compatibility gate and protocol limits
 
 The web app must detect the capabilities of the **daemon it is connected to** via
-`server_info.features`. It must never infer them from `PASEO_AGENT_SESSION_STORAGE=1` on the
+`server_info.features`. It must never infer them from `CLISBOT_AGENT_SESSION_STORAGE=1` on the
 machine running the app, nor from a local URL or config. When the daemon does not advertise the
 matching capability, the app must use the legacy path and send no new request or field. This is
 what allows an upstream session to open without timing out or behaving incorrectly.
@@ -98,7 +98,7 @@ what allows an upstream session to open without timing out or behaving incorrect
 | `pagingMode: "source_ranges"` on `fetch_agent_timeline` | An extension parameter for reading exactly the source range of a page or entry          | Distant page reads and jumps move less data                                 | Legacy paging still works, reading a wider page                                      | Sent only when the daemon advertises the capability      |
 | `allowDeferredPayloads` on `fetch_agent_timeline`       | An extension parameter letting a large payload be returned as a descriptor              | Smaller frames and less RAM for large entries                               | Full payload, or the legacy limit                                                    | Enabled only when the capability is present              |
 | Coalescing assistant chunks in RAM                      | Merges many deltas into one message-level record before writing                         | A readable journal that does not grow `O(N²)`                               | Writing each delta grows the data sharply                                            | No change to the legacy wire                             |
-| Durable submission state                                | Persists `clientMessageId` state across restart and retry                               | Avoids forwarding the same prompt more than once                            | A retry may re-run a prompt, as in old Paseo                                         | Optional; upstream keeps the old flow                    |
+| Durable submission state                                | Persists `clientMessageId` state across restart and retry                               | Avoids forwarding the same prompt more than once                            | A retry may re-run a prompt, as in old Clisbot                                       | Optional; upstream keeps the old flow                    |
 
 **Protocol rule:** never add a request purely to serve an internal cache or index. A new request
 is acceptable only when it is directly needed for page loading or fast jump, has its own
@@ -106,14 +106,14 @@ capability bit, has a legacy fallback, and has a test against a daemon that does
 The web app must treat `unknown request`, `unsupported`, `access_denied` or a timeout as a
 signal to fall back or clean up — never to leave a session loading forever.
 
-**API level (correction):** `fetch_agent_timeline` with `cursor`/`limit` is the legacy Paseo
+**API level (correction):** `fetch_agent_timeline` with `cursor`/`limit` is the legacy Clisbot
 contract. `pagingMode: "source_ranges"` and `allowDeferredPayloads` are extension parameters on
 that same request, not requests of their own. `signal` is a client-local option and never
 crosses the wire. `agent.timeline.list_prompts.request` and
 `agent.timeline.set_subscription.request` are also legacy requests; the permission-history APIs
 and events are the genuinely new part of session storage.
 
-**Upstream matrix:** against an upstream Paseo daemon without `agentSessionStorageRead`, the app
+**Upstream matrix:** against an upstream Clisbot daemon without `agentSessionStorageRead`, the app
 still opens and renders sessions through the legacy timeline, and sends no source-range, deferred
 payload, permission-history or subscription request. Against a capable daemon it uses page
 loading and anchors. Storage improvements are opt-in per daemon, never a condition of connecting.

@@ -15,7 +15,7 @@ import { useCallback, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { View, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import {
   useHostRuntimeClient,

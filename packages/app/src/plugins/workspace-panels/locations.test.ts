@@ -1,6 +1,6 @@
 import appPackage from "../../../package.json";
 import { describe, expect, it, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { pluginRegistry } from "../registry";
 import { panelTargetSupportsHost, resolvePluginPanelOpenLocation } from "./locations";
 
@@ -9,7 +9,7 @@ vi.mock("../navigation", () => ({
 }));
 vi.mock("../client-runtime", () => ({
   createPluginClientRuntime: () => ({
-    paseo: {},
+    clisbot: {},
     rpc: async () => undefined,
     openSurface: () => undefined,
     openPanel: () => undefined,
@@ -34,7 +34,7 @@ function install(locations: readonly ("workspace" | "explorer")[]) {
   })`;
   pluginRegistry.installCatalog(
     "host-1",
-    [{ id: "review", requirements: { paseo: `>=${appPackage.version}` }, clientBundle: bundle }],
+    [{ id: "review", requirements: { clisbot: `>=${appPackage.version}` }, clientBundle: bundle }],
     {
       client: {} as DaemonClient,
     },

@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/group-policy.ts@5d8067a4483
 // Slack plugin module implements group policy behavior.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { ChannelGroupContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { ChannelGroupContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   resolveScopeRequireMention,
   resolveScopeToolsPolicy,
@@ -9,9 +9,9 @@ import {
   type GroupToolPolicyConfig,
   type ScopeNode,
   type ScopeTree,
-} from "@getpaseo/channels-core/plugin-sdk/channel-policy";
-import { buildChannelKeyCandidates } from "@getpaseo/channels-core/plugin-sdk/channel-targets";
-import { normalizeHyphenSlug } from "@getpaseo/channels-core/plugin-sdk/string-normalization-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-policy";
+import { buildChannelKeyCandidates } from "@clisbot/channels-core/plugin-sdk/channel-targets";
+import { normalizeHyphenSlug } from "@clisbot/channels-core/plugin-sdk/string-normalization-runtime";
 import { mergeSlackAccountConfig, resolveDefaultSlackAccountId } from "./accounts.js";
 import { getSlackInstallationKind } from "./installation-identity-state.js";
 

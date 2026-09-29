@@ -2,9 +2,9 @@
 
 Local plugins contribute daemon RPCs, native app surfaces, workspace panels, Command Center items,
 client slash commands, timeline items, header buttons, composer pills, app themes, composer attachment sources, and settings screens.
-Paseo executes `index.server.ts` in a subprocess and `index.client.tsx` in every connected app.
+Clisbot executes `index.server.ts` in a subprocess and `index.client.tsx` in every connected app.
 
-> **Trust every plugin you add.** `paseo plugin add` and `paseo plugin install` mean “I trust this codebase.” Plugins are unsandboxed: server code and preparation commands run with the daemon user's access on the daemon host, and client contributions run inside Paseo. The repository's dependencies and future updates are part of that trust decision. With `--host`, preparation runs on that remote daemon host.
+> **Trust every plugin you add.** `clisbot plugin add` and `clisbot plugin install` mean “I trust this codebase.” Plugins are unsandboxed: server code and preparation commands run with the daemon user's access on the daemon host, and client contributions run inside Clisbot. The repository's dependencies and future updates are part of that trust decision. With `--host`, preparation runs on that remote daemon host.
 
 ## Install a directory source
 
@@ -12,13 +12,13 @@ Create a typecheckable plugin project, install its development dependencies, the
 the daemon. `init` only writes the project files; it does not run the package manager.
 
 ```bash
-paseo plugin init /absolute/path/to/my-plugin
+clisbot plugin init /absolute/path/to/my-plugin
 cd /absolute/path/to/my-plugin
 npm install
 npm run typecheck
-paseo plugin install /absolute/path/to/my-plugin
-paseo plugin install /absolute/path/to/my-plugin --id another-runtime-id
-paseo plugin ls
+clisbot plugin install /absolute/path/to/my-plugin
+clisbot plugin install /absolute/path/to/my-plugin --id another-runtime-id
+clisbot plugin ls
 ```
 
 The daemon stores directory sources under the root `plugins` object:
@@ -37,16 +37,16 @@ The daemon stores directory sources under the root `plugins` object:
 ```
 
 The plugin system is disabled unless `pluginsEnabled` is `true`. Changing that root field is
-runtime-safe: run `paseo reload` after editing `config.json`. Enabling starts every configured,
+runtime-safe: run `clisbot reload` after editing `config.json`. Enabling starts every configured,
 enabled plugin; disabling tears them all down without restarting the daemon. Plugin source entries
 remain lifecycle-owned and do not reload from manual config edits.
 
-The directory contains a manifest declaring identity and Paseo requirements, one optional entry per runtime, runtime-owned
+The directory contains a manifest declaring identity and Clisbot requirements, one optional entry per runtime, runtime-owned
 directories, and local typechecking support. At least one entry is required.
 
 ```text
 my-plugin/
-  paseo-plugin.json
+  clisbot-plugin.json
   package.json
   tsconfig.json
   index.client.tsx
@@ -56,18 +56,18 @@ my-plugin/
   shared/greeting.ts
 ```
 
-The generated `package.json` installs `@getpaseo/plugin` and the other host modules as development
-dependencies for local typechecking and tests. Paseo compiles TypeScript and TSX and supplies the
+The generated `package.json` installs `@clisbot/plugin` and the other host modules as development
+dependencies for local typechecking and tests. Clisbot compiles TypeScript and TSX and supplies the
 runtime modules, so consumers do not install these packages when adding the plugin.
 
 ```json
 {
   "id": "my-plugin",
-  "requirements": { "paseo": ">=0.8.0" }
+  "requirements": { "clisbot": ">=0.8.0" }
 }
 ```
 
-Declare the supported Paseo range and keep it current when adopting newer APIs. See the
+Declare the supported Clisbot range and keep it current when adopting newer APIs. See the
 [requirements contract](../public-docs/plugins/reference.md#requirements), including legacy
 manifests and prerelease matching.
 
@@ -78,10 +78,10 @@ keys.
 
 Never enable plugins on a user's behalf without explicit permission. Before asking, check the
 target daemon's current `pluginsEnabled` value. State that plugins are trusted, unsandboxed code:
-backend code can access the daemon machine, while client contributions run inside the Paseo app.
+backend code can access the daemon machine, while client contributions run inside the Clisbot app.
 
-Source changes are explicit. Run `paseo plugin reload <id>` to stop and fully tear down the old
-plugin before compiling and starting from disk. A failed reload stays failed; Paseo does not restore
+Source changes are explicit. Run `clisbot plugin reload <id>` to stop and fully tear down the old
+plugin before compiling and starting from disk. A failed reload stays failed; Clisbot does not restore
 the old code. Use `enable`, `disable`, and `remove` to manage one plugin. Removing a directory source
 never deletes it. The global `pluginsEnabled` switch remains available.
 
@@ -91,21 +91,21 @@ GitHub repositories use an `owner/repository` shorthand. Other hosts use a Git U
 directory always wins over shorthand resolution.
 
 ```bash
-paseo plugin add owner/repository
-paseo plugin add https://gitlab.com/group/repository.git
-paseo plugin add https://git.example.com/owner/repository.git
-paseo plugin add owner/monorepo:plugins/review
-paseo plugin add owner/repository --ref main
-paseo plugin ls
-paseo plugin update review
-paseo plugin update --all
+clisbot plugin add owner/repository
+clisbot plugin add https://gitlab.com/group/repository.git
+clisbot plugin add https://git.example.com/owner/repository.git
+clisbot plugin add owner/monorepo:plugins/review
+clisbot plugin add owner/repository --ref main
+clisbot plugin ls
+clisbot plugin update review
+clisbot plugin update --all
 ```
 
 Append `:relative/path` to the source when the plugin lives below the repository root.
 
 `--ref` chooses the initial branch, tag, or commit once. Ordinary updates resolve the remote's
 current default HEAD and ask for approval. `ls` reports the installed commit without contacting the remote.
-Removing a Git source deletes Paseo's managed checkout.
+Removing a Git source deletes Clisbot's managed checkout.
 
 ## Managed source ownership
 
@@ -136,13 +136,13 @@ session is stored in the daemon. PluginService owns activation/recovery and inde
 ### Declare Git preparation
 
 Most plugins should omit `build`. Use it only when the staged checkout must install a dependency
-that Paseo does not provide, generate source or assets, or perform another required preparation
+that Clisbot does not provide, generate source or assets, or perform another required preparation
 step:
 
 ```json
 {
   "id": "review",
-  "requirements": { "paseo": ">=0.8.0" },
+  "requirements": { "clisbot": ">=0.8.0" },
   "build": [
     ["npm", "ci"],
     ["npm", "run", "build"]
@@ -151,22 +151,22 @@ step:
 ```
 
 `build` is an optional list of argv arrays. Each array must contain at least one non-empty string;
-shell command strings are rejected. Paseo starts the executable directly, without a shell, from the
+shell command strings are rejected. Clisbot starts the executable directly, without a shell, from the
 plugin directory in the staged checkout. It never detects lockfiles or chooses a package manager.
 
-On install and every update, Paseo resolves the exact Git revision and manifest, runs the declared
+On install and every update, Clisbot resolves the exact Git revision and manifest, runs the declared
 commands, then validates, compiles, and activates the candidate. It logs each argv command and its
-output in the daemon log. If a command fails, the error includes its output, Paseo discards the
+output in the daemon log. If a command fails, the error includes its output, Clisbot discards the
 candidate, and the existing installed and running version stays untouched. On a remote daemon, all
 of this happens on the remote daemon host.
 
-Server contributions can write to stdout and stderr with normal Node logging. Paseo adds `[paseo]`
+Server contributions can write to stdout and stderr with normal Node logging. Clisbot adds `[clisbot]`
 entries for loading, ready, stopping, and stopped transitions. Compilation and load failures are
 recorded as stderr entries before a subprocess exists. Inspect the recent in-memory
-tail from the host plugin settings or with `paseo plugin logs <id>`. Git preparation commands are
-recorded in `$PASEO_HOME/daemon.log` before a plugin exists, rather than the plugin log tail. Reload, disable, and process
+tail from the host plugin settings or with `clisbot plugin logs <id>`. Git preparation commands are
+recorded in `$CLISBOT_HOME/daemon.log` before a plugin exists, rather than the plugin log tail. Reload, disable, and process
 failure retain the tail; removing the plugin clears it. Daemon restarts do not retain the tail, but
-structured copies remain in `$PASEO_HOME/daemon.log`. Plugin output can contain secrets, so do not
+structured copies remain in `$CLISBOT_HOME/daemon.log`. Plugin output can contain secrets, so do not
 log credentials or tokens.
 
 ## Contribute behavior and UI
@@ -182,9 +182,9 @@ wiring. Runtime code lives behind directory boundaries:
 
 Do not put any other code modules in the plugin root.
 
-Shared files import contract helpers and types from `@getpaseo/plugin`. Server handler files import
-`PluginHandlerContext` from `@getpaseo/plugin/server`. Client files import Paseo UI from
-`@getpaseo/plugin/client/react-native`. Its `Icon` resolves a Lucide name using the client's installed icon
+Shared files import contract helpers and types from `@clisbot/plugin`. Server handler files import
+`PluginHandlerContext` from `@clisbot/plugin/server`. Client files import Clisbot UI from
+`@clisbot/plugin/client/react-native`. Its `Icon` resolves a Lucide name using the client's installed icon
 set; an unknown name renders nothing so it cannot break the plugin surface.
 Its controlled modal keeps presentation metadata on `<Modal title="…" icon={…}>` and body UI in
 `<Modal.Content>`. Body layout, sheet-aware scrolling, and clipboard actions follow the
@@ -200,14 +200,14 @@ Classify every SDK export before adding it. All client entry points and implemen
 Zod schemas, and functions that run in both runtimes. A type-only import is still an architectural
 dependency; shared types must not refer to React components, hooks, Node APIs, or server contexts.
 
-| Entry                                                | Owns                                                                       | May depend on          |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
-| `@getpaseo/plugin`                                   | Shared data, schemas, RPC/settings definitions, runtime-neutral helpers    | Shared code only       |
-| `@getpaseo/plugin/server`                            | Server contribution/handler contexts and lifecycle contracts               | Shared and server code |
-| `@getpaseo/plugin/server/provider`, `/server/acp`    | Server provider contracts and adapters                                     | Shared and server code |
-| `@getpaseo/plugin/client`                            | Client contribution contexts, hooks, navigation, and UI contribution types | Shared and client code |
-| `@getpaseo/plugin/client/react-native`, `/client/ui` | Host-provided UI components                                                | Shared and client code |
-| `@getpaseo/plugin/client/host`                       | App-owned rendering integration; not a plugin-author entry                 | Shared and client code |
+| Entry                                               | Owns                                                                       | May depend on          |
+| --------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
+| `@clisbot/plugin`                                   | Shared data, schemas, RPC/settings definitions, runtime-neutral helpers    | Shared code only       |
+| `@clisbot/plugin/server`                            | Server contribution/handler contexts and lifecycle contracts               | Shared and server code |
+| `@clisbot/plugin/server/provider`, `/server/acp`    | Server provider contracts and adapters                                     | Shared and server code |
+| `@clisbot/plugin/client`                            | Client contribution contexts, hooks, navigation, and UI contribution types | Shared and client code |
+| `@clisbot/plugin/client/react-native`, `/client/ui` | Host-provided UI components                                                | Shared and client code |
+| `@clisbot/plugin/client/host`                       | App-owned rendering integration; not a plugin-author entry                 | Shared and client code |
 
 Server code imports shared helpers from the root and server capabilities from `/server`. Client
 code imports shared helpers from the root and client capabilities from `/client`. Neither runtime
@@ -237,7 +237,7 @@ pattern.
 
 ```ts
 // index.server.ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createGreeting } from "./server/greeting";
 import { greetRpc } from "./shared/greeting";
 
@@ -249,7 +249,7 @@ export default function contribute(server: PluginServerContext) {
 
 ```tsx
 // index.client.tsx
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { Greeting } from "./client/greeting";
 
 export default function contribute(client: PluginClientContext) {
@@ -259,25 +259,25 @@ export default function contribute(client: PluginClientContext) {
 }
 ```
 
-The contribution function must return cleanup. Server cleanup may be async; Paseo waits for it when
+The contribution function must return cleanup. Server cleanup may be async; Clisbot waits for it when
 the plugin is reloaded, disabled, removed, disconnected, or shut down. Cleanup is for resources
-created by plugin code. Paseo removes registered contributions, unmounts surfaces, clears query
+created by plugin code. Clisbot removes registered contributions, unmounts surfaces, clears query
 state, rejects pending RPCs, closes the plugin's daemon session, and stops the subprocess. Cleanup
 errors are logged and do not interrupt host teardown.
 
-Paseo owns the route, screen header, Lucide icon validation, close action, theme DTO, layout facts,
+Clisbot owns the route, screen header, Lucide icon validation, close action, theme DTO, layout facts,
 and render error boundary. The contributed component owns the complete body below the header.
 
 RPC contracts validate inputs and outputs in both the app and plugin subprocess. `useRpc` returns a
 typed async function. Use the host-provided `@tanstack/react-query` for request state and caching;
-Paseo gives each plugin installation its own query client.
+Clisbot gives each plugin installation its own query client.
 
-`usePaseo()` and the handler's `{ paseo }` context expose the same `PaseoApi`: projects,
+`useClisbot()` and the handler's `{ clisbot }` context expose the same `ClisbotApi`: projects,
 workspaces, agents, terminals, providers, and daemon config. They do not expose connection lifecycle. A surface borrows the
-selected host's existing connection; switching the screen's host changes both `usePaseo()` and
+selected host's existing connection; switching the screen's host changes both `useClisbot()` and
 `useRpc()` to that host. An offline selected host fails there and never falls through to another
 installation. A server handler owns an IPC-backed daemon session for the life of its subprocess.
-Use plugin RPC for plugin-specific backend behavior that is not a normal Paseo operation.
+Use plugin RPC for plugin-specific backend behavior that is not a normal Clisbot operation.
 
 Host-targeted clients and discovery are owned by `packages/app/src/plugins/hosts`, with per-installation
 bindings supplied by the bundle loader. Bind the imperative getter to that installation; do not
@@ -290,7 +290,7 @@ grace. During daemon startup, plugin sessions may connect while application WebS
 paused; the daemon accepts clients only after configured plugins have settled and the initial
 catalog is complete.
 
-When the same plugin contribution exists on multiple hosts, Paseo shows it once in the sidebar and
+When the same plugin contribution exists on multiple hosts, Clisbot shows it once in the sidebar and
 adds a host picker to the screen header. The selected host supplies the bundle, RPC transport, and
 query cache. Explicit SDK targets follow the [host API contract](../public-docs/plugins/reference.md#discover-hosts-and-target-another-host).
 
@@ -308,7 +308,7 @@ workspace only. Location controls hosting, not context. An agent panel target ke
 when moved between hosts. Explorer configuration can create workspace-context panels and remove
 existing agent-context instances, but it cannot create an agent panel without an agent-aware command.
 
-Command Center callbacks use the selected host's existing `PaseoApi` for normal Paseo operations.
+Command Center callbacks use the selected host's existing `ClisbotApi` for normal Clisbot operations.
 They use typed plugin RPC only for plugin-specific backend work. Surface and panel navigation
 belongs to the app; plugins do not receive Expo Router or workspace-layout store access.
 See the public [navigation fields](../public-docs/plugins/reference.md#surfaces-and-sidebar-items)
@@ -332,8 +332,8 @@ Register a provider from `index.server.ts`. The provider connection is callback-
 of its sessions; plugin RPC is not part of the provider data path.
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import type { PluginServerContext } from "@clisbot/plugin/server";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import { createProvider } from "./server/provider";
 
 export default function contribute(server: PluginServerContext) {
@@ -351,7 +351,7 @@ need no change. See [catalogue ownership](providers.md#provider-snapshot-refresh
 `send()` resolves after acceptance. Publish operation completion, prompt disposition, turn state,
 configuration, permissions, persistence, and complete timeline snapshots through `onEvent()`.
 Route messages, structured commands, steering, and command side effects through `session.prompt`.
-Provider settings are toggle/select data that Paseo renders in the composer. Keep private options in
+Provider settings are toggle/select data that Clisbot renders in the composer. Keep private options in
 the opaque `providerOptions` config object.
 
 Agent refresh closes the current provider session and opens it again with current configuration and
@@ -359,7 +359,7 @@ persistence. Providers re-read credentials, environment, global configuration, a
 `session.open`; there is no provider reload input.
 
 For an ACP command, register `runAcpProvider({ id, label, command })` from
-`@getpaseo/plugin/server/acp`. Its transformer hooks cover narrow vendor differences; do not translate the
+`@clisbot/plugin/server/acp`. Its transformer hooks cover narrow vendor differences; do not translate the
 whole provider event stream. The direct and ACP examples live in `plugin-examples/provider-direct`
 and `plugin-examples/provider-acp-transformer`.
 
@@ -373,7 +373,7 @@ owns author workflow, lifecycle, testing, and distribution guidance.
 It must resolve inside that directory to a regular SVG file no larger than 64 KiB. The SVG must be
 self-contained: scripts, styles, `foreignObject`, event-handler attributes, JavaScript URLs, and
 external `href` or `xlink:href` references are rejected. Fragment references such as `#mark` are
-allowed. Paseo reads and sanitizes the file when the plugin starts; the string is never an inline
+allowed. Clisbot reads and sanitizes the file when the plugin starts; the string is never an inline
 SVG or URL.
 
 ## Contribute buttons
@@ -387,7 +387,7 @@ Native sheets teleport their children. Button surfaces rebuild the installation'
 query, and toast providers inside the surface content, including overflow pages from different
 plugins. Providers only around the trigger do not reach those bodies.
 
-Request observation with `client.paseo.agents.list({ subscribe: {} })` and consume the returned
+Request observation with `client.clisbot.agents.list({ subscribe: {} })` and consume the returned
 `subscription` handle. Plain `list()` and agent/workspace directory `.subscribe(handler)` listeners create no daemon
 demand. Provider and project `subscribe()` calls establish their own demand. On capable daemons, each
 list-and-subscribe call has its own server ID, even for the same query. Older daemons retain
@@ -406,12 +406,12 @@ built-in projection stay unchanged. The app transforms each source item while bu
 model, for both fetched history and live events, before native Markdown splitting and Overview
 tool grouping. Assistant callbacks receive the accumulated source text, never display fragments.
 Live assistant messages use `phase: "streaming"`; committing to history makes them `"complete"`.
-Paseo memoizes by source-item reference and phase and derives replacement IDs from source identity, so
+Clisbot memoizes by source-item reference and phase and derives replacement IDs from source identity, so
 streaming updates preserve mounted component identity.
 
 `query.itemType` selects one public `AgentTimelineItem.type`. The callback owns any detailed
 recognition and returns plain plugin item objects. `undefined` keeps the source item, `items`
-replaces it, and an empty array removes it. Output `data` must be JSON-compatible. Paseo adds the
+replaces it, and an empty array removes it. Output `data` must be JSON-compatible. Clisbot adds the
 runtime plugin ID, preserves the source timeline cursor and identity, validates renderer data with
 its Zod schema, and mounts the component inside the normal plugin runtime and error boundary. An
 optional output `id` distinguishes several stable replacements from the same source item; its output
@@ -424,7 +424,7 @@ See `plugin-examples/timeline-items` for the complete contract.
 A plugin subprocess can also append a canonical plugin row from a server handler:
 
 ```ts
-await paseo.agents.ref(agentId).timeline.append({
+await clisbot.agents.ref(agentId).timeline.append({
   type: "plugin",
   id: "review",
   kind: "review-result",
@@ -445,7 +445,7 @@ be rendered intact. The daemon advertises this RPC through
 
 `addSlashCommand` registers an agent- or workspace-context command in the composer. The
 callback runs in the app, receives the trimmed text after the command name as `args`, and receives
-the same `paseo`, `rpc`, `openSurface`, workspace, agent, and `openPanel` capabilities as the matching
+the same `clisbot`, `rpc`, `openSurface`, workspace, agent, and `openPanel` capabilities as the matching
 Command Center callback.
 
 ```ts
@@ -460,20 +460,20 @@ client.addSlashCommand({
 });
 ```
 
-Paseo owns the autocomplete row, input clearing, and error toast. It never sends the command text to
+Clisbot owns the autocomplete row, input clearing, and error toast. It never sends the command text to
 the agent. Built-in client commands win name and alias collisions, plugin commands win
 provider-command collisions, and the first plugin in stable catalog order wins collisions between
 plugins. Plugin slash commands do not run when the composer has attachments.
 
 ## Contribute composer attachments
 
-Register a declarative attachment source backed by a plugin RPC. Paseo owns the attachment menu,
+Register a declarative attachment source backed by a plugin RPC. Clisbot owns the attachment menu,
 search picker, drafts, selected pill, and submission. The plugin returns complete text snapshots;
 credentials and vendor API calls stay in the daemon handler.
 
 ```ts
 // index.server.ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { search } from "./server/issues";
 import { searchIssues } from "./shared/issues";
 
@@ -485,7 +485,7 @@ export default function contribute(server: PluginServerContext) {
 
 ```tsx
 // index.client.tsx
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { issues } from "./shared/issues";
 
 export default function contribute(client: PluginClientContext) {
@@ -517,7 +517,7 @@ subscription cleanup belongs in the plugin's contribution cleanup when it outliv
 
 ## Contribute a theme
 
-`addTheme` takes a small light or dark palette and a display name. Paseo expands it through the
+`addTheme` takes a small light or dark palette and a display name. Clisbot expands it through the
 same semantic builders as the built-in themes, so plugins do not depend on the complete app token
 contract. Unistyles needs every theme name at `StyleSheet.configure` time, so
 `packages/app/src/styles/theme.ts` reserves one light and one dark plugin slot. The appearance

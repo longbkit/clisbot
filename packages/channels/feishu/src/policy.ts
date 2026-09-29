@@ -11,9 +11,9 @@
 import {
   normalizeAccountId,
   resolveMergedAccountConfig,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/core";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/core";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ChannelGroupContext } from "./fusion/runtime-api.js";
 import { detectIdType } from "./targets.js";
 import type { FeishuConfig } from "./types.js";

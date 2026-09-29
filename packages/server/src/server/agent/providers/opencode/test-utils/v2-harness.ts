@@ -49,7 +49,7 @@ export class V2Harness {
       list: async () => ({
         location: { directory: this.info.location.directory },
         data: [
-          { id: "paseo", source: { type: "builtin" }, features: {}, state: { status: "active" } },
+          { id: "clisbot", source: { type: "builtin" }, features: {}, state: { status: "active" } },
         ],
       }),
     },

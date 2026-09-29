@@ -185,11 +185,11 @@ describe("organization API-key boundary", () => {
             projectSlug,
             files: [
               {
-                path: ".paseo/hub.yml",
+                path: ".clisbot/hub.yml",
                 content: `environments:\n  runner:\n    kind: daemon\n    daemon: ${TEST_DAEMON_SLUG}\n    cwd: /repo\nagents: {}`,
               },
               {
-                path: ".paseo/workflows/noop.yml",
+                path: ".clisbot/workflows/noop.yml",
                 content:
                   "name: noop\non: manual.run\nmax_runtime: 1h\nsteps:\n  - id: work\n    environment: runner\n    max_runtime: 10m\n    idle_timeout: 1m\n    agent: { provider: test }\n    prompt: [{ text: noop }]",
               },
@@ -238,7 +238,7 @@ describe("organization API-key boundary", () => {
         assert.equal(await auth.apiKeys!.revoke("organization-a", revoked.summary.id), true);
         for (const [name, credential, expected] of [
           ["missing", undefined, 401],
-          ["malformed", "not-a-paseo-key", 401],
+          ["malformed", "not-a-clisbot-key", 401],
           ["revoked", revoked.secret, 401],
           ["insufficient", insufficient.secret, 403],
           ["valid", valid.secret, operation.validStatus],
@@ -362,7 +362,7 @@ describe("organization API-key boundary", () => {
     );
     await client.close();
     const select = await auth.handle(
-      new Request("http://localhost:3000/api/auth/paseo/select-organization", {
+      new Request("http://localhost:3000/api/auth/clisbot/select-organization", {
         method: "POST",
         headers: {
           cookie,
@@ -374,7 +374,7 @@ describe("organization API-key boundary", () => {
     );
     assert.equal(select.status, 200);
     const list = await auth.handle(
-      new Request("http://localhost:3000/api/auth/paseo/api-keys", {
+      new Request("http://localhost:3000/api/auth/clisbot/api-keys", {
         headers: { cookie, origin: "http://localhost:3000" },
       }),
     );
@@ -409,7 +409,7 @@ describe("organization API-key boundary", () => {
     );
     await client.close();
     const select = await auth.handle(
-      new Request("http://localhost:3000/api/auth/paseo/select-organization", {
+      new Request("http://localhost:3000/api/auth/clisbot/select-organization", {
         method: "POST",
         headers: {
           cookie,
@@ -425,7 +425,7 @@ describe("organization API-key boundary", () => {
     const created = await Promise.all(
       Array.from({ length: concurrent }, (_, index) =>
         auth.handle(
-          new Request("http://localhost:3000/api/auth/paseo/api-keys", {
+          new Request("http://localhost:3000/api/auth/clisbot/api-keys", {
             method: "POST",
             headers: {
               cookie,
@@ -449,7 +449,7 @@ describe("organization API-key boundary", () => {
     const revoked = await Promise.all(
       keyIds.map((id) =>
         auth.handle(
-          new Request("http://localhost:3000/api/auth/paseo/revoke-api-key", {
+          new Request("http://localhost:3000/api/auth/clisbot/revoke-api-key", {
             method: "POST",
             headers: {
               cookie,

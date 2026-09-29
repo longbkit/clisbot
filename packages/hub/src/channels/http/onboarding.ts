@@ -83,7 +83,7 @@ export function configureOnboardingRoute(
 ): HubBundleFile[] {
   const key = `bot-${input.name}`;
   const resourceFile = configureOnboardingResources(files, key, input);
-  const accountPath = `.paseo/channels/${channel}/${accountId}.yml`;
+  const accountPath = `.clisbot/channels/${channel}/${accountId}.yml`;
   const account = AccountFileSchema.parse(
     load(files.find(({ path }) => path === accountPath)!.content),
   );
@@ -117,7 +117,7 @@ function configureOnboardingResources(
   key: string,
   input: ChannelOnboarding,
 ): HubBundleFile {
-  const resourcePath = ".paseo/hub.yml";
+  const resourcePath = ".clisbot/hub.yml";
   const resourceFile = files.find(({ path }) => path === resourcePath);
   const resource = z
     .record(z.string(), z.unknown())

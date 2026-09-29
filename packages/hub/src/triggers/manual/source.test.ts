@@ -22,7 +22,7 @@ describe("manual trigger source", () => {
         payload: {
           guildId: "guild-1",
           channelId: "channel-1",
-          message: "@paseo ping",
+          message: "@clisbot ping",
         },
       }),
       {
@@ -40,7 +40,7 @@ describe("manual trigger source", () => {
         payload: {
           guildId: "guild-1",
           channelId: "channel-1",
-          message: "@paseo ping",
+          message: "@clisbot ping",
         },
       },
     ]);
@@ -119,7 +119,7 @@ class ManualTriggers {
 
   async dispatchTrusted(
     input: ManualDelivery,
-    identity: import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity,
+    identity: import("@clisbot/protocol/session-operation").VerifiedSessionOperationIdentity,
   ): Promise<void> {
     await dispatchManualTrigger(this.source, { ...input, receivedAt: new Date() }, identity);
   }

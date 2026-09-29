@@ -1,13 +1,13 @@
 ---
-title: Automations in the Paseo app
+title: Automations in the Clisbot app
 description: Configure event and conversation inputs from one Automation.
 nav: Automations
 category: Hub
 ---
 
-# Automations in the Paseo app
+# Automations in the Clisbot app
 
-In a Clisbot Hub-enabled Paseo build, sign in and open **Automations**. Select a row to
+In a Clisbot Hub-enabled Clisbot build, sign in and open **Automations**. Select a row to
 open its detail; use the back arrow beside its name to return.
 
 ## Who can do what

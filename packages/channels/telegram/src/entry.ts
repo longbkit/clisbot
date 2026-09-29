@@ -2,7 +2,7 @@
 // default export, calls `setChannelRuntime(hostRuntime)`, and separately
 // imports the plugin chunk named here (`telegramPlugin`).
 
-import { createChannelEntry } from "@getpaseo/channels-shared";
+import { createChannelEntry } from "@clisbot/channels-shared";
 import { setChannelHostRuntime } from "./runtime-store.js";
 
 export const entry = createChannelEntry(

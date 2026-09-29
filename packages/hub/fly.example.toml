@@ -1,5 +1,5 @@
 # Self-hosting example. Copy this file to fly.toml and replace the placeholders.
-app = 'your-paseo-hub'
+app = 'your-clisbot-hub'
 primary_region = 'iad'
 
 [build]
@@ -8,12 +8,12 @@ dockerfile = "Dockerfile"
 [env]
 NODE_ENV = 'production'
 PORT = '3000'
-PASEO_HUB_APP_URL = 'https://your-paseo-hub.fly.dev'
-PASEO_HUB_TRUSTED_CLIENT_IP_HEADER = 'fly-client-ip'
-PASEO_REGISTRATION_MODE = 'invite_only'
-PASEO_ORGANIZATION_CREATION = 'disabled'
+CLISBOT_HUB_APP_URL = 'https://your-clisbot-hub.fly.dev'
+CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER = 'fly-client-ip'
+CLISBOT_REGISTRATION_MODE = 'invite_only'
+CLISBOT_ORGANIZATION_CREATION = 'disabled'
 # Hub generates and durably stores its authentication secret on first start.
-# Advanced deployments may override it with the PASEO_HUB_AUTH_SECRET app secret.
+# Advanced deployments may override it with the CLISBOT_HUB_AUTH_SECRET app secret.
 
 [http_service]
 internal_port = 3000

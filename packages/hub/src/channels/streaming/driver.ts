@@ -7,7 +7,7 @@
 // `progress-blocks.ts`). The edit-in-place path is the drive verb both
 // verticals already publish (`outbound.updateText`), so Telegram streams
 // through the same producer without a Telegram-specific branch.
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import type { SyncStreaming } from "../config/schema.js";
 import type { SupportedChannelName, PlaneLogger } from "../plane/types.js";
 import type {

@@ -27,7 +27,7 @@ describe("push notifications", () => {
   });
 
   test("an offline device stops receiving notifications after 48 hours", async () => {
-    const home = mkdtempSync(path.join(tmpdir(), "paseo-push-notifications-"));
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-notifications-"));
     homes.push(home);
     const filePath = path.join(home, "push-tokens.json");
     let now = Date.parse("2026-08-10T00:00:00.000Z");
@@ -48,7 +48,7 @@ describe("push notifications", () => {
   });
 
   test("online revocation stops notifications immediately", async () => {
-    const home = mkdtempSync(path.join(tmpdir(), "paseo-push-notifications-"));
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-notifications-"));
     homes.push(home);
     const deliveries: string[][] = [];
     const pushNotifications = createPushNotifications({
@@ -66,7 +66,7 @@ describe("push notifications", () => {
   });
 
   test("managed tokens receive only notifications for authorized Projects", async () => {
-    const home = mkdtempSync(path.join(tmpdir(), "paseo-push-notifications-"));
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-notifications-"));
     homes.push(home);
     const deliveries: string[][] = [];
     const now = Date.parse("2026-08-10T00:00:00.000Z");
@@ -104,7 +104,7 @@ describe("push notifications", () => {
   });
 
   test("managed lease revocation removes only tokens still bound to that lease", async () => {
-    const home = mkdtempSync(path.join(tmpdir(), "paseo-push-notifications-"));
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-notifications-"));
     homes.push(home);
     const deliveries: string[][] = [];
     const now = Date.parse("2026-08-10T00:00:00.000Z");

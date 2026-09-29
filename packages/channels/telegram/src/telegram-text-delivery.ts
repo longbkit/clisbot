@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/telegram-text-delivery.ts@5d8067a4483
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { chunkMarkdownTextWithMode, type ChunkMode } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { chunkMarkdownTextWithMode, type ChunkMode } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
 import {
   escapeTelegramHtml,
   markdownToTelegramChunks,

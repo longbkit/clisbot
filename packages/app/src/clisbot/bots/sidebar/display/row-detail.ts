@@ -1,5 +1,5 @@
 // The second line of a bot or group chat row in the sidebar, from the items the user shows. Pure.
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import type { BotRowItem, ChatRowItem } from "./preferences";
 

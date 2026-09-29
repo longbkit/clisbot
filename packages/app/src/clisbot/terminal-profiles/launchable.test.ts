@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TERMINAL_PROFILES } from "@getpaseo/protocol/terminal-profiles";
+import { DEFAULT_TERMINAL_PROFILES } from "@clisbot/protocol/terminal-profiles";
 import { canManageTerminalProfiles, launchableFromConfig } from "./launchable";
 
 describe("launchableFromConfig", () => {

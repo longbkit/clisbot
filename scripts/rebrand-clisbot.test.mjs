@@ -1,0 +1,135 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+const script = fileURLToPath(new URL("./rebrand-clisbot.mjs", import.meta.url));
+
+test("rebrands source, paths, links, packages, and env names idempotently", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-test-"));
+  git(root, "init", "-q");
+  put(
+    root,
+    "packages/paseo-home.ts",
+    'import "@getpaseo/server";\nexport const raw = env.PASEO_HOME ?? "~/.paseo";\nexport const link = "paseo://open";\n',
+  );
+  put(root, "packages/app/config.ts", 'export const url = "https://app.paseo.sh";\n');
+  put(root, "packages/relay/config.ts", 'export const relay = "relay.paseo.sh:443";\n');
+  put(
+    root,
+    "README.md",
+    "See https://github.com/getpaseo/paseo and https://github.com/getpaseo/paseo-relay and https://paseo.sh/docs.\n",
+  );
+  put(root, "docs/audits/history.md", "The upstream is getpaseo/paseo.\n");
+  git(root, "add", "-A");
+
+  const args = [script, "--root", root, "--site-host", "clisbot.example"];
+  const first = JSON.parse(execFileSync("node", args, { encoding: "utf8" }));
+  assert.equal(first.changedFiles, 4);
+  assert.equal(first.renamedPaths, 1);
+
+  execFileSync("node", [...args, "--apply"]);
+  git(root, "add", "-A");
+  const second = JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" }));
+  assert.equal(second.changedFiles, 0);
+  assert.match(readFileSync(join(root, "packages/clisbot-home.ts"), "utf8"), /CLISBOT_HOME/);
+  assert.match(readFileSync(join(root, "packages/clisbot-home.ts"), "utf8"), /clisbot:\/\/open/);
+  assert.match(readFileSync(join(root, "packages/clisbot-home.ts"), "utf8"), /@clisbot\/server/);
+  assert.match(readFileSync(join(root, "packages/app/config.ts"), "utf8"), /app\.clisbot\.example/);
+  assert.match(
+    readFileSync(join(root, "packages/relay/config.ts"), "utf8"),
+    /relay\.clisbot\.example/,
+  );
+  assert.match(readFileSync(join(root, "README.md"), "utf8"), /github\.com\/longbkit\/clisbot/);
+  assert.match(readFileSync(join(root, "README.md"), "utf8"), /github\.com\/getpaseo\/paseo-relay/);
+  assert.match(readFileSync(join(root, "docs/audits/history.md"), "utf8"), /getpaseo\/paseo/);
+});
+
+test("keeps live upstream services while changing public site links", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-hosts-"));
+  git(root, "init", "-q");
+  put(
+    root,
+    "links.md",
+    "Docs https://paseo.sh/docs; web https://app.paseo.sh; relay relay.paseo.sh:443; Hub https://hub.paseo.sh; site https://www.paseo.sh; regex hub\\.paseo\\.sh and paseo\\.sh.\n",
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--keep-upstream-endpoints", "--apply"]);
+  git(root, "add", "-A");
+  const result = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--keep-upstream-endpoints", "--check"], {
+      encoding: "utf8",
+    }),
+  );
+  assert.equal(result.changedFiles, 0);
+  assert.equal(
+    readFileSync(join(root, "links.md"), "utf8"),
+    "Docs https://clisbot.com/docs; web https://app.paseo.sh; relay relay.paseo.sh:443; Hub https://hub.paseo.sh; site https://www.clisbot.com; regex hub\\.paseo\\.sh and clisbot\\.com.\n",
+  );
+});
+
+test("updates the desktop publishing repository", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-desktop-"));
+  git(root, "init", "-q");
+  put(
+    root,
+    "packages/desktop/electron-builder.yml",
+    "publish:\n  owner: getpaseo\n  repo: paseo\n",
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--keep-upstream-endpoints", "--apply"]);
+  assert.equal(
+    readFileSync(join(root, "packages/desktop/electron-builder.yml"), "utf8"),
+    "publish:\n  owner: longbkit\n  repo: clisbot\n",
+  );
+});
+
+test("removes Paseo EAS ownership without Clisbot Expo details", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-expo-"));
+  git(root, "init", "-q");
+  put(
+    root,
+    "packages/app/app.config.js",
+    'slug: "voice-mobile",\npackageId: "sh.paseo",\npackageId: "sh.paseo.debug",\nprojectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",\nowner: "getpaseo",\n',
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--keep-upstream-endpoints", "--apply"]);
+  git(root, "add", "-A");
+  const result = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--keep-upstream-endpoints", "--check"], {
+      encoding: "utf8",
+    }),
+  );
+  assert.equal(result.changedFiles, 0);
+  assert.equal(
+    readFileSync(join(root, "packages/app/app.config.js"), "utf8"),
+    'slug: "clisbot",\npackageId: "com.clisbot.app",\npackageId: "com.clisbot.app.dev",\nprojectId: process.env.CLISBOT_EXPO_PROJECT_ID,\nowner: process.env.CLISBOT_EXPO_OWNER,\n',
+  );
+  execFileSync("node", [
+    script,
+    "--root",
+    root,
+    "--keep-upstream-endpoints",
+    "--expo-owner",
+    "company",
+    "--expo-project-id",
+    "11111111-2222-3333-4444-555555555555",
+    "--apply",
+  ]);
+  const configured = readFileSync(join(root, "packages/app/app.config.js"), "utf8");
+  assert.match(configured, /projectId: "11111111-2222-3333-4444-555555555555"/);
+  assert.match(configured, /owner: "company"/);
+});
+
+function git(root, ...args) {
+  execFileSync("git", args, { cwd: root });
+}
+
+function put(root, path, content) {
+  const target = join(root, path);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, content);
+}

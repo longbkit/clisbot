@@ -12,18 +12,18 @@ fi
 
 for arg in "$@"; do
   if [ "$arg" = '--no-sandbox' ]; then
-    export PASEO_DESKTOP_SANDBOX_REASON='requested by --no-sandbox'
-    printf '[linux-sandbox] disabled: %s\n' "$PASEO_DESKTOP_SANDBOX_REASON" >&2 || true
+    export CLISBOT_DESKTOP_SANDBOX_REASON='requested by --no-sandbox'
+    printf '[linux-sandbox] disabled: %s\n' "$CLISBOT_DESKTOP_SANDBOX_REASON" >&2 || true
     exec "$executable" "$@"
   fi
 done
 
 # Match main's whitespace-separated debugging flags without evaluating shell code.
 set -f
-for flag in ${PASEO_ELECTRON_FLAGS:-}; do
+for flag in ${CLISBOT_ELECTRON_FLAGS:-}; do
   if [ "$flag" = '--no-sandbox' ]; then
-    export PASEO_DESKTOP_SANDBOX_REASON='requested by PASEO_ELECTRON_FLAGS'
-    printf '[linux-sandbox] disabled: %s\n' "$PASEO_DESKTOP_SANDBOX_REASON" >&2 || true
+    export CLISBOT_DESKTOP_SANDBOX_REASON='requested by CLISBOT_ELECTRON_FLAGS'
+    printf '[linux-sandbox] disabled: %s\n' "$CLISBOT_DESKTOP_SANDBOX_REASON" >&2 || true
     exec "$executable" --no-sandbox "$@"
   fi
 done
@@ -31,8 +31,8 @@ done
 # Map the real UID and create a network namespace as Chromium does. A bare
 # unshare --user can succeed under AppArmor while namespace capabilities fail.
 if namespace_error=$(unshare --user --map-root-user --net true 2>&1); then
-  export PASEO_DESKTOP_SANDBOX_REASON='user namespaces available'
-  printf '[linux-sandbox] enabled: %s\n' "$PASEO_DESKTOP_SANDBOX_REASON" >&2 || true
+  export CLISBOT_DESKTOP_SANDBOX_REASON='user namespaces available'
+  printf '[linux-sandbox] enabled: %s\n' "$CLISBOT_DESKTOP_SANDBOX_REASON" >&2 || true
   exec "$executable" "$@"
 fi
 
@@ -43,13 +43,13 @@ if [ -x "$helper" ] && [ "$(stat -Lc '%u:%a' -- "$helper")" = '0:4755' ] &&
   case ",$mount_options," in
     *,nosuid,*|,,) ;;
     *)
-      export PASEO_DESKTOP_SANDBOX_REASON='root-owned SUID helper available'
-      printf '[linux-sandbox] enabled: %s\n' "$PASEO_DESKTOP_SANDBOX_REASON" >&2 || true
+      export CLISBOT_DESKTOP_SANDBOX_REASON='root-owned SUID helper available'
+      printf '[linux-sandbox] enabled: %s\n' "$CLISBOT_DESKTOP_SANDBOX_REASON" >&2 || true
       exec "$executable" "$@"
       ;;
   esac
 fi
 
-export PASEO_DESKTOP_SANDBOX_REASON="user namespaces unavailable${namespace_error:+ ($namespace_error)}; no usable SUID helper"
-printf '[linux-sandbox] disabled: %s\n' "$PASEO_DESKTOP_SANDBOX_REASON" >&2 || true
+export CLISBOT_DESKTOP_SANDBOX_REASON="user namespaces unavailable${namespace_error:+ ($namespace_error)}; no usable SUID helper"
+printf '[linux-sandbox] disabled: %s\n' "$CLISBOT_DESKTOP_SANDBOX_REASON" >&2 || true
 exec "$executable" --no-sandbox "$@"

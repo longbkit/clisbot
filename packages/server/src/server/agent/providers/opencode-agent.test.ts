@@ -500,7 +500,7 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
       }),
     ]);
     // No modeId configured → no agent field: OpenCode must fall back to its
-    // own default agent instead of Paseo assuming any particular agent exists.
+    // own default agent instead of Clisbot assuming any particular agent exists.
     expect(openCodeClient.calls.sessionPromptAsync[0]).not.toHaveProperty("agent");
 
     await session.close();
@@ -756,8 +756,8 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
       ],
     };
     runtime.enqueueClient(openCodeClient);
-    const paseoHome = tmpCwd();
-    const opencodeHome = path.join(paseoHome, "opencode-home");
+    const clisbotHome = tmpCwd();
+    const opencodeHome = path.join(clisbotHome, "opencode-home");
     const client = new OpenCodeAgentClient(logger, undefined, {
       serverManager: runtime,
       createClient: runtime.createClient,
@@ -798,13 +798,13 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
       },
     });
     expect(openCodeClient.calls.providerList).toEqual([{ directory: opencodeHome }]);
-    rmSync(paseoHome, { recursive: true, force: true });
+    rmSync(clisbotHome, { recursive: true, force: true });
   }, 60_000);
 
   test("fetchCatalog releases the acquired server when opencode-home cannot be created", async () => {
     const runtime = new TestOpenCodeHarness();
-    const paseoHome = tmpCwd();
-    const opencodeHome = path.join(paseoHome, "opencode-home");
+    const clisbotHome = tmpCwd();
+    const opencodeHome = path.join(clisbotHome, "opencode-home");
     writeFileSync(opencodeHome, "not a directory");
     const client = new OpenCodeAgentClient(logger, undefined, {
       serverManager: runtime,
@@ -816,7 +816,7 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
 
     expect(runtime.acquisitions).toEqual([{ kind: "current", releaseCount: 1 }]);
     expect(runtime.clientCreations).toEqual([]);
-    rmSync(paseoHome, { recursive: true, force: true });
+    rmSync(clisbotHome, { recursive: true, force: true });
   });
 
   test("fetchCatalog releases the acquired server when opencode-home cannot be resolved", async () => {
@@ -942,8 +942,8 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
     openCodeClient.appAgentsResponse = {
       data: [
         {
-          name: "paseo-test-custom",
-          description: "Custom agent defined for Paseo integration test",
+          name: "clisbot-test-custom",
+          description: "Custom agent defined for Clisbot integration test",
           mode: "primary",
         },
         { name: "compaction", mode: "subagent" },
@@ -961,12 +961,12 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
 
     const modes = await session.getAvailableModes();
 
-    expect(modes.map((mode) => mode.id)).toEqual(["paseo-test-custom"]);
+    expect(modes.map((mode) => mode.id)).toEqual(["clisbot-test-custom"]);
 
-    const custom = modes.find((mode) => mode.id === "paseo-test-custom");
+    const custom = modes.find((mode) => mode.id === "clisbot-test-custom");
     expect(custom).toBeDefined();
-    expect(custom!.label).toBe("Paseo-test-custom");
-    expect(custom!.description).toBe("Custom agent defined for Paseo integration test");
+    expect(custom!.label).toBe("Clisbot-test-custom");
+    expect(custom!.description).toBe("Custom agent defined for Clisbot integration test");
 
     // System agents should not appear as selectable modes
     expect(modes.some((mode) => mode.id === "compaction")).toBe(false);
@@ -1332,7 +1332,7 @@ describe("OpenCode adapter normalization", () => {
         mimeType: "application/github-issue",
         number: 55,
         title: "Improve startup error details",
-        url: "https://github.com/getpaseo/paseo/issues/55",
+        url: "https://github.com/longbkit/clisbot/issues/55",
         body: "Issue body",
       },
     ]);
@@ -1400,7 +1400,7 @@ describe("OpenCode adapter startTurn error handling", () => {
         provider: "opencode",
         cwd,
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
             url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=test-agent",
           },
@@ -1412,7 +1412,7 @@ describe("OpenCode adapter startTurn error handling", () => {
       expect(openCodeClient.calls.mcpAdd).toEqual([
         {
           directory: cwd,
-          name: "paseo",
+          name: "clisbot",
           config: {
             type: "remote",
             url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=test-agent",
@@ -1433,7 +1433,7 @@ describe("OpenCode adapter startTurn error handling", () => {
     const openCodeClient = new TestOpenCodeClient();
     openCodeClient.mcpAddResponse = {
       data: {
-        paseo: {
+        clisbot: {
           status: "failed",
           error: "SSE error: Non-200 status code (400)",
         },
@@ -1451,7 +1451,7 @@ describe("OpenCode adapter startTurn error handling", () => {
         provider: "opencode",
         cwd,
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
             url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=test-agent",
           },
@@ -1459,7 +1459,7 @@ describe("OpenCode adapter startTurn error handling", () => {
       });
 
       await expect(collectTurnEvents(streamSession(session, "hello"))).rejects.toThrow(
-        /Failed to add OpenCode MCP server 'paseo': SSE error/,
+        /Failed to add OpenCode MCP server 'clisbot': SSE error/,
       );
 
       await session.close();
@@ -4555,7 +4555,7 @@ describe("OpenCode provider subagent contract", () => {
     });
     const parent = await client.createSession(
       { provider: "opencode", cwd: "/workspace/repo" },
-      { env: { PASEO_AGENT_ID: "parent-agent" } },
+      { env: { CLISBOT_AGENT_ID: "parent-agent" } },
     );
 
     parentClient.emitEvent({
@@ -4579,7 +4579,7 @@ describe("OpenCode provider subagent contract", () => {
         metadata: { cwd: "/workspace/repo" },
       },
       undefined,
-      { env: { PASEO_AGENT_ID: "child-agent" } },
+      { env: { CLISBOT_AGENT_ID: "child-agent" } },
     );
     return { runtime, provider: client, parent, child, childClient };
   }
@@ -4624,7 +4624,7 @@ describe("OpenCode provider subagent contract", () => {
     });
     const parent = await client.createSession(
       { provider: "opencode", cwd: "/workspace/repo" },
-      { env: { PASEO_AGENT_ID: "parent-agent" } },
+      { env: { CLISBOT_AGENT_ID: "parent-agent" } },
     );
     const events: AgentStreamEvent[] = [];
     parent.subscribe((event) => events.push(event));
@@ -4650,7 +4650,7 @@ describe("OpenCode provider subagent contract", () => {
         metadata: { cwd: "/workspace/repo" },
       },
       undefined,
-      { env: { PASEO_AGENT_ID: "child-agent" } },
+      { env: { CLISBOT_AGENT_ID: "child-agent" } },
     );
     await child.close();
     await parent.close();
@@ -4667,7 +4667,7 @@ describe("OpenCode provider subagent contract", () => {
       },
     });
     expect(runtime.acquisitions).toEqual([
-      { kind: "dedicated", env: { PASEO_AGENT_ID: "parent-agent" }, releaseCount: 1 },
+      { kind: "dedicated", env: { CLISBOT_AGENT_ID: "parent-agent" }, releaseCount: 1 },
       { kind: "existing", url: runtime.server.url, releaseCount: 1 },
     ]);
     expect(runtime.clientCreations).toEqual([
@@ -4996,7 +4996,7 @@ describe("OpenCode provider subagent contract", () => {
         ]);
       });
 
-      await expect(parent.startTurn("Continue from Paseo")).rejects.toThrow(
+      await expect(parent.startTurn("Continue from Clisbot")).rejects.toThrow(
         "A foreground turn is already active",
       );
       expect(openCode.calls.sessionAbort).toEqual([]);
@@ -5064,7 +5064,7 @@ describe("OpenCode provider subagent contract", () => {
       await parent.close();
     }
   });
-  test("does not adopt late output from an interrupted Paseo turn", async () => {
+  test("does not adopt late output from an interrupted Clisbot turn", async () => {
     const { parent, openCode } = await createParentSession("ses_parent_interrupted");
     openCode.sessionPromptAsyncEvents = [];
     const events: AgentStreamEvent[] = [];
@@ -5077,7 +5077,7 @@ describe("OpenCode provider subagent contract", () => {
     });
 
     try {
-      await parent.startTurn("Start from Paseo");
+      await parent.startTurn("Start from Clisbot");
       await parent.interrupt();
 
       for (const event of userMessageEvents({
@@ -6834,7 +6834,7 @@ describe("OpenCode snapshot summary false-idle regression", () => {
     });
     const session = await client.createSession(
       { provider: "opencode", cwd: "/workspace/repo" },
-      { env: { PASEO_AGENT_ID: "snapshot-agent" } },
+      { env: { CLISBOT_AGENT_ID: "snapshot-agent" } },
     );
     const events: AgentStreamEvent[] = [];
     session.subscribe((event) => events.push(event));

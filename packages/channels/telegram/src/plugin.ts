@@ -6,7 +6,7 @@
 // primitives by their upstream names so the message-action runner (goal ledger
 // slice 11) can dispatch every native action without re-deriving a send path.
 
-import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { resolveTelegramConversation } from "./conversation-metadata.js";
 import { startTelegramAccount } from "./lifecycle/start-account.js";
 import { getHostRuntime } from "./runtime-store.js";

@@ -10,7 +10,7 @@
 // `selectDiscordActivitiesRuntimeConfig` is omitted with the Activities surface
 // (`src/activities/**`, see upstream-sync.json `omitted`): its only job is to
 // restore plugin-owned `activities.clientSecret` from the source snapshot.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 export function selectDiscordRuntimeConfig(inputConfig: OpenClawConfig): OpenClawConfig {
   return inputConfig;

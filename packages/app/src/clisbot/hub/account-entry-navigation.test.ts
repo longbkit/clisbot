@@ -3,38 +3,42 @@ import { oauthAuthorizeUrl } from "./transport/oauth";
 import { hubAccountEntryRoute, hubClientAuthorizationContinuation } from "./account-entry-route";
 
 describe("Hub account entry navigation", () => {
-  it("preserves an invitation while routing the Hub root link into Paseo Account", () => {
-    expect(hubAccountEntryRoute("https://paseo.example.test/?invitation=invite-1")).toEqual({
+  it("preserves an invitation while routing the Hub root link into Clisbot Account", () => {
+    expect(hubAccountEntryRoute("https://clisbot.example.test/?invitation=invite-1")).toEqual({
       pathname: "/settings/hub/[hubSection]",
       params: { invitation: "invite-1", hubSection: "account" },
     });
   });
 
-  it("routes Hub registration links and refused Google sign-ins into Paseo Account", () => {
-    expect(hubAccountEntryRoute("https://paseo.example.test/?emailRegistration=token-1")).toEqual({
-      pathname: "/settings/hub/[hubSection]",
-      params: { emailRegistration: "token-1", hubSection: "account" },
-    });
-    expect(hubAccountEntryRoute("https://paseo.example.test/?error=registration_closed")).toEqual({
-      pathname: "/settings/hub/[hubSection]",
-      params: { error: "registration_closed", hubSection: "account" },
-    });
+  it("routes Hub registration links and refused Google sign-ins into Clisbot Account", () => {
+    expect(hubAccountEntryRoute("https://clisbot.example.test/?emailRegistration=token-1")).toEqual(
+      {
+        pathname: "/settings/hub/[hubSection]",
+        params: { emailRegistration: "token-1", hubSection: "account" },
+      },
+    );
+    expect(hubAccountEntryRoute("https://clisbot.example.test/?error=registration_closed")).toEqual(
+      {
+        pathname: "/settings/hub/[hubSection]",
+        params: { error: "registration_closed", hubSection: "account" },
+      },
+    );
   });
 
-  it("does not take ownership of ordinary Paseo or malformed links", () => {
+  it("does not take ownership of ordinary Clisbot or malformed links", () => {
     expect(
-      hubAccountEntryRoute("https://paseo.example.test/open-project?invitation=invite-1"),
+      hubAccountEntryRoute("https://clisbot.example.test/open-project?invitation=invite-1"),
     ).toBe(null);
-    expect(hubAccountEntryRoute("https://paseo.example.test/")).toBe(null);
+    expect(hubAccountEntryRoute("https://clisbot.example.test/")).toBe(null);
     expect(hubAccountEntryRoute("not a URL")).toBe(null);
     expect(hubAccountEntryRoute(null)).toBe(null);
   });
 });
 
-const origin = "https://paseo.example.test";
+const origin = "https://clisbot.example.test";
 const authorizationInput = {
   origin,
-  redirectUri: "paseo://hub-auth/callback",
+  redirectUri: "clisbot://hub-auth/callback",
   state: "opaque+state/value",
   challenge: "pkce-challenge",
 };
@@ -50,7 +54,7 @@ describe("Hub browser authorization continuation", () => {
       pathname: "/settings/hub/[hubSection]",
       params: {
         invitation: "invite-1",
-        client_id: "paseo-client",
+        client_id: "clisbot-client",
         redirect_uri: authorizationInput.redirectUri,
         state: authorizationInput.state,
         code_challenge: authorizationInput.challenge,
@@ -80,7 +84,7 @@ describe("Hub browser authorization continuation", () => {
     entry.pathname = "/";
     expect(hubAccountEntryRoute(entry.toString())).toMatchObject({
       pathname: "/settings/hub/[hubSection]",
-      params: { client_id: "paseo-client", state: authorizationInput.state },
+      params: { client_id: "clisbot-client", state: authorizationInput.state },
     });
   });
 
@@ -122,7 +126,7 @@ describe("Hub browser authorization continuation", () => {
     for (const url of [
       invitationAuthorizationUrl().replace(origin, "https://foreign.example.test"),
       invitationAuthorizationUrl().replace("/?", "/open-project?"),
-      invitationAuthorizationUrl().replace("client_id=paseo-client", "client_id=other"),
+      invitationAuthorizationUrl().replace("client_id=clisbot-client", "client_id=other"),
       invitationAuthorizationUrl().replace("code_challenge=pkce-challenge&", ""),
       "invalid",
       null,

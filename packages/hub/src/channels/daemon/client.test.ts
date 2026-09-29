@@ -1,4 +1,4 @@
-import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
+import { createDeferredCore } from "@clisbot/channels-core/shared/deferred";
 import { createServer, type Server } from "node:http";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
@@ -794,11 +794,11 @@ describe("channel trusted-client daemon connection", () => {
       const ticketed = connectChannelDaemon({
         host: `127.0.0.1:${admit.port}`,
         clientId: "slack:acct",
-        resolveAccessTicket: async () => "paseo_dat_ticket",
+        resolveAccessTicket: async () => "clisbot_dat_ticket",
       });
       try {
         await ticketed.waitForConnected(5000);
-        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_ticket");
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "clisbot_dat_ticket");
         assert.equal(admit.hellos.at(-1)?.["clientId"], "slack:acct");
         // Without `all_providers` the daemon hides every provider but the
         // three pre-0.1.45 ones (`/provider` then never offers Grok or Pi).
@@ -835,15 +835,15 @@ describe("channel trusted-client daemon connection", () => {
       const reconnecting = connectChannelDaemon({
         host: `127.0.0.1:${admit.port}`,
         clientId: "slack:acct",
-        resolveAccessTicket: async () => `paseo_dat_${n++}`,
+        resolveAccessTicket: async () => `clisbot_dat_${n++}`,
       });
       try {
         await reconnecting.waitForConnected(5000);
-        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_0");
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "clisbot_dat_0");
         admit.dropClients();
         await waitForCount(admit.hellos, 2);
         await reconnecting.waitForConnected(5000);
-        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_1");
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "clisbot_dat_1");
         assert.equal(admit.hellos.at(-1)?.["clientId"], "slack:acct");
       } finally {
         reconnecting.stop();

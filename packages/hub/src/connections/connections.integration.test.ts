@@ -978,7 +978,7 @@ function createConnections(options: CreateConnectionsOptions): ProviderFixture {
         publicBaseUrl: "https://hub.example.test",
         configuration: {
           appId: "42",
-          appSlug: "paseo",
+          appSlug: "clisbot",
           clientId: "client",
           clientSecret: "secret",
           webhookSecret: TEST_WEBHOOK_SECRET,

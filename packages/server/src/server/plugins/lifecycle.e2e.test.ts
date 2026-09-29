@@ -4,17 +4,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, onTestFinished, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { resolveDaemonVersion } from "../daemon-version.js";
 
 test("a plugin transforms workspace creation once across receipt replays and observes its committed lifecycle", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-lifecycle-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-lifecycle-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "lifecycle", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "lifecycle", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -75,13 +75,13 @@ export default function contribute(server) {
 }, 60_000);
 
 test("plugins observe turns, answer permissions, and observe archive without blocking the agent", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-turn-hooks-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-turn-hooks-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "turn-hooks", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "turn-hooks", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -95,7 +95,7 @@ export default function contribute(server) {
   });
   server.on("agent.permission_requested", async (event, context) => {
     console.log(JSON.stringify({ hook: "agent.permission_requested", event }));
-    await context.paseo.agents.ref(event.agent.id).respondToPermission({
+    await context.clisbot.agents.ref(event.agent.id).respondToPermission({
       requestId: event.request.id,
       response: { behavior: "deny", message: "Declined by plugin" },
     });
@@ -167,13 +167,13 @@ export default function contribute(server) {
 }, 60_000);
 
 test("agent creation hooks change the provider and environment before the session opens", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-agent-hooks-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-agent-hooks-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "agent-hooks", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "agent-hooks", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -230,13 +230,13 @@ export default function contribute(server) {
 }, 60_000);
 
 test("invalid output from an untyped plugin rejects creation before later callbacks run", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-invalid-hook-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-invalid-hook-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "invalid-hook", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "invalid-hook", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -281,10 +281,10 @@ async function createProviderPlugin(
   const directory = path.join(root, "plugin");
   await mkdir(directory, { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "shutdown-provider-plugin",
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
@@ -293,7 +293,7 @@ async function createProviderPlugin(
   ProviderEvent,
   ProviderInput,
   ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 const CAPABILITIES = ["prompt.message", "session.persistence"];
 
@@ -386,8 +386,8 @@ test("a clean daemon shutdown leaves a completed plugin-provider agent without a
   const workspace = path.join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "daemon"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
     pluginsEnabled: true,
@@ -430,8 +430,8 @@ test("a provider that never acknowledges session.close does not hold the daemon 
   const workspace = path.join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "daemon"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
     pluginsEnabled: true,
@@ -463,7 +463,7 @@ const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 // Hold the provider close until the subprocess has entered shutdown cleanup.
 async function createSlowClosingProviderPlugin() {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-slow-close-plugin-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-slow-close-plugin-"));
   const closeStarted = path.join(directory, "close-started");
   const closeRelease = path.join(directory, "close-release");
   const cleanupStarted = path.join(directory, "cleanup-started");
@@ -501,8 +501,8 @@ test("reloading a plugin does not send on a closed IPC channel", async () => {
     closeRelease,
     cleanupStarted,
   } = await createSlowClosingProviderPlugin();
-  const cwd = await mkdtemp(path.join(tmpdir(), "paseo-reload-teardown-"));
-  const daemon = await createTestPaseoDaemon();
+  const cwd = await mkdtemp(path.join(tmpdir(), "clisbot-reload-teardown-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();

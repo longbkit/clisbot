@@ -2,12 +2,12 @@ import { configurationEnvironment } from "./config-environment.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePaseoNodeEnv } from "./paseo-env.js";
+import { resolveClisbotNodeEnv } from "./clisbot-env.js";
 import { z } from "zod";
 import { expandTilde } from "../utils/path.js";
 import { resolveBotsConfig, resolveBotsOverridePaths } from "./bots/bots-config.js";
 
-import type { PaseoDaemonConfig } from "./bootstrap.js";
+import type { ClisbotDaemonConfig } from "./bootstrap.js";
 import {
   loadPersistedConfig,
   LogFormatSchema,
@@ -20,7 +20,7 @@ import type {
   ProviderOverride,
 } from "./agent/provider-launch-config.js";
 import { ProviderOverrideSchema } from "./agent/provider-launch-config.js";
-import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
+import { AgentProviderSchema } from "@clisbot/protocol/provider-manifest";
 import { hashDaemonPassword } from "./auth.js";
 import { resolveSpeechConfig } from "./speech/speech-config-resolver.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
@@ -105,7 +105,7 @@ function normalizeLogEnv(value: string | undefined): string | undefined {
 function resolveGitProcessConfig(
   env: NodeJS.ProcessEnv,
   persisted: ReturnType<typeof loadPersistedConfig>,
-): NonNullable<PaseoDaemonConfig["git"]> {
+): NonNullable<ClisbotDaemonConfig["git"]> {
   return resolveGitProcessPolicy({
     env,
     persisted: persisted.daemon?.git,
@@ -128,8 +128,8 @@ function resolveLogConfigFromEnv(
   env: NodeJS.ProcessEnv,
   persisted: PersistedConfig,
 ): PersistedConfig["log"] {
-  const level = parseLogLevelEnv(env.PASEO_LOG_LEVEL ?? env.PASEO_LOG);
-  const format = parseLogFormatEnv(env.PASEO_LOG_FORMAT);
+  const level = parseLogLevelEnv(env.CLISBOT_LOG_LEVEL ?? env.CLISBOT_LOG);
+  const format = parseLogFormatEnv(env.CLISBOT_LOG_FORMAT);
   const console = resolveConsoleLogConfigFromEnv(env, persisted.log?.console);
   const file = resolveFileLogConfigFromEnv(env, persisted.log?.file);
 
@@ -150,8 +150,8 @@ function resolveConsoleLogConfigFromEnv(
   env: NodeJS.ProcessEnv,
   persisted: NonNullable<PersistedConfig["log"]>["console"],
 ): NonNullable<PersistedConfig["log"]>["console"] {
-  const level = parseLogLevelEnv(env.PASEO_LOG_CONSOLE_LEVEL);
-  const format = parseLogFormatEnv(env.PASEO_LOG_CONSOLE_FORMAT);
+  const level = parseLogLevelEnv(env.CLISBOT_LOG_CONSOLE_LEVEL);
+  const format = parseLogFormatEnv(env.CLISBOT_LOG_CONSOLE_FORMAT);
   if (level === undefined && format === undefined) return undefined;
   return {
     ...persisted,
@@ -164,10 +164,10 @@ function resolveFileLogConfigFromEnv(
   env: NodeJS.ProcessEnv,
   persisted: NonNullable<PersistedConfig["log"]>["file"],
 ): NonNullable<PersistedConfig["log"]>["file"] {
-  const level = parseLogLevelEnv(env.PASEO_LOG_FILE_LEVEL);
-  const filePath = nonEmptyEnv(env.PASEO_LOG_FILE_PATH);
-  const maxSize = nonEmptyEnv(env.PASEO_LOG_FILE_ROTATE_SIZE);
-  const maxFiles = parsePositiveIntegerEnv(env.PASEO_LOG_FILE_ROTATE_COUNT);
+  const level = parseLogLevelEnv(env.CLISBOT_LOG_FILE_LEVEL);
+  const filePath = nonEmptyEnv(env.CLISBOT_LOG_FILE_PATH);
+  const maxSize = nonEmptyEnv(env.CLISBOT_LOG_FILE_ROTATE_SIZE);
+  const maxFiles = parsePositiveIntegerEnv(env.CLISBOT_LOG_FILE_ROTATE_COUNT);
   const hasRotateOverride = maxSize !== undefined || maxFiles !== undefined;
   if (level === undefined && filePath === undefined && !hasRotateOverride) return undefined;
   return {
@@ -301,7 +301,7 @@ function resolveTlsFromEnv(
 }
 
 function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
-  const environmentEnabled = parseBooleanEnv(input.env.PASEO_RELAY_ENABLED);
+  const environmentEnabled = parseBooleanEnv(input.env.CLISBOT_RELAY_ENABLED);
   // COMPAT(relayOptInDefault): daemons whose startup config omitted this field
   // retain relay-on removal semantics until 2027-01-31. Modern homes use false.
   const enabled =
@@ -310,22 +310,22 @@ function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
     input.persisted.daemon?.relay?.enabled ??
     input.enabledFallback;
   const endpoint =
-    input.env.PASEO_RELAY_ENDPOINT ??
+    input.env.CLISBOT_RELAY_ENDPOINT ??
     input.persisted.daemon?.relay?.endpoint ??
     DEFAULT_RELAY_ENDPOINT;
   const publicEndpoint =
-    input.env.PASEO_RELAY_PUBLIC_ENDPOINT ??
+    input.env.CLISBOT_RELAY_PUBLIC_ENDPOINT ??
     input.persisted.daemon?.relay?.publicEndpoint ??
     endpoint;
   const useTls =
     input.cliRelayUseTls ??
     resolveTlsFromEnv(
-      input.env.PASEO_RELAY_USE_TLS,
+      input.env.CLISBOT_RELAY_USE_TLS,
       input.persisted.daemon?.relay?.useTls,
       endpoint === DEFAULT_RELAY_ENDPOINT,
     );
   const publicUseTls = resolveTlsFromEnv(
-    input.env.PASEO_RELAY_PUBLIC_USE_TLS,
+    input.env.CLISBOT_RELAY_PUBLIC_USE_TLS,
     input.persisted.daemon?.relay?.publicUseTls,
     useTls,
   );
@@ -352,7 +352,7 @@ function resolveServiceProxyPublicBaseUrl(value: string | null): string | null {
   try {
     return new URL(value).toString().replace(/\/$/, "");
   } catch {
-    throw new Error(`Invalid PASEO_SERVICE_PROXY_PUBLIC_BASE_URL: ${value}`);
+    throw new Error(`Invalid CLISBOT_SERVICE_PROXY_PUBLIC_BASE_URL: ${value}`);
   }
 }
 
@@ -361,20 +361,20 @@ function resolveServiceProxyConfig(
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): ResolvedServiceProxy {
   const enabledShim =
-    parseBooleanEnv(env.PASEO_SERVICE_PROXY_ENABLED) ?? persisted.daemon?.serviceProxy?.enabled;
+    parseBooleanEnv(env.CLISBOT_SERVICE_PROXY_ENABLED) ?? persisted.daemon?.serviceProxy?.enabled;
   // COMPAT(serviceProxyEnabled): added 2026-06-02, remove after 2026-12-02.
   // `enabled=false` used to disable the separate service proxy listener. Localhost
   // service proxying is now always enabled; this only suppresses optional layers.
   const optionalLayersEnabled = enabledShim !== false;
   const publicBaseUrl = optionalLayersEnabled
     ? resolveServiceProxyPublicBaseUrl(
-        env.PASEO_SERVICE_PROXY_PUBLIC_BASE_URL ??
+        env.CLISBOT_SERVICE_PROXY_PUBLIC_BASE_URL ??
           persisted.daemon?.serviceProxy?.publicBaseUrl ??
           null,
       )
     : null;
   const standaloneListen = optionalLayersEnabled
-    ? (env.PASEO_SERVICE_PROXY_LISTEN ?? persisted.daemon?.serviceProxy?.listen ?? null)
+    ? (env.CLISBOT_SERVICE_PROXY_LISTEN ?? persisted.daemon?.serviceProxy?.listen ?? null)
     : null;
 
   return { publicBaseUrl, standaloneListen };
@@ -386,20 +386,20 @@ interface ResolvedWebUi {
 }
 
 function resolveWebUiConfig(
-  paseoHome: string,
+  clisbotHome: string,
   env: NodeJS.ProcessEnv,
   cli: CliConfigOverrides | undefined,
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): ResolvedWebUi {
   const enabled =
     cli?.webUiEnabled ??
-    parseBooleanEnv(env.PASEO_WEB_UI_ENABLED) ??
+    parseBooleanEnv(env.CLISBOT_WEB_UI_ENABLED) ??
     persisted.features?.webUi?.enabled ??
     false;
-  const rawDistDir = env.PASEO_WEB_UI_DIST_DIR ?? persisted.features?.webUi?.distDir;
+  const rawDistDir = env.CLISBOT_WEB_UI_DIST_DIR ?? persisted.features?.webUi?.distDir;
   const trimmedDistDir = rawDistDir?.trim();
   const distDir = trimmedDistDir
-    ? path.resolve(path.isAbsolute(trimmedDistDir) ? trimmedDistDir : paseoHome, trimmedDistDir)
+    ? path.resolve(path.isAbsolute(trimmedDistDir) ? trimmedDistDir : clisbotHome, trimmedDistDir)
     : BUNDLED_WEB_UI_DIST_DIR;
   return {
     enabled,
@@ -411,7 +411,7 @@ function resolveVoiceLlmConfig(
   env: NodeJS.ProcessEnv,
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): ResolvedVoiceLlm {
-  const envVoiceLlmProvider = parseOptionalVoiceLlmProvider(env.PASEO_VOICE_LLM_PROVIDER);
+  const envVoiceLlmProvider = parseOptionalVoiceLlmProvider(env.CLISBOT_VOICE_LLM_PROVIDER);
   const persistedVoiceLlmProvider = parseOptionalVoiceLlmProvider(
     persisted.features?.voiceMode?.llm?.provider,
   );
@@ -426,8 +426,8 @@ function resolveCorsAllowedOrigins(
   env: NodeJS.ProcessEnv,
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): string[] {
-  const envCorsOrigins = env.PASEO_CORS_ORIGINS
-    ? env.PASEO_CORS_ORIGINS.split(",").map((s) => s.trim())
+  const envCorsOrigins = env.CLISBOT_CORS_ORIGINS
+    ? env.CLISBOT_CORS_ORIGINS.split(",").map((s) => s.trim())
     : [];
   const persistedCorsOrigins = persisted.daemon?.cors?.allowedOrigins ?? [];
   return Array.from(
@@ -460,13 +460,13 @@ function resolveTrustedProxiesConfig(
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): TrustedProxiesConfig {
   return (
-    parseTrustedProxiesEnv(env.PASEO_TRUSTED_PROXIES) ??
+    parseTrustedProxiesEnv(env.CLISBOT_TRUSTED_PROXIES) ??
     persisted.daemon?.trustedProxies ??
     DEFAULT_TRUSTED_PROXIES
   );
 }
 
-// PASEO_LISTEN can be:
+// CLISBOT_LISTEN can be:
 // - host:port (TCP)
 // - /path/to/socket (Unix socket)
 // - unix:///path/to/socket (Unix socket)
@@ -478,7 +478,7 @@ function resolveListenAddress(
 ): string {
   return (
     cli?.listen ??
-    env.PASEO_LISTEN ??
+    env.CLISBOT_LISTEN ??
     persisted.daemon?.listen ??
     `127.0.0.1:${env.PORT ?? DEFAULT_PORT}`
   );
@@ -487,8 +487,8 @@ function resolveListenAddress(
 function resolveAuthConfig(
   env: NodeJS.ProcessEnv,
   persisted: ReturnType<typeof loadPersistedConfig>,
-): PaseoDaemonConfig["auth"] {
-  const envPassword = env.PASEO_PASSWORD?.trim();
+): ClisbotDaemonConfig["auth"] {
+  const envPassword = env.CLISBOT_PASSWORD?.trim();
   if (envPassword) {
     return { password: hashDaemonPassword(envPassword) };
   }
@@ -498,7 +498,7 @@ function resolveAuthConfig(
 }
 
 function resolveWorktreesRoot(
-  paseoHome: string,
+  clisbotHome: string,
   persisted: ReturnType<typeof loadPersistedConfig>,
 ): string | undefined {
   const configuredRoot = persisted.worktrees?.root?.trim();
@@ -509,7 +509,7 @@ function resolveWorktreesRoot(
   const expandedRoot = expandTilde(configuredRoot);
   return path.isAbsolute(expandedRoot)
     ? path.resolve(expandedRoot)
-    : path.resolve(paseoHome, expandedRoot);
+    : path.resolve(clisbotHome, expandedRoot);
 }
 
 function resolveAppendSystemPrompt(persisted: ReturnType<typeof loadPersistedConfig>): string {
@@ -547,11 +547,11 @@ function resolveStaticLoadConfigSettings(
     ...resolveProfileLists(persisted),
     hostnames: mergeHostnames([
       persisted.daemon?.hostnames,
-      parseHostnamesEnv(env.PASEO_HOSTNAMES ?? env.PASEO_ALLOWED_HOSTS),
+      parseHostnamesEnv(env.CLISBOT_HOSTNAMES ?? env.CLISBOT_ALLOWED_HOSTS),
       cli?.hostnames,
     ]),
     trustedProxies: resolveTrustedProxiesConfig(env, persisted),
-    appBaseUrl: env.PASEO_APP_BASE_URL ?? persisted.app?.baseUrl ?? DEFAULT_APP_BASE_URL,
+    appBaseUrl: env.CLISBOT_APP_BASE_URL ?? persisted.app?.baseUrl ?? DEFAULT_APP_BASE_URL,
   };
 }
 
@@ -563,10 +563,10 @@ interface ResolveConfigFromPersistedOptions {
 
 // eslint-disable-next-line complexity -- upstream resolver: one flat mapping of env and config.json to daemon config.
 export function resolveConfigFromPersisted(
-  paseoHome: string,
+  clisbotHome: string,
   persisted: PersistedConfig,
   options?: ResolveConfigFromPersistedOptions,
-): PaseoDaemonConfig {
+): ClisbotDaemonConfig {
   const resolvedOptions = options ?? {};
   const env = configurationEnvironment(resolvedOptions.env ?? process.env);
   const cli = resolvedOptions.cli;
@@ -596,13 +596,13 @@ export function resolveConfigFromPersisted(
   });
   const serviceProxy = resolveServiceProxyConfig(env, persisted);
   const directEndpoint =
-    env.PASEO_DIRECT_ENDPOINT?.trim() || persisted.daemon?.direct?.endpoint?.trim() || undefined;
+    env.CLISBOT_DIRECT_ENDPOINT?.trim() || persisted.daemon?.direct?.endpoint?.trim() || undefined;
   const directUseTls =
-    parseBooleanEnv(env.PASEO_DIRECT_USE_TLS) ?? persisted.daemon?.direct?.useTls ?? true;
-  const webUi = resolveWebUiConfig(paseoHome, env, cli, persisted);
+    parseBooleanEnv(env.CLISBOT_DIRECT_USE_TLS) ?? persisted.daemon?.direct?.useTls ?? true;
+  const webUi = resolveWebUiConfig(clisbotHome, env, cli, persisted);
 
   const { openai, speech } = resolveSpeechConfig({
-    paseoHome,
+    clisbotHome,
     env,
     persisted,
   });
@@ -616,9 +616,9 @@ export function resolveConfigFromPersisted(
 
   return {
     listen,
-    paseoHome,
-    desktopManaged: env.PASEO_DESKTOP_MANAGED === "1",
-    worktreesRoot: resolveWorktreesRoot(paseoHome, persisted),
+    clisbotHome,
+    desktopManaged: env.CLISBOT_DESKTOP_MANAGED === "1",
+    worktreesRoot: resolveWorktreesRoot(clisbotHome, persisted),
     corsAllowedOrigins: resolveCorsAllowedOrigins(env, persisted),
     hostnames,
     trustedProxies,
@@ -635,10 +635,10 @@ export function resolveConfigFromPersisted(
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins,
     mcpDebug: env.MCP_DEBUG === "1",
-    isDev: resolvePaseoNodeEnv(env) === "development",
-    agentStoragePath: path.join(paseoHome, "agents"),
+    isDev: resolveClisbotNodeEnv(env) === "development",
+    agentStoragePath: path.join(clisbotHome, "agents"),
     agentSessionStorage: resolveAgentSessionStorageFeature(
-      env.PASEO_AGENT_SESSION_STORAGE,
+      env.CLISBOT_AGENT_SESSION_STORAGE,
       persisted.features,
     ),
     staticDir: "public",
@@ -651,17 +651,17 @@ export function resolveConfigFromPersisted(
     relayPublicUseTls: relay.publicUseTls,
     directEndpoint,
     directUseTls,
-    hubSocketPingIntervalMs: parsePositiveIntegerEnv(env.PASEO_HUB_SOCKET_PING_INTERVAL_MS),
-    hubSocketStaleTimeoutMs: parsePositiveIntegerEnv(env.PASEO_HUB_SOCKET_STALE_TIMEOUT_MS),
+    hubSocketPingIntervalMs: parsePositiveIntegerEnv(env.CLISBOT_HUB_SOCKET_PING_INTERVAL_MS),
+    hubSocketStaleTimeoutMs: parsePositiveIntegerEnv(env.CLISBOT_HUB_SOCKET_STALE_TIMEOUT_MS),
     serviceProxy,
     webUi,
     appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
-    // COMPAT(clisbot-managed-access-default): upstream Paseo runs `off`. The Clisbot fusion
+    // COMPAT(clisbot-managed-access-default): upstream Clisbot runs `off`. The Clisbot fusion
     // runs `external` unless config says otherwise; it requires tickets only once the daemon
     // belongs to a Hub (managed-access/hub-membership.ts).
     managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "external",
-    bots: resolveBotsConfig({ env, persisted: persisted.daemon?.bots, paseoHome }),
+    bots: resolveBotsConfig({ env, persisted: persisted.daemon?.bots, clisbotHome }),
     openai,
     speech,
     voiceLlmProvider: voiceLlm.provider,
@@ -688,7 +688,7 @@ function resolveAgentSessionStorageFeature(
   environment: string | undefined,
   features: { agentSessionStorage?: boolean } | undefined,
 ): boolean {
-  // COMPAT(clisbot-session-storage-default): upstream Paseo defaults capture off. The Clisbot fusion
+  // COMPAT(clisbot-session-storage-default): upstream Clisbot defaults capture off. The Clisbot fusion
   // needs authorship, so capture is on unless the environment or config turns it off.
   if (environment === "0") return false;
   if (environment === "1") return true;
@@ -696,11 +696,11 @@ function resolveAgentSessionStorageFeature(
 }
 
 export function loadConfig(
-  paseoHome: string,
+  clisbotHome: string,
   options?: Omit<ResolveConfigFromPersistedOptions, "relayEnabledFallback">,
-): PaseoDaemonConfig {
-  const persisted = loadPersistedConfig(paseoHome);
-  return resolveConfigFromPersisted(paseoHome, persisted, options);
+): ClisbotDaemonConfig {
+  const persisted = loadPersistedConfig(clisbotHome);
+  return resolveConfigFromPersisted(clisbotHome, persisted, options);
 }
 
 function parsePositiveGitOverride(value: string | undefined): boolean {
@@ -740,26 +740,26 @@ function resolveCoreDaemonOverridePaths(
   cli: CliConfigOverrides | undefined,
 ): string[] {
   const paths: string[] = [];
-  if (cli?.listen !== undefined || env.PASEO_LISTEN !== undefined) {
+  if (cli?.listen !== undefined || env.CLISBOT_LISTEN !== undefined) {
     paths.push("daemon.listen");
   }
   if (cli?.mcpEnabled !== undefined) paths.push("daemon.mcp.enabled");
   if (cli?.mcpInjectIntoAgents !== undefined) paths.push("daemon.mcp.injectIntoAgents");
   // Hostname sources append instead of replacing one another, so a launch value
   // does not prevent a persisted hostname edit from taking effect.
-  if (parseTrustedProxiesEnv(env.PASEO_TRUSTED_PROXIES) !== undefined) {
+  if (parseTrustedProxiesEnv(env.CLISBOT_TRUSTED_PROXIES) !== undefined) {
     paths.push("daemon.trustedProxies");
   }
-  if (parsePositiveGitOverride(env.PASEO_GIT_MAX_PROCESSES_PER_SECOND)) {
+  if (parsePositiveGitOverride(env.CLISBOT_GIT_MAX_PROCESSES_PER_SECOND)) {
     paths.push("daemon.git.maxProcessesPerSecond");
   }
   if (
-    parsePositiveGitOverride(env.PASEO_GIT_MAX_PROCESS_CONCURRENCY ?? env.PASEO_GIT_CONCURRENCY)
+    parsePositiveGitOverride(env.CLISBOT_GIT_MAX_PROCESS_CONCURRENCY ?? env.CLISBOT_GIT_CONCURRENCY)
   ) {
     paths.push("daemon.git.maxProcessConcurrency");
   }
-  if (env.PASEO_APP_BASE_URL !== undefined) paths.push("app.baseUrl");
-  if (env.PASEO_PASSWORD?.trim()) paths.push("daemon.auth.password");
+  if (env.CLISBOT_APP_BASE_URL !== undefined) paths.push("app.baseUrl");
+  if (env.CLISBOT_PASSWORD?.trim()) paths.push("daemon.auth.password");
   return paths;
 }
 
@@ -768,21 +768,21 @@ function resolveRelayOverridePaths(
   cli: CliConfigOverrides | undefined,
 ): string[] {
   const paths: string[] = [];
-  if (cli?.relayEnabled !== undefined || parseBooleanEnv(env.PASEO_RELAY_ENABLED) !== undefined) {
+  if (cli?.relayEnabled !== undefined || parseBooleanEnv(env.CLISBOT_RELAY_ENABLED) !== undefined) {
     paths.push("daemon.relay.enabled");
   }
-  if (env.PASEO_RELAY_ENDPOINT !== undefined) paths.push("daemon.relay.endpoint");
-  if (env.PASEO_RELAY_PUBLIC_ENDPOINT !== undefined) {
+  if (env.CLISBOT_RELAY_ENDPOINT !== undefined) paths.push("daemon.relay.endpoint");
+  if (env.CLISBOT_RELAY_PUBLIC_ENDPOINT !== undefined) {
     paths.push("daemon.relay.publicEndpoint");
   }
-  if (cli?.relayUseTls !== undefined || env.PASEO_RELAY_USE_TLS !== undefined) {
+  if (cli?.relayUseTls !== undefined || env.CLISBOT_RELAY_USE_TLS !== undefined) {
     paths.push("daemon.relay.useTls");
   }
-  if (env.PASEO_RELAY_PUBLIC_USE_TLS !== undefined) {
+  if (env.CLISBOT_RELAY_PUBLIC_USE_TLS !== undefined) {
     paths.push("daemon.relay.publicUseTls");
   }
-  if (env.PASEO_DIRECT_ENDPOINT !== undefined) paths.push("daemon.direct.endpoint");
-  if (env.PASEO_DIRECT_USE_TLS !== undefined) paths.push("daemon.direct.useTls");
+  if (env.CLISBOT_DIRECT_ENDPOINT !== undefined) paths.push("daemon.direct.endpoint");
+  if (env.CLISBOT_DIRECT_USE_TLS !== undefined) paths.push("daemon.direct.useTls");
   return paths;
 }
 
@@ -791,40 +791,43 @@ function resolveServiceAndWebUiOverridePaths(
   cli: CliConfigOverrides | undefined,
 ): string[] {
   const paths: string[] = [];
-  const serviceProxyEnabled = parseBooleanEnv(env.PASEO_SERVICE_PROXY_ENABLED);
+  const serviceProxyEnabled = parseBooleanEnv(env.CLISBOT_SERVICE_PROXY_ENABLED);
   if (serviceProxyEnabled !== undefined) paths.push("daemon.serviceProxy.enabled");
-  if (env.PASEO_SERVICE_PROXY_LISTEN !== undefined || serviceProxyEnabled === false) {
+  if (env.CLISBOT_SERVICE_PROXY_LISTEN !== undefined || serviceProxyEnabled === false) {
     paths.push("daemon.serviceProxy.listen");
   }
-  if (env.PASEO_SERVICE_PROXY_PUBLIC_BASE_URL !== undefined || serviceProxyEnabled === false) {
+  if (env.CLISBOT_SERVICE_PROXY_PUBLIC_BASE_URL !== undefined || serviceProxyEnabled === false) {
     paths.push("daemon.serviceProxy.publicBaseUrl");
   }
 
-  if (cli?.webUiEnabled !== undefined || parseBooleanEnv(env.PASEO_WEB_UI_ENABLED) !== undefined) {
+  if (
+    cli?.webUiEnabled !== undefined ||
+    parseBooleanEnv(env.CLISBOT_WEB_UI_ENABLED) !== undefined
+  ) {
     paths.push("features.webUi.enabled");
   }
-  if (env.PASEO_WEB_UI_DIST_DIR !== undefined) paths.push("features.webUi.distDir");
+  if (env.CLISBOT_WEB_UI_DIST_DIR !== undefined) paths.push("features.webUi.distDir");
   return paths;
 }
 
 function resolveLogOverrideControlledPaths(env: NodeJS.ProcessEnv): string[] {
   const paths: string[] = [];
-  if (parseLogLevelEnv(env.PASEO_LOG_LEVEL ?? env.PASEO_LOG) !== undefined) {
+  if (parseLogLevelEnv(env.CLISBOT_LOG_LEVEL ?? env.CLISBOT_LOG) !== undefined) {
     paths.push("log.level");
   }
-  if (parseLogFormatEnv(env.PASEO_LOG_FORMAT) !== undefined) paths.push("log.format");
-  if (parseLogLevelEnv(env.PASEO_LOG_CONSOLE_LEVEL) !== undefined) {
+  if (parseLogFormatEnv(env.CLISBOT_LOG_FORMAT) !== undefined) paths.push("log.format");
+  if (parseLogLevelEnv(env.CLISBOT_LOG_CONSOLE_LEVEL) !== undefined) {
     paths.push("log.console.level");
   }
-  if (parseLogFormatEnv(env.PASEO_LOG_CONSOLE_FORMAT) !== undefined) {
+  if (parseLogFormatEnv(env.CLISBOT_LOG_CONSOLE_FORMAT) !== undefined) {
     paths.push("log.console.format");
   }
-  if (parseLogLevelEnv(env.PASEO_LOG_FILE_LEVEL) !== undefined) paths.push("log.file.level");
-  if (nonEmptyEnv(env.PASEO_LOG_FILE_PATH) !== undefined) paths.push("log.file.path");
-  if (nonEmptyEnv(env.PASEO_LOG_FILE_ROTATE_SIZE) !== undefined) {
+  if (parseLogLevelEnv(env.CLISBOT_LOG_FILE_LEVEL) !== undefined) paths.push("log.file.level");
+  if (nonEmptyEnv(env.CLISBOT_LOG_FILE_PATH) !== undefined) paths.push("log.file.path");
+  if (nonEmptyEnv(env.CLISBOT_LOG_FILE_ROTATE_SIZE) !== undefined) {
     paths.push("log.file.rotate.maxSize");
   }
-  if (parsePositiveIntegerEnv(env.PASEO_LOG_FILE_ROTATE_COUNT) !== undefined) {
+  if (parsePositiveIntegerEnv(env.CLISBOT_LOG_FILE_ROTATE_COUNT) !== undefined) {
     paths.push("log.file.rotate.maxFiles");
   }
   return paths;
@@ -846,36 +849,36 @@ function resolveSpeechOverrideControlledPaths(
     if (env[envName] !== undefined) paths.push(...configPaths);
   };
 
-  add("PASEO_DICTATION_ENABLED", "features.dictation.enabled");
-  add("PASEO_DICTATION_STT_PROVIDER", "features.dictation.stt.provider");
+  add("CLISBOT_DICTATION_ENABLED", "features.dictation.enabled");
+  add("CLISBOT_DICTATION_STT_PROVIDER", "features.dictation.stt.provider");
   if (
-    env.PASEO_DICTATION_LOCAL_STT_MODEL !== undefined &&
+    env.CLISBOT_DICTATION_LOCAL_STT_MODEL !== undefined &&
     isEnabledSpeechProvider(providers.dictationStt, "local")
   ) {
     paths.push("features.dictation.stt.model");
   }
-  add("PASEO_DICTATION_LANGUAGE", "features.dictation.stt.language");
-  add("PASEO_VOICE_MODE_ENABLED", "features.voiceMode.enabled");
-  add("PASEO_VOICE_LLM_PROVIDER", "features.voiceMode.llm.provider");
-  add("PASEO_VOICE_STT_PROVIDER", "features.voiceMode.stt.provider");
+  add("CLISBOT_DICTATION_LANGUAGE", "features.dictation.stt.language");
+  add("CLISBOT_VOICE_MODE_ENABLED", "features.voiceMode.enabled");
+  add("CLISBOT_VOICE_LLM_PROVIDER", "features.voiceMode.llm.provider");
+  add("CLISBOT_VOICE_STT_PROVIDER", "features.voiceMode.stt.provider");
   if (
-    env.PASEO_VOICE_LOCAL_STT_MODEL !== undefined &&
+    env.CLISBOT_VOICE_LOCAL_STT_MODEL !== undefined &&
     isEnabledSpeechProvider(providers.voiceStt, "local")
   ) {
     paths.push("features.voiceMode.stt.model");
   }
-  add("PASEO_VOICE_LANGUAGE", "features.voiceMode.stt.language");
-  add("PASEO_VOICE_TURN_DETECTION_PROVIDER", "features.voiceMode.turnDetection.provider");
-  add("PASEO_VOICE_TTS_PROVIDER", "features.voiceMode.tts.provider");
+  add("CLISBOT_VOICE_LANGUAGE", "features.voiceMode.stt.language");
+  add("CLISBOT_VOICE_TURN_DETECTION_PROVIDER", "features.voiceMode.turnDetection.provider");
+  add("CLISBOT_VOICE_TTS_PROVIDER", "features.voiceMode.tts.provider");
   if (
-    env.PASEO_VOICE_LOCAL_TTS_MODEL !== undefined &&
+    env.CLISBOT_VOICE_LOCAL_TTS_MODEL !== undefined &&
     isEnabledSpeechProvider(providers.voiceTts, "local")
   ) {
     paths.push("features.voiceMode.tts.model");
   }
-  add("PASEO_VOICE_LOCAL_TTS_SPEAKER_ID", "features.voiceMode.tts.speakerId");
-  add("PASEO_VOICE_LOCAL_TTS_SPEED", "features.voiceMode.tts.speed");
-  add("PASEO_LOCAL_MODELS_DIR", "providers.local.modelsDir");
+  add("CLISBOT_VOICE_LOCAL_TTS_SPEAKER_ID", "features.voiceMode.tts.speakerId");
+  add("CLISBOT_VOICE_LOCAL_TTS_SPEED", "features.voiceMode.tts.speed");
+  add("CLISBOT_LOCAL_MODELS_DIR", "providers.local.modelsDir");
   const openAiDictationStt = isEnabledSpeechProvider(providers.dictationStt, "openai");
   const openAiVoiceStt = isEnabledSpeechProvider(providers.voiceStt, "openai");
   if (env.STT_CONFIDENCE_THRESHOLD !== undefined && (openAiDictationStt || openAiVoiceStt)) {
@@ -889,7 +892,7 @@ function resolveSpeechOverrideControlledPaths(
     add("TTS_MODEL", "features.voiceMode.tts.model");
     add("TTS_VOICE", "features.voiceMode.tts.voice");
   }
-  if (env.PASEO_DICTATION_LANGUAGE !== undefined && env.PASEO_VOICE_LANGUAGE === undefined) {
+  if (env.CLISBOT_DICTATION_LANGUAGE !== undefined && env.CLISBOT_VOICE_LANGUAGE === undefined) {
     paths.push("features.voiceMode.stt.language");
   }
   return paths;

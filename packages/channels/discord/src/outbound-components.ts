@@ -1,11 +1,11 @@
 // upstream: extensions/discord/src/outbound-components.ts@5d8067a4483
 // Discord plugin module implements outbound components behavior.
-import type { ChannelOutboundAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-send-result";
+import type { ChannelOutboundAdapter } from "@clisbot/channels-core/plugin-sdk/channel-send-result";
 import {
   createLazyRuntimeModule,
   createLazyRuntimeNamedExport,
-} from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { resolveAskUserQuestionOptionIndices } from "@getpaseo/channels-core/plugin-sdk/reply-payload";
+} from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { resolveAskUserQuestionOptionIndices } from "@clisbot/channels-core/plugin-sdk/reply-payload";
 import { readDiscordComponentSpec, type DiscordComponentMessageSpec } from "./components.js";
 
 type DiscordComponentSendFn = typeof import("./send.components.js").sendDiscordComponentMessage;

@@ -7,10 +7,10 @@ import {
   hasConfiguredAccountValue,
   normalizeAccountId,
   normalizeOptionalAccountId,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { coerceSecretRef } from "@getpaseo/channels-core/plugin-sdk/provider-auth";
-import { canResolveEnvSecretRefInReadOnlyPath } from "@getpaseo/channels-core/plugin-sdk/secret-ref-readonly";
-import { normalizeOptionalString as normalizeString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { coerceSecretRef } from "@clisbot/channels-core/plugin-sdk/provider-auth";
+import { canResolveEnvSecretRefInReadOnlyPath } from "@clisbot/channels-core/plugin-sdk/secret-ref-readonly";
+import { normalizeOptionalString as normalizeString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type {
   FeishuConfig,
   FeishuAccountConfig,

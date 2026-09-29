@@ -1,13 +1,13 @@
 // upstream: extensions/zalouser/src/accounts.ts@5d8067a4483
 // D-ZU-022: `resolveChannelMediaMaxBytes` comes from `fusion/media-limits.ts`;
-// `@getpaseo/channels-core` omits that member of the upstream barrel.
-import { createAccountListHelpers } from "@getpaseo/channels-core/plugin-sdk/account-helpers";
+// `@clisbot/channels-core` omits that member of the upstream barrel.
+import { createAccountListHelpers } from "@clisbot/channels-core/plugin-sdk/account-helpers";
 import { resolveChannelMediaMaxBytes } from "./fusion/media-limits.js";
 // Zalouser plugin module implements accounts behavior.
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ResolvedZalouserAccount, ZalouserAccountConfig, ZalouserConfig } from "./types.js";
 
 const loadZalouserAccountsRuntime = createLazyRuntimeModule(() => import("./accounts.runtime.js"));

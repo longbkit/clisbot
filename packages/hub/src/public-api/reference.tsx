@@ -11,7 +11,7 @@ const referenceTypography = `
 `;
 const referenceConfiguration = {
   url: "/api/openapi.json",
-  metaData: { title: "Paseo Hub Public API" },
+  metaData: { title: "Clisbot Hub Public API" },
   theme: "default",
   layout: "modern",
   showSidebar: true,
@@ -34,7 +34,7 @@ const referenceConfiguration = {
 
 export function PublicApiReference() {
   return (
-    <main aria-label="Paseo Hub API reference" style={referenceStyle}>
+    <main aria-label="Clisbot Hub API reference" style={referenceStyle}>
       <ApiReferenceReact configuration={referenceConfiguration} />
     </main>
   );

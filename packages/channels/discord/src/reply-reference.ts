@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/reply-reference.ts@5d8067a4483
-import type { ReplyToResolution } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { ReplyToMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { isSingleUseReplyToMode } from "@getpaseo/channels-core/plugin-sdk/reply-reference";
+import type { ReplyToResolution } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { ReplyToMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { isSingleUseReplyToMode } from "@clisbot/channels-core/plugin-sdk/reply-reference";
 
 // Keep the native reference and its physical-send scope together so text, media,
 // component, and voice paths cannot desynchronize parallel reply options.

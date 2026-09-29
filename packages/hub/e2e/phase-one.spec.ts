@@ -1,5 +1,5 @@
 import { test } from "./app.js";
-import type { PaseoHub } from "./helpers/hub.js";
+import type { ClisbotHub } from "./helpers/hub.js";
 
 const alice = {
   name: "Alice",
@@ -87,7 +87,7 @@ test("clears cached tenant state when the loaded membership is revoked", async (
   ]);
 });
 
-async function expectOrbitIsolation(hub: PaseoHub) {
+async function expectOrbitIsolation(hub: ClisbotHub) {
   const membersPresent = ["Alice", alice.email, "Bob", bob.email, "Dana", dana.email];
   const membersAbsent = ["Carol", carol.email];
   await hub.expectOrganizationTeam("alice", {
@@ -99,7 +99,7 @@ async function expectOrbitIsolation(hub: PaseoHub) {
   await hub.expectOrganizationTeam("bob", { membersPresent, membersAbsent });
 }
 
-async function expectAcmeIsolation(hub: PaseoHub) {
+async function expectAcmeIsolation(hub: ClisbotHub) {
   const membersPresent = ["Alice", alice.email, "Bob", bob.email, "Carol", carol.email];
   const membersAbsent = ["Dana", dana.email];
   await hub.expectOrganizationTeam("alice", {

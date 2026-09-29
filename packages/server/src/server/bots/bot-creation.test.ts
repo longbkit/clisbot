@@ -46,7 +46,7 @@ beforeEach(async () => {
     logger,
   });
   service = createBotService({
-    paseoHome: home,
+    clisbotHome: home,
     root,
     logger,
     projectRegistry,

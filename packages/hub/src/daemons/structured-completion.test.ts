@@ -22,7 +22,7 @@ describe("structured daemon completion", () => {
       type: "object",
       additionalProperties: false,
       required: ["repo"],
-      $defs: { repo: { type: "string", minLength: 3, enum: ["paseo", "hub"] } },
+      $defs: { repo: { type: "string", minLength: 3, enum: ["clisbot", "hub"] } },
       properties: { repo: { $ref: "#/$defs/repo" } },
     };
     const intent: LaunchMachineIntent = {
@@ -107,7 +107,7 @@ describe("structured daemon completion", () => {
     const duplicate = await lifecycle.completeAgentExecutionFromCallback({
       executionId,
       token,
-      output: { repo: "paseo" },
+      output: { repo: "clisbot" },
     });
     assert.equal(duplicate.id, completed.id);
     assert.equal(duplicate.status, "succeeded");

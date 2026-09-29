@@ -8,13 +8,13 @@ function password() {
     const e = r.indexOf("=");
     return e > 0 ? r.slice(e + 1).trim() : r;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() ?? "";
+    return process.env.CLISBOT_PASSWORD?.trim() ?? "";
   }
 }
 const AGENT = "fddcee33-9145-4dcc-9b8f-c4d3c0a6e4d9";
 const REQ = "permission-exec-8715ee5b-0d50-4a9d-9981-49f0deb85967";
 const pw = password();
-const sock = new WebSocket("ws://127.0.0.1:6867/ws", pw ? [`paseo.bearer.${pw}`] : undefined);
+const sock = new WebSocket("ws://127.0.0.1:6867/ws", pw ? [`clisbot.bearer.${pw}`] : undefined);
 sock.on("open", () => {
   sock.send(
     JSON.stringify({

@@ -1,5 +1,5 @@
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
-import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type { AgentTimelineItem } from "@clisbot/protocol/agent-types";
+import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import { selectAgentTimelineState, useSessionStore } from "@/stores/session-store";
 import type { AssistantMessageItem, StreamItem, TodoEntry, TimelinePosition } from "@/types/stream";
 import type { TurnLivenessTransition } from "@/timeline/turn-liveness";

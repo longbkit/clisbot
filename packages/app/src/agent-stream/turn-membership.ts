@@ -14,7 +14,7 @@ export function continuesTurn(previous: StreamItem | null, next: StreamItem | nu
 
 /**
  * A visible response can span multiple canonical turns when their prompts are
- * system-injected and therefore absent from the Paseo timeline.
+ * system-injected and therefore absent from the Clisbot timeline.
  */
 export function continuesResponse(previous: StreamItem | null, next: StreamItem | null): boolean {
   if (!previous || !next) return false;

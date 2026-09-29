@@ -6,18 +6,18 @@
 // `plugin-sdk/setup-runtime` and friends — the OpenClaw plugin host's whole
 // surface, most of it for `channel.ts` / `setup-surface.ts`, which this vertical
 // does not port (see upstream-sync.json `omitted`). The ported files here read
-// a handful of members; every one of them comes from `@getpaseo/channels-core`,
+// a handful of members; every one of them comes from `@clisbot/channels-core`,
 // which carries the same upstream source modules.
 //
 // Import specifiers are the only thing the ported files change: every ported
 // `import … from "../runtime-api.js"` was rewritten to this module.
 
-export type { OpenClawConfig as ClawdbotConfig } from "@getpaseo/channels-core/plugin-sdk/core";
-export type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/core";
-export type { ChannelGroupContext } from "@getpaseo/channels-core/plugin-sdk/core";
-export type { OutboundIdentity } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-export type { ReplyPayload } from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-export type { AnyAgentTool } from "@getpaseo/channels-core/agents/tools/common.host-adapter";
+export type { OpenClawConfig as ClawdbotConfig } from "@clisbot/channels-core/plugin-sdk/core";
+export type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/core";
+export type { ChannelGroupContext } from "@clisbot/channels-core/plugin-sdk/core";
+export type { OutboundIdentity } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+export type { ReplyPayload } from "@clisbot/channels-core/plugin-sdk/reply-payload";
+export type { AnyAgentTool } from "@clisbot/channels-core/agents/tools/common.host-adapter";
 export type {
   OpenClawPluginApi,
   OpenClawPluginToolContext,
@@ -25,7 +25,7 @@ export type {
   OpenClawPluginToolOptions,
   PluginLogger,
   ToolFsPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
+} from "@clisbot/channels-core/plugin-sdk/plugin-entry";
 
 /** The runtime env a channel account's monitor receives (upstream's text). */
 export type RuntimeEnv = {

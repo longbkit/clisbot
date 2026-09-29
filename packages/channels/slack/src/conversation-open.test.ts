@@ -3,8 +3,8 @@ import { WebClient, type WebClientOptions } from "@slack/web-api";
 import type {
   ChannelMessageActionContext,
   ChannelMessageActionName,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSlackActions } from "./channel-actions.js";
 import * as slackClient from "./client.js";

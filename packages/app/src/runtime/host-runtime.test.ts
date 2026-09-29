@@ -9,11 +9,11 @@ import type {
   ConnectionState,
   FetchAgentsEntry,
   FetchAgentsOptions,
-} from "@getpaseo/client/internal/daemon-client";
-import { DaemonAuthenticationError } from "@getpaseo/client/internal/daemon-client";
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
+} from "@clisbot/client/internal/daemon-client";
+import { DaemonAuthenticationError } from "@clisbot/client/internal/daemon-client";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
+import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
 import type { HostConnection, HostProfile, HubHostManagement } from "@/types/host-connection";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import { useSessionStore, type Agent } from "@/stores/session-store";
@@ -266,7 +266,7 @@ class FakeDaemonClient {
 
 afterEach(() => {
   vi.useRealTimers();
-  delete (globalThis as Record<string, unknown>).__PASEO_INITIAL_DAEMON_CONNECTION__;
+  delete (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__;
   delete (globalThis as { window?: unknown }).window;
 });
 
@@ -379,7 +379,7 @@ function makeFetchAgentsEntry(input: {
         currentBranch: null,
         remoteUrl: null,
         worktreeRoot: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     },
@@ -1772,8 +1772,8 @@ describe("HostRuntimeStore", () => {
     const manual = makeHost({ serverId: "srv_manual" });
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage({
-        "@paseo:daemon-registry": JSON.stringify([managed, manual]),
-        "@paseo:e2e": "1",
+        "@clisbot:daemon-registry": JSON.stringify([managed, manual]),
+        "@clisbot:e2e": "1",
       }),
       deps: makeDeps({}, []),
     });
@@ -1839,7 +1839,7 @@ describe("HostRuntimeStore", () => {
     let realClientCalls = 0;
     const unregister = registerHostAccessTicketResolver(host.serverId, async () => "ticket");
     const store = new HostRuntimeStore({
-      storage: createMemoryHostRuntimeStorage({ "@paseo:e2e": "1" }),
+      storage: createMemoryHostRuntimeStorage({ "@clisbot:e2e": "1" }),
       deps: {
         createClient: () => {
           realClientCalls += 1;
@@ -1867,9 +1867,9 @@ describe("HostRuntimeStore", () => {
     "keeps reconnect enabled through inactive/background and resumes immediately (mounted %s)",
     async (currentState) => {
       const relay = (suffix: string): HostConnection => ({
-        id: `relay:relay-${suffix}.paseo.sh:443`,
+        id: `relay:relay-${suffix}.clisbot.com:443`,
         type: "relay",
-        relayEndpoint: `relay-${suffix}.paseo.sh:443`,
+        relayEndpoint: `relay-${suffix}.clisbot.com:443`,
         daemonPublicKeyB64: `pk_${suffix}`,
       });
       const hostAConnection = relay("a");
@@ -1965,8 +1965,8 @@ describe("HostRuntimeStore", () => {
     const host = makeHost({ connections: [makeHost().connections[0]!] });
     const revocation = createDeferred<void>();
     const storage = createMemoryHostRuntimeStorage({
-      "@paseo:daemon-registry": JSON.stringify([host]),
-      "@paseo:e2e": "1",
+      "@clisbot:daemon-registry": JSON.stringify([host]),
+      "@clisbot:e2e": "1",
     });
     const store = new HostRuntimeStore({
       storage,
@@ -1991,8 +1991,8 @@ describe("HostRuntimeStore", () => {
     const host = makeHost({ connections: [makeHost().connections[0]!] });
     const revokedServerIds: string[] = [];
     const storage = createMemoryHostRuntimeStorage({
-      "@paseo:daemon-registry": JSON.stringify([host]),
-      "@paseo:e2e": "1",
+      "@clisbot:daemon-registry": JSON.stringify([host]),
+      "@clisbot:e2e": "1",
     });
     const store = new HostRuntimeStore({
       storage,
@@ -2021,8 +2021,8 @@ describe("HostRuntimeStore", () => {
         return backingStore.read(...args);
       },
     };
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
     const session = useSessionStore.getState();
 
     const store = new HostRuntimeStore({
@@ -2100,7 +2100,7 @@ describe("HostRuntimeStore", () => {
   it("exposes the default appearance for a host stored before the field existed", async () => {
     const storage = createMemoryHostRuntimeStorage();
     await storage.setItem(
-      "@paseo:daemon-registry",
+      "@clisbot:daemon-registry",
       JSON.stringify([
         {
           serverId: "srv_legacy",
@@ -2116,7 +2116,7 @@ describe("HostRuntimeStore", () => {
         },
       ]),
     );
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:e2e", "1");
     const store = createAppearanceStore(storage);
 
     const registryLoaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
@@ -2137,8 +2137,8 @@ describe("HostRuntimeStore", () => {
       updatedAt: new Date(0).toISOString(),
     });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
     const store = createAppearanceStore(storage);
 
     const registryLoaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
@@ -2156,7 +2156,7 @@ describe("HostRuntimeStore", () => {
     expect(updated?.appearance).toEqual({ color: "teal", badgeDisplay: null });
     expect(updated?.updatedAt).not.toBe(host.updatedAt);
 
-    const persisted = await storage.getItem("@paseo:daemon-registry");
+    const persisted = await storage.getItem("@clisbot:daemon-registry");
     expect(JSON.parse(persisted ?? "[]")[0].appearance).toEqual({
       color: "teal",
       badgeDisplay: null,
@@ -2171,8 +2171,8 @@ describe("HostRuntimeStore", () => {
       appearance: { color: "amber", badgeDisplay: null },
     });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
     const store = createAppearanceStore(storage);
 
     const registryLoaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
@@ -2191,7 +2191,7 @@ describe("HostRuntimeStore", () => {
       badgeDisplay: "icon",
     });
 
-    const persisted = await storage.getItem("@paseo:daemon-registry");
+    const persisted = await storage.getItem("@clisbot:daemon-registry");
     expect(JSON.parse(persisted ?? "[]")[0].appearance).toEqual({
       color: "amber",
       badgeDisplay: "icon",
@@ -2203,8 +2203,8 @@ describe("HostRuntimeStore", () => {
   it("keeps host appearance unchanged when persistence fails", async () => {
     const host = makeHost({ serverId: "srv_appearance" });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
     const store = createAppearanceStore(storage);
 
     const registryLoaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
@@ -2224,8 +2224,8 @@ describe("HostRuntimeStore", () => {
   it("serializes overlapping host appearance writes", async () => {
     const host = makeHost({ serverId: "srv_appearance" });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
-    await storage.setItem("@paseo:e2e", "1");
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
     const store = createAppearanceStore(storage);
 
     const registryLoaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
@@ -2253,7 +2253,7 @@ describe("HostRuntimeStore", () => {
       color: "teal",
       badgeDisplay: "icon",
     });
-    const persistedHosts = JSON.parse((await storage.getItem("@paseo:daemon-registry")) ?? "[]");
+    const persistedHosts = JSON.parse((await storage.getItem("@clisbot:daemon-registry")) ?? "[]");
     expect(persistedHosts[0]?.appearance).toEqual({
       color: "teal",
       badgeDisplay: "icon",
@@ -2592,7 +2592,7 @@ describe("HostRuntimeStore", () => {
         entries: [
           makeFetchAgentsEntry({
             id: "agent-recent",
-            cwd: "/workspaces/paseo",
+            cwd: "/workspaces/clisbot",
             updatedAt: "2026-03-04T12:00:00.000Z",
             title: "Recent agent",
           }),
@@ -2605,7 +2605,7 @@ describe("HostRuntimeStore", () => {
         entries: [
           makeFetchAgentsEntry({
             id: "agent-stale-attention",
-            cwd: "/workspaces/paseo-pr67-review",
+            cwd: "/workspaces/clisbot-pr67-review",
             updatedAt: "2026-02-20T08:00:00.000Z",
             title: "Needs triage",
             requiresAttention: true,
@@ -3602,7 +3602,7 @@ describe("HostRuntimeStore", () => {
     useSessionStore.getState().setAgents(host.serverId, () => {
       const stale = makeFetchAgentsEntry({
         id: "agent-archived",
-        cwd: "/workspaces/paseo",
+        cwd: "/workspaces/clisbot",
         updatedAt: "2026-03-30T15:29:00.000Z",
         archivedAt: null,
         title: "Stale active copy",
@@ -3769,7 +3769,7 @@ describe("HostRuntimeStore", () => {
 
     await store.upsertDirectConnection({
       serverId: "srv_tls_password",
-      endpoint: "example.paseo.test:7443",
+      endpoint: "example.clisbot.test:7443",
       useTls: true,
       password: "shared-secret",
       label: "tls host",
@@ -3778,9 +3778,9 @@ describe("HostRuntimeStore", () => {
     const host = store.getHosts().find((entry) => entry.serverId === "srv_tls_password");
     expect(host?.connections).toEqual([
       {
-        id: "direct:example.paseo.test:7443",
+        id: "direct:example.clisbot.test:7443",
         type: "directTcp",
-        endpoint: "example.paseo.test:7443",
+        endpoint: "example.clisbot.test:7443",
         useTls: true,
       },
     ]);
@@ -4025,7 +4025,7 @@ describe("readInitialDaemonConnectionHint", () => {
   });
 
   it("parses a valid listen-only hint", () => {
-    (globalThis as Record<string, unknown>).__PASEO_INITIAL_DAEMON_CONNECTION__ = {
+    (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ = {
       listen: "localhost:6767",
     };
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toEqual({
@@ -4035,21 +4035,22 @@ describe("readInitialDaemonConnectionHint", () => {
   });
 
   it("preserves useTls when explicitly true", () => {
-    (globalThis as Record<string, unknown>).__PASEO_INITIAL_DAEMON_CONNECTION__ = {
-      listen: "paseo.example.com:443",
+    (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ = {
+      listen: "clisbot.example.com:443",
       useTls: true,
     };
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toEqual({
-      listen: "paseo.example.com:443",
+      listen: "clisbot.example.com:443",
       useTls: true,
     });
   });
 
   it("ignores invalid shapes", () => {
-    (globalThis as Record<string, unknown>).__PASEO_INITIAL_DAEMON_CONNECTION__ = "localhost:6767";
+    (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ =
+      "localhost:6767";
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toBeNull();
 
-    (globalThis as Record<string, unknown>).__PASEO_INITIAL_DAEMON_CONNECTION__ = {
+    (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ = {
       useTls: true,
     };
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toBeNull();
@@ -4065,7 +4066,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
       ],
     });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
     let remoteProbeStarted = false;
     let finishDesktopStart: (() => void) | undefined;
     const desktopStartPending = new Promise<void>((resolve) => {
@@ -4111,7 +4112,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
       connections: [{ id: "direct:localhost:6799", type: "directTcp", endpoint: "localhost:6799" }],
     });
     const storage = createMemoryHostRuntimeStorage();
-    await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
     const credentialRequests: string[] = [];
     const store = new HostRuntimeStore({
       storage,

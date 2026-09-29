@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/send-forum-topics.ts@5d8067a4483
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import {
   createTelegramNonIdempotentRequestWithDiag,
   createTelegramRequestWithDiag,

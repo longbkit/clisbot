@@ -4,7 +4,7 @@ import { GatewayDispatchEvents } from "discord-api-types/v10";
 import {
   asDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { getGuild, getGuildMember } from "./api.guild.js";
 import { getChannel } from "./api.messages.js";
 import { getUser } from "./api.users.js";

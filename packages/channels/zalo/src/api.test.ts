@@ -1,7 +1,7 @@
 // upstream: extensions/zalo/src/api.test.ts@5d8067a4483
 // Zalo tests cover api plugin behavior.
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { MAX_TIMER_TIMEOUT_MS } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { MAX_TIMER_TIMEOUT_MS } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { resolvePinnedHostnameWithPolicyMock } = vi.hoisted(() => ({

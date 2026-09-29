@@ -1,5 +1,5 @@
 // upstream: extensions/googlechat/src/format.ts@5d8067a4483
-import { sanitizeForPlainText } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+import { sanitizeForPlainText } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import {
   FormatCapabilityProfile,
   markdownToIR,
@@ -7,7 +7,7 @@ import {
   renderMarkdownWithMarkers,
   sanitizeAssistantVisibleText,
   type MarkdownIR,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 
 export const GOOGLE_CHAT_FORMAT_PROFILE = FormatCapabilityProfile.define({
   mechanism: "markdown",

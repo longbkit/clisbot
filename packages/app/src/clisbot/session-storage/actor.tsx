@@ -2,7 +2,7 @@ import { memo, useState, useCallback, useMemo } from "react";
 import { Image, Text, View } from "react-native";
 import { Bot, UserRound } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FOCUSED_PANE_PLACEMENT, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";

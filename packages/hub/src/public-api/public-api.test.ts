@@ -186,8 +186,8 @@ describe("public API interface", () => {
             repositories: ["octocat/starter"],
           },
         ],
-        discord: [{ guildId: "123456789", guildName: "Paseo Guild" }],
-        slack: [{ teamId: "T01234567", teamName: "Paseo Workspace" }],
+        discord: [{ guildId: "123456789", guildName: "Clisbot Guild" }],
+        slack: [{ teamId: "T01234567", teamName: "Clisbot Workspace" }],
       },
     );
     ValidatedConfigurationSchema.parse(
@@ -282,7 +282,7 @@ describe("public API interface", () => {
 
 describe("generated public OpenAPI", () => {
   it("contains only public v1 operations with complete auth, scopes, statuses, and schemas", async () => {
-    const temporaryDirectory = await mkdtemp(join(tmpdir(), "paseo-openapi-"));
+    const temporaryDirectory = await mkdtemp(join(tmpdir(), "clisbot-openapi-"));
     const documentPath = join(temporaryDirectory, "openapi.json");
     try {
       await writeFile(documentPath, JSON.stringify(publicOpenApiDocument), "utf8");
@@ -476,8 +476,8 @@ function successfulOperations(): PublicOperations {
             repositories: ["octocat/starter"],
           },
         ],
-        discord: [{ guildId: "123456789", guildName: "Paseo Guild" }],
-        slack: [{ teamId: "T01234567", teamName: "Paseo Workspace" }],
+        discord: [{ guildId: "123456789", guildName: "Clisbot Guild" }],
+        slack: [{ teamId: "T01234567", teamName: "Clisbot Workspace" }],
       }),
     validateConfiguration: () =>
       Promise.resolve({
@@ -533,8 +533,9 @@ function installRequest(path: string, requestId: string = randomUUID()): Request
       projectSlug: "project",
       files: [
         {
-          path: ".paseo/hub.yml",
-          content: "environments:\n  runner:\n    kind: docker\n    image: paseo/test\nagents: {}",
+          path: ".clisbot/hub.yml",
+          content:
+            "environments:\n  runner:\n    kind: docker\n    image: clisbot/test\nagents: {}",
         },
       ],
     }),

@@ -111,10 +111,10 @@ describe("workflow compiler", () => {
   });
 
   it.each([
-    "paseo.event.github.delivery_id",
-    "paseo.prompt",
-    "paseo.context",
-    "paseo.inputs.repo",
+    "clisbot.event.github.delivery_id",
+    "clisbot.prompt",
+    "clisbot.context",
+    "clisbot.inputs.repo",
     "values.branch",
     "steps.prepare.outputs.branch",
   ])("rejects unsupported newBranch expression %s with field provenance", (expression) => {
@@ -142,7 +142,7 @@ describe("workflow compiler", () => {
         ]);
         assert.match(
           error.message,
-          /unsupported path|execution templates support only paseo\.execution\.id paths/iu,
+          /unsupported path|execution templates support only clisbot\.execution\.id paths/iu,
         );
         return true;
       },
@@ -158,7 +158,7 @@ describe("workflow compiler", () => {
             ...environment,
             worktree: {
               mode: "branch-off",
-              newBranch: "trigger-${{ paseo.execution.id }}",
+              newBranch: "trigger-${{ clisbot.execution.id }}",
             },
           },
         ],
@@ -231,19 +231,19 @@ describe("workflow compiler", () => {
       triggers: [
         {
           ...configuration().triggers[0],
-          inputs: { repo: { type: "string", choices: ["paseo", "hub"] } },
+          inputs: { repo: { type: "string", choices: ["clisbot", "hub"] } },
           values: {
-            selected: "${{ paseo.inputs.repo ?? steps.classify.outputs.repo }}",
+            selected: "${{ clisbot.inputs.repo ?? steps.classify.outputs.repo }}",
           },
           steps: [
             {
               ...configuration().triggers[0]!.steps[0],
               id: "classify",
-              if: "${{ paseo.inputs.repo == null }}",
+              if: "${{ clisbot.inputs.repo == null }}",
               output: {
                 schema: {
                   type: "object",
-                  properties: { repo: { enum: ["paseo", "hub"] } },
+                  properties: { repo: { enum: ["clisbot", "hub"] } },
                 },
               },
             },
@@ -251,7 +251,7 @@ describe("workflow compiler", () => {
               ...configuration().triggers[0]!.steps[0],
               id: "work",
               if: "${{ values.selected == 'hub' }}",
-              prompt: [{ text: "${{ paseo.prompt }} / ${{ values.selected }}" }],
+              prompt: [{ text: "${{ clisbot.prompt }} / ${{ values.selected }}" }],
             },
           ],
         },
@@ -314,20 +314,20 @@ describe("workflow compiler", () => {
     const raw = configuration();
     const step = raw.triggers[0]!.steps[0]!;
     Reflect.set(step, "env", {
-      SOME_TOKEN: "prefix-${{ paseo.connections.some-connection.token }}",
+      SOME_TOKEN: "prefix-${{ clisbot.connections.some-connection.token }}",
     });
     Reflect.set(step, "github", {
       connection: "getpaseo-github",
-      repositories: ["getpaseo/paseo"],
+      repositories: ["longbkit/clisbot"],
     });
 
     const compiled = compileHubConfig(raw);
     assert.deepEqual(compiled.triggers[0]?.steps[0]?.env, {
-      SOME_TOKEN: "prefix-${{ paseo.connections.some-connection.token }}",
+      SOME_TOKEN: "prefix-${{ clisbot.connections.some-connection.token }}",
     });
     assert.deepEqual(compiled.triggers[0]?.steps[0]?.github, {
       connection: "getpaseo-github",
-      repositories: ["getpaseo/paseo"],
+      repositories: ["longbkit/clisbot"],
       permissions: { contents: "read" },
       durationMs: 60 * 60 * 1000,
     });
@@ -419,7 +419,7 @@ describe("workflow compiler", () => {
       {
         github: {
           connection: "getpaseo-github",
-          repositories: ["getpaseo/paseo"],
+          repositories: ["longbkit/clisbot"],
           permissions: { contents: "admin" },
         },
         expected: /github\.permissions\.contents.*admin.*not supported/iu,
@@ -427,7 +427,7 @@ describe("workflow compiler", () => {
       {
         github: {
           connection: "getpaseo-github",
-          repositories: ["getpaseo/paseo"],
+          repositories: ["longbkit/clisbot"],
           permissions: { invented: "read" },
         },
         expected: /github\.permissions\.invented.*unknown GitHub permission/iu,
@@ -435,7 +435,7 @@ describe("workflow compiler", () => {
       {
         github: {
           connection: "getpaseo-github",
-          repositories: ["getpaseo/paseo"],
+          repositories: ["longbkit/clisbot"],
           duration: "2h",
         },
         expected: /github\.duration.*must not exceed 1h/iu,
@@ -471,7 +471,7 @@ describe("workflow compiler", () => {
     const step = raw.triggers[0]!.steps[0]!;
     Reflect.set(step, "github", {
       connection: "getpaseo-github",
-      repositories: ["getpaseo/paseo"],
+      repositories: ["longbkit/clisbot"],
       permissions: { [name]: level },
     });
 
@@ -488,7 +488,7 @@ describe("workflow compiler", () => {
       const step = raw.triggers[0]!.steps[0]!;
       Reflect.set(step, "github", {
         connection: "getpaseo-github",
-        repositories: ["getpaseo/paseo"],
+        repositories: ["longbkit/clisbot"],
         permissions: { [name]: "write" },
       });
 
@@ -505,7 +505,7 @@ describe("workflow compiler", () => {
     });
     Reflect.set(step, "github", {
       connection: "getpaseo-github",
-      repositories: ["getpaseo/paseo"],
+      repositories: ["longbkit/clisbot"],
     });
 
     assert.throws(
@@ -522,7 +522,7 @@ describe("workflow compiler", () => {
       Reflect.set(step, "env", { [key]: "user-authored" });
       Reflect.set(step, "github", {
         connection: "getpaseo-github",
-        repositories: ["getpaseo/paseo"],
+        repositories: ["longbkit/clisbot"],
       });
 
       assert.throws(() => compileHubConfig(raw), /reserved by the step-level github authority/iu);
@@ -647,7 +647,7 @@ describe("workflow compiler", () => {
               steps: [
                 {
                   ...trigger.steps[0]!,
-                  agent: { provider: "${{ paseo.prompt }}" },
+                  agent: { provider: "${{ clisbot.prompt }}" },
                 },
               ],
             },
@@ -666,7 +666,7 @@ describe("workflow compiler", () => {
               steps: [
                 {
                   ...trigger.steps[0]!,
-                  agent: { provider: "${{ paseo.inputs.provider }}" },
+                  agent: { provider: "${{ clisbot.inputs.provider }}" },
                 },
               ],
             },
@@ -687,7 +687,7 @@ describe("workflow compiler", () => {
             steps: [
               {
                 ...trigger.steps[0]!,
-                prompt: [{ text: "${{ paseo.context }}" }],
+                prompt: [{ text: "${{ clisbot.context }}" }],
               },
             ],
           },
@@ -701,11 +701,11 @@ describe("workflow compiler", () => {
           triggers: [
             {
               ...trigger,
-              steps: [{ ...trigger.steps[0]!, if: "${{ paseo.context }}" }],
+              steps: [{ ...trigger.steps[0]!, if: "${{ clisbot.context }}" }],
             },
           ],
         }),
-      /paseo\.context outside a step prompt/iu,
+      /clisbot\.context outside a step prompt/iu,
     );
     assert.throws(
       () =>
@@ -717,7 +717,7 @@ describe("workflow compiler", () => {
               steps: [
                 {
                   ...trigger.steps[0]!,
-                  agent: { provider: "${{ paseo.context }}" },
+                  agent: { provider: "${{ clisbot.context }}" },
                 },
               ],
             },
@@ -895,7 +895,7 @@ describe("workflow compiler", () => {
       () =>
         compileHubConfig({
           ...configuration(),
-          environments: [{ name: "docker", kind: "docker", image: "paseo/test" }],
+          environments: [{ name: "docker", kind: "docker", image: "clisbot/test" }],
           triggers: [
             {
               ...trigger,
@@ -909,7 +909,7 @@ describe("workflow compiler", () => {
       () =>
         compileHubConfig({
           ...configuration(),
-          environments: [{ name: "fly", kind: "fly", image: "paseo/test" }],
+          environments: [{ name: "fly", kind: "fly", image: "clisbot/test" }],
           triggers: [
             {
               ...trigger,
@@ -923,7 +923,7 @@ describe("workflow compiler", () => {
       () =>
         compileHubConfig({
           ...configuration(),
-          environments: [environment, { name: "docker", kind: "docker", image: "paseo/test" }],
+          environments: [environment, { name: "docker", kind: "docker", image: "clisbot/test" }],
           triggers: [
             {
               ...trigger,
@@ -933,7 +933,7 @@ describe("workflow compiler", () => {
               steps: [
                 {
                   ...trigger.steps[0]!,
-                  environment: "${{ paseo.inputs.runner }}",
+                  environment: "${{ clisbot.inputs.runner }}",
                 },
               ],
             },

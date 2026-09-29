@@ -7,7 +7,7 @@
 // lifecycle). In Fusion the Hub owns that store and that drain —
 // `channel_ingress_queue` with lease/fencing, per-lane ordering, retry,
 // dead-letter and restart drain (goal slices 1 and 8) — and the shared inbound
-// processor (`@getpaseo/channels-shared` `createInboundEventProcessor`)
+// processor (`@clisbot/channels-shared` `createInboundEventProcessor`)
 // persists the normalized event before it returns.
 //
 // What upstream's ingress DECIDES is kept, verbatim in spirit and in spelling:
@@ -35,13 +35,13 @@
 //   THROW      — admission did NOT happen; the session retries in place
 //                (`fusion/listener-session.ts`).
 
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import {
   collectErrorGraphCandidates,
   extractErrorCode,
-} from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/channel-secret-basic-runtime";
-import { normalizeNullableString as nonEmptyString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/channel-secret-basic-runtime";
+import { normalizeNullableString as nonEmptyString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { normalizeZaloInboundMessage } from "../zalo-js.js";
 import type { Message } from "../zca-client.js";
 import { ThreadType } from "../zca-constants.js";

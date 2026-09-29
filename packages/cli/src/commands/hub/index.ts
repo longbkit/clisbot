@@ -58,7 +58,7 @@ function productionEnvironment(): HubCommandEnvironment {
 
 export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {}): Command {
   const environment = { ...productionEnvironment(), ...overrides };
-  const hub = addHubResolutionHelp(new Command("hub").description("Manage Paseo Hub"));
+  const hub = addHubResolutionHelp(new Command("hub").description("Manage Clisbot Hub"));
 
   // COMPAT(clisbot-hub-local): embedded-Hub lifecycle before the remote verbs.
   hub.addCommand(startLocalHubCommand());

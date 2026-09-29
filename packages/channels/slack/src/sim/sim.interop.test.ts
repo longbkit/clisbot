@@ -7,7 +7,7 @@
 import { SocketModeClient } from "@slack/socket-mode";
 import { ErrorCode, WebClient, type WebAPICallError } from "@slack/web-api";
 import { afterEach, describe, expect, it } from "vitest";
-import { startSlackSim, type SimSlack } from "@getpaseo/channels-shared/sim";
+import { startSlackSim, type SimSlack } from "@clisbot/channels-shared/sim";
 
 let sim: SimSlack | undefined;
 let socket: SocketModeClient | undefined;

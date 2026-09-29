@@ -5,11 +5,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  *
  * A kick to Welcome is followed by a page reload, which clears the browser console unless
  * "Preserve log" is on. Each event is therefore also appended to a small persisted ring, which
- * survives the reload: run `await paseoHostDiagnostics()` in the browser console to read it.
+ * survives the reload: run `await clisbotHostDiagnostics()` in the browser console to read it.
  */
-const STORAGE_KEY = "@paseo:host-diagnostics-v1";
+const STORAGE_KEY = "@clisbot:host-diagnostics-v1";
 const MAX_EVENTS = 100;
-const GLOBAL_READER = "paseoHostDiagnostics";
+const GLOBAL_READER = "clisbotHostDiagnostics";
 
 export interface HostDiagnosticEvent {
   at: string;
@@ -38,7 +38,7 @@ export function recordHostDiagnostic(event: string, detail: Record<string, unkno
     path: currentPath(),
     ...detail,
   };
-  console.warn(`[paseo:host] ${event}`, entry);
+  console.warn(`[clisbot:host] ${event}`, entry);
   writeTail = writeTail.then(() => appendEvent(entry)).catch(() => undefined);
 }
 

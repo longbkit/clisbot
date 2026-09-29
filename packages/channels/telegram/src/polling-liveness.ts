@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/polling-liveness.ts@5d8067a4483
 // Telegram plugin module implements polling liveness behavior.
-import { formatDurationPrecise } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+import { formatDurationPrecise } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 
 type TelegramPollingLivenessTrackerOptions = {
   now?: () => number;

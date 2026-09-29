@@ -23,10 +23,10 @@
 // `polling-liveness.ts`, `polling-status.ts`, `polling-session-restart-policy.ts`
 // and `network-errors.ts`.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import type { ChannelAccountSnapshot } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import type { ChannelAccountSnapshot } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import type { CallbackQuery, Message, Update } from "grammy/types";
 import { resolveTelegramAllowedUpdates } from "../allowed-updates.js";
 import { MEDIA_GROUP_TIMEOUT_MS } from "../bot-updates.js";

@@ -1,9 +1,9 @@
 // upstream: extensions/feishu/src/bitable.ts@5d8067a4483
 // Feishu plugin module implements bitable behavior.
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { optionalPositiveIntegerSchema } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { readPositiveIntegerParam } from "@getpaseo/channels-core/plugin-sdk/param-readers";
+import { optionalPositiveIntegerSchema } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { readPositiveIntegerParam } from "@clisbot/channels-core/plugin-sdk/param-readers";
 import { Type, type TSchema } from "typebox";
 import type { OpenClawPluginApi } from "./fusion/runtime-api.js";
 import { createFeishuToolClient, resolveAnyEnabledFeishuToolsConfig } from "./tool-account.js";

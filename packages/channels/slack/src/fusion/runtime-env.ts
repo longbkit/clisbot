@@ -9,7 +9,7 @@
 // module keeps the barrel's shape for the Slack files that use the formatter
 // spelling: everything comes from core, except the formatters, which are the
 // identity function — the Hub logger owns colour.
-export * from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+export * from "@clisbot/channels-core/plugin-sdk/runtime-env";
 
 /** Theme formatter. The Hub's logger owns presentation, so the text passes through. */
 export function warn(text: string): string {

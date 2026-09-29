@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/message-actions.secretref.test.ts@5d8067a4483
 // Slack tests cover account-isolated message-tool discovery.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
 import { listSlackMessageActions } from "./message-actions.js";
 

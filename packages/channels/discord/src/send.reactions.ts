@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/send.reactions.ts@5d8067a4483
 // Discord plugin module implements send.reactions behavior.
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
 import {
   createOwnMessageReaction,
   deleteOwnMessageReaction,

@@ -5,8 +5,8 @@ import {
   type MessageReceipt,
   type MessageReceiptPartKind,
   type MessageReceiptSourceResult,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import { attachChannelToResults } from "@getpaseo/channels-core/plugin-sdk/channel-send-result";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import { attachChannelToResults } from "@clisbot/channels-core/plugin-sdk/channel-send-result";
 import type { DiscordReplyReference } from "./reply-reference.js";
 import type { DiscordSendResult } from "./send.types.js";
 

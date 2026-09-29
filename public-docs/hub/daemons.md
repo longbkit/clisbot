@@ -8,38 +8,38 @@ category: Hub
 
 # Daemons in Hub
 
-A daemon is one of your machines running the Paseo daemon. Enroll it once with your Hub organization, then triggers can reference it.
+A daemon is one of your machines running the Clisbot daemon. Enroll it once with your Hub organization, then triggers can reference it.
 
 ## Connect
 
 Log in from the machine first:
 
 ```sh
-paseo hub login https://hub.example.com
+clisbot hub login https://hub.example.com
 ```
 
-The CLI prints a URL and a verification code and opens your browser. The approved login is stored under `PASEO_HOME`.
+The CLI prints a URL and a verification code and opens your browser. The approved login is stored under `CLISBOT_HOME`.
 
-In an interactive terminal, login offers to connect this daemon and separately asks whether to allow Hub automations to run agents. Connection defaults to yes; execution permission defaults to no. It then links to **Triggers** and prints `paseo hub init` for creating a starter trigger as code. `--json` or non-TTY login only logs in. [Quickstart](/docs/hub/quickstart) walks through connection and initialization.
+In an interactive terminal, login offers to connect this daemon and separately asks whether to allow Hub automations to run agents. Connection defaults to yes; execution permission defaults to no. It then links to **Triggers** and prints `clisbot hub init` for creating a starter trigger as code. `--json` or non-TTY login only logs in. [Quickstart](/docs/hub/quickstart) walks through connection and initialization.
 
 Enroll the daemon on its own when you declined, or when the machine is already logged in:
 
 ```sh
-paseo hub connect
+clisbot hub connect
 ```
 
 `connect` uses the active login to request a single-use enrollment token. The daemon exchanges it for its own relationship credential; your CLI login is never stored as daemon authority.
 
-A daemon's identity (its server ID and key) lives in its `PASEO_HOME`. Copying that directory to another computer, cloning a VM, or baking it into a container image copies the identity too. Hub refuses to enroll a second daemon with a server ID another Host in the organization already uses, and names that Host. On the copied computer, reset the identity and connect again:
+A daemon's identity (its server ID and key) lives in its `CLISBOT_HOME`. Copying that directory to another computer, cloning a VM, or baking it into a container image copies the identity too. Hub refuses to enroll a second daemon with a server ID another Host in the organization already uses, and names that Host. On the copied computer, reset the identity and connect again:
 
 ```sh
-paseo daemon stop
-paseo daemon reset-identity
-paseo daemon start
-paseo hub login https://hub.example.com
+clisbot daemon stop
+clisbot daemon reset-identity
+clisbot daemon start
+clisbot hub login https://hub.example.com
 ```
 
-`reset-identity` removes `server-id`, `daemon-keypair.json`, and `hub-relationship.json` from `PASEO_HOME`. It refuses while the daemon runs or while `PASEO_SERVER_ID` is set, since that variable would restore the same ID. Hub also accepts connection details from a daemon only for the identity it enrolled with.
+`reset-identity` removes `server-id`, `daemon-keypair.json`, and `hub-relationship.json` from `CLISBOT_HOME`. It refuses while the daemon runs or while `CLISBOT_SERVER_ID` is set, since that variable would restore the same ID. Hub also accepts connection details from a daemon only for the identity it enrolled with.
 
 Hub derives the daemon's initial slug from its hostname. If that slug is already used in the organization, Hub adds a short daemon ID suffix. You can rename the daemon later in Hub.
 
@@ -47,7 +47,7 @@ Each daemon has two identifiers: an immutable generated ID and a friendly slug. 
 
 You can rename the slug later without changing the daemon ID. Configuration referencing the slug must be updated after a rename; references using the immutable ID remain valid.
 
-In Paseo, open **Settings → Hosts → Rename** with an organization Owner or Admin account.
+In Clisbot, open **Settings → Hosts → Rename** with an organization Owner or Admin account.
 The dialog changes the shared Hub name and reports name conflicts inline. Daemon Administrator
 access alone does not grant organization configuration authority. Hosts following the shared name
 update without reconnecting; a local name chosen in Host Appearance stays personal to that app.
@@ -64,30 +64,30 @@ privilege; older daemons reject unknown Project privileges.
 For unattended setup, pass an organization API key without storing it:
 
 ```sh
-PASEO_HUB_URL=https://hub.example.com PASEO_HUB_API_KEY=paseo_pk_... paseo hub connect
+CLISBOT_HUB_URL=https://hub.example.com CLISBOT_HUB_API_KEY=clisbot_pk_... clisbot hub connect
 ```
 
-Origin precedence is explicit `[origin]`, `PASEO_HUB_URL`, active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over the environment and an exact-origin stored login.
+Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over the environment and an exact-origin stored login.
 
 Check and undo:
 
 ```sh
-paseo hub status
-paseo hub disconnect
-paseo hub disconnect --force   # drop local authority when Hub is unreachable
+clisbot hub status
+clisbot hub disconnect
+clisbot hub disconnect --force   # drop local authority when Hub is unreachable
 ```
 
 One daemon has one Hub relationship. Connecting a daemon that already has one is refused.
 
-`paseo hub logout` removes the active CLI login. The daemon's relationship is a separate identity and stays connected.
+`clisbot hub logout` removes the active CLI login. The daemon's relationship is a separate identity and stays connected.
 
 In an interactive terminal, logout offers to disconnect a daemon enrolled with the same Hub. Accepting disconnects first and then deletes the login, so a failed disconnection keeps your credential. Declining removes only the login.
 
 Noninteractive and `--json` logout never disconnect implicitly:
 
 ```sh
-paseo hub logout --disconnect-daemon           # remove both identities
-paseo hub logout --disconnect-daemon --force   # drop local authority when Hub is unreachable
+clisbot hub logout --disconnect-daemon           # remove both identities
+clisbot hub logout --disconnect-daemon --force   # drop local authority when Hub is unreachable
 ```
 
 ## Reference it from configuration
@@ -109,11 +109,11 @@ To keep executions off your working tree, add a worktree:
 ```yaml
 worktree:
   mode: branch-off
-  newBranch: trigger-${{ paseo.execution.id }}
+  newBranch: trigger-${{ clisbot.execution.id }}
   base: origin/main
 ```
 
-`${{ paseo.execution.id }}` renders the execution's UUID, so every execution gets its own branch off `origin/main`.
+`${{ clisbot.execution.id }}` renders the execution's UUID, so every execution gets its own branch off `origin/main`.
 
 [Environment fields](/docs/hub/configuration/hub-yml#environments) lists what `newBranch` accepts. See [Git worktrees](/docs/worktrees) for setup hooks and scripts.
 

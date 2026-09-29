@@ -11,7 +11,7 @@ function password() {
   const eq = raw.indexOf("=");
   return eq > 0 ? raw.slice(eq + 1).trim() : raw;
 }
-const socket = new WebSocket(URL, [`paseo.bearer.${password()}`]);
+const socket = new WebSocket(URL, [`clisbot.bearer.${password()}`]);
 let gotInfo = false;
 socket.on("open", () => {
   socket.send(

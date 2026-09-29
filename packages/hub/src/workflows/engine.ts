@@ -1133,7 +1133,7 @@ function stepUsesTriggerContext(
 ): boolean {
   return step.prompt.some((block) =>
     expressionPathsInTemplate(block.kind === "text" ? block.value : block.content).some(
-      (path) => path.namespace === "paseo" && path.path === "context",
+      (path) => path.namespace === "clisbot" && path.path === "context",
     ),
   );
 }

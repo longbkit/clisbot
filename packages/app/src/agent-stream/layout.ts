@@ -1,4 +1,4 @@
-import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey } from "@clisbot/protocol/session-authorship";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantBlockSpacing, getGapBetweenStreamItems } from "./spacing";

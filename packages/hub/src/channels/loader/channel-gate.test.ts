@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { assertChannelsEnabled, ChannelsDisabledError, isChannelsEnabled } from "./channel-gate.js";
 
-const KEY = "PASEO_HUB_CHANNELS_ENABLED";
+const KEY = "CLISBOT_HUB_CHANNELS_ENABLED";
 
 describe("isChannelsEnabled", () => {
   it("is enabled by default (key unset)", () => {
@@ -22,12 +22,6 @@ describe("isChannelsEnabled", () => {
     for (const value of ["0", "false", "no", "off", "OFF", "off ", " 0", "False"]) {
       assert.equal(isChannelsEnabled({ [KEY]: value }), false, `expected ${value} disabled`);
     }
-  });
-
-  it("reads the internal (non-alias) env name", () => {
-    // The CLISBOT_* operator alias is resolved to PASEO_HUB_* by env-alias.ts at
-    // process entry; the gate reads only the internal name.
-    assert.equal(isChannelsEnabled({ CLISBOT_HUB_CHANNELS_ENABLED: "0", [KEY]: "1" }), true);
   });
 });
 

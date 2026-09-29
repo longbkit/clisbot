@@ -3,11 +3,11 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
-function clientFor(daemon: TestPaseoDaemon) {
+function clientFor(daemon: TestClisbotDaemon) {
   if (daemon.port === 6767) throw new Error("Production daemon port is forbidden");
   const clients: unknown = Reflect.get(daemon.daemon.agentManager, "clients");
   if (!(clients instanceof Map) || clients.get("codex") !== daemon.config.agentClients?.codex)
@@ -24,11 +24,11 @@ function clientFor(daemon: TestPaseoDaemon) {
 it("downloads linked uploads over real WS and HTTP after archive and capture-off restart, excluding unsent and foreign files", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "session-download-transport-"));
   const staticDirectories: string[] = [];
-  let daemon: TestPaseoDaemon | undefined;
+  let daemon: TestClisbotDaemon | undefined;
   let client: DaemonClient | undefined;
   try {
-    daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: root,
+    daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: root,
       cleanup: false,
       agentSessionStorage: true,
     });
@@ -74,8 +74,8 @@ it("downloads linked uploads over real WS and HTTP after archive and capture-off
     await daemon.close();
     daemon = undefined;
 
-    daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: root,
+    daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: root,
       cleanup: false,
       agentSessionStorage: false,
     });

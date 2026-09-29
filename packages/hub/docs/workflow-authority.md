@@ -1,7 +1,7 @@
 # Workflow step authority
 
 Workflow authority is authored on an individual step. It is not a trigger option,
-agent option, sandbox setting, or Paseo daemon feature.
+agent option, sandbox setting, or Clisbot daemon feature.
 
 ## Generic connection values
 
@@ -10,11 +10,11 @@ connection:
 
 ```yaml
 env:
-  SOME_TOKEN: "${{ paseo.connections.some-connection.token }}"
+  SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}"
 ```
 
 The expression shape is exactly
-`${{ paseo.connections.<connection-slug>.<named-value> }}`. Hub resolves it while
+`${{ clisbot.connections.<connection-slug>.<named-value> }}`. Hub resolves it while
 materializing the selected step, after the project and organization connection
 have been verified. The authored expression, not its resolved value, is retained
 in configuration and durable launch data. Resolved values are not placed in logs
@@ -28,7 +28,7 @@ GitHub authority is opt-in and step-scoped:
 github:
   connection: getpaseo-github
   repositories:
-    - getpaseo/paseo
+    - longbkit/clisbot
   permissions:
     contents: write
     pull_requests: write
@@ -74,7 +74,7 @@ application level. GitHub's returned bot user ID and login form the identity
 The reserved Git environment keys cannot be authored alongside a `github` block;
 activation fails instead of making precedence order observable. Authority is
 materialized independently for each running step. Classifier and skipped steps do
-not receive it, and no Git-specific RPC field is sent to Paseo.
+not receive it, and no Git-specific RPC field is sent to Clisbot.
 
 Graceful Hub shutdown stops the authority owner and retries active lease revocation
 within a bounded shutdown grace period. If upstream revocation remains unavailable,
@@ -83,4 +83,4 @@ retries may continue while the process remains alive. A hard process crash canno
 revocation, so GitHub's upstream one-hour token expiry remains the unavoidable exposure
 boundary until a future persisted lease policy can provide stronger crash recovery.
 
-Public workflow-authority guidance lives in the Paseo repository under `public-docs/`.
+Public workflow-authority guidance lives in the Clisbot repository under `public-docs/`.

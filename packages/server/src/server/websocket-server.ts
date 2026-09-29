@@ -6,10 +6,10 @@ import {
   MANAGED_ACCESS_UNAVAILABLE_REASON,
   MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
   MANAGED_SESSION_SUPERSEDED_REASON,
-} from "@getpaseo/protocol/managed-access";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/managed-access";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { stat } from "node:fs/promises";
-import type { CreationSnapshot } from "@getpaseo/protocol/messages";
+import type { CreationSnapshot } from "@clisbot/protocol/messages";
 import { CreationService } from "./creation/index.js";
 import { MessageReceipts } from "./message-receipts/index.js";
 import { WebSocket, WebSocketServer } from "ws";
@@ -40,8 +40,8 @@ import {
   type WSOutboundMessage,
   wrapSessionMessage,
 } from "./messages.js";
-import { asUint8Array, decodeBinaryFrame } from "@getpaseo/protocol/binary-frames/index";
-import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
+import { asUint8Array, decodeBinaryFrame } from "@clisbot/protocol/binary-frames/index";
+import type { TerminalActivity } from "@clisbot/protocol/terminal-activity";
 import type { HostnamesConfig } from "./hostnames.js";
 import { isHostnameAllowed } from "./hostnames.js";
 import {
@@ -84,7 +84,7 @@ import {
 import {
   buildAgentAttentionNotificationPayload,
   findLatestPermissionRequest,
-} from "@getpaseo/protocol/agent-attention-notification";
+} from "@clisbot/protocol/agent-attention-notification";
 import { createGitHubService } from "../services/github-service.js";
 import type { ForgeService } from "../services/forge-service.js";
 import {
@@ -106,7 +106,7 @@ import {
   CLIENT_SHUTDOWN_RPC_REASON,
   normalizeClientRestartRpcReason,
 } from "./lifecycle-reasons.js";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import type { DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
@@ -240,7 +240,7 @@ function createFallbackWorkspaceGitSnapshot(cwd: string): WorkspaceGitRuntimeSna
       mainRepoRoot: null,
       currentBranch: null,
       remoteUrl: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: null,
       baseRef: null,
       aheadBehind: null,
@@ -274,7 +274,7 @@ function createFallbackWorkspaceGitService(): WorkspaceGitService {
       currentBranch: null,
       remoteUrl: null,
       worktreeRoot: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     }),
     getSnapshot: async (cwd: string) => createFallbackWorkspaceGitSnapshot(cwd),
@@ -643,7 +643,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly workspaceGitService: WorkspaceGitService;
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly downloadTokenStore: DownloadTokenStore;
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   private readonly passwordHash: string | undefined;
   private readonly credentialSource: DaemonAuthConfig | undefined;
   private readonly worktreesRoot: string | undefined;
@@ -718,7 +718,7 @@ export class VoiceAssistantWebSocketServer {
     agentManager: AgentManager,
     agentStorage: AgentStorage,
     downloadTokenStore: DownloadTokenStore,
-    paseoHome: string,
+    clisbotHome: string,
     daemonConfigStore: DaemonConfigStore,
     mcpBaseUrl: string | null,
     wsConfig: WebSocketServerConfig,
@@ -779,12 +779,12 @@ export class VoiceAssistantWebSocketServer {
     this.managedAccess = resolveManagedAccessConfig(wsConfig.managedAccess);
     this.agentManager = agentManager;
     this.agentStorage = agentStorage;
-    this.messageReceipts = new MessageReceipts(join(paseoHome, "agent-requests"));
+    this.messageReceipts = new MessageReceipts(join(clisbotHome, "agent-requests"));
     this.creationService = new CreationService(
-      join(paseoHome, "creations"),
+      join(clisbotHome, "creations"),
       this.logger.child({ module: "creation" }),
       (snapshot) => this.validateCompletedCreation(snapshot),
-      join(paseoHome, "agent-requests"),
+      join(clisbotHome, "agent-requests"),
     );
     this.projectRegistry = projectRegistry ?? createNoopProjectRegistry();
     this.workspaceRegistry = workspaceRegistry ?? createNoopWorkspaceRegistry();
@@ -799,7 +799,7 @@ export class VoiceAssistantWebSocketServer {
     this.workspaceGitService = workspaceGitService ?? createFallbackWorkspaceGitService();
     this.workspaceAutoName = workspaceAutoName;
     this.downloadTokenStore = downloadTokenStore;
-    this.paseoHome = paseoHome;
+    this.clisbotHome = clisbotHome;
     this.passwordHash = auth?.password;
     this.worktreesRoot = daemonRuntimeConfig?.worktreesRoot;
     this.daemonConfigStore = daemonConfigStore;
@@ -851,7 +851,7 @@ export class VoiceAssistantWebSocketServer {
     const pushLogger = this.logger.child({ module: "push" });
     this.pushNotifications = createPushNotifications({
       logger: pushLogger,
-      filePath: join(paseoHome, "push-tokens.json"),
+      filePath: join(clisbotHome, "push-tokens.json"),
     });
     this.pushNotificationSender = pushNotificationSender ?? this.pushNotifications;
 
@@ -1624,7 +1624,7 @@ export class VoiceAssistantWebSocketServer {
       },
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       agentManager: this.agentManager,
       agentStorage: this.agentStorage,

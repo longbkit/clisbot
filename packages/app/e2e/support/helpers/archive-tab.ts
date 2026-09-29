@@ -139,7 +139,7 @@ export async function primeAdditionalPage(page: Page): Promise<void> {
   });
   await page.addInitScript(
     ({ daemon: seededDaemon, preferences: seededPreferences, seedNonce: nonce }) => {
-      const disableOnceKey = "@paseo:e2e-disable-default-seed-once";
+      const disableOnceKey = "@clisbot:e2e-disable-default-seed-once";
       const disableValue = localStorage.getItem(disableOnceKey);
       if (disableValue) {
         localStorage.removeItem(disableOnceKey);
@@ -148,11 +148,11 @@ export async function primeAdditionalPage(page: Page): Promise<void> {
         }
       }
 
-      localStorage.setItem("@paseo:e2e", "1");
-      localStorage.setItem("@paseo:e2e-seed-nonce", nonce);
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([seededDaemon]));
-      localStorage.removeItem("@paseo:settings");
-      localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(seededPreferences));
+      localStorage.setItem("@clisbot:e2e", "1");
+      localStorage.setItem("@clisbot:e2e-seed-nonce", nonce);
+      localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededDaemon]));
+      localStorage.removeItem("@clisbot:settings");
+      localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(seededPreferences));
     },
     { daemon, preferences, seedNonce },
   );
@@ -165,10 +165,10 @@ export async function resetSeededPageState(page: Page): Promise<void> {
   await page.evaluate(
     ({ daemon: seededDaemon, preferences: seededPreferences }) => {
       localStorage.clear();
-      localStorage.setItem("@paseo:e2e", "1");
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([seededDaemon]));
-      localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(seededPreferences));
-      localStorage.removeItem("@paseo:settings");
+      localStorage.setItem("@clisbot:e2e", "1");
+      localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededDaemon]));
+      localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(seededPreferences));
+      localStorage.removeItem("@clisbot:settings");
     },
     { daemon, preferences },
   );

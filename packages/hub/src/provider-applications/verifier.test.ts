@@ -3,7 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { describe, it } from "vitest";
 import { ProviderVerificationError, createProviderApplicationVerifier } from "./index.js";
 
-const DISCORD_IDENTITY = { id: "100", username: "Paseo", bot: true };
+const DISCORD_IDENTITY = { id: "100", username: "Clisbot", bot: true };
 const DISCORD_CONFIGURATION = {
   provider: "discord" as const,
   applicationId: "100",
@@ -52,7 +52,7 @@ describe("provider application verification", () => {
         requests.push(requestUrl(input));
         assert.match(new Headers(init?.headers).get("authorization") ?? "", /^Bearer /u);
         return Promise.resolve(
-          Response.json({ id: 42, name: "Paseo Hub", owner: { login: "acme" } }),
+          Response.json({ id: 42, name: "Clisbot Hub", owner: { login: "acme" } }),
         );
       },
     });
@@ -61,13 +61,13 @@ describe("provider application verification", () => {
       await verifier.verify("github", {
         provider: "github",
         appId: "42",
-        appSlug: "paseo",
+        appSlug: "clisbot",
         clientId: "client",
         clientSecret: "secret",
         privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
         webhookSecret: "webhook",
       }),
-      { provider: "github", id: "42", name: "Paseo Hub", ownerLogin: "acme" },
+      { provider: "github", id: "42", name: "Clisbot Hub", ownerLogin: "acme" },
     );
     assert.deepEqual(requests, ["https://api.github.com/app"]);
   });
@@ -83,7 +83,7 @@ describe("provider application verification", () => {
       verifier.verify("github", {
         provider: "github",
         appId: "42",
-        appSlug: "paseo",
+        appSlug: "clisbot",
         clientId: "client",
         clientSecret: "secret",
         privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
@@ -100,7 +100,7 @@ describe("provider application verification", () => {
     assert.deepEqual(await verifier.verify("discord", DISCORD_CONFIGURATION), {
       provider: "discord",
       id: "100",
-      name: "Paseo",
+      name: "Clisbot",
     });
 
     const token = provider.calls.find((call) => call.url.endsWith("/oauth2/token"));

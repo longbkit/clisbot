@@ -15,13 +15,13 @@
 import {
   normalizeAccountId,
   normalizeOptionalAccountId,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
 import type {
   ChannelMessageActionContext,
   ChannelThreadingToolContext,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { resolveDefaultTelegramAccountId } from "./accounts.js";
 import { noteTelegramMutationRefusal } from "./fusion/message-action-refusal.js";
 import { hasProviderObservedTelegramThreadBinding } from "./fusion/message-thread-observation.js";

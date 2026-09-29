@@ -1,11 +1,11 @@
 // upstream: extensions/slack/src/post-message-identity.ts@5d8067a4483
 // Slack plugin module implements best-effort custom identity fallback for chat.postMessage.
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
   normalizeTrimmedStringList,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type {
   SlackBasePostMessagePayload,
   SlackPostMessagePayload,

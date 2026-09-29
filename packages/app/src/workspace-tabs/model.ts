@@ -1,6 +1,6 @@
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { WorkspaceFileTabTarget } from "@/workspace/file-open";
 
 export interface WorkspaceDraftTabSetup {

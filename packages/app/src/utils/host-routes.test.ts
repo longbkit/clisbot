@@ -50,7 +50,7 @@ describe("workspace route parsing", () => {
 
   it("decodes non-canonical base64url workspace IDs used by older links", () => {
     expect(decodeWorkspaceIdFromPathSegment("L2hvbWUvdXNlci9kZXYvcGFzZW8")).toBe(
-      "/home/user/dev/paseo",
+      "/home/user/dev/clisbot",
     );
   });
 

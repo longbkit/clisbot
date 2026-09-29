@@ -122,7 +122,7 @@ const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
         key: "serviceAccountFile",
         catalogKey: "serviceAccountFile",
         kind: "text",
-        placeholder: "/etc/paseo/googlechat.json",
+        placeholder: "/etc/clisbot/googlechat.json",
       },
     ],
   },

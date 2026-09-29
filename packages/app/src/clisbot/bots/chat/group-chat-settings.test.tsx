@@ -2,7 +2,7 @@
 import React, { type ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { GroupChatSettings } from "./group-chat-settings";
 const state = vi.hoisted(() => ({ supported: true, online: true, update: vi.fn() }));
 vi.mock("@/stores/session-store", () => ({

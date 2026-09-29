@@ -10,7 +10,7 @@ const { isDebugProxyGlobalFetchPatchInstalledMock } = vi.hoisted(() => ({
   isDebugProxyGlobalFetchPatchInstalledMock: vi.fn(() => false),
 }));
 
-vi.mock("@getpaseo/channels-core/plugin-sdk/proxy-capture", () => ({
+vi.mock("@clisbot/channels-core/plugin-sdk/proxy-capture", () => ({
   isDebugProxyGlobalFetchPatchInstalled: isDebugProxyGlobalFetchPatchInstalledMock,
 }));
 

@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/approval-actions.test.ts@5d8067a4483
 // Slack tests cover the transport-private approval callback envelope.
-import { buildApprovalResolutionRef } from "@getpaseo/channels-core/plugin-sdk/approval-reference-runtime";
+import { buildApprovalResolutionRef } from "@clisbot/channels-core/plugin-sdk/approval-reference-runtime";
 import { describe, expect, it } from "vitest";
 import { decodeSlackApprovalAction, encodeSlackApprovalAction } from "./approval-actions.js";
 import { SLACK_BUTTON_VALUE_MAX } from "./presentation.js";

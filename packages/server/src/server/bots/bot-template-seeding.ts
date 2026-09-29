@@ -17,7 +17,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { homedir } from "node:os";
-import type { BotKind } from "@getpaseo/protocol/bots/types";
+import type { BotKind } from "@clisbot/protocol/bots/types";
 
 export interface BotTemplateSeedResult {
   directory: string;

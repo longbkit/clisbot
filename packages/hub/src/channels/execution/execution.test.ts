@@ -2155,8 +2155,8 @@ describe("channel session commands", () => {
       });
       assert.equal(result.outcome?.kind, "command", JSON.stringify(result.outcome));
       assert.match(harness.posted.at(-1)!, /run-a.*running/s);
-      assert.match(harness.posted.at(-1)!, /paseo:\/\/h\/host-a\/agent\/agent-a/);
-      assert.match(harness.posted.at(-1)!, /paseo:\/\/h\/host-b\/agent\/agent-b/);
+      assert.match(harness.posted.at(-1)!, /clisbot:\/\/h\/host-a\/agent\/agent-a/);
+      assert.match(harness.posted.at(-1)!, /clisbot:\/\/h\/host-b\/agent\/agent-b/);
       assert.match(harness.posted.at(-1)!, /review: pending/);
     }
     assert.equal(requests.length, 2);

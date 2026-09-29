@@ -4,7 +4,7 @@ import {
   type SessionAuthorship,
   type SessionActor,
   type SessionChannelReference,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 
 export function copySessionMetadata(value: SessionAuthorship): SessionAuthorship {
   return {

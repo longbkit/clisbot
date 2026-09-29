@@ -1,19 +1,19 @@
 // upstream: extensions/discord/src/group-policy.ts@5d8067a4483
 // Discord plugin module implements group policy behavior.
-import type { ChannelGroupContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelGroupContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   resolveScopeRequireMention,
   resolveScopeToolsPolicy,
   scopeKey,
   type GroupToolPolicyConfig,
   type ScopeTree,
-} from "@getpaseo/channels-core/plugin-sdk/channel-policy";
+} from "@clisbot/channels-core/plugin-sdk/channel-policy";
 import type {
   DiscordConfig,
   OpenClawConfig,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { normalizeAtHashSlug } from "@getpaseo/channels-core/plugin-sdk/string-normalization-runtime";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeAtHashSlug } from "@clisbot/channels-core/plugin-sdk/string-normalization-runtime";
 
 function normalizeDiscordSlug(value?: string | null) {
   return normalizeAtHashSlug(value);

@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vitest";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { probeFeishu } from "@getpaseo/channels-feishu/dist/probe.js";
+import { probeFeishu } from "@clisbot/channels-feishu/dist/probe.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import { configureFeishuConnection, probeFeishuApp } from "./feishu.js";
 import { ChannelCredentialProbeError } from "./probe.js";

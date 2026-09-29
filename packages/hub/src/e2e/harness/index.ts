@@ -11,7 +11,7 @@ import { isHubFinishExecutionToolName } from "../../hub/protocol.js";
 import { DispatchedManualRunSchema, ProblemSchema } from "../../public-api/contracts.js";
 import { runCommand } from "./command.js";
 import { HubFaultProxy } from "./fault-proxy.js";
-import { SourcePaseo } from "./source-paseo.js";
+import { SourceClisbot } from "./source-clisbot.js";
 import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
 import { currentProjectConfigurationFiles } from "../../test-utils/current-project-configuration.js";
 import { createTestCredentialCipher } from "../../credentials/test-utils.js";
@@ -141,7 +141,7 @@ export interface ShutdownEvidence {
 
 export class HubE2E {
   private root = "";
-  private source: SourcePaseo | undefined;
+  private source: SourceClisbot | undefined;
   private workspace = "";
   private hubOrigin = "";
   private proxy: HubFaultProxy | undefined;
@@ -474,14 +474,14 @@ export class HubE2E {
       "    inputs:",
       "      repo:",
       "        type: string",
-      "        choices: [paseo, hub]",
+      "        choices: [clisbot, hub]",
       "    values:",
-      "      selected: '${{ paseo.inputs.repo ?? steps.classify.outputs.repo }}'",
+      "      selected: '${{ clisbot.inputs.repo ?? steps.classify.outputs.repo }}'",
       "    filters:",
       "      from_users: [real-agent-routing-operator]",
       "    steps:",
       "      - id: classify",
-      "        if: '${{ paseo.inputs.repo == null }}'",
+      "        if: '${{ clisbot.inputs.repo == null }}'",
       "        environment: real-agent-routing",
       "        max_runtime: 1h",
       "        idle_timeout: 5m",
@@ -489,7 +489,7 @@ export class HubE2E {
       "        agent:",
       `          provider: ${provider}`,
       ...realAgentOptionsYaml(provider),
-      '        prompt: [{ text: "Classify the request and call finish_execution exactly once with output {repo: hub}. Do not use curl, shell, or direct HTTP. Request: ${{ paseo.prompt }}" }] ',
+      '        prompt: [{ text: "Classify the request and call finish_execution exactly once with output {repo: hub}. Do not use curl, shell, or direct HTTP. Request: ${{ clisbot.prompt }}" }] ',
       "        output:",
       "          schema:",
       "            type: object",
@@ -498,9 +498,9 @@ export class HubE2E {
       "            properties:",
       "              repo:",
       "                type: string",
-      "                enum: [paseo, hub]",
-      "      - id: work-paseo",
-      "        if: \"${{ values.selected == 'paseo' }}\"",
+      "                enum: [clisbot, hub]",
+      "      - id: work-clisbot",
+      "        if: \"${{ values.selected == 'clisbot' }}\"",
       "        environment: real-agent-routing",
       "        max_runtime: 1h",
       "        idle_timeout: 5m",
@@ -915,7 +915,7 @@ export class HubE2E {
 
   relayEvidence() {
     const source = this.requireSource();
-    const config = this.paseoConfig(source.paths.packagesRoot, source.paths.daemonHost);
+    const config = this.clisbotConfig(source.paths.packagesRoot, source.paths.daemonHost);
     const relayOptions = Object.keys(config.daemon.relay).filter((key) => key !== "enabled");
     return {
       enabled: config.daemon.relay.enabled,
@@ -1123,7 +1123,7 @@ export class HubE2E {
   }
 
   private async persistedDaemonAgents(executionId: string) {
-    const agentsRoot = join(this.requireSource().paths.paseoHome, "agents");
+    const agentsRoot = join(this.requireSource().paths.clisbotHome, "agents");
     const files = await readdir(agentsRoot, { recursive: true }).catch(() => []);
     const records = await Promise.all(
       files
@@ -1223,7 +1223,7 @@ export class HubE2E {
   }
 
   private async startResources(): Promise<void> {
-    this.root = await mkdtemp(join(process.env["TMPDIR"] ?? "/tmp", "paseo-hub-e2e-"));
+    this.root = await mkdtemp(join(process.env["TMPDIR"] ?? "/tmp", "clisbot-hub-e2e-"));
     this.workspace = join(this.root, "workspace");
     this.acpRecordFile = join(this.root, "acp-records.jsonl");
     this.outputFile = join(this.root, "hub-outputs.jsonl");
@@ -1266,11 +1266,11 @@ export class HubE2E {
       "Hub child to become healthy",
     );
     MACHINE_KEY = (await readFile(this.machineKeyFile, "utf8")).trim();
-    this.source = await SourcePaseo.start({
+    this.source = await SourceClisbot.start({
       root: this.root,
-      paseoHome: join(this.root, "paseo-home"),
+      clisbotHome: join(this.root, "clisbot-home"),
       daemonHost: this.daemonHost,
-      config: ({ packagesRoot, daemonHost }) => this.paseoConfig(packagesRoot, daemonHost),
+      config: ({ packagesRoot, daemonHost }) => this.clisbotConfig(packagesRoot, daemonHost),
     });
   }
 
@@ -1286,13 +1286,13 @@ export class HubE2E {
         DATABASE_URL: this.requirePostgres().getConnectionUri(),
         PORT: String(this.hubPort),
         HUB_E2E_MACHINE_KEY_FILE: this.machineKeyFile,
-        PASEO_HUB_APP_URL: this.requireProxy().origin,
-        PASEO_HUB_AUTH_SECRET: "hub-e2e-browser-auth-secret-at-least-32-characters",
-        PASEO_REGISTRATION_MODE: "open",
-        PASEO_ORGANIZATION_CREATION: "open",
-        PASEO_BOOTSTRAP_ORGANIZATION: "",
-        PASEO_BOOTSTRAP_OWNER_EMAIL: "",
-        PASEO_BOOTSTRAP_OWNER_PASSWORD: "",
+        CLISBOT_HUB_APP_URL: this.requireProxy().origin,
+        CLISBOT_HUB_AUTH_SECRET: "hub-e2e-browser-auth-secret-at-least-32-characters",
+        CLISBOT_REGISTRATION_MODE: "open",
+        CLISBOT_ORGANIZATION_CREATION: "open",
+        CLISBOT_BOOTSTRAP_ORGANIZATION: "",
+        CLISBOT_BOOTSTRAP_OWNER_EMAIL: "",
+        CLISBOT_BOOTSTRAP_OWNER_PASSWORD: "",
         HUB_E2E_OUTPUT_FILE: this.outputFile,
       },
     });
@@ -1308,7 +1308,7 @@ export class HubE2E {
     MACHINE_KEY = (await readFile(this.machineKeyFile, "utf8")).trim();
   }
 
-  private paseoConfig(packagesRoot: string, daemonHost: string) {
+  private clisbotConfig(packagesRoot: string, daemonHost: string) {
     return {
       version: 1,
       daemon: {
@@ -1459,22 +1459,22 @@ export class HubE2E {
   private async seedCurrentProjectResources(): Promise<void> {
     const providerApplicationId = "A-E2E";
     const credentialEnvelope = createTestCredentialCipher().encrypt(
-      `slack-connection:${providerApplicationId}:paseo`,
+      `slack-connection:${providerApplicationId}:clisbot`,
       { botAccessToken: "xoxb-test" },
     );
     await this.requirePool().query(
       `insert into slack_connections
          (id, organization_id, provider_application_id, team_id, slug, team_name, bot_user_id,
           credential_envelope, scopes)
-       values ('00000000-0000-4000-8000-0000000000c1', 'hub-e2e', $1, 'paseo', 'paseo',
-               'Paseo', 'UBOT', $2, '["app_mentions:read", "chat:write"]'::jsonb)
+       values ('00000000-0000-4000-8000-0000000000c1', 'hub-e2e', $1, 'clisbot', 'clisbot',
+               'Clisbot', 'UBOT', $2, '["app_mentions:read", "chat:write"]'::jsonb)
        on conflict (provider_application_id, team_id) do nothing`,
       [providerApplicationId, credentialEnvelope],
     );
     await this.requirePool().query(
       `insert into discord_connections
          (id, organization_id, guild_id, slug, guild_name)
-       values ('00000000-0000-4000-8000-0000000000c2', 'hub-e2e', 'paseo', 'paseo', 'Paseo')
+       values ('00000000-0000-4000-8000-0000000000c2', 'hub-e2e', 'clisbot', 'clisbot', 'Clisbot')
        on conflict (guild_id) do nothing`,
     );
     await this.requirePool().query(
@@ -1489,7 +1489,7 @@ export class HubE2E {
          (organization_id, connection_id, repository_id, full_name, default_branch)
        values
          ('hub-e2e', '00000000-0000-4000-8000-0000000000c3', 9101, 'getpaseo/hub', 'main'),
-         ('hub-e2e', '00000000-0000-4000-8000-0000000000c3', 9102, 'getpaseo/paseo', 'main')
+         ('hub-e2e', '00000000-0000-4000-8000-0000000000c3', 9102, 'longbkit/clisbot', 'main')
        on conflict (connection_id, repository_id) do nothing`,
     );
   }
@@ -1514,7 +1514,7 @@ export class HubE2E {
         problem.success &&
         problem.data.issues?.some(
           ({ path, message }) =>
-            path[0] === ".paseo/hub.yml" &&
+            path[0] === ".clisbot/hub.yml" &&
             path[1] === "agents" &&
             path.at(-1) === "provider" &&
             /^Provider '.+' is not available$/u.test(message),
@@ -1552,8 +1552,8 @@ export class HubE2E {
     return this.proxy;
   }
 
-  private requireSource(): SourcePaseo {
-    if (!this.source) throw new Error("Source-built Paseo is unavailable");
+  private requireSource(): SourceClisbot {
+    if (!this.source) throw new Error("Source-built Clisbot is unavailable");
     return this.source;
   }
 

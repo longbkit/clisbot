@@ -16,7 +16,7 @@
 // leaves operators DO get (`defaults.inbound.*`) only choose whether a room
 // event is recorded, and whether an edit is re-run as a message.
 
-import type { ChannelInboundFacts, ChannelInboundKind } from "@getpaseo/channels-shared";
+import type { ChannelInboundFacts, ChannelInboundKind } from "@clisbot/channels-shared";
 import type { EffectiveDefaults } from "../config/compile.js";
 import { ORG_DEFAULTS } from "../config/schema.js";
 

@@ -6,15 +6,15 @@ import { test, expect } from "vitest";
 import { resolveLocalPairingOffer } from "./pair.js";
 
 test("offline pairing requires relay consent and saves it in the selected home", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-offline-pair-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-offline-pair-"));
   const home = path.join(root, "home");
   try {
-    expect(await resolveLocalPairingOffer({ paseoHome: home })).toMatchObject({
+    expect(await resolveLocalPairingOffer({ clisbotHome: home })).toMatchObject({
       relayEnabled: false,
       url: null,
     });
     expect(existsSync(home)).toBe(false);
-    const offer = await resolveLocalPairingOffer({ paseoHome: home, enableRelay: true });
+    const offer = await resolveLocalPairingOffer({ clisbotHome: home, enableRelay: true });
     expect(offer.relayEnabled).toBe(true);
     expect(offer.url).toContain("offer=");
     expect(

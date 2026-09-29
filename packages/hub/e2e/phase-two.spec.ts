@@ -26,7 +26,7 @@ const dana = {
   password: "dana-phase-two-password",
 };
 
-test("approves CLI access, then enrolls and manages a Paseo daemon", async ({ hub }) => {
+test("approves CLI access, then enrolls and manages a Clisbot daemon", async ({ hub }) => {
   await hub.signUpAs("alice", alice);
   await hub.createOrganization("alice", "Acme");
 

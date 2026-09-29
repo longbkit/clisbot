@@ -5,7 +5,7 @@ worktree based on `origin/main`.
 
 ## Configure the example
 
-Copy `.paseo` to your repository root, then replace these values:
+Copy `.clisbot` to your repository root, then replace these values:
 
 | Placeholder                         | Value                                    |
 | ----------------------------------- | ---------------------------------------- |
@@ -26,13 +26,13 @@ allowlists narrow; wildcards are not supported.
 From the repository root:
 
 ```sh
-paseo hub deploy -p your-project --dry-run
-paseo hub deploy -p your-project
+clisbot hub deploy -p your-project --dry-run
+clisbot hub deploy -p your-project
 ```
 
 The classifier labels the request without write access. The worker receives the original prompt,
 the classification, and the triggering conversation context. Its GitHub token is limited to the
 configured repository and permissions for one hour.
 
-See the [Hub documentation](https://paseo.sh/docs/hub) for provider setup and configuration
+See the [Hub documentation](https://clisbot.com/docs/hub) for provider setup and configuration
 reference.

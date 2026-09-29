@@ -19,7 +19,7 @@ import path from "node:path";
 /** The directory QR PNGs are written to. Created 0700 when missing. */
 export function resolveZalouserTmpDir(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.ZALOUSER_TMP_DIR?.trim();
-  const dir = configured && configured !== "" ? configured : path.join(os.tmpdir(), "paseo-zalouser");
+  const dir = configured && configured !== "" ? configured : path.join(os.tmpdir(), "clisbot-zalouser");
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
 }

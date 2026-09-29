@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/send.ts@5d8067a4483
 // Zalouser plugin module implements send behavior.
-import { chunkTextRanges } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { chunkTextRanges } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { createZalouserSendReceipt } from "./send-receipt.js";
 import { parseZalouserTextStyles } from "./text-styles.js";
 import type { ZaloEventMessage, ZaloSendOptions, ZaloSendResult } from "./types.js";

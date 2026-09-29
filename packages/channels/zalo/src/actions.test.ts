@@ -1,7 +1,7 @@
 // upstream: extensions/zalo/src/actions.test.ts@5d8067a4483
 // Zalo tests cover actions plugin behavior.
 import http from "node:http";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { zaloMessageActions } from "./actions.js";
 

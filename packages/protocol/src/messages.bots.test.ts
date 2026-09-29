@@ -12,7 +12,7 @@ const bot = {
   kind: "personal",
   projectId: "prj_0123456789abcdef",
   workspaceId: "wks_0123456789abcdef",
-  cwd: "/home/me/.paseo/workspaces/ops-bot",
+  cwd: "/home/me/.clisbot/workspaces/ops-bot",
   launch: { provider: "codex" },
   template: null,
   owner: { kind: "user", id: "owner" },

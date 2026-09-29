@@ -1,14 +1,14 @@
 // upstream: extensions/discord/src/send.components.ts@5d8067a4483
 // Discord plugin module implements send.components behavior.
 import { ChannelType } from "discord-api-types/v10";
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
-import type { MarkdownTableMode, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { extensionForMime } from "@getpaseo/channels-core/plugin-sdk/media-mime";
-import type { OutboundMediaAccess } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import { loadOutboundMediaFromUrl } from "@getpaseo/channels-core/plugin-sdk/outbound-media";
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
-import type { ChunkMode } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
-import { hasNonEmptyString, uniqueStrings } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
+import type { MarkdownTableMode, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { extensionForMime } from "@clisbot/channels-core/plugin-sdk/media-mime";
+import type { OutboundMediaAccess } from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import { loadOutboundMediaFromUrl } from "@clisbot/channels-core/plugin-sdk/outbound-media";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
+import type { ChunkMode } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
+import { hasNonEmptyString, uniqueStrings } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { registerDiscordComponentEntries } from "./components-registry.js";
 import {
   buildDiscordComponentMessage,

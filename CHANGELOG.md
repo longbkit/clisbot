@@ -4,291 +4,291 @@
 
 ### Added
 
-- Added OpenCode v2 support, selected automatically from the installed `opencode` version ([#5198](https://github.com/getpaseo/paseo/pull/5198) by [@karrots](https://github.com/karrots), [@dsingal0](https://github.com/dsingal0))
-- Added task lists from rpiv-todo, pi-goal-x, and Pi's example todo extension to Pi chats ([#5309](https://github.com/getpaseo/paseo/pull/5309))
-- Added subagent runs from pi-subagents, Tintinweb pi-subagents, and Gotgenes pi-subagents to the Subagents track ([#5309](https://github.com/getpaseo/paseo/pull/5309))
-- Added rpiv-ask-user-question dialogs to Pi chats as one question form ([#5309](https://github.com/getpaseo/paseo/pull/5309))
-- Added password checks to relay connections, rejecting an incorrect daemon password; a follow-up release will require the password ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Added a password field to Add host, pairing links, and QR pairing for password-protected daemons ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Added `relay://` connection strings to `paseo daemon pair` ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Added OMP Ask option descriptions to question cards on OMP 17.4.2 and newer ([#3628](https://github.com/getpaseo/paseo/pull/3628) by [@joeshull](https://github.com/joeshull))
+- Added OpenCode v2 support, selected automatically from the installed `opencode` version ([#5198](https://github.com/longbkit/clisbot/pull/5198) by [@karrots](https://github.com/karrots), [@dsingal0](https://github.com/dsingal0))
+- Added task lists from rpiv-todo, pi-goal-x, and Pi's example todo extension to Pi chats ([#5309](https://github.com/longbkit/clisbot/pull/5309))
+- Added subagent runs from pi-subagents, Tintinweb pi-subagents, and Gotgenes pi-subagents to the Subagents track ([#5309](https://github.com/longbkit/clisbot/pull/5309))
+- Added rpiv-ask-user-question dialogs to Pi chats as one question form ([#5309](https://github.com/longbkit/clisbot/pull/5309))
+- Added password checks to relay connections, rejecting an incorrect daemon password; a follow-up release will require the password ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Added a password field to Add host, pairing links, and QR pairing for password-protected daemons ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Added `relay://` connection strings to `clisbot daemon pair` ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Added OMP Ask option descriptions to question cards on OMP 17.4.2 and newer ([#3628](https://github.com/longbkit/clisbot/pull/3628) by [@joeshull](https://github.com/joeshull))
 
 ### Changed
 
-- Changed the CLI and desktop app to connect to a password-protected daemon on the same machine without asking for the password ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Changed a host rejected for its password to show "Password required" or "Incorrect password" on the host and Connections pages ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Reorganized Settings into General, Sidebar, Chat, Terminal, Browser, and Open location pages ([#5459](https://github.com/getpaseo/paseo/pull/5459))
+- Changed the CLI and desktop app to connect to a password-protected daemon on the same machine without asking for the password ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Changed a host rejected for its password to show "Password required" or "Incorrect password" on the host and Connections pages ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Reorganized Settings into General, Sidebar, Chat, Terminal, Browser, and Open location pages ([#5459](https://github.com/longbkit/clisbot/pull/5459))
 
 ### Fixed
 
-- Fixed direct connections failing when the daemon password contains spaces or characters such as `@` or `/` ([#5393](https://github.com/getpaseo/paseo/pull/5393))
-- Fixed existing OpenCode agents failing with `ECONNREFUSED` after the OpenCode server restarts ([#5338](https://github.com/getpaseo/paseo/pull/5338))
-- Fixed messages OpenCode adds on its own appearing in the chat as if the user typed them ([#5434](https://github.com/getpaseo/paseo/pull/5434))
-- Fixed the daemon stopping when `daemon.log` cannot be written, such as on a full disk ([#5445](https://github.com/getpaseo/paseo/pull/5445))
-- Fixed the daemon crashing when opening an archived ACP agent whose worktree was removed ([#5439](https://github.com/getpaseo/paseo/pull/5439) by [@qinkangdeid](https://github.com/qinkangdeid))
-- Fixed existing workspaces missing from the sidebar after the app starts, including after later restarts ([#5394](https://github.com/getpaseo/paseo/pull/5394))
-- Fixed agents on a custom Claude provider with its own `CLAUDE_CONFIG_DIR` opening with an empty chat after a daemon restart ([#5437](https://github.com/getpaseo/paseo/pull/5437))
-- Fixed a custom Codex provider's sessions missing from Import session ([#5446](https://github.com/getpaseo/paseo/pull/5446))
-- Fixed Update daemon and Restart in host settings failing when a provider's version check takes over 1.5s ([#5372](https://github.com/getpaseo/paseo/pull/5372))
-- Fixed `paseo --host <other daemon> run` failing with "Caller agent not found" from inside an agent session ([#5392](https://github.com/getpaseo/paseo/pull/5392))
-- Fixed a Pi chat rewind going back further than the picked message after an earlier rewind ([#5383](https://github.com/getpaseo/paseo/pull/5383))
-- Fixed a Pi chat rewind being undone when the daemon restarts ([#5432](https://github.com/getpaseo/paseo/pull/5432))
-- Fixed Pi agents started without a model ignoring Pi's configured default model ([#5343](https://github.com/getpaseo/paseo/pull/5343))
-- Fixed project skills in a new agent's `/` menu staying stale after the checkout switches branches ([#5415](https://github.com/getpaseo/paseo/pull/5415))
-- Fixed slash commands missing from a new agent's `/` menu on custom ACP providers ([#5411](https://github.com/getpaseo/paseo/pull/5411))
-- Fixed a parent agent receiving a child's finish notification twice after prompting the running child ([#5407](https://github.com/getpaseo/paseo/pull/5407))
-- Fixed a blocking `send_agent_prompt` that outlasts its 30s wait never notifying the caller when the child finishes ([#5347](https://github.com/getpaseo/paseo/pull/5347))
-- Fixed OSC 8 terminal links showing a navigation prompt and opening a blank Paseo window ([#5388](https://github.com/getpaseo/paseo/pull/5388) by [@liujin0506](https://github.com/liujin0506))
-- Fixed the Theme menu not scrolling when plugin themes overflow the window ([#5374](https://github.com/getpaseo/paseo/pull/5374))
-- Fixed a message from today's weekday last week showing only the weekday instead of its date ([#5341](https://github.com/getpaseo/paseo/pull/5341))
-- Fixed `paseo daemon set-password` exiting silently when stdin is not a terminal ([#5358](https://github.com/getpaseo/paseo/pull/5358))
+- Fixed direct connections failing when the daemon password contains spaces or characters such as `@` or `/` ([#5393](https://github.com/longbkit/clisbot/pull/5393))
+- Fixed existing OpenCode agents failing with `ECONNREFUSED` after the OpenCode server restarts ([#5338](https://github.com/longbkit/clisbot/pull/5338))
+- Fixed messages OpenCode adds on its own appearing in the chat as if the user typed them ([#5434](https://github.com/longbkit/clisbot/pull/5434))
+- Fixed the daemon stopping when `daemon.log` cannot be written, such as on a full disk ([#5445](https://github.com/longbkit/clisbot/pull/5445))
+- Fixed the daemon crashing when opening an archived ACP agent whose worktree was removed ([#5439](https://github.com/longbkit/clisbot/pull/5439) by [@qinkangdeid](https://github.com/qinkangdeid))
+- Fixed existing workspaces missing from the sidebar after the app starts, including after later restarts ([#5394](https://github.com/longbkit/clisbot/pull/5394))
+- Fixed agents on a custom Claude provider with its own `CLAUDE_CONFIG_DIR` opening with an empty chat after a daemon restart ([#5437](https://github.com/longbkit/clisbot/pull/5437))
+- Fixed a custom Codex provider's sessions missing from Import session ([#5446](https://github.com/longbkit/clisbot/pull/5446))
+- Fixed Update daemon and Restart in host settings failing when a provider's version check takes over 1.5s ([#5372](https://github.com/longbkit/clisbot/pull/5372))
+- Fixed `clisbot --host <other daemon> run` failing with "Caller agent not found" from inside an agent session ([#5392](https://github.com/longbkit/clisbot/pull/5392))
+- Fixed a Pi chat rewind going back further than the picked message after an earlier rewind ([#5383](https://github.com/longbkit/clisbot/pull/5383))
+- Fixed a Pi chat rewind being undone when the daemon restarts ([#5432](https://github.com/longbkit/clisbot/pull/5432))
+- Fixed Pi agents started without a model ignoring Pi's configured default model ([#5343](https://github.com/longbkit/clisbot/pull/5343))
+- Fixed project skills in a new agent's `/` menu staying stale after the checkout switches branches ([#5415](https://github.com/longbkit/clisbot/pull/5415))
+- Fixed slash commands missing from a new agent's `/` menu on custom ACP providers ([#5411](https://github.com/longbkit/clisbot/pull/5411))
+- Fixed a parent agent receiving a child's finish notification twice after prompting the running child ([#5407](https://github.com/longbkit/clisbot/pull/5407))
+- Fixed a blocking `send_agent_prompt` that outlasts its 30s wait never notifying the caller when the child finishes ([#5347](https://github.com/longbkit/clisbot/pull/5347))
+- Fixed OSC 8 terminal links showing a navigation prompt and opening a blank Clisbot window ([#5388](https://github.com/longbkit/clisbot/pull/5388) by [@liujin0506](https://github.com/liujin0506))
+- Fixed the Theme menu not scrolling when plugin themes overflow the window ([#5374](https://github.com/longbkit/clisbot/pull/5374))
+- Fixed a message from today's weekday last week showing only the weekday instead of its date ([#5341](https://github.com/longbkit/clisbot/pull/5341))
+- Fixed `clisbot daemon set-password` exiting silently when stdin is not a terminal ([#5358](https://github.com/longbkit/clisbot/pull/5358))
 
 ## 0.9.2 - 2026-09-24
 
 ### Added
 
-- Added structured Claude Code launch arguments for session configuration and plugins ([#5206](https://github.com/getpaseo/paseo/pull/5206))
+- Added structured Claude Code launch arguments for session configuration and plugins ([#5206](https://github.com/longbkit/clisbot/pull/5206))
 
 ### Improved
 
-- Reduced background Git polling for repositories the watcher cannot observe ([#5170](https://github.com/getpaseo/paseo/pull/5170))
-- Reduced Add Project directory search time on large home directories ([#5190](https://github.com/getpaseo/paseo/pull/5190))
+- Reduced background Git polling for repositories the watcher cannot observe ([#5170](https://github.com/longbkit/clisbot/pull/5170))
+- Reduced Add Project directory search time on large home directories ([#5190](https://github.com/longbkit/clisbot/pull/5190))
 
 ### Fixed
 
-- Fixed the daemon becoming unresponsive when ignored directories appear after a workspace opens ([c3e1e08](https://github.com/getpaseo/paseo/commit/c3e1e084a068e5895710c43b034ced8ebef256e8) by [@Marcus172](https://github.com/Marcus172))
-- Fixed daemon memory growing after client connections close ([9978988](https://github.com/getpaseo/paseo/commit/9978988e35409a018a52d0d7646f18b51e562346))
-- Fixed a project folder ending in a space crashing the app on load ([#5205](https://github.com/getpaseo/paseo/pull/5205) by [@L4XB](https://github.com/L4XB))
-- Fixed workspace labels missing when an agent screen opens before the sidebar ([#5079](https://github.com/getpaseo/paseo/pull/5079) by [@morven-ai](https://github.com/morven-ai))
-- Fixed workspaces disappearing when their disk or network share is unavailable ([#5227](https://github.com/getpaseo/paseo/pull/5227))
-- Fixed a failed session import making an archived worktree impossible to restore ([#5238](https://github.com/getpaseo/paseo/pull/5238))
-- Fixed archived agent logs failing after Paseo removes their worktree ([#5229](https://github.com/getpaseo/paseo/pull/5229))
-- Fixed a newly created branch pushing to the default branch through an inherited upstream ([#5249](https://github.com/getpaseo/paseo/pull/5249))
-- Fixed fork checkout pull requests disappearing from the workspace after refresh ([#5221](https://github.com/getpaseo/paseo/pull/5221))
-- Fixed agent-created local workspaces accepting a missing path or file ([#5322](https://github.com/getpaseo/paseo/pull/5322))
-- Fixed chat uploads replacing valid characters in original file names with underscores ([#5317](https://github.com/getpaseo/paseo/pull/5317))
-- Fixed multi-select questions dropping checked options or a typed Other answer ([#5320](https://github.com/getpaseo/paseo/pull/5320) by [@ThePharmer](https://github.com/ThePharmer))
-- Fixed Android Back leaving the screen while a bottom sheet is open ([#5245](https://github.com/getpaseo/paseo/pull/5245))
-- Fixed voice mode playing the thinking tone between spoken reply segments ([#5281](https://github.com/getpaseo/paseo/pull/5281))
-- Fixed a Claude slash command sent with an attachment reaching Claude as plain text ([#5240](https://github.com/getpaseo/paseo/pull/5240) by [@joecorkerton](https://github.com/joecorkerton))
-- Fixed Claude rewind after a turn that received no response ([#5285](https://github.com/getpaseo/paseo/pull/5285))
-- Fixed Claude rewind after a turn containing subagent messages ([#5289](https://github.com/getpaseo/paseo/pull/5289))
-- Fixed repeated agent history after refresh when a durable timeline store is configured ([#5286](https://github.com/getpaseo/paseo/pull/5286))
-- Fixed an OMP custom message ending a turn before the provider finished ([#3258](https://github.com/getpaseo/paseo/pull/3258))
-- Fixed a stopped OMP turn appearing as a failed turn ([#5243](https://github.com/getpaseo/paseo/pull/5243))
-- Fixed Stop refusing to settle a Pi or OMP agent whose runtime has exited ([#5235](https://github.com/getpaseo/paseo/pull/5235))
-- Fixed OpenCode agents ignoring their configured permission rules ([#5296](https://github.com/getpaseo/paseo/pull/5296) by [@gurvancampion](https://github.com/gurvancampion))
-- Fixed Codex Default and Read-only modes sending approval requests to Auto-review ([#5239](https://github.com/getpaseo/paseo/pull/5239) by [@HMWCS](https://github.com/HMWCS))
-- Fixed Cursor agent creation after switching from a Fast model to one without Fast ([#5274](https://github.com/getpaseo/paseo/pull/5274) by [@gengjiawen](https://github.com/gengjiawen))
-- Fixed the Fast control missing for GPT-6 Sol and GPT-6 Luna in Codex ([#5273](https://github.com/getpaseo/paseo/pull/5273) by [@basilk15](https://github.com/basilk15), [@colonelpanic8](https://github.com/colonelpanic8))
-- Fixed Claude's configured Fable model missing from the model picker ([#5326](https://github.com/getpaseo/paseo/pull/5326) by [@noahg9](https://github.com/noahg9))
-- Fixed ACP terminals started by the daemon using the wrong agent identity ([#5248](https://github.com/getpaseo/paseo/pull/5248))
-- Fixed an agent's completed plugin session appearing failed after a daemon restart ([#5253](https://github.com/getpaseo/paseo/pull/5253))
-- Fixed plugin reload crashing its subprocess while a provider session closes ([#5231](https://github.com/getpaseo/paseo/pull/5231))
-- Fixed a failed plugin provider request crashing the daemon ([#5298](https://github.com/getpaseo/paseo/pull/5298))
-- Fixed Hub executions being unable to title workspaces they create ([#5302](https://github.com/getpaseo/paseo/pull/5302))
-- Fixed an invalid schedule file preventing the daemon from starting ([#5301](https://github.com/getpaseo/paseo/pull/5301))
-- Fixed an empty `paseo.pid` preventing the daemon from starting ([#5306](https://github.com/getpaseo/paseo/pull/5306))
-- Fixed a recycled daemon PID preventing startup after a reboot ([#5277](https://github.com/getpaseo/paseo/pull/5277))
-- Fixed daemon startup failing on `config.json` saved with a UTF-8 byte order mark ([#5315](https://github.com/getpaseo/paseo/pull/5315))
-- Fixed background daemon startup errors missing from the reported log file ([#5332](https://github.com/getpaseo/paseo/pull/5332))
-- Fixed CLI errors for invalid `config.json` omitting the file and failing field ([#5337](https://github.com/getpaseo/paseo/pull/5337))
-- Fixed the CLI suggesting daemon startup after a password rejection ([#5310](https://github.com/getpaseo/paseo/pull/5310))
-- Fixed Open in editor missing for a password-protected desktop daemon ([#5335](https://github.com/getpaseo/paseo/pull/5335))
-- Fixed `paseo permit ls --json` shortening request IDs needed by `permit allow` and `permit deny` ([#5305](https://github.com/getpaseo/paseo/pull/5305))
-- Fixed a replica cache read spinning when its store keeps rejecting writes ([#5290](https://github.com/getpaseo/paseo/pull/5290))
-- Fixed the MiniMax card showing a raw error for an inactive token subscription ([#5258](https://github.com/getpaseo/paseo/pull/5258))
-- Fixed modified Backspace being rejected as a custom shortcut ([#5224](https://github.com/getpaseo/paseo/pull/5224))
-- Fixed multi-step shortcuts failing when the app updates between steps ([#5255](https://github.com/getpaseo/paseo/pull/5255) by [@colonelpanic8](https://github.com/colonelpanic8))
-- Fixed multi-step shortcuts failing when the second step holds a modifier ([#5272](https://github.com/getpaseo/paseo/pull/5272))
-- Fixed rebound pane-focus shortcuts failing while typing ([#5287](https://github.com/getpaseo/paseo/pull/5287))
+- Fixed the daemon becoming unresponsive when ignored directories appear after a workspace opens ([c3e1e08](https://github.com/longbkit/clisbot/commit/c3e1e084a068e5895710c43b034ced8ebef256e8) by [@Marcus172](https://github.com/Marcus172))
+- Fixed daemon memory growing after client connections close ([9978988](https://github.com/longbkit/clisbot/commit/9978988e35409a018a52d0d7646f18b51e562346))
+- Fixed a project folder ending in a space crashing the app on load ([#5205](https://github.com/longbkit/clisbot/pull/5205) by [@L4XB](https://github.com/L4XB))
+- Fixed workspace labels missing when an agent screen opens before the sidebar ([#5079](https://github.com/longbkit/clisbot/pull/5079) by [@morven-ai](https://github.com/morven-ai))
+- Fixed workspaces disappearing when their disk or network share is unavailable ([#5227](https://github.com/longbkit/clisbot/pull/5227))
+- Fixed a failed session import making an archived worktree impossible to restore ([#5238](https://github.com/longbkit/clisbot/pull/5238))
+- Fixed archived agent logs failing after Clisbot removes their worktree ([#5229](https://github.com/longbkit/clisbot/pull/5229))
+- Fixed a newly created branch pushing to the default branch through an inherited upstream ([#5249](https://github.com/longbkit/clisbot/pull/5249))
+- Fixed fork checkout pull requests disappearing from the workspace after refresh ([#5221](https://github.com/longbkit/clisbot/pull/5221))
+- Fixed agent-created local workspaces accepting a missing path or file ([#5322](https://github.com/longbkit/clisbot/pull/5322))
+- Fixed chat uploads replacing valid characters in original file names with underscores ([#5317](https://github.com/longbkit/clisbot/pull/5317))
+- Fixed multi-select questions dropping checked options or a typed Other answer ([#5320](https://github.com/longbkit/clisbot/pull/5320) by [@ThePharmer](https://github.com/ThePharmer))
+- Fixed Android Back leaving the screen while a bottom sheet is open ([#5245](https://github.com/longbkit/clisbot/pull/5245))
+- Fixed voice mode playing the thinking tone between spoken reply segments ([#5281](https://github.com/longbkit/clisbot/pull/5281))
+- Fixed a Claude slash command sent with an attachment reaching Claude as plain text ([#5240](https://github.com/longbkit/clisbot/pull/5240) by [@joecorkerton](https://github.com/joecorkerton))
+- Fixed Claude rewind after a turn that received no response ([#5285](https://github.com/longbkit/clisbot/pull/5285))
+- Fixed Claude rewind after a turn containing subagent messages ([#5289](https://github.com/longbkit/clisbot/pull/5289))
+- Fixed repeated agent history after refresh when a durable timeline store is configured ([#5286](https://github.com/longbkit/clisbot/pull/5286))
+- Fixed an OMP custom message ending a turn before the provider finished ([#3258](https://github.com/longbkit/clisbot/pull/3258))
+- Fixed a stopped OMP turn appearing as a failed turn ([#5243](https://github.com/longbkit/clisbot/pull/5243))
+- Fixed Stop refusing to settle a Pi or OMP agent whose runtime has exited ([#5235](https://github.com/longbkit/clisbot/pull/5235))
+- Fixed OpenCode agents ignoring their configured permission rules ([#5296](https://github.com/longbkit/clisbot/pull/5296) by [@gurvancampion](https://github.com/gurvancampion))
+- Fixed Codex Default and Read-only modes sending approval requests to Auto-review ([#5239](https://github.com/longbkit/clisbot/pull/5239) by [@HMWCS](https://github.com/HMWCS))
+- Fixed Cursor agent creation after switching from a Fast model to one without Fast ([#5274](https://github.com/longbkit/clisbot/pull/5274) by [@gengjiawen](https://github.com/gengjiawen))
+- Fixed the Fast control missing for GPT-6 Sol and GPT-6 Luna in Codex ([#5273](https://github.com/longbkit/clisbot/pull/5273) by [@basilk15](https://github.com/basilk15), [@colonelpanic8](https://github.com/colonelpanic8))
+- Fixed Claude's configured Fable model missing from the model picker ([#5326](https://github.com/longbkit/clisbot/pull/5326) by [@noahg9](https://github.com/noahg9))
+- Fixed ACP terminals started by the daemon using the wrong agent identity ([#5248](https://github.com/longbkit/clisbot/pull/5248))
+- Fixed an agent's completed plugin session appearing failed after a daemon restart ([#5253](https://github.com/longbkit/clisbot/pull/5253))
+- Fixed plugin reload crashing its subprocess while a provider session closes ([#5231](https://github.com/longbkit/clisbot/pull/5231))
+- Fixed a failed plugin provider request crashing the daemon ([#5298](https://github.com/longbkit/clisbot/pull/5298))
+- Fixed Hub executions being unable to title workspaces they create ([#5302](https://github.com/longbkit/clisbot/pull/5302))
+- Fixed an invalid schedule file preventing the daemon from starting ([#5301](https://github.com/longbkit/clisbot/pull/5301))
+- Fixed an empty `clisbot.pid` preventing the daemon from starting ([#5306](https://github.com/longbkit/clisbot/pull/5306))
+- Fixed a recycled daemon PID preventing startup after a reboot ([#5277](https://github.com/longbkit/clisbot/pull/5277))
+- Fixed daemon startup failing on `config.json` saved with a UTF-8 byte order mark ([#5315](https://github.com/longbkit/clisbot/pull/5315))
+- Fixed background daemon startup errors missing from the reported log file ([#5332](https://github.com/longbkit/clisbot/pull/5332))
+- Fixed CLI errors for invalid `config.json` omitting the file and failing field ([#5337](https://github.com/longbkit/clisbot/pull/5337))
+- Fixed the CLI suggesting daemon startup after a password rejection ([#5310](https://github.com/longbkit/clisbot/pull/5310))
+- Fixed Open in editor missing for a password-protected desktop daemon ([#5335](https://github.com/longbkit/clisbot/pull/5335))
+- Fixed `clisbot permit ls --json` shortening request IDs needed by `permit allow` and `permit deny` ([#5305](https://github.com/longbkit/clisbot/pull/5305))
+- Fixed a replica cache read spinning when its store keeps rejecting writes ([#5290](https://github.com/longbkit/clisbot/pull/5290))
+- Fixed the MiniMax card showing a raw error for an inactive token subscription ([#5258](https://github.com/longbkit/clisbot/pull/5258))
+- Fixed modified Backspace being rejected as a custom shortcut ([#5224](https://github.com/longbkit/clisbot/pull/5224))
+- Fixed multi-step shortcuts failing when the app updates between steps ([#5255](https://github.com/longbkit/clisbot/pull/5255) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Fixed multi-step shortcuts failing when the second step holds a modifier ([#5272](https://github.com/longbkit/clisbot/pull/5272))
+- Fixed rebound pane-focus shortcuts failing while typing ([#5287](https://github.com/longbkit/clisbot/pull/5287))
 
 ## 0.9.1 - 2026-09-22
 
 ### Added
 
-- Added Opus 5.5 to the Claude catalog as its default model, with a 1M context window and Fast Mode, on Claude Code 2.1.280 and newer ([#5200](https://github.com/getpaseo/paseo/pull/5200) by [@leonardourci](https://github.com/leonardourci), [@sebgalind0](https://github.com/sebgalind0), [@rp4ri](https://github.com/rp4ri))
+- Added Opus 5.5 to the Claude catalog as its default model, with a 1M context window and Fast Mode, on Claude Code 2.1.280 and newer ([#5200](https://github.com/longbkit/clisbot/pull/5200) by [@leonardourci](https://github.com/leonardourci), [@sebgalind0](https://github.com/sebgalind0), [@rp4ri](https://github.com/rp4ri))
 
 ### Fixed
 
-- Fixed the sidebar keeping only recently changed conversations after the app reconnects to a daemon ([#5189](https://github.com/getpaseo/paseo/pull/5189) by [@bagutzu](https://github.com/bagutzu))
-- Fixed Import session offering only the newest 100 Codex conversations ([#5174](https://github.com/getpaseo/paseo/pull/5174) by [@3ae3ae](https://github.com/3ae3ae))
-- Fixed a Claude model whose ID carries a minor version, such as Opus 5.5, reverting to its major version in the composer once a turn finished ([#5200](https://github.com/getpaseo/paseo/pull/5200))
+- Fixed the sidebar keeping only recently changed conversations after the app reconnects to a daemon ([#5189](https://github.com/longbkit/clisbot/pull/5189) by [@bagutzu](https://github.com/bagutzu))
+- Fixed Import session offering only the newest 100 Codex conversations ([#5174](https://github.com/longbkit/clisbot/pull/5174) by [@3ae3ae](https://github.com/3ae3ae))
+- Fixed a Claude model whose ID carries a minor version, such as Opus 5.5, reverting to its major version in the composer once a turn finished ([#5200](https://github.com/longbkit/clisbot/pull/5200))
 
 ## 0.9.0 - 2026-09-22
 
 ### Added
 
-- Added Cmd/Ctrl+F Find to file panes, with replacement in editable files ([#4589](https://github.com/getpaseo/paseo/pull/4589))
-- Added Cmd/Ctrl+F Find to terminal scrollback ([#4650](https://github.com/getpaseo/paseo/pull/4650))
-- Added Cmd/Ctrl+F Find to chat, including messages outside the loaded history window ([#4765](https://github.com/getpaseo/paseo/pull/4765))
-- Added Jump to file to mobile Changes, opening the changed-files tree in a sheet ([#4861](https://github.com/getpaseo/paseo/pull/4861))
-- Added automatic Pull request tab opening once per workspace when a PR is detected ([#4956](https://github.com/getpaseo/paseo/pull/4956))
-- Added expandable plan cards, with rejected plans collapsed by default ([#4756](https://github.com/getpaseo/paseo/pull/4756))
-- Added an attachment placeholder with a spinner while a selected file uploads ([#4958](https://github.com/getpaseo/paseo/pull/4958))
-- Added match highlighting to the workspace, agent, project, and branch fields in History search ([#4945](https://github.com/getpaseo/paseo/pull/4945))
+- Added Cmd/Ctrl+F Find to file panes, with replacement in editable files ([#4589](https://github.com/longbkit/clisbot/pull/4589))
+- Added Cmd/Ctrl+F Find to terminal scrollback ([#4650](https://github.com/longbkit/clisbot/pull/4650))
+- Added Cmd/Ctrl+F Find to chat, including messages outside the loaded history window ([#4765](https://github.com/longbkit/clisbot/pull/4765))
+- Added Jump to file to mobile Changes, opening the changed-files tree in a sheet ([#4861](https://github.com/longbkit/clisbot/pull/4861))
+- Added automatic Pull request tab opening once per workspace when a PR is detected ([#4956](https://github.com/longbkit/clisbot/pull/4956))
+- Added expandable plan cards, with rejected plans collapsed by default ([#4756](https://github.com/longbkit/clisbot/pull/4756))
+- Added an attachment placeholder with a spinner while a selected file uploads ([#4958](https://github.com/longbkit/clisbot/pull/4958))
+- Added match highlighting to the workspace, agent, project, and branch fields in History search ([#4945](https://github.com/longbkit/clisbot/pull/4945))
 
 ### Plugins
 
-- Added plugin installation from npm, including scoped packages, versions, tags, and ranges ([#4975](https://github.com/getpaseo/paseo/pull/4975))
-- Added `paseo plugin update` with `--all`, `--check`, and `--yes`, showing the current and proposed revision before approval ([#4975](https://github.com/getpaseo/paseo/pull/4975))
-- Added each plugin's description, source, and installed revision to Settings → Plugins ([#4975](https://github.com/getpaseo/paseo/pull/4975))
-- Added an optional `serverId` to `navigation.openAgent()` and `navigation.openWorkspace()` ([#4942](https://github.com/getpaseo/paseo/pull/4942))
-- Added host discovery through `useHosts()` and host-targeted SDK clients through `getPaseoClient(serverId)` ([#4971](https://github.com/getpaseo/paseo/pull/4971))
-- Added `openExternalUrl()` and `<ExternalLink>` for opening a URL outside Paseo ([#4972](https://github.com/getpaseo/paseo/pull/4972))
-- Added `navigation.openBrowser()` for opening a URL in a workspace browser on desktop ([#4972](https://github.com/getpaseo/paseo/pull/4972))
-- Added a server settings handle returned by `registerSettings()` with `read()` and `subscribe()` ([#4674](https://github.com/getpaseo/paseo/pull/4674) by [@mcowger](https://github.com/mcowger))
-- Changed `assistant_message` transformers to receive the whole accumulated message on each update ([#4675](https://github.com/getpaseo/paseo/pull/4675) by [@mcowger](https://github.com/mcowger), [@jegork](https://github.com/jegork))
-- Changed `tool_call` transformers to receive every original call before Overview groups them ([#4675](https://github.com/getpaseo/paseo/pull/4675))
-- Fixed a plugin session losing its host API permanently after its heartbeat lease expired ([#4912](https://github.com/getpaseo/paseo/pull/4912) by [@gpambrozio](https://github.com/gpambrozio))
-- Fixed plugin build commands failing with `spawn npm ENOENT` on Windows ([#4776](https://github.com/getpaseo/paseo/pull/4776) by [@ABorakati](https://github.com/ABorakati))
-- Fixed ACP text chunks without a `messageId` splitting one reply into a message per chunk ([#4701](https://github.com/getpaseo/paseo/pull/4701) by [@L4XB](https://github.com/L4XB))
-- Fixed nested provider subagents appearing as direct children of the root agent ([#4970](https://github.com/getpaseo/paseo/pull/4970))
+- Added plugin installation from npm, including scoped packages, versions, tags, and ranges ([#4975](https://github.com/longbkit/clisbot/pull/4975))
+- Added `clisbot plugin update` with `--all`, `--check`, and `--yes`, showing the current and proposed revision before approval ([#4975](https://github.com/longbkit/clisbot/pull/4975))
+- Added each plugin's description, source, and installed revision to Settings → Plugins ([#4975](https://github.com/longbkit/clisbot/pull/4975))
+- Added an optional `serverId` to `navigation.openAgent()` and `navigation.openWorkspace()` ([#4942](https://github.com/longbkit/clisbot/pull/4942))
+- Added host discovery through `useHosts()` and host-targeted SDK clients through `getClisbotClient(serverId)` ([#4971](https://github.com/longbkit/clisbot/pull/4971))
+- Added `openExternalUrl()` and `<ExternalLink>` for opening a URL outside Clisbot ([#4972](https://github.com/longbkit/clisbot/pull/4972))
+- Added `navigation.openBrowser()` for opening a URL in a workspace browser on desktop ([#4972](https://github.com/longbkit/clisbot/pull/4972))
+- Added a server settings handle returned by `registerSettings()` with `read()` and `subscribe()` ([#4674](https://github.com/longbkit/clisbot/pull/4674) by [@mcowger](https://github.com/mcowger))
+- Changed `assistant_message` transformers to receive the whole accumulated message on each update ([#4675](https://github.com/longbkit/clisbot/pull/4675) by [@mcowger](https://github.com/mcowger), [@jegork](https://github.com/jegork))
+- Changed `tool_call` transformers to receive every original call before Overview groups them ([#4675](https://github.com/longbkit/clisbot/pull/4675))
+- Fixed a plugin session losing its host API permanently after its heartbeat lease expired ([#4912](https://github.com/longbkit/clisbot/pull/4912) by [@gpambrozio](https://github.com/gpambrozio))
+- Fixed plugin build commands failing with `spawn npm ENOENT` on Windows ([#4776](https://github.com/longbkit/clisbot/pull/4776) by [@ABorakati](https://github.com/ABorakati))
+- Fixed ACP text chunks without a `messageId` splitting one reply into a message per chunk ([#4701](https://github.com/longbkit/clisbot/pull/4701) by [@L4XB](https://github.com/L4XB))
+- Fixed nested provider subagents appearing as direct children of the root agent ([#4970](https://github.com/longbkit/clisbot/pull/4970))
 
 ### Changed
 
-- Changed History search to keep results chronological in date buckets instead of reordering by relevance ([#4945](https://github.com/getpaseo/paseo/pull/4945))
-- Changed workspace Restore to keep the archived agent selected, with its own Unarchive action ([#4736](https://github.com/getpaseo/paseo/pull/4736))
-- Changed the workspace error screen's Retry to Reload, which reopens at the project picker ([#4598](https://github.com/getpaseo/paseo/pull/4598))
-- Changed closing the last content tab to leave the New launcher instead of an unusable pane ([#4844](https://github.com/getpaseo/paseo/pull/4844))
-- Changed `paseo daemon start` to read persistent configuration; removed configuration flags fail with migration instructions ([#4575](https://github.com/getpaseo/paseo/pull/4575))
+- Changed History search to keep results chronological in date buckets instead of reordering by relevance ([#4945](https://github.com/longbkit/clisbot/pull/4945))
+- Changed workspace Restore to keep the archived agent selected, with its own Unarchive action ([#4736](https://github.com/longbkit/clisbot/pull/4736))
+- Changed the workspace error screen's Retry to Reload, which reopens at the project picker ([#4598](https://github.com/longbkit/clisbot/pull/4598))
+- Changed closing the last content tab to leave the New launcher instead of an unusable pane ([#4844](https://github.com/longbkit/clisbot/pull/4844))
+- Changed `clisbot daemon start` to read persistent configuration; removed configuration flags fail with migration instructions ([#4575](https://github.com/longbkit/clisbot/pull/4575))
 
 ### Improved
 
-- Bold, italics, strikethrough, inline code, and link labels stay formatted while a reply streams ([#4742](https://github.com/getpaseo/paseo/pull/4742))
-- Reduced time to first voice audio from 4.80s to 0.95s on a three-sentence reply ([#4927](https://github.com/getpaseo/paseo/pull/4927))
-- Reduced cold diff generation from 11.45s to 2.65s on a 213-file workspace ([#4676](https://github.com/getpaseo/paseo/pull/4676))
-- Reduced desktop memory use, from 290.5 MiB to 152.1 MiB RSS in the Electron main process after loading daemon management ([#5007](https://github.com/getpaseo/paseo/pull/5007))
-- Kept open chats subscribed across view eviction, app backgrounding, and reconnect ([#4863](https://github.com/getpaseo/paseo/pull/4863))
-- Added reconnection and Updating messages status to the chat toast ([#4863](https://github.com/getpaseo/paseo/pull/4863))
-- Kept the app responsive during large uploads by yielding between 128 KiB chunks ([#4958](https://github.com/getpaseo/paseo/pull/4958))
-- Let resident browser pages idle between screenshots while the desktop window is hidden ([#4646](https://github.com/getpaseo/paseo/pull/4646))
+- Bold, italics, strikethrough, inline code, and link labels stay formatted while a reply streams ([#4742](https://github.com/longbkit/clisbot/pull/4742))
+- Reduced time to first voice audio from 4.80s to 0.95s on a three-sentence reply ([#4927](https://github.com/longbkit/clisbot/pull/4927))
+- Reduced cold diff generation from 11.45s to 2.65s on a 213-file workspace ([#4676](https://github.com/longbkit/clisbot/pull/4676))
+- Reduced desktop memory use, from 290.5 MiB to 152.1 MiB RSS in the Electron main process after loading daemon management ([#5007](https://github.com/longbkit/clisbot/pull/5007))
+- Kept open chats subscribed across view eviction, app backgrounding, and reconnect ([#4863](https://github.com/longbkit/clisbot/pull/4863))
+- Added reconnection and Updating messages status to the chat toast ([#4863](https://github.com/longbkit/clisbot/pull/4863))
+- Kept the app responsive during large uploads by yielding between 128 KiB chunks ([#4958](https://github.com/longbkit/clisbot/pull/4958))
+- Let resident browser pages idle between screenshots while the desktop window is hidden ([#4646](https://github.com/longbkit/clisbot/pull/4646))
 
 ### Fixed
 
-- Fixed the daemon exhausting its heap in long conversations with cumulative tool output ([#4838](https://github.com/getpaseo/paseo/pull/4838))
-- Fixed repeated submissions creating several workspaces or agents for one intent ([#4442](https://github.com/getpaseo/paseo/pull/4442))
-- Fixed a crash loop after closing the last content tab in a workspace ([#4844](https://github.com/getpaseo/paseo/pull/4844))
-- Fixed New Agent crashing when an enabled provider published duplicate model IDs ([#4839](https://github.com/getpaseo/paseo/pull/4839))
-- Fixed long drafts growing behind the chat header on Android and iOS ([#4824](https://github.com/getpaseo/paseo/pull/4824))
-- Fixed the Android composer growing taller when the keyboard closed ([#4902](https://github.com/getpaseo/paseo/pull/4902))
-- Fixed the Android composer keeping its height after hold-to-delete emptied a draft ([#4946](https://github.com/getpaseo/paseo/pull/4946))
-- Fixed New workspace setup content not moving up as the composer grows ([#4973](https://github.com/getpaseo/paseo/pull/4973))
-- Fixed the Android timeline scrolling away when tapping or selecting text in a chat ([#5013](https://github.com/getpaseo/paseo/pull/5013))
-- Fixed Paste image failing before an attachment reached the composer on Android ([#4758](https://github.com/getpaseo/paseo/pull/4758))
-- Fixed provider and model pickers not responding on Android tablets ([#4845](https://github.com/getpaseo/paseo/pull/4845) by [@cjcrjc](https://github.com/cjcrjc), [@mkuhl](https://github.com/mkuhl))
-- Fixed Linux desktop packages launching without the Chromium sandbox ([#4447](https://github.com/getpaseo/paseo/pull/4447))
-- Fixed `paseo daemon stop` shutting down a daemon other than the selected one ([#4575](https://github.com/getpaseo/paseo/pull/4575))
-- Fixed restored archived workspaces showing empty Changes and Commits ([#4926](https://github.com/getpaseo/paseo/pull/4926))
-- Fixed a rejected plan appearing below the follow-up message that rejected it ([#4756](https://github.com/getpaseo/paseo/pull/4756))
-- Fixed Cmd/Ctrl+F not opening chat Find while the composer had focus ([#4991](https://github.com/getpaseo/paseo/pull/4991))
-- Fixed the linked pull request going undetected when a branch remote is a repository URL ([#4862](https://github.com/getpaseo/paseo/pull/4862))
-- Fixed a plugin's filtered agent list replacing the app's own directory subscription ([#4596](https://github.com/getpaseo/paseo/pull/4596))
-- Fixed an updated app rejecting daemons that lack independent subscriptions ([#4737](https://github.com/getpaseo/paseo/pull/4737))
-- Fixed workspace and agent creation failing or leaving agent titles at "Loading…" on 0.8.0 and older daemons ([#4895](https://github.com/getpaseo/paseo/pull/4895))
-- Fixed Cursor models showing another model's thinking options ([#4180](https://github.com/getpaseo/paseo/pull/4180) by [@fidelix](https://github.com/fidelix))
-- Fixed Pi model pickers offering thinking levels the model does not support ([#4413](https://github.com/getpaseo/paseo/pull/4413) by [@mcowger](https://github.com/mcowger), [@therainisme](https://github.com/therainisme))
-- Fixed Pi sessions reporting the requested thinking level instead of the one Pi applied ([#4413](https://github.com/getpaseo/paseo/pull/4413))
-- Fixed voice-chat user messages showing the internal prompt wrapper instead of the transcript ([#4927](https://github.com/getpaseo/paseo/pull/4927))
-- Fixed History and Command Center search matching a query assembled from letters in separate words ([#4945](https://github.com/getpaseo/paseo/pull/4945))
-- Fixed workspace titles truncating early on touch layouts behind hidden diff stats ([#4698](https://github.com/getpaseo/paseo/pull/4698))
-- Fixed the Explorer showing `+0 -0` and "No changes" while being dragged open ([#4861](https://github.com/getpaseo/paseo/pull/4861))
-- Fixed the reconnect toast restarting its entrance animation when opening a saved chat ([#4925](https://github.com/getpaseo/paseo/pull/4925))
-- Fixed raised shadows around Android file rows in the changed-files sheet ([#4898](https://github.com/getpaseo/paseo/pull/4898))
+- Fixed the daemon exhausting its heap in long conversations with cumulative tool output ([#4838](https://github.com/longbkit/clisbot/pull/4838))
+- Fixed repeated submissions creating several workspaces or agents for one intent ([#4442](https://github.com/longbkit/clisbot/pull/4442))
+- Fixed a crash loop after closing the last content tab in a workspace ([#4844](https://github.com/longbkit/clisbot/pull/4844))
+- Fixed New Agent crashing when an enabled provider published duplicate model IDs ([#4839](https://github.com/longbkit/clisbot/pull/4839))
+- Fixed long drafts growing behind the chat header on Android and iOS ([#4824](https://github.com/longbkit/clisbot/pull/4824))
+- Fixed the Android composer growing taller when the keyboard closed ([#4902](https://github.com/longbkit/clisbot/pull/4902))
+- Fixed the Android composer keeping its height after hold-to-delete emptied a draft ([#4946](https://github.com/longbkit/clisbot/pull/4946))
+- Fixed New workspace setup content not moving up as the composer grows ([#4973](https://github.com/longbkit/clisbot/pull/4973))
+- Fixed the Android timeline scrolling away when tapping or selecting text in a chat ([#5013](https://github.com/longbkit/clisbot/pull/5013))
+- Fixed Paste image failing before an attachment reached the composer on Android ([#4758](https://github.com/longbkit/clisbot/pull/4758))
+- Fixed provider and model pickers not responding on Android tablets ([#4845](https://github.com/longbkit/clisbot/pull/4845) by [@cjcrjc](https://github.com/cjcrjc), [@mkuhl](https://github.com/mkuhl))
+- Fixed Linux desktop packages launching without the Chromium sandbox ([#4447](https://github.com/longbkit/clisbot/pull/4447))
+- Fixed `clisbot daemon stop` shutting down a daemon other than the selected one ([#4575](https://github.com/longbkit/clisbot/pull/4575))
+- Fixed restored archived workspaces showing empty Changes and Commits ([#4926](https://github.com/longbkit/clisbot/pull/4926))
+- Fixed a rejected plan appearing below the follow-up message that rejected it ([#4756](https://github.com/longbkit/clisbot/pull/4756))
+- Fixed Cmd/Ctrl+F not opening chat Find while the composer had focus ([#4991](https://github.com/longbkit/clisbot/pull/4991))
+- Fixed the linked pull request going undetected when a branch remote is a repository URL ([#4862](https://github.com/longbkit/clisbot/pull/4862))
+- Fixed a plugin's filtered agent list replacing the app's own directory subscription ([#4596](https://github.com/longbkit/clisbot/pull/4596))
+- Fixed an updated app rejecting daemons that lack independent subscriptions ([#4737](https://github.com/longbkit/clisbot/pull/4737))
+- Fixed workspace and agent creation failing or leaving agent titles at "Loading…" on 0.8.0 and older daemons ([#4895](https://github.com/longbkit/clisbot/pull/4895))
+- Fixed Cursor models showing another model's thinking options ([#4180](https://github.com/longbkit/clisbot/pull/4180) by [@fidelix](https://github.com/fidelix))
+- Fixed Pi model pickers offering thinking levels the model does not support ([#4413](https://github.com/longbkit/clisbot/pull/4413) by [@mcowger](https://github.com/mcowger), [@therainisme](https://github.com/therainisme))
+- Fixed Pi sessions reporting the requested thinking level instead of the one Pi applied ([#4413](https://github.com/longbkit/clisbot/pull/4413))
+- Fixed voice-chat user messages showing the internal prompt wrapper instead of the transcript ([#4927](https://github.com/longbkit/clisbot/pull/4927))
+- Fixed History and Command Center search matching a query assembled from letters in separate words ([#4945](https://github.com/longbkit/clisbot/pull/4945))
+- Fixed workspace titles truncating early on touch layouts behind hidden diff stats ([#4698](https://github.com/longbkit/clisbot/pull/4698))
+- Fixed the Explorer showing `+0 -0` and "No changes" while being dragged open ([#4861](https://github.com/longbkit/clisbot/pull/4861))
+- Fixed the reconnect toast restarting its entrance animation when opening a saved chat ([#4925](https://github.com/longbkit/clisbot/pull/4925))
+- Fixed raised shadows around Android file rows in the changed-files sheet ([#4898](https://github.com/longbkit/clisbot/pull/4898))
 
 ## 0.8.0 - 2026-09-10
 
-Paseo 0.8 adds plugin header buttons, custom providers, and richer chat components, alongside fixes for desktop updates and mobile keyboards.
+Clisbot 0.8 adds plugin header buttons, custom providers, and richer chat components, alongside fixes for desktop updates and mobile keyboards.
 
-**Before upgrading:** the macOS desktop app now requires macOS 13 or newer; Linux and Windows support is unchanged. Plugins written for 0.7 need the [0.8 migration guide](https://paseo.sh/docs/plugins/v0.8/migration), including separate client/server entries and the revised composer pill API.
+**Before upgrading:** the macOS desktop app now requires macOS 13 or newer; Linux and Windows support is unchanged. Plugins written for 0.7 need the [0.8 migration guide](https://clisbot.com/docs/plugins/v0.8/migration), including separate client/server entries and the revised composer pill API.
 
 ### Added
 
-- Added answer forms for Codex questions asked while the agent continues working ([#4587](https://github.com/getpaseo/paseo/pull/4587))
-- Added Mark as unread to finished workspaces in the sidebar menu ([#3603](https://github.com/getpaseo/paseo/pull/3603) by [@edihasaj](https://github.com/edihasaj))
-- Added an in-app What's new sheet in the help menu, Settings → About, and desktop update callout ([#4576](https://github.com/getpaseo/paseo/pull/4576))
-- Added Import session to the sidebar footer, History, and Command Center ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Added search, pagination, and workspace filtering to Import session ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Added sidebar item reordering and visibility controls in Appearance settings ([#4203](https://github.com/getpaseo/paseo/pull/4203))
-- Added provider notifications from Pi extensions and OpenCode to the timeline ([#3411](https://github.com/getpaseo/paseo/pull/3411) by [@trim21](https://github.com/trim21))
-- Added a fullscreen Mermaid viewer on web and desktop ([#4107](https://github.com/getpaseo/paseo/pull/4107) by [@gengjiawen](https://github.com/gengjiawen))
-- Added Copy, Copy line, and Select all to the web diff context menu ([#4229](https://github.com/getpaseo/paseo/pull/4229))
-- Added Gajae Code to the ACP provider catalog ([#3471](https://github.com/getpaseo/paseo/pull/3471) by [@Yeachan-Heo](https://github.com/Yeachan-Heo))
-- Added per-provider controls for disabling all or selected Paseo tools ([#4277](https://github.com/getpaseo/paseo/pull/4277) by [@mcowger](https://github.com/mcowger))
-- Added explicit approval before running setup, automatic terminals, or scripts in fork pull request workspaces ([#4215](https://github.com/getpaseo/paseo/pull/4215))
-- Added Hub follow-ups to existing agents, including archived workspace recovery ([#4354](https://github.com/getpaseo/paseo/pull/4354))
-- Added provider catalog discovery to Hub executions ([#4242](https://github.com/getpaseo/paseo/pull/4242))
+- Added answer forms for Codex questions asked while the agent continues working ([#4587](https://github.com/longbkit/clisbot/pull/4587))
+- Added Mark as unread to finished workspaces in the sidebar menu ([#3603](https://github.com/longbkit/clisbot/pull/3603) by [@edihasaj](https://github.com/edihasaj))
+- Added an in-app What's new sheet in the help menu, Settings → About, and desktop update callout ([#4576](https://github.com/longbkit/clisbot/pull/4576))
+- Added Import session to the sidebar footer, History, and Command Center ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Added search, pagination, and workspace filtering to Import session ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Added sidebar item reordering and visibility controls in Appearance settings ([#4203](https://github.com/longbkit/clisbot/pull/4203))
+- Added provider notifications from Pi extensions and OpenCode to the timeline ([#3411](https://github.com/longbkit/clisbot/pull/3411) by [@trim21](https://github.com/trim21))
+- Added a fullscreen Mermaid viewer on web and desktop ([#4107](https://github.com/longbkit/clisbot/pull/4107) by [@gengjiawen](https://github.com/gengjiawen))
+- Added Copy, Copy line, and Select all to the web diff context menu ([#4229](https://github.com/longbkit/clisbot/pull/4229))
+- Added Gajae Code to the ACP provider catalog ([#3471](https://github.com/longbkit/clisbot/pull/3471) by [@Yeachan-Heo](https://github.com/Yeachan-Heo))
+- Added per-provider controls for disabling all or selected Clisbot tools ([#4277](https://github.com/longbkit/clisbot/pull/4277) by [@mcowger](https://github.com/mcowger))
+- Added explicit approval before running setup, automatic terminals, or scripts in fork pull request workspaces ([#4215](https://github.com/longbkit/clisbot/pull/4215))
+- Added Hub follow-ups to existing agents, including archived workspace recovery ([#4354](https://github.com/longbkit/clisbot/pull/4354))
+- Added provider catalog discovery to Hub executions ([#4242](https://github.com/longbkit/clisbot/pull/4242))
 
 ### Plugins
 
-- Added custom providers with their own icons, settings, permissions, and timeline rendering ([#4314](https://github.com/getpaseo/paseo/pull/4314))
-- Added provider session recovery after plugin reload ([#4629](https://github.com/getpaseo/paseo/pull/4629) by [@mcowger](https://github.com/mcowger))
-- Added custom timeline components and persisted timeline rows ([e34aea2](https://github.com/getpaseo/paseo/commit/e34aea206e6ec7ac2d5fa9766db28fb221ae990c))
-- Added client slash commands that run without a provider turn ([e34aea2](https://github.com/getpaseo/paseo/commit/e34aea206e6ec7ac2d5fa9766db28fb221ae990c))
-- Added plugin settings screens under Settings → Plugins ([#4357](https://github.com/getpaseo/paseo/pull/4357))
-- Added lifecycle hooks for agent creation, turns, permissions, and archive events ([#4435](https://github.com/getpaseo/paseo/pull/4435))
-- Added transforms for new agents' provider, model, environment, MCP servers, and workspace isolation ([#4435](https://github.com/getpaseo/paseo/pull/4435))
-- Added header buttons and composer pills with actions, menus, custom popovers, and live updates ([#4577](https://github.com/getpaseo/paseo/pull/4577))
-- Added custom modal bodies with scrolling, keyboard-aware inputs, and clipboard actions ([#4392](https://github.com/getpaseo/paseo/pull/4392))
-- Added terminal creation, input, capture, and management to the SDK ([#4358](https://github.com/getpaseo/paseo/pull/4358))
-- Added live project subscriptions through `paseo.projects.subscribe()` ([#3983](https://github.com/getpaseo/paseo/pull/3983) by [@omercnet](https://github.com/omercnet))
-- Added permission responses through `agent.respondToPermission()` ([#3985](https://github.com/getpaseo/paseo/pull/3985) by [@omercnet](https://github.com/omercnet))
-- Added provider usage queries through `providers.listUsage()` ([#4062](https://github.com/getpaseo/paseo/pull/4062) by [@ivanbrykov](https://github.com/ivanbrykov))
-- Added supported Paseo version requirements to plugin manifests ([#4430](https://github.com/getpaseo/paseo/pull/4430))
-- Changed plugins to separate client and server entries with runtime-specific SDK imports ([#4347](https://github.com/getpaseo/paseo/pull/4347) by [@liujin0506](https://github.com/liujin0506), [@panrafal](https://github.com/panrafal))
-- Changed composer pill registration to use `button`, `registration.update()`, and `registration.remove()` ([#4577](https://github.com/getpaseo/paseo/pull/4577))
-- Changed `paseo plugin ls` to show runtime state, installed commit, and load errors without contacting a remote ([#4265](https://github.com/getpaseo/paseo/pull/4265))
-- Fixed workspace plugin panels missing from the Explorer menu ([#4446](https://github.com/getpaseo/paseo/pull/4446))
+- Added custom providers with their own icons, settings, permissions, and timeline rendering ([#4314](https://github.com/longbkit/clisbot/pull/4314))
+- Added provider session recovery after plugin reload ([#4629](https://github.com/longbkit/clisbot/pull/4629) by [@mcowger](https://github.com/mcowger))
+- Added custom timeline components and persisted timeline rows ([e34aea2](https://github.com/longbkit/clisbot/commit/e34aea206e6ec7ac2d5fa9766db28fb221ae990c))
+- Added client slash commands that run without a provider turn ([e34aea2](https://github.com/longbkit/clisbot/commit/e34aea206e6ec7ac2d5fa9766db28fb221ae990c))
+- Added plugin settings screens under Settings → Plugins ([#4357](https://github.com/longbkit/clisbot/pull/4357))
+- Added lifecycle hooks for agent creation, turns, permissions, and archive events ([#4435](https://github.com/longbkit/clisbot/pull/4435))
+- Added transforms for new agents' provider, model, environment, MCP servers, and workspace isolation ([#4435](https://github.com/longbkit/clisbot/pull/4435))
+- Added header buttons and composer pills with actions, menus, custom popovers, and live updates ([#4577](https://github.com/longbkit/clisbot/pull/4577))
+- Added custom modal bodies with scrolling, keyboard-aware inputs, and clipboard actions ([#4392](https://github.com/longbkit/clisbot/pull/4392))
+- Added terminal creation, input, capture, and management to the SDK ([#4358](https://github.com/longbkit/clisbot/pull/4358))
+- Added live project subscriptions through `clisbot.projects.subscribe()` ([#3983](https://github.com/longbkit/clisbot/pull/3983) by [@omercnet](https://github.com/omercnet))
+- Added permission responses through `agent.respondToPermission()` ([#3985](https://github.com/longbkit/clisbot/pull/3985) by [@omercnet](https://github.com/omercnet))
+- Added provider usage queries through `providers.listUsage()` ([#4062](https://github.com/longbkit/clisbot/pull/4062) by [@ivanbrykov](https://github.com/ivanbrykov))
+- Added supported Clisbot version requirements to plugin manifests ([#4430](https://github.com/longbkit/clisbot/pull/4430))
+- Changed plugins to separate client and server entries with runtime-specific SDK imports ([#4347](https://github.com/longbkit/clisbot/pull/4347) by [@liujin0506](https://github.com/liujin0506), [@panrafal](https://github.com/panrafal))
+- Changed composer pill registration to use `button`, `registration.update()`, and `registration.remove()` ([#4577](https://github.com/longbkit/clisbot/pull/4577))
+- Changed `clisbot plugin ls` to show runtime state, installed commit, and load errors without contacting a remote ([#4265](https://github.com/longbkit/clisbot/pull/4265))
+- Fixed workspace plugin panels missing from the Explorer menu ([#4446](https://github.com/longbkit/clisbot/pull/4446))
 
 ### Changed
 
-- Changed the desktop app to require macOS 13 or newer; macOS 12 stops receiving desktop updates ([#4322](https://github.com/getpaseo/paseo/pull/4322))
-- Changed `--host` to a global CLI option: `paseo --host <target> <command>` ([#4238](https://github.com/getpaseo/paseo/pull/4238))
-- Changed the sidebar footer Home button to Import session ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Changed `paseo hub init` and default `paseo hub deploy` to use organization triggers in `.paseo/triggers/` ([#4517](https://github.com/getpaseo/paseo/pull/4517))
-- Changed Codex Fast availability to the supported model list, including GPT-6 Astra ([#4640](https://github.com/getpaseo/paseo/pull/4640))
-- Changed CLI installs to resolve patched React 19.1.x releases ([#4100](https://github.com/getpaseo/paseo/pull/4100) by [@liujin0506](https://github.com/liujin0506))
+- Changed the desktop app to require macOS 13 or newer; macOS 12 stops receiving desktop updates ([#4322](https://github.com/longbkit/clisbot/pull/4322))
+- Changed `--host` to a global CLI option: `clisbot --host <target> <command>` ([#4238](https://github.com/longbkit/clisbot/pull/4238))
+- Changed the sidebar footer Home button to Import session ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Changed `clisbot hub init` and default `clisbot hub deploy` to use organization triggers in `.clisbot/triggers/` ([#4517](https://github.com/longbkit/clisbot/pull/4517))
+- Changed Codex Fast availability to the supported model list, including GPT-6 Astra ([#4640](https://github.com/longbkit/clisbot/pull/4640))
+- Changed CLI installs to resolve patched React 19.1.x releases ([#4100](https://github.com/longbkit/clisbot/pull/4100) by [@liujin0506](https://github.com/liujin0506))
 
 ### Improved
 
-- Reconnected every host immediately when returning to the app ([#4160](https://github.com/getpaseo/paseo/pull/4160))
-- Smoothed mobile keyboard transitions by moving the timeline and composer together ([#4275](https://github.com/getpaseo/paseo/pull/4275))
-- Reduced stalls when opening large diffs ([#4574](https://github.com/getpaseo/paseo/pull/4574))
-- Reloaded only providers whose configuration changed ([#4332](https://github.com/getpaseo/paseo/pull/4332))
-- Removed unsolicited timeline and catalog traffic from idle SDK connections ([#4470](https://github.com/getpaseo/paseo/pull/4470))
-- Added macOS updater diagnostics to App Diagnostics ([#4322](https://github.com/getpaseo/paseo/pull/4322))
+- Reconnected every host immediately when returning to the app ([#4160](https://github.com/longbkit/clisbot/pull/4160))
+- Smoothed mobile keyboard transitions by moving the timeline and composer together ([#4275](https://github.com/longbkit/clisbot/pull/4275))
+- Reduced stalls when opening large diffs ([#4574](https://github.com/longbkit/clisbot/pull/4574))
+- Reloaded only providers whose configuration changed ([#4332](https://github.com/longbkit/clisbot/pull/4332))
+- Removed unsolicited timeline and catalog traffic from idle SDK connections ([#4470](https://github.com/longbkit/clisbot/pull/4470))
+- Added macOS updater diagnostics to App Diagnostics ([#4322](https://github.com/longbkit/clisbot/pull/4322))
 
 ### Fixed
 
-- Fixed macOS desktop updates closing the app without installing the new version ([#4322](https://github.com/getpaseo/paseo/pull/4322))
-- Fixed the desktop updater reporting up to date before release manifests were available ([#4201](https://github.com/getpaseo/paseo/pull/4201))
-- Fixed `paseo restart` failing from the desktop-installed CLI on Linux `.deb`, RPM, and tarball installs ([#4207](https://github.com/getpaseo/paseo/pull/4207))
-- Fixed the packaged macOS Dock icon rendering oversized ([#4389](https://github.com/getpaseo/paseo/pull/4389))
-- Fixed the mobile terminal keyboard closing and reopening when using toolbar keys or Enter ([#4469](https://github.com/getpaseo/paseo/pull/4469))
-- Fixed cached conversations and workspace lists failing to appear when live updates arrived during loading ([#4436](https://github.com/getpaseo/paseo/pull/4436))
-- Fixed queued messages not sending after a turn completed while the app was in the background ([#4160](https://github.com/getpaseo/paseo/pull/4160))
-- Fixed Codex reloads and follow-ups after workspace archive failing with an active-writer error ([#4353](https://github.com/getpaseo/paseo/pull/4353))
-- Fixed repeated Claude compaction updates leaving extra Compacting rows spinning ([#4391](https://github.com/getpaseo/paseo/pull/4391) by [@tomgrin10](https://github.com/tomgrin10))
-- Fixed Pi agents stuck running after an extension-triggered turn ([#3849](https://github.com/getpaseo/paseo/pull/3849) by [@mjakl](https://github.com/mjakl))
-- Fixed delayed workspace creation navigating away after you switched elsewhere ([#2986](https://github.com/getpaseo/paseo/pull/2986) by [@cleiter](https://github.com/cleiter))
-- Fixed New workspace losing the selected model after creating a workspace ([#4401](https://github.com/getpaseo/paseo/pull/4401))
-- Fixed a crash when the selected provider disappeared during workspace creation ([#4332](https://github.com/getpaseo/paseo/pull/4332))
-- Fixed Codex model rows staying on Loading in the model picker ([#4283](https://github.com/getpaseo/paseo/pull/4283) by [@colonelpanic8](https://github.com/colonelpanic8))
-- Fixed nested subagents appearing under the root agent instead of their actual parent ([#4321](https://github.com/getpaseo/paseo/pull/4321))
-- Fixed repeated tool-call IDs across autonomous turns producing duplicate timeline rows ([140b0bb](https://github.com/getpaseo/paseo/commit/140b0bb716205cf0e00c0ff5b6b3c20af6c79413))
-- Fixed Import session loading forever when one provider hung ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Fixed Import session ignoring Claude Code `/rename` titles ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Fixed importing a session creating a duplicate workspace for an already-open directory ([#4216](https://github.com/getpaseo/paseo/pull/4216))
-- Fixed empty ACP sessions appearing in Import session ([#4335](https://github.com/getpaseo/paseo/pull/4335))
-- Fixed restored terminal titles briefly showing Terminal before loading ([#4553](https://github.com/getpaseo/paseo/pull/4553))
-- Fixed diff file headers lagging behind while scrolling on web and desktop ([#4240](https://github.com/getpaseo/paseo/pull/4240))
-- Fixed Changes and its diff going out of sync when switching between Committed and Uncommitted ([#4199](https://github.com/getpaseo/paseo/pull/4199))
-- Fixed Mermaid diagrams shrinking during streaming or becoming corrupted on reload ([#4210](https://github.com/getpaseo/paseo/pull/4210))
-- Fixed Settings navigation retaining closed views in memory on desktop ([#4228](https://github.com/getpaseo/paseo/pull/4228))
-- Fixed the file watcher missing nested directory changes on Windows ([#4354](https://github.com/getpaseo/paseo/pull/4354))
-- Fixed daemon Git commands allowing a repository's `core.fsmonitor` to execute its own command ([#4208](https://github.com/getpaseo/paseo/pull/4208))
-- Fixed terminal activity reporting for OpenCode 2 sessions ([#4300](https://github.com/getpaseo/paseo/pull/4300) by [@mr-karan](https://github.com/mr-karan))
-- Fixed the website offering downloads for the wrong platform before loading ([#4222](https://github.com/getpaseo/paseo/pull/4222))
+- Fixed macOS desktop updates closing the app without installing the new version ([#4322](https://github.com/longbkit/clisbot/pull/4322))
+- Fixed the desktop updater reporting up to date before release manifests were available ([#4201](https://github.com/longbkit/clisbot/pull/4201))
+- Fixed `clisbot restart` failing from the desktop-installed CLI on Linux `.deb`, RPM, and tarball installs ([#4207](https://github.com/longbkit/clisbot/pull/4207))
+- Fixed the packaged macOS Dock icon rendering oversized ([#4389](https://github.com/longbkit/clisbot/pull/4389))
+- Fixed the mobile terminal keyboard closing and reopening when using toolbar keys or Enter ([#4469](https://github.com/longbkit/clisbot/pull/4469))
+- Fixed cached conversations and workspace lists failing to appear when live updates arrived during loading ([#4436](https://github.com/longbkit/clisbot/pull/4436))
+- Fixed queued messages not sending after a turn completed while the app was in the background ([#4160](https://github.com/longbkit/clisbot/pull/4160))
+- Fixed Codex reloads and follow-ups after workspace archive failing with an active-writer error ([#4353](https://github.com/longbkit/clisbot/pull/4353))
+- Fixed repeated Claude compaction updates leaving extra Compacting rows spinning ([#4391](https://github.com/longbkit/clisbot/pull/4391) by [@tomgrin10](https://github.com/tomgrin10))
+- Fixed Pi agents stuck running after an extension-triggered turn ([#3849](https://github.com/longbkit/clisbot/pull/3849) by [@mjakl](https://github.com/mjakl))
+- Fixed delayed workspace creation navigating away after you switched elsewhere ([#2986](https://github.com/longbkit/clisbot/pull/2986) by [@cleiter](https://github.com/cleiter))
+- Fixed New workspace losing the selected model after creating a workspace ([#4401](https://github.com/longbkit/clisbot/pull/4401))
+- Fixed a crash when the selected provider disappeared during workspace creation ([#4332](https://github.com/longbkit/clisbot/pull/4332))
+- Fixed Codex model rows staying on Loading in the model picker ([#4283](https://github.com/longbkit/clisbot/pull/4283) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Fixed nested subagents appearing under the root agent instead of their actual parent ([#4321](https://github.com/longbkit/clisbot/pull/4321))
+- Fixed repeated tool-call IDs across autonomous turns producing duplicate timeline rows ([140b0bb](https://github.com/longbkit/clisbot/commit/140b0bb716205cf0e00c0ff5b6b3c20af6c79413))
+- Fixed Import session loading forever when one provider hung ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Fixed Import session ignoring Claude Code `/rename` titles ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Fixed importing a session creating a duplicate workspace for an already-open directory ([#4216](https://github.com/longbkit/clisbot/pull/4216))
+- Fixed empty ACP sessions appearing in Import session ([#4335](https://github.com/longbkit/clisbot/pull/4335))
+- Fixed restored terminal titles briefly showing Terminal before loading ([#4553](https://github.com/longbkit/clisbot/pull/4553))
+- Fixed diff file headers lagging behind while scrolling on web and desktop ([#4240](https://github.com/longbkit/clisbot/pull/4240))
+- Fixed Changes and its diff going out of sync when switching between Committed and Uncommitted ([#4199](https://github.com/longbkit/clisbot/pull/4199))
+- Fixed Mermaid diagrams shrinking during streaming or becoming corrupted on reload ([#4210](https://github.com/longbkit/clisbot/pull/4210))
+- Fixed Settings navigation retaining closed views in memory on desktop ([#4228](https://github.com/longbkit/clisbot/pull/4228))
+- Fixed the file watcher missing nested directory changes on Windows ([#4354](https://github.com/longbkit/clisbot/pull/4354))
+- Fixed daemon Git commands allowing a repository's `core.fsmonitor` to execute its own command ([#4208](https://github.com/longbkit/clisbot/pull/4208))
+- Fixed terminal activity reporting for OpenCode 2 sessions ([#4300](https://github.com/longbkit/clisbot/pull/4300) by [@mr-karan](https://github.com/mr-karan))
+- Fixed the website offering downloads for the wrong platform before loading ([#4222](https://github.com/longbkit/clisbot/pull/4222))
 
 ## 0.7.3-beta.1 - 2026-09-09
 
@@ -298,441 +298,441 @@ Paseo 0.8 adds plugin header buttons, custom providers, and richer chat componen
 
 ### Added
 
-- Added active-turn steering for pi agents so new messages reach the running turn without interrupting it ([#3752](https://github.com/getpaseo/paseo/pull/3752) by [@mcowger](https://github.com/mcowger))
-- Added declared build commands and monorepo source paths for Git-hosted plugins ([#4158](https://github.com/getpaseo/paseo/pull/4158))
+- Added active-turn steering for pi agents so new messages reach the running turn without interrupting it ([#3752](https://github.com/longbkit/clisbot/pull/3752) by [@mcowger](https://github.com/mcowger))
+- Added declared build commands and monorepo source paths for Git-hosted plugins ([#4158](https://github.com/longbkit/clisbot/pull/4158))
 
 ### Improved
 
-- Reduced JS stalls while watching a streaming agent on mobile ([#4190](https://github.com/getpaseo/paseo/pull/4190))
+- Reduced JS stalls while watching a streaming agent on mobile ([#4190](https://github.com/longbkit/clisbot/pull/4190))
 
 ### Fixed
 
-- Fixed large and many-file diffs stalling or crashing while opening and scrolling ([#4174](https://github.com/getpaseo/paseo/pull/4174))
-- Fixed mobile sidebar and explorer panels losing their settled position when a JS stall crossed the animation ([#4190](https://github.com/getpaseo/paseo/pull/4190))
-- Fixed a single oversized assistant message crashing the timeline by capping rendered content at 32,000 characters ([#4166](https://github.com/getpaseo/paseo/pull/4166))
-- Fixed Codex rewind failing on paginated threads with Codex 0.151 and later ([#4119](https://github.com/getpaseo/paseo/pull/4119))
-- Fixed Escape closing an image preview also interrupting the running agent ([#4161](https://github.com/getpaseo/paseo/pull/4161))
-- Fixed daemon stop and restart on Windows skipping graceful shutdown and orphaning agent processes ([#4168](https://github.com/getpaseo/paseo/pull/4168))
-- Fixed OMP startup timing out at 10 seconds regardless of the configured RPC timeout ([#4143](https://github.com/getpaseo/paseo/pull/4143) by [@Juns-g](https://github.com/Juns-g))
-- Fixed completed turns without a visible prompt showing no completion time ([#4170](https://github.com/getpaseo/paseo/pull/4170))
-- Fixed Explorer renames replacing an existing file when file identity metadata is unavailable ([#4171](https://github.com/getpaseo/paseo/pull/4171))
+- Fixed large and many-file diffs stalling or crashing while opening and scrolling ([#4174](https://github.com/longbkit/clisbot/pull/4174))
+- Fixed mobile sidebar and explorer panels losing their settled position when a JS stall crossed the animation ([#4190](https://github.com/longbkit/clisbot/pull/4190))
+- Fixed a single oversized assistant message crashing the timeline by capping rendered content at 32,000 characters ([#4166](https://github.com/longbkit/clisbot/pull/4166))
+- Fixed Codex rewind failing on paginated threads with Codex 0.151 and later ([#4119](https://github.com/longbkit/clisbot/pull/4119))
+- Fixed Escape closing an image preview also interrupting the running agent ([#4161](https://github.com/longbkit/clisbot/pull/4161))
+- Fixed daemon stop and restart on Windows skipping graceful shutdown and orphaning agent processes ([#4168](https://github.com/longbkit/clisbot/pull/4168))
+- Fixed OMP startup timing out at 10 seconds regardless of the configured RPC timeout ([#4143](https://github.com/longbkit/clisbot/pull/4143) by [@Juns-g](https://github.com/Juns-g))
+- Fixed completed turns without a visible prompt showing no completion time ([#4170](https://github.com/longbkit/clisbot/pull/4170))
+- Fixed Explorer renames replacing an existing file when file identity metadata is unavailable ([#4171](https://github.com/longbkit/clisbot/pull/4171))
 
 ## 0.7.1 - 2026-09-01
 
 ### Added
 
-- Added Claude Fable 5.1 with a 1M context window ([#4179](https://github.com/getpaseo/paseo/pull/4179))
+- Added Claude Fable 5.1 with a 1M context window ([#4179](https://github.com/longbkit/clisbot/pull/4179))
 
 ## 0.7.0 - 2026-08-31
 
 ### Changed
 
-- Changed the project license to Apache-2.0 ([#3944](https://github.com/getpaseo/paseo/pull/3944))
-- Changed Cmd/Ctrl+E to toggle Explorer visibility without selecting a view ([#3896](https://github.com/getpaseo/paseo/pull/3896))
-- Changed the default mobile content text size from 15px to 16px ([#4111](https://github.com/getpaseo/paseo/pull/4111))
+- Changed the project license to Apache-2.0 ([#3944](https://github.com/longbkit/clisbot/pull/3944))
+- Changed Cmd/Ctrl+E to toggle Explorer visibility without selecting a view ([#3896](https://github.com/longbkit/clisbot/pull/3896))
+- Changed the default mobile content text size from 15px to 16px ([#4111](https://github.com/longbkit/clisbot/pull/4111))
 
 ### Added
 
-- Added plugin installation and updates directly from Git repositories ([#3920](https://github.com/getpaseo/paseo/pull/3920))
-- Added plugin-defined timeline transformations and rendering ([#3940](https://github.com/getpaseo/paseo/pull/3940))
-- Added SSH connections to existing remote daemons from Desktop and CLI ([#3989](https://github.com/getpaseo/paseo/pull/3989) by [@reidlevesque](https://github.com/reidlevesque))
-- Added workspace management and layout actions to the Command Center ([#3013](https://github.com/getpaseo/paseo/pull/3013) by [@cleiter](https://github.com/cleiter))
-- Added contextual composer-pill contributions for plugins ([#3956](https://github.com/getpaseo/paseo/pull/3956))
-- Added host UI primitives for client plugins ([#3967](https://github.com/getpaseo/paseo/pull/3967))
-- Added readable prompts, details, and results for Paseo tool calls ([#4066](https://github.com/getpaseo/paseo/pull/4066))
-- Added zoom and pan to workspace images and assistant timeline previews ([#4032](https://github.com/getpaseo/paseo/pull/4032), [#4049](https://github.com/getpaseo/paseo/pull/4049), [#4064](https://github.com/getpaseo/paseo/pull/4064))
-- Added opening child folders directly in the preferred desktop editor ([#3615](https://github.com/getpaseo/paseo/pull/3615) by [@caikovsky](https://github.com/caikovsky))
-- Added host navigation from plugin surfaces to agents and workspaces ([#3901](https://github.com/getpaseo/paseo/pull/3901) by [@omercnet](https://github.com/omercnet))
-- Added host-rendered icons to plugin client surfaces ([#3903](https://github.com/getpaseo/paseo/pull/3903) by [@omercnet](https://github.com/omercnet))
-- Added semantic surface, border, success, and warning colors to plugin themes ([#3898](https://github.com/getpaseo/paseo/pull/3898) by [@omercnet](https://github.com/omercnet))
-- Added registered project listing to the public plugin SDK ([#3899](https://github.com/getpaseo/paseo/pull/3899) by [@omercnet](https://github.com/omercnet))
-- Added PR and MR number search to the Command Center ([#3008](https://github.com/getpaseo/paseo/pull/3008) by [@cleiter](https://github.com/cleiter))
-- Added session commands to agent SDK handles ([#3719](https://github.com/getpaseo/paseo/pull/3719) by [@gpambrozio](https://github.com/gpambrozio), [@marvin-ambrozio](https://github.com/marvin-ambrozio))
-- Added F-Droid release metadata and stable changelog generation ([#2501](https://github.com/getpaseo/paseo/pull/2501) by [@antonok-edm](https://github.com/antonok-edm))
-- Added Astro syntax highlighting to files, the editor, and diffs ([#3997](https://github.com/getpaseo/paseo/pull/3997))
+- Added plugin installation and updates directly from Git repositories ([#3920](https://github.com/longbkit/clisbot/pull/3920))
+- Added plugin-defined timeline transformations and rendering ([#3940](https://github.com/longbkit/clisbot/pull/3940))
+- Added SSH connections to existing remote daemons from Desktop and CLI ([#3989](https://github.com/longbkit/clisbot/pull/3989) by [@reidlevesque](https://github.com/reidlevesque))
+- Added workspace management and layout actions to the Command Center ([#3013](https://github.com/longbkit/clisbot/pull/3013) by [@cleiter](https://github.com/cleiter))
+- Added contextual composer-pill contributions for plugins ([#3956](https://github.com/longbkit/clisbot/pull/3956))
+- Added host UI primitives for client plugins ([#3967](https://github.com/longbkit/clisbot/pull/3967))
+- Added readable prompts, details, and results for Clisbot tool calls ([#4066](https://github.com/longbkit/clisbot/pull/4066))
+- Added zoom and pan to workspace images and assistant timeline previews ([#4032](https://github.com/longbkit/clisbot/pull/4032), [#4049](https://github.com/longbkit/clisbot/pull/4049), [#4064](https://github.com/longbkit/clisbot/pull/4064))
+- Added opening child folders directly in the preferred desktop editor ([#3615](https://github.com/longbkit/clisbot/pull/3615) by [@caikovsky](https://github.com/caikovsky))
+- Added host navigation from plugin surfaces to agents and workspaces ([#3901](https://github.com/longbkit/clisbot/pull/3901) by [@omercnet](https://github.com/omercnet))
+- Added host-rendered icons to plugin client surfaces ([#3903](https://github.com/longbkit/clisbot/pull/3903) by [@omercnet](https://github.com/omercnet))
+- Added semantic surface, border, success, and warning colors to plugin themes ([#3898](https://github.com/longbkit/clisbot/pull/3898) by [@omercnet](https://github.com/omercnet))
+- Added registered project listing to the public plugin SDK ([#3899](https://github.com/longbkit/clisbot/pull/3899) by [@omercnet](https://github.com/omercnet))
+- Added PR and MR number search to the Command Center ([#3008](https://github.com/longbkit/clisbot/pull/3008) by [@cleiter](https://github.com/cleiter))
+- Added session commands to agent SDK handles ([#3719](https://github.com/longbkit/clisbot/pull/3719) by [@gpambrozio](https://github.com/gpambrozio), [@marvin-ambrozio](https://github.com/marvin-ambrozio))
+- Added F-Droid release metadata and stable changelog generation ([#2501](https://github.com/longbkit/clisbot/pull/2501) by [@antonok-edm](https://github.com/antonok-edm))
+- Added Astro syntax highlighting to files, the editor, and diffs ([#3997](https://github.com/longbkit/clisbot/pull/3997))
 
 ### Improved
 
-- Streamed assistant text at a steady visual rate instead of in arrival lumps ([#3612](https://github.com/getpaseo/paseo/pull/3612) by [@Tommypop2](https://github.com/Tommypop2))
-- Painted cached conversations before unrelated cache restoration and network loading ([#3907](https://github.com/getpaseo/paseo/pull/3907))
-- Reused one OpenCode helper across ordinary agent sessions instead of spawning one per agent ([#4009](https://github.com/getpaseo/paseo/pull/4009))
-- Batched GitHub pull request polling within the reserved API budget ([#3825](https://github.com/getpaseo/paseo/pull/3825) by [@dezchai](https://github.com/dezchai))
-- Added manual, action-required, and warning states to GitLab and Gitea checks ([#2337](https://github.com/getpaseo/paseo/pull/2337) by [@nllptrx](https://github.com/nllptrx))
-- Kept cold-start pull request status checks on the shared GitHub batch path ([#4025](https://github.com/getpaseo/paseo/pull/4025))
+- Streamed assistant text at a steady visual rate instead of in arrival lumps ([#3612](https://github.com/longbkit/clisbot/pull/3612) by [@Tommypop2](https://github.com/Tommypop2))
+- Painted cached conversations before unrelated cache restoration and network loading ([#3907](https://github.com/longbkit/clisbot/pull/3907))
+- Reused one OpenCode helper across ordinary agent sessions instead of spawning one per agent ([#4009](https://github.com/longbkit/clisbot/pull/4009))
+- Batched GitHub pull request polling within the reserved API budget ([#3825](https://github.com/longbkit/clisbot/pull/3825) by [@dezchai](https://github.com/dezchai))
+- Added manual, action-required, and warning states to GitLab and Gitea checks ([#2337](https://github.com/longbkit/clisbot/pull/2337) by [@nllptrx](https://github.com/nllptrx))
+- Kept cold-start pull request status checks on the shared GitHub batch path ([#4025](https://github.com/longbkit/clisbot/pull/4025))
 
 ### Fixed
 
-- Fixed the daemon crashing when a Claude or OMP JSONL process closes during a write ([#4048](https://github.com/getpaseo/paseo/pull/4048))
-- Fixed Android first-message submissions crashing when the keyboard restarted during composer teardown ([#4044](https://github.com/getpaseo/paseo/pull/4044))
-- Fixed long mobile drafts hiding composer controls behind the keyboard ([#4051](https://github.com/getpaseo/paseo/pull/4051))
-- Fixed Android timelines shifting when tapping selectable text ([#4090](https://github.com/getpaseo/paseo/pull/4090))
-- Fixed web and Electron composers losing focus after submission ([#4067](https://github.com/getpaseo/paseo/pull/4067))
-- Fixed Android dictation leaving Bluetooth audio in call-quality routing after capture stopped ([#4069](https://github.com/getpaseo/paseo/pull/4069))
-- Fixed dictation retries timing out after an abandoned partial transcript ([#4065](https://github.com/getpaseo/paseo/pull/4065))
-- Fixed immediate dictation submissions omitting the newest speech segment ([#3968](https://github.com/getpaseo/paseo/pull/3968))
-- Fixed the model selector crashing in iPad desktop layouts ([#3992](https://github.com/getpaseo/paseo/pull/3992) by [@yzim](https://github.com/yzim))
-- Fixed OpenCode child-session prompts missing from provider subagent timelines ([#4055](https://github.com/getpaseo/paseo/pull/4055) by [@mcowger](https://github.com/mcowger))
-- Fixed archived agents disappearing when opened from History ([#4033](https://github.com/getpaseo/paseo/pull/4033))
-- Fixed restored workspace tabs entering reconciliation loops ([#3987](https://github.com/getpaseo/paseo/pull/3987))
-- Fixed archived workspaces returning from durable cache ([#3975](https://github.com/getpaseo/paseo/pull/3975))
-- Fixed Grok unified-billing accounts showing zero credits instead of weekly usage ([#4029](https://github.com/getpaseo/paseo/pull/4029) by [@Lite-G](https://github.com/Lite-G), [@claude](https://github.com/claude))
-- Fixed daemon reconnects stalling while Git processes were queued ([#3945](https://github.com/getpaseo/paseo/pull/3945))
-- Fixed slow Pi and OMP startup requests timing out after 30 seconds ([#4008](https://github.com/getpaseo/paseo/pull/4008))
-- Fixed commits and squash merges bypassing configured Git signing ([#3976](https://github.com/getpaseo/paseo/pull/3976))
-- Fixed Android system navigation covering the Commits controls ([#4005](https://github.com/getpaseo/paseo/pull/4005))
-- Fixed new agent work appearing as reopened tasks ([#4068](https://github.com/getpaseo/paseo/pull/4068))
-- Fixed Markdown literal characters being replaced by typographic symbols ([#3253](https://github.com/getpaseo/paseo/pull/3253) by [@cleiter](https://github.com/cleiter))
-- Fixed rewinding long conversations replaying the complete rebuilt timeline ([#3642](https://github.com/getpaseo/paseo/pull/3642))
-- Fixed rewound prompts remaining blank in the mounted iOS composer ([#3946](https://github.com/getpaseo/paseo/pull/3946))
-- Fixed native plugin setup and async client callbacks failing on iOS ([#3942](https://github.com/getpaseo/paseo/pull/3942))
-- Fixed ACP agents reporting the terminal capability as unavailable ([#3910](https://github.com/getpaseo/paseo/pull/3910) by [@pmilanez](https://github.com/pmilanez))
-- Fixed canceled Claude permission requests leaving stale permission cards ([#3792](https://github.com/getpaseo/paseo/pull/3792))
-- Fixed plugin daemon sessions hiding agents from non-legacy providers ([#3902](https://github.com/getpaseo/paseo/pull/3902) by [@omercnet](https://github.com/omercnet))
-- Fixed manually admitted desktop updates disappearing during readiness checks ([#3865](https://github.com/getpaseo/paseo/pull/3865))
-- Fixed mobile Changes and pull-request actions opening outside Explorer ([#3867](https://github.com/getpaseo/paseo/pull/3867))
-- Fixed older desktop builds deleting settings written by newer builds ([#3909](https://github.com/getpaseo/paseo/pull/3909) by [@cleiter](https://github.com/cleiter))
-- Fixed composer height flashing after returning from Settings ([#3943](https://github.com/getpaseo/paseo/pull/3943))
-- Fixed selected workspaces having no visible highlight in the Light theme ([#3922](https://github.com/getpaseo/paseo/pull/3922) by [@wdaubney](https://github.com/wdaubney))
-- Fixed the scrolling diff order disagreeing with the Changes tree ([#3913](https://github.com/getpaseo/paseo/pull/3913) by [@cleiter](https://github.com/cleiter))
-- Fixed incorrect Spanish translations for Close actions ([#3934](https://github.com/getpaseo/paseo/pull/3934) by [@antonio](https://github.com/antonio))
+- Fixed the daemon crashing when a Claude or OMP JSONL process closes during a write ([#4048](https://github.com/longbkit/clisbot/pull/4048))
+- Fixed Android first-message submissions crashing when the keyboard restarted during composer teardown ([#4044](https://github.com/longbkit/clisbot/pull/4044))
+- Fixed long mobile drafts hiding composer controls behind the keyboard ([#4051](https://github.com/longbkit/clisbot/pull/4051))
+- Fixed Android timelines shifting when tapping selectable text ([#4090](https://github.com/longbkit/clisbot/pull/4090))
+- Fixed web and Electron composers losing focus after submission ([#4067](https://github.com/longbkit/clisbot/pull/4067))
+- Fixed Android dictation leaving Bluetooth audio in call-quality routing after capture stopped ([#4069](https://github.com/longbkit/clisbot/pull/4069))
+- Fixed dictation retries timing out after an abandoned partial transcript ([#4065](https://github.com/longbkit/clisbot/pull/4065))
+- Fixed immediate dictation submissions omitting the newest speech segment ([#3968](https://github.com/longbkit/clisbot/pull/3968))
+- Fixed the model selector crashing in iPad desktop layouts ([#3992](https://github.com/longbkit/clisbot/pull/3992) by [@yzim](https://github.com/yzim))
+- Fixed OpenCode child-session prompts missing from provider subagent timelines ([#4055](https://github.com/longbkit/clisbot/pull/4055) by [@mcowger](https://github.com/mcowger))
+- Fixed archived agents disappearing when opened from History ([#4033](https://github.com/longbkit/clisbot/pull/4033))
+- Fixed restored workspace tabs entering reconciliation loops ([#3987](https://github.com/longbkit/clisbot/pull/3987))
+- Fixed archived workspaces returning from durable cache ([#3975](https://github.com/longbkit/clisbot/pull/3975))
+- Fixed Grok unified-billing accounts showing zero credits instead of weekly usage ([#4029](https://github.com/longbkit/clisbot/pull/4029) by [@Lite-G](https://github.com/Lite-G), [@claude](https://github.com/claude))
+- Fixed daemon reconnects stalling while Git processes were queued ([#3945](https://github.com/longbkit/clisbot/pull/3945))
+- Fixed slow Pi and OMP startup requests timing out after 30 seconds ([#4008](https://github.com/longbkit/clisbot/pull/4008))
+- Fixed commits and squash merges bypassing configured Git signing ([#3976](https://github.com/longbkit/clisbot/pull/3976))
+- Fixed Android system navigation covering the Commits controls ([#4005](https://github.com/longbkit/clisbot/pull/4005))
+- Fixed new agent work appearing as reopened tasks ([#4068](https://github.com/longbkit/clisbot/pull/4068))
+- Fixed Markdown literal characters being replaced by typographic symbols ([#3253](https://github.com/longbkit/clisbot/pull/3253) by [@cleiter](https://github.com/cleiter))
+- Fixed rewinding long conversations replaying the complete rebuilt timeline ([#3642](https://github.com/longbkit/clisbot/pull/3642))
+- Fixed rewound prompts remaining blank in the mounted iOS composer ([#3946](https://github.com/longbkit/clisbot/pull/3946))
+- Fixed native plugin setup and async client callbacks failing on iOS ([#3942](https://github.com/longbkit/clisbot/pull/3942))
+- Fixed ACP agents reporting the terminal capability as unavailable ([#3910](https://github.com/longbkit/clisbot/pull/3910) by [@pmilanez](https://github.com/pmilanez))
+- Fixed canceled Claude permission requests leaving stale permission cards ([#3792](https://github.com/longbkit/clisbot/pull/3792))
+- Fixed plugin daemon sessions hiding agents from non-legacy providers ([#3902](https://github.com/longbkit/clisbot/pull/3902) by [@omercnet](https://github.com/omercnet))
+- Fixed manually admitted desktop updates disappearing during readiness checks ([#3865](https://github.com/longbkit/clisbot/pull/3865))
+- Fixed mobile Changes and pull-request actions opening outside Explorer ([#3867](https://github.com/longbkit/clisbot/pull/3867))
+- Fixed older desktop builds deleting settings written by newer builds ([#3909](https://github.com/longbkit/clisbot/pull/3909) by [@cleiter](https://github.com/cleiter))
+- Fixed composer height flashing after returning from Settings ([#3943](https://github.com/longbkit/clisbot/pull/3943))
+- Fixed selected workspaces having no visible highlight in the Light theme ([#3922](https://github.com/longbkit/clisbot/pull/3922) by [@wdaubney](https://github.com/wdaubney))
+- Fixed the scrolling diff order disagreeing with the Changes tree ([#3913](https://github.com/longbkit/clisbot/pull/3913) by [@cleiter](https://github.com/cleiter))
+- Fixed incorrect Spanish translations for Close actions ([#3934](https://github.com/longbkit/clisbot/pull/3934) by [@antonio](https://github.com/antonio))
 
 ## 0.6.1 - 2026-08-25
 
 ### Improved
 
-- Command Center now matches partial multi-word queries in any order and ranks visible results by relevance ([#2971](https://github.com/getpaseo/paseo/pull/2971) by [@cleiter](https://github.com/cleiter))
+- Command Center now matches partial multi-word queries in any order and ranks visible results by relevance ([#2971](https://github.com/longbkit/clisbot/pull/2971) by [@cleiter](https://github.com/cleiter))
 
 ### Fixed
 
-- Fixed upgrades placing persisted Side panel tabs inside Explorer instead of an ordinary side pane ([#3861](https://github.com/getpaseo/paseo/pull/3861))
-- Fixed Escape leaving Settings open on desktop and web ([#2828](https://github.com/getpaseo/paseo/pull/2828) by [@mcowger](https://github.com/mcowger))
-- Fixed branch switches hiding the current pull request or arming auto-archive from an already-merged pull request ([#3799](https://github.com/getpaseo/paseo/pull/3799))
+- Fixed upgrades placing persisted Side panel tabs inside Explorer instead of an ordinary side pane ([#3861](https://github.com/longbkit/clisbot/pull/3861))
+- Fixed Escape leaving Settings open on desktop and web ([#2828](https://github.com/longbkit/clisbot/pull/2828) by [@mcowger](https://github.com/mcowger))
+- Fixed branch switches hiding the current pull request or arming auto-archive from an already-merged pull request ([#3799](https://github.com/longbkit/clisbot/pull/3799))
 
 ## 0.6.0 - 2026-08-25
 
 ### Changed
 
-- Restored the dedicated Explorer sidebar with Files and Changes by default, replacing the empty user-directed Side panel introduced in 0.5.0 ([#3826](https://github.com/getpaseo/paseo/pull/3826))
-- Changed content opened to the side to use an ordinary closable workspace pane instead of the Explorer sidebar ([#3826](https://github.com/getpaseo/paseo/pull/3826))
-- Restored the resizable combined Explorer dock on tablets ([#3826](https://github.com/getpaseo/paseo/pull/3826))
+- Restored the dedicated Explorer sidebar with Files and Changes by default, replacing the empty user-directed Side panel introduced in 0.5.0 ([#3826](https://github.com/longbkit/clisbot/pull/3826))
+- Changed content opened to the side to use an ordinary closable workspace pane instead of the Explorer sidebar ([#3826](https://github.com/longbkit/clisbot/pull/3826))
+- Restored the resizable combined Explorer dock on tablets ([#3826](https://github.com/longbkit/clisbot/pull/3826))
 
 ### Added
 
-- Added per-action settings for opening files, changes, subagents, and pull requests in the main panel or on the side ([#3826](https://github.com/getpaseo/paseo/pull/3826))
-- Added New tab and drag support for compatible files, diffs, agents, terminals, pull requests, and plugin panels in Explorer ([#3826](https://github.com/getpaseo/paseo/pull/3826))
-- Added standalone Diff tabs while keeping an optional persisted inline-diff mode in Changes ([#3826](https://github.com/getpaseo/paseo/pull/3826))
-- Added custom Windows and Linux window controls ([#3826](https://github.com/getpaseo/paseo/pull/3826))
+- Added per-action settings for opening files, changes, subagents, and pull requests in the main panel or on the side ([#3826](https://github.com/longbkit/clisbot/pull/3826))
+- Added New tab and drag support for compatible files, diffs, agents, terminals, pull requests, and plugin panels in Explorer ([#3826](https://github.com/longbkit/clisbot/pull/3826))
+- Added standalone Diff tabs while keeping an optional persisted inline-diff mode in Changes ([#3826](https://github.com/longbkit/clisbot/pull/3826))
+- Added custom Windows and Linux window controls ([#3826](https://github.com/longbkit/clisbot/pull/3826))
 
 ### Fixed
 
-- Fixed OpenCode turns failing when the first event-stream connection stalls during startup ([#3814](https://github.com/getpaseo/paseo/pull/3814))
-- Fixed OpenCode prompts starting before the provider reports a ready connection ([#3821](https://github.com/getpaseo/paseo/pull/3821))
+- Fixed OpenCode turns failing when the first event-stream connection stalls during startup ([#3814](https://github.com/longbkit/clisbot/pull/3814))
+- Fixed OpenCode prompts starting before the provider reports a ready connection ([#3821](https://github.com/longbkit/clisbot/pull/3821))
 
 ## 0.5.2 - 2026-08-24
 
 ### Fixed
 
-- Fixed workspaces crashing on Android tablets and foldables in non-compact layouts ([#3760](https://github.com/getpaseo/paseo/pull/3760) by [@jeid64](https://github.com/jeid64))
-- Fixed app settings resetting when builds sharing a profile recognize different settings ([#3787](https://github.com/getpaseo/paseo/pull/3787))
+- Fixed workspaces crashing on Android tablets and foldables in non-compact layouts ([#3760](https://github.com/longbkit/clisbot/pull/3760) by [@jeid64](https://github.com/jeid64))
+- Fixed app settings resetting when builds sharing a profile recognize different settings ([#3787](https://github.com/longbkit/clisbot/pull/3787))
 
 ## 0.5.1 - 2026-08-23
 
 ### Fixed
 
-- Fixed multiline composers stopping resizing after workspace and agent transitions on iOS and Android ([#3740](https://github.com/getpaseo/paseo/pull/3740))
+- Fixed multiline composers stopping resizing after workspace and agent transitions on iOS and Android ([#3740](https://github.com/longbkit/clisbot/pull/3740))
 
 ## 0.5.0 - 2026-08-23
 
 ### Added
 
-- Added experimental trusted local plugins ([#3222](https://github.com/getpaseo/paseo/pull/3222), [#3446](https://github.com/getpaseo/paseo/pull/3446), [#3465](https://github.com/getpaseo/paseo/pull/3465))
-- Added plugin-contributed application themes to Settings → Appearance ([#3602](https://github.com/getpaseo/paseo/pull/3602) by [@ragokan](https://github.com/ragokan))
-- Added a user-directed Side panel with independent tabs ([#3287](https://github.com/getpaseo/paseo/pull/3287), [#3605](https://github.com/getpaseo/paseo/pull/3605))
-- Added browser-style New tabs with an anchored pane-local chooser ([#3715](https://github.com/getpaseo/paseo/pull/3715), [#3735](https://github.com/getpaseo/paseo/pull/3735))
-- Added active-turn steering for Claude, Codex, and OpenCode ([#3394](https://github.com/getpaseo/paseo/pull/3394), [#3580](https://github.com/getpaseo/paseo/pull/3580) by [@mcowger](https://github.com/mcowger))
-- Added workspace labels for sidebar organization and filtering ([#3510](https://github.com/getpaseo/paseo/pull/3510) by [@cleiter](https://github.com/cleiter))
-- Added live workspace change counts above active agent composers ([#3682](https://github.com/getpaseo/paseo/pull/3682))
-- Added workspace panel, tab, and pane actions to the Command Center ([#3685](https://github.com/getpaseo/paseo/pull/3685))
-- Added `paseo project` to create, list, rename, and delete projects from the terminal ([#3460](https://github.com/getpaseo/paseo/pull/3460))
-- Added `paseo reload` to apply runtime-safe `config.json` changes without restarting the daemon ([#3365](https://github.com/getpaseo/paseo/pull/3365))
-- Added Paseo skill management to Host → Agents, including remote hosts ([#3451](https://github.com/getpaseo/paseo/pull/3451))
-- Added project filtering to the sidebar display menu ([#3563](https://github.com/getpaseo/paseo/pull/3563) by [@cleiter](https://github.com/cleiter))
-- Added optional branch and project names on workspace rows ([#3445](https://github.com/getpaseo/paseo/pull/3445))
-- Added drag-and-drop reordering for pinned workspaces ([#3341](https://github.com/getpaseo/paseo/pull/3341))
-- Added one-click agent profile creation from the model chooser ([#3533](https://github.com/getpaseo/paseo/pull/3533))
-- Added Android Studio to Open in editor ([#3531](https://github.com/getpaseo/paseo/pull/3531), [#3614](https://github.com/getpaseo/paseo/pull/3614) by [@caikovsky](https://github.com/caikovsky))
-- Added MiniMax Code to the one-click ACP provider catalog ([#3457](https://github.com/getpaseo/paseo/pull/3457) by [@hetaoBackend](https://github.com/hetaoBackend))
-- Added Nix syntax highlighting ([#3110](https://github.com/getpaseo/paseo/pull/3110) by [@Strainy](https://github.com/Strainy))
-- Added Svelte syntax highlighting ([#3487](https://github.com/getpaseo/paseo/pull/3487), [#3534](https://github.com/getpaseo/paseo/pull/3534) by [@fiorelorenzo](https://github.com/fiorelorenzo))
-- Added guided Hub setup that connects a daemon and deploys a compatible starter workflow ([#3651](https://github.com/getpaseo/paseo/pull/3651), [#3657](https://github.com/getpaseo/paseo/pull/3657), [#3677](https://github.com/getpaseo/paseo/pull/3677))
+- Added experimental trusted local plugins ([#3222](https://github.com/longbkit/clisbot/pull/3222), [#3446](https://github.com/longbkit/clisbot/pull/3446), [#3465](https://github.com/longbkit/clisbot/pull/3465))
+- Added plugin-contributed application themes to Settings → Appearance ([#3602](https://github.com/longbkit/clisbot/pull/3602) by [@ragokan](https://github.com/ragokan))
+- Added a user-directed Side panel with independent tabs ([#3287](https://github.com/longbkit/clisbot/pull/3287), [#3605](https://github.com/longbkit/clisbot/pull/3605))
+- Added browser-style New tabs with an anchored pane-local chooser ([#3715](https://github.com/longbkit/clisbot/pull/3715), [#3735](https://github.com/longbkit/clisbot/pull/3735))
+- Added active-turn steering for Claude, Codex, and OpenCode ([#3394](https://github.com/longbkit/clisbot/pull/3394), [#3580](https://github.com/longbkit/clisbot/pull/3580) by [@mcowger](https://github.com/mcowger))
+- Added workspace labels for sidebar organization and filtering ([#3510](https://github.com/longbkit/clisbot/pull/3510) by [@cleiter](https://github.com/cleiter))
+- Added live workspace change counts above active agent composers ([#3682](https://github.com/longbkit/clisbot/pull/3682))
+- Added workspace panel, tab, and pane actions to the Command Center ([#3685](https://github.com/longbkit/clisbot/pull/3685))
+- Added `clisbot project` to create, list, rename, and delete projects from the terminal ([#3460](https://github.com/longbkit/clisbot/pull/3460))
+- Added `clisbot reload` to apply runtime-safe `config.json` changes without restarting the daemon ([#3365](https://github.com/longbkit/clisbot/pull/3365))
+- Added Clisbot skill management to Host → Agents, including remote hosts ([#3451](https://github.com/longbkit/clisbot/pull/3451))
+- Added project filtering to the sidebar display menu ([#3563](https://github.com/longbkit/clisbot/pull/3563) by [@cleiter](https://github.com/cleiter))
+- Added optional branch and project names on workspace rows ([#3445](https://github.com/longbkit/clisbot/pull/3445))
+- Added drag-and-drop reordering for pinned workspaces ([#3341](https://github.com/longbkit/clisbot/pull/3341))
+- Added one-click agent profile creation from the model chooser ([#3533](https://github.com/longbkit/clisbot/pull/3533))
+- Added Android Studio to Open in editor ([#3531](https://github.com/longbkit/clisbot/pull/3531), [#3614](https://github.com/longbkit/clisbot/pull/3614) by [@caikovsky](https://github.com/caikovsky))
+- Added MiniMax Code to the one-click ACP provider catalog ([#3457](https://github.com/longbkit/clisbot/pull/3457) by [@hetaoBackend](https://github.com/hetaoBackend))
+- Added Nix syntax highlighting ([#3110](https://github.com/longbkit/clisbot/pull/3110) by [@Strainy](https://github.com/Strainy))
+- Added Svelte syntax highlighting ([#3487](https://github.com/longbkit/clisbot/pull/3487), [#3534](https://github.com/longbkit/clisbot/pull/3534) by [@fiorelorenzo](https://github.com/fiorelorenzo))
+- Added guided Hub setup that connects a daemon and deploys a compatible starter workflow ([#3651](https://github.com/longbkit/clisbot/pull/3651), [#3657](https://github.com/longbkit/clisbot/pull/3657), [#3677](https://github.com/longbkit/clisbot/pull/3677))
 
 ### Improved
 
-- Restored cached projects, workspaces, agents, and timelines immediately while hosts reconnect ([#3259](https://github.com/getpaseo/paseo/pull/3259), [#3329](https://github.com/getpaseo/paseo/pull/3329))
-- Reduced workspace-switch stalls on desktop and Android with long chats ([#3447](https://github.com/getpaseo/paseo/pull/3447), [#3610](https://github.com/getpaseo/paseo/pull/3610))
-- Kept composer typing within the frame budget on web and desktop ([#3450](https://github.com/getpaseo/paseo/pull/3450))
-- Kept large diffs responsive while expanding, scrolling, and commenting ([#3422](https://github.com/getpaseo/paseo/pull/3422))
-- Kept large read-only source previews responsive with bounded rendering ([#3665](https://github.com/getpaseo/paseo/pull/3665))
-- Removed complete-transcript disk rewrites from long-running agent timelines ([#3647](https://github.com/getpaseo/paseo/pull/3647))
-- Added outcome summaries and failure-first grouping to pull request checks ([#3483](https://github.com/getpaseo/paseo/pull/3483))
-- Moved subagent and task trackers into pills above the composer ([#3482](https://github.com/getpaseo/paseo/pull/3482))
-- Simplified mobile agent configuration into one options sheet ([#3424](https://github.com/getpaseo/paseo/pull/3424))
-- Opened summarized tool-call groups in live sheets on compact layouts ([#3619](https://github.com/getpaseo/paseo/pull/3619))
-- Added separate Content text sizing for chat, the composer, Markdown, and review prose ([#3637](https://github.com/getpaseo/paseo/pull/3637))
-- Updated Pi usage and context meters during active turns ([#3532](https://github.com/getpaseo/paseo/pull/3532))
-- Changed Archive finished to archive every finished subagent in the track ([#3368](https://github.com/getpaseo/paseo/pull/3368))
-- Changed automatic Setup tabs to appear only after workspace setup fails ([#3634](https://github.com/getpaseo/paseo/pull/3634))
-- Changed Default send in Settings to a dropdown menu ([#3644](https://github.com/getpaseo/paseo/pull/3644))
-- Added password-equivalent warnings to pairing links in the desktop app and CLI ([#3734](https://github.com/getpaseo/paseo/pull/3734))
-- Corrected Russian UI translations and terminology ([#3586](https://github.com/getpaseo/paseo/pull/3586) by [@timz](https://github.com/timz))
+- Restored cached projects, workspaces, agents, and timelines immediately while hosts reconnect ([#3259](https://github.com/longbkit/clisbot/pull/3259), [#3329](https://github.com/longbkit/clisbot/pull/3329))
+- Reduced workspace-switch stalls on desktop and Android with long chats ([#3447](https://github.com/longbkit/clisbot/pull/3447), [#3610](https://github.com/longbkit/clisbot/pull/3610))
+- Kept composer typing within the frame budget on web and desktop ([#3450](https://github.com/longbkit/clisbot/pull/3450))
+- Kept large diffs responsive while expanding, scrolling, and commenting ([#3422](https://github.com/longbkit/clisbot/pull/3422))
+- Kept large read-only source previews responsive with bounded rendering ([#3665](https://github.com/longbkit/clisbot/pull/3665))
+- Removed complete-transcript disk rewrites from long-running agent timelines ([#3647](https://github.com/longbkit/clisbot/pull/3647))
+- Added outcome summaries and failure-first grouping to pull request checks ([#3483](https://github.com/longbkit/clisbot/pull/3483))
+- Moved subagent and task trackers into pills above the composer ([#3482](https://github.com/longbkit/clisbot/pull/3482))
+- Simplified mobile agent configuration into one options sheet ([#3424](https://github.com/longbkit/clisbot/pull/3424))
+- Opened summarized tool-call groups in live sheets on compact layouts ([#3619](https://github.com/longbkit/clisbot/pull/3619))
+- Added separate Content text sizing for chat, the composer, Markdown, and review prose ([#3637](https://github.com/longbkit/clisbot/pull/3637))
+- Updated Pi usage and context meters during active turns ([#3532](https://github.com/longbkit/clisbot/pull/3532))
+- Changed Archive finished to archive every finished subagent in the track ([#3368](https://github.com/longbkit/clisbot/pull/3368))
+- Changed automatic Setup tabs to appear only after workspace setup fails ([#3634](https://github.com/longbkit/clisbot/pull/3634))
+- Changed Default send in Settings to a dropdown menu ([#3644](https://github.com/longbkit/clisbot/pull/3644))
+- Added password-equivalent warnings to pairing links in the desktop app and CLI ([#3734](https://github.com/longbkit/clisbot/pull/3734))
+- Corrected Russian UI translations and terminology ([#3586](https://github.com/longbkit/clisbot/pull/3586) by [@timz](https://github.com/timz))
 
 ### Fixed
 
-- Fixed CJK IME composition being cancelled in text fields and mobile terminals ([#2811](https://github.com/getpaseo/paseo/pull/2811), [#3343](https://github.com/getpaseo/paseo/pull/3343), [#3391](https://github.com/getpaseo/paseo/pull/3391), [#3462](https://github.com/getpaseo/paseo/pull/3462), [#3517](https://github.com/getpaseo/paseo/pull/3517) by [@northsea4](https://github.com/northsea4), [@jimersylee](https://github.com/jimersylee), [@ZacharyZcR](https://github.com/ZacharyZcR), [@chulmin-dev](https://github.com/chulmin-dev))
-- Fixed OpenCode turns failing when their event stream dropped ([#3395](https://github.com/getpaseo/paseo/pull/3395))
-- Fixed OpenCode agents timing out during slow or plugin-heavy startup ([#3578](https://github.com/getpaseo/paseo/pull/3578), [#3621](https://github.com/getpaseo/paseo/pull/3621) by [@BrianAguilarWasco](https://github.com/BrianAguilarWasco))
-- Fixed an unrelated merged pull request archiving a workspace ([#3425](https://github.com/getpaseo/paseo/pull/3425))
-- Fixed Annotate element and Screenshot element doing nothing on loaded desktop browser pages ([#3187](https://github.com/getpaseo/paseo/pull/3187) by [@dgk-dev](https://github.com/dgk-dev))
-- Fixed repeated copy and fork footers after heartbeat runs ([#3484](https://github.com/getpaseo/paseo/pull/3484))
-- Fixed Cursor plan usage on hosts signed in only through `cursor-agent` ([#3486](https://github.com/getpaseo/paseo/pull/3486) by [@Lite-G](https://github.com/Lite-G))
-- Fixed mobile composers retaining sent text after submission ([#3564](https://github.com/getpaseo/paseo/pull/3564))
-- Fixed multiline composers retaining stale heights across workspace and draft lifecycles ([#3681](https://github.com/getpaseo/paseo/pull/3681), [#3740](https://github.com/getpaseo/paseo/pull/3740))
-- Fixed pull request checkout when the target repository is configured as `upstream` ([#2997](https://github.com/getpaseo/paseo/pull/2997) by [@mcowger](https://github.com/mcowger))
-- Fixed composer steers remaining unread while Claude or Codex waited on a permission ([#3585](https://github.com/getpaseo/paseo/pull/3585) by [@cleiter](https://github.com/cleiter))
-- Fixed Changes opening an empty comparison after checkout state changes ([#3636](https://github.com/getpaseo/paseo/pull/3636))
-- Fixed Pi chats ending in an error state during a successful automatic retry ([#3639](https://github.com/getpaseo/paseo/pull/3639))
-- Fixed Claude usage appearing unavailable when macOS Keychain contains multiple credential items ([#3597](https://github.com/getpaseo/paseo/pull/3597) by [@t-benoit](https://github.com/t-benoit))
-- Fixed provider usage checks overwriting Claude or Codex credential files ([#3442](https://github.com/getpaseo/paseo/pull/3442) by [@danberindei](https://github.com/danberindei))
-- Fixed active Codex agents failing to open when their native thread was archived outside Paseo ([#3334](https://github.com/getpaseo/paseo/pull/3334))
-- Fixed agents remaining impossible to stop after the provider had already settled their turn ([#3742](https://github.com/getpaseo/paseo/pull/3742))
-- Fixed worktree creation rejecting Git-valid branch names containing uppercase letters, underscores, or dots ([#3591](https://github.com/getpaseo/paseo/pull/3591))
-- Fixed project icons showing stale images in New Workspace ([#3600](https://github.com/getpaseo/paseo/pull/3600))
-- Fixed malformed SVG project icons crashing the iOS app ([#3711](https://github.com/getpaseo/paseo/pull/3711) by [@omercnet](https://github.com/omercnet))
-- Fixed pinning a project's only workspace hiding its New workspace action ([#3722](https://github.com/getpaseo/paseo/pull/3722) by [@yugui923](https://github.com/yugui923))
-- Fixed workspace layout changes bypassing timeline retry backoff ([#3736](https://github.com/getpaseo/paseo/pull/3736))
-- Fixed fresh installs resolving provider SDK versions that were not validated with the release ([#3678](https://github.com/getpaseo/paseo/pull/3678))
+- Fixed CJK IME composition being cancelled in text fields and mobile terminals ([#2811](https://github.com/longbkit/clisbot/pull/2811), [#3343](https://github.com/longbkit/clisbot/pull/3343), [#3391](https://github.com/longbkit/clisbot/pull/3391), [#3462](https://github.com/longbkit/clisbot/pull/3462), [#3517](https://github.com/longbkit/clisbot/pull/3517) by [@northsea4](https://github.com/northsea4), [@jimersylee](https://github.com/jimersylee), [@ZacharyZcR](https://github.com/ZacharyZcR), [@chulmin-dev](https://github.com/chulmin-dev))
+- Fixed OpenCode turns failing when their event stream dropped ([#3395](https://github.com/longbkit/clisbot/pull/3395))
+- Fixed OpenCode agents timing out during slow or plugin-heavy startup ([#3578](https://github.com/longbkit/clisbot/pull/3578), [#3621](https://github.com/longbkit/clisbot/pull/3621) by [@BrianAguilarWasco](https://github.com/BrianAguilarWasco))
+- Fixed an unrelated merged pull request archiving a workspace ([#3425](https://github.com/longbkit/clisbot/pull/3425))
+- Fixed Annotate element and Screenshot element doing nothing on loaded desktop browser pages ([#3187](https://github.com/longbkit/clisbot/pull/3187) by [@dgk-dev](https://github.com/dgk-dev))
+- Fixed repeated copy and fork footers after heartbeat runs ([#3484](https://github.com/longbkit/clisbot/pull/3484))
+- Fixed Cursor plan usage on hosts signed in only through `cursor-agent` ([#3486](https://github.com/longbkit/clisbot/pull/3486) by [@Lite-G](https://github.com/Lite-G))
+- Fixed mobile composers retaining sent text after submission ([#3564](https://github.com/longbkit/clisbot/pull/3564))
+- Fixed multiline composers retaining stale heights across workspace and draft lifecycles ([#3681](https://github.com/longbkit/clisbot/pull/3681), [#3740](https://github.com/longbkit/clisbot/pull/3740))
+- Fixed pull request checkout when the target repository is configured as `upstream` ([#2997](https://github.com/longbkit/clisbot/pull/2997) by [@mcowger](https://github.com/mcowger))
+- Fixed composer steers remaining unread while Claude or Codex waited on a permission ([#3585](https://github.com/longbkit/clisbot/pull/3585) by [@cleiter](https://github.com/cleiter))
+- Fixed Changes opening an empty comparison after checkout state changes ([#3636](https://github.com/longbkit/clisbot/pull/3636))
+- Fixed Pi chats ending in an error state during a successful automatic retry ([#3639](https://github.com/longbkit/clisbot/pull/3639))
+- Fixed Claude usage appearing unavailable when macOS Keychain contains multiple credential items ([#3597](https://github.com/longbkit/clisbot/pull/3597) by [@t-benoit](https://github.com/t-benoit))
+- Fixed provider usage checks overwriting Claude or Codex credential files ([#3442](https://github.com/longbkit/clisbot/pull/3442) by [@danberindei](https://github.com/danberindei))
+- Fixed active Codex agents failing to open when their native thread was archived outside Clisbot ([#3334](https://github.com/longbkit/clisbot/pull/3334))
+- Fixed agents remaining impossible to stop after the provider had already settled their turn ([#3742](https://github.com/longbkit/clisbot/pull/3742))
+- Fixed worktree creation rejecting Git-valid branch names containing uppercase letters, underscores, or dots ([#3591](https://github.com/longbkit/clisbot/pull/3591))
+- Fixed project icons showing stale images in New Workspace ([#3600](https://github.com/longbkit/clisbot/pull/3600))
+- Fixed malformed SVG project icons crashing the iOS app ([#3711](https://github.com/longbkit/clisbot/pull/3711) by [@omercnet](https://github.com/omercnet))
+- Fixed pinning a project's only workspace hiding its New workspace action ([#3722](https://github.com/longbkit/clisbot/pull/3722) by [@yugui923](https://github.com/yugui923))
+- Fixed workspace layout changes bypassing timeline retry backoff ([#3736](https://github.com/longbkit/clisbot/pull/3736))
+- Fixed fresh installs resolving provider SDK versions that were not validated with the release ([#3678](https://github.com/longbkit/clisbot/pull/3678))
 
 ## 0.4.0 - 2026-08-13
 
 ### Breaking
 
-- Removed `paseo chat` and `paseo loop` ([#3053](https://github.com/getpaseo/paseo/pull/3053))
+- Removed `clisbot chat` and `clisbot loop` ([#3053](https://github.com/longbkit/clisbot/pull/3053))
 
 ### Added
 
-- Added host-wide agent profiles for reusable provider, model, mode, thinking, and feature settings ([#3208](https://github.com/getpaseo/paseo/pull/3208))
-- Added workspace file search to Cmd/Ctrl+P ([#3059](https://github.com/getpaseo/paseo/pull/3059))
-- Added file and folder actions to Files and Changes ([#3027](https://github.com/getpaseo/paseo/pull/3027) by [@nikuscs](https://github.com/nikuscs))
-- Added interactive Mermaid diagrams to chats and Markdown previews ([#2306](https://github.com/getpaseo/paseo/pull/2306) by [@dmeledon](https://github.com/dmeledon))
-- Added live task progress above the composer and in the timeline ([#3227](https://github.com/getpaseo/paseo/pull/3227))
-- Added a model setting for generated workspace titles, branch names, commits, and pull request drafts ([#3215](https://github.com/getpaseo/paseo/pull/3215))
-- Added the supported `@getpaseo/client` TypeScript SDK ([#3141](https://github.com/getpaseo/paseo/pull/3141))
-- Added provider installation diagnostics to the CLI ([#3243](https://github.com/getpaseo/paseo/pull/3243))
-- Added workspace rename to the CLI ([#3209](https://github.com/getpaseo/paseo/pull/3209) by [@martinhanzik](https://github.com/martinhanzik))
+- Added host-wide agent profiles for reusable provider, model, mode, thinking, and feature settings ([#3208](https://github.com/longbkit/clisbot/pull/3208))
+- Added workspace file search to Cmd/Ctrl+P ([#3059](https://github.com/longbkit/clisbot/pull/3059))
+- Added file and folder actions to Files and Changes ([#3027](https://github.com/longbkit/clisbot/pull/3027) by [@nikuscs](https://github.com/nikuscs))
+- Added interactive Mermaid diagrams to chats and Markdown previews ([#2306](https://github.com/longbkit/clisbot/pull/2306) by [@dmeledon](https://github.com/dmeledon))
+- Added live task progress above the composer and in the timeline ([#3227](https://github.com/longbkit/clisbot/pull/3227))
+- Added a model setting for generated workspace titles, branch names, commits, and pull request drafts ([#3215](https://github.com/longbkit/clisbot/pull/3215))
+- Added the supported `@clisbot/client` TypeScript SDK ([#3141](https://github.com/longbkit/clisbot/pull/3141))
+- Added provider installation diagnostics to the CLI ([#3243](https://github.com/longbkit/clisbot/pull/3243))
+- Added workspace rename to the CLI ([#3209](https://github.com/longbkit/clisbot/pull/3209) by [@martinhanzik](https://github.com/martinhanzik))
 
 ### Improved
 
-- Added a centered reading layout and formatted YAML front matter to Markdown previews ([#3240](https://github.com/getpaseo/paseo/pull/3240))
-- Added sidebar grouping to the Command Center ([#3063](https://github.com/getpaseo/paseo/pull/3063) by [@cleiter](https://github.com/cleiter))
-- Added every built-in theme to theme shortcuts ([#3214](https://github.com/getpaseo/paseo/pull/3214))
-- Removed periodic Git polling for idle workspaces ([#3323](https://github.com/getpaseo/paseo/pull/3323))
-- Set provider catalog refreshes to a configurable two-minute deadline ([#3322](https://github.com/getpaseo/paseo/pull/3322))
+- Added a centered reading layout and formatted YAML front matter to Markdown previews ([#3240](https://github.com/longbkit/clisbot/pull/3240))
+- Added sidebar grouping to the Command Center ([#3063](https://github.com/longbkit/clisbot/pull/3063) by [@cleiter](https://github.com/cleiter))
+- Added every built-in theme to theme shortcuts ([#3214](https://github.com/longbkit/clisbot/pull/3214))
+- Removed periodic Git polling for idle workspaces ([#3323](https://github.com/longbkit/clisbot/pull/3323))
+- Set provider catalog refreshes to a configurable two-minute deadline ([#3322](https://github.com/longbkit/clisbot/pull/3322))
 
 ### Fixed
 
-- Fixed terminal sessions being lost after host sleep or daemon worker stalls ([#3235](https://github.com/getpaseo/paseo/pull/3235), [#3263](https://github.com/getpaseo/paseo/pull/3263))
-- Fixed daemon hang when archiving a workspace ([#3107](https://github.com/getpaseo/paseo/pull/3107))
-- Fixed New Workspace crash on Android when projects span multiple hosts ([#3241](https://github.com/getpaseo/paseo/pull/3241))
-- Fixed provider cache exhausting Android local storage ([#3234](https://github.com/getpaseo/paseo/pull/3234))
-- Fixed dictation recordings being lost during connection interruptions ([#3159](https://github.com/getpaseo/paseo/pull/3159))
-- Fixed new workspaces reusing an existing worktree ([#3224](https://github.com/getpaseo/paseo/pull/3224))
-- Fixed new worktrees ignoring the setup command saved in Project Settings ([#3233](https://github.com/getpaseo/paseo/pull/3233))
-- Fixed new worktrees becoming dirty when the selected base contained a different `paseo.json` ([#3311](https://github.com/getpaseo/paseo/pull/3311))
-- Fixed removed hosts continuing to receive push notifications ([#3176](https://github.com/getpaseo/paseo/pull/3176))
-- Fixed delegated-agent notifications stopping after permission prompts or workspace closure ([#3177](https://github.com/getpaseo/paseo/pull/3177), [#3192](https://github.com/getpaseo/paseo/pull/3192) by [@thomasvan](https://github.com/thomasvan), [@wilgon456](https://github.com/wilgon456))
-- Fixed OMP agent startup when model catalogs exceed the protocol-v1 frame limit ([#3184](https://github.com/getpaseo/paseo/pull/3184) by [@pi3123](https://github.com/pi3123))
-- Fixed OpenCode models being unable to return to their default variant ([#3281](https://github.com/getpaseo/paseo/pull/3281))
-- Fixed completed Codex subagents remaining marked active ([#3188](https://github.com/getpaseo/paseo/pull/3188) by [@Strainy](https://github.com/Strainy))
-- Fixed Codex compaction leaving turns marked as working ([#3211](https://github.com/getpaseo/paseo/pull/3211) by [@edihasaj](https://github.com/edihasaj))
-- Fixed Cursor usage with current Cursor logins ([#2704](https://github.com/getpaseo/paseo/pull/2704) by [@QuteSaltyFish](https://github.com/QuteSaltyFish))
-- Fixed SVG project icons rendering as blank on mobile ([#2579](https://github.com/getpaseo/paseo/pull/2579) by [@colonelpanic8](https://github.com/colonelpanic8))
-- Fixed crash when persisted cache was incompatible ([#3289](https://github.com/getpaseo/paseo/pull/3289))
-- Fixed open delegated agents being archived with their parent ([#3279](https://github.com/getpaseo/paseo/pull/3279))
-- Fixed agent creation when profiles carried modes unsupported by the selected provider ([#3331](https://github.com/getpaseo/paseo/pull/3331))
-- Fixed Claude agents waiting on Paseo's ten-minute MCP timeout ([#3315](https://github.com/getpaseo/paseo/pull/3315))
-- Fixed Copy resume command for Hermes agents ([#3300](https://github.com/getpaseo/paseo/pull/3300) by [@desmond-rai](https://github.com/desmond-rai))
+- Fixed terminal sessions being lost after host sleep or daemon worker stalls ([#3235](https://github.com/longbkit/clisbot/pull/3235), [#3263](https://github.com/longbkit/clisbot/pull/3263))
+- Fixed daemon hang when archiving a workspace ([#3107](https://github.com/longbkit/clisbot/pull/3107))
+- Fixed New Workspace crash on Android when projects span multiple hosts ([#3241](https://github.com/longbkit/clisbot/pull/3241))
+- Fixed provider cache exhausting Android local storage ([#3234](https://github.com/longbkit/clisbot/pull/3234))
+- Fixed dictation recordings being lost during connection interruptions ([#3159](https://github.com/longbkit/clisbot/pull/3159))
+- Fixed new workspaces reusing an existing worktree ([#3224](https://github.com/longbkit/clisbot/pull/3224))
+- Fixed new worktrees ignoring the setup command saved in Project Settings ([#3233](https://github.com/longbkit/clisbot/pull/3233))
+- Fixed new worktrees becoming dirty when the selected base contained a different `clisbot.json` ([#3311](https://github.com/longbkit/clisbot/pull/3311))
+- Fixed removed hosts continuing to receive push notifications ([#3176](https://github.com/longbkit/clisbot/pull/3176))
+- Fixed delegated-agent notifications stopping after permission prompts or workspace closure ([#3177](https://github.com/longbkit/clisbot/pull/3177), [#3192](https://github.com/longbkit/clisbot/pull/3192) by [@thomasvan](https://github.com/thomasvan), [@wilgon456](https://github.com/wilgon456))
+- Fixed OMP agent startup when model catalogs exceed the protocol-v1 frame limit ([#3184](https://github.com/longbkit/clisbot/pull/3184) by [@pi3123](https://github.com/pi3123))
+- Fixed OpenCode models being unable to return to their default variant ([#3281](https://github.com/longbkit/clisbot/pull/3281))
+- Fixed completed Codex subagents remaining marked active ([#3188](https://github.com/longbkit/clisbot/pull/3188) by [@Strainy](https://github.com/Strainy))
+- Fixed Codex compaction leaving turns marked as working ([#3211](https://github.com/longbkit/clisbot/pull/3211) by [@edihasaj](https://github.com/edihasaj))
+- Fixed Cursor usage with current Cursor logins ([#2704](https://github.com/longbkit/clisbot/pull/2704) by [@QuteSaltyFish](https://github.com/QuteSaltyFish))
+- Fixed SVG project icons rendering as blank on mobile ([#2579](https://github.com/longbkit/clisbot/pull/2579) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Fixed crash when persisted cache was incompatible ([#3289](https://github.com/longbkit/clisbot/pull/3289))
+- Fixed open delegated agents being archived with their parent ([#3279](https://github.com/longbkit/clisbot/pull/3279))
+- Fixed agent creation when profiles carried modes unsupported by the selected provider ([#3331](https://github.com/longbkit/clisbot/pull/3331))
+- Fixed Claude agents waiting on Clisbot's ten-minute MCP timeout ([#3315](https://github.com/longbkit/clisbot/pull/3315))
+- Fixed Copy resume command for Hermes agents ([#3300](https://github.com/longbkit/clisbot/pull/3300) by [@desmond-rai](https://github.com/desmond-rai))
 
 ## 0.3.1 - 2026-08-09
 
 ### Added
 
-- Unassign keyboard shortcuts and see the effective bindings in shortcut help ([#2510](https://github.com/getpaseo/paseo/pull/2510) by [@cleiter](https://github.com/cleiter), [#2985](https://github.com/getpaseo/paseo/pull/2985) by [@cleiter](https://github.com/cleiter))
-- Choose a Pure black theme ([#3012](https://github.com/getpaseo/paseo/pull/3012) by [@shrimpwtf](https://github.com/shrimpwtf))
+- Unassign keyboard shortcuts and see the effective bindings in shortcut help ([#2510](https://github.com/longbkit/clisbot/pull/2510) by [@cleiter](https://github.com/cleiter), [#2985](https://github.com/longbkit/clisbot/pull/2985) by [@cleiter](https://github.com/cleiter))
+- Choose a Pure black theme ([#3012](https://github.com/longbkit/clisbot/pull/3012) by [@shrimpwtf](https://github.com/shrimpwtf))
 
 ### Improved
 
-- Running agents use a clearer animated status ring ([c0daf8e](https://github.com/getpaseo/paseo/commit/c0daf8e066e0d7379723a2a6ddea20afc71ead20) by [@cleiter](https://github.com/cleiter))
-- Workspace Git updates stay responsive under file-watcher failures, heavy Git activity, and large shared-worktree repositories ([#3056](https://github.com/getpaseo/paseo/pull/3056), [#3033](https://github.com/getpaseo/paseo/pull/3033) by [@dwyanewang](https://github.com/dwyanewang), [#3078](https://github.com/getpaseo/paseo/pull/3078))
-- Kimi usage refreshes correctly and shows five-hour limits and reasoning levels ([#2743](https://github.com/getpaseo/paseo/pull/2743) by [@UnbrokenHunter](https://github.com/UnbrokenHunter))
-- Resize the desktop sidebar with touch ([#2953](https://github.com/getpaseo/paseo/pull/2953) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Running agents use a clearer animated status ring ([c0daf8e](https://github.com/longbkit/clisbot/commit/c0daf8e066e0d7379723a2a6ddea20afc71ead20) by [@cleiter](https://github.com/cleiter))
+- Workspace Git updates stay responsive under file-watcher failures, heavy Git activity, and large shared-worktree repositories ([#3056](https://github.com/longbkit/clisbot/pull/3056), [#3033](https://github.com/longbkit/clisbot/pull/3033) by [@dwyanewang](https://github.com/dwyanewang), [#3078](https://github.com/longbkit/clisbot/pull/3078))
+- Kimi usage refreshes correctly and shows five-hour limits and reasoning levels ([#2743](https://github.com/longbkit/clisbot/pull/2743) by [@UnbrokenHunter](https://github.com/UnbrokenHunter))
+- Resize the desktop sidebar with touch ([#2953](https://github.com/longbkit/clisbot/pull/2953) by [@colonelpanic8](https://github.com/colonelpanic8))
 
 ### Fixed
 
-- Direct LAN connections work again on macOS ([#3071](https://github.com/getpaseo/paseo/pull/3071))
-- Desktop update checks no longer report an error while platform downloads are still publishing ([#3076](https://github.com/getpaseo/paseo/pull/3076))
-- Copied lists keep their markers across selection boundaries ([#3055](https://github.com/getpaseo/paseo/pull/3055))
-- Switching hosts keeps the active project selected ([#3051](https://github.com/getpaseo/paseo/pull/3051))
-- New Workspace keeps project and isolation controls inside the composer ([#3050](https://github.com/getpaseo/paseo/pull/3050))
-- Session rename is reachable from the mobile sessions menu ([#2924](https://github.com/getpaseo/paseo/pull/2924) by [@kaspesi](https://github.com/kaspesi))
-- Desktop notification sounds play again ([#2582](https://github.com/getpaseo/paseo/pull/2582) by [@gstamp](https://github.com/gstamp))
-- Codex slash commands omit disabled skills ([#2759](https://github.com/getpaseo/paseo/pull/2759) by [@jasonhnd](https://github.com/jasonhnd))
-- Exact ignored file paths resolve correctly ([#3042](https://github.com/getpaseo/paseo/pull/3042) by [@cleiter](https://github.com/cleiter))
-- Claude question notifications summarize the requested input ([#2925](https://github.com/getpaseo/paseo/pull/2925) by [@SihyeonJeon](https://github.com/SihyeonJeon))
-- The crash screen stays readable and keeps its retry action reachable ([#3043](https://github.com/getpaseo/paseo/pull/3043))
+- Direct LAN connections work again on macOS ([#3071](https://github.com/longbkit/clisbot/pull/3071))
+- Desktop update checks no longer report an error while platform downloads are still publishing ([#3076](https://github.com/longbkit/clisbot/pull/3076))
+- Copied lists keep their markers across selection boundaries ([#3055](https://github.com/longbkit/clisbot/pull/3055))
+- Switching hosts keeps the active project selected ([#3051](https://github.com/longbkit/clisbot/pull/3051))
+- New Workspace keeps project and isolation controls inside the composer ([#3050](https://github.com/longbkit/clisbot/pull/3050))
+- Session rename is reachable from the mobile sessions menu ([#2924](https://github.com/longbkit/clisbot/pull/2924) by [@kaspesi](https://github.com/kaspesi))
+- Desktop notification sounds play again ([#2582](https://github.com/longbkit/clisbot/pull/2582) by [@gstamp](https://github.com/gstamp))
+- Codex slash commands omit disabled skills ([#2759](https://github.com/longbkit/clisbot/pull/2759) by [@jasonhnd](https://github.com/jasonhnd))
+- Exact ignored file paths resolve correctly ([#3042](https://github.com/longbkit/clisbot/pull/3042) by [@cleiter](https://github.com/cleiter))
+- Claude question notifications summarize the requested input ([#2925](https://github.com/longbkit/clisbot/pull/2925) by [@SihyeonJeon](https://github.com/SihyeonJeon))
+- The crash screen stays readable and keeps its retry action reachable ([#3043](https://github.com/longbkit/clisbot/pull/3043))
 
 ## 0.3.0 - 2026-08-08
 
 ### Added
 
-- New mobile terminal with text selection, copy, paste, and faster rendering ([#1607](https://github.com/getpaseo/paseo/pull/1607), [#2830](https://github.com/getpaseo/paseo/pull/2830))
-- Redesigned sidebar with clearer status colours and rows that are quicker to scan ([#2340](https://github.com/getpaseo/paseo/pull/2340) by [@kaspesi](https://github.com/kaspesi), [#2335](https://github.com/getpaseo/paseo/pull/2335), [#2416](https://github.com/getpaseo/paseo/pull/2416) by [@nikuscs](https://github.com/nikuscs), [#2711](https://github.com/getpaseo/paseo/pull/2711))
+- New mobile terminal with text selection, copy, paste, and faster rendering ([#1607](https://github.com/longbkit/clisbot/pull/1607), [#2830](https://github.com/longbkit/clisbot/pull/2830))
+- Redesigned sidebar with clearer status colours and rows that are quicker to scan ([#2340](https://github.com/longbkit/clisbot/pull/2340) by [@kaspesi](https://github.com/kaspesi), [#2335](https://github.com/longbkit/clisbot/pull/2335), [#2416](https://github.com/longbkit/clisbot/pull/2416) by [@nikuscs](https://github.com/nikuscs), [#2711](https://github.com/longbkit/clisbot/pull/2711))
   - Choose what a sidebar workspace row shows: host, pull request, checks, and scripts
-  - Name each host and give it a colour ([#2790](https://github.com/getpaseo/paseo/pull/2790))
-- Search your history by workspace, agent, and branch ([#2995](https://github.com/getpaseo/paseo/pull/2995))
-- Use Paseo in Korean ([#2895](https://github.com/getpaseo/paseo/pull/2895) by [@himomohi](https://github.com/himomohi), [@Kesta-bos](https://github.com/Kesta-bos))
-- Run git and workspace actions from the Command Center ([#2749](https://github.com/getpaseo/paseo/pull/2749))
-- Change model, reasoning, mode, plan, and fast from the Command Center ([#2274](https://github.com/getpaseo/paseo/pull/2274) by [@kedrzu](https://github.com/kedrzu))
-- Fork an agent while it's running ([#2638](https://github.com/getpaseo/paseo/pull/2638) by [@kaspesi](https://github.com/kaspesi))
-- Launch a terminal directly from New Workspace ([#2941](https://github.com/getpaseo/paseo/pull/2941))
-- Jump between prompts in a chat ([#2792](https://github.com/getpaseo/paseo/pull/2792))
-- Preview HTML files ([#2712](https://github.com/getpaseo/paseo/pull/2712) by [@nicholas-salgueiro-britecore](https://github.com/nicholas-salgueiro-britecore), [@nickmaglowsch](https://github.com/nickmaglowsch))
-- See Claude workflows in the subagent track ([#2933](https://github.com/getpaseo/paseo/pull/2933))
-- Choose which orchestration skills Paseo installs ([#2680](https://github.com/getpaseo/paseo/pull/2680))
-- Approve all ACP tool calls with one setting ([#2752](https://github.com/getpaseo/paseo/pull/2752))
-- Add custom HTTP headers to direct host connections ([#2922](https://github.com/getpaseo/paseo/pull/2922))
-- Pick a local branch or its origin counterpart as the base for a new worktree ([#2328](https://github.com/getpaseo/paseo/pull/2328) by [@mcowger](https://github.com/mcowger))
-- Paste images from the clipboard on mobile ([#2793](https://github.com/getpaseo/paseo/pull/2793))
+  - Name each host and give it a colour ([#2790](https://github.com/longbkit/clisbot/pull/2790))
+- Search your history by workspace, agent, and branch ([#2995](https://github.com/longbkit/clisbot/pull/2995))
+- Use Clisbot in Korean ([#2895](https://github.com/longbkit/clisbot/pull/2895) by [@himomohi](https://github.com/himomohi), [@Kesta-bos](https://github.com/Kesta-bos))
+- Run git and workspace actions from the Command Center ([#2749](https://github.com/longbkit/clisbot/pull/2749))
+- Change model, reasoning, mode, plan, and fast from the Command Center ([#2274](https://github.com/longbkit/clisbot/pull/2274) by [@kedrzu](https://github.com/kedrzu))
+- Fork an agent while it's running ([#2638](https://github.com/longbkit/clisbot/pull/2638) by [@kaspesi](https://github.com/kaspesi))
+- Launch a terminal directly from New Workspace ([#2941](https://github.com/longbkit/clisbot/pull/2941))
+- Jump between prompts in a chat ([#2792](https://github.com/longbkit/clisbot/pull/2792))
+- Preview HTML files ([#2712](https://github.com/longbkit/clisbot/pull/2712) by [@nicholas-salgueiro-britecore](https://github.com/nicholas-salgueiro-britecore), [@nickmaglowsch](https://github.com/nickmaglowsch))
+- See Claude workflows in the subagent track ([#2933](https://github.com/longbkit/clisbot/pull/2933))
+- Choose which orchestration skills Clisbot installs ([#2680](https://github.com/longbkit/clisbot/pull/2680))
+- Approve all ACP tool calls with one setting ([#2752](https://github.com/longbkit/clisbot/pull/2752))
+- Add custom HTTP headers to direct host connections ([#2922](https://github.com/longbkit/clisbot/pull/2922))
+- Pick a local branch or its origin counterpart as the base for a new worktree ([#2328](https://github.com/longbkit/clisbot/pull/2328) by [@mcowger](https://github.com/mcowger))
+- Paste images from the clipboard on mobile ([#2793](https://github.com/longbkit/clisbot/pull/2793))
 
 ### Improved
 
 - Provider data is cached in the client for a faster startup
-- Recent chats stay live in the background, so switching back shows current messages right away ([#2842](https://github.com/getpaseo/paseo/pull/2842))
-- Coming back to a workspace from Settings is faster ([#2791](https://github.com/getpaseo/paseo/pull/2791))
-- Workspace Git status stays responsive in large repositories ([#2979](https://github.com/getpaseo/paseo/pull/2979))
-- Paseo runs fewer git processes on busy machines ([#2797](https://github.com/getpaseo/paseo/pull/2797))
-- Copying part of an assistant response keeps its lists, links, and formatting ([#2808](https://github.com/getpaseo/paseo/pull/2808), [#2930](https://github.com/getpaseo/paseo/pull/2930), [#2935](https://github.com/getpaseo/paseo/pull/2935) by [@cleiter](https://github.com/cleiter))
-- See the full conversation from a native Claude subagent ([#2498](https://github.com/getpaseo/paseo/pull/2498) by [@ebg1223](https://github.com/ebg1223), [#2760](https://github.com/getpaseo/paseo/pull/2760))
-- OpenCode subagents show their task, type, model, and token usage ([#2909](https://github.com/getpaseo/paseo/pull/2909) by [@BrianAguilarWasco](https://github.com/BrianAguilarWasco))
-- Pi delegated tasks show their lifecycle status ([#2891](https://github.com/getpaseo/paseo/pull/2891))
-- Claude remembers model and thinking choices for new workspaces ([#2912](https://github.com/getpaseo/paseo/pull/2912))
-- OMP context usage updates while a turn is running ([#2503](https://github.com/getpaseo/paseo/pull/2503) by [@theslava](https://github.com/theslava))
-- OpenCode reports background activity from its own busy status ([#2696](https://github.com/getpaseo/paseo/pull/2696) by [@desflynn](https://github.com/desflynn))
-- Desktop browser tabs keep their state through focus changes and automation ([#2907](https://github.com/getpaseo/paseo/pull/2907))
-- New worktrees start from the tracked upstream branch ([#2848](https://github.com/getpaseo/paseo/pull/2848))
-- Generated workspace titles describe the task ([#2755](https://github.com/getpaseo/paseo/pull/2755))
-- Relay access is opt-in when you pair a device ([#2706](https://github.com/getpaseo/paseo/pull/2706))
-- Voice mode releases the audio session when recording and playback stop ([#2866](https://github.com/getpaseo/paseo/pull/2866) by [@kaspesi](https://github.com/kaspesi))
-- Workspace suggestions skip Git-ignored data ([#2902](https://github.com/getpaseo/paseo/pull/2902))
-- Reconnect messages distinguish daemon restarts from network interruptions ([#2931](https://github.com/getpaseo/paseo/pull/2931))
-- The file viewer shows one accurate status when a file changes or is deleted ([#2670](https://github.com/getpaseo/paseo/pull/2670), [#2694](https://github.com/getpaseo/paseo/pull/2694))
-- The Nix desktop package is smaller ([#2550](https://github.com/getpaseo/paseo/pull/2550) by [@colonelpanic8](https://github.com/colonelpanic8))
-- The Nix desktop app uses the right icon on Linux and macOS ([#2506](https://github.com/getpaseo/paseo/pull/2506), [#2783](https://github.com/getpaseo/paseo/pull/2783) by [@colonelpanic8](https://github.com/colonelpanic8))
-- Paseo Desktop builds from the Nix flake on macOS ([#2556](https://github.com/getpaseo/paseo/pull/2556) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Recent chats stay live in the background, so switching back shows current messages right away ([#2842](https://github.com/longbkit/clisbot/pull/2842))
+- Coming back to a workspace from Settings is faster ([#2791](https://github.com/longbkit/clisbot/pull/2791))
+- Workspace Git status stays responsive in large repositories ([#2979](https://github.com/longbkit/clisbot/pull/2979))
+- Clisbot runs fewer git processes on busy machines ([#2797](https://github.com/longbkit/clisbot/pull/2797))
+- Copying part of an assistant response keeps its lists, links, and formatting ([#2808](https://github.com/longbkit/clisbot/pull/2808), [#2930](https://github.com/longbkit/clisbot/pull/2930), [#2935](https://github.com/longbkit/clisbot/pull/2935) by [@cleiter](https://github.com/cleiter))
+- See the full conversation from a native Claude subagent ([#2498](https://github.com/longbkit/clisbot/pull/2498) by [@ebg1223](https://github.com/ebg1223), [#2760](https://github.com/longbkit/clisbot/pull/2760))
+- OpenCode subagents show their task, type, model, and token usage ([#2909](https://github.com/longbkit/clisbot/pull/2909) by [@BrianAguilarWasco](https://github.com/BrianAguilarWasco))
+- Pi delegated tasks show their lifecycle status ([#2891](https://github.com/longbkit/clisbot/pull/2891))
+- Claude remembers model and thinking choices for new workspaces ([#2912](https://github.com/longbkit/clisbot/pull/2912))
+- OMP context usage updates while a turn is running ([#2503](https://github.com/longbkit/clisbot/pull/2503) by [@theslava](https://github.com/theslava))
+- OpenCode reports background activity from its own busy status ([#2696](https://github.com/longbkit/clisbot/pull/2696) by [@desflynn](https://github.com/desflynn))
+- Desktop browser tabs keep their state through focus changes and automation ([#2907](https://github.com/longbkit/clisbot/pull/2907))
+- New worktrees start from the tracked upstream branch ([#2848](https://github.com/longbkit/clisbot/pull/2848))
+- Generated workspace titles describe the task ([#2755](https://github.com/longbkit/clisbot/pull/2755))
+- Relay access is opt-in when you pair a device ([#2706](https://github.com/longbkit/clisbot/pull/2706))
+- Voice mode releases the audio session when recording and playback stop ([#2866](https://github.com/longbkit/clisbot/pull/2866) by [@kaspesi](https://github.com/kaspesi))
+- Workspace suggestions skip Git-ignored data ([#2902](https://github.com/longbkit/clisbot/pull/2902))
+- Reconnect messages distinguish daemon restarts from network interruptions ([#2931](https://github.com/longbkit/clisbot/pull/2931))
+- The file viewer shows one accurate status when a file changes or is deleted ([#2670](https://github.com/longbkit/clisbot/pull/2670), [#2694](https://github.com/longbkit/clisbot/pull/2694))
+- The Nix desktop package is smaller ([#2550](https://github.com/longbkit/clisbot/pull/2550) by [@colonelpanic8](https://github.com/colonelpanic8))
+- The Nix desktop app uses the right icon on Linux and macOS ([#2506](https://github.com/longbkit/clisbot/pull/2506), [#2783](https://github.com/longbkit/clisbot/pull/2783) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Clisbot Desktop builds from the Nix flake on macOS ([#2556](https://github.com/longbkit/clisbot/pull/2556) by [@colonelpanic8](https://github.com/colonelpanic8))
 
 ### Fixed
 
-- Pi 0.84 agents no longer crash-loop on every prompt ([#2978](https://github.com/getpaseo/paseo/pull/2978) by [@dundunHa](https://github.com/dundunHa))
-- Workspace file watching no longer stalls the daemon ([#2858](https://github.com/getpaseo/paseo/pull/2858))
-- Messages no longer duplicate or arrive out of order after a reconnect or resume ([#2789](https://github.com/getpaseo/paseo/pull/2789), [#2718](https://github.com/getpaseo/paseo/pull/2718))
-- Git status and diffs pick up changes in nested folders on every desktop OS ([#2775](https://github.com/getpaseo/paseo/pull/2775))
-- Claude runtime failures report an error instead of leaving the workspace idle ([#2910](https://github.com/getpaseo/paseo/pull/2910) by [@nickmaglowsch](https://github.com/nickmaglowsch))
-- Claude replay no longer leaves stale running subagents ([#2876](https://github.com/getpaseo/paseo/pull/2876) by [@cleiter](https://github.com/cleiter))
-- The Fast toggle appears for Claude Opus 5 ([#2939](https://github.com/getpaseo/paseo/pull/2939) by [@cleiter](https://github.com/cleiter))
-- Agents stop with an error when their provider process exits ([#2757](https://github.com/getpaseo/paseo/pull/2757))
-- Cancelling an OpenCode turn no longer breaks the next one ([#2662](https://github.com/getpaseo/paseo/pull/2662))
-- ACP permission prompts no longer disappear mid-turn ([#2762](https://github.com/getpaseo/paseo/pull/2762))
-- A workspace no longer looks idle while its native subagents run ([#2777](https://github.com/getpaseo/paseo/pull/2777))
-- Terminal activity stops after an interrupted turn ([#2942](https://github.com/getpaseo/paseo/pull/2942))
+- Pi 0.84 agents no longer crash-loop on every prompt ([#2978](https://github.com/longbkit/clisbot/pull/2978) by [@dundunHa](https://github.com/dundunHa))
+- Workspace file watching no longer stalls the daemon ([#2858](https://github.com/longbkit/clisbot/pull/2858))
+- Messages no longer duplicate or arrive out of order after a reconnect or resume ([#2789](https://github.com/longbkit/clisbot/pull/2789), [#2718](https://github.com/longbkit/clisbot/pull/2718))
+- Git status and diffs pick up changes in nested folders on every desktop OS ([#2775](https://github.com/longbkit/clisbot/pull/2775))
+- Claude runtime failures report an error instead of leaving the workspace idle ([#2910](https://github.com/longbkit/clisbot/pull/2910) by [@nickmaglowsch](https://github.com/nickmaglowsch))
+- Claude replay no longer leaves stale running subagents ([#2876](https://github.com/longbkit/clisbot/pull/2876) by [@cleiter](https://github.com/cleiter))
+- The Fast toggle appears for Claude Opus 5 ([#2939](https://github.com/longbkit/clisbot/pull/2939) by [@cleiter](https://github.com/cleiter))
+- Agents stop with an error when their provider process exits ([#2757](https://github.com/longbkit/clisbot/pull/2757))
+- Cancelling an OpenCode turn no longer breaks the next one ([#2662](https://github.com/longbkit/clisbot/pull/2662))
+- ACP permission prompts no longer disappear mid-turn ([#2762](https://github.com/longbkit/clisbot/pull/2762))
+- A workspace no longer looks idle while its native subagents run ([#2777](https://github.com/longbkit/clisbot/pull/2777))
+- Terminal activity stops after an interrupted turn ([#2942](https://github.com/longbkit/clisbot/pull/2942))
 - Windows terminals handle deferred startup failures without crashing
-- Recreated workspace folders no longer remain incorrectly archived ([#2987](https://github.com/getpaseo/paseo/pull/2987))
-- Restoring a merged workspace no longer leaves it inactive ([#2714](https://github.com/getpaseo/paseo/pull/2714))
-- Switching workspaces no longer scrolls a chat away from where you were reading ([#2838](https://github.com/getpaseo/paseo/pull/2838))
+- Recreated workspace folders no longer remain incorrectly archived ([#2987](https://github.com/longbkit/clisbot/pull/2987))
+- Restoring a merged workspace no longer leaves it inactive ([#2714](https://github.com/longbkit/clisbot/pull/2714))
+- Switching workspaces no longer scrolls a chat away from where you were reading ([#2838](https://github.com/longbkit/clisbot/pull/2838))
 - Images stay anchored while a conversation reloads
-- Swipe and drag gestures work in the mobile sidebar ([#2709](https://github.com/getpaseo/paseo/pull/2709))
-- Dictated prompts no longer disappear when you submit them ([#2745](https://github.com/getpaseo/paseo/pull/2745))
+- Swipe and drag gestures work in the mobile sidebar ([#2709](https://github.com/longbkit/clisbot/pull/2709))
+- Dictated prompts no longer disappear when you submit them ([#2745](https://github.com/longbkit/clisbot/pull/2745))
 - The composer stays above the keyboard on Android
 - Typing with an IME on mobile no longer loses composed text
-- The composer toolbar no longer flickers when switching tabs ([#2937](https://github.com/getpaseo/paseo/pull/2937))
-- Your selected project stays selected when you switch hosts ([#2700](https://github.com/getpaseo/paseo/pull/2700))
-- Host connection choices stay selected through Settings and desktop refreshes ([#2905](https://github.com/getpaseo/paseo/pull/2905))
-- The pull request panel updates after you switch branches ([#2699](https://github.com/getpaseo/paseo/pull/2699))
-- New Workspace shows its isolation controls right away ([#2702](https://github.com/getpaseo/paseo/pull/2702))
-- Sidebar shortcuts leave focus mode ([#2717](https://github.com/getpaseo/paseo/pull/2717))
-- Agents started by the NixOS service no longer run in production mode ([#2697](https://github.com/getpaseo/paseo/pull/2697) by [@shin-sakata](https://github.com/shin-sakata))
+- The composer toolbar no longer flickers when switching tabs ([#2937](https://github.com/longbkit/clisbot/pull/2937))
+- Your selected project stays selected when you switch hosts ([#2700](https://github.com/longbkit/clisbot/pull/2700))
+- Host connection choices stay selected through Settings and desktop refreshes ([#2905](https://github.com/longbkit/clisbot/pull/2905))
+- The pull request panel updates after you switch branches ([#2699](https://github.com/longbkit/clisbot/pull/2699))
+- New Workspace shows its isolation controls right away ([#2702](https://github.com/longbkit/clisbot/pull/2702))
+- Sidebar shortcuts leave focus mode ([#2717](https://github.com/longbkit/clisbot/pull/2717))
+- Agents started by the NixOS service no longer run in production mode ([#2697](https://github.com/longbkit/clisbot/pull/2697) by [@shin-sakata](https://github.com/shin-sakata))
 
 ## 0.2.5 - 2026-07-30
 
 ### Fixed
 
-- Fixed the Linux Debian package ([#2654](https://github.com/getpaseo/paseo/pull/2654) by [@Neumannzc](https://github.com/Neumannzc))
+- Fixed the Linux Debian package ([#2654](https://github.com/longbkit/clisbot/pull/2654) by [@Neumannzc](https://github.com/Neumannzc))
 
 ## 0.2.4 - 2026-07-30
 
 ### Added
 
-- Set an agent's thinking level from the CLI ([#2533](https://github.com/getpaseo/paseo/pull/2533))
-- Switch projects while creating a workspace with ⌘P / Ctrl+P ([#2110](https://github.com/getpaseo/paseo/pull/2110) by [@turtleDev](https://github.com/turtleDev))
-- Open a project or workspace folder from the sidebar ([#2491](https://github.com/getpaseo/paseo/pull/2491) by [@PTK030](https://github.com/PTK030))
-- Flick up on the chat to dismiss the keyboard ([#2417](https://github.com/getpaseo/paseo/pull/2417) by [@nllptrx](https://github.com/nllptrx))
-- Custom providers can read the agent's working directory ([#2563](https://github.com/getpaseo/paseo/pull/2563))
+- Set an agent's thinking level from the CLI ([#2533](https://github.com/longbkit/clisbot/pull/2533))
+- Switch projects while creating a workspace with ⌘P / Ctrl+P ([#2110](https://github.com/longbkit/clisbot/pull/2110) by [@turtleDev](https://github.com/turtleDev))
+- Open a project or workspace folder from the sidebar ([#2491](https://github.com/longbkit/clisbot/pull/2491) by [@PTK030](https://github.com/PTK030))
+- Flick up on the chat to dismiss the keyboard ([#2417](https://github.com/longbkit/clisbot/pull/2417) by [@nllptrx](https://github.com/nllptrx))
+- Custom providers can read the agent's working directory ([#2563](https://github.com/longbkit/clisbot/pull/2563))
 
 ### Fixed
 
-- The same repository added on more than one machine appears as one project in the sidebar ([#2565](https://github.com/getpaseo/paseo/pull/2565))
-- Idle agents keep their background work instead of shutting down when unused ([#2590](https://github.com/getpaseo/paseo/pull/2590))
-- Desktop no longer crashes at startup while restoring your file tree ([#2595](https://github.com/getpaseo/paseo/pull/2595))
-- Plan approval only shows the latest proposal ([#2534](https://github.com/getpaseo/paseo/pull/2534))
-- Opus 5 appears once in the model list, with its full 1M context ([#2497](https://github.com/getpaseo/paseo/pull/2497))
-- The context meter no longer blanks out partway through a conversation ([#2494](https://github.com/getpaseo/paseo/pull/2494) by [@theslava](https://github.com/theslava))
-- A very large working diff no longer drops your session ([#2488](https://github.com/getpaseo/paseo/pull/2488) by [@nikuscs](https://github.com/nikuscs))
-- Interrupting Pi no longer surfaces a stream error ([#2311](https://github.com/getpaseo/paseo/pull/2311) by [@mcowger](https://github.com/mcowger))
-- Grok usage shows again in Settings ([#2353](https://github.com/getpaseo/paseo/pull/2353) by [@jasonhnd](https://github.com/jasonhnd))
-- OMP models that report no context window now load ([#2406](https://github.com/getpaseo/paseo/pull/2406) by [@astartsky](https://github.com/astartsky))
-- Paseo's own tools are available directly in OMP ([#2418](https://github.com/getpaseo/paseo/pull/2418) by [@perezd](https://github.com/perezd))
-- Codex finds the skills defined in your project ([#2423](https://github.com/getpaseo/paseo/pull/2423) by [@dwyanewang](https://github.com/dwyanewang))
-- Pull request comments containing HTML render correctly ([#2432](https://github.com/getpaseo/paseo/pull/2432) by [@mcowger](https://github.com/mcowger))
-- Self-hosted forge links keep their port ([#2478](https://github.com/getpaseo/paseo/pull/2478) by [@muzhi1991](https://github.com/muzhi1991))
-- The Linux AppImage launches when opened from your desktop ([#2439](https://github.com/getpaseo/paseo/pull/2439) by [@stonegray](https://github.com/stonegray))
-- Repository search works with older versions of the GitHub CLI ([#2611](https://github.com/getpaseo/paseo/pull/2611))
+- The same repository added on more than one machine appears as one project in the sidebar ([#2565](https://github.com/longbkit/clisbot/pull/2565))
+- Idle agents keep their background work instead of shutting down when unused ([#2590](https://github.com/longbkit/clisbot/pull/2590))
+- Desktop no longer crashes at startup while restoring your file tree ([#2595](https://github.com/longbkit/clisbot/pull/2595))
+- Plan approval only shows the latest proposal ([#2534](https://github.com/longbkit/clisbot/pull/2534))
+- Opus 5 appears once in the model list, with its full 1M context ([#2497](https://github.com/longbkit/clisbot/pull/2497))
+- The context meter no longer blanks out partway through a conversation ([#2494](https://github.com/longbkit/clisbot/pull/2494) by [@theslava](https://github.com/theslava))
+- A very large working diff no longer drops your session ([#2488](https://github.com/longbkit/clisbot/pull/2488) by [@nikuscs](https://github.com/nikuscs))
+- Interrupting Pi no longer surfaces a stream error ([#2311](https://github.com/longbkit/clisbot/pull/2311) by [@mcowger](https://github.com/mcowger))
+- Grok usage shows again in Settings ([#2353](https://github.com/longbkit/clisbot/pull/2353) by [@jasonhnd](https://github.com/jasonhnd))
+- OMP models that report no context window now load ([#2406](https://github.com/longbkit/clisbot/pull/2406) by [@astartsky](https://github.com/astartsky))
+- Clisbot's own tools are available directly in OMP ([#2418](https://github.com/longbkit/clisbot/pull/2418) by [@perezd](https://github.com/perezd))
+- Codex finds the skills defined in your project ([#2423](https://github.com/longbkit/clisbot/pull/2423) by [@dwyanewang](https://github.com/dwyanewang))
+- Pull request comments containing HTML render correctly ([#2432](https://github.com/longbkit/clisbot/pull/2432) by [@mcowger](https://github.com/mcowger))
+- Self-hosted forge links keep their port ([#2478](https://github.com/longbkit/clisbot/pull/2478) by [@muzhi1991](https://github.com/muzhi1991))
+- The Linux AppImage launches when opened from your desktop ([#2439](https://github.com/longbkit/clisbot/pull/2439) by [@stonegray](https://github.com/stonegray))
+- Repository search works with older versions of the GitHub CLI ([#2611](https://github.com/longbkit/clisbot/pull/2611))
 
 ## 0.2.3 - 2026-07-27
 
 ### Added
 
-- Manage workspace scripts from the CLI and agent MCP tools ([#1992](https://github.com/getpaseo/paseo/pull/1992) by [@mcowger](https://github.com/mcowger))
-- Copy terminal IDs from terminal tab menus ([#2371](https://github.com/getpaseo/paseo/pull/2371))
-- Long Markdown lines wrap by default in the file editor ([#2459](https://github.com/getpaseo/paseo/pull/2459))
+- Manage workspace scripts from the CLI and agent MCP tools ([#1992](https://github.com/longbkit/clisbot/pull/1992) by [@mcowger](https://github.com/mcowger))
+- Copy terminal IDs from terminal tab menus ([#2371](https://github.com/longbkit/clisbot/pull/2371))
+- Long Markdown lines wrap by default in the file editor ([#2459](https://github.com/longbkit/clisbot/pull/2459))
 
 ### Improved
 
-- Desktop stops its managed daemon when you quit unless “Keep daemon running after quit” is enabled ([#2454](https://github.com/getpaseo/paseo/pull/2454))
-- Remote terminal and file traffic uses less bandwidth over encrypted connections ([#2480](https://github.com/getpaseo/paseo/pull/2480))
-- Workspace search now shows and matches project names ([#2345](https://github.com/getpaseo/paseo/pull/2345) by [@cleiter](https://github.com/cleiter))
-- Claude usage shows model-specific weekly limits ([#2303](https://github.com/getpaseo/paseo/pull/2303) by [@cleiter](https://github.com/cleiter))
-- OMP models show only the thinking levels they support ([#2171](https://github.com/getpaseo/paseo/pull/2171) by [@bendavid](https://github.com/bendavid))
+- Desktop stops its managed daemon when you quit unless “Keep daemon running after quit” is enabled ([#2454](https://github.com/longbkit/clisbot/pull/2454))
+- Remote terminal and file traffic uses less bandwidth over encrypted connections ([#2480](https://github.com/longbkit/clisbot/pull/2480))
+- Workspace search now shows and matches project names ([#2345](https://github.com/longbkit/clisbot/pull/2345) by [@cleiter](https://github.com/cleiter))
+- Claude usage shows model-specific weekly limits ([#2303](https://github.com/longbkit/clisbot/pull/2303) by [@cleiter](https://github.com/cleiter))
+- OMP models show only the thinking levels they support ([#2171](https://github.com/longbkit/clisbot/pull/2171) by [@bendavid](https://github.com/bendavid))
 
 ### Fixed
 
-- Image uploads preserve the correct image format ([#2380](https://github.com/getpaseo/paseo/pull/2380))
-- Large file views no longer disconnect the session ([#2482](https://github.com/getpaseo/paseo/pull/2482))
-- Reaching the top of a chat loads the complete older history ([#2481](https://github.com/getpaseo/paseo/pull/2481))
-- Parent agents stay available while child agents are working ([#2458](https://github.com/getpaseo/paseo/pull/2458))
-- Stale client connections no longer exhaust daemon memory ([#2169](https://github.com/getpaseo/paseo/pull/2169))
-- Pin and unpin shortcuts work when sidebar sections are collapsed ([#2299](https://github.com/getpaseo/paseo/pull/2299) by [@cleiter](https://github.com/cleiter))
-- `Shift+Tab` no longer changes a background agent’s permission mode ([#1848](https://github.com/getpaseo/paseo/pull/1848) by [@cleiter](https://github.com/cleiter))
-- Proxied services preserve ports in redirects ([#2288](https://github.com/getpaseo/paseo/pull/2288) by [@cleiter](https://github.com/cleiter))
-- Provider settings open correctly above the model selector ([#2476](https://github.com/getpaseo/paseo/pull/2476))
-- Clicking the file editor correctly focuses its pane ([#2457](https://github.com/getpaseo/paseo/pull/2457))
+- Image uploads preserve the correct image format ([#2380](https://github.com/longbkit/clisbot/pull/2380))
+- Large file views no longer disconnect the session ([#2482](https://github.com/longbkit/clisbot/pull/2482))
+- Reaching the top of a chat loads the complete older history ([#2481](https://github.com/longbkit/clisbot/pull/2481))
+- Parent agents stay available while child agents are working ([#2458](https://github.com/longbkit/clisbot/pull/2458))
+- Stale client connections no longer exhaust daemon memory ([#2169](https://github.com/longbkit/clisbot/pull/2169))
+- Pin and unpin shortcuts work when sidebar sections are collapsed ([#2299](https://github.com/longbkit/clisbot/pull/2299) by [@cleiter](https://github.com/cleiter))
+- `Shift+Tab` no longer changes a background agent’s permission mode ([#1848](https://github.com/longbkit/clisbot/pull/1848) by [@cleiter](https://github.com/cleiter))
+- Proxied services preserve ports in redirects ([#2288](https://github.com/longbkit/clisbot/pull/2288) by [@cleiter](https://github.com/cleiter))
+- Provider settings open correctly above the model selector ([#2476](https://github.com/longbkit/clisbot/pull/2476))
+- Clicking the file editor correctly focuses its pane ([#2457](https://github.com/longbkit/clisbot/pull/2457))
 
 ## 0.2.2 - 2026-07-25
 
@@ -750,150 +750,150 @@ Paseo 0.8 adds plugin header buttons, custom providers, and richer chat componen
 
 ### Added
 
-- Work with pull requests and merge requests from GitLab, Gitea, Forgejo, and Codeberg ([#1913](https://github.com/getpaseo/paseo/pull/1913) by [@nllptrx](https://github.com/nllptrx))
-- Edit files directly in the web and desktop apps ([#2270](https://github.com/getpaseo/paseo/pull/2270), [#2309](https://github.com/getpaseo/paseo/pull/2309), [#2277](https://github.com/getpaseo/paseo/pull/2277), [#2382](https://github.com/getpaseo/paseo/pull/2382) by [@dwyanewang](https://github.com/dwyanewang))
-- Oh My Pi (OMP) as a native agent provider ([#2067](https://github.com/getpaseo/paseo/pull/2067) by [@ebg1223](https://github.com/ebg1223))
-- Open the complete Changes view as a workspace tab ([#2298](https://github.com/getpaseo/paseo/pull/2298) by [@nikuscs](https://github.com/nikuscs))
-- Add files to chat directly from Files and Changes ([#2275](https://github.com/getpaseo/paseo/pull/2275) by [@nikuscs](https://github.com/nikuscs))
-- Browse workspace commit history and open individual commit diffs from Changes ([#1534](https://github.com/getpaseo/paseo/pull/1534), [#2146](https://github.com/getpaseo/paseo/pull/2146), [#2312](https://github.com/getpaseo/paseo/pull/2312) by [@adradr](https://github.com/adradr))
-- Switch models from the Command Center for active agents and new drafts ([#2147](https://github.com/getpaseo/paseo/pull/2147) by [@kedrzu](https://github.com/kedrzu))
-- Open existing agents from Paseo links or the CLI ([#2324](https://github.com/getpaseo/paseo/pull/2324))
-- Configure workspace service ports with a fixed range or external allocator ([#2165](https://github.com/getpaseo/paseo/pull/2165) by [@mcowger](https://github.com/mcowger))
-- Search keyboard shortcuts by action, note, or key combination ([#2160](https://github.com/getpaseo/paseo/pull/2160))
-- Turn thinking off for supported Claude models ([#2257](https://github.com/getpaseo/paseo/pull/2257))
-- Allow Pi's Max thinking level ([#2267](https://github.com/getpaseo/paseo/pull/2267) by [@ByteTrue](https://github.com/ByteTrue))
-- Open workspace files in more installed editors and file managers ([#2119](https://github.com/getpaseo/paseo/pull/2119))
-- Remove individual custom providers from Settings ([#1951](https://github.com/getpaseo/paseo/pull/1951))
+- Work with pull requests and merge requests from GitLab, Gitea, Forgejo, and Codeberg ([#1913](https://github.com/longbkit/clisbot/pull/1913) by [@nllptrx](https://github.com/nllptrx))
+- Edit files directly in the web and desktop apps ([#2270](https://github.com/longbkit/clisbot/pull/2270), [#2309](https://github.com/longbkit/clisbot/pull/2309), [#2277](https://github.com/longbkit/clisbot/pull/2277), [#2382](https://github.com/longbkit/clisbot/pull/2382) by [@dwyanewang](https://github.com/dwyanewang))
+- Oh My Pi (OMP) as a native agent provider ([#2067](https://github.com/longbkit/clisbot/pull/2067) by [@ebg1223](https://github.com/ebg1223))
+- Open the complete Changes view as a workspace tab ([#2298](https://github.com/longbkit/clisbot/pull/2298) by [@nikuscs](https://github.com/nikuscs))
+- Add files to chat directly from Files and Changes ([#2275](https://github.com/longbkit/clisbot/pull/2275) by [@nikuscs](https://github.com/nikuscs))
+- Browse workspace commit history and open individual commit diffs from Changes ([#1534](https://github.com/longbkit/clisbot/pull/1534), [#2146](https://github.com/longbkit/clisbot/pull/2146), [#2312](https://github.com/longbkit/clisbot/pull/2312) by [@adradr](https://github.com/adradr))
+- Switch models from the Command Center for active agents and new drafts ([#2147](https://github.com/longbkit/clisbot/pull/2147) by [@kedrzu](https://github.com/kedrzu))
+- Open existing agents from Clisbot links or the CLI ([#2324](https://github.com/longbkit/clisbot/pull/2324))
+- Configure workspace service ports with a fixed range or external allocator ([#2165](https://github.com/longbkit/clisbot/pull/2165) by [@mcowger](https://github.com/mcowger))
+- Search keyboard shortcuts by action, note, or key combination ([#2160](https://github.com/longbkit/clisbot/pull/2160))
+- Turn thinking off for supported Claude models ([#2257](https://github.com/longbkit/clisbot/pull/2257))
+- Allow Pi's Max thinking level ([#2267](https://github.com/longbkit/clisbot/pull/2267) by [@ByteTrue](https://github.com/ByteTrue))
+- Open workspace files in more installed editors and file managers ([#2119](https://github.com/longbkit/clisbot/pull/2119))
+- Remove individual custom providers from Settings ([#1951](https://github.com/longbkit/clisbot/pull/1951))
 
 ### Improved
 
-- Improved model selection on mobile ([#2361](https://github.com/getpaseo/paseo/pull/2361))
-- Selector popovers stay readable on iPad ([#2360](https://github.com/getpaseo/paseo/pull/2360) by [@yzim](https://github.com/yzim))
-- Projects, workspaces and chat syncing is more efficient ([#2028](https://github.com/getpaseo/paseo/pull/2028), [#2185](https://github.com/getpaseo/paseo/pull/2185), [#2196](https://github.com/getpaseo/paseo/pull/2196), [#2206](https://github.com/getpaseo/paseo/pull/2206), [#2259](https://github.com/getpaseo/paseo/pull/2259), [#2263](https://github.com/getpaseo/paseo/pull/2263))
-- CLI and MCP tools manage workspaces, agents, and schedules more consistently ([#2186](https://github.com/getpaseo/paseo/pull/2186))
-- Pasted PR/MR links in the composer become auto-selected as a checkout option ([#2290](https://github.com/getpaseo/paseo/pull/2290))
-- Make project creation more explicit ([#2098](https://github.com/getpaseo/paseo/pull/2098), [#2187](https://github.com/getpaseo/paseo/pull/2187))
-- Idle agents release processes automatically and resume when needed ([#2203](https://github.com/getpaseo/paseo/pull/2203), [#2209](https://github.com/getpaseo/paseo/pull/2209))
-- New Claude and Codex agents default to safer automatic approval modes when supported ([#2213](https://github.com/getpaseo/paseo/pull/2213))
-- Permission and thinking changes made during a turn now show when they take effect ([#2201](https://github.com/getpaseo/paseo/pull/2201))
-- Usage bars now warn as provider limits approach ([#2322](https://github.com/getpaseo/paseo/pull/2322) by [@cleiter](https://github.com/cleiter))
-- Workspace focus mode stays confined to the active workspace with a visible exit control ([#2151](https://github.com/getpaseo/paseo/pull/2151))
-- Desktop installs the newest available update instead of a cached older release ([#2149](https://github.com/getpaseo/paseo/pull/2149))
-- Remote daemon update failures now show specific recovery steps ([#2120](https://github.com/getpaseo/paseo/pull/2120))
-- Agent history errors now appear immediately instead of after a timeout ([#2124](https://github.com/getpaseo/paseo/pull/2124))
+- Improved model selection on mobile ([#2361](https://github.com/longbkit/clisbot/pull/2361))
+- Selector popovers stay readable on iPad ([#2360](https://github.com/longbkit/clisbot/pull/2360) by [@yzim](https://github.com/yzim))
+- Projects, workspaces and chat syncing is more efficient ([#2028](https://github.com/longbkit/clisbot/pull/2028), [#2185](https://github.com/longbkit/clisbot/pull/2185), [#2196](https://github.com/longbkit/clisbot/pull/2196), [#2206](https://github.com/longbkit/clisbot/pull/2206), [#2259](https://github.com/longbkit/clisbot/pull/2259), [#2263](https://github.com/longbkit/clisbot/pull/2263))
+- CLI and MCP tools manage workspaces, agents, and schedules more consistently ([#2186](https://github.com/longbkit/clisbot/pull/2186))
+- Pasted PR/MR links in the composer become auto-selected as a checkout option ([#2290](https://github.com/longbkit/clisbot/pull/2290))
+- Make project creation more explicit ([#2098](https://github.com/longbkit/clisbot/pull/2098), [#2187](https://github.com/longbkit/clisbot/pull/2187))
+- Idle agents release processes automatically and resume when needed ([#2203](https://github.com/longbkit/clisbot/pull/2203), [#2209](https://github.com/longbkit/clisbot/pull/2209))
+- New Claude and Codex agents default to safer automatic approval modes when supported ([#2213](https://github.com/longbkit/clisbot/pull/2213))
+- Permission and thinking changes made during a turn now show when they take effect ([#2201](https://github.com/longbkit/clisbot/pull/2201))
+- Usage bars now warn as provider limits approach ([#2322](https://github.com/longbkit/clisbot/pull/2322) by [@cleiter](https://github.com/cleiter))
+- Workspace focus mode stays confined to the active workspace with a visible exit control ([#2151](https://github.com/longbkit/clisbot/pull/2151))
+- Desktop installs the newest available update instead of a cached older release ([#2149](https://github.com/longbkit/clisbot/pull/2149))
+- Remote daemon update failures now show specific recovery steps ([#2120](https://github.com/longbkit/clisbot/pull/2120))
+- Agent history errors now appear immediately instead of after a timeout ([#2124](https://github.com/longbkit/clisbot/pull/2124))
 
 ### Fixed
 
-- Terminal pairing QR codes remain scannable in narrow terminals ([#2381](https://github.com/getpaseo/paseo/pull/2381))
-- Workspace creation stays responsive even with many active or archived workspaces ([#2355](https://github.com/getpaseo/paseo/pull/2355), [#2379](https://github.com/getpaseo/paseo/pull/2379))
-- Failed agent starts no longer leave provider processes running ([#2348](https://github.com/getpaseo/paseo/pull/2348) by [@dwyanewang](https://github.com/dwyanewang))
-- Completed OpenCode turns stay idle when late metadata updates arrive ([#2336](https://github.com/getpaseo/paseo/pull/2336) by [@mcowger](https://github.com/mcowger))
-- ACP image prompts no longer appear twice ([#2363](https://github.com/getpaseo/paseo/pull/2363))
-- Web chats stay pinned to the latest message at non-default browser zoom ([#2368](https://github.com/getpaseo/paseo/pull/2368))
-- Grouped tool-call loading animations display correctly ([#2369](https://github.com/getpaseo/paseo/pull/2369))
-- Notifications now open the correct workspace and agent ([#2331](https://github.com/getpaseo/paseo/pull/2331))
-- Archived agents can be restored directly from History ([#2316](https://github.com/getpaseo/paseo/pull/2316))
-- CLI agent runs stay in the current workspace unless a new workspace is requested ([#2315](https://github.com/getpaseo/paseo/pull/2315))
-- Reused branches no longer attach an unrelated merged or closed pull request ([#2172](https://github.com/getpaseo/paseo/pull/2172) by [@nllptrx](https://github.com/nllptrx))
-- Pi compaction waits for long summaries instead of reporting a false timeout ([#2181](https://github.com/getpaseo/paseo/pull/2181) by [@jasonhnd](https://github.com/jasonhnd))
-- Pi chats keep new messages aligned with the correct history after an idle agent resumes ([#2313](https://github.com/getpaseo/paseo/pull/2313))
-- OpenCode follow-ups triggered by completed background work now remain visible ([#2258](https://github.com/getpaseo/paseo/pull/2258))
-- Codex no longer shows the parent agent as a phantom subagent ([#2214](https://github.com/getpaseo/paseo/pull/2214))
-- Oh My Pi background notices appear as task notifications instead of raw system text ([#2218](https://github.com/getpaseo/paseo/pull/2218) by [@ebg1223](https://github.com/ebg1223))
-- Local dictation now works in Nix-packaged installations ([#1587](https://github.com/getpaseo/paseo/pull/1587) by [@yhori991](https://github.com/yhori991))
-- The composer remains visible after submitting dictated text and returning to the app ([#2194](https://github.com/getpaseo/paseo/pull/2194))
-- Desktop's dictation shortcut remains responsive after finishing a recording ([#2268](https://github.com/getpaseo/paseo/pull/2268))
-- Projects can be renamed before their first workspace ([#2252](https://github.com/getpaseo/paseo/pull/2252) by [@albertodeago](https://github.com/albertodeago))
-- Settings keep showing a connected remote host when the local daemon is stopped ([#1749](https://github.com/getpaseo/paseo/pull/1749) by [@dwyanewang](https://github.com/dwyanewang))
-- Pinned workspaces no longer disappear briefly when reopening the compact sidebar ([#2210](https://github.com/getpaseo/paseo/pull/2210))
-- Terminal panes no longer remain at 80x24 after focus or visibility changes ([#2059](https://github.com/getpaseo/paseo/pull/2059), [#2154](https://github.com/getpaseo/paseo/pull/2154) by [@cleiter](https://github.com/cleiter))
-- Sign-in popups in the desktop browser now complete successfully ([#2137](https://github.com/getpaseo/paseo/pull/2137))
-- Browser typing and shortcuts no longer submit the active Paseo prompt ([#1982](https://github.com/getpaseo/paseo/pull/1982))
-- Agent browser tabs remain controllable after switching workspaces ([#2156](https://github.com/getpaseo/paseo/pull/2156))
-- Archived workspaces now show the correct Unarchive or Restore action ([#2002](https://github.com/getpaseo/paseo/pull/2002))
-- Archived sessions can be reimported into the current workspace ([#2123](https://github.com/getpaseo/paseo/pull/2123), [#2265](https://github.com/getpaseo/paseo/pull/2265) by [@nikuscs](https://github.com/nikuscs))
-- Browser shortcuts no longer appear where browser tabs are unavailable ([#2116](https://github.com/getpaseo/paseo/pull/2116) by [@jasonhnd](https://github.com/jasonhnd))
+- Terminal pairing QR codes remain scannable in narrow terminals ([#2381](https://github.com/longbkit/clisbot/pull/2381))
+- Workspace creation stays responsive even with many active or archived workspaces ([#2355](https://github.com/longbkit/clisbot/pull/2355), [#2379](https://github.com/longbkit/clisbot/pull/2379))
+- Failed agent starts no longer leave provider processes running ([#2348](https://github.com/longbkit/clisbot/pull/2348) by [@dwyanewang](https://github.com/dwyanewang))
+- Completed OpenCode turns stay idle when late metadata updates arrive ([#2336](https://github.com/longbkit/clisbot/pull/2336) by [@mcowger](https://github.com/mcowger))
+- ACP image prompts no longer appear twice ([#2363](https://github.com/longbkit/clisbot/pull/2363))
+- Web chats stay pinned to the latest message at non-default browser zoom ([#2368](https://github.com/longbkit/clisbot/pull/2368))
+- Grouped tool-call loading animations display correctly ([#2369](https://github.com/longbkit/clisbot/pull/2369))
+- Notifications now open the correct workspace and agent ([#2331](https://github.com/longbkit/clisbot/pull/2331))
+- Archived agents can be restored directly from History ([#2316](https://github.com/longbkit/clisbot/pull/2316))
+- CLI agent runs stay in the current workspace unless a new workspace is requested ([#2315](https://github.com/longbkit/clisbot/pull/2315))
+- Reused branches no longer attach an unrelated merged or closed pull request ([#2172](https://github.com/longbkit/clisbot/pull/2172) by [@nllptrx](https://github.com/nllptrx))
+- Pi compaction waits for long summaries instead of reporting a false timeout ([#2181](https://github.com/longbkit/clisbot/pull/2181) by [@jasonhnd](https://github.com/jasonhnd))
+- Pi chats keep new messages aligned with the correct history after an idle agent resumes ([#2313](https://github.com/longbkit/clisbot/pull/2313))
+- OpenCode follow-ups triggered by completed background work now remain visible ([#2258](https://github.com/longbkit/clisbot/pull/2258))
+- Codex no longer shows the parent agent as a phantom subagent ([#2214](https://github.com/longbkit/clisbot/pull/2214))
+- Oh My Pi background notices appear as task notifications instead of raw system text ([#2218](https://github.com/longbkit/clisbot/pull/2218) by [@ebg1223](https://github.com/ebg1223))
+- Local dictation now works in Nix-packaged installations ([#1587](https://github.com/longbkit/clisbot/pull/1587) by [@yhori991](https://github.com/yhori991))
+- The composer remains visible after submitting dictated text and returning to the app ([#2194](https://github.com/longbkit/clisbot/pull/2194))
+- Desktop's dictation shortcut remains responsive after finishing a recording ([#2268](https://github.com/longbkit/clisbot/pull/2268))
+- Projects can be renamed before their first workspace ([#2252](https://github.com/longbkit/clisbot/pull/2252) by [@albertodeago](https://github.com/albertodeago))
+- Settings keep showing a connected remote host when the local daemon is stopped ([#1749](https://github.com/longbkit/clisbot/pull/1749) by [@dwyanewang](https://github.com/dwyanewang))
+- Pinned workspaces no longer disappear briefly when reopening the compact sidebar ([#2210](https://github.com/longbkit/clisbot/pull/2210))
+- Terminal panes no longer remain at 80x24 after focus or visibility changes ([#2059](https://github.com/longbkit/clisbot/pull/2059), [#2154](https://github.com/longbkit/clisbot/pull/2154) by [@cleiter](https://github.com/cleiter))
+- Sign-in popups in the desktop browser now complete successfully ([#2137](https://github.com/longbkit/clisbot/pull/2137))
+- Browser typing and shortcuts no longer submit the active Clisbot prompt ([#1982](https://github.com/longbkit/clisbot/pull/1982))
+- Agent browser tabs remain controllable after switching workspaces ([#2156](https://github.com/longbkit/clisbot/pull/2156))
+- Archived workspaces now show the correct Unarchive or Restore action ([#2002](https://github.com/longbkit/clisbot/pull/2002))
+- Archived sessions can be reimported into the current workspace ([#2123](https://github.com/longbkit/clisbot/pull/2123), [#2265](https://github.com/longbkit/clisbot/pull/2265) by [@nikuscs](https://github.com/nikuscs))
+- Browser shortcuts no longer appear where browser tabs are unavailable ([#2116](https://github.com/longbkit/clisbot/pull/2116) by [@jasonhnd](https://github.com/jasonhnd))
 
 ## 0.1.110 - 2026-07-16
 
 ### Fixed
 
-- Kimi and other ACP agents now stay marked as running while a response is actively streaming ([#2148](https://github.com/getpaseo/paseo/pull/2148))
+- Kimi and other ACP agents now stay marked as running while a response is actively streaming ([#2148](https://github.com/longbkit/clisbot/pull/2148))
 
 ## 0.1.109 - 2026-07-16
 
 > **Important update notice**
 >
-> If you installed Paseo Desktop 0.1.108, you need to [download and reinstall Paseo manually](https://paseo.sh/download) to get this fix. The bug in 0.1.108 prevents its automatic updater from installing 0.1.109. Users on 0.1.107 or earlier can update normally.
+> If you installed Clisbot Desktop 0.1.108, you need to [download and reinstall Clisbot manually](https://clisbot.com/download) to get this fix. The bug in 0.1.108 prevents its automatic updater from installing 0.1.109. Users on 0.1.107 or earlier can update normally.
 
 ### Fixed
 
-- Paseo Desktop no longer gets stuck connecting or loses native window controls after updating ([#2111](https://github.com/getpaseo/paseo/pull/2111) by [@cleiter](https://github.com/cleiter))
+- Clisbot Desktop no longer gets stuck connecting or loses native window controls after updating ([#2111](https://github.com/longbkit/clisbot/pull/2111) by [@cleiter](https://github.com/cleiter))
 
 ## 0.1.108 - 2026-07-16
 
 ### Added
 
-- Create a new project folder or clone a GitHub repository from Add Project ([#1331](https://github.com/getpaseo/paseo/pull/1331), [#2045](https://github.com/getpaseo/paseo/pull/2045), [#2097](https://github.com/getpaseo/paseo/pull/2097) by [@mcowger](https://github.com/mcowger))
-- Search for and open workspaces from the search menu ([#2096](https://github.com/getpaseo/paseo/pull/2096))
-- Pin workspaces to the top of the sidebar ([#1981](https://github.com/getpaseo/paseo/pull/1981) by [@half144](https://github.com/half144))
-- Summarize tool calls in a single collapsed item with a new appearance setting ([#2031](https://github.com/getpaseo/paseo/pull/2031), [#2069](https://github.com/getpaseo/paseo/pull/2069), [#2090](https://github.com/getpaseo/paseo/pull/2090) by [@mcowger](https://github.com/mcowger))
-- Save browser cookies and site data across tabs and restarts ([#2089](https://github.com/getpaseo/paseo/pull/2089))
-- Claude and Codex subagents now show their actual names, with a new option to archive finished Claude Code, Codex, and OpenCode subagents ([#2073](https://github.com/getpaseo/paseo/pull/2073))
-- Fork chats from failed turns ([#2063](https://github.com/getpaseo/paseo/pull/2063))
+- Create a new project folder or clone a GitHub repository from Add Project ([#1331](https://github.com/longbkit/clisbot/pull/1331), [#2045](https://github.com/longbkit/clisbot/pull/2045), [#2097](https://github.com/longbkit/clisbot/pull/2097) by [@mcowger](https://github.com/mcowger))
+- Search for and open workspaces from the search menu ([#2096](https://github.com/longbkit/clisbot/pull/2096))
+- Pin workspaces to the top of the sidebar ([#1981](https://github.com/longbkit/clisbot/pull/1981) by [@half144](https://github.com/half144))
+- Summarize tool calls in a single collapsed item with a new appearance setting ([#2031](https://github.com/longbkit/clisbot/pull/2031), [#2069](https://github.com/longbkit/clisbot/pull/2069), [#2090](https://github.com/longbkit/clisbot/pull/2090) by [@mcowger](https://github.com/mcowger))
+- Save browser cookies and site data across tabs and restarts ([#2089](https://github.com/longbkit/clisbot/pull/2089))
+- Claude and Codex subagents now show their actual names, with a new option to archive finished Claude Code, Codex, and OpenCode subagents ([#2073](https://github.com/longbkit/clisbot/pull/2073))
+- Fork chats from failed turns ([#2063](https://github.com/longbkit/clisbot/pull/2063))
 
 ### Improved
 
-- Permission modes have clearer icons ([#1980](https://github.com/getpaseo/paseo/pull/1980) by [@cleiter](https://github.com/cleiter))
-- Desktop stays usable in narrower windows ([#1983](https://github.com/getpaseo/paseo/pull/1983))
-- Sidebar controls stay in place when desktop panels open and close ([#2078](https://github.com/getpaseo/paseo/pull/2078))
-- Typing in long drafts is smoother ([#2086](https://github.com/getpaseo/paseo/pull/2086))
-- Codex terminal commands always appear in chat, even when they have no output ([#2037](https://github.com/getpaseo/paseo/pull/2037))
+- Permission modes have clearer icons ([#1980](https://github.com/longbkit/clisbot/pull/1980) by [@cleiter](https://github.com/cleiter))
+- Desktop stays usable in narrower windows ([#1983](https://github.com/longbkit/clisbot/pull/1983))
+- Sidebar controls stay in place when desktop panels open and close ([#2078](https://github.com/longbkit/clisbot/pull/2078))
+- Typing in long drafts is smoother ([#2086](https://github.com/longbkit/clisbot/pull/2086))
+- Codex terminal commands always appear in chat, even when they have no output ([#2037](https://github.com/longbkit/clisbot/pull/2037))
 
 ### Fixed
 
-- New Workspace keeps your prompt and attachments when you switch projects or hosts ([#2030](https://github.com/getpaseo/paseo/pull/2030), [#2036](https://github.com/getpaseo/paseo/pull/2036))
-- OpenCode sessions close without crashing Paseo ([#2027](https://github.com/getpaseo/paseo/pull/2027) by [@mcowger](https://github.com/mcowger))
-- Pi slash commands no longer leave chats stuck as running ([#2066](https://github.com/getpaseo/paseo/pull/2066) by [@ebg1223](https://github.com/ebg1223))
-- Background-agent updates now appear after the main reply ([#2058](https://github.com/getpaseo/paseo/pull/2058) by [@1254087415](https://github.com/1254087415))
-- Codex subagents no longer disappear from the Subagents track ([#2068](https://github.com/getpaseo/paseo/pull/2068))
-- Forked chats open ready to edit in their new tab ([#2038](https://github.com/getpaseo/paseo/pull/2038))
-- Paseo Desktop opens normally after an interrupted shutdown ([#1962](https://github.com/getpaseo/paseo/pull/1962))
-- Keyboard shortcuts now work with `-`, `=`, `;`, and `'` ([#2047](https://github.com/getpaseo/paseo/pull/2047) by [@OnCloud125252](https://github.com/OnCloud125252))
-- Codebuddy Code models now appear in the model picker ([#1979](https://github.com/getpaseo/paseo/pull/1979) by [@park0er](https://github.com/park0er))
-- Workspace search now includes OpenCode commands and workflows ([#2049](https://github.com/getpaseo/paseo/pull/2049))
-- Nix installations now include the Paseo web app ([#1978](https://github.com/getpaseo/paseo/pull/1978) by [@liamdiprose](https://github.com/liamdiprose))
+- New Workspace keeps your prompt and attachments when you switch projects or hosts ([#2030](https://github.com/longbkit/clisbot/pull/2030), [#2036](https://github.com/longbkit/clisbot/pull/2036))
+- OpenCode sessions close without crashing Clisbot ([#2027](https://github.com/longbkit/clisbot/pull/2027) by [@mcowger](https://github.com/mcowger))
+- Pi slash commands no longer leave chats stuck as running ([#2066](https://github.com/longbkit/clisbot/pull/2066) by [@ebg1223](https://github.com/ebg1223))
+- Background-agent updates now appear after the main reply ([#2058](https://github.com/longbkit/clisbot/pull/2058) by [@1254087415](https://github.com/1254087415))
+- Codex subagents no longer disappear from the Subagents track ([#2068](https://github.com/longbkit/clisbot/pull/2068))
+- Forked chats open ready to edit in their new tab ([#2038](https://github.com/longbkit/clisbot/pull/2038))
+- Clisbot Desktop opens normally after an interrupted shutdown ([#1962](https://github.com/longbkit/clisbot/pull/1962))
+- Keyboard shortcuts now work with `-`, `=`, `;`, and `'` ([#2047](https://github.com/longbkit/clisbot/pull/2047) by [@OnCloud125252](https://github.com/OnCloud125252))
+- Codebuddy Code models now appear in the model picker ([#1979](https://github.com/longbkit/clisbot/pull/1979) by [@park0er](https://github.com/park0er))
+- Workspace search now includes OpenCode commands and workflows ([#2049](https://github.com/longbkit/clisbot/pull/2049))
+- Nix installations now include the Clisbot web app ([#1978](https://github.com/longbkit/clisbot/pull/1978) by [@liamdiprose](https://github.com/liamdiprose))
 
 ## 0.1.107 - 2026-07-13
 
 ### Added
 
-- Inspect provider-created subagents and their live conversations from the Subagents track ([#2013](https://github.com/getpaseo/paseo/pull/2013) by [@omercnet](https://github.com/omercnet))
-- Fork chats with every supported agent provider ([#2022](https://github.com/getpaseo/paseo/pull/2022))
+- Inspect provider-created subagents and their live conversations from the Subagents track ([#2013](https://github.com/longbkit/clisbot/pull/2013) by [@omercnet](https://github.com/omercnet))
+- Fork chats with every supported agent provider ([#2022](https://github.com/longbkit/clisbot/pull/2022))
 
 ### Improved
 
-- Add projects directly from New Workspace when none are configured ([#2026](https://github.com/getpaseo/paseo/pull/2026))
-- New terminals open at the correct size immediately ([#2023](https://github.com/getpaseo/paseo/pull/2023) by [@cleiter](https://github.com/cleiter))
-- Sidebar footer actions now explain themselves with tooltips ([#2025](https://github.com/getpaseo/paseo/pull/2025))
-- Codex shell tool calls show only the command being run ([#2029](https://github.com/getpaseo/paseo/pull/2029))
-- Custom ACP providers keep file and terminal work in the agent environment by default ([#2024](https://github.com/getpaseo/paseo/pull/2024))
+- Add projects directly from New Workspace when none are configured ([#2026](https://github.com/longbkit/clisbot/pull/2026))
+- New terminals open at the correct size immediately ([#2023](https://github.com/longbkit/clisbot/pull/2023) by [@cleiter](https://github.com/cleiter))
+- Sidebar footer actions now explain themselves with tooltips ([#2025](https://github.com/longbkit/clisbot/pull/2025))
+- Codex shell tool calls show only the command being run ([#2029](https://github.com/longbkit/clisbot/pull/2029))
+- Custom ACP providers keep file and terminal work in the agent environment by default ([#2024](https://github.com/longbkit/clisbot/pull/2024))
 - ACP provider catalog updated to the latest registry versions
 
 ### Fixed
 
 - Large tables no longer make iOS chats unresponsive
-- Chat controls remain clickable near the scroll-to-bottom button ([#2007](https://github.com/getpaseo/paseo/pull/2007))
-- Oversized tool output no longer slows or floods chat timelines ([#2020](https://github.com/getpaseo/paseo/pull/2020))
-- Cross-provider subagents can use providers without mode settings ([#2000](https://github.com/getpaseo/paseo/pull/2000) by [@githubbzxs](https://github.com/githubbzxs))
-- Pi's internal metadata tasks no longer clutter normal session history ([#1999](https://github.com/getpaseo/paseo/pull/1999) by [@githubbzxs](https://github.com/githubbzxs))
-- Pi chats remain usable after canceling extension commands ([#2019](https://github.com/getpaseo/paseo/pull/2019))
+- Chat controls remain clickable near the scroll-to-bottom button ([#2007](https://github.com/longbkit/clisbot/pull/2007))
+- Oversized tool output no longer slows or floods chat timelines ([#2020](https://github.com/longbkit/clisbot/pull/2020))
+- Cross-provider subagents can use providers without mode settings ([#2000](https://github.com/longbkit/clisbot/pull/2000) by [@githubbzxs](https://github.com/githubbzxs))
+- Pi's internal metadata tasks no longer clutter normal session history ([#1999](https://github.com/longbkit/clisbot/pull/1999) by [@githubbzxs](https://github.com/githubbzxs))
+- Pi chats remain usable after canceling extension commands ([#2019](https://github.com/longbkit/clisbot/pull/2019))
 
 ## 0.1.106 - 2026-07-12
 
 ### Added
 
-- Approve Codex MCP permission requests in Paseo ([#2001](https://github.com/getpaseo/paseo/pull/2001))
+- Approve Codex MCP permission requests in Clisbot ([#2001](https://github.com/longbkit/clisbot/pull/2001))
 
 ### Improved
 
@@ -901,145 +901,145 @@ Paseo 0.8 adds plugin header buttons, custom providers, and richer chat componen
 
 ### Fixed
 
-- Reduced mobile chat freezes and blank screens when switching workspaces while agents are streaming ([#1989](https://github.com/getpaseo/paseo/pull/1989))
-- OpenCode sessions start reliably instead of occasionally losing the first turn ([#2015](https://github.com/getpaseo/paseo/pull/2015) by [@mcowger](https://github.com/mcowger))
+- Reduced mobile chat freezes and blank screens when switching workspaces while agents are streaming ([#1989](https://github.com/longbkit/clisbot/pull/1989))
+- OpenCode sessions start reliably instead of occasionally losing the first turn ([#2015](https://github.com/longbkit/clisbot/pull/2015) by [@mcowger](https://github.com/mcowger))
 - Switching between workspaces no longer flashes a white screen
-- Pi keeps your existing MCP tools and settings when Paseo adds its own ([#1990](https://github.com/getpaseo/paseo/pull/1990) by [@mcowger](https://github.com/mcowger))
+- Pi keeps your existing MCP tools and settings when Clisbot adds its own ([#1990](https://github.com/longbkit/clisbot/pull/1990) by [@mcowger](https://github.com/mcowger))
 
 ## 0.1.105 - 2026-07-10
 
 ### Added
 
-- Browse changed files as a collapsible folder tree or flat list ([#1918](https://github.com/getpaseo/paseo/pull/1918), [#1945](https://github.com/getpaseo/paseo/pull/1945) by [@cleiter](https://github.com/cleiter))
-- Always expand agent reasoning with a new appearance setting ([#1943](https://github.com/getpaseo/paseo/pull/1943) by [@mcowger](https://github.com/mcowger))
+- Browse changed files as a collapsible folder tree or flat list ([#1918](https://github.com/longbkit/clisbot/pull/1918), [#1945](https://github.com/longbkit/clisbot/pull/1945) by [@cleiter](https://github.com/cleiter))
+- Always expand agent reasoning with a new appearance setting ([#1943](https://github.com/longbkit/clisbot/pull/1943) by [@mcowger](https://github.com/mcowger))
 
 ### Improved
 
-- Project picker finds folders with fuzzy search and native desktop browsing ([#1968](https://github.com/getpaseo/paseo/pull/1968))
-- Large workspace sidebars stay responsive ([#1966](https://github.com/getpaseo/paseo/pull/1966))
-- Generated workspace names and Git text can use MiniMax M3 ([#1955](https://github.com/getpaseo/paseo/pull/1955) by [@octo-patch](https://github.com/octo-patch))
-- Cursor now exposes thinking and fast mode ([#1952](https://github.com/getpaseo/paseo/pull/1952))
+- Project picker finds folders with fuzzy search and native desktop browsing ([#1968](https://github.com/longbkit/clisbot/pull/1968))
+- Large workspace sidebars stay responsive ([#1966](https://github.com/longbkit/clisbot/pull/1966))
+- Generated workspace names and Git text can use MiniMax M3 ([#1955](https://github.com/longbkit/clisbot/pull/1955) by [@octo-patch](https://github.com/octo-patch))
+- Cursor now exposes thinking and fast mode ([#1952](https://github.com/longbkit/clisbot/pull/1952))
 
 ### Fixed
 
-- Codex stays active and streams correctly while subagents run ([#1967](https://github.com/getpaseo/paseo/pull/1967))
-- Android audio interruptions no longer crash voice mode or leave dictation stuck ([#1941](https://github.com/getpaseo/paseo/pull/1941))
-- Mobile sidebars stay in sync and retain swipe-to-open gestures ([#1953](https://github.com/getpaseo/paseo/pull/1953), [#1976](https://github.com/getpaseo/paseo/pull/1976))
-- Pi text-only models accept image prompts without breaking the session ([#1960](https://github.com/getpaseo/paseo/pull/1960))
-- App render failures show a retryable recovery screen instead of a blank screen ([#1924](https://github.com/getpaseo/paseo/pull/1924))
-- Pi context usage remains visible with older Oh My Pi versions ([#1886](https://github.com/getpaseo/paseo/pull/1886) by [@theslava](https://github.com/theslava))
-- Provider usage popovers no longer error when opened and closed quickly ([#1885](https://github.com/getpaseo/paseo/pull/1885) by [@theslava](https://github.com/theslava))
-- Mobile workspace menus hide desktop-only shortcut badges ([#1964](https://github.com/getpaseo/paseo/pull/1964))
+- Codex stays active and streams correctly while subagents run ([#1967](https://github.com/longbkit/clisbot/pull/1967))
+- Android audio interruptions no longer crash voice mode or leave dictation stuck ([#1941](https://github.com/longbkit/clisbot/pull/1941))
+- Mobile sidebars stay in sync and retain swipe-to-open gestures ([#1953](https://github.com/longbkit/clisbot/pull/1953), [#1976](https://github.com/longbkit/clisbot/pull/1976))
+- Pi text-only models accept image prompts without breaking the session ([#1960](https://github.com/longbkit/clisbot/pull/1960))
+- App render failures show a retryable recovery screen instead of a blank screen ([#1924](https://github.com/longbkit/clisbot/pull/1924))
+- Pi context usage remains visible with older Oh My Pi versions ([#1886](https://github.com/longbkit/clisbot/pull/1886) by [@theslava](https://github.com/theslava))
+- Provider usage popovers no longer error when opened and closed quickly ([#1885](https://github.com/longbkit/clisbot/pull/1885) by [@theslava](https://github.com/theslava))
+- Mobile workspace menus hide desktop-only shortcut badges ([#1964](https://github.com/longbkit/clisbot/pull/1964))
 
 ## 0.1.104 - 2026-07-08
 
 ### Added
 
-- Agents can drive the in-app browser with page snapshots, trusted input, dialogs, and tab controls ([#1881](https://github.com/getpaseo/paseo/pull/1881))
-- Inspect, annotate, and send page elements from a browser tab to the agent ([#1708](https://github.com/getpaseo/paseo/pull/1708) by [@huiliaoning](https://github.com/huiliaoning))
-- Schedules screen to create and manage recurring agents ([#1246](https://github.com/getpaseo/paseo/pull/1246))
-- Open a project from anywhere with Cmd+O ([#1849](https://github.com/getpaseo/paseo/pull/1849))
-- Agents can rename workspaces after they understand the task ([#1876](https://github.com/getpaseo/paseo/pull/1876))
-- Claude Ultra Code is available for supported Claude models ([#1872](https://github.com/getpaseo/paseo/pull/1872))
-- ByteDance TRAE CLI available as an agent provider ([#1831](https://github.com/getpaseo/paseo/pull/1831), [#1896](https://github.com/getpaseo/paseo/pull/1896) by [@park0er](https://github.com/park0er))
+- Agents can drive the in-app browser with page snapshots, trusted input, dialogs, and tab controls ([#1881](https://github.com/longbkit/clisbot/pull/1881))
+- Inspect, annotate, and send page elements from a browser tab to the agent ([#1708](https://github.com/longbkit/clisbot/pull/1708) by [@huiliaoning](https://github.com/huiliaoning))
+- Schedules screen to create and manage recurring agents ([#1246](https://github.com/longbkit/clisbot/pull/1246))
+- Open a project from anywhere with Cmd+O ([#1849](https://github.com/longbkit/clisbot/pull/1849))
+- Agents can rename workspaces after they understand the task ([#1876](https://github.com/longbkit/clisbot/pull/1876))
+- Claude Ultra Code is available for supported Claude models ([#1872](https://github.com/longbkit/clisbot/pull/1872))
+- ByteDance TRAE CLI available as an agent provider ([#1831](https://github.com/longbkit/clisbot/pull/1831), [#1896](https://github.com/longbkit/clisbot/pull/1896) by [@park0er](https://github.com/park0er))
 
 ### Improved
 
-- Manage the built-in daemon from one place in desktop settings ([#1938](https://github.com/getpaseo/paseo/pull/1938))
-- Scheduled and loop runs each get their own workspace in the sidebar ([#1909](https://github.com/getpaseo/paseo/pull/1909), [#1934](https://github.com/getpaseo/paseo/pull/1934))
-- Large provider and model refreshes load faster in the app ([#1895](https://github.com/getpaseo/paseo/pull/1895))
-- Workspaces created by agents now get readable generated names ([#1887](https://github.com/getpaseo/paseo/pull/1887))
-- Browser tabs opened by agents stay in the background until you switch to them ([#1875](https://github.com/getpaseo/paseo/pull/1875))
-- Clearer cards when an agent asks a question ([#1643](https://github.com/getpaseo/paseo/pull/1643) by [@cleiter](https://github.com/cleiter))
-- Diagnostic reports include desktop app logs ([#1914](https://github.com/getpaseo/paseo/pull/1914))
-- Paseo's built-in tools take less context ([#1939](https://github.com/getpaseo/paseo/pull/1939))
+- Manage the built-in daemon from one place in desktop settings ([#1938](https://github.com/longbkit/clisbot/pull/1938))
+- Scheduled and loop runs each get their own workspace in the sidebar ([#1909](https://github.com/longbkit/clisbot/pull/1909), [#1934](https://github.com/longbkit/clisbot/pull/1934))
+- Large provider and model refreshes load faster in the app ([#1895](https://github.com/longbkit/clisbot/pull/1895))
+- Workspaces created by agents now get readable generated names ([#1887](https://github.com/longbkit/clisbot/pull/1887))
+- Browser tabs opened by agents stay in the background until you switch to them ([#1875](https://github.com/longbkit/clisbot/pull/1875))
+- Clearer cards when an agent asks a question ([#1643](https://github.com/longbkit/clisbot/pull/1643) by [@cleiter](https://github.com/cleiter))
+- Diagnostic reports include desktop app logs ([#1914](https://github.com/longbkit/clisbot/pull/1914))
+- Clisbot's built-in tools take less context ([#1939](https://github.com/longbkit/clisbot/pull/1939))
 
 ### Fixed
 
-- Renamed hosts keep their name after reconnecting ([#1940](https://github.com/getpaseo/paseo/pull/1940))
-- Desktop finds your installed CLIs even when your shell is slow to start ([#1916](https://github.com/getpaseo/paseo/pull/1916))
-- Restarting the daemon from desktop settings works reliably ([#1915](https://github.com/getpaseo/paseo/pull/1915))
-- Restarting the daemon from the bundled CLI keeps it managed by the desktop app ([#1919](https://github.com/getpaseo/paseo/pull/1919))
-- Web UI loads when the daemon is started from the bundled CLI ([#1899](https://github.com/getpaseo/paseo/pull/1899) by [@yzim](https://github.com/yzim))
-- Worktree setup scripts keep your PATH ([#1908](https://github.com/getpaseo/paseo/pull/1908))
-- Docker images keep running during provider cleanup and diagnostics ([#1877](https://github.com/getpaseo/paseo/pull/1877))
-- New Workspace drafts survive archiving a workspace ([#1838](https://github.com/getpaseo/paseo/pull/1838))
-- Composer autocomplete stays open after switching screens ([#1851](https://github.com/getpaseo/paseo/pull/1851))
-- Claude usage appears when a quota window has no scheduled reset ([#1855](https://github.com/getpaseo/paseo/pull/1855))
-- New workspace action shows for non-git projects in the sidebar ([#1857](https://github.com/getpaseo/paseo/pull/1857) by [@cleiter](https://github.com/cleiter))
+- Renamed hosts keep their name after reconnecting ([#1940](https://github.com/longbkit/clisbot/pull/1940))
+- Desktop finds your installed CLIs even when your shell is slow to start ([#1916](https://github.com/longbkit/clisbot/pull/1916))
+- Restarting the daemon from desktop settings works reliably ([#1915](https://github.com/longbkit/clisbot/pull/1915))
+- Restarting the daemon from the bundled CLI keeps it managed by the desktop app ([#1919](https://github.com/longbkit/clisbot/pull/1919))
+- Web UI loads when the daemon is started from the bundled CLI ([#1899](https://github.com/longbkit/clisbot/pull/1899) by [@yzim](https://github.com/yzim))
+- Worktree setup scripts keep your PATH ([#1908](https://github.com/longbkit/clisbot/pull/1908))
+- Docker images keep running during provider cleanup and diagnostics ([#1877](https://github.com/longbkit/clisbot/pull/1877))
+- New Workspace drafts survive archiving a workspace ([#1838](https://github.com/longbkit/clisbot/pull/1838))
+- Composer autocomplete stays open after switching screens ([#1851](https://github.com/longbkit/clisbot/pull/1851))
+- Claude usage appears when a quota window has no scheduled reset ([#1855](https://github.com/longbkit/clisbot/pull/1855))
+- New workspace action shows for non-git projects in the sidebar ([#1857](https://github.com/longbkit/clisbot/pull/1857) by [@cleiter](https://github.com/cleiter))
 
 ## 0.1.103 - 2026-07-01
 
 ### Added
 
-- Claude Sonnet 5 is available in the Claude model picker ([#1850](https://github.com/getpaseo/paseo/pull/1850))
+- Claude Sonnet 5 is available in the Claude model picker ([#1850](https://github.com/longbkit/clisbot/pull/1850))
 
 ## 0.1.102 - 2026-06-30
 
 ### Added
 
-- Fork chats into a new tab or new worktree ([#1788](https://github.com/getpaseo/paseo/pull/1788))
-- See workspaces from all connected hosts ([#1538](https://github.com/getpaseo/paseo/pull/1538), [#1775](https://github.com/getpaseo/paseo/pull/1775), [#1825](https://github.com/getpaseo/paseo/pull/1825))
-- Daemon can now serve the web UI ([#1635](https://github.com/getpaseo/paseo/pull/1635), [#1739](https://github.com/getpaseo/paseo/pull/1739))
-- Run Paseo from an official Docker image ([#1740](https://github.com/getpaseo/paseo/pull/1740) by [@Herbrant](https://github.com/Herbrant))
-- Update a daemon remotely from the app ([#1513](https://github.com/getpaseo/paseo/pull/1513) by [@thedavidweng](https://github.com/thedavidweng))
-- Configure separate OpenAI endpoints for speech-to-text and text-to-speech ([#1823](https://github.com/getpaseo/paseo/pull/1823))
-- Drop files into any composer ([#1750](https://github.com/getpaseo/paseo/pull/1750), [#1801](https://github.com/getpaseo/paseo/pull/1801))
-- Show MiniMax usage in quota views ([#1662](https://github.com/getpaseo/paseo/pull/1662) by [@ilteoood](https://github.com/ilteoood))
-- Highlight C# code blocks ([#1651](https://github.com/getpaseo/paseo/pull/1651) by [@dev693](https://github.com/dev693))
+- Fork chats into a new tab or new worktree ([#1788](https://github.com/longbkit/clisbot/pull/1788))
+- See workspaces from all connected hosts ([#1538](https://github.com/longbkit/clisbot/pull/1538), [#1775](https://github.com/longbkit/clisbot/pull/1775), [#1825](https://github.com/longbkit/clisbot/pull/1825))
+- Daemon can now serve the web UI ([#1635](https://github.com/longbkit/clisbot/pull/1635), [#1739](https://github.com/longbkit/clisbot/pull/1739))
+- Run Clisbot from an official Docker image ([#1740](https://github.com/longbkit/clisbot/pull/1740) by [@Herbrant](https://github.com/Herbrant))
+- Update a daemon remotely from the app ([#1513](https://github.com/longbkit/clisbot/pull/1513) by [@thedavidweng](https://github.com/thedavidweng))
+- Configure separate OpenAI endpoints for speech-to-text and text-to-speech ([#1823](https://github.com/longbkit/clisbot/pull/1823))
+- Drop files into any composer ([#1750](https://github.com/longbkit/clisbot/pull/1750), [#1801](https://github.com/longbkit/clisbot/pull/1801))
+- Show MiniMax usage in quota views ([#1662](https://github.com/longbkit/clisbot/pull/1662) by [@ilteoood](https://github.com/ilteoood))
+- Highlight C# code blocks ([#1651](https://github.com/longbkit/clisbot/pull/1651) by [@dev693](https://github.com/dev693))
 
 ### Improved
 
-- New Workspace opens from anywhere ([#1746](https://github.com/getpaseo/paseo/pull/1746), [#1806](https://github.com/getpaseo/paseo/pull/1806))
-- Project search shows loading progress ([#1762](https://github.com/getpaseo/paseo/pull/1762))
-- Desktop update checks show clearer status ([#1808](https://github.com/getpaseo/paseo/pull/1808), [#1815](https://github.com/getpaseo/paseo/pull/1815))
-- Slow remote hosts time out less aggressively ([#1789](https://github.com/getpaseo/paseo/pull/1789))
-- Pi waits longer for extension results ([#1732](https://github.com/getpaseo/paseo/pull/1732) by [@theslava](https://github.com/theslava))
-- Open file tabs refresh when you revisit them ([#1699](https://github.com/getpaseo/paseo/pull/1699) by [@cleiter](https://github.com/cleiter))
-- Web terminals scroll more smoothly ([#1622](https://github.com/getpaseo/paseo/pull/1622) by [@TommyLike](https://github.com/TommyLike))
+- New Workspace opens from anywhere ([#1746](https://github.com/longbkit/clisbot/pull/1746), [#1806](https://github.com/longbkit/clisbot/pull/1806))
+- Project search shows loading progress ([#1762](https://github.com/longbkit/clisbot/pull/1762))
+- Desktop update checks show clearer status ([#1808](https://github.com/longbkit/clisbot/pull/1808), [#1815](https://github.com/longbkit/clisbot/pull/1815))
+- Slow remote hosts time out less aggressively ([#1789](https://github.com/longbkit/clisbot/pull/1789))
+- Pi waits longer for extension results ([#1732](https://github.com/longbkit/clisbot/pull/1732) by [@theslava](https://github.com/theslava))
+- Open file tabs refresh when you revisit them ([#1699](https://github.com/longbkit/clisbot/pull/1699) by [@cleiter](https://github.com/cleiter))
+- Web terminals scroll more smoothly ([#1622](https://github.com/longbkit/clisbot/pull/1622) by [@TommyLike](https://github.com/TommyLike))
 
 ### Fixed
 
-- Freshly added projects can be edited without restarting ([#1761](https://github.com/getpaseo/paseo/pull/1761) by [@huiliaoning](https://github.com/huiliaoning))
-- Large repos open more reliably ([#1620](https://github.com/getpaseo/paseo/pull/1620) by [@jms830](https://github.com/jms830))
-- Mobile restores the saved workspace on launch ([#1777](https://github.com/getpaseo/paseo/pull/1777))
-- Agent prompts no longer rename workspaces ([#1779](https://github.com/getpaseo/paseo/pull/1779))
-- Chat stays put when delayed history arrives ([#1776](https://github.com/getpaseo/paseo/pull/1776))
-- Streamed chat images stay in order ([#1805](https://github.com/getpaseo/paseo/pull/1805))
-- Chat actions stay below tool output ([#1827](https://github.com/getpaseo/paseo/pull/1827))
-- Claude subagent narration stays out of chat ([#1807](https://github.com/getpaseo/paseo/pull/1807))
-- Kiro slash commands and skills appear in Paseo ([#1792](https://github.com/getpaseo/paseo/pull/1792) by [@park0er](https://github.com/park0er))
-- Agent lists survive stale project records ([#1812](https://github.com/getpaseo/paseo/pull/1812))
-- Windows image previews handle drive-letter paths ([#1811](https://github.com/getpaseo/paseo/pull/1811))
-- OpenCode closes cleanly on Windows ([#1771](https://github.com/getpaseo/paseo/pull/1771) by [@agamotto](https://github.com/agamotto))
-- Desktop file uploads keep their extensions ([#1741](https://github.com/getpaseo/paseo/pull/1741))
-- Claude Code cleanup kills child processes ([#1540](https://github.com/getpaseo/paseo/pull/1540) by [@TommyLike](https://github.com/TommyLike))
-- OpenCode no longer indexes your home directory ([#1704](https://github.com/getpaseo/paseo/pull/1704) by [@rex-chang](https://github.com/rex-chang))
-- Packaged macOS CLI daemon no longer shows extra Dock icons ([#1759](https://github.com/getpaseo/paseo/pull/1759) by [@yzim](https://github.com/yzim))
-- `paseo daemon status` works without loading agents ([#1810](https://github.com/getpaseo/paseo/pull/1810))
-- PR worktrees show pushed state correctly ([#1804](https://github.com/getpaseo/paseo/pull/1804))
+- Freshly added projects can be edited without restarting ([#1761](https://github.com/longbkit/clisbot/pull/1761) by [@huiliaoning](https://github.com/huiliaoning))
+- Large repos open more reliably ([#1620](https://github.com/longbkit/clisbot/pull/1620) by [@jms830](https://github.com/jms830))
+- Mobile restores the saved workspace on launch ([#1777](https://github.com/longbkit/clisbot/pull/1777))
+- Agent prompts no longer rename workspaces ([#1779](https://github.com/longbkit/clisbot/pull/1779))
+- Chat stays put when delayed history arrives ([#1776](https://github.com/longbkit/clisbot/pull/1776))
+- Streamed chat images stay in order ([#1805](https://github.com/longbkit/clisbot/pull/1805))
+- Chat actions stay below tool output ([#1827](https://github.com/longbkit/clisbot/pull/1827))
+- Claude subagent narration stays out of chat ([#1807](https://github.com/longbkit/clisbot/pull/1807))
+- Kiro slash commands and skills appear in Clisbot ([#1792](https://github.com/longbkit/clisbot/pull/1792) by [@park0er](https://github.com/park0er))
+- Agent lists survive stale project records ([#1812](https://github.com/longbkit/clisbot/pull/1812))
+- Windows image previews handle drive-letter paths ([#1811](https://github.com/longbkit/clisbot/pull/1811))
+- OpenCode closes cleanly on Windows ([#1771](https://github.com/longbkit/clisbot/pull/1771) by [@agamotto](https://github.com/agamotto))
+- Desktop file uploads keep their extensions ([#1741](https://github.com/longbkit/clisbot/pull/1741))
+- Claude Code cleanup kills child processes ([#1540](https://github.com/longbkit/clisbot/pull/1540) by [@TommyLike](https://github.com/TommyLike))
+- OpenCode no longer indexes your home directory ([#1704](https://github.com/longbkit/clisbot/pull/1704) by [@rex-chang](https://github.com/rex-chang))
+- Packaged macOS CLI daemon no longer shows extra Dock icons ([#1759](https://github.com/longbkit/clisbot/pull/1759) by [@yzim](https://github.com/yzim))
+- `clisbot daemon status` works without loading agents ([#1810](https://github.com/longbkit/clisbot/pull/1810))
+- PR worktrees show pushed state correctly ([#1804](https://github.com/longbkit/clisbot/pull/1804))
 
 ## 0.1.101 - 2026-06-26
 
 ### Added
 
-- Copy a troubleshooting report from Settings when support needs host, daemon, provider, and log details ([#1728](https://github.com/getpaseo/paseo/pull/1728))
-- Claude image tool results now render as images in chat ([#1717](https://github.com/getpaseo/paseo/pull/1717))
-- Added Japanese ([#1694](https://github.com/getpaseo/paseo/pull/1694) by [@sysCat64](https://github.com/sysCat64))
-- Added Brazilian Portuguese ([#1653](https://github.com/getpaseo/paseo/pull/1653) by [@Alcimerio](https://github.com/Alcimerio))
+- Copy a troubleshooting report from Settings when support needs host, daemon, provider, and log details ([#1728](https://github.com/longbkit/clisbot/pull/1728))
+- Claude image tool results now render as images in chat ([#1717](https://github.com/longbkit/clisbot/pull/1717))
+- Added Japanese ([#1694](https://github.com/longbkit/clisbot/pull/1694) by [@sysCat64](https://github.com/sysCat64))
+- Added Brazilian Portuguese ([#1653](https://github.com/longbkit/clisbot/pull/1653) by [@Alcimerio](https://github.com/Alcimerio))
 
 ### Improved
 
-- Provider diagnostics stay useful even when model discovery is slow ([#1724](https://github.com/getpaseo/paseo/pull/1724))
-- Slow provider requests no longer make the app look disconnected ([#1723](https://github.com/getpaseo/paseo/pull/1723))
-- Worktrees linked to differently named tracked branches find their PRs correctly ([#1718](https://github.com/getpaseo/paseo/pull/1718))
-- Workspaces started from slash-command prompts get clearer names ([#1709](https://github.com/getpaseo/paseo/pull/1709))
+- Provider diagnostics stay useful even when model discovery is slow ([#1724](https://github.com/longbkit/clisbot/pull/1724))
+- Slow provider requests no longer make the app look disconnected ([#1723](https://github.com/longbkit/clisbot/pull/1723))
+- Worktrees linked to differently named tracked branches find their PRs correctly ([#1718](https://github.com/longbkit/clisbot/pull/1718))
+- Workspaces started from slash-command prompts get clearer names ([#1709](https://github.com/longbkit/clisbot/pull/1709))
 - ACP provider catalog updated to the latest registry versions
 
 ### Fixed
 
-- Pi no longer creates empty sessions while loading new-agent options ([#1727](https://github.com/getpaseo/paseo/pull/1727))
-- Windows daemon status finds the daemon process more reliably ([#1725](https://github.com/getpaseo/paseo/pull/1725))
+- Pi no longer creates empty sessions while loading new-agent options ([#1727](https://github.com/longbkit/clisbot/pull/1727))
+- Windows daemon status finds the daemon process more reliably ([#1725](https://github.com/longbkit/clisbot/pull/1725))
 - OpenAI voice credentials no longer affect other OpenAI-backed tools
 - Provider model lists no longer disappear during refresh
 
@@ -1048,7 +1048,7 @@ Paseo 0.8 adds plugin header buttons, custom providers, and richer chat componen
 ### Added
 
 - Cycle agent modes with Shift+Tab
-- Select a custom Copilot agent when starting or mid-session ([#1700](https://github.com/getpaseo/paseo/pull/1700))
+- Select a custom Copilot agent when starting or mid-session ([#1700](https://github.com/longbkit/clisbot/pull/1700))
 
 ### Improved
 
@@ -1056,88 +1056,88 @@ Paseo 0.8 adds plugin header buttons, custom providers, and richer chat componen
 
 ### Fixed
 
-- Claude no longer sends an extra API request after each message ([#1701](https://github.com/getpaseo/paseo/pull/1701))
-- OpenCode no longer leaves stray background servers running after sessions end ([#1697](https://github.com/getpaseo/paseo/pull/1697))
-- Slash commands and skills now load in OMP agents ([#1698](https://github.com/getpaseo/paseo/pull/1698))
+- Claude no longer sends an extra API request after each message ([#1701](https://github.com/longbkit/clisbot/pull/1701))
+- OpenCode no longer leaves stray background servers running after sessions end ([#1697](https://github.com/longbkit/clisbot/pull/1697))
+- Slash commands and skills now load in OMP agents ([#1698](https://github.com/longbkit/clisbot/pull/1698))
 
 ## 0.1.99 - 2026-06-23
 
 ### Improved
 
-- The PR panel now has a refresh button and clearer loading states ([#1664](https://github.com/getpaseo/paseo/pull/1664))
-- Provider diagnostics and model lists now stay in sync ([#1660](https://github.com/getpaseo/paseo/pull/1660))
+- The PR panel now has a refresh button and clearer loading states ([#1664](https://github.com/longbkit/clisbot/pull/1664))
+- Provider diagnostics and model lists now stay in sync ([#1660](https://github.com/longbkit/clisbot/pull/1660))
 
 ### Fixed
 
 - ACP providers like Grok no longer show duplicate user messages
-- Saved composer modes no longer reset while provider data is loading ([#1658](https://github.com/getpaseo/paseo/pull/1658))
-- The right sidebar no longer gets stuck on mobile ([#1661](https://github.com/getpaseo/paseo/pull/1661))
+- Saved composer modes no longer reset while provider data is loading ([#1658](https://github.com/longbkit/clisbot/pull/1658))
+- The right sidebar no longer gets stuck on mobile ([#1661](https://github.com/longbkit/clisbot/pull/1661))
 
 ## 0.1.98 - 2026-06-21
 
 ### Added
 
-- See plan usage in-app for Claude, Codex, Copilot, Cursor, Z.AI, Grok, and Kimi ([#1278](https://github.com/getpaseo/paseo/pull/1278) by [@ABorakati](https://github.com/ABorakati))
-- Added Ultracode for Claude ([#1625](https://github.com/getpaseo/paseo/pull/1625))
-- Detach a subagent to run it on its own ([#1612](https://github.com/getpaseo/paseo/pull/1612))
+- See plan usage in-app for Claude, Codex, Copilot, Cursor, Z.AI, Grok, and Kimi ([#1278](https://github.com/longbkit/clisbot/pull/1278) by [@ABorakati](https://github.com/ABorakati))
+- Added Ultracode for Claude ([#1625](https://github.com/longbkit/clisbot/pull/1625))
+- Detach a subagent to run it on its own ([#1612](https://github.com/longbkit/clisbot/pull/1612))
 - Add a project without creating a workspace
 - Add a setting to show branch names instead of titles in the sidebar
 
 ### Improved
 
 - Mid-turn thinking and mode changes now say they apply next turn
-- PR merge options name their method: squash, merge, or rebase ([#1608](https://github.com/getpaseo/paseo/pull/1608) by [@mcowger](https://github.com/mcowger))
+- PR merge options name their method: squash, merge, or rebase ([#1608](https://github.com/longbkit/clisbot/pull/1608) by [@mcowger](https://github.com/mcowger))
 - A running agent's mode change is remembered for new agents
-- Copy a provider's launch diagnostic in one tap ([#1611](https://github.com/getpaseo/paseo/pull/1611))
+- Copy a provider's launch diagnostic in one tap ([#1611](https://github.com/longbkit/clisbot/pull/1611))
 
 ### Fixed
 
-- OpenCode no longer scans your whole disk on macOS desktop ([#1626](https://github.com/getpaseo/paseo/pull/1626))
-- Daemon no longer crashes when OpenAI speech has no API key ([#1368](https://github.com/getpaseo/paseo/pull/1368) by [@mcowger](https://github.com/mcowger))
+- OpenCode no longer scans your whole disk on macOS desktop ([#1626](https://github.com/longbkit/clisbot/pull/1626))
+- Daemon no longer crashes when OpenAI speech has no API key ([#1368](https://github.com/longbkit/clisbot/pull/1368) by [@mcowger](https://github.com/mcowger))
 - Reopening an archived Codex agent no longer hangs
 - Claude's context meter no longer jumps to subagent usage
 - Claude's context meter fills from the first message in a new session
-- OpenCode's mode picker now respects your disabled modes ([#1366](https://github.com/getpaseo/paseo/pull/1366) by [@mcowger](https://github.com/mcowger))
-- File links and @-mentions find files in dot-folders and deep paths ([#1609](https://github.com/getpaseo/paseo/pull/1609))
-- Archiving a project's last workspace no longer makes it vanish ([#1631](https://github.com/getpaseo/paseo/pull/1631))
+- OpenCode's mode picker now respects your disabled modes ([#1366](https://github.com/longbkit/clisbot/pull/1366) by [@mcowger](https://github.com/mcowger))
+- File links and @-mentions find files in dot-folders and deep paths ([#1609](https://github.com/longbkit/clisbot/pull/1609))
+- Archiving a project's last workspace no longer makes it vanish ([#1631](https://github.com/longbkit/clisbot/pull/1631))
 - Collapsed sidebar projects stay collapsed
 
 ## 0.1.97 - 2026-06-18
 
 ### Added
 
-- **Simplify workspace model** — run multiple workspaces on the same code without a worktree, each with its own agents, terminals, and status ([#1539](https://github.com/getpaseo/paseo/pull/1539))
+- **Simplify workspace model** — run multiple workspaces on the same code without a worktree, each with its own agents, terminals, and status ([#1539](https://github.com/longbkit/clisbot/pull/1539))
 - **Reopen archived workspaces from History** — restore a past workspace even after its worktree was removed
-- **Terminals show when their agent is working, idle, or waiting for input** ([#1507](https://github.com/getpaseo/paseo/pull/1507))
-- **Attach files to agents on mobile** ([#1501](https://github.com/getpaseo/paseo/pull/1501))
-- **Hide dotfiles in the file explorer** ([#1516](https://github.com/getpaseo/paseo/pull/1516) by [@yuruiz](https://github.com/yuruiz))
+- **Terminals show when their agent is working, idle, or waiting for input** ([#1507](https://github.com/longbkit/clisbot/pull/1507))
+- **Attach files to agents on mobile** ([#1501](https://github.com/longbkit/clisbot/pull/1501))
+- **Hide dotfiles in the file explorer** ([#1516](https://github.com/longbkit/clisbot/pull/1516) by [@yuruiz](https://github.com/yuruiz))
 - **Pin terminal, browser, and new-tab buttons to the tab row and sidebar**
 - **Create a new workspace with a keyboard shortcut**
 
 ### Improved
 
-- Workspace titles come from your first prompt and are shorter ([#1563](https://github.com/getpaseo/paseo/pull/1563))
+- Workspace titles come from your first prompt and are shorter ([#1563](https://github.com/longbkit/clisbot/pull/1563))
 - Copy a workspace's branch or path from its hover card
-- Terminals stay smooth under heavy output ([#1500](https://github.com/getpaseo/paseo/pull/1500))
-- Worktrees are removed when their last workspace is archived ([#1562](https://github.com/getpaseo/paseo/pull/1562))
-- Finish notifications include subagent results ([#1558](https://github.com/getpaseo/paseo/pull/1558))
-- Cursor lists only models you can select ([#1556](https://github.com/getpaseo/paseo/pull/1556))
+- Terminals stay smooth under heavy output ([#1500](https://github.com/longbkit/clisbot/pull/1500))
+- Worktrees are removed when their last workspace is archived ([#1562](https://github.com/longbkit/clisbot/pull/1562))
+- Finish notifications include subagent results ([#1558](https://github.com/longbkit/clisbot/pull/1558))
+- Cursor lists only models you can select ([#1556](https://github.com/longbkit/clisbot/pull/1556))
 - ACP provider catalog updated to the latest registry versions
 
 ### Fixed
 
 - Brief daemon slowdowns no longer drop your connection
-- Linux AppImage updates no longer hang on quit or delete the app ([#1485](https://github.com/getpaseo/paseo/pull/1485) by [@xpufx](https://github.com/xpufx))
-- Opening Providers settings no longer crashes on Android ([#1537](https://github.com/getpaseo/paseo/pull/1537))
-- Coding-agent terminal shortcuts work on Windows ([#1509](https://github.com/getpaseo/paseo/pull/1509))
-- ACP and Kimi sessions can be imported again ([#1510](https://github.com/getpaseo/paseo/pull/1510) by [@wbxl2000](https://github.com/wbxl2000))
-- ACP agents shut down without leaving orphaned processes ([#1460](https://github.com/getpaseo/paseo/pull/1460) by [@yeshan333](https://github.com/yeshan333))
-- Imported session previews show clean prompts ([#1502](https://github.com/getpaseo/paseo/pull/1502))
-- Local pairing offers use the correct app URL ([#1187](https://github.com/getpaseo/paseo/pull/1187) by [@aibaiiqpl](https://github.com/aibaiiqpl))
+- Linux AppImage updates no longer hang on quit or delete the app ([#1485](https://github.com/longbkit/clisbot/pull/1485) by [@xpufx](https://github.com/xpufx))
+- Opening Providers settings no longer crashes on Android ([#1537](https://github.com/longbkit/clisbot/pull/1537))
+- Coding-agent terminal shortcuts work on Windows ([#1509](https://github.com/longbkit/clisbot/pull/1509))
+- ACP and Kimi sessions can be imported again ([#1510](https://github.com/longbkit/clisbot/pull/1510) by [@wbxl2000](https://github.com/wbxl2000))
+- ACP agents shut down without leaving orphaned processes ([#1460](https://github.com/longbkit/clisbot/pull/1460) by [@yeshan333](https://github.com/yeshan333))
+- Imported session previews show clean prompts ([#1502](https://github.com/longbkit/clisbot/pull/1502))
+- Local pairing offers use the correct app URL ([#1187](https://github.com/longbkit/clisbot/pull/1187) by [@aibaiiqpl](https://github.com/aibaiiqpl))
 - The app no longer freezes from repeated provider re-probes
 - Removing a project from the sidebar now removes the project itself instead of leaving it behind
-- Workspace shortcut numbers no longer appear for the wrong key ([#1580](https://github.com/getpaseo/paseo/pull/1580) by [@cleiter](https://github.com/cleiter))
-- Chats no longer hang when a message contains unmatched backticks ([#1585](https://github.com/getpaseo/paseo/pull/1585) by [@thaning0](https://github.com/thaning0))
+- Workspace shortcut numbers no longer appear for the wrong key ([#1580](https://github.com/longbkit/clisbot/pull/1580) by [@cleiter](https://github.com/cleiter))
+- Chats no longer hang when a message contains unmatched backticks ([#1585](https://github.com/longbkit/clisbot/pull/1585) by [@thaning0](https://github.com/thaning0))
 
 ## 0.1.96 - 2026-06-13
 
@@ -1151,43 +1151,43 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Attach any file to agents on desktop** ([#1474](https://github.com/getpaseo/paseo/pull/1474))
+- **Attach any file to agents on desktop** ([#1474](https://github.com/longbkit/clisbot/pull/1474))
 
 ### Improved
 
-- The git push button shows before merge actions when your branch is ahead ([#1488](https://github.com/getpaseo/paseo/pull/1488))
+- The git push button shows before merge actions when your branch is ahead ([#1488](https://github.com/longbkit/clisbot/pull/1488))
 - SVG attachments are uploaded to disk
 - Switching workspaces feels smoother
 
 ### Fixed
 
-- Fixed cases where outdated GitHub data could be shown ([#1491](https://github.com/getpaseo/paseo/pull/1491))
-- Uploaded images in PR comments and review threads now load in the PR panel ([#1486](https://github.com/getpaseo/paseo/pull/1486))
-- Opening a project whose folder is missing shows a clear error ([#1490](https://github.com/getpaseo/paseo/pull/1490))
-- The new workspace title moves out of the way of the keyboard ([#1489](https://github.com/getpaseo/paseo/pull/1489))
+- Fixed cases where outdated GitHub data could be shown ([#1491](https://github.com/longbkit/clisbot/pull/1491))
+- Uploaded images in PR comments and review threads now load in the PR panel ([#1486](https://github.com/longbkit/clisbot/pull/1486))
+- Opening a project whose folder is missing shows a clear error ([#1490](https://github.com/longbkit/clisbot/pull/1490))
+- The new workspace title moves out of the way of the keyboard ([#1489](https://github.com/longbkit/clisbot/pull/1489))
 - Sidebars no longer open on their own on Android
 
 ## 0.1.94 - 2026-06-12
 
 ### Added
 
-- **Attach pull request comments, reviews, threads, and failed check logs to chat from the PR panel** ([#1400](https://github.com/getpaseo/paseo/pull/1400))
-- **Use Paseo in Arabic, Chinese, English, French, Russian, and Spanish** ([#1282](https://github.com/getpaseo/paseo/pull/1282), [#1478](https://github.com/getpaseo/paseo/pull/1478) by [@chyendongnhanh338](https://github.com/chyendongnhanh338), [@dwyanewang](https://github.com/dwyanewang))
+- **Attach pull request comments, reviews, threads, and failed check logs to chat from the PR panel** ([#1400](https://github.com/longbkit/clisbot/pull/1400))
+- **Use Clisbot in Arabic, Chinese, English, French, Russian, and Spanish** ([#1282](https://github.com/longbkit/clisbot/pull/1282), [#1478](https://github.com/longbkit/clisbot/pull/1478) by [@chyendongnhanh338](https://github.com/chyendongnhanh338), [@dwyanewang](https://github.com/dwyanewang))
 - **Create reusable terminal profiles from Host settings**
-- **Open workspaces in Antigravity** ([#1424](https://github.com/getpaseo/paseo/pull/1424) by [@krumpyzoid](https://github.com/krumpyzoid))
+- **Open workspaces in Antigravity** ([#1424](https://github.com/longbkit/clisbot/pull/1424) by [@krumpyzoid](https://github.com/krumpyzoid))
 
 ### Improved
 
-- Claude skills appear in prompt autocomplete as you type ([#1464](https://github.com/getpaseo/paseo/pull/1464))
-- Copy file paths directly from file preview tab menus ([#1473](https://github.com/getpaseo/paseo/pull/1473))
-- PR status stays current after an agent merges a branch ([#1455](https://github.com/getpaseo/paseo/pull/1455))
-- Workspace tabs stay fast by retaining only the active workspace screens ([#1472](https://github.com/getpaseo/paseo/pull/1472))
+- Claude skills appear in prompt autocomplete as you type ([#1464](https://github.com/longbkit/clisbot/pull/1464))
+- Copy file paths directly from file preview tab menus ([#1473](https://github.com/longbkit/clisbot/pull/1473))
+- PR status stays current after an agent merges a branch ([#1455](https://github.com/longbkit/clisbot/pull/1455))
+- Workspace tabs stay fast by retaining only the active workspace screens ([#1472](https://github.com/longbkit/clisbot/pull/1472))
 
 ### Fixed
 
 - Composer send shortcuts no longer conflict with other keyboard shortcuts
-- Multi-question prompts advance one answer at a time ([#1462](https://github.com/getpaseo/paseo/pull/1462))
-- Imported Pi sessions keep their original model and thinking settings ([#1441](https://github.com/getpaseo/paseo/pull/1441) by [@thomasaull](https://github.com/thomasaull))
+- Multi-question prompts advance one answer at a time ([#1462](https://github.com/longbkit/clisbot/pull/1462))
+- Imported Pi sessions keep their original model and thinking settings ([#1441](https://github.com/longbkit/clisbot/pull/1441) by [@thomasaull](https://github.com/thomasaull))
 - Reconnecting to a desktop host keeps the saved shell and workspace route
 - Worktree terminals no longer appear in parent workspaces
 - Mobile reconnects show the welcome screen correctly
@@ -1196,7 +1196,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Claude Fable 5 is available in the Claude model picker** ([#1443](https://github.com/getpaseo/paseo/pull/1443) by [@0-Captain](https://github.com/0-Captain))
+- **Claude Fable 5 is available in the Claude model picker** ([#1443](https://github.com/longbkit/clisbot/pull/1443) by [@0-Captain](https://github.com/0-Captain))
 
 ## 0.1.92 - 2026-06-10
 
@@ -1206,7 +1206,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Improved
 
-- Provider catalog is inline in Host settings ([#1423](https://github.com/getpaseo/paseo/pull/1423))
+- Provider catalog is inline in Host settings ([#1423](https://github.com/longbkit/clisbot/pull/1423))
 - Manual update checks skip staged rollout delays
 - CodeWhale replaces DeepSeek TUI in the provider catalog
 - ACP provider catalog entries are updated for Cline, Codebuddy Code, DimCode, Factory Droid, Gemini, Nova, and Qoder
@@ -1216,10 +1216,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- New Paseo worktree branches can push their first commits
+- New Clisbot worktree branches can push their first commits
 - Imported sessions no longer open blank or in the wrong workspace
-- Windows Explorer opens the selected workspace instead of Documents ([#1412](https://github.com/getpaseo/paseo/pull/1412) by [@bjspi](https://github.com/bjspi))
-- Windows editor shortcuts installed as command shims launch correctly ([#1387](https://github.com/getpaseo/paseo/pull/1387) by [@Peter7896](https://github.com/Peter7896))
+- Windows Explorer opens the selected workspace instead of Documents ([#1412](https://github.com/longbkit/clisbot/pull/1412) by [@bjspi](https://github.com/bjspi))
+- Windows editor shortcuts installed as command shims launch correctly ([#1387](https://github.com/longbkit/clisbot/pull/1387) by [@Peter7896](https://github.com/Peter7896))
 - ACP providers that cannot use MCP servers can start correctly
 - Removed hosts no longer leave host pages stuck connecting
 - File preview links open in your external browser
@@ -1230,10 +1230,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Open multiple desktop windows** ([#1355](https://github.com/getpaseo/paseo/pull/1355) by [@arieel-ost](https://github.com/arieel-ost))
-- **Open browser pop-ups and links inside workspace tabs** ([#1375](https://github.com/getpaseo/paseo/pull/1375))
+- **Open multiple desktop windows** ([#1355](https://github.com/longbkit/clisbot/pull/1355) by [@arieel-ost](https://github.com/arieel-ost))
+- **Open browser pop-ups and links inside workspace tabs** ([#1375](https://github.com/longbkit/clisbot/pull/1375))
 - **Use the command center from mobile**
-- **Add OMP as a provider** ([#1388](https://github.com/getpaseo/paseo/pull/1388))
+- **Add OMP as a provider** ([#1388](https://github.com/longbkit/clisbot/pull/1388))
 
 ### Improved
 
@@ -1241,51 +1241,51 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Git controls now default ready branches to pull requests and hide unavailable pull or push actions
 - Desktop-managed hosts recover more reliably after stale daemon state
 - Daemon status now explains authentication failures
-- Project search skips Python virtual environments ([#1356](https://github.com/getpaseo/paseo/pull/1356))
+- Project search skips Python virtual environments ([#1356](https://github.com/longbkit/clisbot/pull/1356))
 - Config files can include `$schema` for editor help
-- Claude MCP servers preserve always-load tool settings ([#1333](https://github.com/getpaseo/paseo/pull/1333) by [@nodomain](https://github.com/nodomain))
-- Claude profiles keep their configured models ([#1311](https://github.com/getpaseo/paseo/pull/1311) by [@ilteoood](https://github.com/ilteoood))
-- Provider loading can wait longer on slow machines ([#1346](https://github.com/getpaseo/paseo/pull/1346) by [@nodomain](https://github.com/nodomain))
-- The Kimi catalog entry now points to Kimi Code CLI ([#1403](https://github.com/getpaseo/paseo/pull/1403) by [@wbxl2000](https://github.com/wbxl2000))
+- Claude MCP servers preserve always-load tool settings ([#1333](https://github.com/longbkit/clisbot/pull/1333) by [@nodomain](https://github.com/nodomain))
+- Claude profiles keep their configured models ([#1311](https://github.com/longbkit/clisbot/pull/1311) by [@ilteoood](https://github.com/ilteoood))
+- Provider loading can wait longer on slow machines ([#1346](https://github.com/longbkit/clisbot/pull/1346) by [@nodomain](https://github.com/nodomain))
+- The Kimi catalog entry now points to Kimi Code CLI ([#1403](https://github.com/longbkit/clisbot/pull/1403) by [@wbxl2000](https://github.com/wbxl2000))
 - ACP provider catalog entries are updated for Auggie, Claude Agent, Cline, Codebuddy Code, DimCode, Factory Droid, fast-agent, Gemini, GitHub Copilot, and Nova
-- Local dictation crash reports show more useful details ([#1379](https://github.com/getpaseo/paseo/pull/1379))
+- Local dictation crash reports show more useful details ([#1379](https://github.com/longbkit/clisbot/pull/1379))
 - Daemon logs show why managed workers exit
 
 ### Fixed
 
-- Pi compaction slash commands run correctly ([#1338](https://github.com/getpaseo/paseo/pull/1338) by [@chyendongnhanh338](https://github.com/chyendongnhanh338))
-- Auto-archiving still works after a merged PR branch is deleted ([#1378](https://github.com/getpaseo/paseo/pull/1378))
-- Worktrees can check out existing branch refs correctly ([#1358](https://github.com/getpaseo/paseo/pull/1358) by [@dixonl90](https://github.com/dixonl90))
-- File downloads work when daemon password protection is enabled ([#1351](https://github.com/getpaseo/paseo/pull/1351) by [@nodomain](https://github.com/nodomain))
-- iOS markdown links are tappable again ([#1334](https://github.com/getpaseo/paseo/pull/1334) by [@kaspesi](https://github.com/kaspesi))
+- Pi compaction slash commands run correctly ([#1338](https://github.com/longbkit/clisbot/pull/1338) by [@chyendongnhanh338](https://github.com/chyendongnhanh338))
+- Auto-archiving still works after a merged PR branch is deleted ([#1378](https://github.com/longbkit/clisbot/pull/1378))
+- Worktrees can check out existing branch refs correctly ([#1358](https://github.com/longbkit/clisbot/pull/1358) by [@dixonl90](https://github.com/dixonl90))
+- File downloads work when daemon password protection is enabled ([#1351](https://github.com/longbkit/clisbot/pull/1351) by [@nodomain](https://github.com/nodomain))
+- iOS markdown links are tappable again ([#1334](https://github.com/longbkit/clisbot/pull/1334) by [@kaspesi](https://github.com/kaspesi))
 - iOS markdown images render correctly
-- Windows workspaces load their providers correctly ([#1329](https://github.com/getpaseo/paseo/pull/1329))
-- Removing a localhost host stops its local daemon ([#1297](https://github.com/getpaseo/paseo/pull/1297) by [@mcowger](https://github.com/mcowger))
+- Windows workspaces load their providers correctly ([#1329](https://github.com/longbkit/clisbot/pull/1329))
+- Removing a localhost host stops its local daemon ([#1297](https://github.com/longbkit/clisbot/pull/1297) by [@mcowger](https://github.com/mcowger))
 - Provider settings sheets stack correctly
 - The new workspace screen no longer opens behind the mobile sidebar
-- Global agent listing works again ([#1420](https://github.com/getpaseo/paseo/pull/1420))
+- Global agent listing works again ([#1420](https://github.com/longbkit/clisbot/pull/1420))
 - OpenCode compaction summaries stay out of chat
-- OpenCode agents sharing a workspace keep their own Paseo tools
+- OpenCode agents sharing a workspace keep their own Clisbot tools
 
 ## 0.1.90 - 2026-06-04
 
 ### Added
 
-- **Group the sidebar by status so workspaces waiting on you, ready to review, working, and done are visible at a glance** ([#1317](https://github.com/getpaseo/paseo/pull/1317))
-- **Start a new workspace from the global sidebar button without choosing a project first** ([#1324](https://github.com/getpaseo/paseo/pull/1324))
-- **Open the active file directly in your editor, file manager, or GitHub instead of only opening the workspace root** ([#1285](https://github.com/getpaseo/paseo/pull/1285) by [@aaronzhongg](https://github.com/aaronzhongg))
-- **Automatically archive clean PR workspaces after the PR is merged from host settings** ([#1313](https://github.com/getpaseo/paseo/pull/1313))
-- **Desktop-managed Paseo skills stay current after installing a newer desktop build** ([#1309](https://github.com/getpaseo/paseo/pull/1309))
-- **Dart files and Dart code blocks are now syntax-highlighted** ([#1326](https://github.com/getpaseo/paseo/pull/1326))
+- **Group the sidebar by status so workspaces waiting on you, ready to review, working, and done are visible at a glance** ([#1317](https://github.com/longbkit/clisbot/pull/1317))
+- **Start a new workspace from the global sidebar button without choosing a project first** ([#1324](https://github.com/longbkit/clisbot/pull/1324))
+- **Open the active file directly in your editor, file manager, or GitHub instead of only opening the workspace root** ([#1285](https://github.com/longbkit/clisbot/pull/1285) by [@aaronzhongg](https://github.com/aaronzhongg))
+- **Automatically archive clean PR workspaces after the PR is merged from host settings** ([#1313](https://github.com/longbkit/clisbot/pull/1313))
+- **Desktop-managed Clisbot skills stay current after installing a newer desktop build** ([#1309](https://github.com/longbkit/clisbot/pull/1309))
+- **Dart files and Dart code blocks are now syntax-highlighted** ([#1326](https://github.com/longbkit/clisbot/pull/1326))
 
 ### Improved
 
-- Sidebar workspaces can be marked as read when they are ready to review or failed ([#1317](https://github.com/getpaseo/paseo/pull/1317))
-- Child agents keep unattended permissions when delegated across providers ([#1315](https://github.com/getpaseo/paseo/pull/1315))
-- Scheduled agents open with the real prompt and title instead of looking empty ([#1316](https://github.com/getpaseo/paseo/pull/1316))
-- Git controls prioritize the action that gets a ready branch shipped ([#1316](https://github.com/getpaseo/paseo/pull/1316))
+- Sidebar workspaces can be marked as read when they are ready to review or failed ([#1317](https://github.com/longbkit/clisbot/pull/1317))
+- Child agents keep unattended permissions when delegated across providers ([#1315](https://github.com/longbkit/clisbot/pull/1315))
+- Scheduled agents open with the real prompt and title instead of looking empty ([#1316](https://github.com/longbkit/clisbot/pull/1316))
+- Git controls prioritize the action that gets a ready branch shipped ([#1316](https://github.com/longbkit/clisbot/pull/1316))
 - Multiple agent questions are shown one at a time
-- OpenCode questions with free-write answers show the typed response in Paseo
+- OpenCode questions with free-write answers show the typed response in Clisbot
 - Delegated agent activity is visible on the parent workspace
 - Sessions are ordered by latest activity
 - ACP provider catalog entries are updated for Claude Agent, Cline, Codebuddy Code, Factory Droid, and Qoder
@@ -1304,9 +1304,9 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Open workspace services through public service proxy links** ([#1280](https://github.com/getpaseo/paseo/pull/1280) by [@mcowger](https://github.com/mcowger))
-- **Choose where new worktrees are created** ([#1230](https://github.com/getpaseo/paseo/pull/1230) by [@mcowger](https://github.com/mcowger))
-- **Desktop windows reopen at the same size and position** ([#1224](https://github.com/getpaseo/paseo/pull/1224) by [@everton-dgn](https://github.com/everton-dgn))
+- **Open workspace services through public service proxy links** ([#1280](https://github.com/longbkit/clisbot/pull/1280) by [@mcowger](https://github.com/mcowger))
+- **Choose where new worktrees are created** ([#1230](https://github.com/longbkit/clisbot/pull/1230) by [@mcowger](https://github.com/mcowger))
+- **Desktop windows reopen at the same size and position** ([#1224](https://github.com/longbkit/clisbot/pull/1224) by [@everton-dgn](https://github.com/everton-dgn))
 - **Delegated agents can run independently and send recurring heartbeat updates**
 
 ### Improved
@@ -1317,9 +1317,9 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- Archiving a worktree finishes even if teardown hits an error ([#1260](https://github.com/getpaseo/paseo/pull/1260) by [@mcowger](https://github.com/mcowger))
-- iOS chat messages render bold, italics, strikethrough, and line breaks correctly ([#1254](https://github.com/getpaseo/paseo/pull/1254) by [@outofrange-consulting](https://github.com/outofrange-consulting))
-- Right-edge split pane resizing no longer clips ([#1261](https://github.com/getpaseo/paseo/pull/1261) by [@everton-dgn](https://github.com/everton-dgn))
+- Archiving a worktree finishes even if teardown hits an error ([#1260](https://github.com/longbkit/clisbot/pull/1260) by [@mcowger](https://github.com/mcowger))
+- iOS chat messages render bold, italics, strikethrough, and line breaks correctly ([#1254](https://github.com/longbkit/clisbot/pull/1254) by [@outofrange-consulting](https://github.com/outofrange-consulting))
+- Right-edge split pane resizing no longer clips ([#1261](https://github.com/longbkit/clisbot/pull/1261) by [@everton-dgn](https://github.com/everton-dgn))
 - Pi extension command output no longer hangs
 - Delegated agents no longer appear in workspace alert counts
 
@@ -1333,7 +1333,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - **Adjust the interface text size**
 - **Adjust the code text size**
 - **Choose a syntax highlighting theme**
-- **Keep cron schedules aligned to a chosen time zone** ([#1232](https://github.com/getpaseo/paseo/pull/1232) by [@damselem](https://github.com/damselem))
+- **Keep cron schedules aligned to a chosen time zone** ([#1232](https://github.com/longbkit/clisbot/pull/1232) by [@damselem](https://github.com/damselem))
 
 ### Improved
 
@@ -1341,7 +1341,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Workspace tab switching is faster
 - Compact composers now show context usage as a percentage
 - Agent terminals opened in workspace subdirectories now appear with the rest of the workspace terminals
-- macOS displays can idle normally while the desktop app is open ([#1242](https://github.com/getpaseo/paseo/pull/1242) by [@fireblue](https://github.com/fireblue))
+- macOS displays can idle normally while the desktop app is open ([#1242](https://github.com/longbkit/clisbot/pull/1242) by [@fireblue](https://github.com/fireblue))
 - Large generated diffs now show a clear too-large placeholder instead of trying to render the whole file
 
 ### Fixed
@@ -1350,13 +1350,13 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Terminal panes keep the right size after splitting or resizing panes
 - Restored terminal snapshots reflow correctly after the pane size changes
 - Workspace scripts menus keep the right size after launching a service
-- iOS chat messages no longer hide inline links, URLs, or linked file paths ([#1257](https://github.com/getpaseo/paseo/pull/1257) by [@outofrange-consulting](https://github.com/outofrange-consulting))
+- iOS chat messages no longer hide inline links, URLs, or linked file paths ([#1257](https://github.com/longbkit/clisbot/pull/1257) by [@outofrange-consulting](https://github.com/outofrange-consulting))
 
 ## 0.1.87 - 2026-05-30
 
 ### Added
 
-- Permission prompts from OpenCode subagents now surface in Paseo so you can approve or deny them
+- Permission prompts from OpenCode subagents now surface in Clisbot so you can approve or deny them
 
 ### Fixed
 
@@ -1379,7 +1379,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Refresh git diffs on demand with a new refresh button
 - Previews can open readable files outside the current workspace
 - Projects without an icon now show a colored icon instead of a grey placeholder
-- Auto-generated agent titles and worktree branch names now use your configured provider fallbacks ([#1219](https://github.com/getpaseo/paseo/pull/1219) by [@mcowger](https://github.com/mcowger))
+- Auto-generated agent titles and worktree branch names now use your configured provider fallbacks ([#1219](https://github.com/longbkit/clisbot/pull/1219) by [@mcowger](https://github.com/mcowger))
 - Local dictation keeps its speech models out of the daemon, lowering its memory use
 
 ### Fixed
@@ -1407,10 +1407,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Improved
 
-- Copy an OpenCode resume command to continue the session outside Paseo
+- Copy an OpenCode resume command to continue the session outside Clisbot
 - Model selector lists every enabled provider, with a Retry button when one fails to load
 - Provider settings are easier to search and manage
-- Other agents connecting to Paseo via MCP see the same providers, models, and modes as the app ([#1198](https://github.com/getpaseo/paseo/pull/1198))
+- Other agents connecting to Clisbot via MCP see the same providers, models, and modes as the app ([#1198](https://github.com/longbkit/clisbot/pull/1198))
 - OpenCode Edit tool calls render as inline diffs
 - Typing a slash command shows the best match first
 - Daemon starts faster on workspaces with many git folders
@@ -1422,10 +1422,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- Allow selecting text in the chat on mobile ([#1153](https://github.com/getpaseo/paseo/pull/1153) by [@muzhi1991](https://github.com/muzhi1991))
-- Submitting a Pi question no longer looks like a second prompt opened ([#1188](https://github.com/getpaseo/paseo/pull/1188) by [@yuruiz](https://github.com/yuruiz))
-- Daemon memory leak from unbounded workspace git caches ([#1200](https://github.com/getpaseo/paseo/pull/1200))
-- Provider diagnostics include the command override binary path ([#1191](https://github.com/getpaseo/paseo/pull/1191))
+- Allow selecting text in the chat on mobile ([#1153](https://github.com/longbkit/clisbot/pull/1153) by [@muzhi1991](https://github.com/muzhi1991))
+- Submitting a Pi question no longer looks like a second prompt opened ([#1188](https://github.com/longbkit/clisbot/pull/1188) by [@yuruiz](https://github.com/yuruiz))
+- Daemon memory leak from unbounded workspace git caches ([#1200](https://github.com/longbkit/clisbot/pull/1200))
+- Provider diagnostics include the command override binary path ([#1191](https://github.com/longbkit/clisbot/pull/1191))
 - OpenCode MCP servers connect correctly when the daemon binds to wildcard addresses
 - Tool calls from MCP servers that return non-spec output no longer fail validation
 
@@ -1441,29 +1441,29 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Rewind chat or files from any user message** ([#1154](https://github.com/getpaseo/paseo/pull/1154))
-- **See the cumulative cost of an agent session** ([#1163](https://github.com/getpaseo/paseo/pull/1163))
-- **Drop files onto the terminal to insert their paths** ([#1173](https://github.com/getpaseo/paseo/pull/1173))
-- **Tap a file path in the terminal to open it in the workspace preview** ([#1174](https://github.com/getpaseo/paseo/pull/1174))
-- **Approve OpenCode permissions for the whole session** ([#1168](https://github.com/getpaseo/paseo/pull/1168))
-- **Workspace scripts now appear on the mobile header** ([#1093](https://github.com/getpaseo/paseo/pull/1093) by [@ayhanmalkoc](https://github.com/ayhanmalkoc))
+- **Rewind chat or files from any user message** ([#1154](https://github.com/longbkit/clisbot/pull/1154))
+- **See the cumulative cost of an agent session** ([#1163](https://github.com/longbkit/clisbot/pull/1163))
+- **Drop files onto the terminal to insert their paths** ([#1173](https://github.com/longbkit/clisbot/pull/1173))
+- **Tap a file path in the terminal to open it in the workspace preview** ([#1174](https://github.com/longbkit/clisbot/pull/1174))
+- **Approve OpenCode permissions for the whole session** ([#1168](https://github.com/longbkit/clisbot/pull/1168))
+- **Workspace scripts now appear on the mobile header** ([#1093](https://github.com/longbkit/clisbot/pull/1093) by [@ayhanmalkoc](https://github.com/ayhanmalkoc))
 - Devin CLI in the ACP provider catalog (by [@Alcimerio](https://github.com/Alcimerio))
 - OpenCode agents show their mode colors
 
 ### Improved
 
 - Mobile terminal keyboard hides when you open a sidebar
-- Tool activity for read, write, and OpenCode tools renders more consistently ([#1171](https://github.com/getpaseo/paseo/pull/1171))
+- Tool activity for read, write, and OpenCode tools renders more consistently ([#1171](https://github.com/longbkit/clisbot/pull/1171))
 - Compact workspace header actions are tidier
-- Settings latency readouts are easier to scan ([#1170](https://github.com/getpaseo/paseo/pull/1170))
-- Pull request merge is available as soon as GitHub reports the PR is ready ([#1172](https://github.com/getpaseo/paseo/pull/1172))
+- Settings latency readouts are easier to scan ([#1170](https://github.com/longbkit/clisbot/pull/1170))
+- Pull request merge is available as soon as GitHub reports the PR is ready ([#1172](https://github.com/longbkit/clisbot/pull/1172))
 
 ### Fixed
 
 - Mobile slash command autocomplete no longer flickers or mis-layers
-- Interrupting an OpenCode agent returns it to idle instead of showing an error ([#1169](https://github.com/getpaseo/paseo/pull/1169))
-- Provider model selection per workspace is honored ([#1167](https://github.com/getpaseo/paseo/pull/1167))
-- Draft composer keeps the permission mode you selected ([#1175](https://github.com/getpaseo/paseo/pull/1175))
+- Interrupting an OpenCode agent returns it to idle instead of showing an error ([#1169](https://github.com/longbkit/clisbot/pull/1169))
+- Provider model selection per workspace is honored ([#1167](https://github.com/longbkit/clisbot/pull/1167))
+- Draft composer keeps the permission mode you selected ([#1175](https://github.com/longbkit/clisbot/pull/1175))
 - Terminal color queries no longer return malformed replies
 - File links in chat no longer crash when a message contains a bare '%' (by [@Elliotwu-7](https://github.com/Elliotwu-7))
 
@@ -1471,13 +1471,13 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Paseo can now be installed as a web app from supported browsers** ([#1144](https://github.com/getpaseo/paseo/pull/1144))
-- **Pi extension dialogs now appear as Paseo permission prompts** ([#1134](https://github.com/getpaseo/paseo/pull/1134) by [@yuruiz](https://github.com/yuruiz))
+- **Clisbot can now be installed as a web app from supported browsers** ([#1144](https://github.com/longbkit/clisbot/pull/1144))
+- **Pi extension dialogs now appear as Clisbot permission prompts** ([#1134](https://github.com/longbkit/clisbot/pull/1134) by [@yuruiz](https://github.com/yuruiz))
 - Added community links and a home button to the sidebar
 
 ### Improved
 
-- **Mobile terminals load faster and restore existing output more smoothly** ([#1147](https://github.com/getpaseo/paseo/pull/1147))
+- **Mobile terminals load faster and restore existing output more smoothly** ([#1147](https://github.com/longbkit/clisbot/pull/1147))
 - Copying assistant messages preserves formatting
 - Agent metadata fallback failures now log each provider attempt for easier debugging
 
@@ -1488,7 +1488,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Terminal panes no longer flicker during resize
 - OpenCode MCP servers are injected once instead of being connected twice
 - Import session no longer shows empty sessions
-- Worktree archive status no longer reports false unpushed commits ([#1158](https://github.com/getpaseo/paseo/pull/1158))
+- Worktree archive status no longer reports false unpushed commits ([#1158](https://github.com/longbkit/clisbot/pull/1158))
 - The `/exit`, `/quit`, and `/q` slash command aliases now show as one row
 - Shortcut chord badges are readable in light mode
 - Segmented controls show their track under every segment
@@ -1506,44 +1506,44 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 - **Pi has been revamped with first-class support**
   - Runs through your installed Pi CLI, so your Pi extensions and configuration carry over
-  - Pi agents can call Paseo tools when you have the Pi MCP extension installed
+  - Pi agents can call Clisbot tools when you have the Pi MCP extension installed
   - Import a Pi session you started in the terminal
   - Copy Pi's resume command from any agent to continue the session in your terminal
   - Windows: Pi sessions match correctly across symlinked and junctioned workspace paths
 - **New home screen with quick tiles for adding a project, importing a session, setting up providers, and pairing a device**
 - **Create an agent directly into a fresh worktree that auto-archives when the run finishes**
 - **Set a custom system prompt that applies to every agent you start**
-- **Rename workspaces, terminals, and agent tabs** ([#531](https://github.com/getpaseo/paseo/pull/531))
-- **DeepSeek TUI in the ACP provider catalog** ([#1096](https://github.com/getpaseo/paseo/pull/1096))
+- **Rename workspaces, terminals, and agent tabs** ([#531](https://github.com/longbkit/clisbot/pull/531))
+- **DeepSeek TUI in the ACP provider catalog** ([#1096](https://github.com/longbkit/clisbot/pull/1096))
 - **Kiro CLI in the ACP provider catalog** (by [@huhusmang](https://github.com/huhusmang))
-- Catalog providers show their icons in the model picker ([#1098](https://github.com/getpaseo/paseo/pull/1098))
-- Custom environment variables passed when creating an agent now reach the agent process ([#1112](https://github.com/getpaseo/paseo/pull/1112))
-- NixOS module supports the public TLS option for self-hosted relays ([#1106](https://github.com/getpaseo/paseo/pull/1106) by [@yzx9](https://github.com/yzx9))
+- Catalog providers show their icons in the model picker ([#1098](https://github.com/longbkit/clisbot/pull/1098))
+- Custom environment variables passed when creating an agent now reach the agent process ([#1112](https://github.com/longbkit/clisbot/pull/1112))
+- NixOS module supports the public TLS option for self-hosted relays ([#1106](https://github.com/longbkit/clisbot/pull/1106) by [@yzx9](https://github.com/yzx9))
 
 ### Improved
 
 - **Stale host connections recover automatically without a manual refresh**
-- Paseo opens to the workspace you were on last time you used it ([#1101](https://github.com/getpaseo/paseo/pull/1101))
+- Clisbot opens to the workspace you were on last time you used it ([#1101](https://github.com/longbkit/clisbot/pull/1101))
 - Workspaces remember which editor you opened them in
 - Outdated daemons now suggest an upgrade when they receive a command they don't understand
 - Voice mode is hidden while an agent is running
-- Agent file-link tooltips show the full resolved file path ([#1088](https://github.com/getpaseo/paseo/pull/1088))
-- Workspace git status refreshes less aggressively in the background ([#1102](https://github.com/getpaseo/paseo/pull/1102))
+- Agent file-link tooltips show the full resolved file path ([#1088](https://github.com/longbkit/clisbot/pull/1088))
+- Workspace git status refreshes less aggressively in the background ([#1102](https://github.com/longbkit/clisbot/pull/1102))
 
 ### Fixed
 
-- macOS desktop no longer freezes after the display wakes from sleep ([#745](https://github.com/getpaseo/paseo/pull/745))
-- Windows: Codex picks up the Microsoft Store install correctly ([#1020](https://github.com/getpaseo/paseo/pull/1020) by [@32r4](https://github.com/32r4))
-- Workspace selection survives a daemon restart ([#1111](https://github.com/getpaseo/paseo/pull/1111))
-- Cursor agents wait for slash commands to load before listing them ([#1099](https://github.com/getpaseo/paseo/pull/1099) by [@chrisbanes](https://github.com/chrisbanes))
+- macOS desktop no longer freezes after the display wakes from sleep ([#745](https://github.com/longbkit/clisbot/pull/745))
+- Windows: Codex picks up the Microsoft Store install correctly ([#1020](https://github.com/longbkit/clisbot/pull/1020) by [@32r4](https://github.com/32r4))
+- Workspace selection survives a daemon restart ([#1111](https://github.com/longbkit/clisbot/pull/1111))
+- Cursor agents wait for slash commands to load before listing them ([#1099](https://github.com/longbkit/clisbot/pull/1099) by [@chrisbanes](https://github.com/chrisbanes))
 - Codex sub-agents keep running through transient child process errors (by [@xy-plus](https://github.com/xy-plus))
 - iPad terminals send Ctrl+C correctly from a hardware keyboard (by [@samatar26](https://github.com/samatar26))
 - Git filenames with non-ASCII characters render correctly (by [@samatar26](https://github.com/samatar26))
 - Paste shortcuts work on Dvorak keyboard layouts (by [@qin-nz](https://github.com/qin-nz))
 - Claude file links resolve correctly for projects whose paths need SDK encoding
-- Duplicate Claude result text no longer appears in chat ([#1095](https://github.com/getpaseo/paseo/pull/1095))
-- Dynamic UI styles no longer leak CSS rules across the page ([#1103](https://github.com/getpaseo/paseo/pull/1103))
-- Relay handshakes reject sessions that try to change encryption keys mid-flight ([#1037](https://github.com/getpaseo/paseo/pull/1037) by [@joaosa](https://github.com/joaosa))
+- Duplicate Claude result text no longer appears in chat ([#1095](https://github.com/longbkit/clisbot/pull/1095))
+- Dynamic UI styles no longer leak CSS rules across the page ([#1103](https://github.com/longbkit/clisbot/pull/1103))
+- Relay handshakes reject sessions that try to change encryption keys mid-flight ([#1037](https://github.com/longbkit/clisbot/pull/1037) by [@joaosa](https://github.com/joaosa))
 
 ## 0.1.78 - 2026-05-18
 
@@ -1564,43 +1564,43 @@ _This release only fixes an Android issue — desktop users don't need to update
 - **Slash commands to end and restart an agent**
 - **Syntax highlighting for code blocks in chat**
 - **Copy button on code blocks in chat**
-- **Configurable terminal scrollback** ([#1021](https://github.com/getpaseo/paseo/pull/1021) by [@32r4](https://github.com/32r4))
+- **Configurable terminal scrollback** ([#1021](https://github.com/longbkit/clisbot/pull/1021) by [@32r4](https://github.com/32r4))
 - Assistant file links open at a specific line range when one is included
-- Mode icons appear in the agent status menu ([#1059](https://github.com/getpaseo/paseo/pull/1059) by [@32r4](https://github.com/32r4))
-- MCP exposes schedule update, logs, and run-once tools ([#1032](https://github.com/getpaseo/paseo/pull/1032) by [@skevetter](https://github.com/skevetter))
-- Self-hosted relays can use a different TLS setting for the public endpoint ([#1045](https://github.com/getpaseo/paseo/pull/1045) by [@yzx9](https://github.com/yzx9))
+- Mode icons appear in the agent status menu ([#1059](https://github.com/longbkit/clisbot/pull/1059) by [@32r4](https://github.com/32r4))
+- MCP exposes schedule update, logs, and run-once tools ([#1032](https://github.com/longbkit/clisbot/pull/1032) by [@skevetter](https://github.com/skevetter))
+- Self-hosted relays can use a different TLS setting for the public endpoint ([#1045](https://github.com/longbkit/clisbot/pull/1045) by [@yzx9](https://github.com/yzx9))
 
 ### Improved
 
 - User messages now have a distinct bubble fill for clearer chat hierarchy
 - Closing a tab returns to its parent tab
-- Diff rows show the full file path on hover ([#1061](https://github.com/getpaseo/paseo/pull/1061) by [@Myriad-Dreamin](https://github.com/Myriad-Dreamin))
-- The CLI shows the remote daemon host when `ls` cannot connect ([#1043](https://github.com/getpaseo/paseo/pull/1043) by [@mturac](https://github.com/mturac))
-- Nix install of the daemon is smaller ([#966](https://github.com/getpaseo/paseo/pull/966) by [@ixxie](https://github.com/ixxie))
-- Nix install honors home-manager profile paths when inheriting the user PATH ([#1040](https://github.com/getpaseo/paseo/pull/1040) by [@ixxie](https://github.com/ixxie))
+- Diff rows show the full file path on hover ([#1061](https://github.com/longbkit/clisbot/pull/1061) by [@Myriad-Dreamin](https://github.com/Myriad-Dreamin))
+- The CLI shows the remote daemon host when `ls` cannot connect ([#1043](https://github.com/longbkit/clisbot/pull/1043) by [@mturac](https://github.com/mturac))
+- Nix install of the daemon is smaller ([#966](https://github.com/longbkit/clisbot/pull/966) by [@ixxie](https://github.com/ixxie))
+- Nix install honors home-manager profile paths when inheriting the user PATH ([#1040](https://github.com/longbkit/clisbot/pull/1040) by [@ixxie](https://github.com/ixxie))
 
 ### Fixed
 
 - OpenCode probes no longer create empty sessions
 - OpenCode custom commands no longer hang
 - OpenCode session imports succeed across more environments
-- Native diff rows expand correctly ([#940](https://github.com/getpaseo/paseo/pull/940) by [@bolasblack](https://github.com/bolasblack))
-- Mobile sidebar interactions work correctly on web ([#900](https://github.com/getpaseo/paseo/pull/900) by [@nikuscs](https://github.com/nikuscs))
-- Mobile web drag gestures fire reliably ([#1048](https://github.com/getpaseo/paseo/pull/1048) by [@nikuscs](https://github.com/nikuscs))
-- Mobile web drag-and-drop activates correctly ([#1048](https://github.com/getpaseo/paseo/pull/1048) by [@nikuscs](https://github.com/nikuscs))
-- iOS Safari no longer zooms when focusing the composer ([#1048](https://github.com/getpaseo/paseo/pull/1048) by [@nikuscs](https://github.com/nikuscs))
-- Enter behavior in the mobile web composer is consistent ([#1048](https://github.com/getpaseo/paseo/pull/1048) by [@nikuscs](https://github.com/nikuscs))
+- Native diff rows expand correctly ([#940](https://github.com/longbkit/clisbot/pull/940) by [@bolasblack](https://github.com/bolasblack))
+- Mobile sidebar interactions work correctly on web ([#900](https://github.com/longbkit/clisbot/pull/900) by [@nikuscs](https://github.com/nikuscs))
+- Mobile web drag gestures fire reliably ([#1048](https://github.com/longbkit/clisbot/pull/1048) by [@nikuscs](https://github.com/nikuscs))
+- Mobile web drag-and-drop activates correctly ([#1048](https://github.com/longbkit/clisbot/pull/1048) by [@nikuscs](https://github.com/nikuscs))
+- iOS Safari no longer zooms when focusing the composer ([#1048](https://github.com/longbkit/clisbot/pull/1048) by [@nikuscs](https://github.com/nikuscs))
+- Enter behavior in the mobile web composer is consistent ([#1048](https://github.com/longbkit/clisbot/pull/1048) by [@nikuscs](https://github.com/nikuscs))
 - Composer no longer flickers when resizing with long prompts
 - Inline code links in assistant messages open the correct file
-- Host switcher popover is wide enough to show host names ([#981](https://github.com/getpaseo/paseo/pull/981) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
-- Windows: importing existing sessions matches paths correctly ([#1012](https://github.com/getpaseo/paseo/pull/1012) by [@kj1534](https://github.com/kj1534))
+- Host switcher popover is wide enough to show host names ([#981](https://github.com/longbkit/clisbot/pull/981) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
+- Windows: importing existing sessions matches paths correctly ([#1012](https://github.com/longbkit/clisbot/pull/1012) by [@kj1534](https://github.com/kj1534))
 
 ## 0.1.76 - 2026-05-15
 
 ### Added
 
 - **Chat timestamps and turn durations** Every message shows when it was sent, and each turn surfaces how long the agent took
-- **Auto Review permission mode for Claude Code and Codex** Agents stop after each assistant turn for review instead of running unattended ([#928](https://github.com/getpaseo/paseo/pull/928), [#963](https://github.com/getpaseo/paseo/pull/963) by [@bolasblack](https://github.com/bolasblack))
+- **Auto Review permission mode for Claude Code and Codex** Agents stop after each assistant turn for review instead of running unattended ([#928](https://github.com/longbkit/clisbot/pull/928), [#963](https://github.com/longbkit/clisbot/pull/963) by [@bolasblack](https://github.com/bolasblack))
 - Surface Codex's context compaction events and the `/compact` command in chat
 - Optional auto-archive for worktrees once their PR merges
 - Paste a GitHub PR or issue URL into the composer to attach it as context
@@ -1611,20 +1611,20 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Claude Code now picks up models from `~/.claude/settings.json` so custom model lists show up in the model picker
 - Local Claude Code settings (`.claude/settings.local.json`) apply per workspace
 - Diagnostics for generic ACP providers surface in the model picker
-- Allow setting fast mode for Paseo subagents ([#909](https://github.com/getpaseo/paseo/pull/909), [#910](https://github.com/getpaseo/paseo/pull/910) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
+- Allow setting fast mode for Clisbot subagents ([#909](https://github.com/longbkit/clisbot/pull/909), [#910](https://github.com/longbkit/clisbot/pull/910) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
 
 ### Improved
 
 - Surface Claude error messages in chat instead of ending the turn silently
 - Workspace checkout picker auto-selects when a single PR is attached
-- New workspace flow honors the currently checked-out branch when branching off ([#909](https://github.com/getpaseo/paseo/pull/908) by [@sbtobb](https://github.com/sbtobb))
-- OpenCode models from console subscription providers now appear in the model picker ([#917](https://github.com/getpaseo/paseo/pull/917) by [@t2o2](https://github.com/t2o2))
-- Cursor model picker reflects the models advertised by the Cursor ACP client ([#958](https://github.com/getpaseo/paseo/pull/958) by [@chrisbanes](https://github.com/chrisbanes))
+- New workspace flow honors the currently checked-out branch when branching off ([#909](https://github.com/longbkit/clisbot/pull/908) by [@sbtobb](https://github.com/sbtobb))
+- OpenCode models from console subscription providers now appear in the model picker ([#917](https://github.com/longbkit/clisbot/pull/917) by [@t2o2](https://github.com/t2o2))
+- Cursor model picker reflects the models advertised by the Cursor ACP client ([#958](https://github.com/longbkit/clisbot/pull/958) by [@chrisbanes](https://github.com/chrisbanes))
 
 ### Fixed
 
-- iPad hardware Enter submits the composer ([#919](https://github.com/getpaseo/paseo/pull/919) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
-- PR status falls back to a non-checks query for fine-grained GitHub tokens ([#932](https://github.com/getpaseo/paseo/pull/932) by [@32r4](https://github.com/32r4))
+- iPad hardware Enter submits the composer ([#919](https://github.com/longbkit/clisbot/pull/919) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
+- PR status falls back to a non-checks query for fine-grained GitHub tokens ([#932](https://github.com/longbkit/clisbot/pull/932) by [@32r4](https://github.com/32r4))
 - ACP errors display as readable text instead of `[object Object]`
 - OpenCode no longer hangs on retry when the upstream provider stalls
 - Worktree ahead count is correct when the upstream branch has been deleted
@@ -1639,90 +1639,90 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Relay E2EE reconnects cleanly under racing connect/disconnect
 - Workspace kind stays in sync with project kind after reconfiguration
 - zsh integration files install with usable runtime modes
-- MCP worktree cache refreshes after create and archive ([#911](https://github.com/getpaseo/paseo/pull/911) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
+- MCP worktree cache refreshes after create and archive ([#911](https://github.com/longbkit/clisbot/pull/911) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
 
 ## 0.1.75 - 2026-05-12
 
 ### Added
 
-- Set the speech-to-text language used by dictation and voice mode from settings ([#941](https://github.com/getpaseo/paseo/pull/941))
+- Set the speech-to-text language used by dictation and voice mode from settings ([#941](https://github.com/longbkit/clisbot/pull/941))
 
 ### Fixed
 
-- Codex resume failures now surface as explicit errors instead of leaving the agent silently stuck ([#947](https://github.com/getpaseo/paseo/pull/947))
-- Custom providers extending Codex now route correctly when they set a custom `OPENAI_BASE_URL` ([#915](https://github.com/getpaseo/paseo/pull/915))
-- Fixed Copilot's **Allow All** mode (renamed from Autopilot) ([#935](https://github.com/getpaseo/paseo/pull/935))
-- Desktop: daemon startup no longer fails when a stale PID file is left next to a still-running daemon ([#913](https://github.com/getpaseo/paseo/pull/913) by [@biaoma-ty](https://github.com/biaoma-ty))
-- iPhone HEIC photos now attach correctly from the image picker ([#934](https://github.com/getpaseo/paseo/pull/934))
-- Scheduled agents now archive automatically after each run ([#945](https://github.com/getpaseo/paseo/pull/945))
-- Windows: Codex command summaries trim `pwsh`, `powershell`, or `cmd` wrappers ([#931](https://github.com/getpaseo/paseo/pull/931) by [@32r4](https://github.com/32r4))
-- iPad: settings sidebar and main sidebar respect the top safe area in wide layouts ([#922](https://github.com/getpaseo/paseo/pull/922), [#937](https://github.com/getpaseo/paseo/pull/937) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
+- Codex resume failures now surface as explicit errors instead of leaving the agent silently stuck ([#947](https://github.com/longbkit/clisbot/pull/947))
+- Custom providers extending Codex now route correctly when they set a custom `OPENAI_BASE_URL` ([#915](https://github.com/longbkit/clisbot/pull/915))
+- Fixed Copilot's **Allow All** mode (renamed from Autopilot) ([#935](https://github.com/longbkit/clisbot/pull/935))
+- Desktop: daemon startup no longer fails when a stale PID file is left next to a still-running daemon ([#913](https://github.com/longbkit/clisbot/pull/913) by [@biaoma-ty](https://github.com/biaoma-ty))
+- iPhone HEIC photos now attach correctly from the image picker ([#934](https://github.com/longbkit/clisbot/pull/934))
+- Scheduled agents now archive automatically after each run ([#945](https://github.com/longbkit/clisbot/pull/945))
+- Windows: Codex command summaries trim `pwsh`, `powershell`, or `cmd` wrappers ([#931](https://github.com/longbkit/clisbot/pull/931) by [@32r4](https://github.com/32r4))
+- iPad: settings sidebar and main sidebar respect the top safe area in wide layouts ([#922](https://github.com/longbkit/clisbot/pull/922), [#937](https://github.com/longbkit/clisbot/pull/937) by [@kongjiadongyuan](https://github.com/kongjiadongyuan))
 
 ## 0.1.74 - 2026-05-11
 
 ### Fixed
 
-- **OpenCode agent turns no longer stall** Paseo now follows OpenCode's global event stream, so turns stream reliably without falling back to fragile recovery paths ([#916](https://github.com/getpaseo/paseo/pull/916))
+- **OpenCode agent turns no longer stall** Clisbot now follows OpenCode's global event stream, so turns stream reliably without falling back to fragile recovery paths ([#916](https://github.com/longbkit/clisbot/pull/916))
 
 ## 0.1.73 - 2026-05-10
 
 ### Fixed
 
-- **OpenCode agents work again on OpenCode 1.14.42+** ([#895](https://github.com/getpaseo/paseo/pull/895), [#902](https://github.com/getpaseo/paseo/pull/902), [#904](https://github.com/getpaseo/paseo/pull/904) by [@atomlink-ye](https://github.com/atomlink-ye), [@plutofog](https://github.com/plutofog))
-- Web: opening a workspace no longer hangs in browsers without `crypto.randomUUID` ([#858](https://github.com/getpaseo/paseo/pull/858) by [@cokekitten](https://github.com/cokekitten))
-- Codex sub-agent child tool calls now report a final failure state instead of staying as "running" ([#899](https://github.com/getpaseo/paseo/pull/899))
-- Old relay pairing URLs without an explicit TLS flag work again ([#896](https://github.com/getpaseo/paseo/pull/896))
-- macOS: the tab-jump shortcut no longer collides with system shortcuts ([#859](https://github.com/getpaseo/paseo/pull/859) by [@nikuscs](https://github.com/nikuscs))
-- Web: the composer no longer triggers a bottom-sheet keyboard on desktop browsers ([#898](https://github.com/getpaseo/paseo/pull/898) by [@nikuscs](https://github.com/nikuscs))
-- Windows: git operations no longer flash a console window on each invocation ([#897](https://github.com/getpaseo/paseo/pull/897))
-- File explorer no longer follows symlinks outside the workspace root ([#847](https://github.com/getpaseo/paseo/pull/847) by [@joaosa](https://github.com/joaosa))
-- Desktop only opens external URLs via http(s) and mailto schemes ([#845](https://github.com/getpaseo/paseo/pull/845) by [@joaosa](https://github.com/joaosa))
-- MCP debug request logs now redact request bodies ([#842](https://github.com/getpaseo/paseo/pull/842) by [@joaosa](https://github.com/joaosa))
+- **OpenCode agents work again on OpenCode 1.14.42+** ([#895](https://github.com/longbkit/clisbot/pull/895), [#902](https://github.com/longbkit/clisbot/pull/902), [#904](https://github.com/longbkit/clisbot/pull/904) by [@atomlink-ye](https://github.com/atomlink-ye), [@plutofog](https://github.com/plutofog))
+- Web: opening a workspace no longer hangs in browsers without `crypto.randomUUID` ([#858](https://github.com/longbkit/clisbot/pull/858) by [@cokekitten](https://github.com/cokekitten))
+- Codex sub-agent child tool calls now report a final failure state instead of staying as "running" ([#899](https://github.com/longbkit/clisbot/pull/899))
+- Old relay pairing URLs without an explicit TLS flag work again ([#896](https://github.com/longbkit/clisbot/pull/896))
+- macOS: the tab-jump shortcut no longer collides with system shortcuts ([#859](https://github.com/longbkit/clisbot/pull/859) by [@nikuscs](https://github.com/nikuscs))
+- Web: the composer no longer triggers a bottom-sheet keyboard on desktop browsers ([#898](https://github.com/longbkit/clisbot/pull/898) by [@nikuscs](https://github.com/nikuscs))
+- Windows: git operations no longer flash a console window on each invocation ([#897](https://github.com/longbkit/clisbot/pull/897))
+- File explorer no longer follows symlinks outside the workspace root ([#847](https://github.com/longbkit/clisbot/pull/847) by [@joaosa](https://github.com/joaosa))
+- Desktop only opens external URLs via http(s) and mailto schemes ([#845](https://github.com/longbkit/clisbot/pull/845) by [@joaosa](https://github.com/joaosa))
+- MCP debug request logs now redact request bodies ([#842](https://github.com/longbkit/clisbot/pull/842) by [@joaosa](https://github.com/joaosa))
 
 ## 0.1.72 - 2026-05-10
 
 ### Fixed
 
-- **Codex approval prompts no longer hang** Fixes a regression introduced in 0.1.70 where Codex agents would wait forever on command and file approvals — the prompt never reached the app and the agent stayed stuck in "running" ([#866](https://github.com/getpaseo/paseo/pull/866), [#869](https://github.com/getpaseo/paseo/pull/869))
-- **Windows: daemon no longer crashes when Codex emits non-JSON output** Localized stdout lines from the Codex CLI are now ignored instead of taking down the daemon worker ([#866](https://github.com/getpaseo/paseo/pull/866))
-- Drag-and-drop images onto the new workspace screen now works ([#850](https://github.com/getpaseo/paseo/pull/850))
-- Archiving a worktree from the toolbar redirects you immediately instead of leaving you on the dead screen for a beat ([#852](https://github.com/getpaseo/paseo/pull/852))
-- Pi-backed sessions now shut down cleanly when you close them, releasing extension resources on the Pi side ([#863](https://github.com/getpaseo/paseo/pull/863))
+- **Codex approval prompts no longer hang** Fixes a regression introduced in 0.1.70 where Codex agents would wait forever on command and file approvals — the prompt never reached the app and the agent stayed stuck in "running" ([#866](https://github.com/longbkit/clisbot/pull/866), [#869](https://github.com/longbkit/clisbot/pull/869))
+- **Windows: daemon no longer crashes when Codex emits non-JSON output** Localized stdout lines from the Codex CLI are now ignored instead of taking down the daemon worker ([#866](https://github.com/longbkit/clisbot/pull/866))
+- Drag-and-drop images onto the new workspace screen now works ([#850](https://github.com/longbkit/clisbot/pull/850))
+- Archiving a worktree from the toolbar redirects you immediately instead of leaving you on the dead screen for a beat ([#852](https://github.com/longbkit/clisbot/pull/852))
+- Pi-backed sessions now shut down cleanly when you close them, releasing extension resources on the Pi side ([#863](https://github.com/longbkit/clisbot/pull/863))
 
 ## 0.1.71 - 2026-05-09
 
 ### Added
 
-- **Import existing Claude, Codex, and OpenCode sessions** into Paseo — pick up a conversation you started in the terminal and keep going from the app, with the full timeline ([#766](https://github.com/getpaseo/paseo/pull/766), [#833](https://github.com/getpaseo/paseo/pull/833))
-- **Subagents now appear in a collapsible section above the composer** so you can jump into agents your main agent spawned ([#532](https://github.com/getpaseo/paseo/pull/532))
-- Merge a pull request directly from the checkout pane ([#814](https://github.com/getpaseo/paseo/pull/814))
-- Customize the per-project prompts Paseo uses to auto-generate agent titles, branch names, commit messages, and pull request descriptions ([#836](https://github.com/getpaseo/paseo/pull/836))
-- Open an empty workspace without typing a prompt first ([#834](https://github.com/getpaseo/paseo/pull/834))
-- Project settings are now grouped with inline links to the relevant docs ([#837](https://github.com/getpaseo/paseo/pull/837))
+- **Import existing Claude, Codex, and OpenCode sessions** into Clisbot — pick up a conversation you started in the terminal and keep going from the app, with the full timeline ([#766](https://github.com/longbkit/clisbot/pull/766), [#833](https://github.com/longbkit/clisbot/pull/833))
+- **Subagents now appear in a collapsible section above the composer** so you can jump into agents your main agent spawned ([#532](https://github.com/longbkit/clisbot/pull/532))
+- Merge a pull request directly from the checkout pane ([#814](https://github.com/longbkit/clisbot/pull/814))
+- Customize the per-project prompts Clisbot uses to auto-generate agent titles, branch names, commit messages, and pull request descriptions ([#836](https://github.com/longbkit/clisbot/pull/836))
+- Open an empty workspace without typing a prompt first ([#834](https://github.com/longbkit/clisbot/pull/834))
+- Project settings are now grouped with inline links to the relevant docs ([#837](https://github.com/longbkit/clisbot/pull/837))
 - Rich context menu on desktop — copy link, copy image, and spellcheck suggestions
-- Archiving a Codex-backed agent now archives the underlying native Codex thread too ([#827](https://github.com/getpaseo/paseo/pull/827) by [@32r4](https://github.com/32r4))
+- Archiving a Codex-backed agent now archives the underlying native Codex thread too ([#827](https://github.com/longbkit/clisbot/pull/827) by [@32r4](https://github.com/32r4))
 
 ### Improved
 
-- Opening a workspace auto-focuses the agent that needs your attention ([#828](https://github.com/getpaseo/paseo/pull/828))
+- Opening a workspace auto-focuses the agent that needs your attention ([#828](https://github.com/longbkit/clisbot/pull/828))
 - An unattended agent that spawns a sub-agent on a different provider via MCP now starts the sub-agent in unattended mode too
 
 ### Fixed
 
-- iOS project picker now submits the typed path ([#831](https://github.com/getpaseo/paseo/pull/831))
-- System messages and chat mentions routed to multiple agents now reach every recipient consistently ([#830](https://github.com/getpaseo/paseo/pull/830))
+- iOS project picker now submits the typed path ([#831](https://github.com/longbkit/clisbot/pull/831))
+- System messages and chat mentions routed to multiple agents now reach every recipient consistently ([#830](https://github.com/longbkit/clisbot/pull/830))
 - Clicking a Markdown link in agent output no longer reloads the desktop app on top of opening the link
 - macOS desktop tab-jump shortcuts now use Cmd+Option+1-9, avoiding conflicts with Option-based international keyboard characters such as `@`
 
 ### Security
 
-- Local state files (daemon keypair, stored credentials, persisted config) are now readable only by the owning user ([#825](https://github.com/getpaseo/paseo/pull/825) by [@joaosa](https://github.com/joaosa))
+- Local state files (daemon keypair, stored credentials, persisted config) are now readable only by the owning user ([#825](https://github.com/longbkit/clisbot/pull/825) by [@joaosa](https://github.com/joaosa))
 
 ## 0.1.70 - 2026-05-08
 
 ### Breaking
 
-- **Claude agents now require `claude` on your PATH** Install Claude Code globally (`npm install -g @anthropic-ai/claude-code`) before running a Claude agent — Paseo no longer ships a bundled fallback binary. Same posture as Codex and OpenCode, and shrinks the desktop install by ~210 MB per platform
+- **Claude agents now require `claude` on your PATH** Install Claude Code globally (`npm install -g @anthropic-ai/claude-code`) before running a Claude agent — Clisbot no longer ships a bundled fallback binary. Same posture as Codex and OpenCode, and shrinks the desktop install by ~210 MB per platform
 
 ### Added
 
@@ -1730,10 +1730,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Codex `/goal` slash command — set or update the goal mid-turn while a Codex agent is running
 - Claude's Sonnet 4.6 1M context model is now selectable in the model picker
 - Detect GitHub issue and PR URLs pasted into the composer search
-- `paseo worktree create` CLI command, with parity to the MCP `create_worktree` tool
-- `paseo schedule update` to edit a schedule in place without recreating it
-- `paseo schedule run-once` for cron-style triggers, plus `--mode` on `schedule` and `loop`. Background runs now default to unattended mode
-- Projects settings now lists workspaces from any remote — GitLab, Gitea, Bitbucket, self-hosted, and SSH-style URLs, not just GitHub ([#681](https://github.com/getpaseo/paseo/pull/681) by [@krumpyzoid](https://github.com/krumpyzoid))
+- `clisbot worktree create` CLI command, with parity to the MCP `create_worktree` tool
+- `clisbot schedule update` to edit a schedule in place without recreating it
+- `clisbot schedule run-once` for cron-style triggers, plus `--mode` on `schedule` and `loop`. Background runs now default to unattended mode
+- Projects settings now lists workspaces from any remote — GitLab, Gitea, Bitbucket, self-hosted, and SSH-style URLs, not just GitHub ([#681](https://github.com/longbkit/clisbot/pull/681) by [@krumpyzoid](https://github.com/krumpyzoid))
 
 ### Improved
 
@@ -1751,12 +1751,12 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 - **Claude agent: daemon no longer crashes mid-turn** when the underlying SDK fires a stray control message after the connection has been torn down
 - **Windows:** Terminals start reliably and shut down cleanly without leaving stuck processes behind
-- **Linux:** Workspace file watchers no longer storm with events on busy working trees, fixing CPU spikes on large repos ([#794](https://github.com/getpaseo/paseo/pull/794) by [@312223105](https://github.com/312223105))
-- ACP-based agents launch terminal shell commands reliably ([#793](https://github.com/getpaseo/paseo/pull/793) by [@ebg1223](https://github.com/ebg1223))
-- Checkout shortstat now counts untracked files ([#608](https://github.com/getpaseo/paseo/issues/608), [#762](https://github.com/getpaseo/paseo/pull/762) by [@somus](https://github.com/somus))
-- Relay endpoints on port 443 use TLS automatically ([#774](https://github.com/getpaseo/paseo/pull/774) by [@caoer](https://github.com/caoer))
+- **Linux:** Workspace file watchers no longer storm with events on busy working trees, fixing CPU spikes on large repos ([#794](https://github.com/longbkit/clisbot/pull/794) by [@312223105](https://github.com/312223105))
+- ACP-based agents launch terminal shell commands reliably ([#793](https://github.com/longbkit/clisbot/pull/793) by [@ebg1223](https://github.com/ebg1223))
+- Checkout shortstat now counts untracked files ([#608](https://github.com/longbkit/clisbot/issues/608), [#762](https://github.com/longbkit/clisbot/pull/762) by [@somus](https://github.com/somus))
+- Relay endpoints on port 443 use TLS automatically ([#774](https://github.com/longbkit/clisbot/pull/774) by [@caoer](https://github.com/caoer))
 - Desktop CLI passthrough TTY handling — interactive commands now behave correctly when launched from the desktop app
-- The CLI honors the `PASEO_PASSWORD` environment variable for password-protected daemons
+- The CLI honors the `CLISBOT_PASSWORD` environment variable for password-protected daemons
 - Daemon shutdown terminates all child processes cleanly using tree-kill
 - Agent spawn paths handle missing executables and unusual install layouts more reliably
 - OpenCode now forwards provider retry errors instead of silently swallowing them
@@ -1769,19 +1769,19 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Browser pane reload focus and devtools handling
 - MCP terminal capture now includes scrollback
 - Worktree branches no longer get renamed when an agent is created against an existing worktree from MCP
-- Creating an agent in a subdirectory of a registered workspace now runs in that subdirectory instead of jumping up to the parent ([#551](https://github.com/getpaseo/paseo/issues/551))
+- Creating an agent in a subdirectory of a registered workspace now runs in that subdirectory instead of jumping up to the parent ([#551](https://github.com/longbkit/clisbot/issues/551))
 - Non-GitHub project display names are derived from the remote owner/repo instead of the local path
-- Desktop IPC wrapped in shared mutation/query hooks, fixing stale state and intermittent failures ([#761](https://github.com/getpaseo/paseo/issues/761))
-- `paseo schedule create --host` now requires `--cwd` to avoid running schedules in the wrong directory
-- `paseo schedule create --every` runs once immediately by default, then on the configured interval
+- Desktop IPC wrapped in shared mutation/query hooks, fixing stale state and intermittent failures ([#761](https://github.com/longbkit/clisbot/issues/761))
+- `clisbot schedule create --host` now requires `--cwd` to avoid running schedules in the wrong directory
+- `clisbot schedule create --every` runs once immediately by default, then on the configured interval
 - MCP `create_agent` validates the requested mode and refuses silent cross-provider inheritance
 
 ## 0.1.69 - 2026-05-05
 
 ### Fixed
 
-- Paseo now recovers automatically when an internal daemon process crashes — your agents stay connected instead of getting stuck and you don't have to restart anything
-- Answering an interactive question from a Claude agent now reaches Claude correctly instead of being dropped ([#760](https://github.com/getpaseo/paseo/pull/760) by [@somus](https://github.com/somus))
+- Clisbot now recovers automatically when an internal daemon process crashes — your agents stay connected instead of getting stuck and you don't have to restart anything
+- Answering an interactive question from a Claude agent now reaches Claude correctly instead of being dropped ([#760](https://github.com/longbkit/clisbot/pull/760) by [@somus](https://github.com/somus))
 
 ## 0.1.68 - 2026-05-05
 
@@ -1811,15 +1811,15 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **In-app browser** — open a real web browser in any workspace to test your app ([#670](https://github.com/getpaseo/paseo/pull/670) by [@jasonkneen](https://github.com/jasonkneen))
-- Inline review comments in the git diff pane. Tap a line number to start a comment ([#530](https://github.com/getpaseo/paseo/pull/530))
-- Sub-agent activity is now shown for Codex, OpenCode, and Claude ([#672](https://github.com/getpaseo/paseo/pull/672), [#658](https://github.com/getpaseo/paseo/pull/658) by [@thisisryanswift](https://github.com/thisisryanswift))
+- **In-app browser** — open a real web browser in any workspace to test your app ([#670](https://github.com/longbkit/clisbot/pull/670) by [@jasonkneen](https://github.com/jasonkneen))
+- Inline review comments in the git diff pane. Tap a line number to start a comment ([#530](https://github.com/longbkit/clisbot/pull/530))
+- Sub-agent activity is now shown for Codex, OpenCode, and Claude ([#672](https://github.com/longbkit/clisbot/pull/672), [#658](https://github.com/longbkit/clisbot/pull/658) by [@thisisryanswift](https://github.com/thisisryanswift))
 - Pull and push your branch in one step from the git actions menu in the changes pane
-- Resume existing agent sessions with `paseo import --provider <name> <id>` ([#632](https://github.com/getpaseo/paseo/pull/632))
-- Password authentication and SSL support for daemon connections ([#635](https://github.com/getpaseo/paseo/pull/635))
-- Connect to a daemon via relay using a pairing offer URL from the CLI ([#639](https://github.com/getpaseo/paseo/pull/639))
+- Resume existing agent sessions with `clisbot import --provider <name> <id>` ([#632](https://github.com/longbkit/clisbot/pull/632))
+- Password authentication and SSL support for daemon connections ([#635](https://github.com/longbkit/clisbot/pull/635))
+- Connect to a daemon via relay using a pairing offer URL from the CLI ([#639](https://github.com/longbkit/clisbot/pull/639))
 - **Windows:** Native ARM64 builds are now available
-- Bundled Paseo skills now refresh automatically on desktop app launch
+- Bundled Clisbot skills now refresh automatically on desktop app launch
 
 ### Improved
 
@@ -1831,27 +1831,27 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- **Apple Silicon Mac:** The desktop update pipeline now publishes manifests atomically, closing a race that could install the Intel build on Apple Silicon Macs and cause 100%+ renderer CPU usage. Affected users will self-heal — electron-updater's Rosetta detection migrates back to arm64 on the next update poll ([#555](https://github.com/getpaseo/paseo/issues/555))
-- **Linux:** `.deb` and `.rpm` packages now show as `Paseo` in the dock and process list instead of `Paseo.bin`. `--no-sandbox` is now scoped to AppImage only, matching VS Code's sandbox handling ([#602](https://github.com/getpaseo/paseo/issues/602))
-- **Windows:** Git diff commands no longer break on paths with special characters ([#629](https://github.com/getpaseo/paseo/pull/629))
-- Cursor CLI and other ACP custom providers launch reliably ([#628](https://github.com/getpaseo/paseo/pull/628))
-- Daemon stays up when WebSocket clients disconnect mid-stream, and crashes now write a fatal log entry instead of disappearing silently ([#613](https://github.com/getpaseo/paseo/pull/613) by [@yuruiz](https://github.com/yuruiz))
-- Long agent timelines reconnect cleanly over the relay instead of looping through disconnects while catching up ([#657](https://github.com/getpaseo/paseo/pull/657) by [@fireblue](https://github.com/fireblue))
+- **Apple Silicon Mac:** The desktop update pipeline now publishes manifests atomically, closing a race that could install the Intel build on Apple Silicon Macs and cause 100%+ renderer CPU usage. Affected users will self-heal — electron-updater's Rosetta detection migrates back to arm64 on the next update poll ([#555](https://github.com/longbkit/clisbot/issues/555))
+- **Linux:** `.deb` and `.rpm` packages now show as `Clisbot` in the dock and process list instead of `Clisbot.bin`. `--no-sandbox` is now scoped to AppImage only, matching VS Code's sandbox handling ([#602](https://github.com/longbkit/clisbot/issues/602))
+- **Windows:** Git diff commands no longer break on paths with special characters ([#629](https://github.com/longbkit/clisbot/pull/629))
+- Cursor CLI and other ACP custom providers launch reliably ([#628](https://github.com/longbkit/clisbot/pull/628))
+- Daemon stays up when WebSocket clients disconnect mid-stream, and crashes now write a fatal log entry instead of disappearing silently ([#613](https://github.com/longbkit/clisbot/pull/613) by [@yuruiz](https://github.com/yuruiz))
+- Long agent timelines reconnect cleanly over the relay instead of looping through disconnects while catching up ([#657](https://github.com/longbkit/clisbot/pull/657) by [@fireblue](https://github.com/fireblue))
 - Agent timelines refresh with smaller catch-up requests when you reopen an agent
 - Terminal snapshots flush reliably before clients reconnect
 - Workspace reconnects avoid unnecessary refresh work when the focused workspace is already current
 - Voice dictation keeps recording when the agent tab loses focus
-- OpenCode mode picker now lists agents available in every mode ([#606](https://github.com/getpaseo/paseo/pull/606) by [@thisisryanswift](https://github.com/thisisryanswift))
+- OpenCode mode picker now lists agents available in every mode ([#606](https://github.com/longbkit/clisbot/pull/606) by [@thisisryanswift](https://github.com/thisisryanswift))
 - Codex plan approval panels no longer duplicate
 - Imported agents display the correct title immediately
 - OpenCode surfaces invalid mode/model errors instead of hanging
-- Archived worktrees stay hidden without flashing back into the list ([#640](https://github.com/getpaseo/paseo/pull/640))
+- Archived worktrees stay hidden without flashing back into the list ([#640](https://github.com/longbkit/clisbot/pull/640))
 - Web dropdown menus no longer resize unexpectedly
 - The visible changes pane keeps in sync with the working tree diff
 - Tool detail rows on the timeline are selectable again
-- `paseo.json` parse errors in setup, teardown, and terminal actions now surface a clear error instead of failing silently
+- `clisbot.json` parse errors in setup, teardown, and terminal actions now surface a clear error instead of failing silently
 - Diff gutter line numbers were shifted one row out of alignment in some cases on web
-- Streamed agent output reconciles cleanly when the timeline hydrates mid-turn ([#663](https://github.com/getpaseo/paseo/pull/663))
+- Streamed agent output reconciles cleanly when the timeline hydrates mid-turn ([#663](https://github.com/longbkit/clisbot/pull/663))
 - Images in assistant messages show a loading spinner while they load and an "Image unavailable" fallback if they fail, instead of a blank space
 - Isolated bottom sheet modals close and re-open without getting stuck
 
@@ -1859,42 +1859,42 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- OpenCode now has a Full Access mode that auto-approves tool calls ([#595](https://github.com/getpaseo/paseo/pull/595) by [@tmih06](https://github.com/tmih06))
-- OpenCode supports executable slash commands ([#597](https://github.com/getpaseo/paseo/pull/597) by [@tmih06](https://github.com/tmih06))
+- OpenCode now has a Full Access mode that auto-approves tool calls ([#595](https://github.com/longbkit/clisbot/pull/595) by [@tmih06](https://github.com/tmih06))
+- OpenCode supports executable slash commands ([#597](https://github.com/longbkit/clisbot/pull/597) by [@tmih06](https://github.com/tmih06))
 
 ### Improved
 
-- `@`-mention stays responsive on very large projects ([#600](https://github.com/getpaseo/paseo/pull/600) by [@yuruiz](https://github.com/yuruiz))
+- `@`-mention stays responsive on very large projects ([#600](https://github.com/longbkit/clisbot/pull/600) by [@yuruiz](https://github.com/yuruiz))
 
 ### Fixed
 
-- Workspaces still load when `paseo.json` has a parse error
+- Workspaces still load when `clisbot.json` has a parse error
 
 ## 0.1.63 - 2026-04-28
 
 ### Added
 
-- Project settings page with a built-in `paseo.json` editor
+- Project settings page with a built-in `clisbot.json` editor
 - Cold start restores your last open workspace
 - Tool call badges have a button to open the referenced file directly
-- Open the current branch on GitHub from a workspace's open menu ([#583](https://github.com/getpaseo/paseo/pull/583) by [@Myriad-Dreamin](https://github.com/Myriad-Dreamin))
+- Open the current branch on GitHub from a workspace's open menu ([#583](https://github.com/longbkit/clisbot/pull/583) by [@Myriad-Dreamin](https://github.com/Myriad-Dreamin))
 - Enable or disable providers from Settings without editing config files
-- Paseo prompts you to configure a worktree setup script when one is missing
+- Clisbot prompts you to configure a worktree setup script when one is missing
 - Choose whether the daemon shuts down when you close the desktop app
 
 ### Improved
 
 - Provider settings and model selection have been redesigned
-- Voice mode transcription endpoint is configurable for OpenAI-compatible providers ([#570](https://github.com/getpaseo/paseo/pull/570) by [@yuruiz](https://github.com/yuruiz))
+- Voice mode transcription endpoint is configurable for OpenAI-compatible providers ([#570](https://github.com/longbkit/clisbot/pull/570) by [@yuruiz](https://github.com/yuruiz))
 - Adding a project no longer waits for GitHub PR status to load
 - Startup splash screen is cleaner — just the logo with a subtle shimmer
-- `paseo.json` setup and teardown accept a single command string, not just an array
+- `clisbot.json` setup and teardown accept a single command string, not just an array
 - Archiving a worktree is instant instead of waiting for the backend to confirm
 - Agent timelines and git diff lists no longer jump around while loading or streaming
 
 ### Fixed
 
-- `paseo loop run` and `paseo run` now respect the `--provider` and `--model` flags ([#594](https://github.com/getpaseo/paseo/pull/594) by [@VincenzoRocchi](https://github.com/VincenzoRocchi))
+- `clisbot loop run` and `clisbot run` now respect the `--provider` and `--model` flags ([#594](https://github.com/longbkit/clisbot/pull/594) by [@VincenzoRocchi](https://github.com/VincenzoRocchi))
 - Pi provider shows up when only DeepSeek or other non-OpenAI/Anthropic/OpenRouter API keys are set
 - Custom models from `additionalModels` and `profileModels` are honored when picking a default for new agents
 - File preview line numbers stay on one line past line 99
@@ -1927,15 +1927,15 @@ _This release only fixes an Android issue — desktop users don't need to update
 ### Fixed
 
 - Pull request status resolves correctly for PRs opened from forks
-- Installing the paseo CLI from the macOS desktop app now works in packaged builds
+- Installing the clisbot CLI from the macOS desktop app now works in packaged builds
 - Agents launched from the desktop app no longer inherit Electron-only environment variables
 
 ## 0.1.61 - 2026-04-23
 
 ### Added
 
-- `additionalModels` option in provider config lets you add or relabel models without replacing the full list — entries merge with runtime-discovered models (ACP) or your static `models` list. See the [Providers docs](https://paseo.sh/docs/providers)
-- New [Providers docs page](https://paseo.sh/docs/providers) covering first-class providers and every custom provider config pattern in one place
+- `additionalModels` option in provider config lets you add or relabel models without replacing the full list — entries merge with runtime-discovered models (ACP) or your static `models` list. See the [Providers docs](https://clisbot.com/docs/providers)
+- New [Providers docs page](https://clisbot.com/docs/providers) covering first-class providers and every custom provider config pattern in one place
 
 ### Improved
 
@@ -1947,7 +1947,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Scripts and services per worktree — define named commands in `paseo.json`, and long-running services get supervised with their own ports and nice proxy URLs like `http://web.my-app.localhost:6767`. See the [worktrees guide](https://paseo.sh/docs/worktrees)
+- Scripts and services per worktree — define named commands in `clisbot.json`, and long-running services get supervised with their own ports and nice proxy URLs like `http://web.my-app.localhost:6767`. See the [worktrees guide](https://clisbot.com/docs/worktrees)
 - Launch scripts and services for a worktree directly from the workspace header
 - New Setup tab in every workspace showing setup, teardown, and script progress live
 - GitHub checks and PR reviews in the explorer sidebar, with a hover card for the full breakdown
@@ -1972,7 +1972,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Keyboard shortcuts keep working while Settings is open
 - Escape reliably interrupts the active agent
 - Checking out a pull request from a fork lands on an owner-prefixed branch so multiple forks don't collide
-- `paseo ls` defaults to active agents; pass `-a` to include archived
+- `clisbot ls` defaults to active agents; pass `-a` to include archived
 - GitHub branch and PR picker loads faster — queries are deferred until the picker opens
 
 ### Fixed
@@ -1982,7 +1982,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Replacing a running agent cleans up the previous one without leaving it behind
 - Agent notifications no longer get swallowed by a backgrounded focused client
 - Removed workspace folders disappear from the workspace list again
-- Codex keeps fast mode after you approve a plan ([#526](https://github.com/getpaseo/paseo/pull/526) by [@therainisme](https://github.com/therainisme))
+- Codex keeps fast mode after you approve a plan ([#526](https://github.com/longbkit/clisbot/pull/526) by [@therainisme](https://github.com/therainisme))
 - Workspace tab focus is preserved across page refreshes
 - Settings screen no longer pushes its header down with extra spacing
 - Branch switcher title no longer overflows on narrow rows
@@ -2006,27 +2006,27 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Markdown files render as formatted markdown in the file pane ([#427](https://github.com/getpaseo/paseo/pull/427) by [@aaronflorey](https://github.com/aaronflorey))
+- Markdown files render as formatted markdown in the file pane ([#427](https://github.com/longbkit/clisbot/pull/427) by [@aaronflorey](https://github.com/aaronflorey))
 - Cmd+L (Ctrl+L on Windows/Linux) focuses the agent message input
-- Provider models refresh on a freshness TTL; Settings shows last-updated time and any fetch errors ([#426](https://github.com/getpaseo/paseo/pull/426))
+- Provider models refresh on a freshness TTL; Settings shows last-updated time and any fetch errors ([#426](https://github.com/longbkit/clisbot/pull/426))
 - `disallowedTools` option in provider config to block specific tools from an agent
 
 ### Improved
 
-- Windows: agents launch reliably from npm `.cmd` shims, paths with spaces, and JSON config args — fixes `spawn EINVAL` startup errors ([#454](https://github.com/getpaseo/paseo/pull/454))
-- OpenCode permission prompts include the requesting tool's context ([#398](https://github.com/getpaseo/paseo/pull/398) by [@aaronflorey](https://github.com/aaronflorey))
-- OpenCode todo and compaction events render in the timeline ([#429](https://github.com/getpaseo/paseo/pull/429) by [@aaronflorey](https://github.com/aaronflorey))
-- OpenCode sessions archive cleanly when closed ([#408](https://github.com/getpaseo/paseo/pull/408) by [@aaronflorey](https://github.com/aaronflorey))
-- OpenCode slash commands recover from SSE timeouts ([#407](https://github.com/getpaseo/paseo/pull/407) by [@aaronflorey](https://github.com/aaronflorey))
-- Paseo MCP tools work against archived agents, matching the CLI ([#423](https://github.com/getpaseo/paseo/pull/423))
-- Native scrollbars match the active theme across all web views ([#399](https://github.com/getpaseo/paseo/pull/399) by [@ethersh](https://github.com/ethersh))
+- Windows: agents launch reliably from npm `.cmd` shims, paths with spaces, and JSON config args — fixes `spawn EINVAL` startup errors ([#454](https://github.com/longbkit/clisbot/pull/454))
+- OpenCode permission prompts include the requesting tool's context ([#398](https://github.com/longbkit/clisbot/pull/398) by [@aaronflorey](https://github.com/aaronflorey))
+- OpenCode todo and compaction events render in the timeline ([#429](https://github.com/longbkit/clisbot/pull/429) by [@aaronflorey](https://github.com/aaronflorey))
+- OpenCode sessions archive cleanly when closed ([#408](https://github.com/longbkit/clisbot/pull/408) by [@aaronflorey](https://github.com/aaronflorey))
+- OpenCode slash commands recover from SSE timeouts ([#407](https://github.com/longbkit/clisbot/pull/407) by [@aaronflorey](https://github.com/aaronflorey))
+- Clisbot MCP tools work against archived agents, matching the CLI ([#423](https://github.com/longbkit/clisbot/pull/423))
+- Native scrollbars match the active theme across all web views ([#399](https://github.com/longbkit/clisbot/pull/399) by [@ethersh](https://github.com/ethersh))
 
 ### Fixed
 
-- Code file previews can be selected and copied on iOS ([#447](https://github.com/getpaseo/paseo/pull/447) by [@muzhi1991](https://github.com/muzhi1991))
-- File preview no longer shows stale content when reopening the same file ([#411](https://github.com/getpaseo/paseo/pull/411) by [@muzhi1991](https://github.com/muzhi1991))
-- File explorer reinitialises when the client reconnects after a page refresh ([#442](https://github.com/getpaseo/paseo/pull/442) by [@1996fanrui](https://github.com/1996fanrui))
-- Generic ACP providers no longer receive duplicated command arguments ([#444](https://github.com/getpaseo/paseo/pull/444) by [@edvardchen](https://github.com/edvardchen))
+- Code file previews can be selected and copied on iOS ([#447](https://github.com/longbkit/clisbot/pull/447) by [@muzhi1991](https://github.com/muzhi1991))
+- File preview no longer shows stale content when reopening the same file ([#411](https://github.com/longbkit/clisbot/pull/411) by [@muzhi1991](https://github.com/muzhi1991))
+- File explorer reinitialises when the client reconnects after a page refresh ([#442](https://github.com/longbkit/clisbot/pull/442) by [@1996fanrui](https://github.com/1996fanrui))
+- Generic ACP providers no longer receive duplicated command arguments ([#444](https://github.com/longbkit/clisbot/pull/444) by [@edvardchen](https://github.com/edvardchen))
 - Workspace headers no longer show a branch icon for non-git workspaces
 - Branch switcher layout is stable on mobile
 - Model names no longer truncate mid-word in the picker rows
@@ -2044,8 +2044,8 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Provider profiles — define custom providers in your Paseo config that appear alongside built-ins. Override a built-in's binary, env, or models, or create entirely new providers. See the [configuration guide](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md)
-- ACP agent support — add any ACP-compatible agent to Paseo with `extends: "acp"` in your provider config. No code changes needed
+- Provider profiles — define custom providers in your Clisbot config that appear alongside built-ins. Override a built-in's binary, env, or models, or create entirely new providers. See the [configuration guide](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md)
+- ACP agent support — add any ACP-compatible agent to Clisbot with `extends: "acp"` in your provider config. No code changes needed
 - Choose provider and model when creating scheduled agents
 - Max reasoning effort option for Opus 4.6 models
 - Cmd+, (Ctrl+, on Windows/Linux) opens settings
@@ -2073,8 +2073,8 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Improved
 
-- Paseo tools are no longer injected into agents by default — opt in from Settings when you need agent-to-agent orchestration
-- Agent provider and mode are now resolved server-side, so CLI commands like `paseo run` use consistent defaults without client-side lookups
+- Clisbot tools are no longer injected into agents by default — opt in from Settings when you need agent-to-agent orchestration
+- Agent provider and mode are now resolved server-side, so CLI commands like `clisbot run` use consistent defaults without client-side lookups
 
 ### Fixed
 
@@ -2086,10 +2086,10 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Agents get Paseo tools automatically — every new agent gets access to terminals, schedules, worktrees, and other agents through MCP. Toggle it off in Settings under "Inject Paseo tools"
+- Agents get Clisbot tools automatically — every new agent gets access to terminals, schedules, worktrees, and other agents through MCP. Toggle it off in Settings under "Inject Clisbot tools"
 - Git pull — pull remote changes directly from the workspace header. Promoted to the primary action when your branch is behind origin
 - Child agent notifications — parent agents are automatically notified when a child agent finishes, errors, or needs permission approval
-- Agent reload — `paseo agent reload` restarts an agent's underlying process from the CLI
+- Agent reload — `clisbot agent reload` restarts an agent's underlying process from the CLI
 - Middle-click to close tabs on desktop
 - Keyboard shortcut to cycle themes
 
@@ -2098,7 +2098,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 - Unavailable git actions now explain why in a toast instead of being silently greyed out
 - Streaming markdown on mobile renders significantly faster
 - Sidebar, branch switcher, and agent panel no longer re-render unnecessarily — noticeable on large workspaces
-- Paseo tool calls in agent timelines show the Paseo logo and human-readable names
+- Clisbot tool calls in agent timelines show the Clisbot logo and human-readable names
 - Relay and pairing URLs are stripped from daemon logs
 
 ### Fixed
@@ -2149,7 +2149,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 ### Added
 
 - Context window meter — see how much of the context window your agent has used, with color thresholds at 70% and 90%. Works with Claude Code, Codex, and OpenCode
-- Open in editor — jump from any workspace straight into Cursor, VS Code, Zed, or your file manager. Paseo remembers your choice
+- Open in editor — jump from any workspace straight into Cursor, VS Code, Zed, or your file manager. Clisbot remembers your choice
 - Side-by-side diffs — toggle between unified and split-column diff views, with a whitespace visibility option
 - Spoken messages — when using voice mode, agent speech now appears as regular messages in the conversation instead of raw tool output
 - Plan actions — plan cards now show the actions your agent supports (e.g. "Implement", "Deny") instead of generic accept/reject buttons
@@ -2199,7 +2199,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- Desktop app now resolves the user's full login shell environment at startup, fixing tools like `codex`, `node`, `bun`, and `direnv` not being found when Paseo is launched from Finder or Dock. Terminals spawned by Paseo now inherit the same PATH and environment variables as a normal terminal session. Approach adapted from VS Code's battle-tested shell environment resolution
+- Desktop app now resolves the user's full login shell environment at startup, fixing tools like `codex`, `node`, `bun`, and `direnv` not being found when Clisbot is launched from Finder or Dock. Terminals spawned by Clisbot now inherit the same PATH and environment variables as a normal terminal session. Approach adapted from VS Code's battle-tested shell environment resolution
 - Input field on running agent screens now correctly receives keyboard focus
 - Mobile model selector alignment and sizing
 
@@ -2227,14 +2227,14 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 - Pi (pi.dev) agent provider — connect Pi as a new agent type with thinking levels and tool call support
 - Copilot agent provider re-enabled after ACP compatibility fixes
-- `paseo .` and `paseo <path>` open the desktop app with the given project, similar to `code .`
+- `clisbot .` and `clisbot <path>` open the desktop app with the given project, similar to `code .`
 - Provider-declared features system — providers can expose dynamic toggles and selects that the app renders automatically. First consumer: Codex fast mode
 - Codex plan mode — start agents in plan-only mode with a dedicated plan card UI for reviewing proposed changes before execution
 - OpenCode custom agents and slash commands — user-defined agents from opencode.json now appear in the mode picker, and slash commands accept optional arguments
-- Desktop Integrations settings — install the Paseo CLI and orchestration skills directly from the app without touching the terminal
+- Desktop Integrations settings — install the Clisbot CLI and orchestration skills directly from the app without touching the terminal
 - Daemon status dialog in desktop settings for quick health checks
 - Auto-restart daemon on version mismatch — the desktop app detects when the running daemon is outdated and restarts it automatically
-- Setup hint and paseo.sh link on the mobile welcome screen so new App Store users know what to do next
+- Setup hint and clisbot.com link on the mobile welcome screen so new App Store users know what to do next
 
 ### Improved
 
@@ -2335,7 +2335,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- **Terminal management from the CLI** — new `paseo terminal` command group lets you list, create, and interact with workspace terminals without leaving your terminal
+- **Terminal management from the CLI** — new `clisbot terminal` command group lets you list, create, and interact with workspace terminals without leaving your terminal
 - **Material file icons in the explorer** — the file explorer tree now shows language-specific icons (TypeScript, JSON, Markdown, etc.) so you can spot files at a glance
 
 ### Fixed
@@ -2394,8 +2394,8 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Added `paseo archive` as a top-level alias for `paseo agent archive`
-- Added the `PASEO_AGENT_ID` environment variable for Claude and Codex agents
+- Added `clisbot archive` as a top-level alias for `clisbot agent archive`
+- Added the `CLISBOT_AGENT_ID` environment variable for Claude and Codex agents
 - Added a redesigned command autocomplete with a detail card and dropdown styling
 - Linked Android download surfaces to the Google Play Store
 
@@ -2410,7 +2410,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Fixed
 
-- Fixed `paseo send --no-wait` not taking effect
+- Fixed `clisbot send --no-wait` not taking effect
 - Fixed stale abort results contaminating replacement turns after an interrupt
 - Fixed Claude interrupt handling and autonomous wake reliability
 - Fixed nested Claude Code session detection and provider availability checks
@@ -2533,7 +2533,7 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Improved
 
-- Improved desktop runtime behavior on Windows by suppressing console windows and defaulting app data to `~/.paseo`
+- Improved desktop runtime behavior on Windows by suppressing console windows and defaulting app data to `~/.clisbot`
 - Added a Discord link to the website navigation
 
 ### Fixed
@@ -2638,11 +2638,11 @@ _This release only fixes an Android issue — desktop users don't need to update
 
 ### Added
 
-- Update the Paseo desktop app and local daemon directly from Settings
+- Update the Clisbot desktop app and local daemon directly from Settings
 - Microphone and notification permission controls in Settings
 - Thinking/reasoning mode — agents can use extended thinking when the provider supports it
 - Autonomous run mode — let agents keep working without manual approval at each step
-- `paseo wait` now shows a snapshot of recent agent activity while you wait
+- `clisbot wait` now shows a snapshot of recent agent activity while you wait
 
 ### Improved
 

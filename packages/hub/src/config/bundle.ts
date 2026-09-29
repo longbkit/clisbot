@@ -91,7 +91,7 @@ export function compileHubBundle(
   if (Object.hasOwn(resource, "triggers")) {
     throw issue(
       [HUB_RESOURCE_PATH, "triggers"],
-      "Monolithic triggers are not accepted; move each trigger to .paseo/workflows/<workflow>.yml.",
+      "Monolithic triggers are not accepted; move each trigger to .clisbot/workflows/<workflow>.yml.",
     );
   }
   rejectResourceKeys(resource);
@@ -104,7 +104,7 @@ export function compileHubBundle(
   if (workflowFiles.length === 0 && options.requireWorkflow !== false) {
     throw issue(
       [WORKFLOW_DIRECTORY],
-      "at least one direct .paseo/workflows/<workflow>.yml document is required",
+      "at least one direct .clisbot/workflows/<workflow>.yml document is required",
     );
   }
   const triggers: unknown[] = [];
@@ -214,8 +214,8 @@ function validateBundlePath(path: string): void {
   ) {
     throw issue([path], "unsafe bundle path");
   }
-  if (path === ".paseo/hub.toml" || path.endsWith(".toml")) {
-    throw issue([path], "TOML is not accepted; use .paseo/hub.yml and workflow .yml files");
+  if (path === ".clisbot/hub.toml" || path.endsWith(".toml")) {
+    throw issue([path], "TOML is not accepted; use .clisbot/hub.yml and workflow .yml files");
   }
   if (path === HUB_RESOURCE_PATH) return;
   if (path.startsWith(`${WORKFLOW_PARTIAL_DIRECTORY}/`)) {
@@ -227,7 +227,7 @@ function validateBundlePath(path: string): void {
   if (path.startsWith(`${WORKFLOW_DIRECTORY}/`)) {
     const relative = path.slice(`${WORKFLOW_DIRECTORY}/`.length);
     if (relative.includes("/")) {
-      throw issue([path], "workflow YAML must be a direct child of .paseo/workflows/");
+      throw issue([path], "workflow YAML must be a direct child of .clisbot/workflows/");
     }
     if (relative.endsWith(".yaml")) {
       throw issue([path], "workflow files must use the .yml extension");
@@ -389,7 +389,7 @@ function resolvePartials(
   }
   for (const path of requested.toSorted()) {
     if (!path.startsWith(`${WORKFLOW_PARTIAL_DIRECTORY}/`)) {
-      throw issue([path], "prompt includes must resolve under .paseo/workflows/partials/");
+      throw issue([path], "prompt includes must resolve under .clisbot/workflows/partials/");
     }
     const file = files.get(path);
     if (file === undefined) throw issue([path], "prompt partial is missing from the bundle");

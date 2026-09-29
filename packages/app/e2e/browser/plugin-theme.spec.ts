@@ -52,11 +52,11 @@ const LATTE_MUTED_FOREGROUND = "rgb(108, 111, 133)";
 test("applies a contributed theme and falls back when its plugin is gone", async ({
   page,
 }, testInfo) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-theme-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-theme-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.ts"), PLUGIN_SOURCE);
@@ -158,11 +158,11 @@ async function scrollThemeMenuToLastTheme(page: Page) {
 test("scrolls to the last theme when a plugin contributes more themes than fit", async ({
   page,
 }, testInfo) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-theme-many-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-theme-many-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: MANY_THEMES_PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.ts"), MANY_THEMES_SOURCE);

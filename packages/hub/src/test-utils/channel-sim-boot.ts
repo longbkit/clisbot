@@ -1,7 +1,7 @@
 // Boots the real channel supervisor against simulated platforms.
 //
 // Everything is real except the two things a test cannot own: the chat platform
-// (a `@getpaseo/channels-shared/sim` loopback server) and the daemon (a
+// (a `@clisbot/channels-shared/sim` loopback server) and the daemon (a
 // `FakeDaemon`). The database, the config revision, the in-repo package,
 // loader, the verticals' built `dist/`, the ingress queue and the plane are the
 // production objects.
@@ -19,7 +19,7 @@ import {
   startTelegramSim,
   type SimSlack,
   type SimTelegram,
-} from "@getpaseo/channels-shared/sim";
+} from "@clisbot/channels-shared/sim";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { createDatabase } from "../db/pg.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "../db/runtime/index.js";
@@ -213,11 +213,11 @@ export async function startChannelSimBoot(
   await database.saveChannelConfiguration({
     organizationId: SIM_ORG_ID,
     files: [
-      { path: ".paseo/hub.yml", content: HUB_YAML },
-      { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
-      { path: `.paseo/channels/slack/${SIM_ACCOUNT_ID}.yml`, content: slackAccountYaml(options) },
+      { path: ".clisbot/hub.yml", content: HUB_YAML },
+      { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
+      { path: `.clisbot/channels/slack/${SIM_ACCOUNT_ID}.yml`, content: slackAccountYaml(options) },
       {
-        path: `.paseo/channels/telegram/${SIM_ACCOUNT_ID}.yml`,
+        path: `.clisbot/channels/telegram/${SIM_ACCOUNT_ID}.yml`,
         content: telegramAccountYaml(telegram.apiRoot, options),
       },
     ],
@@ -226,8 +226,8 @@ export async function startChannelSimBoot(
   });
 
   const env = { ...process.env } as NodeJS.ProcessEnv;
-  delete env["PASEO_PASSWORD"];
-  env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+  delete env["CLISBOT_PASSWORD"];
+  env["CLISBOT_HUB_CHANNELS_ENABLED"] = "1";
 
   const supervisorOptions: ChannelSupervisorOptions = {
     database,

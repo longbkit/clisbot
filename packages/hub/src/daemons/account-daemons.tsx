@@ -41,7 +41,7 @@ const DAEMON_COLUMNS: readonly DataColumn[] = [
 ];
 const DAEMONS_EMPTY = {
   title: "No daemons registered",
-  description: "Run paseo hub connect with this Hub URL to register one.",
+  description: "Run clisbot hub connect with this Hub URL to register one.",
 };
 
 export function DaemonsPanel({

@@ -318,7 +318,7 @@
     },
     {
       "upstream": "extensions/zalouser/index.ts",
-      "reason": "The OpenClaw bundled-channel entry (`defineBundledChannelEntry`) plus `registerFull(api)`, which registers the `zalouser` agent tool on the plugin host. Fusion's equivalents are `src/entry.ts` over `@getpaseo/channels-shared` `createChannelEntry` and `src/fusion/tools.ts` (D-ZU-017)."
+      "reason": "The OpenClaw bundled-channel entry (`defineBundledChannelEntry`) plus `registerFull(api)`, which registers the `zalouser` agent tool on the plugin host. Fusion's equivalents are `src/entry.ts` over `@clisbot/channels-shared` `createChannelEntry` and `src/fusion/tools.ts` (D-ZU-017)."
     },
     {
       "upstream": "extensions/zalouser/api.ts",
@@ -357,7 +357,7 @@
     {
       "id": "D-ZU-001",
       "file": "src/runtime-api.ts",
-      "reason": "`runtime-api.ts` \u2014 upstream's file is the plugin's OpenClaw host binding: ~40 re-exports of `openclaw/plugin-sdk/*` (the setup wizard, the pairing controller, the reply pipeline, the config contracts, the plugin runtime setter) so a bundled plugin can be loaded without importing `openclaw`. Fusion has no OpenClaw host; the members this vertical's closure reads come from `@getpaseo/channels-core`, which mirrors the same upstream source modules. Kept at the same name and job so the ported files keep upstream's import block; the Hub-owned members (setup, pairing, reply delivery, doctor) are dropped rather than re-implemented."
+      "reason": "`runtime-api.ts` \u2014 upstream's file is the plugin's OpenClaw host binding: ~40 re-exports of `openclaw/plugin-sdk/*` (the setup wizard, the pairing controller, the reply pipeline, the config contracts, the plugin runtime setter) so a bundled plugin can be loaded without importing `openclaw`. Fusion has no OpenClaw host; the members this vertical's closure reads come from `@clisbot/channels-core`, which mirrors the same upstream source modules. Kept at the same name and job so the ported files keep upstream's import block; the Hub-owned members (setup, pairing, reply delivery, doctor) are dropped rather than re-implemented."
     },
     {
       "id": "D-ZU-002",
@@ -399,7 +399,7 @@
     {
       "id": "D-ZU-008",
       "file": "src/fusion/with-timeout.ts",
-      "reason": "`withTimeout` \u2014 upstream reads it from `plugin-sdk/security-runtime`, which re-exports it from the `@openclaw/fs-safe` workspace package. Fusion never depends on an OpenClaw workspace package, and `@getpaseo/channels-core`'s `security-runtime` boundary deliberately stops at the secret-compare and external-content members (D-CORE-244). The two ported call sites (restoring a session, and the session health check) need one behaviour \u2014 reject with a named message when the promise outruns its budget \u2014 so the boundary keeps that call shape. NOT carried: cancelling the underlying work, which upstream does not do here either (`zca-js` exposes no abort for a login).",
+      "reason": "`withTimeout` \u2014 upstream reads it from `plugin-sdk/security-runtime`, which re-exports it from the `@openclaw/fs-safe` workspace package. Fusion never depends on an OpenClaw workspace package, and `@clisbot/channels-core`'s `security-runtime` boundary deliberately stops at the secret-compare and external-content members (D-CORE-244). The two ported call sites (restoring a session, and the session health check) need one behaviour \u2014 reject with a named message when the promise outruns its budget \u2014 so the boundary keeps that call shape. NOT carried: cancelling the underlying work, which upstream does not do here either (`zca-js` exposes no abort for a login).",
       "tests": ["src/zalo-js.credentials.test.ts"]
     },
     {
@@ -475,24 +475,24 @@
     {
       "id": "D-ZU-021",
       "file": "src/runtime-api.ts",
-      "reason": "`OpenClawPluginToolContext` \u2014 `@getpaseo/channels-core` carries the tool context as a host adapter that narrows away upstream's two runtime-config readers (`runtimeConfig`, `getRuntimeConfig`). The ported `tool.ts` prefers them over `config` so a media ceiling changed mid-session is honoured, so the barrel restores upstream's spelling by intersection rather than editing the ported file."
+      "reason": "`OpenClawPluginToolContext` \u2014 `@clisbot/channels-core` carries the tool context as a host adapter that narrows away upstream's two runtime-config readers (`runtimeConfig`, `getRuntimeConfig`). The ported `tool.ts` prefers them over `config` so a media ceiling changed mid-session is honoured, so the barrel restores upstream's spelling by intersection rather than editing the ported file."
     },
     {
       "id": "D-ZU-022",
       "file": "src/fusion/media-limits.ts",
-      "reason": "`resolveChannelMediaMaxBytes` \u2014 upstream's barrel `plugin-sdk/account-helpers` re-exports it, and `@getpaseo/channels-core` deliberately omits that member (D-CORE-303, \"the Hub owns media ceilings\"). The ported `accounts.ts` and `tool.ts` still need the ACCOUNT-level ceiling, which is channel config and not a Hub policy, so upstream's `src/channels/plugins/media-limits.ts` is carried here with its body and call shape. The one line that changes is `normalizeAccountId`, which upstream imports from its session-key module; the boundary inlines the trim-or-`default` it performs.",
+      "reason": "`resolveChannelMediaMaxBytes` \u2014 upstream's barrel `plugin-sdk/account-helpers` re-exports it, and `@clisbot/channels-core` deliberately omits that member (D-CORE-303, \"the Hub owns media ceilings\"). The ported `accounts.ts` and `tool.ts` still need the ACCOUNT-level ceiling, which is channel config and not a Hub policy, so upstream's `src/channels/plugins/media-limits.ts` is carried here with its body and call shape. The one line that changes is `normalizeAccountId`, which upstream imports from its session-key module; the boundary inlines the trim-or-`default` it performs.",
       "tests": ["src/zalo-quote-metadata.test.ts"]
     },
     {
       "id": "D-ZU-023",
       "file": "src/probe.ts",
-      "reason": "One ported test expectation moves with the core probe boundary: `@getpaseo/channels-core` carries `runChannelProbe` with its own rejection text (`timed out after Nms`) where upstream's is a bare `timeout`. The invariant the case exists for \u2014 the probe fails instead of hanging, and reports an elapsed time \u2014 is asserted unchanged.",
+      "reason": "One ported test expectation moves with the core probe boundary: `@clisbot/channels-core` carries `runChannelProbe` with its own rejection text (`timed out after Nms`) where upstream's is a bare `timeout`. The invariant the case exists for \u2014 the probe fails instead of hanging, and reports an elapsed time \u2014 is asserted unchanged.",
       "tests": ["src/probe.test.ts"]
     },
     {
       "id": "D-ZU-024",
       "file": "src/send.ts",
-      "reason": "One ported test expectation moves with the core outbound-media boundary: `@getpaseo/channels-core`'s `loadOutboundMediaFromUrl` refuses an oversized file with `\u2026 is N bytes, over the M byte limit` where upstream's message is `exceeds limit`. The invariant the case exists for \u2014 the account media cap is applied BEFORE the native send, so nothing is posted \u2014 is asserted unchanged.",
+      "reason": "One ported test expectation moves with the core outbound-media boundary: `@clisbot/channels-core`'s `loadOutboundMediaFromUrl` refuses an oversized file with `\u2026 is N bytes, over the M byte limit` where upstream's message is `exceeds limit`. The invariant the case exists for \u2014 the account media cap is applied BEFORE the native send, so nothing is posted \u2014 is asserted unchanged.",
       "tests": ["src/zalo-quote-metadata.test.ts"]
     }
   ]

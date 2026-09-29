@@ -21,7 +21,7 @@ import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { SLACK_MAX_MEDIA_BYTES } from "@getpaseo/channels-shared";
+import { SLACK_MAX_MEDIA_BYTES } from "@clisbot/channels-shared";
 import { createMemoryDatabase } from "../db/memory.js";
 import type { ChannelReplyMcp } from "./channel-reply.js";
 import type { ChannelReplyOutputBudget } from "./channel-reply-capabilities.js";
@@ -608,7 +608,7 @@ describe("channel-reply MCP endpoint", () => {
   it("interoperates with the official MCP client", async () => {
     const fixture = makeFixture();
     const endpoint = await serve(fixture);
-    const client = new Client({ name: "paseo-hub-channel-reply-test", version: "1.0.0" });
+    const client = new Client({ name: "clisbot-hub-channel-reply-test", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL(endpoint.url));
     try {
       // The SDK's getter is typed `string | undefined` while its Transport
@@ -850,7 +850,7 @@ describe("channel message actions", () => {
               type: "buttons",
               buttons: [
                 { label: "Start over", action: { type: "command", command: "/new" } },
-                { label: "Docs", action: { type: "url", url: "https://paseo.sh" } },
+                { label: "Docs", action: { type: "url", url: "https://clisbot.com" } },
               ],
             },
           ],
@@ -863,7 +863,7 @@ describe("channel message actions", () => {
     const token = /\/cb-[0-9a-f]+/u.exec(posted)?.[0];
     assert.ok(token, posted);
     // The url button is untouched: only a command carries authority.
-    assert.match(posted, /https:\/\/paseo\.sh/u);
+    assert.match(posted, /https:\/\/clisbot\.com/u);
 
     const click = {
       organizationId: "org-1",
@@ -1534,12 +1534,12 @@ async function outputBudgetFixture() {
 // declare native rendering, and the Hub's post seam carried text only. These
 // cases drive the whole tool path against the REAL built Slack vertical with a
 // fake Web API, so the blocks asserted are the ones Slack would receive.
-import { slackPlugin } from "@getpaseo/channels-slack/dist/plugin.js";
+import { slackPlugin } from "@clisbot/channels-slack/dist/plugin.js";
 import {
   registerSlackWriteClientForTest,
   slackWebClientStubForTest,
   type WebClient,
-} from "@getpaseo/channels-slack/dist/client/web-api.js";
+} from "@clisbot/channels-slack/dist/client/web-api.js";
 
 const SLACK_PRESENTATION_TOKEN = "xoxb-channel-reply-presentation";
 const SLACK_PRESENTATION_CFG = {

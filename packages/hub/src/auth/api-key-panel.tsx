@@ -100,7 +100,7 @@ const EMPTY_TABLE = {
 };
 const EMPTY_CLI_TABLE = {
   title: "No CLI logins",
-  description: "Run paseo hub login to create one.",
+  description: "Run clisbot hub login to create one.",
 };
 const CLI_COLUMNS = [
   { header: "Prefix" },
@@ -227,7 +227,7 @@ export function ApiKeys() {
     <>
       <PageHeader title="API keys" description={`Machine access for ${account.organization.name}.`}>
         <Button asChild variant="outline">
-          <a href="https://paseo.sh/docs/hub/api">API reference</a>
+          <a href="https://clisbot.com/docs/hub/api">API reference</a>
         </Button>
         {account.capabilities.manageResources ? (
           <Button type="button" onClick={openCreate}>

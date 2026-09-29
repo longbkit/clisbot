@@ -1,9 +1,9 @@
 // upstream: extensions/zalouser/src/probe.ts@5d8067a4483
 // Zalouser plugin module implements probe behavior.
-import type { BaseProbeResult } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { runChannelProbe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import type { BaseProbeResult } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { runChannelProbe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import type { ZcaUserInfo } from "./types.js";
 import { getZaloUserInfo } from "./zalo-js.js";
 

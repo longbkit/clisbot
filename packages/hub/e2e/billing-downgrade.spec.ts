@@ -13,7 +13,7 @@ import { test } from "./app.js";
 // webhook is HMAC-signed with a known secret so signature verification is real.
 
 const DIR = "e2e/screenshots/slice-7";
-const PLAN = "Paseo Hub";
+const PLAN = "Clisbot Hub";
 
 test.use({ billing: true });
 

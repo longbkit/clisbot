@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
-const LOCK_FILE_NAME = ".paseo-hub.lock";
+const LOCK_FILE_NAME = ".clisbot-hub.lock";
 const OWNER_READ_ATTEMPTS = 10;
 const OWNER_READ_DELAY_MS = 10;
 
@@ -36,7 +36,7 @@ export async function acquireDataDirectoryLock(dataDirectory: string): Promise<D
     const existingOwner = await readLockOwner(path);
     if (existingOwner !== undefined && processIsRunning(existingOwner.pid)) {
       throw new Error(
-        `Embedded database directory is already in use by another Paseo Hub process (PID ${existingOwner.pid}): ${dataDirectory}. Embedded mode supports one process per data directory.`,
+        `Embedded database directory is already in use by another Clisbot Hub process (PID ${existingOwner.pid}): ${dataDirectory}. Embedded mode supports one process per data directory.`,
       );
     }
 

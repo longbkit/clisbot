@@ -18,7 +18,7 @@
 import {
   clearSubsystemLoggerSink,
   registerSubsystemLoggerSink,
-} from "@getpaseo/channels-core/logging/subsystem";
+} from "@clisbot/channels-core/logging/subsystem";
 import type { HostChildLogger } from "./host.js";
 
 export interface ChannelSubsystemLogSink {

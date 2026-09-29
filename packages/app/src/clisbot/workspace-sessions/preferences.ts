@@ -6,7 +6,7 @@ import { z } from "zod";
  * Pure on purpose, like `display-preferences/checks-display.ts`: `hooks/use-settings/storage.ts`
  * validates the persisted value through `SidebarWorkspaceSessionsSchema` rather than growing its
  * own copy of the shape. `visible: false` is the whole feature switched off — the sidebar renders
- * exactly as upstream Paseo does. The fusion ships it on.
+ * exactly as upstream Clisbot does. The fusion ships it on.
  */
 
 export const SIDEBAR_WORKSPACE_SESSION_EXPANSIONS = [

@@ -7,7 +7,7 @@ test("sidebar pins the local desktop daemon host first", async ({ page }) => {
   const serverId = getServerId();
 
   await page.addInitScript((localServerId) => {
-    (window as unknown as { paseoDesktop: unknown }).paseoDesktop = {
+    (window as unknown as { clisbotDesktop: unknown }).clisbotDesktop = {
       platform: "darwin",
       invoke: async (command: string) => {
         if (command === "desktop_daemon_status") {

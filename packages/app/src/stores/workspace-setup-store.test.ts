@@ -217,7 +217,7 @@ describe("workspace-setup-store", () => {
           log: "",
           commands: [],
         },
-        error: "Failed to parse paseo.json",
+        error: "Failed to parse clisbot.json",
         updatedAt: Date.now(),
       }),
     ).toBe(true);

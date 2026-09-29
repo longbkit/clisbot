@@ -25,7 +25,7 @@
 // include message_thread_id"). Dropping it for General would silently type into
 // the wrong place.
 
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { installTelegramRuntime } from "./fusion/runtime.js";
 import { getHostRuntime } from "./runtime-store.js";
 import { withTelegramAccount } from "./runtime.js";

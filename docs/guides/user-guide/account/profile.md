@@ -4,7 +4,7 @@
 
 ## Đổi tên và ảnh
 
-1. Mở Paseo web app, vào **Settings → Account**.
+1. Mở Clisbot web app, vào **Settings → Account**.
 2. Ở mục **Profile**, bấm **Edit**.
 3. Sửa **Display name** (1–100 ký tự).
 4. Dán **Profile image link**, hoặc để trống để bỏ ảnh.
@@ -12,7 +12,7 @@
 
 Tên và ảnh hiện ở tài khoản Hub, danh sách thành viên và người thao tác trong session. Ảnh không tải được thì app hiện chữ viết tắt của tên.
 
-Hiện chỉ sửa được trên Paseo web app mở cùng địa chỉ với Hub. App native và desktop chưa có mục này.
+Hiện chỉ sửa được trên Clisbot web app mở cùng địa chỉ với Hub. App native và desktop chưa có mục này.
 
 ## Link ảnh được chấp nhận
 

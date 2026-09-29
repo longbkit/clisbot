@@ -122,22 +122,22 @@ export function createDevEnvironment(base, paths, hubOrigin, envFile = {}) {
     BROWSER: "none",
     CLISBOT_HUB_ORIGIN: hubOrigin,
     // The app's Hosts screen shows this checkout's CLI against the dev home, not an installed
-    // `paseo`, so a copied command enrolls the dev daemon.
-    EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND: `PASEO_HOME=${paths.devHome} npm run cli --`,
+    // `clisbot`, so a copied command enrolls the dev daemon.
+    EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND: `CLISBOT_HOME=${paths.devHome} npm run cli --`,
     EXPO_PORT: String(APP_PORT),
     EXPO_PUBLIC_LOCAL_DAEMON: `localhost:${DAEMON_PORT}`,
-    PASEO_CORS_ORIGINS: "*",
-    PASEO_DEV_MANAGED_HOME: "1",
-    PASEO_HOME: paths.devHome,
-    PASEO_HUB_APP_URL: hubOrigin,
-    // Channel session links offer a web destination beside the `paseo://` deep
+    CLISBOT_CORS_ORIGINS: "*",
+    CLISBOT_DEV_MANAGED_HOME: "1",
+    CLISBOT_HOME: paths.devHome,
+    CLISBOT_HUB_APP_URL: hubOrigin,
+    // Channel session links offer a web destination beside the `clisbot://` deep
     // link; in dev the Hub origin is also where the web app is served.
-    PASEO_HUB_APP_WEB_URL: hubOrigin,
-    PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: paths.credentialKeyFile,
-    PASEO_HUB_DATA_DIR: paths.hubDataDirectory,
-    PASEO_LISTEN: `127.0.0.1:${DAEMON_PORT}`,
-    PASEO_RELAY_ENABLED: "true",
-    PASEO_SKIP_DEV_SERVER_BUILD: "1",
+    CLISBOT_HUB_APP_WEB_URL: hubOrigin,
+    CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: paths.credentialKeyFile,
+    CLISBOT_HUB_DATA_DIR: paths.hubDataDirectory,
+    CLISBOT_LISTEN: `127.0.0.1:${DAEMON_PORT}`,
+    CLISBOT_RELAY_ENABLED: "true",
+    CLISBOT_SKIP_DEV_SERVER_BUILD: "1",
   };
 
   // The combined dev command always owns an isolated embedded Hub database and
@@ -145,13 +145,13 @@ export function createDevEnvironment(base, paths, hubOrigin, envFile = {}) {
   delete environment["CLISBOT_HUB_DATABASE_URL"];
   delete environment["CLISBOT_HUB_CREDENTIAL_MASTER_KEY"];
   delete environment["DATABASE_URL"];
-  delete environment["PASEO_HUB_AUTH_SECRET"];
-  delete environment["PASEO_HUB_CREDENTIAL_MASTER_KEY"];
+  delete environment["CLISBOT_HUB_AUTH_SECRET"];
+  delete environment["CLISBOT_HUB_CREDENTIAL_MASTER_KEY"];
   return environment;
 }
 
 export async function clearZombiePidLock(devHome, procRoot = "/proc") {
-  const pidPath = join(devHome, "paseo.pid");
+  const pidPath = join(devHome, "clisbot.pid");
   let lock;
   try {
     lock = JSON.parse(await readFile(pidPath, "utf8"));
@@ -339,8 +339,8 @@ async function main() {
       "--names",
       "daemon,hub,app",
       "npm run dev:server:raw",
-      `npm run dev --workspace=@getpaseo/hub -- --host 127.0.0.1 --port ${HUB_PORT} --strictPort`,
-      `npm run web:expo --workspace=@getpaseo/app -- --port ${APP_PORT} --max-workers 1`,
+      `npm run dev --workspace=@clisbot/hub -- --host 127.0.0.1 --port ${HUB_PORT} --strictPort`,
+      `npm run web:expo --workspace=@clisbot/app -- --port ${APP_PORT} --max-workers 1`,
     ],
     { cwd: ROOT_DIRECTORY, env: environment, stdio: "inherit" },
   );

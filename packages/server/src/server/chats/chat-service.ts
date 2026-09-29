@@ -3,8 +3,8 @@
 // (docs/features/bots-and-chats/plans/server-chat.md). Only built when
 // `daemon.bots.enabled` is on; off, nothing here is constructed.
 import type { Logger } from "pino";
-import type { ChatPayload, ChatRules } from "@getpaseo/protocol/chats/types";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { ChatPayload, ChatRules } from "@clisbot/protocol/chats/types";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import type { AgentManager } from "../agent/agent-manager.js";
 import { sendPromptToAgent } from "../agent/agent-prompt.js";
@@ -28,7 +28,7 @@ import {
 } from "./transcript-log.js";
 
 export interface ChatServiceOptions {
-  /** `$PASEO_HOME/chats`; created on the first chat, never at start. */
+  /** `$CLISBOT_HOME/chats`; created on the first chat, never at start. */
   rootDir: string;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
@@ -53,7 +53,7 @@ export interface CreateChatServiceInput {
 export interface ChatService {
   update(
     chatId: string,
-    patch: import("@getpaseo/protocol/chats/rpc-schemas").ChatUpdatePatch,
+    patch: import("@clisbot/protocol/chats/rpc-schemas").ChatUpdatePatch,
   ): Promise<ChatPayload>;
   record(chatId: string): import("./chat-record.js").StoredChat | null;
   subscribe(

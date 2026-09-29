@@ -8,7 +8,7 @@
  * which database is underneath. Every call is pinned to one organization —
  * the account's — so a channel can never claim another tenant's backlog.
  */
-import type { InboundQueueSink } from "@getpaseo/channels-shared";
+import type { InboundQueueSink } from "@clisbot/channels-shared";
 import type { ChannelStore } from "../../db/channels.js";
 import { CHANNEL_INGRESS_MAX_AGE_MS } from "./budget.js";
 import type {

@@ -74,7 +74,7 @@ class BrowserHubTransport implements HubTransport {
   private assertSameOrigin(): void {
     if (window.location.origin !== this.origin) {
       throw new Error(
-        "Browser Hub access requires the Paseo client to be served from the Hub origin.",
+        "Browser Hub access requires the Clisbot client to be served from the Hub origin.",
       );
     }
   }

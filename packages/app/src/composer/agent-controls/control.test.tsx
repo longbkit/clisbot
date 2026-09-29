@@ -50,11 +50,11 @@ describe("AgentControlTrigger", () => {
         iconColor="#3e704a"
         onPress={noop}
         accessibilityRole="switch"
-        accessibilityLabel="Paseo auto-accepts permission prompts (On)"
+        accessibilityLabel="Clisbot auto-accepts permission prompts (On)"
       />,
     );
     const trigger = view.getByRole("switch", {
-      name: "Paseo auto-accepts permission prompts (On)",
+      name: "Clisbot auto-accepts permission prompts (On)",
     });
 
     expect(trigger.getAttribute("role")).toBe("switch");

@@ -34,7 +34,7 @@ import {
   SiteHeaderActionsProvider,
   SiteHeaderActionsTarget,
 } from "../components/app/site-header-actions.js";
-import { PaseoGlyph } from "../components/app/auth-layout.js";
+import { ClisbotGlyph } from "../components/app/auth-layout.js";
 import { Button } from "../components/ui/button.js";
 import {
   Dialog,
@@ -633,7 +633,7 @@ function OrganizationSwitcher({
               className="data-[state=open]:bg-sidebar-accent"
             >
               <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <PaseoGlyph />
+                <ClisbotGlyph />
               </span>
               <span className="grid flex-1 text-left leading-tight">
                 <span className="truncate text-sm">{currentOrganization.name}</span>

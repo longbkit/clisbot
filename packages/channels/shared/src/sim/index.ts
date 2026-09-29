@@ -1,7 +1,7 @@
 // Simulated chat platforms for tests that need the real SDK on one side.
 //
-// Import as `@getpaseo/channels-shared/sim`; the subpath keeps `ws` out of the
-// import graph of every production consumer of `@getpaseo/channels-shared`.
+// Import as `@clisbot/channels-shared/sim`; the subpath keeps `ws` out of the
+// import graph of every production consumer of `@clisbot/channels-shared`.
 //
 // See docs/testing.md "Channel platform" for when a sim is the right tier and
 // when only a live run counts.

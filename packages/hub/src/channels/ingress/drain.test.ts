@@ -1,8 +1,8 @@
-import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
+import { createDeferredCore } from "@clisbot/channels-core/shared/deferred";
 // Targeted tests for the durable ingress drain on its production path: the
 // real `ChannelStore` over a migrated embedded (PGlite) database, the real
 // queue-sink adapter, and the retry policy ported verbatim from OpenClaw
-// (`@getpaseo/channels-core/channels/message/ingress-retry-policy`). Nothing
+// (`@clisbot/channels-core/channels/message/ingress-retry-policy`). Nothing
 // here fakes the queue — a fake would prove the loop and not the claim lease,
 // the lane lock or the fencing token, which are the parts a restart depends on.
 import assert from "node:assert/strict";
@@ -10,7 +10,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import type { InboundLedgerSink, InboundQueueSink } from "@getpaseo/channels-shared";
+import type { InboundLedgerSink, InboundQueueSink } from "@clisbot/channels-shared";
 import { ChannelDeliveryRecordNotFoundError, ChannelStore } from "../../db/channels.js";
 import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import { embeddedDatabaseRuntime } from "../../db/runtime/index.js";

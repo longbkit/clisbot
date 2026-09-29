@@ -3,7 +3,7 @@
 import {
   asOptionalRecord,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   renderSlackDataTableFallbackText,
   renderSlackDataTableMrkdwnFallbackText,

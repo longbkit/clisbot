@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
-import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { MutableDaemonConfig } from "@clisbot/protocol/messages";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { daemonConfigQueryKey } from "@/data/daemon-config";
 import { getHostRuntimeStore, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import type { HubDaemonsSchema } from "../contracts";

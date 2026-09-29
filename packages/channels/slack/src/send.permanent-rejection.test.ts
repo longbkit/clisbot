@@ -1,5 +1,5 @@
 // upstream: extensions/slack/src/send.permanent-rejection.test.ts@5d8067a4483
-import { PlatformMessageNotDispatchedError } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { PlatformMessageNotDispatchedError } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { createSlackSendTestClient } from "./blocks.test-helpers.js";
 import { rethrowSlackPermanentOutboundApiRejection } from "./client-delivery.js";

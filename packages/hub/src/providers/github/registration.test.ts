@@ -120,19 +120,19 @@ describe("GitHub registration", () => {
         installationId: 42,
         repositoryId: 9001,
         commitSha: "valid-sha",
-        path: ".paseo/hub.yml",
+        path: ".clisbot/hub.yml",
       },
       {
         installationId: 42,
         repositoryId: 9001,
         commitSha: "valid-sha",
-        path: ".paseo/workflows/noop.yml",
+        path: ".clisbot/workflows/noop.yml",
       },
       {
         installationId: 42,
         repositoryId: 9001,
         commitSha: "invalid-sha",
-        path: ".paseo/hub.yml",
+        path: ".clisbot/hub.yml",
       },
     ]);
     assert.equal(
@@ -166,7 +166,7 @@ describe("GitHub registration", () => {
       publicBaseUrl: "https://hub.test",
       configuration: {
         appId: "42",
-        appSlug: "paseo",
+        appSlug: "clisbot",
         clientId: "client",
         clientSecret: "secret",
         webhookSecret: "webhook-secret",
@@ -181,7 +181,7 @@ describe("GitHub registration", () => {
             token: "scoped-token",
             expiresAt: Date.now() + 3_600_000,
           }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "clisbot[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -282,7 +282,7 @@ describe("GitHub registration", () => {
             token: "scoped-token",
             expiresAt: Date.now() + 3_600_000,
           }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "clisbot[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -352,7 +352,7 @@ describe("GitHub registration", () => {
           identityLookups += 1;
           identityTokens.push(token);
           if (identityFailure !== undefined) return Promise.reject(identityFailure);
-          return Promise.resolve({ id: 123, login: "paseo[bot]" });
+          return Promise.resolve({ id: 123, login: "clisbot[bot]" });
         },
         revokeInstallationToken: (token) => {
           revoked.push(token);
@@ -372,14 +372,14 @@ describe("GitHub registration", () => {
     const minted = await authority.mint({
       organizationId: "org_1",
       connectionSlug: "getpaseo-github",
-      repositories: ["getpaseo/paseo", "getpaseo/hub"],
+      repositories: ["longbkit/clisbot", "getpaseo/hub"],
       permissions: { contents: "write", pull_requests: "read" },
     });
     assert.deepEqual(requests, [
       {
         installationId: 142,
         accountLogin: "getpaseo",
-        repositories: ["getpaseo/paseo", "getpaseo/hub"],
+        repositories: ["longbkit/clisbot", "getpaseo/hub"],
         permissions: { contents: "write", pull_requests: "read" },
       },
     ]);
@@ -387,7 +387,7 @@ describe("GitHub registration", () => {
       token: "scoped-token",
       expiresAt: minted.expiresAt,
       botUserId: 123,
-      botLogin: "paseo[bot]",
+      botLogin: "clisbot[bot]",
     });
     assert.equal(identityLookups, 1);
     assert.deepEqual(identityTokens, ["scoped-token"]);
@@ -397,7 +397,7 @@ describe("GitHub registration", () => {
         authority.mint({
           organizationId: "org_1",
           connectionSlug: "getpaseo-github",
-          repositories: ["other-owner/paseo"],
+          repositories: ["other-owner/clisbot"],
           permissions: { contents: "read" },
         }),
       /repository owner.*other-owner.*getpaseo/iu,
@@ -408,13 +408,13 @@ describe("GitHub registration", () => {
     const caseInsensitive = await authority.mint({
       organizationId: "org_1",
       connectionSlug: "getpaseo-github",
-      repositories: ["GETPASEO/private"],
+      repositories: ["GETCLISBOT/private"],
       permissions: { contents: "read" },
     });
     assert.deepEqual(requests[1], {
       installationId: 142,
       accountLogin: "getpaseo",
-      repositories: ["GETPASEO/private"],
+      repositories: ["GETCLISBOT/private"],
       permissions: { contents: "read" },
     });
 
@@ -439,7 +439,7 @@ describe("GitHub registration", () => {
         authority.mint({
           organizationId: "org_2",
           connectionSlug: "getpaseo-github",
-          repositories: ["getpaseo/paseo"],
+          repositories: ["longbkit/clisbot"],
           permissions: { contents: "read" },
         }),
       /connection is unavailable/u,
@@ -523,7 +523,7 @@ describe("GitHub registration", () => {
       publicBaseUrl: "https://hub.test",
       configuration: {
         appId: "42",
-        appSlug: "paseo",
+        appSlug: "clisbot",
         clientId: "client",
         clientSecret: "secret",
         webhookSecret: "webhook-secret",
@@ -538,7 +538,7 @@ describe("GitHub registration", () => {
             token: "scoped-token",
             expiresAt: Date.now() + 3_600_000,
           }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "clisbot[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -596,7 +596,7 @@ class RegistrationConfigurationFake implements GitHubConfigurationProvider {
         })),
       );
     } catch {
-      return Promise.resolve([{ path: ".paseo/hub.yml", kind: "file" as const }]);
+      return Promise.resolve([{ path: ".clisbot/hub.yml", kind: "file" as const }]);
     }
   }
   readFileAtCommit(input: { repositoryId: number; commitSha: string; path: string }) {
@@ -609,7 +609,7 @@ class RegistrationConfigurationFake implements GitHubConfigurationProvider {
           ({ path }) => path === input.path,
         )?.content;
       } catch {
-        content = input.path === ".paseo/hub.yml" ? rawYaml : undefined;
+        content = input.path === ".clisbot/hub.yml" ? rawYaml : undefined;
       }
     }
     return Promise.resolve(content === undefined ? undefined : { kind: "file" as const, content });
@@ -700,7 +700,7 @@ class RegistrationAuth implements AuthServer {
 function githubConfiguration() {
   return {
     appId: "42",
-    appSlug: "paseo",
+    appSlug: "clisbot",
     clientId: "client",
     clientSecret: "secret",
     webhookSecret: "webhook-secret",
@@ -734,7 +734,7 @@ function githubAuth() {
         token: "scoped-token",
         expiresAt: Date.now() + 3_600_000,
       }),
-    getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+    getAppBotIdentity: () => Promise.resolve({ id: 123, login: "clisbot[bot]" }),
     revokeInstallationToken: () => Promise.resolve(),
     createInstallationOctokit: () => Promise.reject(new Error("unused")),
   };

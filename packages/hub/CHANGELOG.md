@@ -17,12 +17,12 @@
 
 ### Added
 
-- A post-app onboarding step that gives operators the exact `paseo hub login` command, watches for their daemon to connect, and lands them in the Default project.
+- A post-app onboarding step that gives operators the exact `clisbot hub login` command, watches for their daemon to connect, and lands them in the Default project.
 - An authenticated setup-resources API for guided clients to discover usable GitHub repositories, Slack workspaces, and Discord servers.
 
 ### Changed
 
-- Textual triggers now preserve the complete message as `${{ paseo.prompt }}` while exposing parsed typed inputs separately.
+- Textual triggers now preserve the complete message as `${{ clisbot.prompt }}` while exposing parsed typed inputs separately.
 - Startup logs print the complete browser URL for the running Hub.
 
 ### Fixed
@@ -54,11 +54,11 @@
 - A zero-configuration local start with an embedded PGlite database, generated durable authentication secret, and first-run operator account setup.
 - Browser-guided GitHub, Slack, and Discord app onboarding.
 - Slack Socket Mode for local bots that do not have a public URL.
-- A published `@getpaseo/hub` package that runs with `npx @getpaseo/hub`.
+- A published `@clisbot/hub` package that runs with `npx @clisbot/hub`.
 
 ### Changed
 
-- Embedded Hub data now lives under `$XDG_DATA_HOME/paseo-hub`, falling back to `~/.local/share/paseo-hub`.
+- Embedded Hub data now lives under `$XDG_DATA_HOME/clisbot-hub`, falling back to `~/.local/share/clisbot-hub`.
 - Configuration deployment can create or restore its implicit target project.
 
 ### Fixed
@@ -69,7 +69,7 @@
 
 ### Added
 
-- Execution-scoped worktree branch templates with `${{ paseo.execution.id }}` for unique branches that remain stable through retries and recovery.
+- Execution-scoped worktree branch templates with `${{ clisbot.execution.id }}` for unique branches that remain stable through retries and recovery.
 - Structured server logs for connection callbacks, provider event intake and routing, and workflow failures without recording event payloads or credentials.
 - A ready-to-adapt single-repository team bot example.
 
@@ -87,7 +87,7 @@
 ### Added
 
 - Multi-file configuration bundles with named environments, named agents, reusable prompt partials, and independently routed workflows.
-- Explicit `${{ paseo.context }}` access for provider context without rewriting `${{ paseo.prompt }}`.
+- Explicit `${{ clisbot.context }}` access for provider context without rewriting `${{ clisbot.prompt }}`.
 - Step-scoped GitHub credentials with repository, permission, and duration controls.
 - Safe routing reasons for known events that no workflow accepted.
 
@@ -102,7 +102,7 @@
 ### Added
 
 - Browser-based project configuration editing, including prompt partials and GitHub-backed configuration.
-- Durable Hub login support for the Paseo CLI.
+- Durable Hub login support for the Clisbot CLI.
 - Provider-specific passthrough options with provider-owned validation.
 - Scoped preapproval for the exact Hub MCP tools authorized by each workflow step.
 
@@ -119,9 +119,9 @@
 
 ### Added
 
-- Self-hosted automation for Paseo daemons with durable PostgreSQL-backed workflows.
+- Self-hosted automation for Clisbot daemons with durable PostgreSQL-backed workflows.
 - Discord, Slack, GitHub, and manual triggers for multi-step agent workflows.
-- Project configuration through the dashboard, GitHub synchronization, prompt partials, and `paseo hub deploy`.
+- Project configuration through the dashboard, GitHub synchronization, prompt partials, and `clisbot hub deploy`.
 - Organization authentication, daemon enrollment, API keys, and scoped access controls.
 - Stripe billing, organization usage visibility, and operator-managed plan limits.
 - A versioned public API with an OpenAPI 3.1 specification and interactive reference.

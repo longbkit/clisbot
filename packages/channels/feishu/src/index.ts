@@ -1,4 +1,4 @@
-// @getpaseo/channels-feishu — the in-repo Feishu/Lark channel vertical
+// @clisbot/channels-feishu — the in-repo Feishu/Lark channel vertical
 // (goal ledger slice 15). Exports:
 // - `default` — the bundled-channel entry (`id: "feishu"`);
 // - `feishuPlugin` — the pinned drive-surface name (startAccount + sendText);

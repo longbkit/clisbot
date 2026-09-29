@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type * as React from "react";
 import { SIDEBAR_W, TITLEBAR_H } from "./geometry";
-import { PaseoMark } from "./icons";
+import { ClisbotMark } from "./icons";
 import { FADE_IN, FADE_OUT } from "./motion";
 import type { MockupStateId } from "./states";
 
@@ -31,7 +31,7 @@ const NAV_EXTENDED_LAYOUT = { height: 127 };
 // --- data -------------------------------------------------------------------
 
 type Avatar =
-  | { kind: "paseo" }
+  | { kind: "clisbot" }
   | { kind: "blank-page" }
   | { kind: "tile"; letter: string; tile: string };
 
@@ -47,7 +47,7 @@ interface WorkspaceRow {
   selected?: boolean;
 }
 
-const PASEO: Avatar = { kind: "paseo" };
+const CLISBOT: Avatar = { kind: "clisbot" };
 const BLANK_PAGE: Avatar = { kind: "blank-page" };
 
 const PINNED_ROWS: WorkspaceRow[] = [
@@ -63,7 +63,7 @@ const WORKING_ROWS: WorkspaceRow[] = [
   {
     id: "safe-area",
     title: "Fix commit safe area in emulators",
-    avatar: PASEO,
+    avatar: CLISBOT,
     time: "4m",
     running: true,
   },
@@ -79,8 +79,8 @@ const WORKING_ROWS: WorkspaceRow[] = [
 const READY_TO_REVIEW_ROWS: WorkspaceRow[] = [
   {
     id: "lineage",
-    title: "Paseo homepage",
-    avatar: PASEO,
+    title: "Clisbot homepage",
+    avatar: CLISBOT,
     pr: "3981",
     passed: true,
     time: "now",
@@ -97,7 +97,7 @@ const READY_TO_REVIEW_ROWS: WorkspaceRow[] = [
 ];
 
 const DONE_ROWS: WorkspaceRow[] = [
-  { id: "beta", title: "Release v0.7.0-beta.2", avatar: PASEO, time: "2h" },
+  { id: "beta", title: "Release v0.7.0-beta.2", avatar: CLISBOT, time: "2h" },
   {
     id: "blank-page-focus",
     title: "Preserve focus between pages",
@@ -109,7 +109,7 @@ const DONE_ROWS: WorkspaceRow[] = [
   {
     id: "perms",
     title: "Design semantic permission sy…",
-    avatar: PASEO,
+    avatar: CLISBOT,
     host: "my-server",
     pr: "3981",
     passed: true,
@@ -118,18 +118,18 @@ const DONE_ROWS: WorkspaceRow[] = [
   {
     id: "modules",
     title: "Plan modules and abstractions",
-    avatar: PASEO,
+    avatar: CLISBOT,
     pr: "3884",
     passed: true,
     time: "1d",
   },
-  { id: "resume", title: "Resume in-progress work", avatar: PASEO, time: "3d" },
-  { id: "undef", title: "Undefined task", avatar: PASEO, time: "3d" },
-  { id: "codex-issue", title: "Diagnose cloud/Codex issue re…", avatar: PASEO, time: "4d" },
-  { id: "cws", title: "Diagnose create_workspace 37…", avatar: PASEO, time: "4d" },
-  { id: "taps", title: "Diagnose tap interactions", avatar: PASEO, time: "4d" },
-  { id: "clarify", title: "Clarify task requirements", avatar: PASEO, time: "5d" },
-  { id: "abc", title: "Task for abcdefghi", avatar: PASEO, time: "5d" },
+  { id: "resume", title: "Resume in-progress work", avatar: CLISBOT, time: "3d" },
+  { id: "undef", title: "Undefined task", avatar: CLISBOT, time: "3d" },
+  { id: "codex-issue", title: "Diagnose cloud/Codex issue re…", avatar: CLISBOT, time: "4d" },
+  { id: "cws", title: "Diagnose create_workspace 37…", avatar: CLISBOT, time: "4d" },
+  { id: "taps", title: "Diagnose tap interactions", avatar: CLISBOT, time: "4d" },
+  { id: "clarify", title: "Clarify task requirements", avatar: CLISBOT, time: "5d" },
+  { id: "abc", title: "Task for abcdefghi", avatar: CLISBOT, time: "5d" },
 ];
 
 // --- pieces -----------------------------------------------------------------
@@ -166,10 +166,10 @@ function NavItem({
 
 /** The rounded-square agent avatar, with a blue running dot on the corner. */
 function AvatarIcon({ avatar }: { avatar: Avatar }) {
-  if (avatar.kind === "paseo") {
+  if (avatar.kind === "clisbot") {
     return (
       <span className="flex size-[16px] items-center justify-center rounded-[5px] bg-black text-white">
-        <PaseoMark size={14} />
+        <ClisbotMark size={14} />
       </span>
     );
   }

@@ -19,7 +19,7 @@ describe("Linear trigger matching", () => {
     const irrelevantEdit = issue({ action: "update", updatedFrom: {} });
     assert.equal(matchLinearTriggers(config, irrelevantEdit).length, 0);
 
-    const excluded = issue({ action: "create", labelIds: ["no-paseo"] });
+    const excluded = issue({ action: "create", labelIds: ["no-clisbot"] });
     assert.equal(matchLinearTriggers(config, excluded).length, 0);
   });
 
@@ -101,51 +101,51 @@ describe("Linear comment invocation parser handoff", () => {
   it.each([
     {
       name: "uses a later contains marker after a consumed pattern",
-      filters: { pattern: "@paseo", contains: "/run" },
-      body: "@paseo please /run priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "/run" },
+      body: "@clisbot please /run priority=high investigate",
       expected: "priority=high investigate",
     },
     {
       name: "treats equal markers as one consumed marker",
-      filters: { pattern: "@paseo", contains: "@paseo" },
-      body: "@paseo priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "@clisbot" },
+      body: "@clisbot priority=high investigate",
       expected: "priority=high investigate",
     },
     {
       name: "uses an overlapping contains marker that extends the pattern",
-      filters: { pattern: "@paseo", contains: "@paseo /run" },
-      body: "@paseo /run priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "@clisbot /run" },
+      body: "@clisbot /run priority=high investigate",
       expected: "priority=high investigate",
     },
     {
       name: "keeps an input-shaped suffix of an overlapping contains marker",
-      filters: { pattern: "@paseo", contains: "@paseo repo=hub" },
-      body: "@paseo repo=hub priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "@clisbot repo=hub" },
+      body: "@clisbot repo=hub priority=high investigate",
       expected: "repo=hub priority=high investigate",
     },
     {
       name: "uses the longer pattern when contains is inside it",
-      filters: { pattern: "@paseo /run", contains: "/run" },
-      body: "@paseo /run priority=high investigate",
+      filters: { pattern: "@clisbot /run", contains: "/run" },
+      body: "@clisbot /run priority=high investigate",
       expected: "priority=high investigate",
     },
     {
       name: "uses the first boundary-valid repeated contains marker",
-      filters: { pattern: "@paseo", contains: "/run" },
-      body: "@paseo /run prose /run priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "/run" },
+      body: "@clisbot /run prose /run priority=high investigate",
       expected: "prose /run priority=high investigate",
     },
     {
       name: "does not treat an inside-word contains match as a marker",
-      filters: { pattern: "@paseo", contains: "run" },
-      body: "@paseo prerun priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "run" },
+      body: "@clisbot prerun priority=high investigate",
       expected: "prerun priority=high investigate",
     },
     {
       name: "does not bypass a non-boundary pattern prefix with contains",
-      filters: { pattern: "@paseo", contains: "/run" },
-      body: "@paseoX /run priority=high investigate",
-      expected: "@paseoX /run priority=high investigate",
+      filters: { pattern: "@clisbot", contains: "/run" },
+      body: "@clisbotX /run priority=high investigate",
+      expected: "@clisbotX /run priority=high investigate",
     },
     {
       name: "preserves a leading input-shaped pattern before a later command",
@@ -165,7 +165,7 @@ function configuration() {
     max_runtime: "1h",
     idle_timeout: "5m",
     agent: { provider: "codex" },
-    prompt: [{ text: "Work from ${{ paseo.context }}" }],
+    prompt: [{ text: "Work from ${{ clisbot.context }}" }],
   };
   return compileHubConfig({
     environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
@@ -177,7 +177,7 @@ function configuration() {
         filters: {
           project: "project-1",
           states: ["ready"],
-          exclude_labels: ["no-paseo"],
+          exclude_labels: ["no-clisbot"],
         },
         steps: [base],
       },
@@ -192,7 +192,7 @@ function configuration() {
         name: "comment",
         on: "linear.comment_created",
         max_runtime: "2h",
-        filters: { project: "project-1", from_users: ["operator"], contains: "@paseo" },
+        filters: { project: "project-1", from_users: ["operator"], contains: "@clisbot" },
         steps: [base],
       },
     ],
@@ -226,7 +226,7 @@ function issue(
   };
 }
 
-function commentEvent(body = "@paseo please investigate"): NormalizedLinearCommentEvent {
+function commentEvent(body = "@clisbot please investigate"): NormalizedLinearCommentEvent {
   const event = issue();
   return {
     type: "comment",

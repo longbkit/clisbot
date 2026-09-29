@@ -1,6 +1,6 @@
 // upstream: extensions/googlechat/src/message-tool-api.test.ts@5d8067a4483
 // Google Chat tests cover account-isolated message-tool discovery.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { inspectGoogleChatAccount, resolveGoogleChatAccount } from "./accounts.js";
 import { describeGoogleChatMessageTool } from "./message-tool-api.js";

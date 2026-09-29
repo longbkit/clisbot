@@ -1,5 +1,5 @@
 /**
- * Slack (and every other channel) only linkifies `http(s):`. A `paseo://` deep
+ * Slack (and every other channel) only linkifies `http(s):`. A `clisbot://` deep
  * link posted as link markup is rendered as literal text — verified against
  * Slack's own message parse — so the app destination is offered as an https URL
  * on the Hub that redirects into the scheme.
@@ -11,7 +11,7 @@ export const SESSION_OPEN_PATH = "/api/open/agent";
 const ID_PATTERN = /^[\w.-]+$/;
 
 export function sessionDeepLink(serverId: string, agentId: string): string {
-  return `paseo://h/${encodeURIComponent(serverId)}/agent/${encodeURIComponent(agentId)}`;
+  return `clisbot://h/${encodeURIComponent(serverId)}/agent/${encodeURIComponent(agentId)}`;
 }
 
 export function sessionOpenUrl(origin: string, serverId: string, agentId: string): string {

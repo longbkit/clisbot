@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Daemon-owned policy. `off` preserves ordinary Paseo trust. */
+/** Daemon-owned policy. `off` preserves ordinary Clisbot trust. */
 export const ManagedAccessModeSchema = z.enum(["off", "external"]);
 export type ManagedAccessMode = z.infer<typeof ManagedAccessModeSchema>;
 

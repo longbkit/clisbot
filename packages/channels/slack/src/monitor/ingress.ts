@@ -18,7 +18,7 @@
 // (provider-support.ts, upstream) is what keeps Bolt from acking on its own
 // error path.
 import type { App, Receiver, ReceiverEvent } from "@slack/bolt";
-import { asOptionalRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { asOptionalRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 function isSlackEventCallback(body: unknown): boolean {
   return asOptionalRecord(body)?.type === "event_callback";

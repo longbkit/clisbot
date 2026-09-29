@@ -1,6 +1,6 @@
 // upstream: extensions/googlechat/src/targets.ts@5d8067a4483
 // Googlechat plugin module implements targets behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import { findGoogleChatDirectMessage } from "./api.js";
 import type { GoogleChatSpace } from "./types.js";

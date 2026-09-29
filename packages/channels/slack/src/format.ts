@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/format.ts@5d8067a4483
 // Slack helper module supports format behavior.
 import { eastAsianWidthType } from "get-east-asian-width";
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   chunkTextForOutbound,
   FormatCapabilityProfile,
@@ -10,7 +10,7 @@ import {
   type MarkdownLinkSpan,
   renderMarkdownIRChunksWithinLimit,
   renderMarkdownWithMarkers,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { escapeSlackMrkdwn } from "./monitor/mrkdwn.js";
 
 const SLACK_ANGLE_TOKEN_RE = /<[^>\n]+>/g;

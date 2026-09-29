@@ -1,6 +1,6 @@
-import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PluginHostSummary } from "@getpaseo/plugin/client";
+import { createClisbotApi, type ClisbotApi } from "@clisbot/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { PluginHostSummary } from "@clisbot/plugin/client";
 
 export interface PluginHostsSource {
   getHosts(): readonly { serverId: string; label: string }[];
@@ -16,7 +16,7 @@ export interface PluginHostsSource {
 export function createPluginHosts(source: PluginHostsSource, signal: AbortSignal) {
   const clients = new Map<
     string,
-    { client: DaemonClient; api: PaseoApi; lifetime: AbortController }
+    { client: DaemonClient; api: ClisbotApi; lifetime: AbortController }
   >();
   const listeners = new Set<() => void>();
   let snapshot: readonly PluginHostSummary[] = [];
@@ -30,11 +30,11 @@ export function createPluginHosts(source: PluginHostsSource, signal: AbortSignal
   function resolve(serverId: string): DaemonClient {
     if (signal.aborted) throw new Error("Plugin has stopped");
     if (!source.getHosts().some((host) => host.serverId === serverId)) {
-      throw new Error(`Unknown Paseo host: ${serverId}`);
+      throw new Error(`Unknown Clisbot host: ${serverId}`);
     }
     const host = source.getSnapshot(serverId);
     if (host?.connectionStatus !== "online" || !host.client) {
-      throw new Error(`Paseo host is disconnected: ${serverId}`);
+      throw new Error(`Clisbot host is disconnected: ${serverId}`);
     }
     return host.client;
   }
@@ -74,7 +74,7 @@ export function createPluginHosts(source: PluginHostsSource, signal: AbortSignal
         listeners.delete(listener);
       };
     },
-    getPaseoClient(serverId: string): PaseoApi {
+    getClisbotClient(serverId: string): ClisbotApi {
       const client = resolve(serverId);
       const existing = clients.get(serverId);
       if (existing?.client === client) return existing.api;
@@ -87,15 +87,17 @@ export function createPluginHosts(source: PluginHostsSource, signal: AbortSignal
           const value: unknown = Reflect.get(target, key, target);
           if (typeof value !== "function") return value;
           return (...args: unknown[]) => {
-            if (lifetime.signal.aborted) throw new Error(`Paseo client is released: ${serverId}`);
+            if (lifetime.signal.aborted) throw new Error(`Clisbot client is released: ${serverId}`);
             if (resolve(serverId) !== client) {
-              throw new Error(`Paseo connection changed; call getPaseoClient again: ${serverId}`);
+              throw new Error(
+                `Clisbot connection changed; call getClisbotClient again: ${serverId}`,
+              );
             }
             return Reflect.apply(value, target, args);
           };
         },
       });
-      const api = createPaseoApi(borrowed, { signal: lifetime.signal });
+      const api = createClisbotApi(borrowed, { signal: lifetime.signal });
       const dispose = api.dispose;
       api.dispose = () => {
         if (clients.get(serverId)?.api === api) clients.delete(serverId);

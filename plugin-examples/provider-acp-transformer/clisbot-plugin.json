@@ -1,0 +1,6 @@
+{
+  "id": "provider-acp-transformer-example",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

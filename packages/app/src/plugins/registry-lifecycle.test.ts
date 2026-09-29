@@ -1,7 +1,7 @@
 import { createPluginHosts } from "./hosts";
 import { expect, test } from "vitest";
-import { createPaseoApi } from "@getpaseo/client";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { createClisbotApi } from "@clisbot/client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { PluginRegistry } from "./registry";
 
 function registry() {
@@ -10,7 +10,7 @@ function registry() {
   const plugins = new PluginRegistry({
     version: "0.8.0",
     createRuntime: (installation) => {
-      const api = createPaseoApi(client);
+      const api = createClisbotApi(client);
       return {
         hosts: createPluginHosts(
           {
@@ -21,7 +21,7 @@ function registry() {
           },
           installation.lifetime.signal,
         ),
-        paseo: {
+        clisbot: {
           ...api,
           dispose: async () => {
             released.push(installation.id);
@@ -45,7 +45,7 @@ function registry() {
 function catalog(id: string, body: string) {
   return {
     id,
-    requirements: { paseo: ">=0.8.0" },
+    requirements: { clisbot: ">=0.8.0" },
     clientBundle: `(function() { return { default: function(plugin) { ${body} } }; })`,
   };
 }

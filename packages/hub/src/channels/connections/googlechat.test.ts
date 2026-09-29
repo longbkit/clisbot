@@ -10,7 +10,7 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, describe, it } from "vitest";
-import { resolveValidatedGoogleChatCredentials } from "@getpaseo/channels-googlechat/dist/google-auth.runtime.js";
+import { resolveValidatedGoogleChatCredentials } from "@clisbot/channels-googlechat/dist/google-auth.runtime.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import {
   configureGoogleChatConnection,

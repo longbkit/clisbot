@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import type { ChatMessagePayload, ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatMessagePayload, ChatPayload } from "@clisbot/protocol/chats/types";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentSubscriber } from "../agent/agent-manager.js";
 import type { AgentStreamEvent } from "../agent/agent-sdk-types.js";

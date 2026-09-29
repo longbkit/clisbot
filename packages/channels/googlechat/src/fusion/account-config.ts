@@ -12,8 +12,8 @@
 //
 // The ported `accounts.ts` keeps its upstream shape and flow; it just reads the
 // carrier instead of the OpenClaw config file.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { StartAccountContext } from "@getpaseo/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { StartAccountContext } from "@clisbot/channels-shared";
 import { resolveGoogleChatAccount, type ResolvedGoogleChatAccount } from "../accounts.js";
 
 /** The credential fields the Hub connection carries onto the account entry. */

@@ -115,7 +115,7 @@ describe("provider application failure copy", () => {
       ["github", new ProviderApplicationError("network")],
       ["github", new ProviderApplicationError("upstreamUnavailable")],
       ["github", new ProviderApplicationError("configurationConflict")],
-      ["github", new ProviderApplicationError("identityConflict", "Paseo Hub")],
+      ["github", new ProviderApplicationError("identityConflict", "Clisbot Hub")],
       ["github", new ProviderApplicationError("invalidInput")],
       ["github", new ProviderApplicationError("internal")],
       ["github", new ProviderApplicationError("forbidden")],
@@ -156,7 +156,7 @@ describe("provider application failure copy", () => {
     assert.match(message, /restart Hub/u);
   });
 
-  it("keeps Paseo's own vocabulary out of every failure the operator can read", () => {
+  it("keeps Clisbot's own vocabulary out of every failure the operator can read", () => {
     const forbidden = ["this hub", "app settings", "configuration version", "runtime", "latch"];
     const codes = [
       "credentialsRejected",

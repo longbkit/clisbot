@@ -26,7 +26,7 @@ import {
   resolveMessagePresentationButtonAction,
   resolveMessagePresentationOptionAction,
   type MessagePresentation,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 
 /** How long a posted command button stays clickable. */
 export const CHANNEL_COMMAND_BUTTON_TTL_MS = 15 * 60_000;

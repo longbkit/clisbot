@@ -8,8 +8,8 @@
 // The harness is `conversation-open.test.ts`'s: a fake `fetch` under a real
 // WebClient, so the assertions read the actual `chat.postMessage` body.
 import { WebClient, type WebClientOptions } from "@slack/web-api";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSlackActions } from "./channel-actions.js";
 import * as slackClient from "./client.js";

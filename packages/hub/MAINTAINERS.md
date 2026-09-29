@@ -1,7 +1,7 @@
-# Maintaining Paseo Hub
+# Maintaining Clisbot Hub
 
 This guide covers repository operations for maintainers. Product usage belongs in the
-[public Hub documentation](https://paseo.sh/docs/hub); architecture decisions live under
+[public Hub documentation](https://clisbot.com/docs/hub); architecture decisions live under
 [`docs/`](docs/).
 
 ## Verify a change
@@ -20,8 +20,8 @@ npm run test:e2e:browser
 npm run test:e2e:hub:source
 ```
 
-The source-built browser and Hub suites use the exact Paseo commit in `PASEO_E2E_COMMIT`.
-When a Hub change depends on a Paseo protocol or CLI change, update that immutable SHA and
+The source-built browser and Hub suites use the exact Clisbot commit in `CLISBOT_E2E_COMMIT`.
+When a Hub change depends on a Clisbot protocol or CLI change, update that immutable SHA and
 prove the combined contract before merging. Do not replace it with a branch or another mutable
 reference.
 
@@ -45,7 +45,7 @@ separate binary assets.
 5. Create an annotated tag on the intended release commit and push it:
 
    ```sh
-   git tag -a v<version> <commit> -m "Paseo Hub v<version>"
+   git tag -a v<version> <commit> -m "Clisbot Hub v<version>"
    git push origin v<version>
    ```
 
@@ -61,6 +61,6 @@ Later changes to the current changelog section update the existing release notes
 
 ## Update public documentation
 
-Public Hub documentation lives in `getpaseo/paseo` under `public-docs/`. Externally visible Hub
-changes require a companion Paseo pull request. Keep task guides progressive and examples
+Public Hub documentation lives in `longbkit/clisbot` under `public-docs/`. Externally visible Hub
+changes require a companion Clisbot pull request. Keep task guides progressive and examples
 complete; keep exhaustive field documentation in reference pages.

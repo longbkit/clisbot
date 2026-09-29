@@ -31,12 +31,12 @@ const nonnegativeIntegerOrUnlimited = z.string().transform((value, ctx) => {
 const booleanFlag = z.enum(["true", "false"]).transform((value) => value === "true");
 
 /**
- * The metadata shape a Paseo plan product must carry. Keys map 1:1 onto `entitlementsSchema`
+ * The metadata shape a Clisbot plan product must carry. Keys map 1:1 onto `entitlementsSchema`
  * in `src/entitlements/catalog.ts` — add a field there, add its `ent_` key here.
- * `paseo_plan_slug` is catalog identity, not an entitlement, so it carries no `ent_` prefix.
+ * `clisbot_plan_slug` is catalog identity, not an entitlement, so it carries no `ent_` prefix.
  */
 const planMetadataSchema = z.object({
-  paseo_plan_slug: z.string().trim().min(1, "paseo_plan_slug must not be blank"),
+  clisbot_plan_slug: z.string().trim().min(1, "clisbot_plan_slug must not be blank"),
   ent_seats_max: positiveIntegerOrUnlimited,
   ent_can_invite: booleanFlag,
   ent_executions_monthly_limit: nonnegativeIntegerOrUnlimited,
@@ -65,5 +65,5 @@ export function parsePlanMetadata(metadata: Record<string, string>): ParsePlanMe
     meters: { "executions.monthly": { limit: raw.data.ent_executions_monthly_limit } },
   });
   if (!template.success) return { success: false, message: z.prettifyError(template.error) };
-  return { success: true, data: { slug: raw.data.paseo_plan_slug, template: template.data } };
+  return { success: true, data: { slug: raw.data.clisbot_plan_slug, template: template.data } };
 }

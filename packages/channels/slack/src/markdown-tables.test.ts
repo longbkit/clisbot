@@ -86,15 +86,15 @@ describe("forwarded Slack Markdown tables", () => {
   });
 
   it("does not confuse authored text with a native-table placeholder", () => {
-    const messages = compile(`PASEOSLACKTABLE0END\n\n${TABLE}`);
+    const messages = compile(`CLISBOTSLACKTABLE0END\n\n${TABLE}`);
     expect(messages[0]?.blocks?.[0]).toMatchObject({
       type: "section",
-      text: { text: "PASEOSLACKTABLE0END" },
+      text: { text: "CLISBOTSLACKTABLE0END" },
     });
     expect(messages[0]?.blocks?.[1]?.type).toBe("data_table");
     // Entity decoding can expose the same spelling only after the whole-document parse.
     // In that case fall back to rendering the untouched source rather than move its content.
-    expect(compile(`PASEO&#83;LACKTABLE0END\n\n${TABLE}`)).toEqual([]);
+    expect(compile(`CLISBOT&#83;LACKTABLE0END\n\n${TABLE}`)).toEqual([]);
   });
 
   it("preserves escaped pipes, link destinations and literal special characters", () => {

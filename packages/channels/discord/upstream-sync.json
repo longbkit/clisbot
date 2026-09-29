@@ -1090,7 +1090,7 @@
     {
       "id": "D-DC-014",
       "file": "src/fusion/commands.ts",
-      "reason": "Fusion registers one native /paseo umbrella and normalizes its interactions to Hub plaintext commands. The gateway subscribes this listener with autoInteractions disabled; durable admission precedes its private acknowledgement. Platform vocabulary, access, and execution stay in Hub.",
+      "reason": "Fusion registers one native /clisbot umbrella and normalizes its interactions to Hub plaintext commands. The gateway subscribes this listener with autoInteractions disabled; durable admission precedes its private acknowledgement. Platform vocabulary, access, and execution stay in Hub.",
       "tests": ["src/fusion/commands.test.ts", "src/transport/gateway.test.ts"]
     },
     {

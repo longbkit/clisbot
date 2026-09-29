@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/markdown.ts@5d8067a4483
 import { fromMarkdown } from "mdast-util-from-markdown";
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { convertMarkdownTables } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { convertMarkdownTables } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 
 type PositionedMarkdownNode = {
   type: string;

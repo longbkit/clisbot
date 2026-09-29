@@ -1,5 +1,5 @@
-import type { FetchAgentsEntry } from "@getpaseo/client/internal/daemon-client";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { clearArchiveAgentPending } from "@/hooks/use-archive-agent";
 import { queryClient } from "@/data/query-client";
 import type { Agent } from "@/stores/session-store";

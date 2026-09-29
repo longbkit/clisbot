@@ -5,24 +5,24 @@ import path from "node:path";
 import { app, ipcMain, safeStorage, shell, type IpcMainInvokeEvent } from "electron";
 import { z } from "zod";
 
-const PASEO_CLIENT_ID = "paseo-client";
+const CLISBOT_CLIENT_ID = "clisbot-client";
 const HUB_ACCESS_SCOPE = "hub:access";
 const CALLBACK_PATH = "/hub-auth/callback";
 const AUTHORIZATION_TIMEOUT_MS = 5 * 60_000;
 const CREDENTIALS_FILENAME = "hub-client-credentials.json";
 const ALLOWED_ACCOUNT_PATHS = new Set([
-  "/api/auth/paseo/state",
-  "/api/auth/paseo/select-organization",
-  "/api/auth/paseo/create-organization",
-  "/api/auth/paseo/complete-app-setup",
-  "/api/auth/paseo/api-keys",
-  "/api/auth/paseo/revoke-api-key",
-  "/api/auth/paseo/revoke-cli-credential",
-  "/api/auth/paseo/create-invitation",
-  "/api/auth/paseo/cancel-invitation",
-  "/api/auth/paseo/accept-invitation",
-  "/api/auth/paseo/change-member-role",
-  "/api/auth/paseo/remove-member",
+  "/api/auth/clisbot/state",
+  "/api/auth/clisbot/select-organization",
+  "/api/auth/clisbot/create-organization",
+  "/api/auth/clisbot/complete-app-setup",
+  "/api/auth/clisbot/api-keys",
+  "/api/auth/clisbot/revoke-api-key",
+  "/api/auth/clisbot/revoke-cli-credential",
+  "/api/auth/clisbot/create-invitation",
+  "/api/auth/clisbot/cancel-invitation",
+  "/api/auth/clisbot/accept-invitation",
+  "/api/auth/clisbot/change-member-role",
+  "/api/auth/clisbot/remove-member",
 ]);
 const ALLOWED_REQUEST_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 
@@ -131,7 +131,7 @@ export class DesktopHubClient {
       origin,
     );
     authorization.searchParams.set("response_type", "code");
-    authorization.searchParams.set("client_id", PASEO_CLIENT_ID);
+    authorization.searchParams.set("client_id", CLISBOT_CLIENT_ID);
     authorization.searchParams.set("redirect_uri", callback.redirectUri);
     authorization.searchParams.set("scope", `${HUB_ACCESS_SCOPE} offline_access`);
     authorization.searchParams.set("state", state);
@@ -157,7 +157,7 @@ export class DesktopHubClient {
         origin,
         new URLSearchParams({
           grant_type: "authorization_code",
-          client_id: PASEO_CLIENT_ID,
+          client_id: CLISBOT_CLIENT_ID,
           resource: origin,
           redirect_uri: callback.redirectUri,
           code,
@@ -181,7 +181,7 @@ export class DesktopHubClient {
       .fetch(new URL("/api/auth/oauth2/revoke", origin), {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token: refreshToken, client_id: PASEO_CLIENT_ID }),
+        body: new URLSearchParams({ token: refreshToken, client_id: CLISBOT_CLIENT_ID }),
       })
       .catch(() => undefined);
   }
@@ -264,7 +264,7 @@ export class DesktopHubClient {
         origin,
         new URLSearchParams({
           grant_type: "refresh_token",
-          client_id: PASEO_CLIENT_ID,
+          client_id: CLISBOT_CLIENT_ID,
           resource: origin,
           refresh_token: refreshToken,
         }),
@@ -368,16 +368,16 @@ export function registerHubClientHandlers(): void {
     encryptionAvailable: () => safeStorage.isEncryptionAvailable(),
     fetch: (input, init) => fetch(input, init),
   });
-  ipcMain.handle("paseo:hub:sign-in", (event, input: unknown) => {
+  ipcMain.handle("clisbot:hub:sign-in", (event, input: unknown) => {
     requireTrustedRenderer(event);
     const parsed = HubSignInInputSchema.parse(input);
     return client.signIn(parsed.origin, parsed.invitationId);
   });
-  ipcMain.handle("paseo:hub:sign-out", (event, input: unknown) => {
+  ipcMain.handle("clisbot:hub:sign-out", (event, input: unknown) => {
     requireTrustedRenderer(event);
     return client.signOut(HubOriginInputSchema.parse(input).origin);
   });
-  ipcMain.handle("paseo:hub:request", (event, input: unknown) => {
+  ipcMain.handle("clisbot:hub:request", (event, input: unknown) => {
     requireTrustedRenderer(event);
     return client.request(input);
   });
@@ -387,9 +387,9 @@ function requireTrustedRenderer(event: IpcMainInvokeEvent): void {
   const frameUrl = event.senderFrame?.url ?? event.sender.getURL();
   const url = new URL(frameUrl);
   const trusted =
-    (url.protocol === "paseo:" && url.host === "app") ||
+    (url.protocol === "clisbot:" && url.host === "app") ||
     (!app.isPackaged && url.origin === (process.env.EXPO_DEV_URL ?? "http://localhost:8081"));
-  if (!trusted) throw new Error("Hub client IPC is available only to the Paseo renderer.");
+  if (!trusted) throw new Error("Hub client IPC is available only to the Clisbot renderer.");
 }
 
 function allowedHubPath(value: string): string {
@@ -410,7 +410,7 @@ function allowedHubPath(value: string): string {
     const invitation = url.searchParams.getAll("invitation");
     const onlyInvitation = [...url.searchParams.keys()].every((key) => key === "invitation");
     if (
-      pathname !== "/api/auth/paseo/state" ||
+      pathname !== "/api/auth/clisbot/state" ||
       !onlyInvitation ||
       invitation.length !== 1 ||
       invitation[0]?.trim().length === 0
@@ -468,7 +468,7 @@ async function openLoopbackCallback(): Promise<{
       "cache-control": "no-store",
     });
     response.end(
-      '<!doctype html><meta charset="utf-8"><title>Paseo sign-in complete</title><p>Sign-in complete. You can return to Paseo.</p><script>window.close()</script>',
+      '<!doctype html><meta charset="utf-8"><title>Clisbot sign-in complete</title><p>Sign-in complete. You can return to Clisbot.</p><script>window.close()</script>',
     );
     resolveResult(requestUrl);
   });

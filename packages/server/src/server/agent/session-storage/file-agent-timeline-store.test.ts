@@ -233,7 +233,7 @@ describe("session log write concurrency", () => {
     });
     const limit = 2;
     // The limit is fixed when the module loads, so load a fresh copy under the test's env.
-    vi.stubEnv("PASEO_SESSION_LOG_WRITE_CONCURRENCY", String(limit));
+    vi.stubEnv("CLISBOT_SESSION_LOG_WRITE_CONCURRENCY", String(limit));
     vi.resetModules();
     const fresh = await import("./file-agent-timeline-store.js");
     vi.unstubAllEnvs();
@@ -255,7 +255,7 @@ describe("session log write concurrency", () => {
     expect(
       resolveSessionLogWriteConcurrency({
         UV_THREADPOOL_SIZE: "16",
-        PASEO_SESSION_LOG_WRITE_CONCURRENCY: "3",
+        CLISBOT_SESSION_LOG_WRITE_CONCURRENCY: "3",
       }),
     ).toBe(3);
   });

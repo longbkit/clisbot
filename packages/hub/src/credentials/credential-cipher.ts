@@ -155,19 +155,19 @@ export async function readCredentialCipherEnvironment(
   environment: Record<string, string | undefined>,
   options: { hubDataDirectory?: string } = {},
 ): Promise<CredentialCipher> {
-  const encoded = nonEmpty(environment["PASEO_HUB_CREDENTIAL_MASTER_KEY"]);
-  const file = nonEmpty(environment["PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE"]);
+  const encoded = nonEmpty(environment["CLISBOT_HUB_CREDENTIAL_MASTER_KEY"]);
+  const file = nonEmpty(environment["CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE"]);
   if ((encoded === undefined) === (file === undefined)) {
     throw new CredentialCipherError(
-      "set exactly one of PASEO_HUB_CREDENTIAL_MASTER_KEY or PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE",
+      "set exactly one of CLISBOT_HUB_CREDENTIAL_MASTER_KEY or CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE",
     );
   }
-  const previousFile = nonEmpty(environment["PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE"]);
+  const previousFile = nonEmpty(environment["CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE"]);
   for (const path of [file, previousFile]) {
     if (path !== undefined) requireExternalKeyFile(path, options.hubDataDirectory);
   }
   const material = encoded ?? (await readMasterKeyFile(file!));
-  const keyId = nonEmpty(environment["PASEO_HUB_CREDENTIAL_KEY_ID"]) ?? DEFAULT_KEY_ID;
+  const keyId = nonEmpty(environment["CLISBOT_HUB_CREDENTIAL_KEY_ID"]) ?? DEFAULT_KEY_ID;
   // A read tries only the keys whose id matches the envelope's, so the retired
   // key's id has to be the id the OLD rows carry. Unnamed keys all carry the
   // default, which is the documented rotation (both keys tried in order); a
@@ -176,11 +176,11 @@ export async function readCredentialCipherEnvironment(
   // every pre-rotation row answered "credential envelope key is unavailable" at
   // read time instead of failing here, at boot, with the fix in the message.
   const previousKeyId =
-    nonEmpty(environment["PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS"]) ??
+    nonEmpty(environment["CLISBOT_HUB_CREDENTIAL_KEY_ID_PREVIOUS"]) ??
     (keyId === DEFAULT_KEY_ID ? DEFAULT_KEY_ID : undefined);
   if (previousFile !== undefined && previousKeyId === undefined) {
     throw new CredentialCipherError(
-      "set PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS to the id the retired key sealed with when PASEO_HUB_CREDENTIAL_KEY_ID names the current one",
+      "set CLISBOT_HUB_CREDENTIAL_KEY_ID_PREVIOUS to the id the retired key sealed with when CLISBOT_HUB_CREDENTIAL_KEY_ID names the current one",
     );
   }
   return createCredentialCipher({
@@ -247,7 +247,7 @@ function isEnvelopeVersion(value: unknown): value is CredentialEnvelopeVersion {
 }
 
 function additionalAuthenticatedData(owner: string, version: CredentialEnvelopeVersion): Buffer {
-  return Buffer.from(`paseo-hub:credential:${version}:${owner}`, "utf8");
+  return Buffer.from(`clisbot-hub:credential:${version}:${owner}`, "utf8");
 }
 
 function decodeMasterKey(value: string): Buffer {

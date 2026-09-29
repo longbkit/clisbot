@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/sent-message-cache.ts@5d8067a4483
 // Telegram plugin module implements sent message cache behavior.
-import type { PluginStateSyncKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import type { PluginStateSyncKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { getTelegramRuntime } from "./runtime.js";
 import {
   resolveSentMessageScopeKey,

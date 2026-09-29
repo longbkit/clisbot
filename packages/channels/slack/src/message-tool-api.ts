@@ -5,7 +5,7 @@ import type {
   ChannelMessageActionName,
   ChannelMessageToolDiscovery,
   ChannelMessageToolSchemaContribution,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import { Type, type TSchema } from "typebox";
 import { listSlackMessageActions } from "./message-actions.js";
 

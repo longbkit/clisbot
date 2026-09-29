@@ -28,9 +28,9 @@ import {
   mediaMaxBytesForChannel,
   RemoteMediaRefusedError,
   type MediaChannel,
-} from "@getpaseo/channels-shared";
-import { detectMime, FILE_TYPE_SNIFF_MAX_BYTES } from "@getpaseo/channels-core/media-core/mime";
-import { runWithMediaBufferStager } from "@getpaseo/channels-core/media/store.host-adapter";
+} from "@clisbot/channels-shared";
+import { detectMime, FILE_TYPE_SNIFF_MAX_BYTES } from "@clisbot/channels-core/media-core/mime";
+import { runWithMediaBufferStager } from "@clisbot/channels-core/media/store.host-adapter";
 
 /** One media source as the upstream `message` tool spells it. */
 export interface ChannelMediaSource {
@@ -288,7 +288,7 @@ export function createChannelMediaStager(options: ChannelMediaStagerOptions): Ch
     channel: options.channel,
     readLocalFile: options.readLocalFile,
     maxBytes: mediaMaxBytesForChannel(options.channel),
-    stagingRoot: options.stagingRoot ?? path.join(tmpdir(), "paseo-hub-channel-outbound-media"),
+    stagingRoot: options.stagingRoot ?? path.join(tmpdir(), "clisbot-hub-channel-outbound-media"),
     fetchImpl: options.fetchImpl,
     lookupImpl: options.lookupImpl,
     written: new Map(),

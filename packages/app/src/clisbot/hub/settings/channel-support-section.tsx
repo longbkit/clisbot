@@ -16,7 +16,7 @@ export function ChannelSupportSection({ entry }: { entry: ChannelCatalogEntry })
   return (
     <SettingsSection
       title="What it supports"
-      info={`What Paseo's ${entry.label} integration can do in a conversation. It is the same for every ${entry.label} Connection.`}
+      info={`What Clisbot's ${entry.label} integration can do in a conversation. It is the same for every ${entry.label} Connection.`}
     >
       <View style={[settingsStyles.card, styles.card]}>
         <View style={styles.chips}>

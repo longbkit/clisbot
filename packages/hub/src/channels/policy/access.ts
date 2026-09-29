@@ -2,7 +2,7 @@
 // `allowFrom` / `groupAllowFrom` decision, run by the Hub before a turn starts.
 //
 // The decision itself is NOT re-implemented here. `resolveDmGroupAccessWithLists`
-// is the ported OpenClaw function (`@getpaseo/channels-core/security/dm-policy-shared`,
+// is the ported OpenClaw function (`@clisbot/channels-core/security/dm-policy-shared`,
 // upstream `src/security/dm-policy-shared.ts`), and the sender match is
 // upstream's `resolveAllowlistMatchSimple` (`channels/allowlist-match.ts`). This
 // module only supplies the three things upstream reads from its own config and
@@ -19,13 +19,13 @@
 // instead of it: both must allow. A revision that authored no `access:` block
 // has no `EffectiveAccess`, so the gate does not run at all and admission is
 // exactly what it was before the knob existed.
-import { resolveAllowlistMatchSimple } from "@getpaseo/channels-core/channels/allowlist-match";
+import { resolveAllowlistMatchSimple } from "@clisbot/channels-core/channels/allowlist-match";
 import {
   DM_GROUP_ACCESS_REASON,
   resolveDmGroupAccessWithLists,
   type DmGroupAccessDecision,
   type DmGroupAccessReasonCode,
-} from "@getpaseo/channels-core/security/dm-policy-shared";
+} from "@clisbot/channels-core/security/dm-policy-shared";
 import type { EffectiveAccess } from "../config/compile.js";
 import type { InboundMessage } from "../plane/types.js";
 

@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 // COMPAT(clisbot-env-alias): fork-owned operator namespace + shared home. Applied at
 // process entry (the `clisbot` CLI at every spawn, and the Hub's own entry for the
 // deployed form, per implementation doc §4.5 / plan §14.8). The internal code keeps
-// reading upstream `PASEO_*` names, so an explicit `PASEO_*` always wins and an
+// reading upstream `CLISBOT_*` names, so an explicit `CLISBOT_*` always wins and an
 // unmodified upstream read is never re-fought on a `getpaseo/hub` merge.
 
 /**
@@ -15,23 +15,7 @@ import { existsSync } from "node:fs";
  * place" decision (implementation doc §4.5).
  */
 const CLISBOT_ALIAS_TABLE = [
-  ["CLISBOT_HOME", "PASEO_HOME"],
-  ["CLISBOT_HUB_DATA_DIR", "PASEO_HUB_DATA_DIR"],
   ["CLISBOT_HUB_DATABASE_URL", "DATABASE_URL"],
-  ["CLISBOT_HUB_DATABASE_POOL_SIZE", "PASEO_HUB_DATABASE_POOL_SIZE"],
-  ["CLISBOT_HUB_CREDENTIAL_MASTER_KEY", "PASEO_HUB_CREDENTIAL_MASTER_KEY"],
-  ["CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE", "PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE"],
-  ["CLISBOT_HUB_CREDENTIAL_KEY_ID", "PASEO_HUB_CREDENTIAL_KEY_ID"],
-  ["CLISBOT_HUB_CHANNELS_ENABLED", "PASEO_HUB_CHANNELS_ENABLED"],
-  ["CLISBOT_HUB_CHANNEL_SECRETS_DIR", "PASEO_HUB_CHANNEL_SECRETS_DIR"],
-  ["CLISBOT_HUB_BIND", "PASEO_HUB_BIND"],
-  ["CLISBOT_HUB_URL", "PASEO_HUB_URL"],
-  ["CLISBOT_HUB_API_KEY", "PASEO_HUB_API_KEY"],
-  ["CLISBOT_REGISTRATION_MODE", "PASEO_REGISTRATION_MODE"],
-  ["CLISBOT_REGISTRATION_ALLOWED_DOMAINS", "PASEO_REGISTRATION_ALLOWED_DOMAINS"],
-  ["CLISBOT_GOOGLE_AUTH_CLIENT_ID", "PASEO_GOOGLE_AUTH_CLIENT_ID"],
-  ["CLISBOT_GOOGLE_AUTH_CLIENT_SECRET", "PASEO_GOOGLE_AUTH_CLIENT_SECRET"],
-  ["CLISBOT_PROFILE_IMAGE_HOSTS", "PASEO_PROFILE_IMAGE_HOSTS"],
   ["CLISBOT_RESEND_API_KEY", "RESEND_API_KEY"],
   ["CLISBOT_RESEND_FROM", "RESEND_FROM"],
 ] as const;
@@ -55,8 +39,8 @@ function isSet(value: string | undefined): boolean {
  * root.
  */
 function resolveSharedHome(environment: EnvLike): string {
-  return isSet(environment["PASEO_HOME"])
-    ? (environment["PASEO_HOME"] as string)
+  return isSet(environment["CLISBOT_HOME"])
+    ? (environment["CLISBOT_HOME"] as string)
     : join(homedir(), FORK_DEFAULT_HOME_DIRECTORY_NAME);
 }
 
@@ -99,16 +83,16 @@ export function applyClisbotEnvAliases(environment: EnvLike = process.env): void
  */
 export function applyClisbotEnvDefaults(environment: EnvLike = process.env): void {
   applyClisbotEnvAliases(environment);
-  if (!isSet(environment["PASEO_HUB_BIND"])) {
-    environment["PASEO_HUB_BIND"] = FORK_DEFAULT_BIND;
+  if (!isSet(environment["CLISBOT_HUB_BIND"])) {
+    environment["CLISBOT_HUB_BIND"] = FORK_DEFAULT_BIND;
   }
-  if (!isSet(environment["PASEO_HOME"])) {
-    environment["PASEO_HOME"] = resolveSharedHome(environment);
+  if (!isSet(environment["CLISBOT_HOME"])) {
+    environment["CLISBOT_HOME"] = resolveSharedHome(environment);
   }
-  if (!isSet(environment["PASEO_HUB_DATA_DIR"])) {
-    environment["PASEO_HUB_DATA_DIR"] = resolveDefaultHubDataDirectory(environment);
+  if (!isSet(environment["CLISBOT_HUB_DATA_DIR"])) {
+    environment["CLISBOT_HUB_DATA_DIR"] = resolveDefaultHubDataDirectory(environment);
   }
-  if (!isSet(environment["PASEO_HUB_CHANNELS_ENABLED"])) {
-    environment["PASEO_HUB_CHANNELS_ENABLED"] = FORK_DEFAULT_CHANNELS_ENABLED;
+  if (!isSet(environment["CLISBOT_HUB_CHANNELS_ENABLED"])) {
+    environment["CLISBOT_HUB_CHANNELS_ENABLED"] = FORK_DEFAULT_CHANNELS_ENABLED;
   }
 }

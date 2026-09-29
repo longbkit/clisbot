@@ -1,9 +1,9 @@
 {
-  "name": "@getpaseo/cli",
+  "name": "@clisbot/cli",
   "version": "0.10.0-beta.1",
-  "description": "Paseo CLI - control your AI coding agents from the command line",
+  "description": "Clisbot CLI - control your AI coding agents from the command line",
   "bin": {
-    "paseo": "bin/paseo"
+    "clisbot": "bin/clisbot"
   },
   "files": [
     "bin",
@@ -28,10 +28,10 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
-    "@getpaseo/client": "0.10.0-beta.1",
-    "@getpaseo/hub": "0.7.3-beta.1",
-    "@getpaseo/protocol": "0.10.0-beta.1",
-    "@getpaseo/server": "0.10.0-beta.1",
+    "@clisbot/client": "0.10.0-beta.1",
+    "@clisbot/hub": "0.7.3-beta.1",
+    "@clisbot/protocol": "0.10.0-beta.1",
+    "@clisbot/server": "0.10.0-beta.1",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "mime-types": "^2.1.35",

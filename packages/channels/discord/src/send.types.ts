@@ -1,8 +1,8 @@
 // upstream: extensions/discord/src/send.types.ts@5d8067a4483
 // Discord type declarations define plugin contracts.
-import type { MessageReceipt } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { RetryConfig } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
+import type { MessageReceipt } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { RetryConfig } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
 import type { RequestClient } from "./internal/discord.js";
 
 export class DiscordSendError extends Error {

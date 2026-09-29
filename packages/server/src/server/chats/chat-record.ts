@@ -13,10 +13,10 @@ import {
   type ChatPayload,
   type ChatRules,
   type ChatWhenBusy,
-} from "@getpaseo/protocol/chats/types";
-import { SessionActorSchema } from "@getpaseo/protocol/session-authorship";
-import { CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/rpc-schemas";
-import { DEFAULT_CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/room";
+} from "@clisbot/protocol/chats/types";
+import { SessionActorSchema } from "@clisbot/protocol/session-authorship";
+import { CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/rpc-schemas";
+import { DEFAULT_CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/room";
 
 const StoredChatLimitsSchema = z
   .object(

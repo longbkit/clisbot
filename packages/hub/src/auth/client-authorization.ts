@@ -1,13 +1,13 @@
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
 
-/** Stable OAuth identity shared by the Paseo native and desktop applications. */
-export const PASEO_CLIENT_ID = "paseo-client";
+/** Stable OAuth identity shared by the Clisbot native and desktop applications. */
+export const CLISBOT_CLIENT_ID = "clisbot-client";
 export const HUB_ACCESS_SCOPE = "hub:access";
 export const HUB_AUTHORIZATION_SCOPES = [HUB_ACCESS_SCOPE, "offline_access"] as const;
-export const HUB_ORGANIZATION_CLAIM = "https://paseo.sh/organization_id";
+export const HUB_ORGANIZATION_CLAIM = "https://clisbot.com/organization_id";
 
-export const PASEO_CLIENT_REDIRECT_URIS = [
-  "paseo://hub-auth/callback",
+export const CLISBOT_CLIENT_REDIRECT_URIS = [
+  "clisbot://hub-auth/callback",
   "http://127.0.0.1/hub-auth/callback",
   "http://[::1]/hub-auth/callback",
 ] as const;
@@ -53,10 +53,10 @@ export class ClientAuthorization {
          require_pkce = excluded.require_pkce,
          updated_at = now()`,
       [
-        PASEO_CLIENT_ID,
+        CLISBOT_CLIENT_ID,
         [...HUB_AUTHORIZATION_SCOPES],
-        "Paseo client",
-        [...PASEO_CLIENT_REDIRECT_URIS],
+        "Clisbot client",
+        [...CLISBOT_CLIENT_REDIRECT_URIS],
         ["authorization_code", "refresh_token"],
         ["code"],
       ],

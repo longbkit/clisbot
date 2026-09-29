@@ -3,7 +3,7 @@
 import {
   parseStrictNonNegativeInteger,
   parseStrictPositiveInteger,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 export type TelegramTarget = {
   chatId: string;

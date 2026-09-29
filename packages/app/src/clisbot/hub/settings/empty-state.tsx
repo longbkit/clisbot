@@ -1,5 +1,5 @@
 // An empty Hub list: what would be here, one line on what it is for, and the
-// action that fills it. The same shape as Paseo's Schedules empty state
+// action that fills it. The same shape as Clisbot's Schedules empty state
 // (packages/app/src/screens/schedules-screen.tsx), inside the list's card.
 
 import type { LucideIcon } from "lucide-react-native";

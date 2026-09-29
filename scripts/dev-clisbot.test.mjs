@@ -78,23 +78,23 @@ test("createDevEnvironment replaces ambient production state", () => {
   const environment = createDevEnvironment(
     {
       DATABASE_URL: "postgres://production",
-      PASEO_HOME: "/home/operator/.paseo",
-      PASEO_HUB_AUTH_SECRET: "production-secret",
-      PASEO_HUB_CREDENTIAL_MASTER_KEY: "production-key",
+      CLISBOT_HOME: "/home/operator/.clisbot",
+      CLISBOT_HUB_AUTH_SECRET: "production-secret",
+      CLISBOT_HUB_CREDENTIAL_MASTER_KEY: "production-key",
     },
     paths,
     "https://hub.example.com",
   );
-  assert.equal(environment.PASEO_HOME, paths.devHome);
-  assert.equal(environment.PASEO_HUB_APP_WEB_URL, "https://hub.example.com");
-  assert.equal(environment.PASEO_HUB_DATA_DIR, paths.hubDataDirectory);
-  assert.equal(environment.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE, paths.credentialKeyFile);
-  assert.equal(environment.PASEO_HUB_CREDENTIAL_MASTER_KEY, undefined);
-  assert.equal(environment.PASEO_HUB_AUTH_SECRET, undefined);
+  assert.equal(environment.CLISBOT_HOME, paths.devHome);
+  assert.equal(environment.CLISBOT_HUB_APP_WEB_URL, "https://hub.example.com");
+  assert.equal(environment.CLISBOT_HUB_DATA_DIR, paths.hubDataDirectory);
+  assert.equal(environment.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE, paths.credentialKeyFile);
+  assert.equal(environment.CLISBOT_HUB_CREDENTIAL_MASTER_KEY, undefined);
+  assert.equal(environment.CLISBOT_HUB_AUTH_SECRET, undefined);
   assert.equal(environment.DATABASE_URL, undefined);
   assert.equal(
     environment.EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND,
-    "PASEO_HOME=/home/operator/.clisbot-dev-01 npm run cli --",
+    "CLISBOT_HOME=/home/operator/.clisbot-dev-01 npm run cli --",
   );
 });
 
@@ -104,11 +104,11 @@ test("clearZombiePidLock removes only a confirmed zombie owner's lock", async ()
   const devHome = join(root, "home");
   await mkdir(join(procRoot, "123"), { recursive: true });
   await mkdir(devHome, { recursive: true });
-  await writeFile(join(devHome, "paseo.pid"), JSON.stringify({ pid: 123 }));
-  await writeFile(join(procRoot, "123", "stat"), "123 (Paseo Supervisor) Z 1 2 3");
+  await writeFile(join(devHome, "clisbot.pid"), JSON.stringify({ pid: 123 }));
+  await writeFile(join(procRoot, "123", "stat"), "123 (Clisbot Supervisor) Z 1 2 3");
 
   assert.equal(await clearZombiePidLock(devHome, procRoot), true);
-  await assert.rejects(access(join(devHome, "paseo.pid")), /ENOENT/);
+  await assert.rejects(access(join(devHome, "clisbot.pid")), /ENOENT/);
 });
 
 test(

@@ -6,7 +6,7 @@ export interface CompiledJsonSchema {
   readonly schema: JsonValue;
 }
 
-const FINISH_EXECUTION_OUTPUT_ID = "urn:paseo:hub:finish-execution-output";
+const FINISH_EXECUTION_OUTPUT_ID = "urn:clisbot:hub:finish-execution-output";
 
 export function compileJsonSchema(schema: JsonValue): CompiledJsonSchema {
   if (!isRecord(schema)) throw new Error("JSON Schema must be an object");

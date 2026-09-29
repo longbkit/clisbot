@@ -15,7 +15,7 @@
 // carrier instead of the OpenClaw config file. The env fallbacks are NOT
 // carried: a Hub process serves every organization, so an ambient
 // `FEISHU_APP_SECRET` would leak one tenant's app into another's account.
-import type { StartAccountContext } from "@getpaseo/channels-shared";
+import type { StartAccountContext } from "@clisbot/channels-shared";
 import { resolveFeishuAccount } from "../accounts.js";
 import type { OpenClawConfig as ClawdbotConfig } from "./runtime-api.js";
 import type { ResolvedFeishuAccount } from "../types.js";

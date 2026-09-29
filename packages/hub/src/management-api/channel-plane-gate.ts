@@ -1,5 +1,5 @@
 // COMPAT(clisbot-channels): the management contract's half of the channel
-// kill-switch (`PASEO_HUB_CHANNELS_ENABLED`, operator name
+// kill-switch (`CLISBOT_HUB_CHANNELS_ENABLED`, operator name
 // `CLISBOT_HUB_CHANNELS_ENABLED`; `channels/loader/channel-gate.ts`).
 //
 // The `/api/v1/channels` operator surface gates itself per request

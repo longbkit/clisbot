@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/truncate.ts@5d8067a4483
 // Slack plugin module implements truncate behavior.
-import { sliceUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { sliceUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 
 export function truncateSlackText(value: string, max: number): string {
   const trimmed = value.trim();

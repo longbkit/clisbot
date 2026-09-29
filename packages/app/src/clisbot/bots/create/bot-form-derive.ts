@@ -3,8 +3,8 @@ import type {
   AgentModelDefinition,
   AgentProvider,
   ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
-import { slugify } from "@getpaseo/protocol/branch-slug";
+} from "@clisbot/protocol/agent-types";
+import { slugify } from "@clisbot/protocol/branch-slug";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import { filterSelectableModels } from "@/provider-selection/model-catalog";

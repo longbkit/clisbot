@@ -1,10 +1,10 @@
 // upstream: extensions/telegram/src/send-outbound.ts@5d8067a4483
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
-import { createChannelPartialDeliveryError } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
+import { createChannelPartialDeliveryError } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import {
   createMessageReceiptFromOutboundResults,
   type MessageReceiptPartKind,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import type { TelegramThreadSpec } from "./bot/helpers.js";
 import {
   recordOutboundMessageForPromptContext,

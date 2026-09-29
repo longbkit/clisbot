@@ -28,7 +28,7 @@ monogram colour and adjacent-message author grouping each keyed on `actor.id`.
    every "same person" question routes through the Member link.
 
 Option 1 costs a protocol field and a change at the capture point, widening the surface that has
-to merge with upstream Paseo. It also cannot fix history: sessions already stored keep their old
+to merge with upstream Clisbot. It also cannot fix history: sessions already stored keep their old
 ids, and this repo does no migrations. Its one apparent advantage — a self-sufficient snapshot —
 turned out to be smaller than it looked, because a snapshot only ever knows the single channel
 that interaction came through. Listing _every_ channel a person has linked is a live Hub read

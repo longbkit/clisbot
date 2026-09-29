@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, test } from "vitest";
 import pino from "pino";
 import { ProjectConfigSession, type ProjectConfigSessionHost } from "./project-config-session.js";
-import { statPaseoConfigPath } from "../../../utils/paseo-config-file.js";
+import { statClisbotConfigPath } from "../../../utils/clisbot-config-file.js";
 import type { PersistedProjectRecord } from "../../workspace-registry.js";
 import type { SessionOutboundMessage } from "../../messages.js";
 
@@ -52,11 +52,14 @@ describe("ProjectConfigSession", () => {
     execFileSync("git", ["init", "-b", "main"], { cwd: repoRoot });
     execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repoRoot });
     execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
-    writeFileSync(join(repoRoot, "paseo.json"), JSON.stringify({ worktree: { setup: "npm ci" } }));
-    execFileSync("git", ["add", "paseo.json"], { cwd: repoRoot });
+    writeFileSync(
+      join(repoRoot, "clisbot.json"),
+      JSON.stringify({ worktree: { setup: "npm ci" } }),
+    );
+    execFileSync("git", ["add", "clisbot.json"], { cwd: repoRoot });
     execFileSync("git", ["commit", "-m", "add config"], { cwd: repoRoot });
     writeFileSync(
-      join(repoRoot, "paseo.json"),
+      join(repoRoot, "clisbot.json"),
       JSON.stringify({ worktree: { setup: "npm install" } }),
     );
     const { subsystem, emitted } = makeSubsystem([projectRecord(repoRoot)]);
@@ -81,7 +84,10 @@ describe("ProjectConfigSession", () => {
 
   test("read resolves a known root despite a trailing slash and returns the raw config + revision", async () => {
     const repoRoot = makeRoot();
-    writeFileSync(join(repoRoot, "paseo.json"), JSON.stringify({ worktree: { setup: "npm ci" } }));
+    writeFileSync(
+      join(repoRoot, "clisbot.json"),
+      JSON.stringify({ worktree: { setup: "npm ci" } }),
+    );
     const { subsystem, emitted } = makeSubsystem([projectRecord(repoRoot)]);
 
     await subsystem.handleReadProjectConfigRequest({
@@ -113,7 +119,7 @@ describe("ProjectConfigSession", () => {
     async () => {
       const repoRoot = makeRoot();
       writeFileSync(
-        join(repoRoot, "paseo.json"),
+        join(repoRoot, "clisbot.json"),
         JSON.stringify({ worktree: { setup: "npm ci" } }),
       );
       const linkRoot = join(makeRoot(), "link");
@@ -218,8 +224,11 @@ describe("ProjectConfigSession", () => {
     execFileSync("git", ["init", "-b", "main"], { cwd: repoRoot });
     execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repoRoot });
     execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
-    writeFileSync(join(repoRoot, "paseo.json"), JSON.stringify({ worktree: { setup: "npm ci" } }));
-    execFileSync("git", ["add", "paseo.json"], { cwd: repoRoot });
+    writeFileSync(
+      join(repoRoot, "clisbot.json"),
+      JSON.stringify({ worktree: { setup: "npm ci" } }),
+    );
+    execFileSync("git", ["add", "clisbot.json"], { cwd: repoRoot });
     execFileSync("git", ["commit", "-m", "add config"], { cwd: repoRoot });
     const { subsystem, emitted } = makeSubsystem([projectRecord(repoRoot)]);
 
@@ -228,7 +237,7 @@ describe("ProjectConfigSession", () => {
       requestId: "write-uncommitted-setup",
       repoRoot,
       config: { worktree: { setup: "npm install" } },
-      expectedRevision: statPaseoConfigPath(repoRoot),
+      expectedRevision: statClisbotConfigPath(repoRoot),
     });
 
     expect(emitted).toEqual([
@@ -245,7 +254,7 @@ describe("ProjectConfigSession", () => {
 
   test("write rejects a stale revision and an unknown root with their inline domain failures", async () => {
     const staleRoot = makeRoot();
-    writeFileSync(join(staleRoot, "paseo.json"), JSON.stringify({ worktree: { setup: "old" } }));
+    writeFileSync(join(staleRoot, "clisbot.json"), JSON.stringify({ worktree: { setup: "old" } }));
     const unknownRoot = makeRoot();
     const { subsystem, emitted } = makeSubsystem([projectRecord(staleRoot)]);
 

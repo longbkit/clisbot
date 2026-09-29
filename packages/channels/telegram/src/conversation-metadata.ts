@@ -1,4 +1,4 @@
-import type { ResolveConversationFn } from "@getpaseo/channels-shared";
+import type { ResolveConversationFn } from "@clisbot/channels-shared";
 import {
   buildTelegramClientOptions,
   createTelegramApi,

@@ -5,8 +5,8 @@
 // out of scope. A per-attachment failure is a skip (logged), not a fault:
 // admission of the message is unaffected.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import type { HostChildLogger, InboundAttachedFile } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import type { HostChildLogger, InboundAttachedFile } from "@clisbot/channels-shared";
 import {
   buildAttachedFilesManifest,
   downloadMediaFile,
@@ -14,7 +14,7 @@ import {
   mediaInboundMaxBytesForChannel,
   MEDIA_DOWNLOAD_TIMEOUT_MS,
   type ChannelInboundEvent,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 /** The Bot API file carriers this extractor reads. Structurally a subset of
  * grammY's `Message`, declared here so the module stays loadable without the
  * SDK types (slice 20 retired `./poll.js`, which used to own this shape). */

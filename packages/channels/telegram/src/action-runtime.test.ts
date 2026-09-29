@@ -1,13 +1,13 @@
 // upstream: extensions/telegram/src/action-runtime.test.ts@5d8067a4483
 import os from "node:os";
 import path from "node:path";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveStorePath } from "@getpaseo/channels-core/plugin-sdk/session-store-runtime";
-import { captureEnv } from "@getpaseo/channels-core/plugin-sdk/test-env";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveStorePath } from "@clisbot/channels-core/plugin-sdk/session-store-runtime";
+import { captureEnv } from "@clisbot/channels-core/plugin-sdk/test-env";
 // Telegram tests cover action runtime plugin behavior.
-import { createRequireRecord } from "@getpaseo/channels-core/plugin-sdk/test-fixtures";
-import { createOpenClawTestState, type OpenClawTestState } from "@getpaseo/channels-core/plugin-sdk/test-state";
+import { createRequireRecord } from "@clisbot/channels-core/plugin-sdk/test-fixtures";
+import { createOpenClawTestState, type OpenClawTestState } from "@clisbot/channels-core/plugin-sdk/test-state";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleTelegramAction as handleTelegramActionRuntime,

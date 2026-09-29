@@ -1,8 +1,8 @@
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { AgentTimelineRow } from "./agent-timeline-store-types.js";
-import { isLikelyExternalToolName } from "@getpaseo/protocol/tool-name-normalization";
-import { buildToolCallDisplayModel } from "@getpaseo/protocol/tool-call-display";
+import { isLikelyExternalToolName } from "@clisbot/protocol/tool-name-normalization";
+import { buildToolCallDisplayModel } from "@clisbot/protocol/tool-call-display";
 import { projectTimelineRows } from "./timeline-projection.js";
 
 const DEFAULT_MAX_ITEMS = 0;
@@ -287,7 +287,7 @@ function buildForkContextText(input: {
   agentTitle?: string | null;
   cwd?: string | null;
 }): string {
-  const header = ["Chat history from a previous Paseo agent."];
+  const header = ["Chat history from a previous Clisbot agent."];
   const agentTitle = trimContextMetadata(input.agentTitle);
   const cwd = trimContextMetadata(input.cwd);
   if (agentTitle) {

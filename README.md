@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Clisbot logo">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Clisbot</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -12,11 +12,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/getpaseo/paseo/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaseo/paseo?style=flat&logo=github" alt="GitHub stars">
+  <a href="https://github.com/longbkit/clisbot/stargazers">
+    <img src="https://img.shields.io/github/stars/longbkit/clisbot?style=flat&logo=github" alt="GitHub stars">
   </a>
-  <a href="https://github.com/getpaseo/paseo/releases">
-    <img src="https://img.shields.io/github/v/release/getpaseo/paseo?style=flat&logo=github" alt="GitHub release">
+  <a href="https://github.com/longbkit/clisbot/releases">
+    <img src="https://img.shields.io/github/v/release/longbkit/clisbot?style=flat&logo=github" alt="GitHub release">
   </a>
   <a href="https://x.com/moboudra">
     <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
@@ -24,7 +24,7 @@
   <a href="https://discord.gg/jz8T2uahpH">
     <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
   </a>
-  <a href="https://www.reddit.com/r/PaseoAI/">
+  <a href="https://www.reddit.com/r/ClisbotAI/">
     <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
   </a>
 </p>
@@ -32,11 +32,11 @@
 <p align="center">One interface for Claude Code, Codex, Copilot, OpenCode, and Pi agents.</p>
 
 <p align="center">
-  <img src="https://paseo.sh/hero-mockup.png" alt="Paseo app screenshot" width="100%">
+  <img src="https://clisbot.com/hero-mockup.png" alt="Clisbot app screenshot" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
+  <img src="https://clisbot.com/mobile-mockup.png" alt="Clisbot mobile app" width="100%">
 </p>
 
 Run agents in parallel on your own machines. Ship from your phone or your desk.
@@ -45,19 +45,19 @@ Run agents in parallel on your own machines. Ship from your phone or your desk.
 - **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, and Pi through the same interface. Pick the right model for each job.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
-- **Privacy-first:** Paseo doesn't have any telemetry, tracking, or forced log-ins.
+- **Privacy-first:** Clisbot doesn't have any telemetry, tracking, or forced log-ins.
 
 ## Plugins
 
 Add themes, workspace panels, commands, settings screens, and coding-agent providers with trusted
-TypeScript plugins. Install from npm, Git, or a local directory with `paseo plugin install <source>`.
+TypeScript plugins. Install from npm, Git, or a local directory with `clisbot plugin install <source>`.
 
-Start with the [plugin quickstart](https://paseo.sh/docs/plugins). Plugins run with access to your daemon
+Start with the [plugin quickstart](https://clisbot.com/docs/plugins). Plugins run with access to your daemon
 machine and inside connected clients; install only code you trust.
 
 ## Getting Started
 
-Paseo runs a local server called the daemon that manages your coding agents. Clients like the desktop app, mobile app, web app, and CLI connect to it.
+Clisbot runs a local server called the daemon that manages your coding agents. Clients like the desktop app, mobile app, web app, and CLI connect to it.
 
 ### Prerequisites
 
@@ -71,68 +71,68 @@ You need at least one agent CLI installed and configured with your credentials:
 
 ### Desktop app (recommended)
 
-Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/getpaseo/paseo/releases). Open the app and the daemon starts automatically. Nothing else to install.
+Download it from [clisbot.com/download](https://clisbot.com/download) or the [GitHub releases page](https://github.com/longbkit/clisbot/releases). Open the app and the daemon starts automatically. Nothing else to install.
 
 To connect from your phone, open **Settings → your host → Pair Device**.
 
 ### CLI / headless
 
-Install the CLI and start Paseo:
+Install the CLI and start Clisbot:
 
 ```bash
-npm install -g @getpaseo/cli
-paseo
+npm install -g @clisbot/cli
+clisbot
 ```
 
-Paseo starts locally, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. This path is useful for servers and remote machines.
+Clisbot starts locally, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. This path is useful for servers and remote machines.
 
 For full setup and configuration, see:
 
-- [Docs](https://paseo.sh/docs)
-- [Connectivity guide](https://paseo.sh/docs/connectivity)
-- [Configuration reference](https://paseo.sh/docs/configuration)
+- [Docs](https://clisbot.com/docs)
+- [Connectivity guide](https://clisbot.com/docs/connectivity)
+- [Configuration reference](https://clisbot.com/docs/configuration)
 
 ### Docker
 
-Run the Paseo daemon and self-hosted web UI in Docker:
+Run the Clisbot daemon and self-hosted web UI in Docker:
 
 ```bash
-docker run -d --name paseo \
+docker run -d --name clisbot \
   -p 6767:6767 \
-  -e PASEO_PASSWORD=change-me \
-  -v "$PWD/paseo-home:/home/paseo" \
+  -e CLISBOT_PASSWORD=change-me \
+  -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
-  ghcr.io/getpaseo/paseo:latest
+  ghcr.io/longbkit/clisbot:latest
 ```
 
-Open `http://localhost:6767` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/paseo` volume. See the [Docker documentation](docs/docker.md) for full setup details.
+Open `http://localhost:6767` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/clisbot` volume. See the [Docker documentation](docs/docker.md) for full setup details.
 
 ## CLI
 
 Everything you can do in the app, you can do from the terminal.
 
 ```bash
-paseo run --provider claude/opus-4.6 "implement user authentication"
-paseo run --provider codex/gpt-5.5 --worktree feature-x "implement feature X"
+clisbot run --provider claude/opus-4.6 "implement user authentication"
+clisbot run --provider codex/gpt-5.5 --worktree feature-x "implement feature X"
 
-paseo ls                           # list running agents
-paseo attach abc123                # stream live output
-paseo send abc123 "also add tests" # follow-up task
+clisbot ls                           # list running agents
+clisbot attach abc123                # stream live output
+clisbot send abc123 "also add tests" # follow-up task
 
 # run on a remote daemon; --cwd is a path on that host
-paseo run --host workstation.local:6767 --cwd /workspace "run the full test suite"
+clisbot run --host workstation.local:6767 --cwd /workspace "run the full test suite"
 ```
 
-See the [full CLI reference](https://paseo.sh/docs/cli) for more.
+See the [full CLI reference](https://clisbot.com/docs/cli) for more.
 
 ## TypeScript SDK
 
-Build issue integrations, dashboards, and orchestration services with `@getpaseo/client`:
+Build issue integrations, dashboards, and orchestration services with `@clisbot/client`:
 
 ```ts
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 
-const client = createPaseoClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6767/ws" });
 await client.connect();
 
 const agent = await client.agents.create({
@@ -147,32 +147,32 @@ console.log(result.lastMessage);
 await client.close();
 ```
 
-See the [SDK quickstart](https://paseo.sh/docs/sdk/quickstart), [recipes](https://paseo.sh/docs/sdk/recipes), and [API reference](https://paseo.sh/docs/sdk/reference).
+See the [SDK quickstart](https://clisbot.com/docs/sdk/quickstart), [recipes](https://clisbot.com/docs/sdk/recipes), and [API reference](https://clisbot.com/docs/sdk/reference).
 
 ## Skills
 
-Skills teach your agent to use Paseo to orchestrate other agents.
+Skills teach your agent to use Clisbot to orchestrate other agents.
 
 ```bash
-npx skills add getpaseo/paseo
+npx skills add longbkit/clisbot
 ```
 
 Then use them in any agent conversation:
 
-- `/paseo-handoff` — hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
-- `/paseo-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
-- `/paseo-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
+- `/clisbot-handoff` — hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
+- `/clisbot-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
+- `/clisbot-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
 
 ## Development
 
 Quick monorepo package map:
 
-- `packages/server`: Paseo daemon (agent process orchestration, WebSocket API, MCP server)
+- `packages/server`: Clisbot daemon (agent process orchestration, WebSocket API, MCP server)
 - `packages/app`: Expo client (iOS, Android, web)
-- `packages/cli`: `paseo` CLI for daemon and agent workflows
+- `packages/cli`: `clisbot` CLI for daemon and agent workflows
 - `packages/desktop`: Electron desktop app
 - `packages/relay`: Relay transport and encryption used by the daemon and clients
-- `packages/website`: Marketing site and documentation (`paseo.sh`)
+- `packages/website`: Marketing site and documentation (`clisbot.com`)
 
 Common commands:
 
@@ -195,14 +195,14 @@ npm run typecheck
 
 ## Sponsors
 
-Paseo is built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown here and on the paseo.sh homepage.
+Clisbot is built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Clisbot](https://clisbot.com/sponsor#spot) monthly and have their logo shown here and on the clisbot.com homepage.
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
 ## Related projects
 
 - [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay) — official distributed relay, written in Elixir
-- [paseo-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.paseo-vscode) — VS Code extension
+- [clisbot-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.clisbot-vscode) — VS Code extension
 
 ## License
 

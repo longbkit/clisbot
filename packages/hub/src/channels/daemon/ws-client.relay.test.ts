@@ -7,8 +7,8 @@ import {
   exportPublicKey,
   generateKeyPair,
   type Transport,
-} from "@getpaseo/relay/e2ee";
-import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+} from "@clisbot/relay/e2ee";
+import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 import { connectChannelDaemon, type DaemonConnection } from "./client.js";
 
 function toTransportData(data: RawData, isBinary: boolean): string | ArrayBuffer {

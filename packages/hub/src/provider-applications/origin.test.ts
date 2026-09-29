@@ -10,7 +10,7 @@ describe("provider application callback origin", () => {
         host: "attacker.test",
         "x-forwarded-host": "also-attacker.test",
         "x-forwarded-proto": "https",
-        "x-paseo-trusted-request-origin": "https://hub.test",
+        "x-clisbot-trusted-request-origin": "https://hub.test",
       },
     });
 
@@ -25,7 +25,7 @@ describe("provider application callback origin", () => {
             headers: {
               origin: "https://hub.test",
               host: "hub.test",
-              "x-paseo-trusted-request-origin": "https://attacker.test",
+              "x-clisbot-trusted-request-origin": "https://attacker.test",
             },
           }),
         ),

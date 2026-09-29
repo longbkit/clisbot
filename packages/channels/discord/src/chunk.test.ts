@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/chunk.test.ts@5d8067a4483
-import { expectDefined } from "@getpaseo/channels-core/normalization-core/expect";
+import { expectDefined } from "@clisbot/channels-core/normalization-core/expect";
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { countLines, hasBalancedFences } from "@getpaseo/channels-core/plugin-sdk/test-fixtures";
+import { countLines, hasBalancedFences } from "@clisbot/channels-core/plugin-sdk/test-fixtures";
 import { describe, expect, it } from "vitest";
 import { chunkDiscordTextWithMode } from "./chunk.js";
 

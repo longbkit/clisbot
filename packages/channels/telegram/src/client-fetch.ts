@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/client-fetch.ts@5d8067a4483
 // Telegram plugin module implements client fetch behavior.
 import type { ApiClientOptions } from "grammy";
-import { responseWithRelease } from "@getpaseo/channels-core/plugin-sdk/fetch-runtime";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { responseWithRelease } from "@clisbot/channels-core/plugin-sdk/fetch-runtime";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { TelegramTransport } from "./fetch.js";
 import {
   isTelegramMisdirectedRequestError,

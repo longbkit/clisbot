@@ -146,7 +146,7 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
   configure(input: AppUpdateRuntimeConfiguration): void {
     autoUpdater.autoDownload = true;
     autoUpdater.autoRunAppAfterInstall = true;
-    // Paseo revalidates the current manifest before explicitly installing on quit.
+    // Clisbot revalidates the current manifest before explicitly installing on quit.
     // Electron's built-in handler would install an older download without checking
     // whether a newer release has superseded it.
     autoUpdater.autoInstallOnAppQuit = false;
@@ -165,7 +165,7 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
     this.configured = true;
 
     // electron-updater logs every emitted error before consumers can classify it.
-    // Paseo reports genuine check, runtime, and install failures through the
+    // Clisbot reports genuine check, runtime, and install failures through the
     // callbacks below, so leave internal error logging disabled to avoid both
     // duplicate logs and expected missing-channel noise.
     const updaterLogger = autoUpdater.logger;

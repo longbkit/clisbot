@@ -1,7 +1,7 @@
 // The `message` tool surface the Hub drives: discovery, the send action over
 // the ported send path, and the refusal every other action gets.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { setSsrfLookupImplementation } from "./fusion/ssrf.js";
 import { zaloChannelActions, ZALO_MESSAGE_ACTIONS } from "./channel-actions.js";
 

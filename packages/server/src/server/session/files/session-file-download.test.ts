@@ -29,7 +29,7 @@ async function setup() {
   const emitted: SessionOutboundMessage[] = [];
   const tokens = new DownloadTokenStore({ ttlMs: 10000 });
   const subsystem = new WorkspaceFilesSession({
-    paseoHome: directory,
+    clisbotHome: directory,
     logger: pino({ level: "silent" }),
     downloadTokenStore: tokens,
     host: {

@@ -58,7 +58,7 @@ export async function runHubConnect(
     ) {
       await daemon.disconnectHub(false).catch(() => undefined);
       throw new Error(
-        "The daemon did not honor the requested Hub access. Update Paseo before connecting it.",
+        "The daemon did not honor the requested Hub access. Update Clisbot before connecting it.",
       );
     }
     return withCredentialIdentity(hubStatusResult(response.status), identity);
@@ -70,8 +70,8 @@ export function addHubConnectCommand(parent: Command, dependencies: HubConnectDe
     addHubResolutionHelp(
       parent
         .command("connect")
-        .description("Enroll this daemon with a Paseo Hub")
-        .argument("[origin]", "Paseo Hub origin")
+        .description("Enroll this daemon with a Clisbot Hub")
+        .argument("[origin]", "Clisbot Hub origin")
         .option("--api-key <secret>", "Organization API key")
         .option("--permission <permission...>", "Grant daemon permission during connection"),
     ),

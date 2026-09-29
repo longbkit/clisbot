@@ -11,11 +11,11 @@ import {
   type MessagePresentation,
   type MessagePresentationInteractiveBlock,
   type MessagePresentationTableBlock,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   resolveAskUserQuestionOptionIndices,
   type ReplyPayload,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
 import {
   buildTelegramPresentationButtons,
   resolveTelegramInlineButtons,

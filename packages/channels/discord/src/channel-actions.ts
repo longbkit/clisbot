@@ -1,16 +1,16 @@
 // upstream: extensions/discord/src/channel-actions.ts@5d8067a4483
 // Discord plugin module implements channel actions behavior.
-import { createUnionActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { createUnionActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
   ChannelMessageToolDiscovery,
   ChannelMessageToolSchemaContribution,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { DiscordActionConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { extractToolSend } from "@getpaseo/channels-core/plugin-sdk/tool-send";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { DiscordActionConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { extractToolSend } from "@clisbot/channels-core/plugin-sdk/tool-send";
 import { Type } from "typebox";
 import { inspectDiscordAccount } from "./account-inspect.js";
 import { createDiscordActionGate, listDiscordAccountIds } from "./accounts.js";

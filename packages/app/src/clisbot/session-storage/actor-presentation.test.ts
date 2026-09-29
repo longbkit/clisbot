@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
-import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
+import { sessionParticipantKey } from "@clisbot/protocol/session-authorship";
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
 import {
   actorLabel,

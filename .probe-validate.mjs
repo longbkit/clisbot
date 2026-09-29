@@ -10,14 +10,14 @@ function password() {
     const e = r.indexOf("=");
     return e > 0 ? r.slice(e + 1).trim() : r;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() ?? "";
+    return process.env.CLISBOT_PASSWORD?.trim() ?? "";
   }
 }
 const provider = process.argv[2] || "pi";
 const t0 = Date.now();
 const st = (x) => console.log(`[t+${Date.now() - t0}ms] ${x}`);
 const pw = password();
-const sock = new WebSocket(URL, pw ? [`paseo.bearer.${pw}`] : undefined);
+const sock = new WebSocket(URL, pw ? [`clisbot.bearer.${pw}`] : undefined);
 sock.on("open", () => {
   st("OPEN, sending hello");
   sock.send(

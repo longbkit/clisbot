@@ -20,8 +20,8 @@
 // click whose handler threw is not retried by re-serving the update (the Hub
 // owns approval retries).
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import type { CallbackQuery } from "grammy/types";
 
 /** Dispatched ids kept per session. Cleared wholesale at the cap, the same

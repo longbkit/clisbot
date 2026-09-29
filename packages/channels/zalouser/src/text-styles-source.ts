@@ -1,5 +1,5 @@
 // upstream: extensions/zalouser/src/text-styles-source.ts@5d8067a4483
-import { markdownToIR } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { markdownToIR } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { protectLiteral, protectLocalInlineSyntax } from "./text-styles-inline.js";
 import type { MarkdownIRWithBlockMetadata, TokenRegistry } from "./text-styles-shared.js";
 import {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { FileTransferOpcode } from "@getpaseo/protocol/binary-frames/index";
+import { FileTransferOpcode } from "@clisbot/protocol/binary-frames/index";
 import { FileUploadStore } from "./index.js";
 import { attachSessionFiles, deleteSessionDirectory, pruneSessionDrafts } from "./session-files.js";
 
@@ -54,11 +54,11 @@ async function upload(store: FileUploadStore, requestId: string, agentId?: strin
 
 describe("session-owned files", () => {
   it("binds temporary uploads and images durably; retry reuses accepted files and rejects conflicts", async () => {
-    const directory = path.join(await root(), ".paseo");
+    const directory = path.join(await root(), ".clisbot");
     await fs.mkdir(directory);
     const session = path.join(directory, "agents", "a");
     const store = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
     });
     const file = await upload(store, "draft");
@@ -136,7 +136,7 @@ describe("session-owned files", () => {
     const directory = await root();
     const session = path.join(directory, "agents", "a");
     const store = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
       resolveAgentDirectory: async () => session,
     });
@@ -156,7 +156,7 @@ describe("session-owned files", () => {
   it("does not accept a forged path or metadata and rejects zero-byte FileEnd without Begin", async () => {
     const directory = await root();
     const store = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
     });
     const file = await upload(store, "owned");
@@ -190,12 +190,12 @@ describe("session-owned files", () => {
     const session = path.join(directory, "agents", "a");
     // Two independent connections = two principals; each owns its own upload store.
     const principalA = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
       resolveAgentDirectory: async () => session,
     });
     const principalB = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
       resolveAgentDirectory: async () => session,
     });
@@ -236,7 +236,7 @@ describe("session-owned files", () => {
     const directory = await root();
     const session = path.join(directory, "agents", "a");
     const store = new FileUploadStore({
-      paseoHome: directory,
+      clisbotHome: directory,
       sessionStorageEnabled: () => true,
       resolveAgentDirectory: async () => session,
     });
@@ -280,7 +280,7 @@ it("forks only files from the authorized anchored messages and reuses the target
   const directory = await root();
   const source = path.join(directory, "source");
   const target = path.join(directory, "target");
-  const store = new FileUploadStore({ paseoHome: directory, sessionStorageEnabled: () => true });
+  const store = new FileUploadStore({ clisbotHome: directory, sessionStorageEnabled: () => true });
   const uploaded = await upload(store, "source-file");
   const linked = await attachSessionFiles({
     directory: source,
@@ -336,7 +336,7 @@ it("forks only files from the authorized anchored messages and reuses the target
 it("rejects a fork when its authorized linked file is missing instead of forwarding a broken path", async () => {
   const directory = await root();
   const source = path.join(directory, "source");
-  const store = new FileUploadStore({ paseoHome: directory, sessionStorageEnabled: () => true });
+  const store = new FileUploadStore({ clisbotHome: directory, sessionStorageEnabled: () => true });
   const file = await upload(store, "missing-source");
   const linked = await attachSessionFiles({
     directory: source,

@@ -1,5 +1,5 @@
 // upstream: extensions/discord/src/components-registry-state.ts@5d8067a4483
-import { resolveGlobalSingleton } from "@getpaseo/channels-core/plugin-sdk/global-singleton";
+import { resolveGlobalSingleton } from "@clisbot/channels-core/plugin-sdk/global-singleton";
 import type { DiscordComponentEntry, DiscordModalEntry } from "./components.js";
 
 type PersistedDiscordRegistryEntry<T extends { id: string }> = {

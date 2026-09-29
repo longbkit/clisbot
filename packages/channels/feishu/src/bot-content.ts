@@ -1,7 +1,7 @@
 // upstream: extensions/feishu/src/bot-content.ts@5d8067a4483
 // Feishu plugin module implements bot content behavior.
-import { parseStrictNonNegativeInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { escapeHtml } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { parseStrictNonNegativeInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { escapeHtml } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import type { ClawdbotConfig } from "./fusion/runtime-api.js";
 import { buildFeishuConversationId } from "./conversation-id.js";
 import { normalizeFeishuExternalKey } from "./external-keys.js";

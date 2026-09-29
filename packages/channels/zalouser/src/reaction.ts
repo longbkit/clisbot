@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/reaction.ts@5d8067a4483
 // Zalouser plugin module implements reaction behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { Reactions } from "./zca-constants.js";
 
 const REACTION_ALIAS_MAP = new Map<string, string>([

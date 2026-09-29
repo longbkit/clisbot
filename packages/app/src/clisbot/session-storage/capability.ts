@@ -1,4 +1,4 @@
-import type { ServerInfoStatusPayload } from "@getpaseo/protocol/messages";
+import type { ServerInfoStatusPayload } from "@clisbot/protocol/messages";
 import { useSessionStore } from "@/stores/session-store";
 
 // COMPAT(agentSessionStorageRead): capture alone does not advertise the extended read contract.

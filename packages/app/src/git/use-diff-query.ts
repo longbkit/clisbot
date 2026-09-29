@@ -4,7 +4,7 @@ import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useReplicaQuery } from "@/data/query";
 import { checkoutDiffPushRoute } from "@/data/push-router";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
-import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@getpaseo/protocol/messages";
+import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@clisbot/protocol/messages";
 import { checkoutDiffQueryKey } from "@/git/query-keys";
 
 interface UseCheckoutDiffQueryOptions {

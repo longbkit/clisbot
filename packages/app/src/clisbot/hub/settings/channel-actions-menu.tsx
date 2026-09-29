@@ -17,7 +17,7 @@ function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
   return [styles.trigger, (hovered || pressed || open) && styles.highlight];
 }
 
-/** Infrequent actions share Paseo's menu presentation and confirmation handoff. */
+/** Infrequent actions share Clisbot's menu presentation and confirmation handoff. */
 export interface ChannelMenuAction {
   label: string;
   onSelect(): void;

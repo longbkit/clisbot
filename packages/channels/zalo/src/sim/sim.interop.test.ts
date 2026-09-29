@@ -6,7 +6,7 @@
 // can confirm that is the ported `handleZaloWebhookRequest`, running behind a
 // real `node:http` listener, admitting a request the signer built.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSimWebhookClient, signWebhookRequest } from "@getpaseo/channels-shared/sim";
+import { createSimWebhookClient, signWebhookRequest } from "@clisbot/channels-shared/sim";
 import { zaloWebhookRuntime } from "../monitor.webhook.js";
 import type { ResolvedZaloAccount } from "../types.js";
 import type { ZaloAdmission, ZaloAdmissionResult } from "../fusion/admission.js";

@@ -13,11 +13,11 @@ import {
   folderRulesAllow,
   parseFolderPatterns,
   type ProjectFolderRules,
-} from "@getpaseo/protocol/project-folders";
+} from "@clisbot/protocol/project-folders";
 import { isSameOrDescendantPath } from "../path-utils.js";
 
-export const PROJECT_FOLDERS_ALLOW_ENV = "PASEO_PROJECT_FOLDERS_ALLOW";
-export const PROJECT_FOLDERS_DENY_ENV = "PASEO_PROJECT_FOLDERS_DENY";
+export const PROJECT_FOLDERS_ALLOW_ENV = "CLISBOT_PROJECT_FOLDERS_ALLOW";
+export const PROJECT_FOLDERS_DENY_ENV = "CLISBOT_PROJECT_FOLDERS_DENY";
 
 /** The Host policy: each environment variable replaces its default list when set. */
 export function hostProjectFolderPolicy(

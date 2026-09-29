@@ -15,11 +15,11 @@
 // native Bot API 10.3 `table` block; on a plain account the table degrades to
 // the portable fallback text the HTML send path posts. Telegram has no chart
 // primitive at all, so a chart is always fallback text.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   admitMessagePresentation,
   type MessagePresentationBlockNote,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import { mergeTelegramAccountConfig } from "./accounts.js";
 import {
   canonicalizeTelegramPresentationPayload,

@@ -1,4 +1,4 @@
-// @getpaseo/channels-discord — the in-repo Discord channel vertical (goal
+// @clisbot/channels-discord — the in-repo Discord channel vertical (goal
 // ledger slice 13). Exports:
 // - `default` — the bundled-channel entry (`id: "discord"`);
 // - `discordPlugin` — the pinned drive-surface name (startAccount + sendText);

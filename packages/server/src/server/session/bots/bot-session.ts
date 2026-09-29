@@ -1,6 +1,6 @@
 import type pino from "pino";
-import type { StoredBot } from "@getpaseo/protocol/bots/types";
-import { sessionParticipantKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { StoredBot } from "@clisbot/protocol/bots/types";
+import { sessionParticipantKey, type SessionActor } from "@clisbot/protocol/session-authorship";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import { BotRequestError } from "../../bots/bot-creation.js";
 import type { BotService } from "../../bots/index.js";

@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/button-types.ts@5d8067a4483
 // Telegram plugin module implements button types behavior.
-import { parseExecApprovalCommandText } from "@getpaseo/channels-core/plugin-sdk/approval-reply-runtime";
+import { parseExecApprovalCommandText } from "@clisbot/channels-core/plugin-sdk/approval-reply-runtime";
 import {
   legacyInteractiveReplyToPresentation,
   isMessagePresentationInteractiveBlock,
@@ -10,11 +10,11 @@ import {
   resolveMessagePresentationButtonAction,
   type MessagePresentation,
   type MessagePresentationButton,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   resolveAskUserQuestionOptionIndex,
   type AskUserQuestionOptionIndices,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
 import {
   buildTelegramApprovalCallbackData,
   TELEGRAM_CALLBACK_DATA_MAX_BYTES,

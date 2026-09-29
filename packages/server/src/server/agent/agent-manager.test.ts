@@ -20,7 +20,7 @@ import { AgentStorage } from "./agent-storage.js";
 import { InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { projectTimelineRows } from "./timeline-projection.js";
-import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { formatSystemNotificationPrompt, startAgentRun } from "./agent-prompt.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
 import { PromptNotDeliveredError } from "./prompt-not-delivered-error.js";
@@ -52,7 +52,7 @@ import type {
   ImportProviderSessionContext,
   ResolveAgentDefaultModeInput,
 } from "./agent-sdk-types.js";
-import type { PaseoToolCatalog } from "./tools/types.js";
+import type { ClisbotToolCatalog } from "./tools/types.js";
 import type { ProviderDefinition } from "./provider-registry.js";
 
 const DESKTOP_OPEN_AGENT_TAB_LABEL = getOpenAgentTabLabel("desktop-client");
@@ -412,7 +412,7 @@ class EnvProbeAgentClient extends TestAgentClient {
     const script = `
       process.stdout.write(JSON.stringify({
         probe: process.env.CHUNK14_PROBE ?? null,
-        agentId: process.env.PASEO_AGENT_ID ?? null
+        agentId: process.env.CLISBOT_AGENT_ID ?? null
       }));
     `;
     const child = spawn(process.execPath, ["-e", script], {
@@ -2862,8 +2862,8 @@ test("createAgent passes daemon launch env through the provider launch context",
   expect(client.lastLaunchContext).toEqual({
     agentId: snapshot.id,
     env: {
-      PASEO_AGENT_ID: snapshot.id,
-      PASEO_AGENT_CWD: workdir,
+      CLISBOT_AGENT_ID: snapshot.id,
+      CLISBOT_AGENT_CWD: workdir,
     },
   });
 });
@@ -2943,7 +2943,7 @@ test("createAgent persists workspaceId on the stored record and emits it in the 
   }
 });
 
-test("createAgent injects paseo MCP server only into provider launch config", async () => {
+test("createAgent injects clisbot MCP server only into provider launch config", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
@@ -2990,7 +2990,7 @@ test("createAgent injects paseo MCP server only into provider launch config", as
     },
   });
   expect(client.lastConfig?.mcpServers).toEqual({
-    paseo: {
+    clisbot: {
       type: "http",
       url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${snapshot.id}`,
     },
@@ -3137,12 +3137,12 @@ test("reloadAgentSession preserves the live session when its replacement cannot 
     }
   }
 
-  let paseoToolPolicy = { disabledTools: ["list_agents"] };
+  let clisbotToolPolicy = { disabledTools: ["list_agents"] };
   const manager = new AgentManager({
     clients: { codex: new UnsupportedReloadClient() },
     registry: new AgentStorage(join(workdir, "agents"), logger),
     logger,
-    resolvePaseoToolPolicy: () => paseoToolPolicy,
+    resolveClisbotToolPolicy: () => clisbotToolPolicy,
   });
 
   try {
@@ -3151,7 +3151,7 @@ test("reloadAgentSession preserves the live session when its replacement cannot 
       "00000000-0000-4000-8000-000000000109",
       { workspaceId: undefined },
     );
-    paseoToolPolicy = { disabledTools: ["create_agent"] };
+    clisbotToolPolicy = { disabledTools: ["create_agent"] };
 
     await expect(
       manager.reloadAgentSession(created.id, {
@@ -3165,7 +3165,7 @@ test("reloadAgentSession preserves the live session when its replacement cannot 
     expect(original.closed).toBe(false);
     expect(manager.getAgent(created.id)?.session).toBe(original);
     expect(manager.getAgent(created.id)?.lifecycle).toBe("idle");
-    expect(manager.getPaseoToolPolicy(created.id)).toEqual({
+    expect(manager.getClisbotToolPolicy(created.id)).toEqual({
       disabledTools: ["list_agents"],
     });
   } finally {
@@ -3173,12 +3173,12 @@ test("reloadAgentSession preserves the live session when its replacement cannot 
   }
 });
 
-test("createAgent passes native Paseo tools through launch context without internal MCP", async () => {
+test("createAgent passes native Clisbot tools through launch context without internal MCP", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
 
-  const paseoTools: PaseoToolCatalog = {
+  const clisbotTools: ClisbotToolCatalog = {
     tools: new Map(),
     getTool: () => undefined,
     executeTool: async () => {
@@ -3190,7 +3190,7 @@ test("createAgent passes native Paseo tools through launch context without inter
     override readonly capabilities = {
       ...TEST_CAPABILITIES,
       supportsMcpServers: true,
-      supportsNativePaseoTools: true,
+      supportsNativeClisbotTools: true,
     };
     lastConfig: AgentSessionConfig | null = null;
     lastLaunchContext: AgentLaunchContext | undefined;
@@ -3213,7 +3213,7 @@ test("createAgent passes native Paseo tools through launch context without inter
     registry: storage,
     logger,
     mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
-    paseoToolCatalogFactory: () => paseoTools,
+    clisbotToolCatalogFactory: () => clisbotTools,
     idFactory: () => "00000000-0000-4000-8000-000000000106",
   });
 
@@ -3232,7 +3232,7 @@ test("createAgent passes native Paseo tools through launch context without inter
     { workspaceId: undefined },
   );
 
-  expect(client.lastLaunchContext?.paseoTools).toBe(paseoTools);
+  expect(client.lastLaunchContext?.clisbotTools).toBe(clisbotTools);
   expect(client.lastConfig?.mcpServers).toEqual({
     custom: {
       type: "stdio",
@@ -3291,7 +3291,7 @@ test("createAgent allows best-effort internal MCP when the provider session repo
   );
 
   expect(manager.getMcpAuthToken()).toBe("cap-token");
-  expect(client.lastConfig?.mcpServers?.paseo).toEqual({
+  expect(client.lastConfig?.mcpServers?.clisbot).toEqual({
     type: "http",
     url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${snapshot.id}`,
     headers: { Authorization: "Bearer cap-token" },
@@ -3312,7 +3312,7 @@ test("uses each provider's current policy for new sessions and snapshots it by a
     override readonly capabilities = {
       ...TEST_CAPABILITIES,
       supportsMcpServers: true,
-      supportsNativePaseoTools: true,
+      supportsNativeClisbotTools: true,
     };
     readonly launchContexts: AgentLaunchContext[] = [];
     readonly configs: AgentSessionConfig[] = [];
@@ -3329,8 +3329,8 @@ test("uses each provider's current policy for new sessions and snapshots it by a
 
   const codex = new CaptureClient("codex");
   const claude = new CaptureClient("claude");
-  const policyInputs: Array<{ callerAgentId?: string; paseoToolPolicy?: unknown }> = [];
-  const paseoTools: PaseoToolCatalog = {
+  const policyInputs: Array<{ callerAgentId?: string; clisbotToolPolicy?: unknown }> = [];
+  const clisbotTools: ClisbotToolCatalog = {
     tools: new Map(),
     getTool: () => undefined,
     executeTool: async () => {
@@ -3342,10 +3342,10 @@ test("uses each provider's current policy for new sessions and snapshots it by a
     registry: storage,
     logger,
     mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
-    resolvePaseoToolPolicy: (provider) => policies.get(provider),
-    paseoToolCatalogFactory: async (context) => {
+    resolveClisbotToolPolicy: (provider) => policies.get(provider),
+    clisbotToolCatalogFactory: async (context) => {
       policyInputs.push(context);
-      return paseoTools;
+      return clisbotTools;
     },
   });
 
@@ -3361,16 +3361,16 @@ test("uses each provider's current policy for new sessions and snapshots it by a
   );
 
   expect(policyInputs).toEqual([
-    { callerAgentId: codexAgent.id, paseoToolPolicy: { disabledTools: ["list_agents"] } },
+    { callerAgentId: codexAgent.id, clisbotToolPolicy: { disabledTools: ["list_agents"] } },
   ]);
-  expect(codex.launchContexts[0]?.paseoTools).toBe(paseoTools);
-  expect(claude.launchContexts[0]?.paseoTools).toBeUndefined();
-  expect(codex.configs[0]?.mcpServers?.paseo).toBeUndefined();
+  expect(codex.launchContexts[0]?.clisbotTools).toBe(clisbotTools);
+  expect(claude.launchContexts[0]?.clisbotTools).toBeUndefined();
+  expect(codex.configs[0]?.mcpServers?.clisbot).toBeUndefined();
   expect(claude.configs[0]?.mcpServers).toBeUndefined();
-  expect(manager.getPaseoToolPolicy(codexAgent.id)).toEqual({
+  expect(manager.getClisbotToolPolicy(codexAgent.id)).toEqual({
     disabledTools: ["list_agents"],
   });
-  expect(manager.getPaseoToolPolicy(claudeAgent.id)).toEqual({ enabled: false });
+  expect(manager.getClisbotToolPolicy(claudeAgent.id)).toEqual({ enabled: false });
 
   policies.set("codex", { disabledTools: ["create_agent"] });
   const nextCodexAgent = await manager.createAgent(
@@ -3379,27 +3379,27 @@ test("uses each provider's current policy for new sessions and snapshots it by a
     { workspaceId: undefined },
   );
 
-  expect(manager.getPaseoToolPolicy(codexAgent.id)).toEqual({
+  expect(manager.getClisbotToolPolicy(codexAgent.id)).toEqual({
     disabledTools: ["list_agents"],
   });
-  expect(manager.getPaseoToolPolicy(nextCodexAgent.id)).toEqual({
+  expect(manager.getClisbotToolPolicy(nextCodexAgent.id)).toEqual({
     disabledTools: ["create_agent"],
   });
   expect(policyInputs).toEqual([
-    { callerAgentId: codexAgent.id, paseoToolPolicy: { disabledTools: ["list_agents"] } },
+    { callerAgentId: codexAgent.id, clisbotToolPolicy: { disabledTools: ["list_agents"] } },
     {
       callerAgentId: nextCodexAgent.id,
-      paseoToolPolicy: { disabledTools: ["create_agent"] },
+      clisbotToolPolicy: { disabledTools: ["create_agent"] },
     },
   ]);
 
   await manager.archiveAgent(claudeAgent.id);
-  expect(manager.getPaseoToolPolicy(claudeAgent.id)).toBeUndefined();
+  expect(manager.getClisbotToolPolicy(claudeAgent.id)).toBeUndefined();
 
   rmSync(workdir, { recursive: true, force: true });
 });
 
-test("keeps the global Paseo-tools gate outside provider policy and MCP injection", async () => {
+test("keeps the global Clisbot-tools gate outside provider policy and MCP injection", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);
 
@@ -3422,7 +3422,7 @@ test("keeps the global Paseo-tools gate outside provider policy and MCP injectio
     registry: storage,
     logger,
     mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
-    resolvePaseoToolPolicy: () => ({ disabledTools: ["list_agents"] }),
+    resolveClisbotToolPolicy: () => ({ disabledTools: ["list_agents"] }),
   });
   const enabledAgent = await enabledManager.createAgent(
     { provider: "codex", cwd: workdir },
@@ -3430,7 +3430,7 @@ test("keeps the global Paseo-tools gate outside provider policy and MCP injectio
     { workspaceId: undefined },
   );
 
-  expect(enabledClient.lastConfig?.mcpServers?.paseo).toEqual({
+  expect(enabledClient.lastConfig?.mcpServers?.clisbot).toEqual({
     type: "http",
     url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${enabledAgent.id}`,
   });
@@ -3442,11 +3442,11 @@ test("keeps the global Paseo-tools gate outside provider policy and MCP injectio
     registry: storage,
     logger,
     mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
-    paseoToolsEnabled: false,
-    resolvePaseoToolPolicy: () => ({ enabled: true }),
-    paseoToolCatalogFactory: () => {
+    clisbotToolsEnabled: false,
+    resolveClisbotToolPolicy: () => ({ enabled: true }),
+    clisbotToolCatalogFactory: () => {
       catalogFactoryCalls += 1;
-      return paseoTools;
+      return clisbotTools;
     },
   });
   const disabledAgent = await disabledManager.createAgent(
@@ -3457,12 +3457,12 @@ test("keeps the global Paseo-tools gate outside provider policy and MCP injectio
 
   expect(disabledClient.lastConfig?.mcpServers).toBeUndefined();
   expect(catalogFactoryCalls).toBe(0);
-  expect(disabledManager.getPaseoToolPolicy(disabledAgent.id)).toEqual({ enabled: false });
+  expect(disabledManager.getClisbotToolPolicy(disabledAgent.id)).toEqual({ enabled: false });
 
   rmSync(workdir, { recursive: true, force: true });
 });
 
-test("resumeAgentFromPersistence replaces stored internal paseo MCP with current runtime URL", async () => {
+test("resumeAgentFromPersistence replaces stored internal clisbot MCP with current runtime URL", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
@@ -3487,7 +3487,7 @@ test("resumeAgentFromPersistence replaces stored internal paseo MCP with current
   const snapshot = await manager.resumeAgentFromPersistence(handle, {
     cwd: workdir,
     mcpServers: {
-      paseo: {
+      clisbot: {
         type: "http",
         url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=stale-agent",
       },
@@ -3499,7 +3499,7 @@ test("resumeAgentFromPersistence replaces stored internal paseo MCP with current
   });
 
   expect(client.resumeOverrides[0]?.mcpServers).toEqual({
-    paseo: {
+    clisbot: {
       type: "http",
       url: `http://127.0.0.1:6768/mcp/agents?callerAgentId=${snapshot.id}`,
     },
@@ -3516,7 +3516,7 @@ test("resumeAgentFromPersistence replaces stored internal paseo MCP with current
   });
 });
 
-test("resumeAgentFromPersistence drops stored internal paseo MCP when runtime injection is disabled", async () => {
+test("resumeAgentFromPersistence drops stored internal clisbot MCP when runtime injection is disabled", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
@@ -3539,7 +3539,7 @@ test("resumeAgentFromPersistence drops stored internal paseo MCP when runtime in
   const snapshot = await manager.resumeAgentFromPersistence(handle, {
     cwd: workdir,
     mcpServers: {
-      paseo: {
+      clisbot: {
         type: "http",
         url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=stale-agent",
       },
@@ -3550,7 +3550,7 @@ test("resumeAgentFromPersistence drops stored internal paseo MCP when runtime in
   expect(snapshot.config.mcpServers).toBeUndefined();
 });
 
-test("createAgent preserves a user-provided paseo MCP config", async () => {
+test("createAgent preserves a user-provided clisbot MCP config", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
@@ -3580,9 +3580,9 @@ test("createAgent preserves a user-provided paseo MCP config", async () => {
       provider: "codex",
       cwd: workdir,
       mcpServers: {
-        paseo: {
+        clisbot: {
           type: "http",
-          url: "https://example.com/custom-paseo",
+          url: "https://example.com/custom-clisbot",
         },
       },
     },
@@ -3591,9 +3591,9 @@ test("createAgent preserves a user-provided paseo MCP config", async () => {
   );
 
   expect(snapshot.config.mcpServers).toEqual({
-    paseo: {
+    clisbot: {
       type: "http",
-      url: "https://example.com/custom-paseo",
+      url: "https://example.com/custom-clisbot",
     },
   });
   expect(client.lastConfig?.mcpServers).toEqual(snapshot.config.mcpServers);
@@ -4161,30 +4161,30 @@ test("resumeAgentFromPersistence keeps metadata config, applies overrides, and p
     cwd: workdir,
     systemPrompt: "new prompt",
     mcpServers: {
-      paseo: {
+      clisbot: {
         type: "stdio",
         command: "node",
-        args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/paseo.sock"],
+        args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/clisbot.sock"],
       },
     },
   });
 
   expect(resumed.config.systemPrompt).toBe("new prompt");
   expect(resumed.config.mcpServers).toEqual({
-    paseo: {
+    clisbot: {
       type: "stdio",
       command: "node",
-      args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/paseo.sock"],
+      args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/clisbot.sock"],
     },
   });
   expect(client.lastResumeOverrides).toMatchObject({
     model: "gpt-5.4",
     systemPrompt: "new prompt",
     mcpServers: {
-      paseo: {
+      clisbot: {
         type: "stdio",
         command: "node",
-        args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/paseo.sock"],
+        args: ["/tmp/mcp-bridge.mjs", "--socket", "/tmp/clisbot.sock"],
       },
     },
   });
@@ -4192,8 +4192,8 @@ test("resumeAgentFromPersistence keeps metadata config, applies overrides, and p
   expect(client.lastResumeLaunchContext).toEqual({
     agentId: resumed.id,
     env: {
-      PASEO_AGENT_ID: resumed.id,
-      PASEO_AGENT_CWD: workdir,
+      CLISBOT_AGENT_ID: resumed.id,
+      CLISBOT_AGENT_CWD: workdir,
     },
   });
 });
@@ -4300,8 +4300,8 @@ test("importProviderSession imports the selected session without listing and pub
   expect(client.importLaunchContext).toEqual({
     agentId: imported.id,
     env: {
-      PASEO_AGENT_ID: imported.id,
-      PASEO_AGENT_CWD: workdir,
+      CLISBOT_AGENT_ID: imported.id,
+      CLISBOT_AGENT_CWD: workdir,
     },
   });
   expect(imported.lifecycle).toBe("idle");
@@ -4403,8 +4403,8 @@ test("reloadAgentSession passes daemon launch env through the provider launch co
   expect(client.lastCreateLaunchContext).toEqual({
     agentId: snapshot.id,
     env: {
-      PASEO_AGENT_ID: snapshot.id,
-      PASEO_AGENT_CWD: workdir,
+      CLISBOT_AGENT_ID: snapshot.id,
+      CLISBOT_AGENT_CWD: workdir,
     },
   });
 
@@ -4415,8 +4415,8 @@ test("reloadAgentSession passes daemon launch env through the provider launch co
   expect(client.lastResumeLaunchContext).toEqual({
     agentId: snapshot.id,
     env: {
-      PASEO_AGENT_ID: snapshot.id,
-      PASEO_AGENT_CWD: workdir,
+      CLISBOT_AGENT_ID: snapshot.id,
+      CLISBOT_AGENT_CWD: workdir,
     },
   });
 });
@@ -10982,7 +10982,7 @@ test("listImportableSessions searches every provider result before global rankin
   ]);
 });
 
-test("user_message events wrapping a paseo-system envelope are not added to the timeline", async () => {
+test("user_message events wrapping a clisbot-system envelope are not added to the timeline", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-envelope-live-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
@@ -11017,7 +11017,7 @@ test("user_message events wrapping a paseo-system envelope are not added to the 
   expect(userMessages[0].text).toBe("plain user message");
 });
 
-test("user_message events wrapping a paseo-system envelope are not restored during history replay", async () => {
+test("user_message events wrapping a clisbot-system envelope are not restored during history replay", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-envelope-history-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);

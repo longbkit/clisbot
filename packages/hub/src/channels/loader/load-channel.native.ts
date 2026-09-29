@@ -292,8 +292,8 @@ describe("loadChannelVertical (native ESM loader)", () => {
   it("refuses to load any vertical while the kill-switch is off", async () => {
     const base = join(workDir, "gate");
     const { mainDir, channelDir, hostBaseDir } = writeTree(base);
-    const prior = process.env["PASEO_HUB_CHANNELS_ENABLED"];
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";
+    const prior = process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "0";
     try {
       await assert.rejects(
         () =>
@@ -314,8 +314,8 @@ describe("loadChannelVertical (native ESM loader)", () => {
           error instanceof ChannelsDisabledError && /disabled/u.test(error.message),
       );
     } finally {
-      if (prior === undefined) delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
-      else process.env["PASEO_HUB_CHANNELS_ENABLED"] = prior;
+      if (prior === undefined) delete process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
+      else process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = prior;
     }
   });
 
@@ -368,8 +368,8 @@ describe("loadChannelVertical (native ESM loader)", () => {
   });
 
   it("isChannelsEnabled reads the operator-facing env name", () => {
-    assert.equal(isChannelsEnabled({ PASEO_HUB_CHANNELS_ENABLED: "1" }), true);
-    assert.equal(isChannelsEnabled({ PASEO_HUB_CHANNELS_ENABLED: "0" }), false);
+    assert.equal(isChannelsEnabled({ CLISBOT_HUB_CHANNELS_ENABLED: "1" }), true);
+    assert.equal(isChannelsEnabled({ CLISBOT_HUB_CHANNELS_ENABLED: "0" }), false);
     assert.equal(isChannelsEnabled({}), true);
   });
 });

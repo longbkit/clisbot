@@ -4,16 +4,16 @@ Running, debugging, and live-testing the channel plane. The platform itself is [
 
 ## The dev-home live loop
 
-Live channel work runs against one fixed home, reused across runs so offsets, bindings, approval state, and agent threads stay inspectable. **Never `~/.paseo`** (a real daemon owns it and port 6767) and never this checkout's `.dev/paseo-home`.
+Live channel work runs against one fixed home, reused across runs so offsets, bindings, approval state, and agent threads stay inspectable. **Never `~/.clisbot`** (a real daemon owns it and port 6767) and never this checkout's `.dev/clisbot-home`.
 
-| Thing    | Value                                                      |
-| -------- | ---------------------------------------------------------- |
-| Home     | `~/.clisbot-dev` (`CLISBOT_HOME`)                          |
-| Hub data | `~/.clisbot-dev/hub` (`CLISBOT_HUB_DATA_DIR`)              |
-| Hub      | `127.0.0.1:6868`                                           |
-| Daemon   | `127.0.0.1:6867` — the loop never stops it                 |
-| Log      | `~/.clisbot-dev/hub.log`                                   |
-| Binary   | `node packages/cli/bin/paseo`, never a built `dist/cli.js` |
+| Thing    | Value                                                        |
+| -------- | ------------------------------------------------------------ |
+| Home     | `~/.clisbot-dev` (`CLISBOT_HOME`)                            |
+| Hub data | `~/.clisbot-dev/hub` (`CLISBOT_HUB_DATA_DIR`)                |
+| Hub      | `127.0.0.1:6868`                                             |
+| Daemon   | `127.0.0.1:6867` — the loop never stops it                   |
+| Log      | `~/.clisbot-dev/hub.log`                                     |
+| Binary   | `node packages/cli/bin/clisbot`, never a built `dist/cli.js` |
 
 `scripts/e2e-dev.sh` is the only entry point. Anything it does not do, do by hand and then teach it:
 
@@ -21,7 +21,7 @@ Live channel work runs against one fixed home, reused across runs so offsets, bi
 scripts/e2e-dev.sh build      # hub stop --force, then npm run build:hub
 scripts/e2e-dev.sh restart    # stop, source the password, start detached
 scripts/e2e-dev.sh foreground # same, but attached and tee'd into hub.log
-scripts/e2e-dev.sh status     # paseo channels status
+scripts/e2e-dev.sh status     # clisbot channels status
 scripts/e2e-dev.sh logs -f
 scripts/e2e-dev.sh stop
 scripts/e2e-dev.sh migrate-layout # one time: stopped root-level PGlite → hub/
@@ -35,11 +35,11 @@ entries. Existing unmigrated homes remain readable through the legacy-layout det
 
 `build` stops the Hub first on purpose: the Vite build is OOM-killed (exit 137) on an 8 GB box with the Hub resident.
 
-**The Hub's daemon link needs no password.** The dev home's daemon pairing is persisted (`~/.clisbot-dev/hub-relationship.json`, `state: "active"`), so a Hub started with no `PASEO_PASSWORD` in its environment connects — `channel daemon connected`, verified 2026-09-07 on a Hub started straight from `~/.clisbot-dev/start-hub.sh`, which exports neither the password nor a password file.
+**The Hub's daemon link needs no password.** The dev home's daemon pairing is persisted (`~/.clisbot-dev/hub-relationship.json`, `state: "active"`), so a Hub started with no `CLISBOT_PASSWORD` in its environment connects — `channel daemon connected`, verified 2026-09-07 on a Hub started straight from `~/.clisbot-dev/start-hub.sh`, which exports neither the password nor a password file.
 
-`PASEO_PASSWORD` is still the **daemon WS subprotocol** credential a _trusted client_ opens `/ws` with: `scripts/live-trusted-client.mjs` and the revision writer's provider-catalog check read it from the environment. `scripts/e2e-dev.sh` sources `~/.clisbot-dev/.daemon-password` (`PASEO_PASSWORD=<value>`, mode 0600) when that file exists and warns when it does not; on this box it no longer exists, so export the variable for those two drivers or expect them to fail to authenticate. Nothing about the channel plane depends on it.
+`CLISBOT_PASSWORD` is still the **daemon WS subprotocol** credential a _trusted client_ opens `/ws` with: `scripts/live-trusted-client.mjs` and the revision writer's provider-catalog check read it from the environment. `scripts/e2e-dev.sh` sources `~/.clisbot-dev/.daemon-password` (`CLISBOT_PASSWORD=<value>`, mode 0600) when that file exists and warns when it does not; on this box it no longer exists, so export the variable for those two drivers or expect them to fail to authenticate. Nothing about the channel plane depends on it.
 
-**Start the Hub with `~/.clisbot-dev/start-hub.sh`, not `scripts/e2e-dev.sh restart`.** The script's `paseo hub start` path looks for the credential master key as a sibling of the home directory, which is not where it lives (`~/.clisbot-dev-secrets/hub-credential-master-key`); `start-hub.sh` exports `PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE` and runs `packages/hub/bin/paseo-hub.js` directly. The cost is that the local Hub record is not refreshed: `~/.clisbot-dev/hub-local.json` keeps the PID of whichever Hub `paseo hub start` last launched, so `paseo channels status` (and `scripts/e2e-dev.sh status`) refuses with "records PID N, but that process is not running". Read account startup from `hub.log` instead — `telegram account started`, `slack socket mode connected`, `channel daemon connected` — until the record is rewritten by a `hub start`.
+**Start the Hub with `~/.clisbot-dev/start-hub.sh`, not `scripts/e2e-dev.sh restart`.** The script's `clisbot hub start` path looks for the credential master key as a sibling of the home directory, which is not where it lives (`~/.clisbot-dev-secrets/hub-credential-master-key`); `start-hub.sh` exports `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` and runs `packages/hub/bin/clisbot-hub.js` directly. The cost is that the local Hub record is not refreshed: `~/.clisbot-dev/hub-local.json` keeps the PID of whichever Hub `clisbot hub start` last launched, so `clisbot channels status` (and `scripts/e2e-dev.sh status`) refuses with "records PID N, but that process is not running". Read account startup from `hub.log` instead — `telegram account started`, `slack socket mode connected`, `channel daemon connected` — until the record is rewritten by a `hub start`.
 
 **Never `source` the repo `.env` for a Hub process.** `SLACK_APP_TOKEN` without `SLACK_TRANSPORT=socket` throws at boot. The `.env` is for test drivers, not for the Hub.
 
@@ -66,7 +66,7 @@ The channel plane admits against a daemon in managed-access `external` mode by m
   accounts reconnect and admit with fresh tickets. A _cold Hub boot while the daemon is already
   `external`_ races the relationship that consumes tickets; `startAccount`'s 15 s connect gate
   can expire first and tear the account down with no retry. Lease refresh and socket reconnect
-  are otherwise automatic. Shorten the lease with `PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION=1m`
+  are otherwise automatic. Shorten the lease with `CLISBOT_HUB_MANAGED_ACCESS_LEASE_DURATION=1m`
   (min `1m`) to watch a refresh without a 1-hour wait.
 
 ### Writing a config revision
@@ -89,11 +89,11 @@ It takes a scenario argument so several non-conflicting scenarios share one stop
 
 One script per surface, each ending in a single `VERDICT` line:
 
-| Surface           | Script                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| Slack             | `scripts/slack-live-assert.mjs post --text … [--thread-ts] [--expect]` / `check --since HH:MM` |
-| Telegram          | `scripts/tg-live-assert.mjs` — same verbs plus `--drain`                                       |
-| Paseo permissions | `scripts/live-trusted-client.mjs list \| answer \| watch`                                      |
+| Surface             | Script                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| Slack               | `scripts/slack-live-assert.mjs post --text … [--thread-ts] [--expect]` / `check --since HH:MM` |
+| Telegram            | `scripts/tg-live-assert.mjs` — same verbs plus `--drain`                                       |
+| Clisbot permissions | `scripts/live-trusted-client.mjs list \| answer \| watch`                                      |
 
 Telegram's asserter combines the driver bot's `getUpdates` stream with the Hub's content-free `relay post completed` line, because Telegram does not reliably deliver bot-authored group messages to another bot.
 
@@ -114,7 +114,7 @@ Two companions:
 
 ## Turning the channel plane off
 
-`CLISBOT_HUB_CHANNELS_ENABLED=0` on the Hub process is the operator kill switch (`0`, `false`, `no` and `off` all disable; anything else, including absent, leaves it on). It is read at process entry and resolved to the internal `PASEO_HUB_CHANNELS_ENABLED` name the fork code uses.
+`CLISBOT_HUB_CHANNELS_ENABLED=0` on the Hub process is the operator kill switch (`0`, `false`, `no` and `off` all disable; anything else, including absent, leaves it on). It is read at process entry and resolved to the internal `CLISBOT_HUB_CHANNELS_ENABLED` name the fork code uses.
 
 Off means the plane never exists, not that it is idle: no supervisor is composed, no account starts, no vertical is loaded, no channel agent tool is registered, no reply MCP endpoint is mounted, and the retention sweep never arms. The channel catalog, the activity page and all four queue verbs answer `404 channels_disabled` — `404` rather than `403`, because the resource does not exist on this Hub.
 
@@ -167,7 +167,7 @@ Fusion exposes TTL cutoffs only. Upstream also caps completed and failed rows pe
 
 ## Service-account files
 
-Google Chat's credential is the service-account JSON document. The FILE form stores only a path, which the Hub reads with its own privileges — so the path must resolve inside an allowlisted secrets directory: `PASEO_HUB_CHANNEL_SECRETS_DIR` (colon-separated, `CLISBOT_HUB_CHANNEL_SECRETS_DIR` aliases onto it), defaulting to `/run/secrets`. Symlinks are resolved before the check, so a link planted inside the mount cannot point out of it.
+Google Chat's credential is the service-account JSON document. The FILE form stores only a path, which the Hub reads with its own privileges — so the path must resolve inside an allowlisted secrets directory: `CLISBOT_HUB_CHANNEL_SECRETS_DIR` (colon-separated, `CLISBOT_HUB_CHANNEL_SECRETS_DIR` aliases onto it), defaulting to `/run/secrets`. Symlinks are resolved before the check, so a link planted inside the mount cannot point out of it.
 
 Every refusal — outside the allowlist, absent, a directory, over 64 KiB, unreadable — is the same sentence. That is deliberate: distinct messages would turn a management-API call into a filesystem oracle. If a mount that should work is refused, check the allowlist and the file mode; the Hub will not tell you which one it was.
 
@@ -186,9 +186,9 @@ A first start landing in `needs-login` is the designed path for a QR channel, no
 
 ## The credential master key
 
-Channel credentials and encrypted channel state are sealed with AES-256-GCM under one key, supplied as `PASEO_HUB_CREDENTIAL_MASTER_KEY` (base64 of exactly 32 bytes) or `PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE` (an absolute path, outside the Hub data directory). The Clisbot-prefixed names alias onto these. Exactly one must be set or the Hub fails closed at startup.
+Channel credentials and encrypted channel state are sealed with AES-256-GCM under one key, supplied as `CLISBOT_HUB_CREDENTIAL_MASTER_KEY` (base64 of exactly 32 bytes) or `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` (an absolute path, outside the Hub data directory). The Clisbot-prefixed names alias onto these. Exactly one must be set or the Hub fails closed at startup.
 
-A local `paseo hub start` reads a mode-0600 key file that sits as a sibling of the home — for `~/.clisbot-dev`, that is `~/.clisbot-dev-hub-credential-master-key` — and hands the child the **path**, never the key material, so the key never appears in the process table or in a log that dumps the environment. If that file is missing the start fails; `paseo hub start --init-master-key` mints one, and is the first run only. A missing key is never regenerated silently: a fresh key next to a populated database means every stored credential is unreadable with no error anywhere. Explicit environment always wins, and hosted Hubs do not auto-provision.
+A local `clisbot hub start` reads a mode-0600 key file that sits as a sibling of the home — for `~/.clisbot-dev`, that is `~/.clisbot-dev-hub-credential-master-key` — and hands the child the **path**, never the key material, so the key never appears in the process table or in a log that dumps the environment. If that file is missing the start fails; `clisbot hub start --init-master-key` mints one, and is the first run only. A missing key is never regenerated silently: a fresh key next to a populated database means every stored credential is unreadable with no error anywhere. Explicit environment always wins, and hosted Hubs do not auto-provision.
 
 The envelope's AAD binds each row to its scope (`<channel>-connection:<org>:<connectionId>`, `channel-state:<channel>:<org>:<account>:<namespace>`), so a row lifted into another organization or account fails authentication instead of decrypting into someone else's account. Connection envelopes sealed before 2026-09-07 carry `version: 1` and an owner without the organization; reads accept them and the next write to that Connection re-seals it as `version: 2`.
 
@@ -198,11 +198,11 @@ Reads try the current key, then the retired one; writes always use the current k
 
 1. Back up the database **and** the current key file. Either alone is useless.
 2. Write the new key (base64 of exactly 32 bytes) to a new file outside the Hub data directory, mode 0600.
-3. Restart the Hub with `PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE` pointing at the new key and `PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE` at the old one. Every stored credential still reads; every write from now on seals under the new key.
-4. Rewrite each row once. A Connection is re-sealed by reconfiguring it (`paseo channels add <channel> --account <id> --secret-file <path>`, or the app's Add-connection form); channel state secrets re-seal on their own next write. Track this per account — nothing sweeps for you.
-5. Drop `PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE` and restart. Any row nobody rewrote stops decrypting at this point, which is why step 4 is a checklist and not a hope.
+3. Restart the Hub with `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` pointing at the new key and `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE` at the old one. Every stored credential still reads; every write from now on seals under the new key.
+4. Rewrite each row once. A Connection is re-sealed by reconfiguring it (`clisbot channels add <channel> --account <id> --secret-file <path>`, or the app's Add-connection form); channel state secrets re-seal on their own next write. Track this per account — nothing sweeps for you.
+5. Drop `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE` and restart. Any row nobody rewrote stops decrypting at this point, which is why step 4 is a checklist and not a hope.
 
-Give the keys distinct ids (`PASEO_HUB_CREDENTIAL_KEY_ID`, `PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS`) when you want the envelope to say which key sealed it; with neither set both keys carry the default id and are tried in order. If you name the current key, name the retired one too — a read only tries keys whose id matches the envelope, so the Hub refuses to start with a named current key and no `PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS` instead of silently never trying the retired material.
+Give the keys distinct ids (`CLISBOT_HUB_CREDENTIAL_KEY_ID`, `CLISBOT_HUB_CREDENTIAL_KEY_ID_PREVIOUS`) when you want the envelope to say which key sealed it; with neither set both keys carry the default id and are tried in order. If you name the current key, name the retired one too — a read only tries keys whose id matches the envelope, so the Hub refuses to start with a named current key and no `CLISBOT_HUB_CREDENTIAL_KEY_ID_PREVIOUS` instead of silently never trying the retired material.
 
 If the old key is lost before step 4 finishes there is no recovery for the rows still under it: those accounts must be re-credentialed by hand, and every QR channel re-linked, which lands it in `needs-login`.
 
@@ -214,9 +214,9 @@ If the old key is lost before step 4 finishes there is no recovery for the rows 
 
 What to grep for, by question:
 
-**Did the account start?** There is no success line. `started` is observed through `paseo channels status`, not the log. Failure says `channel account start failed`; a QR channel says `channel account needs a QR login`.
+**Did the account start?** There is no success line. `started` is observed through `clisbot channels status`, not the log. Failure says `channel account start failed`; a QR channel says `channel account needs a QR login`.
 
-**Is the transport alive?** `channel daemon connected` / `channel daemon disconnected`. An account that rides its Host's own connection says so once at start: `channel drives its Host over the Host's own connection`, with the Host's slug. From then on the Host's state is the Hub's own — the app shows it as `Hub connected` on Settings → Hosts and as `Host <slug>` on the Route that runs there. A call made while that Host is away fails immediately with `host_not_connected` rather than waiting out an RPC timeout; the fix is on the Host (start Paseo there, check `paseo hub status`), not on the Hub.
+**Is the transport alive?** `channel daemon connected` / `channel daemon disconnected`. An account that rides its Host's own connection says so once at start: `channel drives its Host over the Host's own connection`, with the Host's slug. From then on the Host's state is the Hub's own — the app shows it as `Hub connected` on Settings → Hosts and as `Host <slug>` on the Route that runs there. A call made while that Host is away fails immediately with `host_not_connected` rather than waiting out an RPC timeout; the fix is on the Host (start Clisbot there, check `clisbot hub status`), not on the Hub.
 
 **Did the message get in?** One line per inbound decision, all carrying `dispatched`:
 

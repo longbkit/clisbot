@@ -3,7 +3,7 @@
 // Users write `@slug` from the picker; models write the names they read in the roster, so a
 // bot's line may also name a participant as `@Display Name`. An `@x` that names no
 // participant is plain text.
-import { isRoomWideMention, mentionTokens } from "@getpaseo/protocol/chats/mentions";
+import { isRoomWideMention, mentionTokens } from "@clisbot/protocol/chats/mentions";
 
 export interface MentionableParticipant {
   botId: string;

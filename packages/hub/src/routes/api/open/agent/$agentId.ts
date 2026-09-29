@@ -6,7 +6,7 @@ export const Route = createFileRoute("/api/open/agent/$agentId")({
     handlers: {
       // Hands a channel reader off to the installed app. It carries no
       // authority: the app still authenticates to the Host, so this only saves
-      // the reader from copying a `paseo://` URL their client will not linkify.
+      // the reader from copying a `clisbot://` URL their client will not linkify.
       GET: ({ params, request }) => {
         const target = sessionOpenRedirect(
           params.agentId,

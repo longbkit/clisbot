@@ -17,8 +17,8 @@
 // event id, `chat:<id>` as the lane key), the post-admission identity check and
 // the failure taxonomy the Hub's non-retryable classifier reads.
 // Zalo plugin owns raw webhook durable admission and replay draining.
-import { createChannelIngressError } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import { normalizeNullableString as nonEmptyString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { createChannelIngressError } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import { normalizeNullableString as nonEmptyString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { z } from "zod";
 import { ZaloApiError, type ZaloUpdate } from "./api.js";
 

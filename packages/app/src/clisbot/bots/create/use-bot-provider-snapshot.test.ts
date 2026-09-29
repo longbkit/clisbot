@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook, act } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { openBotForm } from "./bot-form-model";
 import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
 

@@ -2,7 +2,7 @@
 //
 // Upstream reads it from `openclaw/plugin-sdk/security-runtime`, which
 // re-exports it from the `@openclaw/fs-safe` workspace package. Fusion never
-// depends on an OpenClaw workspace package, and `@getpaseo/channels-core`'s
+// depends on an OpenClaw workspace package, and `@clisbot/channels-core`'s
 // `security-runtime` boundary deliberately stops at the secret-compare and
 // external-content members (D-CORE-244). The two ported call sites
 // (`zalo-js.ts`: restoring a session, and the session health check) need one

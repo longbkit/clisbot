@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/threading-tool-context.test.ts@5d8067a4483
 // Slack tests cover threading tool context plugin behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
 import { buildSlackThreadingToolContext } from "./threading-tool-context.js";
 

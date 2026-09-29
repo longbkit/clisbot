@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { load } from "js-yaml";
 
-const BASELINE_WORKFLOW_PATH = ".paseo/workflows/baseline.yml";
+const BASELINE_WORKFLOW_PATH = ".clisbot/workflows/baseline.yml";
 /**
  * A save is a round trip plus a refetch, so its budget is a server's, not a rendered locator's.
  * This is the command waiting for its own completion — nothing else waits on a save.
@@ -50,9 +50,9 @@ export class ProjectConfiguration {
   }
 
   private partialLabel(path: string) {
-    return path.startsWith(".paseo/workflows/partials/")
+    return path.startsWith(".clisbot/workflows/partials/")
       ? path
-      : `.paseo/workflows/partials/${path}`;
+      : `.clisbot/workflows/partials/${path}`;
   }
 
   private async startEditing() {

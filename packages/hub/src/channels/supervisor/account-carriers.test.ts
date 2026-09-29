@@ -8,15 +8,15 @@
 // siblings the Hub loads at runtime; `npm run build --workspace=…` must have run.
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { resolveDiscordAccount } from "@getpaseo/channels-discord/dist/accounts.js";
-import { resolveFeishuDriveAccount } from "@getpaseo/channels-feishu/dist/fusion/account-config.js";
-import { resolveGoogleChatDriveAccount } from "@getpaseo/channels-googlechat/dist/fusion/account-config.js";
+import { resolveDiscordAccount } from "@clisbot/channels-discord/dist/accounts.js";
+import { resolveFeishuDriveAccount } from "@clisbot/channels-feishu/dist/fusion/account-config.js";
+import { resolveGoogleChatDriveAccount } from "@clisbot/channels-googlechat/dist/fusion/account-config.js";
 // Telegram has two `resolveTelegramAccount` readers; the drive-time one
 // (`client/bot-api.ts`, positional args) is the one the Hub's cfg feeds.
-import { resolveTelegramAccount } from "@getpaseo/channels-telegram/dist/client/bot-api.js";
-import { resolveTelegramAccount as resolveTelegramDriveAccount } from "@getpaseo/channels-telegram/dist/fusion/account-config.js";
-import { resolveZaloDriveAccount } from "@getpaseo/channels-zalo/dist/fusion/account-config.js";
-import { resolveZalouserDriveAccount } from "@getpaseo/channels-zalouser/dist/fusion/account-config.js";
+import { resolveTelegramAccount } from "@clisbot/channels-telegram/dist/client/bot-api.js";
+import { resolveTelegramAccount as resolveTelegramDriveAccount } from "@clisbot/channels-telegram/dist/fusion/account-config.js";
+import { resolveZaloDriveAccount } from "@clisbot/channels-zalo/dist/fusion/account-config.js";
+import { resolveZalouserDriveAccount } from "@clisbot/channels-zalouser/dist/fusion/account-config.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { buildAccountCarriers, type AccountCarrierInput } from "./account-carriers.js";
 

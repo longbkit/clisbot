@@ -9,7 +9,7 @@ import {
   authorizationCodeFromCallback,
   oauthAuthorizeUrl,
   OAuthTokenResponseSchema,
-  PASEO_CLIENT_ID,
+  CLISBOT_CLIENT_ID,
   tokenRequestBody,
 } from "./oauth";
 
@@ -94,7 +94,7 @@ class NativeHubTransport implements HubTransport {
     await fetch(new URL("/api/auth/oauth2/revoke", this.origin), {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ token: refreshToken, client_id: PASEO_CLIENT_ID }),
+      body: new URLSearchParams({ token: refreshToken, client_id: CLISBOT_CLIENT_ID }),
     }).catch(() => undefined);
   }
 

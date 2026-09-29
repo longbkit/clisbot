@@ -49,10 +49,10 @@ describe("Linear trigger provider", () => {
 
   it("parses after a contains command marker following a matched pattern", async () => {
     const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
-      commandConfiguration({ pattern: "@paseo", contains: "/run" }),
+      commandConfiguration({ pattern: "@clisbot", contains: "/run" }),
     );
     const provider = createLinearTriggerProvider({ configurationForWorkflow });
-    const body = "@paseo please /run priority=high investigate";
+    const body = "@clisbot please /run priority=high investigate";
 
     const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
@@ -66,10 +66,10 @@ describe("Linear trigger provider", () => {
 
   it("keeps an input-shaped contains marker after a matched pattern", async () => {
     const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
-      inputShapedMarkerConfiguration({ pattern: "@paseo" }),
+      inputShapedMarkerConfiguration({ pattern: "@clisbot" }),
     );
     const provider = createLinearTriggerProvider({ configurationForWorkflow });
-    const body = "@paseo please repo=hub priority=high investigate";
+    const body = "@clisbot please repo=hub priority=high investigate";
 
     const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
@@ -83,10 +83,10 @@ describe("Linear trigger provider", () => {
 
   it("keeps an input-shaped suffix of an overlapping contains marker", async () => {
     const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
-      inputShapedMarkerConfiguration({ pattern: "@paseo", contains: "@paseo repo=hub" }),
+      inputShapedMarkerConfiguration({ pattern: "@clisbot", contains: "@clisbot repo=hub" }),
     );
     const provider = createLinearTriggerProvider({ configurationForWorkflow });
-    const body = "@paseo repo=hub priority=high investigate";
+    const body = "@clisbot repo=hub priority=high investigate";
 
     const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
@@ -321,7 +321,7 @@ function linearCommentConfiguration() {
             max_runtime: "1h",
             idle_timeout: "5m",
             agent: { provider: "codex" },
-            prompt: [{ text: "Work from ${{ paseo.context }}" }],
+            prompt: [{ text: "Work from ${{ clisbot.context }}" }],
           },
         ],
       },
@@ -359,7 +359,7 @@ function inputShapedMarkerConfiguration(marker: { pattern?: string; contains?: s
       {
         ...trigger,
         inputs: {
-          repo: { type: "string", required: true, choices: ["hub", "paseo"] },
+          repo: { type: "string", required: true, choices: ["hub", "clisbot"] },
           priority: { type: "string", required: true, choices: ["high", "low"] },
         },
         filters: {
@@ -377,7 +377,7 @@ function external(
   workflowId: string,
   configurationRevisionId: string,
   occurredAt = "2026-01-02T00:00:00.000Z",
-  commentBody = "@paseo please investigate",
+  commentBody = "@clisbot please investigate",
 ): ExternalTrigger {
   return {
     providerEventReceiptId: "11111111-1111-4111-8111-111111111119",
@@ -394,7 +394,7 @@ function external(
 
 function event(
   occurredAt: string,
-  commentBody = "@paseo please investigate",
+  commentBody = "@clisbot please investigate",
 ): NormalizedLinearCommentEvent {
   return {
     type: "comment",

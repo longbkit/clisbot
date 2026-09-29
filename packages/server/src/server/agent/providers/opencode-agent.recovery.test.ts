@@ -243,7 +243,7 @@ test("adds the session's MCP servers to the new OpenCode server after the old on
   const session = await client.createSession({
     provider: "opencode",
     cwd: "/workspace",
-    mcpServers: { paseo: { type: "http", url: "http://127.0.0.1:1/mcp" } },
+    mcpServers: { clisbot: { type: "http", url: "http://127.0.0.1:1/mcp" } },
   });
   await exited.connected(1);
   exited.send(0, connectedRecord());
@@ -251,7 +251,7 @@ test("adds the session's MCP servers to the new OpenCode server after the old on
   await exited.dispatched(1);
   exited.send(0, idleRecord());
   await firstTurn;
-  expect(exited.mcpAdds()).toEqual(["paseo"]);
+  expect(exited.mcpAdds()).toEqual(["clisbot"]);
   processes[0]?.exit();
   await exited.close();
 
@@ -261,7 +261,7 @@ test("adds the session's MCP servers to the new OpenCode server after the old on
   await turn;
   await current.dispatched(1);
 
-  expect(current.mcpAdds()).toEqual(["paseo"]);
+  expect(current.mcpAdds()).toEqual(["clisbot"]);
 
   await session.close();
   await manager.shutdown();

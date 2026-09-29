@@ -8,12 +8,10 @@ if (!packagesRoot || !daemonHost || !agentId) {
   throw new Error("usage: timeline-reader <packages-root> <daemon-host> <agent-id>");
 }
 
-const requireFromPaseo = createRequire(join(packagesRoot, "package.json"));
-const { WebSocket } = requireFromPaseo("ws");
+const requireFromClisbot = createRequire(join(packagesRoot, "package.json"));
+const { WebSocket } = requireFromClisbot("ws");
 const { DaemonClient } = await import(
-  pathToFileURL(
-    join(packagesRoot, "node_modules/@getpaseo/client/dist/daemon-client.js"),
-  ).toString()
+  pathToFileURL(join(packagesRoot, "node_modules/@clisbot/client/dist/daemon-client.js")).toString()
 );
 const client = new DaemonClient({
   url: `ws://${daemonHost}/ws`,

@@ -1,6 +1,6 @@
 ---
 name: naming-expert
-description: Plan, choose, or review names in Clisbot PaseoClaw Fusion using repository evidence. Use for domain terms, wire contracts, RPC methods, events, settings, files, types, functions, UI concepts, naming audits, broad renames, ambiguous terminology, aliases, or naming drift across the Paseo foundation and Clisbot-specific boundaries.
+description: Plan, choose, or review names in Clisbot ClisbotClaw Fusion using repository evidence. Use for domain terms, wire contracts, RPC methods, events, settings, files, types, functions, UI concepts, naming audits, broad renames, ambiguous terminology, aliases, or naming drift across the Clisbot foundation and Clisbot-specific boundaries.
 user-invocable: true
 ---
 
@@ -45,7 +45,7 @@ Use `rg` over the smallest complete owner chain. Include:
 - sibling names with the same role;
 - wire contracts, RPC methods, events, settings, persisted fields, provider
   adapters, errors, tests, docs, and UI copy;
-- aliases, compatibility paths, and terms inherited from upstream Paseo.
+- aliases, compatibility paths, and terms inherited from upstream Clisbot.
 
 For each material concept, write a one-sentence concept card:
 
@@ -58,7 +58,7 @@ it is not <nearest confusing alternative>.
 
 Use the first semantically correct option:
 
-1. Reuse the canonical Paseo term unchanged (check `docs/glossary.md` first).
+1. Reuse the canonical Clisbot term unchanged (check `docs/glossary.md` first).
 2. Reuse an established same-role naming family.
 3. Add one owner- or role-revealing qualifier.
 4. Introduce a Clisbot-specific term only for a genuinely new concept.

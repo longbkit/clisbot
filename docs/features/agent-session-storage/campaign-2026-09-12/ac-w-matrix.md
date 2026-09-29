@@ -148,7 +148,7 @@ permission-snapshot-inspector.tsx}`, app tabs model (`workspace-tabs`),
   read region + in-flight submit/write state in separate limits. Reopen by page; no lost
   pending, no duplicate messages, no certifying a cursor for a dropped range. Restart does
   not load all history. Long runs / opening many sessions in turn must not retain full
-  history; measure Paseo RAM separately from the provider process.
+  history; measure Clisbot RAM separately from the provider process.
 - **Code path:** `timeline-retention.ts` / `pending-event-budget.ts` (daemon budgets),
   app `timeline-page-retention.ts` / `timeline-retention-owner.ts` /
   `subagents/timeline-retention.ts` (parent/global retained-page budgets, subagent projected

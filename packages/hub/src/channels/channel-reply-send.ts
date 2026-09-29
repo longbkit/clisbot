@@ -43,7 +43,7 @@ import {
   admitMessagePresentation,
   type MessagePresentation,
   type MessagePresentationBlockNote,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import type { ChannelReplyBindingRef } from "./plane/types.js";
 
 /** One reserved output-budget attempt. Reserving returns `undefined` when the
@@ -120,7 +120,7 @@ function isNonEmptyString(value: unknown): boolean {
   return typeof value === "string" && value.trim() !== "";
 }
 
-/** Canonical `message` with Paseo's `text` alias; both present must agree. A
+/** Canonical `message` with Clisbot's `text` alias; both present must agree. A
  * send that carries a file needs no body — the file is the message. */
 function readSendText(
   args: Record<string, unknown>,

@@ -1,5 +1,5 @@
 // upstream: extensions/feishu/src/interactive-message-content.ts@5d8067a4483
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { parsePostContent } from "./post.js";
 
 const INTERACTIVE_CARD_FALLBACK_TEXT = "[Interactive Card]";

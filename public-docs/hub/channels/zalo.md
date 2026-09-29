@@ -24,7 +24,7 @@ Polling needs nothing else. Webhook mode additionally needs a public HTTPS endpo
 
 ```sh
 umask 077 && printf '%s' '<bot token>' > /tmp/zalo-token
-paseo channels add zalo --account main --secret-file /tmp/zalo-token
+clisbot channels add zalo --account main --secret-file /tmp/zalo-token
 rm /tmp/zalo-token
 ```
 

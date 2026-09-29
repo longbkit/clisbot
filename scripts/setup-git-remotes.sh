@@ -6,7 +6,7 @@
 # `v0.8.0` pointed at the Hub release, so `git checkout v0.8.0` gave the wrong
 # repository's code, and `git fetch upstream --tags` could not repair it
 # ("would clobber existing tag"). Five of origin's own tags (v0.1.39, v0.1.41,
-# v0.1.43, v0.1.50, v0.1.53) share a name with a different Paseo commit.
+# v0.1.43, v0.1.50, v0.1.53) share a name with a different Clisbot commit.
 #
 # The rule: `refs/tags/` mirrors `origin`. An upstream release is fetched on
 # demand into its own namespace, which is what the sync playbook already does:

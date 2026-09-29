@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 
-const APPLICATION_DATA_DIRECTORY = "paseo-hub";
+const APPLICATION_DATA_DIRECTORY = "clisbot-hub";
 
 interface HubDataDirectoryOptions {
   environment?: Record<string, string | undefined>;
@@ -13,7 +13,7 @@ interface HubDataDirectoryOptions {
 export function resolveHubDataDirectory(options: HubDataDirectoryOptions = {}): string {
   const environment = options.environment ?? process.env;
   const workingDirectory = options.workingDirectory ?? process.cwd();
-  const override = environment["PASEO_HUB_DATA_DIR"];
+  const override = environment["CLISBOT_HUB_DATA_DIR"];
   if (override !== undefined) return resolve(workingDirectory, override);
 
   const configuredDataHome = nonEmpty(environment["XDG_DATA_HOME"]);

@@ -14,7 +14,7 @@
 import type { ChannelInboxScope } from "../../db/channel-inbox.js";
 import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import type { ConversationSettings } from "../config/conversation.js";
-import type { InboundQueueSink } from "@getpaseo/channels-shared";
+import type { InboundQueueSink } from "@clisbot/channels-shared";
 import type { ChannelIngressDeferral } from "../ingress/drain.js";
 import type { PlaneInboundDeferral, PlaneLogger } from "../plane/types.js";
 import type { BindingInbox } from "./inbox.js";

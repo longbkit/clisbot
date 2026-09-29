@@ -10,7 +10,7 @@ export interface HubConfiguration {
 
 export function getHubConfiguration(): HubConfiguration | null {
   const browserOrigin =
-    Platform.OS === "web" && typeof window !== "undefined" && window.paseoDesktop === undefined
+    Platform.OS === "web" && typeof window !== "undefined" && window.clisbotDesktop === undefined
       ? window.location.origin
       : undefined;
   return resolveHubConfiguration(Constants.expoConfig?.extra?.clisbotHub, browserOrigin);

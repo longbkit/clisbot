@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/internal/gateway-identify-limiter.ts@5d8067a4483
 // Discord plugin module implements gateway identify limiter behavior.
-import { parseFiniteNumber } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseFiniteNumber } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 const IDENTIFY_WINDOW_MS = 5_000;
 

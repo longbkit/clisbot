@@ -4,7 +4,7 @@
     "/usr/local/bin/node",
     "--import",
     "tsx",
-    "/home/node/projects/clisbot-paseoclaw-fusion/packages/server/scripts/rollback-session-layout.ts",
+    "/home/node/projects/clisbot-clisbotclaw-fusion/packages/server/scripts/rollback-session-layout.ts",
     "/tmp/session-storage-rollback-proof-HMZ6Wn/agents",
     "--daemon-stopped"
   ],

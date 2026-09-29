@@ -1,6 +1,6 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { BotTemplateResultSchema } from "@getpaseo/protocol/bots/rpc-schemas";
-import type { BotPayload } from "@getpaseo/protocol/bots/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { BotTemplateResultSchema } from "@clisbot/protocol/bots/rpc-schemas";
+import type { BotPayload } from "@clisbot/protocol/bots/types";
 import type { BotManifest } from "./manifest.js";
 import type { AssistantPlan } from "./plan.js";
 

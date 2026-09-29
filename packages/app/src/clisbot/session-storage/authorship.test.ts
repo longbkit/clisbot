@@ -5,7 +5,7 @@ import {
   buildDeterministicWorkspaceTabId,
   workspaceTabTargetsEqual,
 } from "@/workspace-tabs/identity";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 const actor: SessionActor = {
   kind: "user",
   id: "slack:U1",

@@ -13,7 +13,7 @@ export const GitHubPrAttachmentSchema = z.object({
 
 export const ForgeChangeRequestAttachmentSchema = z.object({
   type: z.literal("forge_change_request"),
-  mimeType: z.literal("application/paseo-forge-change-request"),
+  mimeType: z.literal("application/clisbot-forge-change-request"),
   forge: z.string().optional().default("github"),
   number: z.number().int().positive(),
   title: z.string(),
@@ -38,7 +38,7 @@ export const GitHubIssueAttachmentSchema = z.object({
 
 export const ForgeIssueAttachmentSchema = z.object({
   type: z.literal("forge_issue"),
-  mimeType: z.literal("application/paseo-forge-issue"),
+  mimeType: z.literal("application/clisbot-forge-issue"),
   forge: z.string().optional().default("github"),
   number: z.number().int().positive(),
   title: z.string(),
@@ -96,7 +96,7 @@ export const ReviewAttachmentCommentSchema = z.object({
 
 export const ReviewAttachmentSchema = z.object({
   type: z.literal("review"),
-  mimeType: z.literal("application/paseo-review"),
+  mimeType: z.literal("application/clisbot-review"),
   cwd: z.string(),
   mode: z.enum(["uncommitted", "base"]),
   baseRef: z.string().nullable().optional(),

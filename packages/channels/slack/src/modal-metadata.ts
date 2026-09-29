@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/modal-metadata.ts@5d8067a4483
 // Slack plugin module implements modal metadata behavior.
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 type SlackModalPrivateMetadata = {
   sessionKey?: string;

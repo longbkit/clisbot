@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/channel-actions.test.ts@5d8067a4483
 // Telegram tests cover channel actions plugin behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { telegramMessageActions } from "./channel-actions.js";
 

@@ -3,11 +3,11 @@
 import type {
   OpenClawConfig,
   TelegramInlineButtonsScope,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalLowercaseString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { inspectTelegramAccount } from "./account-inspect.js";
 import { listTelegramAccountIds } from "./accounts.js";
 

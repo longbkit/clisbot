@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 import { parseInvocation, parseStructuredInvocation } from "./invocation.js";
 
 const inputs = {
-  repo: { type: "string" as const, choices: ["paseo", "hub"] },
+  repo: { type: "string" as const, choices: ["clisbot", "hub"] },
   agent: { type: "string" as const, default: "codex", choices: ["codex", "opus"] },
   count: { type: "number" as const },
 };
@@ -36,10 +36,10 @@ describe("provider-neutral message invocation parser", () => {
   it.each([
     {
       name: "parses after the mention without changing the prompt",
-      message: "  @Paseo   repo=hub investigate",
-      mention: "@Paseo",
+      message: "  @Clisbot   repo=hub investigate",
+      mention: "@Clisbot",
       expected: {
-        prompt: "  @Paseo   repo=hub investigate",
+        prompt: "  @Clisbot   repo=hub investigate",
         inputs: { repo: "hub", agent: "codex" },
       },
     },
@@ -69,19 +69,19 @@ describe("provider-neutral message invocation parser", () => {
     },
     {
       name: "requires a mention boundary before removing the provider mention",
-      message: "@PaseoBot repo=hub investigate",
-      mention: "@Paseo",
+      message: "@ClisbotBot repo=hub investigate",
+      mention: "@Clisbot",
       expected: {
-        prompt: "@PaseoBot repo=hub investigate",
+        prompt: "@ClisbotBot repo=hub investigate",
         inputs: { agent: "codex" },
       },
     },
     {
       name: "does not remove an embedded provider mention",
-      message: "request @Paseo repo=hub investigate",
-      mention: "@Paseo",
+      message: "request @Clisbot repo=hub investigate",
+      mention: "@Clisbot",
       expected: {
-        prompt: "request @Paseo repo=hub investigate",
+        prompt: "request @Clisbot repo=hub investigate",
         inputs: { agent: "codex" },
       },
     },
@@ -109,8 +109,8 @@ describe("provider-neutral message invocation parser", () => {
     },
     {
       name: "duplicate key",
-      message: "repo=hub repo=paseo investigate",
-      expectedPrompt: "repo=hub repo=paseo investigate",
+      message: "repo=hub repo=clisbot investigate",
+      expectedPrompt: "repo=hub repo=clisbot investigate",
       reason: /duplicate.*repo/iu,
     },
   ])("preserves the complete prompt after a $name control-token rejection", (example) => {
@@ -135,8 +135,8 @@ describe("provider-neutral message invocation parser", () => {
     ["invalid boolean", "dry=sometimes investigate", "dry=sometimes investigate", /dry.*boolean/iu],
     [
       "duplicate key",
-      "repo=hub repo=paseo investigate",
-      "repo=hub repo=paseo investigate",
+      "repo=hub repo=clisbot investigate",
+      "repo=hub repo=clisbot investigate",
       /duplicate.*repo/iu,
     ],
   ] as const)("rejects %s values before execution", (_name, message, expectedPrompt, error) => {

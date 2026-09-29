@@ -9,7 +9,7 @@
 import { access, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { MAX_TIMER_TIMEOUT_MS } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { MAX_TIMER_TIMEOUT_MS } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { API, LoginQRCallbackEvent } from "./zca-client.js";
 import { LoginQRCallbackEventType } from "./zca-constants.js";

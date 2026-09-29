@@ -1,4 +1,4 @@
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 
 /** A stale fetch must never undo an already observed terminal acknowledgement. */
 export function mergePermissionHistory(

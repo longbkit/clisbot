@@ -4,8 +4,8 @@ import { hashTemplate } from "../entitlements/catalog.js";
 import { parsePlanMetadata } from "./plan-template.js";
 
 const VALID_METADATA = {
-  paseo_plan: "true",
-  paseo_plan_slug: "solo",
+  clisbot_plan: "true",
+  clisbot_plan_slug: "solo",
   ent_seats_max: "5",
   ent_can_invite: "true",
   ent_executions_monthly_limit: "2000",
@@ -65,7 +65,7 @@ describe("parsePlanMetadata", () => {
   });
 
   it("rejects a blank plan slug", () => {
-    const result = parsePlanMetadata({ ...VALID_METADATA, paseo_plan_slug: "" });
+    const result = parsePlanMetadata({ ...VALID_METADATA, clisbot_plan_slug: "" });
     assert.equal(result.success, false);
   });
 

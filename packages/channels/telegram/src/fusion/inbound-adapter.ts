@@ -27,7 +27,7 @@
 //     (`hasLeadingBotCommandAddressedToOtherBot`) but the Fusion transport
 //     never called it: any `/command` line was treated as addressing us.
 
-import type { ChannelInboundEvent, ChannelInboundKind } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, ChannelInboundKind } from "@clisbot/channels-shared";
 import type {
   CallbackQuery,
   Chat,
@@ -38,7 +38,7 @@ import type {
   Update,
   User,
 } from "grammy/types";
-import { formatLocationText } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+import { formatLocationText } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import {
   buildSenderLabel,
   buildSenderName,

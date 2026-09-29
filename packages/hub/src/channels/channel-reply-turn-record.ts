@@ -4,12 +4,12 @@
 // fallback, and a `hybrid` turn does not relay text the tool already posted
 // (docs/audits/2026-09-22-channel-reply-hybrid-mode.md). Successful calls only.
 
-import type { ChannelMessageActionName } from "@getpaseo/channels-core/channels/plugins/types.public.host-adapter";
+import type { ChannelMessageActionName } from "@clisbot/channels-core/channels/plugins/types.public.host-adapter";
 
 export interface ToolTurnDeliveries {
   /** The channel started this turn (a first prompt or a follow-up), so what
    * the turn ends with is owed to the conversation. A turn started from the
-   * Paseo app, or by the Agent on its own, is not. */
+   * Clisbot app, or by the Agent on its own, is not. */
   channelTurn: boolean;
   /** A `send` with `final` true or omitted, or an action that posts new
    * content, landed. */

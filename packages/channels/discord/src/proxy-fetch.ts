@@ -6,9 +6,9 @@
 // is a `ProxyAgent`-backed undici fetch declared here — the same shape the
 // Telegram vertical ships (D-TG-013). Theme formatters come from
 // `./fusion/runtime-env.js` (D-DC-005).
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { danger } from "./fusion/runtime-env.js";
-import type { RuntimeEnv } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import type { RuntimeEnv } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 
 const PROXY_URL = Symbol.for("openclaw.discordProxyFetchUrl");
 
@@ -31,7 +31,7 @@ export function makeProxyFetch(proxyUrl: string): typeof fetch {
 export function getProxyUrlFromFetch(fetchImpl?: typeof fetch): string | undefined {
   return (fetchImpl as ProxyTaggedFetch | undefined)?.[PROXY_URL];
 }
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ResolvedDiscordAccount } from "./accounts.js";
 
 function resolveDiscordProxyUrl(

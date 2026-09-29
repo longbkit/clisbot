@@ -4,7 +4,7 @@
 // name (`telegramPlugin` / `slackPlugin`). Declared in-repo; never imported
 // from OpenClaw.
 
-import type { ChannelMessageActionAdapter as ChannelMessageActionAdapterRef } from "@getpaseo/channels-core/channels/plugins/types.public";
+import type { ChannelMessageActionAdapter as ChannelMessageActionAdapterRef } from "@clisbot/channels-core/channels/plugins/types.public";
 import type { StartAccountContext } from "./host.js";
 
 /** The account monitor: `gateway.startAccount(ctx)`. The returned promise
@@ -60,7 +60,7 @@ export type SendMediaFn = (args: {
  * other advertised action with a structured `unsupported_action` result.
  * Declared here so the drive surface stays one contract; the type itself is the
  * ported upstream one. */
-export type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/channels/plugins/types.public";
+export type { ChannelMessageActionAdapter } from "@clisbot/channels-core/channels/plugins/types.public";
 
 /** The plugin chunk the pin drives. Unknown keys stay open — the vertical's
  * own surface may carry more; the Hub reads only these (sendText today;

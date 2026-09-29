@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/send-error-predicates.ts@5d8067a4483
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const TELEGRAM_CAPTION_TOO_LONG_RE = /caption is too long/i;
 const TELEGRAM_PHOTO_LIMIT_ERROR_RE = /\b(?:PHOTO_INVALID_DIMENSIONS|PHOTO_TOO_BIG)\b/i;

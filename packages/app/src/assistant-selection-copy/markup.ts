@@ -1,10 +1,10 @@
-export const MARKDOWN_COPY_TAG_ATTRIBUTE = "data-paseo-markdown-tag";
-export const MARKDOWN_COPY_IGNORE_ATTRIBUTE = "data-paseo-markdown-ignore";
-export const MARKDOWN_COPY_LIST_MARKER_ATTRIBUTE = "data-paseo-markdown-list-marker";
-export const MARKDOWN_COPY_UNWRAP_ATTRIBUTE = "data-paseo-markdown-unwrap";
-export const MARKDOWN_COPY_LIST_START_ATTRIBUTE = "data-paseo-markdown-list-start";
-export const MARKDOWN_COPY_LANGUAGE_ATTRIBUTE = "data-paseo-markdown-language";
-export const MARKDOWN_COPY_ALIGN_ATTRIBUTE = "data-paseo-markdown-align";
+export const MARKDOWN_COPY_TAG_ATTRIBUTE = "data-clisbot-markdown-tag";
+export const MARKDOWN_COPY_IGNORE_ATTRIBUTE = "data-clisbot-markdown-ignore";
+export const MARKDOWN_COPY_LIST_MARKER_ATTRIBUTE = "data-clisbot-markdown-list-marker";
+export const MARKDOWN_COPY_UNWRAP_ATTRIBUTE = "data-clisbot-markdown-unwrap";
+export const MARKDOWN_COPY_LIST_START_ATTRIBUTE = "data-clisbot-markdown-list-start";
+export const MARKDOWN_COPY_LANGUAGE_ATTRIBUTE = "data-clisbot-markdown-language";
+export const MARKDOWN_COPY_ALIGN_ATTRIBUTE = "data-clisbot-markdown-align";
 
 /**
  * Trailing line breaks, with any indentation that followed the last one.
@@ -17,33 +17,33 @@ export const MARKDOWN_COPY_ALIGN_ATTRIBUTE = "data-paseo-markdown-align";
 export const TRAILING_CODE_LINE_BREAKS = /(\r?\n[ \t]*)+$/;
 
 export const markdownCopyDataSet = {
-  blockquote: { paseoMarkdownTag: "blockquote" },
-  br: { paseoMarkdownTag: "br" },
-  code: { paseoMarkdownTag: "code" },
-  h1: { paseoMarkdownTag: "h1" },
-  h2: { paseoMarkdownTag: "h2" },
-  h3: { paseoMarkdownTag: "h3" },
-  h4: { paseoMarkdownTag: "h4" },
-  h5: { paseoMarkdownTag: "h5" },
-  h6: { paseoMarkdownTag: "h6" },
-  hr: { paseoMarkdownTag: "hr" },
-  ignore: { paseoMarkdownIgnore: "true" },
-  li: { paseoMarkdownTag: "li" },
-  listMarker: { paseoMarkdownIgnore: "true", paseoMarkdownListMarker: "true" },
-  ol: { paseoMarkdownTag: "ol" },
-  p: { paseoMarkdownTag: "p" },
-  pre: { paseoMarkdownTag: "pre" },
-  s: { paseoMarkdownTag: "s" },
-  strong: { paseoMarkdownTag: "strong" },
-  em: { paseoMarkdownTag: "em" },
-  table: { paseoMarkdownTag: "table" },
-  tbody: { paseoMarkdownTag: "tbody" },
-  td: { paseoMarkdownTag: "td" },
-  th: { paseoMarkdownTag: "th" },
-  thead: { paseoMarkdownTag: "thead" },
-  tr: { paseoMarkdownTag: "tr" },
-  ul: { paseoMarkdownTag: "ul" },
-  unwrap: { paseoMarkdownUnwrap: "true" },
+  blockquote: { clisbotMarkdownTag: "blockquote" },
+  br: { clisbotMarkdownTag: "br" },
+  code: { clisbotMarkdownTag: "code" },
+  h1: { clisbotMarkdownTag: "h1" },
+  h2: { clisbotMarkdownTag: "h2" },
+  h3: { clisbotMarkdownTag: "h3" },
+  h4: { clisbotMarkdownTag: "h4" },
+  h5: { clisbotMarkdownTag: "h5" },
+  h6: { clisbotMarkdownTag: "h6" },
+  hr: { clisbotMarkdownTag: "hr" },
+  ignore: { clisbotMarkdownIgnore: "true" },
+  li: { clisbotMarkdownTag: "li" },
+  listMarker: { clisbotMarkdownIgnore: "true", clisbotMarkdownListMarker: "true" },
+  ol: { clisbotMarkdownTag: "ol" },
+  p: { clisbotMarkdownTag: "p" },
+  pre: { clisbotMarkdownTag: "pre" },
+  s: { clisbotMarkdownTag: "s" },
+  strong: { clisbotMarkdownTag: "strong" },
+  em: { clisbotMarkdownTag: "em" },
+  table: { clisbotMarkdownTag: "table" },
+  tbody: { clisbotMarkdownTag: "tbody" },
+  td: { clisbotMarkdownTag: "td" },
+  th: { clisbotMarkdownTag: "th" },
+  thead: { clisbotMarkdownTag: "thead" },
+  tr: { clisbotMarkdownTag: "tr" },
+  ul: { clisbotMarkdownTag: "ul" },
+  unwrap: { clisbotMarkdownUnwrap: "true" },
 } as const;
 
 export type MarkdownCopyInlineTag = "br" | "code" | "em" | "s" | "strong";
@@ -51,7 +51,7 @@ export type MarkdownCopyInlineTag = "br" | "code" | "em" | "s" | "strong";
 export function markdownCopyOrderedListDataSet(start: unknown) {
   return {
     ...markdownCopyDataSet.ol,
-    paseoMarkdownListStart: String(start ?? 1),
+    clisbotMarkdownListStart: String(start ?? 1),
   } as const;
 }
 
@@ -59,7 +59,7 @@ export function markdownCopyCodeBlockDataSet(language: string | null | undefined
   const fenceLanguage = language?.trim().split(/\s+/)[0];
   return {
     ...markdownCopyDataSet.pre,
-    ...(fenceLanguage ? { paseoMarkdownLanguage: fenceLanguage } : {}),
+    ...(fenceLanguage ? { clisbotMarkdownLanguage: fenceLanguage } : {}),
   } as const;
 }
 
@@ -70,6 +70,6 @@ export function markdownCopyTableCellDataSet(tag: "td" | "th", style: unknown) {
       : null;
   return {
     ...markdownCopyDataSet[tag],
-    ...(alignment ? { paseoMarkdownAlign: alignment.toLowerCase() } : {}),
+    ...(alignment ? { clisbotMarkdownAlign: alignment.toLowerCase() } : {}),
   } as const;
 }

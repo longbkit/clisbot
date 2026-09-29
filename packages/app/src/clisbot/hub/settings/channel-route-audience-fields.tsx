@@ -56,7 +56,7 @@ export interface AudienceRulesEditorProps {
 export const OPEN_AUDIENCE_WARNING = {
   title: "Anyone in the matching conversations can use this Route",
   description:
-    "They can talk to the Agent this Route runs, with the settings below. This does not give them Paseo, Host or Project access. The Hub warns about wide choices after you save.",
+    "They can talk to the Agent this Route runs, with the settings below. This does not give them Clisbot, Host or Project access. The Hub warns about wide choices after you save.",
 };
 
 export function AudienceRulesEditor({

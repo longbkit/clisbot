@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/approval-actions.ts@5d8067a4483
 // Slack plugin module owns its transport-private approval callback envelope.
-import { buildApprovalResolutionRef } from "@getpaseo/channels-core/plugin-sdk/approval-reference-runtime";
-import type { MessagePresentationAction } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import { buildApprovalResolutionRef } from "@clisbot/channels-core/plugin-sdk/approval-reference-runtime";
+import type { MessagePresentationAction } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import { SLACK_BUTTON_VALUE_MAX } from "./presentation.js";
 
 const SLACK_APPROVAL_VALUE_PREFIX = "openclaw:approval:v1:";

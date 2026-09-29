@@ -2,11 +2,11 @@
 
 [User guide](../README.md) · [Hồ sơ](profile.md) · [Mật khẩu và recovery](password-and-recovery.md) · [Q&A](../help/faq.md)
 
-Mở Hub trong Paseo web app tại **Settings → Account**. App native và desktop mở cùng trang này trên trình duyệt để đăng nhập rồi quay lại app.
+Mở Hub trong Clisbot web app tại **Settings → Account**. App native và desktop mở cùng trang này trên trình duyệt để đăng nhập rồi quay lại app.
 
-Màn **Welcome** có hai nhóm nguồn Host: **Managed Hosts** (ô **Paseo Hub**) và **Your own computer** (QR, pairing link, direct, Remote SSH trên desktop). Dùng được cả hai cùng lúc, nên nhóm dưới vẫn ở đó sau khi bạn đã đăng nhập Hub.
+Màn **Welcome** có hai nhóm nguồn Host: **Managed Hosts** (ô **Clisbot Hub**) và **Your own computer** (QR, pairing link, direct, Remote SSH trên desktop). Dùng được cả hai cùng lúc, nên nhóm dưới vẫn ở đó sau khi bạn đã đăng nhập Hub.
 
-Đăng nhập ở Welcome xong, nếu tổ chức đã có Host bạn dùng được thì app vào thẳng workspace; nếu chưa có hoặc tài khoản còn thiếu bước (chọn tổ chức, đổi mật khẩu…) thì app mở **Settings → Account** để bạn làm tiếp. Các lần vào Welcome sau đó ô **Paseo Hub** hiện tài khoản đang đăng nhập và trạng thái Host: đang kết nối, tổ chức chưa chia sẻ Host nào, Host chưa công bố cách kết nối, hoặc lỗi lưu Host kèm nút **Retry**. Nút **Refresh Hosts** đọc lại danh sách Host từ Hub, giống nút cùng tên trong **Settings → Hosts**.
+Đăng nhập ở Welcome xong, nếu tổ chức đã có Host bạn dùng được thì app vào thẳng workspace; nếu chưa có hoặc tài khoản còn thiếu bước (chọn tổ chức, đổi mật khẩu…) thì app mở **Settings → Account** để bạn làm tiếp. Các lần vào Welcome sau đó ô **Clisbot Hub** hiện tài khoản đang đăng nhập và trạng thái Host: đang kết nối, tổ chức chưa chia sẻ Host nào, Host chưa công bố cách kết nối, hoặc lỗi lưu Host kèm nút **Retry**. Nút **Refresh Hosts** đọc lại danh sách Host từ Hub, giống nút cùng tên trong **Settings → Hosts**.
 
 Đóng Welcome bằng nút **✕** ở góc trên phải để về màn hình chính; từ đó tile **Add a Host** mở lại Welcome. Nút **⚙** cạnh nó mở Settings.
 
@@ -30,7 +30,7 @@ CLISBOT_REGISTRATION_ALLOWED_DOMAINS=
 
 ```dotenv
 CLISBOT_RESEND_API_KEY=re_...
-CLISBOT_RESEND_FROM="Paseo <accounts@acme.com>"
+CLISBOT_RESEND_FROM="Clisbot <accounts@acme.com>"
 ```
 
 Muốn tắt: bỏ hai biến Google, hoặc chuyển về `invite_only`. Tài khoản tạo bằng Google không có mật khẩu, nên sẽ không đăng nhập được cho tới khi bật lại Google.

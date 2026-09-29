@@ -16,7 +16,7 @@ describe("project directory creation", () => {
   });
 
   async function createRoot(): Promise<string> {
-    const root = await mkdtemp(join(tmpdir(), "paseo-project-directory-"));
+    const root = await mkdtemp(join(tmpdir(), "clisbot-project-directory-"));
     roots.push(root);
     return root;
   }

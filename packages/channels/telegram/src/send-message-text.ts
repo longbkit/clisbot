@@ -1,9 +1,9 @@
 // upstream: extensions/telegram/src/send-message-text.ts@5d8067a4483
-import { isChannelPartialDeliveryError } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import { createMessageReceiptFromOutboundResults } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+import { isChannelPartialDeliveryError } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import { createMessageReceiptFromOutboundResults } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 import type { ResolvedTelegramAccount } from "./accounts.js";
 import { buildInlineKeyboard } from "./inline-keyboard.js";
 import { recordOutboundMessageForPromptContext } from "./outbound-message-context.js";

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { and, eq, sql } from "drizzle-orm";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { JsonValue } from "../config/compiler.js";
@@ -1601,7 +1601,7 @@ class PgDatabase implements Database {
   ): Promise<CliAuthorizationRecord | undefined> {
     try {
       return await this.pool.transaction(async (client) => {
-        await this.locks.withTxLock(client, "paseo-cli-authorization-issuance");
+        await this.locks.withTxLock(client, "clisbot-cli-authorization-issuance");
         const capacity = await client.query<{
           fingerprint_count: number;
           global_count: number;
@@ -2001,7 +2001,7 @@ class PgDatabase implements Database {
 
   async setDaemonConnectionOffer(
     id: string,
-    connectionOffer: import("@getpaseo/protocol/connection-offer").ConnectionOffer | null,
+    connectionOffer: import("@clisbot/protocol/connection-offer").ConnectionOffer | null,
     managedAccessMode: ManagedAccessMode,
   ): Promise<DaemonRecord | undefined> {
     const rows = await query<DaemonRow>(
@@ -2998,7 +2998,7 @@ class PgDatabase implements Database {
   }
 
   async deactivateBillingPlansExcept(activeIds: readonly string[]): Promise<void> {
-    // An empty snapshot means no Paseo plans remain, so every mirrored plan is deactivated.
+    // An empty snapshot means no Clisbot plans remain, so every mirrored plan is deactivated.
     await query(
       this.pool,
       `update billing_plans set active = false where id <> all($1::text[]) and active`,

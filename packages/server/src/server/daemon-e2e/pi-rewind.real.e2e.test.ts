@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest"
 
 import type { AgentTimelineItem } from "../agent/agent-sdk-types.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { canRunRealProvider, createRealProviderClients } from "./real-provider-test-config.js";
 import {
   closeRewindSession,
@@ -18,7 +18,7 @@ import {
 
 interface PiRewindHarness {
   client: DaemonClient;
-  daemon: TestPaseoDaemon;
+  daemon: TestClisbotDaemon;
 }
 
 interface PiRewindSession {
@@ -74,7 +74,7 @@ interface PiTurn {
 
 function piPrompt(input: PiTurn): string {
   return [
-    `PASEO_PI_REWIND_PROMPT_${input.promptToken}.`,
+    `CLISBOT_PI_REWIND_PROMPT_${input.promptToken}.`,
     "Remember this marker for the conversation.",
     ...(input.filler ? [`Ignore this filler: ${input.filler}`] : []),
     `Reply exactly: ${input.doneToken}`,
@@ -151,7 +151,7 @@ describe("daemon E2E (real pi) - rewind", () => {
       return;
     }
     const logger = pino({ level: "silent" });
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["pi"], logger),
       logger,
     });
@@ -310,13 +310,13 @@ describe("daemon E2E (real pi) - rewind", () => {
 
   test("keeps a rewind after the daemon restarts", async () => {
     const cwd = tmpRewindCwd("daemon-real-pi-rewind-");
-    const paseoHomeRoot = mkdtempSync(path.join(tmpdir(), "daemon-real-pi-rewind-home-"));
+    const clisbotHomeRoot = mkdtempSync(path.join(tmpdir(), "daemon-real-pi-rewind-home-"));
     const logger = pino({ level: "silent" });
     const startDaemon = async (): Promise<PiRewindHarness> => {
-      const daemon = await createTestPaseoDaemon({
+      const daemon = await createTestClisbotDaemon({
         agentClients: createRealProviderClients(["pi"], logger),
         logger,
-        paseoHomeRoot,
+        clisbotHomeRoot,
         cleanup: false,
       });
       const client = new DaemonClient({
@@ -361,7 +361,7 @@ describe("daemon E2E (real pi) - rewind", () => {
       expectTimeline(await fetchTimelineItems(current.client, agent.id), rewound);
     } finally {
       await stopDaemon(current);
-      rmSync(paseoHomeRoot, { recursive: true, force: true });
+      rmSync(clisbotHomeRoot, { recursive: true, force: true });
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 900_000);

@@ -7,8 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
   DaemonClient,
   FetchRecentProviderSessionEntry,
-} from "@getpaseo/client/internal/daemon-client";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+} from "@clisbot/client/internal/daemon-client";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImportSessionSheet } from "@/components/import-session-sheet";
 
@@ -254,7 +254,7 @@ function renderSheet(
     },
   });
 
-  const cwd = options && "cwd" in options ? (options.cwd ?? undefined) : "/repo/paseo";
+  const cwd = options && "cwd" in options ? (options.cwd ?? undefined) : "/repo/clisbot";
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -286,7 +286,7 @@ function createImportedAgentSnapshot(id: string): Awaited<ReturnType<DaemonClien
   return {
     id,
     provider: "custom-provider",
-    cwd: "/repo/paseo",
+    cwd: "/repo/clisbot",
     model: null,
     createdAt: "2026-04-30T10:00:00.000Z",
     updatedAt: "2026-04-30T10:00:00.000Z",
@@ -326,7 +326,7 @@ function createProviderSessionEntry(
     providerId: "custom-provider",
     providerLabel: "Custom Agent",
     providerHandleId: "provider-thread-1",
-    cwd: "/repo/paseo",
+    cwd: "/repo/clisbot",
     title: "Import me",
     firstPromptPreview: "Import this external provider session",
     lastPromptPreview: "Import this external provider session",
@@ -483,7 +483,7 @@ describe("ImportSessionSheet", () => {
 
     await waitFor(() => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-        cwd: "/repo/paseo",
+        cwd: "/repo/clisbot",
         providers: ["claude"],
         limit: 15,
       });
@@ -525,7 +525,7 @@ describe("ImportSessionSheet", () => {
             visible={visible}
             client={client}
             serverId="server-1"
-            cwd="/repo/paseo"
+            cwd="/repo/clisbot"
             onClose={vi.fn()}
             onImportedAgent={vi.fn()}
           />
@@ -545,7 +545,7 @@ describe("ImportSessionSheet", () => {
     await screen.findByText("Cached importable session");
     await waitFor(() => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-        cwd: "/repo/paseo",
+        cwd: "/repo/clisbot",
         providers: ["claude"],
         limit: 15,
       });
@@ -567,7 +567,7 @@ describe("ImportSessionSheet", () => {
           createProviderSessionEntry({
             providerId: "claude",
             providerLabel: "Claude Code",
-            cwd: "/repo/paseo-realpath",
+            cwd: "/repo/clisbot-realpath",
           }),
         ],
       };
@@ -607,7 +607,7 @@ describe("ImportSessionSheet", () => {
       expect(importAgent).toHaveBeenCalledWith({
         providerId: "claude",
         providerHandleId: "provider-thread-1",
-        cwd: "/repo/paseo-realpath",
+        cwd: "/repo/clisbot-realpath",
         workspaceId: "ws-current",
       });
       expect(events).toEqual(["fetch", "close", "navigate"]);
@@ -646,7 +646,7 @@ describe("ImportSessionSheet", () => {
     expect(importAgent).toHaveBeenCalledWith({
       providerId: "claude",
       providerHandleId: "provider-thread-1",
-      cwd: "/repo/paseo",
+      cwd: "/repo/clisbot",
     });
     expect(onImportedAgent).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -689,13 +689,13 @@ describe("ImportSessionSheet", () => {
 
     await waitFor(() => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-        cwd: "/repo/paseo",
+        cwd: "/repo/clisbot",
         providers: ["claude"],
         limit: 15,
       });
     });
     expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-      cwd: "/repo/paseo",
+      cwd: "/repo/clisbot",
       providers: ["codex"],
       limit: 15,
     });
@@ -703,7 +703,7 @@ describe("ImportSessionSheet", () => {
       expect.objectContaining({ providers: ["opencode"] }),
     );
     expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-      cwd: "/repo/paseo",
+      cwd: "/repo/clisbot",
       providers: ["z-ai"],
       limit: 15,
     });
@@ -974,8 +974,8 @@ describe("ImportSessionSheet", () => {
         createProviderSessionEntry({
           providerId: "claude",
           providerHandleId: "newest",
-          cwd: "/home/me/paseo",
-          title: "Newest in paseo",
+          cwd: "/home/me/clisbot",
+          title: "Newest in clisbot",
           lastActivityAt: "2026-04-30T12:00:00.000Z",
         }),
         createProviderSessionEntry({
@@ -988,14 +988,14 @@ describe("ImportSessionSheet", () => {
         createProviderSessionEntry({
           providerId: "claude",
           providerHandleId: "older",
-          cwd: "/home/me/paseo",
-          title: "Older in paseo",
+          cwd: "/home/me/clisbot",
+          title: "Older in clisbot",
           lastActivityAt: "2026-04-30T10:00:00.000Z",
         }),
         createProviderSessionEntry({
           providerId: "claude",
           providerHandleId: "worktree",
-          cwd: "/home/me/paseo/.dev/worktrees/zebra",
+          cwd: "/home/me/clisbot/.dev/worktrees/zebra",
           title: "Worktree session",
           lastActivityAt: "2026-04-30T09:00:00.000Z",
         }),
@@ -1010,7 +1010,7 @@ describe("ImportSessionSheet", () => {
       >,
       {
         cwd: null,
-        projects: [{ iconWorkingDir: "/home/me/paseo", projectName: "paseo" }],
+        projects: [{ iconWorkingDir: "/home/me/clisbot", projectName: "clisbot" }],
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
     );
@@ -1028,7 +1028,7 @@ describe("ImportSessionSheet", () => {
     ]);
     expect(
       screen.getAllByTestId(/^import-session-row-folder-/).map((folder) => folder.textContent),
-    ).toEqual(["paseo", "/tmp/scratch", "paseo", "paseo · .dev/worktrees/zebra"]);
+    ).toEqual(["clisbot", "/tmp/scratch", "clisbot", "clisbot · .dev/worktrees/zebra"]);
   });
 
   it("leaves the folder off every row when the sheet is scoped to one workspace", async () => {
@@ -1038,7 +1038,7 @@ describe("ImportSessionSheet", () => {
         createProviderSessionEntry({
           providerId: "claude",
           providerHandleId: "scoped",
-          cwd: "/repo/paseo",
+          cwd: "/repo/clisbot",
           title: "Scoped session",
         }),
       ],
@@ -1052,7 +1052,7 @@ describe("ImportSessionSheet", () => {
       >,
       {
         workspaceId: "ws-current",
-        projects: [{ iconWorkingDir: "/repo/paseo", projectName: "paseo" }],
+        projects: [{ iconWorkingDir: "/repo/clisbot", projectName: "clisbot" }],
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
     );
@@ -1197,7 +1197,7 @@ describe("ImportSessionSheet", () => {
 
     await waitFor(() => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
-        cwd: "/repo/paseo",
+        cwd: "/repo/clisbot",
         providers: ["claude"],
         limit: 15,
       });

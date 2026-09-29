@@ -2,7 +2,7 @@
 // Dev-daemon grok provider toggle (H5 unblock, wave-3 2026-08-28).
 //
 // The user toggled the grok ACP provider ON manually on the PRODUCTION daemon
-// (~/.paseo; persisted as agents.providers.grok = { extends: "acp",
+// (~/.clisbot; persisted as agents.providers.grok = { extends: "acp",
 // command: ["grok","agent","stdio"] }). The DEV daemon (127.0.0.1:6867,
 // ~/.clisbot-dev — the channel-E2E home) had no agents.providers key at all,
 // so H5 was BLOCKED ("Unknown provider: grok"). This script applies the same
@@ -11,7 +11,7 @@
 //   - it PERSISTS to ~/.clisbot-dev/config.json (agents.providers.grok)
 //   - it is HOT-APPLIED (config store applyListeners -> snapshot manager
 //     applyMutableProviderConfig -> registry rebuild) — NO daemon restart
-//   - it touches nothing under ~/.paseo and nothing on port 6767
+//   - it touches nothing under ~/.clisbot and nothing on port 6767
 //
 // Usage: node .set-dev-grok.mjs apply | remove | probe
 //   apply  -> set providers.grok = { extends:"acp", label, command, enabled:true }
@@ -48,13 +48,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() || "";
+    return process.env.CLISBOT_PASSWORD?.trim() || "";
   }
 }
 function openTrusted() {
   return new Promise((res, rej) => {
     const pw = password();
-    const sock = new WebSocket(DAEMON_WS, pw ? [`paseo.bearer.${pw}`] : undefined);
+    const sock = new WebSocket(DAEMON_WS, pw ? [`clisbot.bearer.${pw}`] : undefined);
     const timer = setTimeout(() => rej(new Error("daemon /ws connect timeout")), 15000);
     sock.on("open", () => {
       sock.send(

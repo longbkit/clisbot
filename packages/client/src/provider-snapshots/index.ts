@@ -1,7 +1,7 @@
 import type {
   GetProvidersSnapshotResponseMessage,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 type Update = Extract<SessionOutboundMessage, { type: "providers_snapshot_update" }>;
 type Snapshot = GetProvidersSnapshotResponseMessage["payload"];

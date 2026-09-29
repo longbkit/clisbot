@@ -1,20 +1,20 @@
 // upstream: extensions/slack/src/message-action-dispatch.ts@5d8067a4483
 // Slack plugin module implements message action dispatch behavior.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
-import { resolveReactionMessageId } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
+import { resolveReactionMessageId } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   normalizeLegacyInteractiveReply,
   normalizeMessagePresentation,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
-import { readPositiveIntegerParam, readStringParam } from "@getpaseo/channels-core/plugin-sdk/param-readers";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
+import { readPositiveIntegerParam, readStringParam } from "@clisbot/channels-core/plugin-sdk/param-readers";
 import {
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveDefaultSlackAccountId } from "./accounts.js";
 import { SLACK_MAX_BLOCKS } from "./blocks-input.js";
 import { buildSlackPresentationBlocks, canRenderSlackPresentation } from "./blocks-render.js";

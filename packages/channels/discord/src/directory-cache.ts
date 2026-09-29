@@ -1,11 +1,11 @@
 // upstream: extensions/discord/src/directory-cache.ts@5d8067a4483
 // Discord plugin module implements directory cache behavior.
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/routing";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/routing";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
   normalizeOptionalStringifiedId,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { discordDirectoryCacheState } from "./directory-cache-state.js";
 
 const DISCORD_DIRECTORY_CACHE_MAX_ENTRIES = 4000;

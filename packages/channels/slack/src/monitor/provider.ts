@@ -24,7 +24,7 @@
 //     3s response window, then admitted (D-041).
 
 import type { App, Receiver } from "@slack/bolt";
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import { foldInboundSlackMedia } from "../transport/media.js";
 import { SlackSenderDirectory, type SlackUsersClient } from "../transport/sender-directory.js";
 import {
@@ -82,7 +82,7 @@ export interface SlackBoltProviderOptions {
   /** COMPAT(clisbot-control-plane): the native approval-card seam. Receives the
    * raw `block_actions` body; the Hub's card parser owns the value format. */
   onInteractive?: (body: Record<string, unknown>) => Promise<void>;
-  /** The account's registered native slash command (`/paseo`). Absent = native
+  /** The account's registered native slash command (`/clisbot`). Absent = native
    * slash ingestion off; the in-message text commands still work. */
   slashCommand?: string;
   /** Inbound media: when set, a message's `files[]` are downloaded and the

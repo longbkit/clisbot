@@ -1,7 +1,7 @@
 import { useMemo, type ReactElement } from "react";
 import { Text, type StyleProp, type TextStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { MatchRange } from "@getpaseo/protocol/search/text-match";
+import type { MatchRange } from "@clisbot/protocol/search/text-match";
 import { toHighlightSegments } from "./highlighted-text-segments";
 
 export interface HighlightedTextProps {

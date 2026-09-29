@@ -63,7 +63,7 @@ export function channelPlaneAbsent(): ControlPlaneHttpError {
     404,
     "not_found",
     "Not found",
-    "the channel control plane is disabled on this Hub (PASEO_HUB_CHANNELS_ENABLED)",
+    "the channel control plane is disabled on this Hub (CLISBOT_HUB_CHANNELS_ENABLED)",
   );
 }
 
@@ -110,7 +110,7 @@ export function problem(
   const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
   return Response.json(
     {
-      type: `https://paseo.sh/problems/${code.replaceAll("_", "-")}`,
+      type: `https://clisbot.com/problems/${code.replaceAll("_", "-")}`,
       title,
       status,
       detail,

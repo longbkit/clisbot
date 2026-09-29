@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/api-logging.ts@5d8067a4483
 // Telegram plugin module implements api logging behavior.
-import { createSubsystemLogger } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import type { RuntimeEnv } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+import { createSubsystemLogger } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import type { RuntimeEnv } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 
 type TelegramApiLogger = (message: string) => void;
 

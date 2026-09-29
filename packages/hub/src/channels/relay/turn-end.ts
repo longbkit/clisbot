@@ -21,7 +21,7 @@ export function isSystemErrorText(text: string): boolean {
 
 /**
  * Whether a failed turn gets a notice. `relay` and `hybrid` relay every turn's
- * text, from the channel or the Paseo app alike, so they report every
+ * text, from the channel or the Clisbot app alike, so they report every
  * failure with it. `tool` relays nothing, so only a turn the channel started
  * and the tool did not already answer is owed one.
  */

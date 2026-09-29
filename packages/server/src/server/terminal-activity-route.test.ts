@@ -95,7 +95,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
     command: process.execPath,
     args: [
       "-e",
-      `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ terminalId: process.env.PASEO_TERMINAL_ID, token: process.env.PASEO_ACTIVITY_TOKEN, url: process.env.PASEO_TERMINAL_ACTIVITY_URL })); setInterval(() => {}, 1000);`,
+      `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ terminalId: process.env.CLISBOT_TERMINAL_ID, token: process.env.CLISBOT_ACTIVITY_TOKEN, url: process.env.CLISBOT_TERMINAL_ACTIVITY_URL })); setInterval(() => {}, 1000);`,
     ],
   });
   await waitForCondition(() => existsSync(envPath), 10000);

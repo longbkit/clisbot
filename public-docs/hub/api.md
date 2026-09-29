@@ -9,7 +9,7 @@ category: Hub
 # Hub public API
 
 The Hub public API lets automation operate on triggers, projects, and daemons in one
-organization. Set the Hub origin in `PASEO_HUB_URL` below, for example
+organization. Set the Hub origin in `CLISBOT_HUB_URL` below, for example
 `https://hub.example.com`.
 
 ## API reference
@@ -17,16 +17,16 @@ organization. Set the Hub origin in `PASEO_HUB_URL` below, for example
 - [Interactive API reference](https://hub.paseo.sh/api/reference)
 - [OpenAPI 3.1 document](https://hub.paseo.sh/api/openapi.json)
 
-These are the canonical reference endpoints for the hosted Paseo Hub. A self-hosted Hub exposes the same `/api/reference` and `/api/openapi.json` paths on its own origin.
+These are the canonical reference endpoints for the hosted Clisbot Hub. A self-hosted Hub exposes the same `/api/reference` and `/api/openapi.json` paths on its own origin.
 
 ## Authentication
 
-Run `paseo hub login [origin]` for interactive CLI access. After browser approval, Paseo stores a durable, revocable organization credential under `PASEO_HOME` for that exact origin. Without an explicit origin, the CLI uses `PASEO_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`.
+Run `clisbot hub login [origin]` for interactive CLI access. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`.
 
 For automation, create an organization API key from the Hub dashboard under **API keys**. Both credential types are bearer tokens:
 
 ```http
-Authorization: Bearer paseo_pk_...
+Authorization: Bearer clisbot_pk_...
 Content-Type: application/json
 ```
 
@@ -48,16 +48,16 @@ Each key has one or more selectable scopes:
 API keys do not grant dashboard access. They cannot manage connections,
 projects, or organization members.
 
-CLI credentials have the current CLI operation scopes and remain revocable independently of daemon relationships. `paseo hub logout` deletes the active local CLI credential; it does not revoke or disconnect the daemon identity.
+CLI credentials have the current CLI operation scopes and remain revocable independently of daemon relationships. `clisbot hub logout` deletes the active local CLI credential; it does not revoke or disconnect the daemon identity.
 
 API failures use RFC 9457 problem details. Missing, invalid, or revoked credentials return `401` with `application/problem+json`:
 
 ```json
 {
-  "type": "https://paseo.sh/problems/unauthorized",
+  "type": "https://clisbot.com/problems/unauthorized",
   "title": "Authentication required",
   "status": 401,
-  "detail": "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+  "detail": "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
   "code": "unauthorized",
   "requestId": "5e967c44-fc22-4f6d-8fc5-1bbff33121af"
 }
@@ -67,7 +67,7 @@ A valid key without the scope required by an endpoint returns `403` in the same 
 
 ## Trigger validation and installation
 
-`paseo hub deploy --dry-run` validates each `.paseo/triggers/*.yml` file through `POST /api/v1/triggers/validate`. `paseo hub deploy` validates all files first, then installs each through `POST /api/v1/triggers/install`.
+`clisbot hub deploy --dry-run` validates each `.clisbot/triggers/*.yml` file through `POST /api/v1/triggers/validate`. `clisbot hub deploy` validates all files first, then installs each through `POST /api/v1/triggers/install`.
 
 Both endpoints accept one self-contained document:
 
@@ -95,7 +95,7 @@ Invalid YAML or an unknown organization resource returns `422` with field issues
 
 ## Project list
 
-`GET /api/v1/projects` returns active projects in the bearer credential's organization. `paseo hub projects` renders the projects as a table. With `--json`, it returns `{ "origin": "...", "projects": [...] }` so even an empty result records the resolved Hub.
+`GET /api/v1/projects` returns active projects in the bearer credential's organization. `clisbot hub projects` renders the projects as a table. With `--json`, it returns `{ "origin": "...", "projects": [...] }` so even an empty result records the resolved Hub.
 
 ```json
 {
@@ -122,7 +122,7 @@ On success, Hub returns `200`:
 }
 ```
 
-`paseo hub deploy --project <slug> --dry-run` calls this endpoint with the identical locally resolved payload that a deployment would send.
+`clisbot hub deploy --project <slug> --dry-run` calls this endpoint with the identical locally resolved payload that a deployment would send.
 
 ## Legacy configuration install
 
@@ -139,22 +139,22 @@ Request body:
   "projectSlug": "my-project",
   "files": [
     {
-      "path": ".paseo/hub.yml",
+      "path": ".clisbot/hub.yml",
       "content": "environments:\n  production:\n    kind: daemon\n    daemon: build-server\n    cwd: /workspace\nagents:\n  codex:\n    provider: codex\n"
     },
     {
-      "path": ".paseo/workflows/deploy.yml",
+      "path": ".clisbot/workflows/deploy.yml",
       "content": "name: deploy\non: manual.run\nmax_runtime: 2h\nfilters:\n  from_users: [automation]\nsteps:\n  - id: deploy\n    environment: production\n    max_runtime: 90m\n    idle_timeout: 10m\n    agent: codex\n    prompt:\n      - include: partials/safety.md\n"
     },
     {
-      "path": ".paseo/workflows/partials/safety.md",
+      "path": ".clisbot/workflows/partials/safety.md",
       "content": "Follow the safety checklist."
     }
   ]
 }
 ```
 
-`projectSlug` picks the target project; the bearer credential fixes the organization. `files` contains `.paseo/hub.yml`, every direct workflow `.yml`, and each referenced workflow partial. Hub rejects missing, extra, duplicate, unsafe, or noncanonical paths.
+`projectSlug` picks the target project; the bearer credential fixes the organization. `files` contains `.clisbot/hub.yml`, every direct workflow `.yml`, and each referenced workflow partial. Hub rejects missing, extra, duplicate, unsafe, or noncanonical paths.
 
 Limits:
 
@@ -179,13 +179,13 @@ Common responses are `400` for a missing or malformed body, `404` for an inactiv
 Example:
 
 ```bash
-curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/configurations/install" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY" \
+curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/configurations/install" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY" \
   -H "Content-Type: application/json" \
   --data @configuration-install.json
 ```
 
-`paseo hub deploy -p <project>` selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
+`clisbot hub deploy -p <project>` selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
 
 ## Manual run dispatch
 
@@ -211,7 +211,7 @@ Request body:
 ```
 
 - `expectedVersionId` is optional. When supplied, Hub rejects the dispatch if that revision is no longer active.
-- `input` is the same string a provider message uses: leading `key=value` tokens are parsed as declared inputs, and the remainder becomes `${{ paseo.prompt }}`.
+- `input` is the same string a provider message uses: leading `key=value` tokens are parsed as declared inputs, and the remainder becomes `${{ clisbot.prompt }}`.
 - `deliveryKey` should be unique and stable per dispatch. Hub uses it for durable deduplication, but does not promise exactly-once dispatch or replay of an earlier response.
 
 On success, Hub returns `200`:
@@ -231,8 +231,8 @@ Common responses are `400` for an invalid request, `403` when the actor is not a
 Example:
 
 ```bash
-curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/manual-runs" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY" \
+curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/manual-runs" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY" \
   -H "Content-Type: application/json" \
   --data '{
     "projectSlug": "my-project",
@@ -267,15 +267,15 @@ No request body is required. On success, Hub returns `201`:
 
 The token expires after 10 minutes and is consumed when the daemon enrolls.
 
-`paseo hub connect [origin]` performs this request with `--api-key`, `PASEO_HUB_API_KEY`, or the matching stored login, then passes the one-time token to the daemon's enrollment operation. The daemon generates and keeps its own relationship credential.
+`clisbot hub connect [origin]` performs this request with `--api-key`, `CLISBOT_HUB_API_KEY`, or the matching stored login, then passes the one-time token to the daemon's enrollment operation. The daemon generates and keeps its own relationship credential.
 
 ```bash
 curl --fail-with-body -sS -X POST \
-  "$PASEO_HUB_URL/api/v1/daemons/enrollment-tokens" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY"
+  "$CLISBOT_HUB_URL/api/v1/daemons/enrollment-tokens" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY"
 ```
 
-Direct API consumers can pass the returned token to the daemon enrollment protocol. The Paseo CLI intentionally does not accept raw enrollment tokens; `connect` owns the authenticated single-flow exchange.
+Direct API consumers can pass the returned token to the daemon enrollment protocol. The Clisbot CLI intentionally does not accept raw enrollment tokens; `connect` owns the authenticated single-flow exchange.
 
 An enrollment token cannot be reused. Revoking the API key immediately rejects
 future API requests and expires any unconsumed enrollment tokens that key

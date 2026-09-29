@@ -211,14 +211,14 @@ class OperatorAccount {
   }
 
   async createOrganization(name: string): Promise<string> {
-    const response = await this.post("/api/auth/paseo/create-organization", { name });
+    const response = await this.post("/api/auth/clisbot/create-organization", { name });
     assert.equal(response.status, 201);
     const body = z.object({ organizationId: z.string() }).parse(await response.json());
-    const selected = await this.post("/api/auth/paseo/select-organization", {
+    const selected = await this.post("/api/auth/clisbot/select-organization", {
       organizationId: body.organizationId,
     });
     assert.equal(selected.status, 200);
-    const state = await this.get("/api/auth/paseo/state");
+    const state = await this.get("/api/auth/clisbot/state");
     const parsed = z
       .object({ organization: z.object({ slug: z.string() }) })
       .parse(await state.json());
@@ -251,7 +251,7 @@ class OperatorAccount {
       },
       body: JSON.stringify(body),
     });
-    if (path.startsWith("/api/auth/paseo/")) {
+    if (path.startsWith("/api/auth/clisbot/")) {
       assert.ok(this.auth.browserAccount !== undefined);
       return this.auth.browserAccount(request);
     }

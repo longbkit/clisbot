@@ -1,7 +1,7 @@
 // Exact SVG paths from packages/app/src/components/icons/
 
-/** The Paseo brand swirl — public/logo.svg, drawn as a small sidebar avatar mark. */
-export function PaseoMark({ size = 13, className }: { size?: number; className?: string }) {
+/** The Clisbot brand swirl — public/logo.svg, drawn as a small sidebar avatar mark. */
+export function ClisbotMark({ size = 13, className }: { size?: number; className?: string }) {
   return (
     <svg
       width={size}

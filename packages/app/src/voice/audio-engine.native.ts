@@ -70,7 +70,7 @@ export function createAudioEngine(
   callbacks: AudioEngineCallbacks,
   _options?: AudioEngineTraceOptions,
 ): AudioEngine {
-  const native = require("@getpaseo/expo-two-way-audio");
+  const native = require("@clisbot/expo-two-way-audio");
 
   const refs: {
     initialized: boolean;

@@ -8,11 +8,11 @@ export {
   chunkTextRanges,
   type ChunkTextRangesOptions,
   type TextChunkRange,
-} from "@getpaseo/channels-markdown-core/chunk-text";
+} from "@clisbot/channels-markdown-core/chunk-text";
 /** Quote-aware HTML tag tokens for exact post-render projections. */
-export { tokenizeHtmlTags } from "@getpaseo/channels-markdown-core/html-tags";
+export { tokenizeHtmlTags } from "@clisbot/channels-markdown-core/html-tags";
 /** Static outbound formatting capabilities declared by a channel plugin. */
-export { FormatCapabilityProfile } from "@getpaseo/channels-markdown-core/format-capabilities";
+export { FormatCapabilityProfile } from "@clisbot/channels-markdown-core/format-capabilities";
 
 /**
  * Splits outbound channel text into chunks no longer than the requested limit.
@@ -47,17 +47,17 @@ export {
   type MarkdownStyleSpan,
   type MarkdownTableCell,
   type MarkdownTableMeta,
-} from "@getpaseo/channels-markdown-core/ir";
+} from "@clisbot/channels-markdown-core/ir";
 /** Render-size-aware Markdown chunking for channel payload limits. */
 export {
   renderMarkdownIRChunksWithinLimit,
   type RenderMarkdownIRChunksWithinLimitOptions,
-} from "@getpaseo/channels-markdown-core/render-aware-chunking";
+} from "@clisbot/channels-markdown-core/render-aware-chunking";
 /** Attributed Markdown rendering hooks for native channel formatting. */
 export {
   renderMarkdownWithAttributedRanges,
   type AttributedRenderOptions,
-} from "@getpaseo/channels-markdown-core/render-attributed";
+} from "@clisbot/channels-markdown-core/render-attributed";
 /** Marker-based Markdown rendering hooks for channel-specific formatting. */
 export {
   renderMarkdownWithMarkers,
@@ -65,9 +65,9 @@ export {
   type RenderOptions,
   type RenderStyleMap,
   type RenderStyleMarker,
-} from "@getpaseo/channels-markdown-core/render";
+} from "@clisbot/channels-markdown-core/render";
 /** Markdown table conversion helper shared by text-only channel renderers. */
-export { convertMarkdownTables } from "@getpaseo/channels-markdown-core/tables";
+export { convertMarkdownTables } from "@clisbot/channels-markdown-core/tables";
 /** File-reference detection helpers for avoiding accidental autolinks. */
 export {
   FILE_REF_EXTENSIONS_WITH_TLD,

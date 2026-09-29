@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/actions.download-file.test.ts@5d8067a4483
 // Slack tests cover actionsownload file plugin behavior.
 import type { WebClient } from "@slack/web-api";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const resolveSlackMedia = vi.fn<typeof import("./monitor/media.js").resolveSlackMedia>();

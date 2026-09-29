@@ -160,7 +160,7 @@ describe("normalizeStoredHostProfile", () => {
     const profile = normalizeStoredHostProfile({
       serverId: "srv_old",
       connections: [
-        { id: "socket:/tmp/paseo.sock", type: "directSocket", path: "/tmp/paseo.sock" },
+        { id: "socket:/tmp/clisbot.sock", type: "directSocket", path: "/tmp/clisbot.sock" },
       ],
     });
 
@@ -172,7 +172,7 @@ describe("normalizeStoredHostProfile", () => {
       serverId: "srv_new",
       appearance: { color: "teal", badgeDisplay: "icon" },
       connections: [
-        { id: "socket:/tmp/paseo.sock", type: "directSocket", path: "/tmp/paseo.sock" },
+        { id: "socket:/tmp/clisbot.sock", type: "directSocket", path: "/tmp/clisbot.sock" },
       ],
     });
 
@@ -227,9 +227,9 @@ describe("createRemoteSshHostConnection", () => {
 
 describe("upsertHostConnectionInProfiles", () => {
   const connection: HostConnection = {
-    id: "socket:/tmp/paseo.sock",
+    id: "socket:/tmp/clisbot.sock",
     type: "directSocket",
-    path: "/tmp/paseo.sock",
+    path: "/tmp/clisbot.sock",
   };
 
   it("follows shared Hub renames while preserving a local Appearance label", () => {

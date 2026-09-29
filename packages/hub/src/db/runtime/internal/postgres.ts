@@ -30,9 +30,9 @@ const DEFAULT_POSTGRES_DATABASE = "postgres";
  * default `max_connections` (100) for a second Hub process or a migration.
  */
 export const DEFAULT_POSTGRES_POOL_SIZE = 30;
-const POOL_SIZE_VARIABLE = "PASEO_HUB_DATABASE_POOL_SIZE";
+const POOL_SIZE_VARIABLE = "CLISBOT_HUB_DATABASE_POOL_SIZE";
 
-/** The pool size from `PASEO_HUB_DATABASE_POOL_SIZE`, or the default. */
+/** The pool size from `CLISBOT_HUB_DATABASE_POOL_SIZE`, or the default. */
 export function postgresPoolSize(environment: Record<string, string | undefined>): number {
   const raw = environment[POOL_SIZE_VARIABLE]?.trim();
   if (raw === undefined || raw === "") return DEFAULT_POSTGRES_POOL_SIZE;

@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/retry-after.ts@5d8067a4483
 // Discord plugin module implements retry after behavior.
-import { asFiniteNumberInRange, parseStrictFiniteNumber } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { asFiniteNumberInRange, parseStrictFiniteNumber } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 const RETRY_AFTER_BODY_SECONDS_RE = /^(?:\d+\.?\d*|\.\d+)$/;
 const MAX_SAFE_RETRY_AFTER_SECONDS = Number.MAX_SAFE_INTEGER / 1000;

@@ -2,7 +2,7 @@
 // the channel plane rides (`channels/daemon/enrolled-client.ts`). A private
 // Host has no address to dial, so this is the only path that reaches it.
 import { afterEach, expect, test } from "vitest";
-import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@clisbot/protocol/client-capabilities";
 import { DaemonRegistryHarness } from "./test-utils/daemon-registry-harness.js";
 import { EnrolledDaemonClient, HOST_NOT_CONNECTED } from "../channels/daemon/enrolled-client.js";
 import { connectEnrolledChannelDaemon } from "../channels/daemon/client.js";

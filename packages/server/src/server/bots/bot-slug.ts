@@ -1,5 +1,5 @@
-import { slugify } from "@getpaseo/protocol/branch-slug";
-import { isRoomWideMention } from "@getpaseo/protocol/chats/mentions";
+import { slugify } from "@clisbot/protocol/branch-slug";
+import { isRoomWideMention } from "@clisbot/protocol/chats/mentions";
 
 /**
  * The bot directory name (docs/features/bots-and-chats/README.md, D3): derived from

@@ -54,7 +54,7 @@ export function FounderNote() {
   return (
     <div className="max-w-2xl space-y-5 leading-relaxed text-white/70">
       <p>
-        I build Paseo on my own. There are no investors, no board and no company behind it, and I
+        I build Clisbot on my own. There are no investors, no board and no company behind it, and I
         have turned down funding offers to keep it that way.
       </p>
       <p>
@@ -63,11 +63,11 @@ export function FounderNote() {
         monetize, and that pressure changes what gets built.
       </p>
       <p>
-        Paseo is self-funded: the work is paid for by sponsorship and by{" "}
+        Clisbot is self-funded: the work is paid for by sponsorship and by{" "}
         <a href="/hub" className="underline hover:text-white/90">
-          Paseo Hub
+          Clisbot Hub
         </a>
-        , an optional hosted service. Your support is what lets me work on Paseo full time.
+        , an optional hosted service. Your support is what lets me work on Clisbot full time.
       </p>
       <p className="text-white/50">{MAINTAINER_LINK}, maintainer</p>
     </div>
@@ -168,7 +168,7 @@ function SponsorLogoRow() {
 }
 
 const SPOT_FEATURES: ReadonlyArray<string> = [
-  "Your logo on the homepage of paseo.sh, around 70,000 visitors a month",
+  "Your logo on the homepage of clisbot.com, around 70,000 visitors a month",
   "Your logo in the GitHub README, around 30,000 visitors a month",
   "An announcement in the Discord, around 2,000 members",
   "A mention in the changelog",
@@ -181,7 +181,7 @@ export function SponsorSpotSection() {
       <SectionHeading
         as="h2"
         title="Sponsor as a company"
-        description="If your team relies on Paseo, a monthly sponsorship funds its development directly. As a thank you, your logo goes on the homepage and in the README."
+        description="If your team relies on Clisbot, a monthly sponsorship funds its development directly. As a thank you, your logo goes on the homepage and in the README."
       />
       <div className="space-y-8">
         <div className="flex items-end gap-2">
@@ -218,10 +218,10 @@ export function SponsorSpotSection() {
 }
 
 /** The /sponsor page's first section: the note and the ways to back the work. */
-export function SponsorPaseoSection() {
+export function SponsorClisbotSection() {
   return (
     <section>
-      <SectionHeading as="h1" title="Sponsor Paseo" />
+      <SectionHeading as="h1" title="Sponsor Clisbot" />
       <div className="space-y-10">
         <FounderNote />
         <BackingOptions />
@@ -234,19 +234,19 @@ export function SponsorPaseoSection() {
 export function SponsorSection() {
   return (
     <section>
-      <SectionHeading as="h2" title="Sponsor Paseo" />
+      <SectionHeading as="h2" title="Sponsor Clisbot" />
       <div className="space-y-10">
         <div className="max-w-2xl space-y-5 leading-relaxed text-white/70">
           <p>
-            I build Paseo on my own, with no investors and no company behind it, and I have turned
+            I build Clisbot on my own, with no investors and no company behind it, and I have turned
             down funding offers to keep it that way. A tool that sits between you and your code,
             your keys and your machines has to stay neutral, and funding creates pressure to
             monetize.
           </p>
           <p>
-            Paseo is self-funded through sponsorship and{" "}
+            Clisbot is self-funded through sponsorship and{" "}
             <a href="/hub" className="underline hover:text-white/90">
-              Paseo Hub
+              Clisbot Hub
             </a>
             , and your support is what lets me work on it full time.
           </p>
@@ -258,7 +258,7 @@ export function SponsorSection() {
   );
 }
 
-/** Homepage: the companies sponsoring Paseo. Renders nothing until there is one. */
+/** Homepage: the companies sponsoring Clisbot. Renders nothing until there is one. */
 export function SponsorsSection() {
   if (HOMEPAGE_SPONSORS.length === 0) return null;
   return (

@@ -414,7 +414,7 @@ async function handleRemoveChannel(
       `no ${body.channel} account "${body.account}" is installed`,
     );
   }
-  const path = `.paseo/channels/${body.channel}/${body.account}.yml`;
+  const path = `.clisbot/channels/${body.channel}/${body.account}.yml`;
   await deployRevision(
     database,
     snapshot,
@@ -759,7 +759,7 @@ function upsertAccountFile(
   account: string,
   connectionId: string,
 ): HubBundleFile[] {
-  const path = `.paseo/channels/${channel}/${account}.yml`;
+  const path = `.clisbot/channels/${channel}/${account}.yml`;
   const previous = snapshot.files.find((file) => file.path === path);
   const retained = previous ? (load(previous.content) as Record<string, unknown>) : {};
   const content = dump(

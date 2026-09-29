@@ -110,10 +110,10 @@ describe("manual configuration saves", () => {
     "",
   ].join("\n");
   const files = () => [
-    { path: ".paseo/hub.yml", content: hubYaml },
-    { path: ".paseo/workflows/triage.yml", content: workflowYaml },
+    { path: ".clisbot/hub.yml", content: hubYaml },
+    { path: ".clisbot/workflows/triage.yml", content: workflowYaml },
     {
-      path: ".paseo/workflows/partials/triage/preamble.md",
+      path: ".clisbot/workflows/partials/triage/preamble.md",
       content: "Triage first.",
     },
   ];
@@ -151,7 +151,7 @@ describe("manual configuration saves", () => {
     const activated = await hub.save({ files: files() });
 
     const extra = {
-      path: ".paseo/workflows/partials/unused.md",
+      path: ".clisbot/workflows/partials/unused.md",
       content: "Available for future workflows.",
     };
     const saved = await hub.save({ files: [...files(), extra] });
@@ -168,7 +168,7 @@ describe("manual configuration saves", () => {
     const hub = await manualConfigurationHub();
 
     const rejected = await hub.save({
-      files: [{ path: ".paseo/hub.yml", content: "environments: [" }],
+      files: [{ path: ".clisbot/hub.yml", content: "environments: [" }],
     });
 
     assert.equal(rejected.outcome, "invalid");
@@ -178,11 +178,11 @@ describe("manual configuration saves", () => {
   it("shows malformed expressions against the authored workflow field", async () => {
     const hub = await manualConfigurationHub();
     const malformed = files().map((file) =>
-      file.path === ".paseo/workflows/triage.yml"
+      file.path === ".clisbot/workflows/triage.yml"
         ? Object.assign({}, file, {
             content: file.content.replace(
               "agent: { provider: claude }",
-              "agent: ${{ paseo.inputs.agent + }}",
+              "agent: ${{ clisbot.inputs.agent + }}",
             ),
           })
         : file,
@@ -191,7 +191,10 @@ describe("manual configuration saves", () => {
     const rejected = await hub.save({ files: malformed });
 
     assert.equal(rejected.outcome, "invalid");
-    assert.match(String(rejected.errors), /\.paseo\/workflows\/triage\.yml\.steps\.only\.agent/iu);
+    assert.match(
+      String(rejected.errors),
+      /\.clisbot\/workflows\/triage\.yml\.steps\.only\.agent/iu,
+    );
   });
 });
 

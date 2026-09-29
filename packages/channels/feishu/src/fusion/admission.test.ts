@@ -1,7 +1,7 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { createFeishuAdmission } from "./admission.js";
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 
 const ENCRYPT_KEY = "test-encrypt-key";
 

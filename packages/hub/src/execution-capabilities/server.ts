@@ -134,7 +134,7 @@ function createMcpServer(
   materializedOutputs: readonly MaterializedOutputCapability[],
 ): Server {
   const server = new Server(
-    { name: "paseo-hub-execution", version: "1.0.0" },
+    { name: "clisbot-hub-execution", version: "1.0.0" },
     { capabilities: { tools: {} } },
   );
   const tools = executionToolDefinitions(execution.launchIntent?.outputSchema, materializedOutputs);

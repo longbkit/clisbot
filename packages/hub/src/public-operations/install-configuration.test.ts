@@ -24,7 +24,7 @@ const authorization = {
 function files(partial = "Follow the safety checklist."): HubBundleFile[] {
   return [
     {
-      path: ".paseo/hub.yml",
+      path: ".clisbot/hub.yml",
       content: [
         "environments:",
         "  runner:",
@@ -35,7 +35,7 @@ function files(partial = "Follow the safety checklist."): HubBundleFile[] {
       ].join("\n"),
     },
     {
-      path: ".paseo/workflows/request.yml",
+      path: ".clisbot/workflows/request.yml",
       content: [
         "name: request",
         "on: manual.run",
@@ -50,7 +50,7 @@ function files(partial = "Follow the safety checklist."): HubBundleFile[] {
         "      - include: partials/docs/safety.md",
       ].join("\n"),
     },
-    { path: ".paseo/workflows/partials/docs/safety.md", content: partial },
+    { path: ".clisbot/workflows/partials/docs/safety.md", content: partial },
   ];
 }
 
@@ -71,7 +71,7 @@ describe("public configuration bundle installation", () => {
     assert.deepEqual(compiled.triggers[0]?.steps[0]?.prompt, [
       {
         kind: "partial",
-        path: ".paseo/workflows/partials/docs/safety.md",
+        path: ".clisbot/workflows/partials/docs/safety.md",
         content: "Follow the safety checklist.",
         contentHash: hashPromptPartialContent("Follow the safety checklist."),
       },
@@ -111,8 +111,8 @@ describe("public configuration bundle installation", () => {
     assert.deepEqual(
       result.issues.map(({ path }) => path),
       [
-        [".paseo/hub.yml", "agents", "broken", "provider"],
-        [".paseo/hub.yml", "agents", "broken", "options", "nonsense"],
+        [".clisbot/hub.yml", "agents", "broken", "provider"],
+        [".clisbot/hub.yml", "agents", "broken", "options", "nonsense"],
       ],
     );
     assert.deepEqual(validations, [
@@ -142,7 +142,7 @@ describe("public configuration bundle installation", () => {
     if (result.status !== "invalid_configuration") return;
     assert.deepEqual(result.issues, [
       {
-        path: [".paseo/hub.yml", "agents", "broken", "provider"],
+        path: [".clisbot/hub.yml", "agents", "broken", "provider"],
         message: "provider became unavailable",
       },
     ]);
@@ -154,36 +154,36 @@ describe("public configuration bundle installation", () => {
     {
       name: "missing workflow partial",
       bundle: files().slice(0, 2),
-      path: [".paseo/workflows/partials/docs/safety.md"],
+      path: [".clisbot/workflows/partials/docs/safety.md"],
     },
     {
       name: "duplicate source path",
       bundle: [...files(), files()[1]!],
-      path: [".paseo/workflows/request.yml"],
+      path: [".clisbot/workflows/request.yml"],
     },
     {
       name: "monolithic trigger",
       bundle: [
         {
-          path: ".paseo/hub.yml",
+          path: ".clisbot/hub.yml",
           content: `${files()[0]!.content}\ntriggers: []`,
         },
       ],
-      path: [".paseo/hub.yml", "triggers"],
+      path: [".clisbot/hub.yml", "triggers"],
     },
     {
       name: "malformed workflow expression",
       bundle: files().map((file) =>
-        file.path === ".paseo/workflows/request.yml"
+        file.path === ".clisbot/workflows/request.yml"
           ? Object.assign({}, file, {
               content: file.content.replace(
                 "agent: { provider: test }",
-                "agent: ${{ paseo.inputs.agent + }}",
+                "agent: ${{ clisbot.inputs.agent + }}",
               ),
             })
           : file,
       ),
-      path: [".paseo/workflows/request.yml", "steps", "work", "agent"],
+      path: [".clisbot/workflows/request.yml", "steps", "work", "agent"],
     },
   ])("rejects $name before creating a revision", async ({ bundle, path }) => {
     const harness = await installHarness();
@@ -347,7 +347,7 @@ async function deploymentHarness() {
 
 function namedFiles(name: string): HubBundleFile[] {
   return files().map((file) =>
-    file.path === ".paseo/hub.yml"
+    file.path === ".clisbot/hub.yml"
       ? Object.assign({}, file, { content: `name: ${name}\n${file.content}` })
       : file,
   );
@@ -397,7 +397,7 @@ async function installHarness(validator?: DaemonAgentConfigurationValidator) {
 
 function namedAgentFiles(): HubBundleFile[] {
   return files().map((file) => {
-    if (file.path === ".paseo/hub.yml") {
+    if (file.path === ".clisbot/hub.yml") {
       return Object.assign({}, file, {
         content: file.content.replace(
           "agents: {}",
@@ -410,7 +410,7 @@ function namedAgentFiles(): HubBundleFile[] {
         ),
       });
     }
-    return file.path === ".paseo/workflows/request.yml"
+    return file.path === ".clisbot/workflows/request.yml"
       ? Object.assign({}, file, {
           content: file.content.replace("agent: { provider: test }", "agent: broken"),
         })

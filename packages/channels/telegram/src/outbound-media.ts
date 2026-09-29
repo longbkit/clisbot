@@ -1,11 +1,11 @@
 // upstream: extensions/telegram/src/outbound-media.ts@5d8067a4483
 import { InputFile } from "grammy";
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { extensionForMime, type MediaKind } from "@getpaseo/channels-core/plugin-sdk/media-mime";
-import { isGifMedia, kindFromMime } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
-import type { loadWebMedia } from "@getpaseo/channels-core/plugin-sdk/web-media";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { extensionForMime, type MediaKind } from "@clisbot/channels-core/plugin-sdk/media-mime";
+import { isGifMedia, kindFromMime } from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
+import type { loadWebMedia } from "@clisbot/channels-core/plugin-sdk/web-media";
 import { resolveTelegramPlainCaption, splitTelegramCaption } from "./caption.js";
 import { renderTelegramHtmlText, telegramHtmlToPlainTextFallback } from "./format.js";
 import type { TelegramOutboundPromptContextMessage } from "./outbound-message-context.js";

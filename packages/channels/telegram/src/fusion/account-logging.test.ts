@@ -8,11 +8,11 @@
 //   2. An account's lines have to follow the account being served, not the
 //      account that installed the runtime first.
 import { describe, expect, it } from "vitest";
-import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostKeyedStore, HostKeyedStoreOptions, HostRuntime } from "@clisbot/channels-shared";
 import {
   createSubsystemLogger,
   registerSubsystemLoggerSink,
-} from "@getpaseo/channels-core/logging/subsystem";
+} from "@clisbot/channels-core/logging/subsystem";
 import { sendText } from "../outbound.js";
 
 const CFG = {

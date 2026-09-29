@@ -1,16 +1,16 @@
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type {
   AgentProvider,
   AgentTimelineItem,
   JsonValue,
   ToolCallDetail,
-} from "@getpaseo/protocol/agent-types";
-import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
+} from "@clisbot/protocol/agent-types";
+import { timelineItemIdentity } from "@clisbot/protocol/timeline-identity";
 import type {
   AgentAttachment,
   AgentStreamEventPayload,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { extractTaskEntriesFromToolCall } from "../utils/tool-call-parsers";
 

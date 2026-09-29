@@ -8,7 +8,7 @@ import {
 } from "../support/helpers/new-workspace";
 import { seedWorkspace } from "../support/helpers/seed-client";
 
-const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
+const CREATE_AGENT_PREFERENCES_KEY = "@clisbot:create-agent-preferences";
 
 type WebSocketMessage = string | Buffer;
 

@@ -29,13 +29,13 @@ it("keeps the most recent events across reads, oldest first", async () => {
     expect(events[99]).toMatchObject({ index: 104 });
   });
   expect(console.warn).toHaveBeenCalledWith(
-    "[paseo:host] managed-host-removed",
+    "[clisbot:host] managed-host-removed",
     expect.objectContaining({ index: 0 }),
   );
 });
 
 it("exposes the persisted events to the browser console", async () => {
   recordHostDiagnostic("host-route-redirect", { to: "/welcome" });
-  const reader = Reflect.get(globalThis, "paseoHostDiagnostics") as () => Promise<unknown[]>;
+  const reader = Reflect.get(globalThis, "clisbotHostDiagnostics") as () => Promise<unknown[]>;
   await vi.waitFor(async () => expect(await reader()).toHaveLength(1));
 });

@@ -6,13 +6,13 @@ import {
   formatErrorMessage,
   PlatformMessageNotDispatchedError,
   readErrorName,
-} from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { parseStrictNonNegativeInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { classifyTransientNetworkErrorCode } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
+} from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { parseStrictNonNegativeInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { classifyTransientNetworkErrorCode } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
 import {
   isRecord,
   normalizeLowercaseStringOrEmpty,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const TELEGRAM_NETWORK_ORIGIN = Symbol("openclaw.telegram.network-origin");
 const TELEGRAM_SUPERGROUP_MIGRATION_DESCRIPTION =

@@ -9,7 +9,7 @@
 
 import { App, HTTPReceiver } from "@slack/bolt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { createSlackBoltProvider, type SlackBoltProviderOptions } from "./provider.js";
 
 type ProcessEventShim = (event: {
@@ -419,7 +419,7 @@ describe("slack bolt provider: slash commands and interactive payloads", () => {
   it("acks a slash command first, then admits the rewritten text command", async () => {
     const order: string[] = [];
     const harness = makeProvider({
-      slashCommand: "/paseo",
+      slashCommand: "/clisbot",
       onInbound: async () => {
         order.push("admit");
       },
@@ -428,7 +428,7 @@ describe("slack bolt provider: slash commands and interactive payloads", () => {
     const acks: unknown[] = [];
     await receiver.shim?.processEvent({
       body: {
-        command: "/paseo",
+        command: "/clisbot",
         text: "status",
         user_id: "U_HUMAN",
         channel_id: "C1",

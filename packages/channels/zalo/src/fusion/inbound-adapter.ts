@@ -7,7 +7,7 @@
 // Fusion's Hub owns every one of those, so this module does only the part the
 // Hub cannot: turn the native update into the channel-agnostic
 // `ChannelInboundEvent` the shared L3 monitor admits
-// (`@getpaseo/channels-shared`).
+// (`@clisbot/channels-shared`).
 //
 // Carried from upstream `monitor.ts` unchanged: the seconds-vs-milliseconds
 // timestamp rule (`resolveZaloTimestampMs`), the group/direct split off
@@ -26,7 +26,7 @@ import {
   readSlashCommand,
   type ChannelInboundEvent,
   type ChannelInboundKind,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import type { ZaloMessage, ZaloUpdate } from "../api.js";
 
 /** Upstream `monitor.ts`: a `date` this large is already milliseconds. */

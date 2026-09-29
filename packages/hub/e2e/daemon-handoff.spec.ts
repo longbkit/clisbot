@@ -21,8 +21,8 @@ test("app setup hands off to a daemon, and the daemon that connects opens the da
 
     // A self-hosted Hub has to be named, and the only address that is certainly reachable is the
     // one the operator is already looking at.
-    await handoff.expectCommand(`paseo hub login ${origin}`);
-    expect(await handoff.copyCommand()).toBe(`paseo hub login ${origin}`);
+    await handoff.expectCommand(`clisbot hub login ${origin}`);
+    expect(await handoff.copyCommand()).toBe(`clisbot hub login ${origin}`);
     await handoff.accessible();
 
     // The command sends the operator to a terminal, and the terminal sends a browser back here.
@@ -30,7 +30,7 @@ test("app setup hands off to a daemon, and the daemon that connects opens the da
     const terminal = await page.context().newPage();
     try {
       await terminal.goto(`${origin}/cli-login`);
-      await expect(terminal.getByRole("heading", { name: "Log in the Paseo CLI" })).toBeVisible();
+      await expect(terminal.getByRole("heading", { name: "Log in the Clisbot CLI" })).toBeVisible();
       await expect(terminal.getByLabel("Verification code")).toBeVisible();
       await expect(terminal.getByRole("heading", { name: "Set up your apps" })).toHaveCount(0);
     } finally {

@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/rich-plain-fallback.ts@5d8067a4483
 // withTelegramPlainFallback owns formatted-to-plain recovery for durable sends,
 // final replies, and draft previews. A second orchestrator reintroduces silent drift.
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
-import { chunkTextForOutbound } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
+import { chunkTextForOutbound } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import type { TelegramRichBlocksDegradationReason } from "./rich-block-model.js";
 
 // Any RICH_MESSAGE_*_INVALID rejection (entities, media, depth) degrades to

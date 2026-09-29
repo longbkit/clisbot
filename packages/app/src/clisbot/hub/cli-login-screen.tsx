@@ -218,7 +218,7 @@ type CliLoginFormModel = ReturnType<typeof openCliLoginForm>;
 function CliCodeEntry({ model, state }: { model: CliLoginFormModel; state: CliLoginFormState }) {
   const compact = useIsCompactFormFactor();
   return (
-    <SettingsSection title="Log in the Paseo CLI">
+    <SettingsSection title="Log in the Clisbot CLI">
       <Field label="Verification code" hint="Only approve a code you requested yourself.">
         <FormTextInput
           initialValue={state.enteredCode}
@@ -256,11 +256,11 @@ function CliHostDiscovery({
       <SettingsSection title="Connect host">
         <Alert
           variant="success"
-          title={`${host.label} was added to Paseo`}
+          title={`${host.label} was added to Clisbot`}
           description={
             connected
               ? "The Host is online and ready for Projects and Agents."
-              : "The Host was added and Paseo is connecting to it."
+              : "The Host was added and Clisbot is connecting to it."
           }
         />
         {connected ? (
@@ -281,7 +281,7 @@ function CliHostDiscovery({
         description={
           failed
             ? "Confirm enrollment in the terminal, then retry. If this host is already enrolled, open Hosts to continue."
-            : "Return to the terminal and confirm Connect this daemon to Paseo Hub. Paseo will add the host automatically."
+            : "Return to the terminal and confirm Connect this daemon to Clisbot Hub. Clisbot will add the host automatically."
         }
       >
         {failed ? (

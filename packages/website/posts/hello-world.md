@@ -1,7 +1,7 @@
 ---
 title: "Hello World"
-description: "The first post on the Paseo blog."
+description: "The first post on the Clisbot blog."
 date: "2026-03-29"
 ---
 
-Welcome to the Paseo blog.
+Welcome to the Clisbot blog.

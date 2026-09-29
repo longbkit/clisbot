@@ -88,7 +88,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
     assert.equal((await hub.signUp("first@acme.test")).status, 403);
 
     const token = hub.mailer.lastToken("first@acme.test");
-    const inspected = await hub.post("/api/auth/paseo/registration/inspect", { token });
+    const inspected = await hub.post("/api/auth/clisbot/registration/inspect", { token });
     assert.deepEqual(
       { ...((await inspected.json()) as object), expiresAt: undefined },
       { status: "valid", email: "first@acme.test", expiresAt: undefined },
@@ -259,7 +259,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
     );
     await hub.query(
       `insert into organization_cli_credentials (organization_id, prefix, verifier, created_by_user_id)
-       select $1, 'paseo_cli_testprefix', 'verifier', id from "user" where email = 'victim@partner.test'`,
+       select $1, 'clisbot_cli_testprefix', 'verifier', id from "user" where email = 'victim@partner.test'`,
       [invitation.organizationId],
     );
     assert.equal(await hub.count(`select count(*) from session`), 1);
@@ -281,7 +281,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
   it("describes a CLI credential's Hub, organization, approving account, and role", async () => {
     const hub = await start();
     await hub.register("cli@acme.test");
-    const token = `paseo_cli_abcdefghijkl_${"s".repeat(43)}`;
+    const token = `clisbot_cli_abcdefghijkl_${"s".repeat(43)}`;
     const parts = cliCredentialParts(token);
     await hub.query(
       `insert into organization_cli_credentials (organization_id, prefix, verifier, created_by_user_id)
@@ -289,7 +289,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
        where u.email = 'cli@acme.test'`,
       [parts.prefix, parts.verifier],
     );
-    const identity = await hub.get("/api/auth/paseo/credential", token);
+    const identity = await hub.get("/api/auth/clisbot/credential", token);
     assert.equal(identity.status, 200);
     const body = (await identity.json()) as Record<string, unknown>;
     assert.equal(body["hub"], ORIGIN);
@@ -297,7 +297,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
     assert.equal((body["organization"] as { name: string }).name, "acme.test");
     assert.equal((body["account"] as { email: string }).email, "cli@acme.test");
     assert.equal(body["role"], "owner");
-    assert.equal((await hub.get("/api/auth/paseo/credential", `${token}x`)).status, 401);
+    assert.equal((await hub.get("/api/auth/clisbot/credential", `${token}x`)).status, 401);
   }, 120_000);
 
   it("claims a pristine Hub with Google and makes that account the operator", async () => {
@@ -367,7 +367,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
       [{ name: "Ada Lovelace", image: "https://lh3.googleusercontent.com/a/avatar" }],
     );
     const state = await hub.auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/state`, { headers: { cookie: hub.cookieHeader } }),
+      new Request(`${ORIGIN}/api/auth/clisbot/state`, { headers: { cookie: hub.cookieHeader } }),
     );
     const body = (await state.json()) as { account?: { image?: string } };
     assert.equal(body.account?.image, "https://lh3.googleusercontent.com/a/avatar");
@@ -401,7 +401,7 @@ describe("domain self-registration, email verification, and Google sign-in", () 
       `insert into "user" (id, name, email, email_verified) values ('stray', 'Stray', 'stray@gmail.com', true)`,
     );
     await hub.query(`insert into pending_registrations (email) values ('stray@gmail.com')`);
-    const claim = await hub.post("/api/auth/paseo/claim-instance", {
+    const claim = await hub.post("/api/auth/clisbot/claim-instance", {
       email: "owner@example.test",
       password: PASSWORD,
     });
@@ -543,11 +543,11 @@ class RegistrationHub {
   }
 
   startRegistration(email: string): Promise<Response> {
-    return this.post("/api/auth/paseo/registration/start", { email });
+    return this.post("/api/auth/clisbot/registration/start", { email });
   }
 
   async completeRegistration(token: string, name = "User"): Promise<Response> {
-    const response = await this.post("/api/auth/paseo/registration/complete", {
+    const response = await this.post("/api/auth/clisbot/registration/complete", {
       token,
       name,
       password: PASSWORD,

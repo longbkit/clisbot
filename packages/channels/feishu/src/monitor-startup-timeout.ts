@@ -1,5 +1,5 @@
 // upstream: extensions/feishu/src/monitor-startup-timeout.ts@5d8067a4483
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 const FEISHU_STARTUP_BOT_INFO_TIMEOUT_DEFAULT_MS = 30_000;
 const FEISHU_STARTUP_BOT_INFO_TIMEOUT_ENV = "OPENCLAW_FEISHU_STARTUP_PROBE_TIMEOUT_MS";

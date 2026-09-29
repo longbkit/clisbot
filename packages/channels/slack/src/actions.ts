@@ -1,12 +1,12 @@
 // upstream: extensions/slack/src/actions.ts@5d8067a4483
 // Slack plugin module implements actions behavior.
 import type { Block, KnownBlock, WebClient } from "@slack/web-api";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
 import { requireRuntimeConfig } from "./fusion/plugin-config.js";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { z } from "zod";
 import { resolveDefaultSlackAccountId, resolveSlackAccount } from "./accounts.js";
 import { SLACK_PRIVATE_ACTION_DELIVERY_RESULT } from "./action-threading.js";

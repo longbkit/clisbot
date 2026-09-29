@@ -4,7 +4,7 @@
 // the per-channel native card payloads (Slack Block Kit `blocks`, Telegram
 // inline-keyboard `reply_markup`), the decided-state one-liner the in-place
 // update posts, and the `inlineButtons` placement gate. Pure + channel-open-
-// typed: the Hub package keeps zero `@getpaseo/channels-*` imports, so the
+// typed: the Hub package keeps zero `@clisbot/channels-*` imports, so the
 // card payloads are plain records the verticals' send adapters understand,
 // and the channel wire envelopes (the Slack `block_actions` payload) are
 // parsed in the vertical — the hub owns only the card-value scheme.

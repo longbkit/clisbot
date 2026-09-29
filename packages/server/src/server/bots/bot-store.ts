@@ -2,11 +2,11 @@ import { randomBytes } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Logger } from "pino";
-import { StoredBotSchema, type StoredBot } from "@getpaseo/protocol/bots/types";
+import { StoredBotSchema, type StoredBot } from "@clisbot/protocol/bots/types";
 import { writeJsonFileAtomic } from "../atomic-file.js";
 
 /**
- * One JSON file per bot at `$PASEO_HOME/bots/{botId}.json`, written atomically
+ * One JSON file per bot at `$CLISBOT_HOME/bots/{botId}.json`, written atomically
  * (docs/features/bots-and-chats/README.md, D2; docs/data-model.md). The directory is
  * made on the first write, never at construction, so a daemon with no bots leaves
  * its home byte-identical to a flag-off one.

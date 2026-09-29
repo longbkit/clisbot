@@ -1,16 +1,16 @@
 {
-  "name": "@getpaseo/plugin-example-modal-ui",
+  "name": "@clisbot/plugin-example-modal-ui",
   "version": "0.1.1",
-  "description": "Interactive Paseo plugin example for modal forms, scrolling, and clipboard actions",
-  "homepage": "https://paseo.sh/docs/plugins",
+  "description": "Interactive Clisbot plugin example for modal forms, scrolling, and clipboard actions",
+  "homepage": "https://clisbot.com/docs/plugins",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/getpaseo/paseo.git",
+    "url": "git+https://github.com/longbkit/clisbot.git",
     "directory": "plugin-examples/modal-ui"
   },
   "files": [
-    "paseo-plugin.json",
+    "clisbot-plugin.json",
     "index.client.tsx",
     "client/",
     "screenshots/",
@@ -22,7 +22,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "peerDependencies": {
-    "@getpaseo/plugin": ">=0.8.0",
+    "@clisbot/plugin": ">=0.8.0",
     "react": ">=19",
     "react-native": ">=0.81"
   }

@@ -14,9 +14,9 @@
 //    nothing at all.
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vitest";
-import { feishuPlugin } from "@getpaseo/channels-feishu/dist/plugin.js";
-import { discordPlugin } from "@getpaseo/channels-discord/dist/plugin.js";
-import { zalouserPlugin } from "@getpaseo/channels-zalouser/dist/plugin.js";
+import { feishuPlugin } from "@clisbot/channels-feishu/dist/plugin.js";
+import { discordPlugin } from "@clisbot/channels-discord/dist/plugin.js";
+import { zalouserPlugin } from "@clisbot/channels-zalouser/dist/plugin.js";
 import {
   agentToolContext,
   callChannelAgentTool,

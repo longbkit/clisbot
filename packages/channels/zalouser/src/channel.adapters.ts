@@ -26,17 +26,17 @@
 // upstream — an OpenClaw host function that reads the process config. Fusion
 // reads the same two knobs off the account's compiled config entry and falls
 // back to upstream's defaults ("length" mode, 2000 chars).
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
-import type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
+import type { ChannelMessageActionAdapter } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import type { ChannelGroupContext, OpenClawConfig, RuntimeEnv } from "./runtime-api.js";
-import { isDangerousNameMatchingEnabled } from "@getpaseo/channels-core/plugin-sdk/dangerous-name-runtime";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import type { GroupToolPolicyConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { isDangerousNameMatchingEnabled } from "@clisbot/channels-core/plugin-sdk/dangerous-name-runtime";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import type { GroupToolPolicyConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   resolveScopeRequireMention,
   resolveScopeToolsPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/channel-policy";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-policy";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   listZalouserAccountIds,
   resolveDefaultZalouserAccountId,

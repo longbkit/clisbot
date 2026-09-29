@@ -1,6 +1,6 @@
 // upstream: src/shared/text/code-regions.ts@5d8067a4483
 // Code region helpers expose Markdown Core spans to sanitizer consumers.
-import { findMarkdownCodeRegions } from "@getpaseo/channels-markdown-core/reasoning-tags";
+import { findMarkdownCodeRegions } from "@clisbot/channels-markdown-core/reasoning-tags";
 
 /** Public range inputs need only offsets; parser-owned metadata belongs to discovered regions. */
 export interface CodeRegion {

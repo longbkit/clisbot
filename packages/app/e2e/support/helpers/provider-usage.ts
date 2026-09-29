@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { ProviderUsage } from "@getpaseo/protocol/messages";
+import type { ProviderUsage } from "@clisbot/protocol/messages";
 import { daemonWsRoutePattern } from "./daemon-port";
 
 interface ProviderUsageFixturePayload {

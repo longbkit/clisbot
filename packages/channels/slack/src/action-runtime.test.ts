@@ -1,9 +1,9 @@
 // upstream: extensions/slack/src/action-runtime.test.ts@5d8067a4483
 import { WebClient } from "@slack/web-api";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 // Slack tests cover action runtime plugin behavior.
-import { createDeferred } from "@getpaseo/channels-core/plugin-sdk/extension-shared";
-import { createRequireRecord } from "@getpaseo/channels-core/plugin-sdk/test-fixtures";
+import { createDeferred } from "@clisbot/channels-core/plugin-sdk/extension-shared";
+import { createRequireRecord } from "@clisbot/channels-core/plugin-sdk/test-fixtures";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SlackActionContext } from "./action-runtime.js";
 import { handleSlackAction, slackActionRuntime } from "./action-runtime.js";

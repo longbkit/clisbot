@@ -5,7 +5,7 @@
 // SQLite-backed `openChannelIngressQueue`, appends the raw envelope and runs its
 // own drain: in Fusion the Hub owns the durable queue (`channel_ingress_queue`)
 // and one drain per account, and the shared inbound processor
-// (`@getpaseo/channels-shared` `createInboundEventProcessor`) persists the
+// (`@clisbot/channels-shared` `createInboundEventProcessor`) persists the
 // normalized event before it returns.
 //
 // What upstream's spool decides is kept and imported from the ported
@@ -29,8 +29,8 @@ import {
   type ChannelInboundEvent,
   type HostChildLogger,
   type InboundAttachedFile,
-} from "@getpaseo/channels-shared";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+} from "@clisbot/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import type { ZaloUpdate } from "../api.js";
 import {
   inspectZaloWebhookEvent,

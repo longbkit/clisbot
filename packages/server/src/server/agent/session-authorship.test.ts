@@ -3,7 +3,7 @@ import {
   sessionActorKey,
   type SessionActor,
   type SessionAuthorship,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 import { aggregateWorkspaceAuthorship, recordSessionInteraction } from "./session-authorship.js";
 const a: SessionActor = {
   kind: "user",
@@ -71,7 +71,7 @@ describe("session authorship", () => {
 });
 
 it("retains historical verified memberships when one scoped sender unlinks and links again", () => {
-  const summary: import("@getpaseo/protocol/session-authorship").SessionAuthorship = {};
+  const summary: import("@clisbot/protocol/session-authorship").SessionAuthorship = {};
   const actor = {
     kind: "user" as const,
     id: "slack:sender",

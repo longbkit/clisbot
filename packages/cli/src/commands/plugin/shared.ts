@@ -1,5 +1,5 @@
 import type { DaemonTarget } from "../../utils/daemon-target.js";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { CommandError } from "../../output/index.js";
 import { connectToDaemon } from "../../utils/client.js";
 

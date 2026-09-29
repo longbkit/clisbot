@@ -88,7 +88,7 @@ describe("CLI authorization client address", () => {
           await hub.request({
             "cf-connecting-ip": `198.51.100.${index + 1}`,
             "x-forwarded-for": `203.0.113.${index + 1}`,
-            "x-paseo-client-address": `192.0.2.${index + 1}`,
+            "x-clisbot-client-address": `192.0.2.${index + 1}`,
             "x-real-ip": `192.0.2.${index + 10}`,
             "user-agent": `rotating-agent-${index}`,
           }),
@@ -111,7 +111,7 @@ describe("CLI authorization client address", () => {
           await hub.request({
             "fly-client-ip": "198.51.100.20",
             "x-forwarded-for": `203.0.113.${index + 1}`,
-            "x-paseo-client-address": `192.0.2.${index + 1}`,
+            "x-clisbot-client-address": `192.0.2.${index + 1}`,
             "user-agent": `rotating-agent-${index}`,
           }),
         );
@@ -132,7 +132,7 @@ describe("CLI authorization client address", () => {
       { "fly-client-ip": "198.51.100.1, 198.51.100.2" },
       { "fly-client-ip": "198.51.100.999" },
       { "fly-client-ip": "[2001:db8::1]" },
-      { "x-paseo-client-address": "203.0.113.50" },
+      { "x-clisbot-client-address": "203.0.113.50" },
     ];
 
     try {
@@ -369,7 +369,7 @@ class CliAuthorizationServer {
 
   static async start(trustedClientIpHeader?: string): Promise<CliAuthorizationServer> {
     const database = createMemoryDatabase({ organizationIds: ["acme"] });
-    const authorizations = new CliAuthorizations(database, undefined, "https://hub.paseo.test");
+    const authorizations = new CliAuthorizations(database, undefined, "https://hub.clisbot.test");
     const server = createFetchServer(
       (request) => authorizations.start(request),
       trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader },

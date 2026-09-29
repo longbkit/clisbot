@@ -5,9 +5,9 @@ import {
   readNonNegativeIntegerParam,
   readPositiveIntegerParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { asBoolean } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { asBoolean } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type {
   DiscordChannelCreate,
   DiscordChannelEdit,

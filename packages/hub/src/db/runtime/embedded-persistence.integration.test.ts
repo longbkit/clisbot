@@ -42,7 +42,7 @@ it("rejects a second process using the same embedded data directory", async () =
   const result = await openEmbeddedRuntimeInChild(dataDirectory);
 
   assert.equal(result.exitCode, 23);
-  assert.match(result.stderr, /already in use by another Paseo Hub process/);
+  assert.match(result.stderr, /already in use by another Clisbot Hub process/);
   assert.match(result.stderr, /Embedded mode supports one process per data directory/);
 });
 
@@ -53,7 +53,7 @@ async function openEmbeddedRuntimeInChild(
   const source = `
     const { embeddedDatabaseRuntime } = await import(${JSON.stringify(runtimeModule.href)});
     try {
-      const bundle = await embeddedDatabaseRuntime(process.env.PASEO_TEST_DATA_DIR);
+      const bundle = await embeddedDatabaseRuntime(process.env.CLISBOT_TEST_DATA_DIR);
       await bundle.runtime.close();
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);
@@ -65,7 +65,7 @@ async function openEmbeddedRuntimeInChild(
     ["--import", "tsx", "--input-type=module", "--eval", source],
     {
       cwd: process.cwd(),
-      env: { ...process.env, PASEO_TEST_DATA_DIR: dataDirectory },
+      env: { ...process.env, CLISBOT_TEST_DATA_DIR: dataDirectory },
       stdio: ["ignore", "ignore", "pipe"],
     },
   );

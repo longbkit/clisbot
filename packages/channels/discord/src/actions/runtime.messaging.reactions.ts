@@ -5,7 +5,7 @@ import {
   readPositiveIntegerParam,
   readReactionParams,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import { discordMessagingActionRuntime } from "./runtime.messaging.runtime.js";
 import type { DiscordMessagingActionContext } from "./runtime.messaging.shared.js";
 

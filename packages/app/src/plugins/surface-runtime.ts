@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { InstalledPlugin } from "./types";
-import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { createClisbotApi, type ClisbotApi } from "@clisbot/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 
 export interface PluginSurfaceRuntime {
-  paseo: PaseoApi;
+  clisbot: ClisbotApi;
   invoke(method: string, input: unknown): Promise<unknown>;
 }
 
@@ -14,7 +14,7 @@ export function createPluginSurfaceRuntime(
 ): PluginSurfaceRuntime | null {
   if (!client || plugin.lifetime.signal.aborted) return null;
   return {
-    paseo: createPaseoApi(client, { signal: plugin.lifetime.signal }),
+    clisbot: createClisbotApi(client, { signal: plugin.lifetime.signal }),
     invoke: (method, input) => client.invokePluginRpc(plugin.id, method, input),
   };
 }
@@ -35,7 +35,7 @@ export function usePluginSurfaceRuntime(
     if (!runtime) return;
     setMounted({ client, plugin, runtime });
     return () => {
-      void runtime.paseo
+      void runtime.clisbot
         .dispose()
         .catch((error) => console.warn(`[Plugins] Surface cleanup failed for ${plugin.id}`, error));
     };

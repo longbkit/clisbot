@@ -95,13 +95,13 @@ describe("OpenCode v2 session lifecycle", () => {
           {
             type: "tool",
             id: "output",
-            name: "paseo_structured_output",
+            name: "clisbot_structured_output",
             time: { created: 2 },
             state: {
               status: "completed",
               input: { value: { answer: 42 } },
               content: [{ type: "text", text: "accepted" }],
-              metadata: { paseoStructuredOutput: { answer: 42 } },
+              metadata: { clisbotStructuredOutput: { answer: 42 } },
             },
           },
         ],
@@ -380,14 +380,14 @@ describe("OpenCode v2 session lifecycle", () => {
     const client = new OpenCodeV2AgentClient({ logger: createTestLogger(), runtime });
     const session = await client.createSession(
       { provider: "opencode", cwd: "/tmp/project" },
-      { agentId: "agent", env: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" } },
+      { agentId: "agent", env: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" } },
     );
     try {
       expect(acquires).toEqual([{}]);
       expect(harness.environments).toEqual([
         {
           sessionID: "session",
-          variables: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" },
+          variables: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" },
         },
       ]);
     } finally {
@@ -412,7 +412,7 @@ describe("OpenCode v2 session lifecycle", () => {
         cwd: "/tmp/project",
         mcpServers: { custom: { type: "stdio", command: "custom", args: [] } },
       },
-      { agentId: "agent", env: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" } },
+      { agentId: "agent", env: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" } },
     );
     try {
       expect(acquires).toHaveLength(1);

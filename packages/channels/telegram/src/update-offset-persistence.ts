@@ -4,8 +4,8 @@ import {
   computeBackoff,
   sleepWithAbort,
   type BackoffPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { asSafeIntegerInRange } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { asSafeIntegerInRange } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const OFFSET_PERSIST_RETRY_POLICY: BackoffPolicy = {
   initialMs: 250,

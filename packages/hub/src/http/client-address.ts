@@ -1,1 +1,1 @@
-export const INTERNAL_CLIENT_ADDRESS_HEADER = "x-paseo-client-address";
+export const INTERNAL_CLIENT_ADDRESS_HEADER = "x-clisbot-client-address";

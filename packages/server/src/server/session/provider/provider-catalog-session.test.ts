@@ -15,7 +15,7 @@ import {
 } from "../../agent/provider-snapshot-manager.js";
 import type { ProviderSnapshotEntry } from "../../agent/agent-sdk-types.js";
 import { ProviderUsageService } from "../../../services/quota-fetcher/service.js";
-import { expandProviderSnapshot } from "@getpaseo/protocol/provider-snapshot-codec";
+import { expandProviderSnapshot } from "@clisbot/protocol/provider-snapshot-codec";
 
 type SnapshotChangeHandler = (transition: ProviderSnapshotTransition) => void;
 

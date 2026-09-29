@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import type { Command } from "commander";
 import { basename } from "node:path";
 import { connectToDaemon } from "../../utils/client.js";
@@ -56,7 +56,7 @@ export async function runLsCommand(
     );
 
     // Get worktree list from daemon
-    const response = await client.getPaseoWorktreeList({});
+    const response = await client.getClisbotWorktreeList({});
 
     await client.close();
 

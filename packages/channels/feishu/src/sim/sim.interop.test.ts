@@ -9,7 +9,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { createSimWebhookClient, signWebhookRequest } from "@getpaseo/channels-shared/sim";
+import { createSimWebhookClient, signWebhookRequest } from "@clisbot/channels-shared/sim";
 import { startFeishuWebhookSession } from "../fusion/webhook-session.js";
 import type { ResolvedFeishuAccount } from "../types.js";
 

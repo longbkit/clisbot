@@ -6,7 +6,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import type { Message } from "grammy/types";
 import { clearTelegramRuntimeForTest } from "../runtime.test-support.js";
 import { buildTelegramAdmission } from "./admission.js";

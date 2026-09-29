@@ -3,6 +3,6 @@
   "deliveryId": "fixture-manual-smoke",
   "payload": {
     "repo": "owner/test",
-    "comment": "@paseo ping"
+    "comment": "@clisbot ping"
   }
 }

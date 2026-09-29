@@ -31,7 +31,7 @@ export const syntaxTokenStyles = StyleSheet.create((theme) => ({
 type SyntaxTokenStyleValue = (typeof syntaxTokenStyles)["base"];
 
 // Accepts a plain string so diff tokens (server-typed `string | null`) and
-// @getpaseo/highlight tokens (typed `HighlightStyle | null`) share one path.
+// @clisbot/highlight tokens (typed `HighlightStyle | null`) share one path.
 // Unknown styles fall back to the base color.
 export function syntaxTokenStyleFor(style: string | null | undefined): SyntaxTokenStyleValue {
   if (!style) return syntaxTokenStyles.base;

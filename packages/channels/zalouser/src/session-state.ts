@@ -11,7 +11,7 @@
 // state credentials file; Fusion has no OpenClaw state dir and no such file to
 // migrate.
 import { createHash } from "node:crypto";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   getZalouserSessionCache,
   ZALOUSER_SESSION_MAX_ENTRIES,

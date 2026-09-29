@@ -194,7 +194,7 @@ export type ZaloTransportMode = z.infer<typeof ZaloTransportModeSchema>;
 // spelling and semantics (`extensions/*/src/config-schema*.ts`,
 // `src/config/types.base.ts`) so an account authored for OpenClaw compiles
 // unchanged. The decision itself is upstream's too — the Hub calls the ported
-// `resolveDmGroupAccessWithLists` (`@getpaseo/channels-core/security/dm-policy-shared`)
+// `resolveDmGroupAccessWithLists` (`@clisbot/channels-core/security/dm-policy-shared`)
 // rather than re-deriving it.
 
 /** `dmPolicy` — who may open a direct conversation with the bot. */

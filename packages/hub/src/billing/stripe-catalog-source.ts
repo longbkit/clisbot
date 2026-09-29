@@ -3,8 +3,8 @@
  * real Stripe SDK (`stripe-client.ts`); the E2E harness wires a fixture implementation — see
  * the plan's "Testing Stripe" section. A caller never learns which one it got.
  *
- * `listProducts()` returns only products tagged `metadata.paseo_plan=true` — "which products
- * are Paseo plans" is this port's concern, not the sync algorithm's. `listPrices()` returns
+ * `listProducts()` returns only products tagged `metadata.clisbot_plan=true` — "which products
+ * are Clisbot plans" is this port's concern, not the sync algorithm's. `listPrices()` returns
  * every price; the caller joins by `productId`.
  */
 export interface StripeCatalogSource {

@@ -1,5 +1,5 @@
 import type { PrepareChatMessageFiles } from "../../chats/chat-engine.js";
-import { sessionActorKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
+import { sessionActorKey, type SessionActor } from "@clisbot/protocol/session-authorship";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import type { ChatService } from "../../chats/chat-service.js";
 import type { BotService } from "../../bots/index.js";

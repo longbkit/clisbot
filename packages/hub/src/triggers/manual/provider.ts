@@ -1,7 +1,7 @@
 import {
   SessionOperationIdentitySchema,
   type VerifiedSessionOperationIdentity,
-} from "@getpaseo/protocol/session-operation";
+} from "@clisbot/protocol/session-operation";
 import { z } from "zod";
 import { type TriggerProvider, type TriggerProviderMatch } from "../index.js";
 import { matchesInputFilters, parseInvocation, parseStructuredInvocation } from "../invocation.js";

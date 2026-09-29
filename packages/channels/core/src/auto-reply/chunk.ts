@@ -3,7 +3,7 @@ import {
   findFenceSpanAt,
   isSafeFenceBreak,
   parseFenceSpans,
-} from "@getpaseo/channels-markdown-core/fences";
+} from "@clisbot/channels-markdown-core/fences";
 import type { ChannelId } from "../channels/plugins/channel-id.types.js";
 import { resolveChannelStreamingChunkMode } from "../channels/streaming.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";

@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/send.test.ts@5d8067a4483
 // Zalouser tests cover send plugin behavior.
-import { createRequireRecord } from "@getpaseo/channels-core/plugin-sdk/test-fixtures";
+import { createRequireRecord } from "@clisbot/channels-core/plugin-sdk/test-fixtures";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createZalouserSendReceipt } from "./send-receipt.js";
 import {

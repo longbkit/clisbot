@@ -67,7 +67,7 @@ export function usePluginClientSlashCommands(input: {
                   else if (contribution.context === "workspace" && context?.context === "workspace")
                     await contribution.onSubmit({ ...context, args });
                 } finally {
-                  await runtime.paseo.dispose();
+                  await runtime.clisbot.dispose();
                 }
               },
             },

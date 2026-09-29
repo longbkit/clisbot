@@ -143,7 +143,7 @@ describe("execution capability MCP boundary", () => {
   it("interoperates with the official MCP client for discovery and completion", async () => {
     const fixture = await capabilityFixture();
     const endpoint = await serveFixture(fixture);
-    const client = new Client({ name: "paseo-hub-test", version: "1.0.0" });
+    const client = new Client({ name: "clisbot-hub-test", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL(endpoint.url), {
       requestInit: { headers: { authorization: "Bearer token" } },
     });
@@ -191,10 +191,10 @@ describe("execution capability MCP boundary", () => {
       type: "object",
       additionalProperties: false,
       required: ["repo"],
-      properties: { repo: { type: "string", enum: ["paseo", "hub"] } },
+      properties: { repo: { type: "string", enum: ["clisbot", "hub"] } },
     });
     const endpoint = await serveFixture(fixture);
-    const client = new Client({ name: "paseo-hub-test", version: "1.0.0" });
+    const client = new Client({ name: "clisbot-hub-test", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL(endpoint.url), {
       requestInit: { headers: { authorization: "Bearer token" } },
     });
@@ -228,11 +228,11 @@ describe("execution capability MCP boundary", () => {
           required: ["output"],
           properties: {
             output: {
-              $id: "urn:paseo:hub:finish-execution-output",
+              $id: "urn:clisbot:hub:finish-execution-output",
               type: "object",
               additionalProperties: false,
               required: ["repo"],
-              properties: { repo: { type: "string", enum: ["paseo", "hub"] } },
+              properties: { repo: { type: "string", enum: ["clisbot", "hub"] } },
             },
           },
         },
@@ -359,7 +359,7 @@ describe("execution capability MCP boundary", () => {
     const schema = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $defs: {
-        repo: { type: "string", minLength: 3, pattern: "^(paseo|hub)$" },
+        repo: { type: "string", minLength: 3, pattern: "^(clisbot|hub)$" },
         count: { type: "integer", minimum: 1, maximum: 3 },
       },
       type: "object",
@@ -423,10 +423,10 @@ describe("execution capability MCP boundary", () => {
       required: ["output"],
       properties: {
         output: {
-          $id: "urn:paseo:hub:finish-execution-output",
+          $id: "urn:clisbot:hub:finish-execution-output",
           $schema: "http://json-schema.org/draft-07/schema#",
           $defs: {
-            repo: { type: "string", minLength: 3, pattern: "^(paseo|hub)$" },
+            repo: { type: "string", minLength: 3, pattern: "^(clisbot|hub)$" },
             count: { type: "integer", minimum: 1, maximum: 3 },
           },
           type: "object",

@@ -37,7 +37,7 @@ export class PluginSessionSocket {
     this.bufferedAmount += byteLength;
     try {
       this.child.send(
-        { type: "paseo_frame", data: frame, isBinary: typeof frame !== "string" },
+        { type: "clisbot_frame", data: frame, isBinary: typeof frame !== "string" },
         (error) => {
           this.bufferedAmount = Math.max(0, this.bufferedAmount - byteLength);
           callback?.(error ?? undefined);
@@ -58,7 +58,7 @@ export class PluginSessionSocket {
     if (this.readyState === 3) return;
     this.readyState = 3;
     try {
-      this.child.send({ type: "paseo_close" });
+      this.child.send({ type: "clisbot_close" });
     } catch {
       // The child has already gone; local session cleanup still has to run.
     }

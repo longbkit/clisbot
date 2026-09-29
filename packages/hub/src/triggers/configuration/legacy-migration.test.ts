@@ -18,9 +18,9 @@ describe("legacy project bundle migration", () => {
   it("inlines a one-step workflow and its prompt partial into one trigger document", () => {
     const migrated = migrateLegacyBundle({
       files: [
-        { path: ".paseo/hub.yml", content: hub },
+        { path: ".clisbot/hub.yml", content: hub },
         {
-          path: ".paseo/workflows/slack.yml",
+          path: ".clisbot/workflows/slack.yml",
           content: `
 name: slack-help
 on: slack.mention
@@ -36,13 +36,13 @@ steps:
     agent: codex
     prompt:
       - include: partials/safety.md
-      - text: "Request: \${{ paseo.prompt }}"
+      - text: "Request: \${{ clisbot.prompt }}"
     allow_outputs:
       - { type: slack.reply, max: 5 }
 `,
         },
         {
-          path: ".paseo/workflows/partials/safety.md",
+          path: ".clisbot/workflows/partials/safety.md",
           content: "Never disclose secrets.",
         },
       ],
@@ -61,9 +61,9 @@ steps:
   it("preserves a multi-step workflow as one self-contained normalized legacy trigger", () => {
     const migrated = migrateLegacyBundle({
       files: [
-        { path: ".paseo/hub.yml", content: hub },
+        { path: ".clisbot/hub.yml", content: hub },
         {
-          path: ".paseo/workflows/route.yml",
+          path: ".clisbot/workflows/route.yml",
           content: `
 name: route
 on: manual.run

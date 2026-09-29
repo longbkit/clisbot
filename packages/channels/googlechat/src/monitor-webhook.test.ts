@@ -1,7 +1,7 @@
 // upstream: extensions/googlechat/src/monitor-webhook.test.ts@5d8067a4483
 // Googlechat tests cover monitor webhook plugin behavior.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { FixedWindowRateLimiter } from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
+import type { FixedWindowRateLimiter } from "@clisbot/channels-core/plugin-sdk/webhook-ingress";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WebhookTarget } from "./monitor-types.js";
 import type { GoogleChatEvent } from "./types.js";
@@ -13,12 +13,12 @@ const withResolvedWebhookRequestPipeline = vi.hoisted(() => vi.fn());
 const verifyGoogleChatRequest = vi.hoisted(() => vi.fn());
 const ingressReceive = vi.hoisted(() => vi.fn());
 
-vi.mock("@getpaseo/channels-core/plugin-sdk/webhook-request-guards", () => ({
+vi.mock("@clisbot/channels-core/plugin-sdk/webhook-request-guards", () => ({
   readJsonWebhookBodyOrReject,
   runDetachedWebhookWork,
 }));
 
-vi.mock("@getpaseo/channels-core/plugin-sdk/webhook-targets", () => ({
+vi.mock("@clisbot/channels-core/plugin-sdk/webhook-targets", () => ({
   canonicalizeWebhookRouteKey: (raw: string) =>
     raw
       .replace(/\/{2,}/g, "/")

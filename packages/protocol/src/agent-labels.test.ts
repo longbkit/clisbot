@@ -33,7 +33,7 @@ describe("agent label policy", () => {
 
   test("recognizes only client-scoped open-tab labels", () => {
     expect(isOpenAgentTabLabel(getOpenAgentTabLabel("client-a"))).toBe(true);
-    expect(isOpenAgentTabLabel("paseo.open-agent-tab")).toBe(false);
+    expect(isOpenAgentTabLabel("clisbot.open-agent-tab")).toBe(false);
     expect(isOpenAgentTabLabel("custom.open-agent-tab.client-a")).toBe(false);
   });
 });

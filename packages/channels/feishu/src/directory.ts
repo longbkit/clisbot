@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/directory.ts@5d8067a4483
 // Feishu plugin module implements directory behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ClawdbotConfig } from "./fusion/runtime-api.js";
 import { resolveFeishuAccount } from "./accounts.js";
 import { createFeishuClient } from "./client.js";

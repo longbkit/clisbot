@@ -1,4 +1,4 @@
-# @getpaseo/channels-zalo
+# @clisbot/channels-zalo
 
 The in-repo Zalo Official Account (Bot API) channel vertical (goal ledger slice
 16). Ported from `extensions/zalo/src@5d8067a4483` — see `upstream-sync.json` for

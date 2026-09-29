@@ -1,16 +1,16 @@
 // upstream: extensions/discord/src/token.ts@5d8067a4483
 // Discord plugin module implements token behavior.
-import type { BaseTokenResolution } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { BaseTokenResolution } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
   resolveAccountEntry,
-} from "@getpaseo/channels-core/plugin-sdk/routing";
+} from "@clisbot/channels-core/plugin-sdk/routing";
 import {
   normalizeResolvedSecretInputString,
   resolveSecretInputString,
-} from "@getpaseo/channels-core/plugin-sdk/secret-input";
+} from "@clisbot/channels-core/plugin-sdk/secret-input";
 import { selectDiscordRuntimeConfig } from "./runtime-config.js";
 
 type DiscordTokenSource = "env" | "config" | "none";

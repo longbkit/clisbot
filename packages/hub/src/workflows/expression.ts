@@ -2,7 +2,7 @@ import type { JsonPrimitive, JsonValue } from "../config/compiler.js";
 
 export type ExpressionPath =
   | {
-      namespace: "paseo";
+      namespace: "clisbot";
       path: "prompt" | "context" | ["inputs", string] | ["execution", "id"];
     }
   | { namespace: "steps"; stepId: string; path: readonly string[] }
@@ -114,7 +114,7 @@ export function parseExpression(source: string): Expression {
       if (next?.kind !== "identifier") throw new ExpressionSyntaxError("expected path segment");
       parts.push(next.value);
     }
-    if (parts[0] === "paseo") return parsePaseoPath(parts);
+    if (parts[0] === "clisbot") return parseClisbotPath(parts);
     if (parts[0] === "steps" && parts.length >= 4 && parts[2] === "outputs") {
       return {
         kind: "path",
@@ -173,18 +173,18 @@ export function parseExpression(source: string): Expression {
   }
 }
 
-function parsePaseoPath(parts: readonly string[]): Expression {
+function parseClisbotPath(parts: readonly string[]): Expression {
   if (parts[1] === "prompt" && parts.length === 2) {
-    return { kind: "path", value: { namespace: "paseo", path: "prompt" } };
+    return { kind: "path", value: { namespace: "clisbot", path: "prompt" } };
   }
   if (parts[1] === "context" && parts.length === 2) {
-    return { kind: "path", value: { namespace: "paseo", path: "context" } };
+    return { kind: "path", value: { namespace: "clisbot", path: "context" } };
   }
   if (parts[1] === "inputs" && parts.length === 3) {
-    return { kind: "path", value: { namespace: "paseo", path: ["inputs", parts[2]!] } };
+    return { kind: "path", value: { namespace: "clisbot", path: ["inputs", parts[2]!] } };
   }
   if (parts[1] === "execution" && parts[2] === "id" && parts.length === 3) {
-    return { kind: "path", value: { namespace: "paseo", path: ["execution", "id"] } };
+    return { kind: "path", value: { namespace: "clisbot", path: ["execution", "id"] } };
   }
   throw new ExpressionSyntaxError(`unsupported path ${parts.join(".")}`);
 }
@@ -262,12 +262,14 @@ export function renderExecutionTemplate(template: string, executionId: string): 
 export function validateExecutionTemplate(template: string): void {
   for (const path of expressionPathsInTemplate(template)) {
     if (
-      path.namespace !== "paseo" ||
+      path.namespace !== "clisbot" ||
       !Array.isArray(path.path) ||
       path.path[0] !== "execution" ||
       path.path[1] !== "id"
     ) {
-      throw new ExpressionSyntaxError("execution templates support only paseo.execution.id paths");
+      throw new ExpressionSyntaxError(
+        "execution templates support only clisbot.execution.id paths",
+      );
     }
   }
 }
@@ -377,7 +379,7 @@ function operatorPrecedence(operator: BinaryOperator): number {
 }
 
 function readPath(path: ExpressionPath, context: ExpressionContext): JsonValue {
-  if (path.namespace === "paseo") {
+  if (path.namespace === "clisbot") {
     if (path.path === "prompt") return context.prompt;
     if (path.path === "context") return context.context;
     if (path.path[0] === "execution") {

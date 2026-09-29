@@ -1,11 +1,11 @@
 // upstream: extensions/telegram/src/message-cache.ts@5d8067a4483
 // Telegram plugin module implements message cache behavior.
 import type { Message } from "grammy/types";
-import { formatLocationText } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import type { MsgContext } from "@getpaseo/channels-core/plugin-sdk/reply-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { formatLocationText } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import type { MsgContext } from "@clisbot/channels-core/plugin-sdk/reply-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   resolveTelegramPrimaryMedia,
   resolveTelegramRichMessageBody,

@@ -93,8 +93,8 @@ export function automationRouteBacklinks(
 export function buildSingleAgentAutomationYaml(input: SingleAgentAutomationInput): string {
   const instruction = input.instruction.trim();
   const prompt = instruction
-    ? `${instruction}\n\nRequest:\n\${{ paseo.prompt }}`
-    : "${{ paseo.prompt }}";
+    ? `${instruction}\n\nRequest:\n\${{ clisbot.prompt }}`
+    : "${{ clisbot.prompt }}";
   const document = {
     name: normalizeAutomationName(input.name),
     ...(input.description?.trim() ? { description: input.description.trim() } : {}),
@@ -387,10 +387,10 @@ function parseAutomationAgent(
   };
 }
 
-const PROMPT_SUFFIX = "\n\nRequest:\n${{ paseo.prompt }}";
+const PROMPT_SUFFIX = "\n\nRequest:\n${{ clisbot.prompt }}";
 
 function parseManagedPrompt(value: unknown): string | null {
-  if (value === "${{ paseo.prompt }}") return "";
+  if (value === "${{ clisbot.prompt }}") return "";
   if (typeof value !== "string" || !value.endsWith(PROMPT_SUFFIX)) return null;
   return value.slice(0, -PROMPT_SUFFIX.length);
 }

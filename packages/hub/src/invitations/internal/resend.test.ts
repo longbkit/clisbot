@@ -25,16 +25,16 @@ describe("optional Resend invitation delivery", () => {
     assert.deepEqual(
       readResendConfig({
         RESEND_API_KEY: " re_test_abc123 ",
-        RESEND_FROM: " Paseo <invites@example.com> ",
+        RESEND_FROM: " Clisbot <invites@example.com> ",
       }),
-      { apiKey: "re_test_abc123", from: "Paseo <invites@example.com>" },
+      { apiKey: "re_test_abc123", from: "Clisbot <invites@example.com>" },
     );
   });
 
   it("sends an escaped text and HTML invitation through Resend", async () => {
     let request: { input: string; init: RequestInit } | undefined;
     const mailer = createResendInvitationMailer(
-      { apiKey: "re_test_abc123", from: "Paseo <invites@example.com>" },
+      { apiKey: "re_test_abc123", from: "Clisbot <invites@example.com>" },
       (input, init = {}) => {
         let inputUrl: string;
         if (typeof input === "string") inputUrl = input;
@@ -61,14 +61,14 @@ describe("optional Resend invitation delivery", () => {
     assert.deepEqual(request.init.headers, {
       Authorization: "Bearer re_test_abc123",
       "Content-Type": "application/json",
-      "Idempotency-Key": "paseo-invitation-invite-1",
+      "Idempotency-Key": "clisbot-invitation-invite-1",
     });
     const bodyText = request.init.body;
     assert.ok(typeof bodyText === "string");
     const body = z
       .object({ subject: z.string(), text: z.string(), html: z.string() })
       .parse(JSON.parse(bodyText));
-    assert.equal(body.subject, "Join Acme <Labs> on Paseo");
+    assert.equal(body.subject, "Join Acme <Labs> on Clisbot");
     assert.match(body.text, /Alice & Bob invited you/);
     assert.match(body.html, /Alice &amp; Bob/);
     assert.match(body.html, /Acme &lt;Labs&gt;/);
@@ -99,7 +99,7 @@ describe("optional Resend invitation delivery", () => {
   it("sends a single-use verification link through the same delivery adapter", async () => {
     let init: RequestInit | undefined;
     const mailer = createResendVerificationMailer(
-      { apiKey: "re_test_abc123", from: "Paseo <accounts@example.com>" },
+      { apiKey: "re_test_abc123", from: "Clisbot <accounts@example.com>" },
       (_input, requestInit = {}) => {
         init = requestInit;
         return Promise.resolve(new Response("{}", { status: 200 }));
@@ -116,13 +116,13 @@ describe("optional Resend invitation delivery", () => {
     assert.ok(init !== undefined);
     assert.equal(
       (init.headers as Record<string, string>)["Idempotency-Key"],
-      "paseo-verification-verification-1",
+      "clisbot-verification-verification-1",
     );
     const body = z
       .object({ to: z.array(z.string()), subject: z.string(), text: z.string(), html: z.string() })
       .parse(JSON.parse(String(init.body)));
     assert.deepEqual(body.to, ["person@acme.test"]);
-    assert.equal(body.subject, "Create your Paseo Hub account");
+    assert.equal(body.subject, "Create your Clisbot Hub account");
     assert.match(body.text, /emailRegistration=abc/);
     assert.match(body.html, /x=&lt;y&gt;/);
     const rejecting = createResendVerificationMailer(

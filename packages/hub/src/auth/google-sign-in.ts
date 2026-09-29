@@ -17,12 +17,12 @@ export interface GoogleAuthConfig {
 export function readGoogleAuthConfig(
   environment: Record<string, string | undefined>,
 ): GoogleAuthConfig | undefined {
-  const clientId = environment["PASEO_GOOGLE_AUTH_CLIENT_ID"]?.trim() ?? "";
-  const clientSecret = environment["PASEO_GOOGLE_AUTH_CLIENT_SECRET"]?.trim() ?? "";
+  const clientId = environment["CLISBOT_GOOGLE_AUTH_CLIENT_ID"]?.trim() ?? "";
+  const clientSecret = environment["CLISBOT_GOOGLE_AUTH_CLIENT_SECRET"]?.trim() ?? "";
   if (clientId.length === 0 && clientSecret.length === 0) return undefined;
   if (clientId.length === 0 || clientSecret.length === 0) {
     throw new Error(
-      "PASEO_GOOGLE_AUTH_CLIENT_ID and PASEO_GOOGLE_AUTH_CLIENT_SECRET must be supplied together",
+      "CLISBOT_GOOGLE_AUTH_CLIENT_ID and CLISBOT_GOOGLE_AUTH_CLIENT_SECRET must be supplied together",
     );
   }
   return { clientId, clientSecret };

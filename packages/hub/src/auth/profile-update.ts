@@ -19,12 +19,12 @@ export const DEFAULT_PROFILE_IMAGE_HOSTS = [
 /**
  * Profile images are URLs Hub never fetches, but every app and daemon that renders the account
  * does, so an arbitrary URL would let its owner see who looks at the account. Operators choose the
- * image hosts they trust with `PASEO_PROFILE_IMAGE_HOSTS` (comma-separated).
+ * image hosts they trust with `CLISBOT_PROFILE_IMAGE_HOSTS` (comma-separated).
  */
 export function readProfileImageHosts(
   environment: Record<string, string | undefined>,
 ): readonly string[] {
-  const configured = (environment["PASEO_PROFILE_IMAGE_HOSTS"] ?? "")
+  const configured = (environment["CLISBOT_PROFILE_IMAGE_HOSTS"] ?? "")
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter((host) => host.length > 0);

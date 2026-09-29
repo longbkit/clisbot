@@ -1,5 +1,5 @@
 // The fork's channel pass over the Hub bundle (plan S8, implementation doc
-// §4.3): compile `.paseo/channels/**` into the channel control-plane snapshot.
+// §4.3): compile `.clisbot/channels/**` into the channel control-plane snapshot.
 // Pure function — authored files + the upstream bundle's reference names in,
 // a fully-effective snapshot out. Loaded only under CLISBOT_HUB_CHANNELS_ENABLED,
 // so flag-off the module never enters the process (byte-equivalence).
@@ -227,7 +227,7 @@ interface ParsedAccountIdentity {
 }
 
 /** Parse the account file and check its declared channel/accountId match the
- * bundle path (`.paseo/channels/<channel>/<accountId>.yml`). */
+ * bundle path (`.clisbot/channels/<channel>/<accountId>.yml`). */
 function parseAccountIdentity(file: HubBundleFile): ParsedAccountIdentity {
   const account = parseYaml(file, AccountFileSchema);
   const channel = file.path.slice(`${CHANNELS_DIRECTORY}/`.length).split("/")[0] ?? "";

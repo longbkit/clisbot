@@ -1,7 +1,7 @@
 import pino from "pino";
 import { describe, expect, it } from "vitest";
-import type { StoredBot } from "@getpaseo/protocol/bots/types";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { StoredBot } from "@clisbot/protocol/bots/types";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { BotRequestError } from "../../bots/bot-creation.js";
 import type { BotService } from "../../bots/index.js";
 import type { SessionOutboundMessage } from "../../messages.js";

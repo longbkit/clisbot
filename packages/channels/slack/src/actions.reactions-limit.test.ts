@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/actions.reactions-limit.test.ts@5d8067a4483
 import { WebClient } from "@slack/web-api";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { slackActionRuntime } from "./action-runtime.js";
 import {

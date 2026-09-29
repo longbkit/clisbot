@@ -5,8 +5,8 @@ import type {
   BotKind,
   BotLaunchDefaults,
   StoredBot,
-} from "@getpaseo/protocol/bots/types";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/bots/types";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type {
   PersistedProjectRecord,
   PersistedWorkspaceRecord,

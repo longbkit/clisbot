@@ -112,7 +112,7 @@ describe("Linear connection client", () => {
                   id: "comment-2",
                   body: "second",
                   createdAt: "2023-11-14T22:13:19.002Z",
-                  user: { id: "user-2", name: "Paseo" },
+                  user: { id: "user-2", name: "Clisbot" },
                 },
                 {
                   id: "comment-1",
@@ -147,7 +147,7 @@ describe("Linear connection client", () => {
           id: "comment-2",
           body: "second",
           createdAt: "2023-11-14T22:13:19.002Z",
-          author: { id: "user-2", name: "Paseo" },
+          author: { id: "user-2", name: "Clisbot" },
         },
       ],
     });
@@ -423,7 +423,12 @@ describe("Linear connection client", () => {
       linearOrganizationId,
       operation,
     ) => {
-      const key = JSON.stringify(["paseo-connection", "linear", "external", linearOrganizationId]);
+      const key = JSON.stringify([
+        "clisbot-connection",
+        "linear",
+        "external",
+        linearOrganizationId,
+      ]);
       lockKeys.push(key);
       const updateWithinRefresh = (input: LinearConnectionTokenUpdate) =>
         updateTokens({ connectionId: connection.id, ...input });
@@ -471,8 +476,8 @@ describe("Linear connection client", () => {
     assert.equal(refreshCalls, 1);
     assert.equal(connectionReads, 2);
     assert.deepEqual(lockKeys, [
-      '["paseo-connection","linear","external","linear-org"]',
-      '["paseo-connection","linear","external","linear-org"]',
+      '["clisbot-connection","linear","external","linear-org"]',
+      '["clisbot-connection","linear","external","linear-org"]',
     ]);
     assert.deepEqual(updates, [
       {

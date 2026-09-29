@@ -9,7 +9,7 @@ import {
   collectErrorGraphCandidates,
   formatErrorMessage,
   readErrorName,
-} from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+} from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import { TelegramIngressPayloadError } from "./telegram-ingress-spool.payload.js";
 
 const MISSING_AGENT_HARNESS_ERROR_NAME = "MissingAgentHarnessError";

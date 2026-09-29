@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import type pino from "pino";
 
 import type { ForgeService } from "../../services/forge-service.js";
-import { isPaseoOwnedWorktreeCwd } from "../../utils/worktree.js";
+import { isClisbotOwnedWorktreeCwd } from "../../utils/worktree.js";
 import { archiveByScope, type ActiveWorkspaceRef } from "../workspace-archive-service.js";
 import type {
-  CreatePaseoWorktreeWorkflowFn,
-  CreatePaseoWorktreeWorkflowResult,
+  CreateClisbotWorktreeWorkflowFn,
+  CreateClisbotWorktreeWorkflowResult,
 } from "../worktree-session.js";
 import type { WorkspaceGitService } from "../workspace-git-service.js";
 import type {
@@ -18,13 +18,13 @@ import type { AgentManager, AgentSubscriber, SubscribeOptions } from "./agent-ma
 import type { AgentStorage } from "./agent-storage.js";
 
 interface CreateAgentLifecycleDispatchDependencies {
-  paseoHome: string;
+  clisbotHome: string;
   worktreesRoot?: string;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   github: ForgeService;
   workspaceGitService: WorkspaceGitService;
-  createPaseoWorktreeWorkflow: CreatePaseoWorktreeWorkflowFn;
+  createClisbotWorktreeWorkflow: CreateClisbotWorktreeWorkflowFn;
   archiveAgentForClose: (agentId: string) => Promise<unknown>;
   findWorkspaceIdForCwd: (cwd: string) => Promise<string | null>;
   listActiveWorkspaces: () => Promise<ActiveWorkspaceRef[]>;
@@ -50,7 +50,7 @@ const inactiveRegistration: LifecycleRegistration = { cancel: async () => undefi
 
 type AutoArchiveTarget =
   | { kind: "agent-only" }
-  | { kind: "created-worktree"; result: CreatePaseoWorktreeWorkflowResult };
+  | { kind: "created-worktree"; result: CreateClisbotWorktreeWorkflowResult };
 
 export class CreateAgentLifecycleDispatch {
   private readonly autoArchiveAgentIds = new Set<string>();
@@ -62,7 +62,7 @@ export class CreateAgentLifecycleDispatch {
     target: CreateAgentWorktreeTarget | undefined;
     firstAgentContext: FirstAgentContext;
     hasLegacyGitOptions: boolean;
-  }): Promise<CreatePaseoWorktreeWorkflowResult | null> {
+  }): Promise<CreateClisbotWorktreeWorkflowResult | null> {
     if (input.target && input.hasLegacyGitOptions) {
       throw new Error("create_agent_request worktree cannot be combined with git options");
     }
@@ -76,7 +76,7 @@ export class CreateAgentLifecycleDispatch {
   registerAutoArchiveIfRequested(input: {
     autoArchive: boolean | undefined;
     agentId: string;
-    createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
+    createdWorktree: CreateClisbotWorktreeWorkflowResult | null;
   }): LifecycleRegistration {
     if (input.autoArchive !== true) {
       return inactiveRegistration;
@@ -89,7 +89,7 @@ export class CreateAgentLifecycleDispatch {
   }
 
   async cleanupCreatedWorktreeAfterFailedAgentCreate(input: {
-    createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
+    createdWorktree: CreateClisbotWorktreeWorkflowResult | null;
     createdAgentId: string | null;
   }): Promise<void> {
     const { createdWorktree, createdAgentId } = input;
@@ -115,18 +115,18 @@ export class CreateAgentLifecycleDispatch {
     cwd: string,
     target: CreateAgentWorktreeTarget,
     firstAgentContext: FirstAgentContext,
-  ): Promise<CreatePaseoWorktreeWorkflowResult> {
+  ): Promise<CreateClisbotWorktreeWorkflowResult> {
     const baseInput = {
       cwd,
       firstAgentContext,
       runSetup: false,
-      paseoHome: this.dependencies.paseoHome,
+      clisbotHome: this.dependencies.clisbotHome,
       worktreesRoot: this.dependencies.worktreesRoot,
     } as const;
 
     switch (target.mode) {
       case "branch-off":
-        return this.dependencies.createPaseoWorktreeWorkflow(
+        return this.dependencies.createClisbotWorktreeWorkflow(
           {
             ...baseInput,
             worktreeSlug: target.newBranch,
@@ -136,13 +136,13 @@ export class CreateAgentLifecycleDispatch {
           target.base ? { resolveDefaultBranch: async () => target.base! } : undefined,
         );
       case "checkout-branch":
-        return this.dependencies.createPaseoWorktreeWorkflow({
+        return this.dependencies.createClisbotWorktreeWorkflow({
           ...baseInput,
           action: "checkout",
           refName: target.branch,
         });
       case "checkout-pr":
-        return this.dependencies.createPaseoWorktreeWorkflow({
+        return this.dependencies.createClisbotWorktreeWorkflow({
           ...baseInput,
           action: "checkout",
           githubPrNumber: target.prNumber,
@@ -186,22 +186,22 @@ export class CreateAgentLifecycleDispatch {
 
   private async archiveAutoCreatedWorktree(options: {
     agentId: string | null;
-    createdWorktree: CreatePaseoWorktreeWorkflowResult;
+    createdWorktree: CreateClisbotWorktreeWorkflowResult;
   }): Promise<void> {
     const { createdWorktree } = options;
     const worktreePath = createdWorktree.worktree.worktreePath;
-    const ownership = await isPaseoOwnedWorktreeCwd(worktreePath, {
-      paseoHome: this.dependencies.paseoHome,
+    const ownership = await isClisbotOwnedWorktreeCwd(worktreePath, {
+      clisbotHome: this.dependencies.clisbotHome,
       worktreesRoot: this.dependencies.worktreesRoot,
     });
     if (!ownership.allowed) {
-      throw new Error("Auto-created worktree is not a Paseo-owned worktree");
+      throw new Error("Auto-created worktree is not a Clisbot-owned worktree");
     }
 
     await archiveByScope(
       {
-        paseoHome: this.dependencies.paseoHome,
-        paseoWorktreesBaseRoot: this.dependencies.worktreesRoot,
+        clisbotHome: this.dependencies.clisbotHome,
+        clisbotWorktreesBaseRoot: this.dependencies.worktreesRoot,
         github: this.dependencies.github,
         workspaceGitService: this.dependencies.workspaceGitService,
         agentManager: this.dependencies.agentManager,
@@ -265,7 +265,7 @@ export function registerAgentAutoArchive(input: {
 }
 
 function toAutoArchiveTarget(
-  createdWorktree: CreatePaseoWorktreeWorkflowResult | null,
+  createdWorktree: CreateClisbotWorktreeWorkflowResult | null,
 ): AutoArchiveTarget {
   return createdWorktree
     ? { kind: "created-worktree", result: createdWorktree }

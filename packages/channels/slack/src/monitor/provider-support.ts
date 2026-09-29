@@ -1,11 +1,11 @@
 // upstream: extensions/slack/src/monitor/provider-support.ts@5d8067a4483
 // Slack provider module implements model/runtime integration.
-import { toErrorObject } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { channelBlockedPatch, channelReadyPatch } from "@getpaseo/channels-core/plugin-sdk/gateway-runtime";
+import { toErrorObject } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { channelBlockedPatch, channelReadyPatch } from "@clisbot/channels-core/plugin-sdk/gateway-runtime";
 import {
   asOptionalRecord as asRecord,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { SlackChannelResolution } from "../resolve-channels.js";
 import type { SlackUserResolution } from "../resolve-users.js";
 import type { SlackIdentityHealth } from "./enterprise-install.js";

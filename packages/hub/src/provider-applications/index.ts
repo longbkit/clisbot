@@ -334,13 +334,13 @@ export class ProviderVerificationError extends Error {
 /**
  * Which first-party surface an OAuth or install round trip has to come back to. An enum rather
  * than a caller-supplied route keeps the redirect allowlisted while the legacy Hub pages and the
- * unified Paseo client coexist.
+ * unified Clisbot client coexist.
  */
-export type ProviderApplicationSurface = "appSetup" | "apps" | "paseo";
+export type ProviderApplicationSurface = "appSetup" | "apps" | "clisbot";
 
 export const PROVIDER_APPLICATION_RETURN_ROUTES: Readonly<
   Record<ProviderApplicationSurface, string>
-> = { appSetup: "/", apps: "/apps", paseo: "/settings/hub/configuration" };
+> = { appSetup: "/", apps: "/apps", clisbot: "/settings/hub/configuration" };
 
 export function providerApplicationReturnRoute(
   surface: ProviderApplicationSurface | undefined,

@@ -67,7 +67,7 @@ is exhausted.
 
 ## Durable item anchors
 
-Provider message IDs are not guaranteed for every displayed item. Paseo-generated system errors are one example. Rendered item indices are not durable either because pagination and projection can merge source rows.
+Provider message IDs are not guaranteed for every displayed item. Clisbot-generated system errors are one example. Rendered item indices are not durable either because pagination and projection can merge source rows.
 
 Actions that address a point in chat history, such as Fork, use the daemon timeline `epoch` plus the projected item's `seqEnd`. The app carries that position on the rendered assistant item for both live and fetched history. When adjacent projected chunks merge, the merged item retains the newer chunk's position.
 
@@ -241,7 +241,7 @@ with that record rather than in a React component, so an old request cannot clea
 remain a separate pre-turn registry and retire on canonical acknowledgement.
 
 Canonical turns and visible responses are different boundaries. System-injected prompts are absent from
-the Paseo timeline, so one visible response can span several canonical turns without a user message
+the Clisbot timeline, so one visible response can span several canonical turns without a user message
 between them. Layout and copy group that response together; lifecycle, timing, tool sequences, and exact
 fork positions retain the canonical `turnId` boundaries.
 

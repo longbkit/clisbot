@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidFolderPattern } from "@getpaseo/protocol/project-folders";
+import { isValidFolderPattern } from "@clisbot/protocol/project-folders";
 
 /** Stable semantic privileges shared by Hub policy, management clients, and daemon admission. */
 export const ACCESS_PRIVILEGES = [

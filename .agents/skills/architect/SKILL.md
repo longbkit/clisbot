@@ -1,13 +1,13 @@
 ---
 name: architect
-description: Answer, plan, decide, or implement architecture work in Clisbot PaseoClaw Fusion from repository evidence. Use when work may change clients, the daemon, providers, wire contracts, pairing or authorization, channel synchronization, automation, persistence, agent lifecycle, or ownership boundaries, especially when the design must remain easy to merge with upstream Paseo (upstream/main).
+description: Answer, plan, decide, or implement architecture work in Clisbot ClisbotClaw Fusion from repository evidence. Use when work may change clients, the daemon, providers, wire contracts, pairing or authorization, channel synchronization, automation, persistence, agent lifecycle, or ownership boundaries, especially when the design must remain easy to merge with upstream Clisbot (upstream/main).
 user-invocable: true
 ---
 
 # Architect
 
 Treat architecture as the traceable assignment of identity, behavior,
-authority, persistence, lifecycle, and process ownership. Preserve the Paseo
+authority, persistence, lifecycle, and process ownership. Preserve the Clisbot
 foundation and add the smallest isolated Clisbot extension that can express the
 requested user outcome.
 
@@ -33,7 +33,7 @@ Always start with:
 1. `AGENTS.md` (symlink to `CLAUDE.md`) and the dirty-tree boundary.
 2. `docs/overview/product-vision.md` for the Fusion target and upstream
    strategy.
-3. `docs/architecture.md` for current Paseo system design, package layering,
+3. `docs/architecture.md` for current Clisbot system design, package layering,
    and data flow.
 4. `docs/glossary.md` for canonical terminology.
 5. The relevant focused docs, wire schemas, implementation, tests, and history.
@@ -59,7 +59,7 @@ Start from one visible user action and trace the smallest complete flow:
 
 ```text
 mobile, web, desktop, or CLI client
-  -> @getpaseo/client (PaseoClient / daemon client)
+  -> @clisbot/client (ClisbotClient / daemon client)
   -> typed WebSocket RPC (dotted namespace, .request/.response)
   -> daemon session / agent-manager handler
   -> agent lifecycle state machine and timeline events
@@ -78,7 +78,7 @@ registry entry without tracing its executable path.
 Use this order:
 
 1. Reuse the current upstream owner and contract unchanged.
-2. Connect an existing seam such as a plugin, `paseo.json` workspace
+2. Connect an existing seam such as a plugin, `clisbot.json` workspace
    configuration, MCP tooling, provider adapter, or client-runtime module.
 3. Add an isolated Clisbot-owned adapter or module behind a feature toggle.
 4. Extend a shared wire contract only when all consumers require the new

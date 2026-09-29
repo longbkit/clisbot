@@ -9,7 +9,7 @@
 // assertions are unchanged.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostKeyedStore, HostRuntime } from "@clisbot/channels-shared";
 import { setChannelHostRuntime } from "./runtime-store.js";
 import {
   clearTelegramTypingTimersForTest,

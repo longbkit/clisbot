@@ -48,9 +48,9 @@ async function publishConfiguration(database: Database, requireMention = true): 
   await database.saveChannelConfiguration({
     organizationId: ORG,
     files: [
-      { path: ".paseo/hub.yml", content: HUB },
-      { path: ".paseo/channels/policy.yml", content: POLICY },
-      { path: ".paseo/channels/slack/support.yml", content: account(requireMention) },
+      { path: ".clisbot/hub.yml", content: HUB },
+      { path: ".clisbot/channels/policy.yml", content: POLICY },
+      { path: ".clisbot/channels/slack/support.yml", content: account(requireMention) },
     ],
     contentHash: `configuration-${requireMention}`,
     createdByUserId: null,

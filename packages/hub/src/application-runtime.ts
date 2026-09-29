@@ -13,8 +13,8 @@ import type { Database } from "./db/types.js";
 import {
   buildDaemonWebSocketUrl,
   buildRelayWebSocketUrl,
-} from "@getpaseo/protocol/daemon-endpoints";
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+} from "@clisbot/protocol/daemon-endpoints";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { reportFailure } from "./failures/index.js";
 import { composeNotificationMailer } from "./invitations/index.js";
 import { resolveRouteTenant } from "./projects/access.js";
@@ -665,14 +665,14 @@ async function createChannelSupervisorAtComposition(
       // may live in a separate sandbox pod. An explicit URL is required in
       // that deployment; otherwise discovery incorrectly targets Hub-local
       // 127.0.0.1:6767.
-      ...(process.env["PASEO_HUB_CHANNEL_DAEMON_URL"]
-        ? { daemon: { url: process.env["PASEO_HUB_CHANNEL_DAEMON_URL"] } }
+      ...(process.env["CLISBOT_HUB_CHANNEL_DAEMON_URL"]
+        ? { daemon: { url: process.env["CLISBOT_HUB_CHANNEL_DAEMON_URL"] } }
         : {}),
       dispatchWorkflow,
       cancelWorkflowRuns,
       readWorkflowRuns,
-      ...(process.env["PASEO_HUB_APP_WEB_URL"]
-        ? { appWebUrl: process.env["PASEO_HUB_APP_WEB_URL"] }
+      ...(process.env["CLISBOT_HUB_APP_WEB_URL"]
+        ? { appWebUrl: process.env["CLISBOT_HUB_APP_WEB_URL"] }
         : {}),
       ...(access
         ? {
@@ -797,7 +797,7 @@ async function createChannelDaemonAccessTicketFactory(
  * daemon's persisted `ConnectionOffer` — the same offer any trusted client
  * (app/web) reaches it by, so channels are multi-daemon by construction
  * (per-daemon, determined when the daemon connects), not a single global URL.
- * `PASEO_HUB_CHANNEL_DAEMON_TRANSPORT` (auto|direct|relay|loopback) orders the
+ * `CLISBOT_HUB_CHANNEL_DAEMON_TRANSPORT` (auto|direct|relay|loopback) orders the
  * candidates. Returns `[]` when the daemon has no offer, so the supervisor falls
  * back to the global `daemon` env url or loopback discovery.
  */
@@ -812,7 +812,7 @@ function createChannelDaemonTargetFactory(
 }> {
   const isUuid = (value: string): boolean =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
-  const mode = (env["PASEO_HUB_CHANNEL_DAEMON_TRANSPORT"] ?? "auto").toLowerCase();
+  const mode = (env["CLISBOT_HUB_CHANNEL_DAEMON_TRANSPORT"] ?? "auto").toLowerCase();
   return async ({ organizationId, daemonReference }) => {
     const record = isUuid(daemonReference)
       ? await database.findDaemonForOrganization(organizationId, daemonReference)

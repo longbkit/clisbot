@@ -82,7 +82,7 @@ async function exercisePersistence(bundle: DatabaseRuntimeBundle) {
   const configuration = {
     provider: "github" as const,
     appId: "42",
-    appSlug: "paseo",
+    appSlug: "clisbot",
     clientId: "client",
     clientSecret: "secret",
     privateKey: "private-key",
@@ -91,7 +91,7 @@ async function exercisePersistence(bundle: DatabaseRuntimeBundle) {
   const identity = {
     provider: "github" as const,
     id: "42",
-    name: "Paseo",
+    name: "Clisbot",
     ownerLogin: "acme",
   };
   const attempts = await Promise.allSettled([

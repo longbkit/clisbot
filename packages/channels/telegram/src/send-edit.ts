@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/send-edit.ts@5d8067a4483
 import type { Message } from "grammy/types";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { resolveTelegramMessageThreadSpec } from "./bot/helpers.js";
 import type { TelegramInlineButtons } from "./button-types.js";
 import { renderTelegramHtmlText, telegramHtmlToPlainTextFallback } from "./format.js";

@@ -4,7 +4,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { setGuardedFetchImplementation } from "./fusion/ssrf-fetch.js";
 
 vi.mock("./auth.js", async (importOriginal) => ({

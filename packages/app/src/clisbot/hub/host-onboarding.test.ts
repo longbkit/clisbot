@@ -182,7 +182,7 @@ describe("Hub Host onboarding projection", () => {
 
   it("builds the same cross-platform enrollment command", () => {
     expect(buildHubLoginCommand("https://hub.example.com")).toBe(
-      "paseo hub login https://hub.example.com",
+      "clisbot hub login https://hub.example.com",
     );
   });
 
@@ -190,8 +190,10 @@ describe("Hub Host onboarding projection", () => {
     expect(
       buildHubLoginCommand(
         "https://hub.example.com",
-        "PASEO_HOME=/home/op/.clisbot-dev-01 npm run cli --",
+        "CLISBOT_HOME=/home/op/.clisbot-dev-01 npm run cli --",
       ),
-    ).toBe("PASEO_HOME=/home/op/.clisbot-dev-01 npm run cli -- hub login https://hub.example.com");
+    ).toBe(
+      "CLISBOT_HOME=/home/op/.clisbot-dev-01 npm run cli -- hub login https://hub.example.com",
+    );
   });
 });

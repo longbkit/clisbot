@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/polling-transport-state.ts@5d8067a4483
 // Telegram plugin module implements polling transport state behavior.
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import type { TelegramTransport } from "./fetch.js";
 
 type TelegramPollingTransportStateOpts = {

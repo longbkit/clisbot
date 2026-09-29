@@ -23,7 +23,7 @@ import { HUB_RESOURCE_PATH } from "./packages/hub/dist/config/bundle-contract.js
 import { compileChannelControlPlane } from "./packages/hub/dist/channels/config/compile.js";
 
 const DATA_DIR =
-  process.env.CLISBOT_HOME || process.env.PASEO_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
+  process.env.CLISBOT_HOME || process.env.CLISBOT_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
 const DAEMON_WS = process.env.TRUSTED_CLIENT_URL || "ws://127.0.0.1:6867/ws";
 const t0 = Date.now();
 const log = (x) => console.log(`[t+${Date.now() - t0}ms] ${x}`);
@@ -40,13 +40,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() || "";
+    return process.env.CLISBOT_PASSWORD?.trim() || "";
   }
 }
 function openTrusted() {
   return new Promise((res, rej) => {
     const pw = password();
-    const sock = new WebSocket(DAEMON_WS, pw ? [`paseo.bearer.${pw}`] : undefined);
+    const sock = new WebSocket(DAEMON_WS, pw ? [`clisbot.bearer.${pw}`] : undefined);
     const timer = setTimeout(() => rej(new Error("daemon /ws connect timeout")), 15000);
     sock.on("open", () => {
       sock.send(
@@ -146,7 +146,7 @@ const filesByPath = (files) => new Map(files.map((f) => [f.path, f.content]));
 
 function transform(files, activeId) {
   const m = filesByPath(files);
-  const slackPath = ".paseo/channels/slack/work.yml";
+  const slackPath = ".clisbot/channels/slack/work.yml";
   if (!m.has(slackPath)) fail(`no slack account file in active revision ${activeId}`);
   const slack = load(m.get(slackPath));
   const defaults = slack.defaults ?? {};
@@ -157,8 +157,8 @@ function transform(files, activeId) {
   defaults.outbound = { ...(defaults.outbound ?? {}), path: "relay" };
   slack.defaults = defaults;
   m.set(slackPath, dump(slack, { noRefs: true, lineWidth: -1 }));
-  const policyOutbound = m.has(".paseo/channels/policy.yml")
-    ? load(m.get(".paseo/channels/policy.yml")).defaults?.outbound
+  const policyOutbound = m.has(".clisbot/channels/policy.yml")
+    ? load(m.get(".clisbot/channels/policy.yml")).defaults?.outbound
     : null;
   log(
     `slack account defaults.outbound.path = relay (org policy outbound: ${JSON.stringify(policyOutbound)})`,
@@ -185,7 +185,7 @@ function routeAgentTargets(files, bundle) {
   const m = filesByPath(files);
   const out = new Set();
   for (const [path, content] of m.entries()) {
-    if (!/\.paseo\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
+    if (!/\.clisbot\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
     if (path.endsWith("policy.yml")) continue;
     const doc = load(content);
     for (const r of doc?.routes ?? []) if (r?.agent) out.add(r.agent);

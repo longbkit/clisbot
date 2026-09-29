@@ -62,7 +62,7 @@ import {
   SIDEBAR_UNLABELLED_LABEL_KEY,
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
-import { workspaceLabelKey, type WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey, type WorkspaceLabelColor } from "@clisbot/protocol/workspace-labels";
 import type { WorkspaceTitleSource } from "@/hooks/use-settings";
 import { SIDEBAR_CHECKS_DISPLAYS, type SidebarChecksDisplay } from "./checks-display";
 import { useSidebarDisplayPreferences, type SidebarTrailingChoice } from "./model";

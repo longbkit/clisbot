@@ -35,7 +35,7 @@ import {
 export const FIXTURE_APP_CREDENTIALS = {
   github: {
     appId: "42",
-    appSlug: "paseo",
+    appSlug: "clisbot",
     clientId: "client",
     clientSecret: "secret",
     privateKey: "fixture-private-key",
@@ -130,10 +130,10 @@ export class BrowserSlackSocketFixture {
 }
 
 export const FIXTURE_APP_IDENTITIES: Readonly<Record<Provider, ProviderApplicationIdentity>> = {
-  github: { provider: "github", id: "42", name: "Paseo Hub", ownerLogin: "acme-inc" },
-  discord: { provider: "discord", id: "900", name: "Paseo" },
-  slack: { provider: "slack", id: "browser-slack-app", name: "Paseo" },
-  linear: { provider: "linear", id: "browser-linear-client", name: "Paseo" },
+  github: { provider: "github", id: "42", name: "Clisbot Hub", ownerLogin: "acme-inc" },
+  discord: { provider: "discord", id: "900", name: "Clisbot" },
+  slack: { provider: "slack", id: "browser-slack-app", name: "Clisbot" },
+  linear: { provider: "linear", id: "browser-linear-client", name: "Clisbot" },
 };
 
 /** The identity an environment-configured provider activates with at boot. */

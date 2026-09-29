@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { WebSocket, type RawData } from "ws";
-import { createClientChannel, type EncryptedChannel, type Transport } from "@getpaseo/relay/e2ee";
-import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@getpaseo/protocol/client-capabilities";
-import { isRelayClientWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+import { createClientChannel, type EncryptedChannel, type Transport } from "@clisbot/relay/e2ee";
+import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@clisbot/protocol/client-capabilities";
+import { isRelayClientWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 import { DaemonSessionProtocol, type DaemonSessionFrame } from "./session-protocol.js";
 
-// The Hub's trusted-client transport to a Paseo daemon. One connection drives the
+// The Hub's trusted-client transport to a Clisbot daemon. One connection drives the
 // channel control plane: create agents, steer threads, answer permissions, and
 // consume the bound agent's timeline. It speaks the stock local-client wire
 // (hello -> trusted session, scopes ["*"]) with no pairing (SECURITY.md: loopback
 // reachability is the trust boundary). A password-protected daemon is met the
-// stock way: the `paseo.bearer.<password>` WS subprotocol (the same mechanism
+// stock way: the `clisbot.bearer.<password>` WS subprotocol (the same mechanism
 // `packages/client`'s daemon client uses) — without it the upgrade is rejected
 // and the connection never reaches hello. One code path for the embedded
 // (loopback) and team/remote (relay-paired) forms; the team form reuses the same
@@ -31,7 +31,7 @@ export interface TrustedDaemonClientOptions {
   urls?: readonly string[];
   clientId?: string;
   /** The daemon password, carried exactly like the app/CLI clients: the
-   * `paseo.bearer.<password>` WS subprotocol. The daemon compares it against
+   * `clisbot.bearer.<password>` WS subprotocol. The daemon compares it against
    * its hash; loopback reachability stays the trust boundary. */
   password?: string;
   /** Mint an `accessTicket` for the `hello`, exactly like the app/CLI daemon
@@ -227,13 +227,13 @@ export class TrustedDaemonClient extends EventEmitter {
       this.options.daemonPublicKeyB64 !== undefined && isRelayClientWebSocketUrl(url)
         ? this.options.daemonPublicKeyB64
         : undefined;
-    // The daemon password rides the stock `paseo.bearer.<password>` subprotocol,
+    // The daemon password rides the stock `clisbot.bearer.<password>` subprotocol,
     // exactly like the app/CLI DaemonClient — which sends it for relay URLs too
     // (packages/client/src/daemon-client.ts). Matching the trusted-client path is
     // the invariant; E2EE (below) is layered independently on top.
     const password = this.options.password?.trim();
     const subprotocols =
-      password !== undefined && password !== "" ? [`paseo.bearer.${password}`] : undefined;
+      password !== undefined && password !== "" ? [`clisbot.bearer.${password}`] : undefined;
     const socket = new WebSocket(url, subprotocols, { handshakeTimeout: HELLO_TIMEOUT_MS });
     this.socket = socket;
     this.channel = null;

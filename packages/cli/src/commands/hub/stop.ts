@@ -90,7 +90,7 @@ export async function runStopCommand(
 }
 
 export function stopCommand(): Command {
-  const command = addJsonOption(new Command("stop").description("Stop the local Paseo Hub"))
+  const command = addJsonOption(new Command("stop").description("Stop the local Clisbot Hub"))
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--timeout <seconds>", "Wait timeout before failing (default: 15)")
     .option("--force", "Send SIGKILL if graceful stop times out")

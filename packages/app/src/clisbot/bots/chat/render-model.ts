@@ -1,6 +1,6 @@
 import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
-import { isSilentReply } from "@getpaseo/protocol/chats/room";
+import { isSilentReply } from "@clisbot/protocol/chats/room";
 import type { ChatMessage } from "../data/contracts";
 
 /**

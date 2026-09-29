@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/rich-blocks.ts@5d8067a4483
 // Markdown → Bot API 10.3 InputRichBlock[] for Telegram rich messages.
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   FormatCapabilityProfile,
   isAutoLinkedFileRef,
@@ -12,7 +12,7 @@ import {
   type MarkdownStyle,
   type MarkdownTableCell,
   type MarkdownTableMeta,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import {
   inputRichBlocksToPlainText,
   maxInputRichBlockNesting,

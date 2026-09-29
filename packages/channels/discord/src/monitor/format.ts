@@ -1,5 +1,5 @@
 // upstream: extensions/discord/src/monitor/format.ts@5d8067a4483
-import { parseDateStringTimestampMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseDateStringTimestampMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 // Discord helper module supports format behavior.
 import type { Guild, User } from "../internal/discord.js";
 

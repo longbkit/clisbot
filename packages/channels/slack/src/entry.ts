@@ -5,8 +5,8 @@
 // (`setSlackChannelRuntime`), and the `plugin` chunk's pinned export is
 // `slackPlugin`.
 
-import { createChannelEntry } from "@getpaseo/channels-shared";
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import { createChannelEntry } from "@clisbot/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { setSlackChannelRuntime } from "./runtime-store.js";
 
 export const slackEntry = createChannelEntry(

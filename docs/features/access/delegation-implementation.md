@@ -5,7 +5,7 @@ Status: all six workstreams shipped 2026-09-19 in commits `2cf04acf2` (access, P
 and the People page redesign recorded below (its decision lives only here).
 
 Everything here is Clisbot scope (`packages/hub`, `packages/app/src/clisbot`). No
-upstream Paseo file changes; no protocol package changes. An unmodified Paseo app
+upstream Clisbot file changes; no protocol package changes. An unmodified Clisbot app
 still pairs with the daemon; Hub features are already gated by Hub presence.
 
 ## Workstreams and file ownership

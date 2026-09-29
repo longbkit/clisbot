@@ -8,8 +8,8 @@ import {
   PROMPT_SENTINEL,
   getTerminalProfileIcon,
   profileTakesPrompt,
-} from "@getpaseo/protocol/terminal-profiles";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/terminal-profiles";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import type { ProjectAuthorization } from "./types.js";
 
 /** Whether the grant may launch, or use a terminal launched from, `profileId`. */

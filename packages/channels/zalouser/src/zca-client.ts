@@ -1,5 +1,5 @@
 // upstream: extensions/zalouser/src/zca-client.ts@5d8067a4483
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
 // Zalouser plugin module implements zca client behavior.
 import { TextStyle } from "./zca-constants.js";
 

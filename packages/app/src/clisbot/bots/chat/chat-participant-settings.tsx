@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { BotPayload } from "../data/contracts";
 import { BotMembersField, type MemberBot } from "./bot-members-field";
 

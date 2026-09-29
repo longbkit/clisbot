@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/inbound-event-delivery.ts@5d8067a4483
 // Telegram plugin module implements inbound event delivery behavior.
-import { createInboundEventDeliveryCorrelation } from "@getpaseo/channels-core/plugin-sdk/inbound-event-delivery";
+import { createInboundEventDeliveryCorrelation } from "@clisbot/channels-core/plugin-sdk/inbound-event-delivery";
 import { stripTelegramInternalPrefixes } from "./targets.js";
 
 function normalizeTelegramDeliveryTarget(value: string): string {

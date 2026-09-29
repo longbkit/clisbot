@@ -12,7 +12,7 @@ import {
 } from "./session-file-activity.js";
 
 import { FileUploadStore } from "./index.js";
-import { FileTransferOpcode } from "@getpaseo/protocol/binary-frames/index";
+import { FileTransferOpcode } from "@clisbot/protocol/binary-frames/index";
 const roots: string[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -153,7 +153,7 @@ it("releases registration when deletion cancels a transfer during asynchronous a
   const parent = await temporary();
   const directory = path.join(parent, "agent");
   const store = new FileUploadStore({
-    paseoHome: parent,
+    clisbotHome: parent,
     sessionStorageEnabled: () => true,
     resolveAgentDirectory: async () => directory,
   });

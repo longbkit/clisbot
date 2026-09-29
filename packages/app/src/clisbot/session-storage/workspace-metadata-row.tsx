@@ -8,7 +8,7 @@ import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import {
   type SessionAuthorship,
   type SessionChannelReference,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 import { ChannelIcon, channelConversationLabel } from "@/clisbot/channels/channel-icon";
 import { SessionActorName } from "./actor";
 import { useSessionStorageReadable } from "./capability";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { SlackSenderDirectory, slackPersonName, type SlackUsersClient } from "./sender-directory.js";
 
 const PEOPLE: Record<string, unknown> = {

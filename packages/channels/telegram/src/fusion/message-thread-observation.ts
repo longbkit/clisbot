@@ -24,8 +24,8 @@
 // agent, or an inbound message from before this account started — still answers
 // "not observed", and `message-topic-binding.ts` refuses the mutation.
 
-import { normalizeOptionalAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { normalizeOptionalAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import {
   type PersistedTelegramMessageCacheValue,
   TELEGRAM_MESSAGE_CACHE_PERSISTENT_MAX_MESSAGES,

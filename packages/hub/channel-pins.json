@@ -19,7 +19,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-slack",
+      "inRepoPackage": "@clisbot/channels-slack",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -36,7 +36,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-telegram",
+      "inRepoPackage": "@clisbot/channels-telegram",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -53,7 +53,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-discord",
+      "inRepoPackage": "@clisbot/channels-discord",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -70,7 +70,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-googlechat",
+      "inRepoPackage": "@clisbot/channels-googlechat",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -87,7 +87,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-feishu",
+      "inRepoPackage": "@clisbot/channels-feishu",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -104,7 +104,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-zalouser",
+      "inRepoPackage": "@clisbot/channels-zalouser",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",
@@ -121,7 +121,7 @@
         }
       },
       "loadMode": "in-repo",
-      "inRepoPackage": "@getpaseo/channels-zalo",
+      "inRepoPackage": "@clisbot/channels-zalo",
       "entry": "./dist/index.js",
       "plugin": {
         "specifier": "./dist/plugin.js",

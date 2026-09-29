@@ -4,7 +4,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawnProcess } from "@getpaseo/server";
+import { spawnProcess } from "@clisbot/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
@@ -69,7 +69,7 @@ class FakeHubProcess extends EventEmitter implements HubLocalProcess {
 class FakeHubRuntime implements HubLaunchRuntime {
   readonly process = new FakeHubProcess();
   lastDetached?: { command: string; args: string[]; options: DetachOptions };
-  bin = "/repo/packages/hub/bin/paseo-hub.js";
+  bin = "/repo/packages/hub/bin/clisbot-hub.js";
   foregroundStatus = 0;
 
   resolveHubBin(): string {
@@ -133,11 +133,10 @@ describe("resolveLocalHubHome", () => {
     );
     expect(resolveLocalHubHome({ home: "relative-home" }, {})).toBe(path.resolve("relative-home"));
   });
-  test("flag beats CLISBOT_HOME, PASEO_HOME, and default", () => {
-    const env = { CLISBOT_HOME: "/a", PASEO_HOME: "/b" } as NodeJS.ProcessEnv;
+  test("flag beats CLISBOT_HOME and default", () => {
+    const env = { CLISBOT_HOME: "/a" } as NodeJS.ProcessEnv;
     expect(resolveLocalHubHome({ home: "/flag" }, env)).toBe("/flag");
     expect(resolveLocalHubHome({}, env)).toBe("/a");
-    expect(resolveLocalHubHome({}, { PASEO_HOME: "/b" } as NodeJS.ProcessEnv)).toBe("/b");
     expect(resolveLocalHubHome({}, {} as NodeJS.ProcessEnv)).toBe(
       path.join(os.homedir(), ".clisbot"),
     );
@@ -187,9 +186,9 @@ describe("readHubStateFile", () => {
 });
 
 describe("readDaemonPasswordFile", () => {
-  test("reads a PASEO_PASSWORD=<value> line (the repo .env shape)", async () => {
+  test("reads a CLISBOT_PASSWORD=<value> line (the repo .env shape)", async () => {
     const home = await createHome();
-    writeFileSync(path.join(home, ".daemon-password"), "PASEO_PASSWORD=secret123\n");
+    writeFileSync(path.join(home, ".daemon-password"), "CLISBOT_PASSWORD=secret123\n");
     expect(readDaemonPasswordFile(home)).toBe("secret123");
   });
 
@@ -259,7 +258,7 @@ describe("startLocalHubDetached", () => {
     const recorded = readHubStateFile(home);
     expect(recorded?.instanceId).toBeTruthy();
     expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_INSTANCE_ID).toBe(recorded?.instanceId);
-    expect(runtime.lastDetached?.options.env?.PASEO_HUB_APP_URL).toBe(result.url);
+    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_APP_URL).toBe(result.url);
   });
 
   test("keeps the selected port across stop and restart without treating a stopped PID as live", async () => {
@@ -309,8 +308,8 @@ describe("startLocalHubDetached", () => {
     await startLocalHubDetached({ home, initMasterKey: true }, runtime);
     const child = runtime.lastDetached?.options.env as NodeJS.ProcessEnv;
     const keyPath = localHubMasterKeyPath(home);
-    expect(child.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE).toBe(keyPath);
-    expect(child.PASEO_HUB_CREDENTIAL_MASTER_KEY).toBeUndefined();
+    expect(child.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE).toBe(keyPath);
+    expect(child.CLISBOT_HUB_CREDENTIAL_MASTER_KEY).toBeUndefined();
     expect(JSON.stringify(child)).not.toContain(fs.readFileSync(keyPath, "utf8").trim());
   });
 
@@ -346,11 +345,11 @@ describe("startLocalHubDetached", () => {
     expect(launch?.args).toEqual([runtime.bin]);
     expect(launch?.options?.detached).toBe(true);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6868");
-    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_APP_URL).toBe(result.url);
-    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_BIND).toBe("127.0.0.1");
-    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE).toBe(
-      localHubMasterKeyPath(home),
-    );
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_APP_URL).toBe(result.url);
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_BIND).toBe("127.0.0.1");
+    expect(
+      (launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE,
+    ).toBe(localHubMasterKeyPath(home));
 
     expect(readHubStateFile(home)).toMatchObject({
       url: "http://127.0.0.1:6868",
@@ -372,14 +371,14 @@ describe("startLocalHubDetached", () => {
     expect(readHubStateFile(home)?.port).toBe(7100);
   });
 
-  test("passes the home's .daemon-password through as PASEO_PASSWORD", async () => {
+  test("passes the home's .daemon-password through as CLISBOT_PASSWORD", async () => {
     const home = await createHome();
-    writeFileSync(path.join(home, ".daemon-password"), "PASEO_PASSWORD=secret789\n");
+    writeFileSync(path.join(home, ".daemon-password"), "CLISBOT_PASSWORD=secret789\n");
     const runtime = new FakeHubRuntime();
 
     await startLocalHubDetached({ home, initMasterKey: true }, runtime);
 
-    expect((runtime.lastDetached?.options?.env as NodeJS.ProcessEnv)?.PASEO_PASSWORD).toBe(
+    expect((runtime.lastDetached?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_PASSWORD).toBe(
       "secret789",
     );
   });

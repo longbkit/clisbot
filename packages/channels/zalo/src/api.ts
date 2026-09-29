@@ -4,11 +4,11 @@
  * @see https://bot.zaloplatforms.com/docs
  */
 
-import { resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import {
   assertOkOrThrowProviderError,
   readProviderJsonResponse,
-} from "@getpaseo/channels-core/plugin-sdk/provider-http";
+} from "@clisbot/channels-core/plugin-sdk/provider-http";
 import { resolvePinnedHostnameWithPolicy, type SsrFPolicy } from "./fusion/ssrf.js";
 import { ZALO_DEFAULT_REQUEST_TIMEOUT_MS, ZALO_SEND_PHOTO_REQUEST_TIMEOUT_MS } from "./timeouts.js";
 

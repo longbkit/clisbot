@@ -1,6 +1,6 @@
 // What an Agent receives from a channel. The sender line and the context /
 // message headers live in the protocol package so the daemon's chat engine
-// renders the same shape (`@getpaseo/protocol/conversation-prompt`); this file
+// renders the same shape (`@clisbot/protocol/conversation-prompt`); this file
 // keeps the Hub-only parts: the delivery receipt key and the session title.
 import { createHash } from "node:crypto";
 import { channelMessageId } from "../daemon/session-operation.js";
@@ -12,7 +12,7 @@ export {
   renderConversationPrompt,
   senderLabel,
   type ConversationPrompt,
-} from "@getpaseo/protocol/conversation-prompt";
+} from "@clisbot/protocol/conversation-prompt";
 
 /**
  * The daemon receipt key of a delivery. One message keeps the key it has on

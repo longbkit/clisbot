@@ -23,7 +23,7 @@ Everything lives on one page, **Show → Agent sessions** — the first row of t
 
 | Item                 | Values                                                                                 | Default                                      |
 | -------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Show sessions        | on / off. Off draws the sidebar exactly as upstream Paseo.                             | on                                           |
+| Show sessions        | on / off. Off draws the sidebar exactly as upstream Clisbot.                           | on                                           |
 | Expansion            | Auto collapse / Keep as is / Always expanded                                           | Auto collapse                                |
 | Active sessions only | on / off                                                                               | off                                          |
 | Full titles          | on / off                                                                               | on                                           |

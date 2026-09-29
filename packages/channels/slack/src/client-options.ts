@@ -11,8 +11,8 @@ import { isDebugProxyGlobalFetchPatchInstalled } from "./fusion/fetch.js";
 import {
   parseRetryAfterHeaderSeconds,
   retryAsync,
-} from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+} from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import type { EnvHttpProxyAgent } from "undici";
 
 type SlackUndiciRuntime = Pick<typeof import("undici"), "EnvHttpProxyAgent" | "fetch">;

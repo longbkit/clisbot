@@ -80,7 +80,7 @@ export class HubApiClient {
 
   private authPath(resource: string): string {
     const normalized = resource.replace(/^\/+/, "");
-    return `/api/auth/paseo/${normalized}`;
+    return `/api/auth/clisbot/${normalized}`;
   }
 }
 

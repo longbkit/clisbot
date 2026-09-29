@@ -14,26 +14,26 @@ Các lệnh dưới đây dùng home ví dụ `~/.clisbot-dev-01`; thay bằng h
 | `Managed access ticket required` / home đang `external` | Đây là home đã bật Managed Access. Dùng app đã đăng nhập Hub và có quyền để kết nối, hoặc đường quản trị socket/pipe local. Owner password không thay vé daemon. Xem [Managed Access](../hosts/managed-access.md); muốn test mới thì chọn home khác. |
 | Port bận / không khởi động được                         | Home mới tự chọn port khác khi port mặc định bận; home đã lưu giữ port cũ. Giải phóng đúng port hoặc chọn port rõ ràng; không dừng nhầm home khác.                                                                                                   |
 | Slack đã kết nối nhưng không trả lời                    | Kiểm tra owner linked, bot đã vào channel, có `@mention`, event/quyền Slack và Codex đã đăng nhập trên máy daemon. Test gửi ra thành công chưa chứng minh chiều nhận vào chạy.                                                                       |
-| Command/flag mới không nhận biết                        | Build lại và dùng `./packages/cli/bin/paseo` tại repo; kiểm tra có đang gọi nhầm CLI global cũ.                                                                                                                                                      |
+| Command/flag mới không nhận biết                        | Build lại và dùng `./packages/cli/bin/clisbot` tại repo; kiểm tra có đang gọi nhầm CLI global cũ.                                                                                                                                                    |
 
 **Mất/hết hạn mã `/link`:** chạy lại lệnh dưới. Nếu owner chưa linked, Hub cấp mã mới hạn 10 phút và vô hiệu mã cũ; không cần token. Nếu đã linked thì giữ nguyên.
 
 ```bash
-paseo bot start --home "$HOME/.clisbot-dev-01"
+clisbot bot start --home "$HOME/.clisbot-dev-01"
 ```
 
 Bot có tên khác cần `--bot-name`; `bot status NAME --home ...` cũng in lệnh lấy mã mới. Mã cũ không thể đọc lại từ file.
 
-### Hub chạy nhưng không mở được Paseo web app
+### Hub chạy nhưng không mở được Clisbot web app
 
 URL **Hub** và URL **daemon** là hai địa chỉ khác nhau. Dùng địa chỉ thật được in ra, không mặc định mọi home đều dùng port 6767/6868.
 
 ```bash
-paseo daemon status --home "$HOME/.clisbot-dev-01"
-paseo daemon restart --home "$HOME/.clisbot-dev-01" --web-ui
+clisbot daemon status --home "$HOME/.clisbot-dev-01"
+clisbot daemon restart --home "$HOME/.clisbot-dev-01" --web-ui
 ```
 
-Cần có web assets (`npm run build:daemon-web-ui` nếu chạy source). Mở HTTP origin của daemon sau restart. Biến `PASEO_WEB_UI_ENABLED=true` ở lệnh init không thay cấu hình một daemon đã chạy từ trước.
+Cần có web assets (`npm run build:daemon-web-ui` nếu chạy source). Mở HTTP origin của daemon sau restart. Biến `CLISBOT_WEB_UI_ENABLED=true` ở lệnh init không thay cấu hình một daemon đã chạy từ trước.
 
 Nếu localhost mở được mà URL Tailscale/proxy không mở được, kiểm tra đích proxy. Ví dụ URL `:8444/` trỏ tới Expo `:8081` sẽ lỗi khi dev server đó đã dừng, dù Hub vẫn chạy. Init không tự sửa proxy hay khởi động Expo. Với web UI tích hợp, trỏ tới đúng daemon origin và hỗ trợ WebSocket; giữ đúng cấu hình proxy cho các URL Hub riêng.
 
@@ -42,7 +42,7 @@ Nếu localhost mở được mà URL Tailscale/proxy không mở được, ki�
 ### Muốn seed lại template, ghi đè file hiện có
 
 ```bash
-paseo hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
+clisbot hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
 ```
 
 Với bot đặt tên riêng, thêm `--bot-name TEN_BOT`. Lệnh sao lưu file cũ vào `<workspace>/.clisbot-template-backup-*` rồi thay các file template, **gồm USER.md, MEMORY.md và BOOTSTRAP.md**; output ghi đường dẫn backup. File ngoài template và symlink được giữ nguyên. Khôi phục phần nội dung cần giữ từ backup trước khi chat tiếp. Flag chỉ áp dụng lần chạy này; lần sau lại giữ nguyên file.
@@ -53,7 +53,7 @@ Làm theo [Mật khẩu và recovery](../account/password-and-recovery.md). Ch�
 
 ## Đăng nhập Hub xong sao chưa thấy Host?
 
-Login chưa chắc đã enroll daemon. Chạy `paseo hub status` trên đúng máy; nếu chưa kết nối, chạy `paseo hub connect`. Trong app kiểm tra đúng Hub/tổ chức rồi **Refresh Hosts**. Member cần grant Connect; trạng thái offline còn cần kiểm tra daemon và đường mạng.
+Login chưa chắc đã enroll daemon. Chạy `clisbot hub status` trên đúng máy; nếu chưa kết nối, chạy `clisbot hub connect`. Trong app kiểm tra đúng Hub/tổ chức rồi **Refresh Hosts**. Member cần grant Connect; trạng thái offline còn cần kiểm tra daemon và đường mạng.
 
 ## Enroll rồi có cần cấu hình provider nữa không?
 
@@ -67,7 +67,7 @@ Không, đổi mode áp dụng ngay. App phải kết nối lại để lấy v�
 
 App đó có thể không hỗ trợ vé Hub hoặc người đăng nhập thiếu Connect. Dùng app hỗ trợ Managed Access, đăng nhập đúng tổ chức, kiểm tra grant và kết nối lại. LAN/Tailscale/SSH tunnel không bỏ qua yêu cầu vé. Nếu mất đường quản trị, người vận hành dùng socket/pipe local để kiểm tra cấu hình.
 
-## Off có phải mọi upstream Paseo app đều vào được?
+## Off có phải mọi upstream Clisbot app đều vào được?
 
 App tương thích có thể dùng đường ghép nối tin cậy nếu có đủ thông tin kết nối và đáp ứng điều kiện endpoint. Không phải cứ biết địa chỉ là được vào. Nhưng Hub Project Access không giới hạn session tin cậy đó; dùng `external` khi cần phân quyền người dùng.
 
@@ -151,7 +151,7 @@ Kiểm tra bạn đổi tên dùng chung trên **Settings → Hosts** hay nhãn 
 
 ## Logout có ngắt daemon khỏi Hub không?
 
-Không tự động. Login CLI và enrollment tách nhau. Dùng `paseo hub disconnect` để unenroll; `--force` khi Hub không truy cập được chỉ bảo đảm dọn phía local, cần kiểm tra thu hồi phía Hub sau đó.
+Không tự động. Login CLI và enrollment tách nhau. Dùng `clisbot hub disconnect` để unenroll; `--force` khi Hub không truy cập được chỉ bảo đảm dọn phía local, cần kiểm tra thu hồi phía Hub sau đó.
 
 ## Được Channel access sao vẫn không gọi được Agent?
 

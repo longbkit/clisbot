@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/channels-shared",
+  "name": "@clisbot/channels-shared",
   "version": "0.7.3-beta.1",
   "private": true,
   "description": "Channel-agnostic contract + L3 inbound monitor for the in-repo channel verticals (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md §6.5)",
@@ -23,7 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@getpaseo/channels-core": "*"
+    "@clisbot/channels-core": "*"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

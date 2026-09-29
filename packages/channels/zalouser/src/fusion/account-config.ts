@@ -17,7 +17,7 @@
 // The ported `accounts.ts` keeps its upstream shape and flow; it just reads the
 // merged carrier instead of the OpenClaw config file.
 
-import type { StartAccountContext } from "@getpaseo/channels-shared";
+import type { StartAccountContext } from "@clisbot/channels-shared";
 import { resolveZalouserAccountSync } from "../accounts.js";
 import type { OpenClawConfig } from "../runtime-api.js";
 import type { ResolvedZalouserAccount } from "../types.js";

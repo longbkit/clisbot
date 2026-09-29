@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import type { AgentPermissionResponse } from "./agent-sdk-types.js";
 import { PendingEventBudget } from "./session-storage/pending-event-budget.js";
 import { PermissionResponseAdmission } from "./permission-response-journal.js";
@@ -199,7 +199,7 @@ it("rejects a response to an older provider request generation before any durabl
   const p = {
     ...params(),
     requestGeneration: "previous",
-    getPendingRequest: () => ({ ...request, metadata: { paseoPermissionGeneration: "current" } }),
+    getPendingRequest: () => ({ ...request, metadata: { clisbotPermissionGeneration: "current" } }),
   };
   await expect(h.admission.respond(p)).rejects.toThrow("generation changed");
   expect(h.writes).toHaveLength(0);

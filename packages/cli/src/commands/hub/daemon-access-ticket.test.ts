@@ -7,8 +7,8 @@ import {
   requiresDaemonAccessTicket,
 } from "./daemon-access-ticket.js";
 
-function paseoHome(files: Record<string, unknown>): string {
-  const home = mkdtempSync(path.join(tmpdir(), "paseo-cli-ticket-"));
+function clisbotHome(files: Record<string, unknown>): string {
+  const home = mkdtempSync(path.join(tmpdir(), "clisbot-cli-ticket-"));
   for (const [name, value] of Object.entries(files)) {
     writeFileSync(path.join(home, name), JSON.stringify(value));
   }
@@ -27,39 +27,39 @@ describe("daemon access tickets for the CLI", () => {
   });
 
   it("has no ticket to offer when the daemon is not enrolled or the CLI is not logged in", () => {
-    const unenrolled = paseoHome({});
+    const unenrolled = clisbotHome({});
     expect(
       createDaemonAccessTicketResolver({
-        paseoHome: unenrolled,
+        clisbotHome: unenrolled,
         clientId: "cid",
-        env: { PASEO_HOME: unenrolled },
+        env: { CLISBOT_HOME: unenrolled },
       }),
     ).toBeNull();
 
-    const loggedOut = paseoHome({ "hub-relationship.json": relationship });
+    const loggedOut = clisbotHome({ "hub-relationship.json": relationship });
     expect(
       createDaemonAccessTicketResolver({
-        paseoHome: loggedOut,
+        clisbotHome: loggedOut,
         clientId: "cid",
-        env: { PASEO_HOME: loggedOut },
+        env: { CLISBOT_HOME: loggedOut },
       }),
     ).toBeNull();
   });
 
   it("offers a ticket resolver for an enrolled daemon whose Hub this CLI is logged in to", () => {
-    const home = paseoHome({
+    const home = clisbotHome({
       "hub-relationship.json": relationship,
       "hub-credentials.json": {
         version: 1,
         activeOrigin: "https://hub.test",
-        credentials: [{ origin: "https://hub.test", credential: "paseo_cli_abc_secret" }],
+        credentials: [{ origin: "https://hub.test", credential: "clisbot_cli_abc_secret" }],
       },
     });
     expect(
       createDaemonAccessTicketResolver({
-        paseoHome: home,
+        clisbotHome: home,
         clientId: "cid",
-        env: { PASEO_HOME: home },
+        env: { CLISBOT_HOME: home },
       }),
     ).toBeTypeOf("function");
   });

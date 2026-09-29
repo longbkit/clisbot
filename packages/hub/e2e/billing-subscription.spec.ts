@@ -42,12 +42,12 @@ test("subscribing lifts an unsubscribed org's invite limit, and replaying the we
   await test.step("open the upgrade dialog and choose a paid plan", async () => {
     await hub.expectCardlessTrialOffer("owner");
     await page.screenshot({ path: `${SLICE_6_DIR}/03-upgrade-dialog.png`, fullPage: true });
-    await hub.choosePlan("owner", "Paseo Hub");
+    await hub.choosePlan("owner", "Clisbot Hub");
   });
 
   await test.step("the subscription webhook stamps the paid plan and bills for one seat", async () => {
     await hub.deliverSubscriptionWebhook("owner");
-    await hub.expectCurrentPlan("owner", "Paseo Hub");
+    await hub.expectCurrentPlan("owner", "Clisbot Hub");
     await hub.expectActiveTrial("owner");
     // Post-paid seats: with only the owner, Stripe is billed for one seat.
     await hub.expectReportedSeatQuantity("owner", 1);
@@ -64,7 +64,7 @@ test("subscribing lifts an unsubscribed org's invite limit, and replaying the we
 
   await test.step("replaying the subscription webhook changes nothing", async () => {
     await hub.deliverSubscriptionWebhook("owner");
-    await hub.expectCurrentPlan("owner", "Paseo Hub");
+    await hub.expectCurrentPlan("owner", "Clisbot Hub");
     await hub.expectPendingInvitation("owner", invitee);
   });
 

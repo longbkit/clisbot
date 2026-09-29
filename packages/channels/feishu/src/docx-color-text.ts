@@ -13,7 +13,7 @@
  */
 
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 // Feishu text_color values (1-7)
 const TEXT_COLOR: Record<string, number> = {

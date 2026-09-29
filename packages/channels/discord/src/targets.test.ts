@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/targets.test.ts@5d8067a4483
 // Discord tests cover targets plugin behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveDiscordDirectoryUserId } from "./directory-cache.js";
 import { clearDiscordDirectoryCacheForTest } from "./directory-cache.test-support.js";

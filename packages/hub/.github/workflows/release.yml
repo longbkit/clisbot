@@ -63,7 +63,7 @@ jobs:
             exit 0
           fi
 
-          args=(--verify-tag --title "Paseo Hub $RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH")
+          args=(--verify-tag --title "Clisbot Hub $RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH")
           if [[ "$IS_PRERELEASE" == "true" ]]; then
             args+=(--prerelease)
           fi

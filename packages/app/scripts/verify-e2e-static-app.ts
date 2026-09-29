@@ -5,7 +5,7 @@ import path from "node:path";
 import { startStaticAppServer } from "../e2e/support/static-app-server";
 
 async function main() {
-  const temporary = await mkdtemp(path.join(os.tmpdir(), "paseo-static-app-smoke-"));
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-app-smoke-"));
   let server: Awaited<ReturnType<typeof startStaticAppServer>> | undefined;
   try {
     const root = path.join(temporary, "export");

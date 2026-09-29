@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/reaction-level.test.ts@5d8067a4483
 // Telegram tests cover reaction level plugin behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveTelegramReactionLevel } from "./reaction-level.js";
 

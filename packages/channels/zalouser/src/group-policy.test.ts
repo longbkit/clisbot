@@ -3,7 +3,7 @@
 import {
   resolveScopeRequireMention,
   resolveScopeToolsPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/channel-policy";
+} from "@clisbot/channels-core/plugin-sdk/channel-policy";
 import { describe, expect, it } from "vitest";
 import {
   buildZalouserGroupCandidates,

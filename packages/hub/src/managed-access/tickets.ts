@@ -1,5 +1,5 @@
 import { SessionOperationTickets } from "./session-operation-tickets.js";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -13,7 +13,7 @@ export const DEFAULT_ACCESS_LEASE_DURATION_MS = 60 * 60_000;
 export const MIN_ACCESS_LEASE_DURATION_MS = 60_000;
 export const MAX_ACCESS_LEASE_DURATION_MS = 60 * 60_000;
 
-const accessTicketSchema = z.string().regex(/^paseo_dat_[A-Za-z0-9_-]{43}$/u);
+const accessTicketSchema = z.string().regex(/^clisbot_dat_[A-Za-z0-9_-]{43}$/u);
 
 export interface IssuedAccessTicket {
   accessTicket: string;
@@ -75,7 +75,7 @@ export class AccessTicketService {
     }
     const now = input.now ?? new Date();
     const expiresAt = new Date(now.getTime() + ACCESS_TICKET_LIFETIME_MS);
-    const accessTicket = `paseo_dat_${randomBytes(32).toString("base64url")}`;
+    const accessTicket = `clisbot_dat_${randomBytes(32).toString("base64url")}`;
     await this.runtime
       .drizzle()
       .insert(schema.daemonAccessTickets)

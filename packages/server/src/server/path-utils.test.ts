@@ -17,6 +17,8 @@ describe("isSameOrDescendantPath", () => {
   });
 
   it("supports mixed Windows separators and drive-letter case", () => {
-    expect(isSameOrDescendantPath("C:\\Users\\Paseo\\Repo", "c:/users/paseo/repo/src")).toBe(true);
+    expect(isSameOrDescendantPath("C:\\Users\\Clisbot\\Repo", "c:/users/clisbot/repo/src")).toBe(
+      true,
+    );
   });
 });

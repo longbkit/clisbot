@@ -18,23 +18,23 @@ const FDROID_ABI_VERSION_CODE_ENTRIES = Object.entries(FDROID_ABI_VERSION_CODE_S
   .map(([abi, suffix]) => `    "${abi}": ${suffix},`)
   .join("\n");
 
-const FDROID_ABI_VERSION_CODE_BLOCK = `// Paseo F-Droid single-ABI version codes
-def paseoAbiVersionCodes = [
+const FDROID_ABI_VERSION_CODE_BLOCK = `// Clisbot F-Droid single-ABI version codes
+def clisbotAbiVersionCodes = [
 ${FDROID_ABI_VERSION_CODE_ENTRIES}
 ]
-def paseoArchitectures = (findProperty("reactNativeArchitectures") ?: "")
+def clisbotArchitectures = (findProperty("reactNativeArchitectures") ?: "")
     .toString()
     .split(",")
     .collect { it.trim() }
     .findAll { !it.isEmpty() }
 
-if (paseoArchitectures.size() == 1) {
-    def paseoAbi = paseoArchitectures[0]
-    def paseoAbiVersionCode = paseoAbiVersionCodes[paseoAbi]
-    if (paseoAbiVersionCode == null) {
-        throw new GradleException("Unsupported Paseo Android ABI: " + paseoAbi)
+if (clisbotArchitectures.size() == 1) {
+    def clisbotAbi = clisbotArchitectures[0]
+    def clisbotAbiVersionCode = clisbotAbiVersionCodes[clisbotAbi]
+    if (clisbotAbiVersionCode == null) {
+        throw new GradleException("Unsupported Clisbot Android ABI: " + clisbotAbi)
     }
-    android.defaultConfig.versionCode = android.defaultConfig.versionCode * 10 + paseoAbiVersionCode
+    android.defaultConfig.versionCode = android.defaultConfig.versionCode * 10 + clisbotAbiVersionCode
 }
 `;
 
@@ -53,7 +53,7 @@ function configureFdroidAppBuildGradle(contents) {
     );
   }
 
-  if (!configuredContents.includes("// Paseo F-Droid single-ABI version codes")) {
+  if (!configuredContents.includes("// Clisbot F-Droid single-ABI version codes")) {
     configuredContents = `${configuredContents.trimEnd()}\n\n${FDROID_ABI_VERSION_CODE_BLOCK}`;
   }
 

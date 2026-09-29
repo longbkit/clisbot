@@ -7,7 +7,7 @@
 // without re-deriving a send path, and `agentTools` carries the six `feishu_*`
 // tool families the way upstream's `ChannelPlugin.agentTools` does.
 
-import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { feishuChannelActions } from "./channel-actions.js";
 import { disposeFeishuRuntime } from "./fusion/runtime.js";
 import {

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Issues are only for bugs. Product discussions go in [GitHub Discussions](https://github.com/getpaseo/paseo/discussions) or `#product` in [Discord](https://discord.gg/jz8T2uahpH) — feature requests opened as issues get closed automatically.
+        Issues are only for bugs. Product discussions go in [GitHub Discussions](https://github.com/longbkit/clisbot/discussions) or `#product` in [Discord](https://discord.gg/jz8T2uahpH) — feature requests opened as issues get closed automatically.
 
         Before opening, please:
 
@@ -54,10 +54,10 @@ body:
       required: true
 
   - type: input
-    id: paseo-version
+    id: clisbot-version
     attributes:
-      label: Paseo version
-      description: Settings → About in the app, or `paseo --version` from the CLI.
+      label: Clisbot version
+      description: Settings → About in the app, or `clisbot --version` from the CLI.
       placeholder: "0.1.71"
     validations:
       required: true
@@ -91,7 +91,7 @@ body:
         Claude Code v1.2.3 with Anthropic API
         Codex CLI v0.5.0 with OpenAI API
         OpenCode v0.3.1
-        (or paste the relevant section of ~/.paseo/config.json for custom providers)
+        (or paste the relevant section of ~/.clisbot/config.json for custom providers)
 
   - type: textarea
     id: logs
@@ -100,10 +100,10 @@ body:
       description: |
         Paste relevant log output. Strongly preferred for crashes and daemon issues.
 
-        - **Daemon log:** `~/.paseo/daemon.log` (override with `$PASEO_HOME`)
-        - **Electron log (macOS):** `~/Library/Logs/Paseo/main.log`
-        - **Electron log (Windows):** `%APPDATA%\Paseo\logs\main.log`
-        - **Electron log (Linux):** `~/.config/Paseo/logs/main.log`
+        - **Daemon log:** `~/.clisbot/daemon.log` (override with `$CLISBOT_HOME`)
+        - **Electron log (macOS):** `~/Library/Logs/Clisbot/main.log`
+        - **Electron log (Windows):** `%APPDATA%\Clisbot\logs\main.log`
+        - **Electron log (Linux):** `~/.config/Clisbot/logs/main.log`
 
         Paste the **full log around the time of the bug**, not a summary. If you used an AI to investigate, paste the raw log it read, not the AI's interpretation. AI summaries skew the signal and waste my time.
       render: text

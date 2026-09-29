@@ -5,4 +5,4 @@ Fixed
 - Fixed the sidebar keeping only recently changed conversations after the app reconnects to a daemon
 - Fixed Import session offering only the newest 100 Codex conversations
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

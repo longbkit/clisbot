@@ -18,13 +18,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() || "";
+    return process.env.CLISBOT_PASSWORD?.trim() || "";
   }
 }
 function openTrusted() {
   return new Promise((res, rej) => {
     const pw = password();
-    const sock = new WebSocket(DAEMON_WS, pw ? [`paseo.bearer.${pw}`] : undefined);
+    const sock = new WebSocket(DAEMON_WS, pw ? [`clisbot.bearer.${pw}`] : undefined);
     const timer = setTimeout(() => rej(new Error("daemon /ws connect timeout")), 15000);
     sock.on("open", () => {
       sock.send(

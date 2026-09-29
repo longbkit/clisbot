@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/trusted-requester-actions.ts@5d8067a4483
 // Discord guild-admin actions need a Discord sender identity for permission checks.
-import type { ChannelMessageActionName } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelMessageActionName } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 
 const trustedRequesterGuildAdminActions = new Set<ChannelMessageActionName>([
   "emoji-upload",

@@ -1,5 +1,5 @@
 
- RUN  v4.1.7 /home/node/projects/clisbot-paseoclaw-fusion
+ RUN  v4.1.7 /home/node/projects/clisbot-clisbotclaw-fusion
 
  ❯ packages/cli/src/commands/bot/stop.test.ts (6 tests | 1 failed) 35ms
      × stops the Hub first, then discards only the runtime-only mirror files 17ms

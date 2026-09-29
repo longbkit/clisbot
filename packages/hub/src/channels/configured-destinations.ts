@@ -1,4 +1,4 @@
-import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
+import type { ChannelConversationMetadata } from "@clisbot/channels-shared";
 import type { CompiledChannelAccount } from "./config/compile.js";
 import type {
   ChannelConversationKind,

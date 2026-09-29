@@ -6,8 +6,8 @@ import {
   sleepWithAbort,
   waitForAbortSignal,
   type BackoffPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   isRecoverableTelegramNetworkError,
   isTelegramRateLimitError,

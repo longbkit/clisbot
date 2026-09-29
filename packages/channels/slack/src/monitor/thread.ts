@@ -1,13 +1,13 @@
 // upstream: extensions/slack/src/monitor/thread.ts@5d8067a4483
 // Slack plugin module implements thread behavior.
 import type { WebClient as SlackWebClient } from "@slack/web-api";
-import { pruneMapToMaxSize } from "@getpaseo/channels-core/plugin-sdk/collection-runtime";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { pruneMapToMaxSize } from "@clisbot/channels-core/plugin-sdk/collection-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import {
   asDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { formatSlackFileReferenceList } from "../file-reference.js";
 import type { SlackAttachment, SlackFile } from "../types.js";
 import {

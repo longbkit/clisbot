@@ -1,6 +1,6 @@
 import { pluginSettingsKey } from "./settings/use-settings";
 import { useEffect } from "react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { pluginRegistry } from "./registry";

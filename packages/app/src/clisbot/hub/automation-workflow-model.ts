@@ -184,7 +184,7 @@ export function openAutomationWorkflow(source: string) {
           id: `step_${index}`,
           environment: previous?.environment ?? state.environments[0]?.name ?? "target",
           agent: previous?.agent ?? { provider: "" },
-          prompt: [{ text: "${{ paseo.prompt }}" }],
+          prompt: [{ text: "${{ clisbot.prompt }}" }],
           max_runtime: "2h",
           idle_timeout: "10m",
           auto_archive: true,

@@ -1,4 +1,4 @@
-import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
+import type { FileReadResult } from "@clisbot/client/internal/daemon-client";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { getFileNameFromPath } from "@/attachments/utils";
 import type { AssistantImageSourceResolution } from "@/utils/assistant-image-source";

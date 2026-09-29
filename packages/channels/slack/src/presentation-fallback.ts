@@ -8,7 +8,7 @@ import {
   type MessagePresentationBlock,
   type MessagePresentationChartBlock,
   type MessagePresentationTableBlock,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import { escapeSlackMrkdwn } from "./monitor/mrkdwn.js";
 
 const SLACK_UNCOPYABLE_COMMAND_WARNING = "not copyable: contains backtick";

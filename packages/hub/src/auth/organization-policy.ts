@@ -34,7 +34,7 @@ const ROLE_CAPABILITIES = {
   },
 } as const satisfies Record<OrganizationRole, OrganizationCapabilities>;
 
-export function paseoOrganizationPlugin() {
+export function clisbotOrganizationPlugin() {
   return organization({
     creatorRole: ORGANIZATION_ROLES[0],
     dynamicAccessControl: { enabled: false },

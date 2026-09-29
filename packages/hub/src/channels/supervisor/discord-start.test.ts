@@ -19,9 +19,9 @@
 // The vertical is imported from its build output (`npm run build --workspace=…`).
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vitest";
-import discordEntry from "@getpaseo/channels-discord/dist/entry.js";
-import { discordPlugin } from "@getpaseo/channels-discord/dist/plugin.js";
-import type { HostRuntime, KeyedStoreEntry } from "@getpaseo/channels-shared";
+import discordEntry from "@clisbot/channels-discord/dist/entry.js";
+import { discordPlugin } from "@clisbot/channels-discord/dist/plugin.js";
+import type { HostRuntime, KeyedStoreEntry } from "@clisbot/channels-shared";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { buildAccountCarriers } from "./account-carriers.js";

@@ -5,10 +5,10 @@ import { compiledConfigurationHash } from "./compiler.js";
 
 const hub = `
 environments:
-  paseo:
+  clisbot:
     kind: daemon
     daemon: local
-    cwd: /workspace/paseo
+    cwd: /workspace/clisbot
   hub:
     kind: daemon
     daemon: local
@@ -34,27 +34,27 @@ inputs:
   repo:
     type: string
     required: true
-    choices: [paseo, hub]
+    choices: [clisbot, hub]
   agent:
     type: string
     required: true
     choices: [codex-safe, claude]
 steps:
   - id: work
-    environment: \${{ paseo.inputs.repo }}
+    environment: \${{ clisbot.inputs.repo }}
     max_runtime: 30m
     idle_timeout: 5m
-    agent: \${{ paseo.inputs.agent }}
+    agent: \${{ clisbot.inputs.agent }}
     prompt:
       - include: partials/shared.md
-      - text: "Request: \${{ paseo.prompt }}"
+      - text: "Request: \${{ clisbot.prompt }}"
 `;
 
 function canonicalFiles() {
   return [
-    { path: ".paseo/workflows/route.yml", content: workflow },
-    { path: ".paseo/workflows/partials/shared.md", content: "Keep context exact." },
-    { path: ".paseo/hub.yml", content: hub },
+    { path: ".clisbot/workflows/route.yml", content: workflow },
+    { path: ".clisbot/workflows/partials/shared.md", content: "Keep context exact." },
+    { path: ".clisbot/hub.yml", content: hub },
   ];
 }
 
@@ -69,7 +69,7 @@ function filesWithWorkflow(content: string) {
 
 function filesWithHub(content: string) {
   const files = canonicalFiles();
-  const index = files.findIndex(({ path }) => path === ".paseo/hub.yml");
+  const index = files.findIndex(({ path }) => path === ".clisbot/hub.yml");
   const current = files[index];
   if (current === undefined) throw new Error("canonical Hub fixture is missing");
   files[index] = { path: current.path, content };
@@ -98,7 +98,7 @@ describe("Hub configuration bundle", () => {
         (error) =>
           hasBundleIssue(
             error,
-            ".paseo/hub.yml.name",
+            ".clisbot/hub.yml.name",
             /lowercase letters, numbers, and single hyphens|too big/iu,
           ),
       );
@@ -112,13 +112,13 @@ describe("Hub configuration bundle", () => {
 
     assert.deepEqual(
       bundle.configuration.environments.map(({ name }) => name),
-      ["hub", "paseo"],
+      ["hub", "clisbot"],
     );
-    assert.equal(trigger.sourceFile, ".paseo/workflows/route.yml");
-    assert.equal(step.environment, "${{ paseo.inputs.repo }}");
+    assert.equal(trigger.sourceFile, ".clisbot/workflows/route.yml");
+    assert.equal(step.environment, "${{ clisbot.inputs.repo }}");
     assert.ok("selector" in step.agent);
     if (!("selector" in step.agent)) return;
-    assert.equal(step.agent.selector, "${{ paseo.inputs.agent }}");
+    assert.equal(step.agent.selector, "${{ clisbot.inputs.agent }}");
     assert.deepEqual(Object.keys(step.agent.choices), ["claude", "codex-safe"]);
     assert.deepEqual(step.agent.choices["codex-safe"]?.options, {
       sandbox_workspace_write: {
@@ -128,7 +128,7 @@ describe("Hub configuration bundle", () => {
     });
     assert.deepEqual(step.prompt[0], {
       kind: "partial",
-      path: ".paseo/workflows/partials/shared.md",
+      path: ".clisbot/workflows/partials/shared.md",
       content: "Keep context exact.",
       contentHash: "4d64ca5298d18aaf016856e6579d80ec097e276c0acf1fa061689b0643844b8d",
     });
@@ -136,24 +136,24 @@ describe("Hub configuration bundle", () => {
 
   it("rejects monolithic triggers with a direct migration error", () => {
     assert.throws(
-      () => compileHubBundle([{ path: ".paseo/hub.yml", content: `${hub}\ntriggers: []\n` }]),
+      () => compileHubBundle([{ path: ".clisbot/hub.yml", content: `${hub}\ntriggers: []\n` }]),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/hub.yml.triggers",
-          /move each trigger to \.paseo\/workflows\/<workflow>\.yml/iu,
+          ".clisbot/hub.yml.triggers",
+          /move each trigger to \.clisbot\/workflows\/<workflow>\.yml/iu,
         ),
     );
   });
 
   it("rejects a resource document without a direct workflow document", () => {
     assert.throws(
-      () => compileHubBundle([{ path: ".paseo/hub.yml", content: hub }]),
+      () => compileHubBundle([{ path: ".clisbot/hub.yml", content: hub }]),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/workflows",
-          /at least one direct \.paseo\/workflows\/<workflow>\.yml/iu,
+          ".clisbot/workflows",
+          /at least one direct \.clisbot\/workflows\/<workflow>\.yml/iu,
         ),
     );
   });
@@ -161,7 +161,7 @@ describe("Hub configuration bundle", () => {
   it("rejects unknown, non-finite, and object-valued dynamic authority", () => {
     const cases = [
       {
-        source: workflow.replace("choices: [paseo, hub]", "choices: [paseo, missing]"),
+        source: workflow.replace("choices: [clisbot, hub]", "choices: [clisbot, missing]"),
         expected: /environment choice missing is not a configured environment/iu,
       },
       {
@@ -170,8 +170,8 @@ describe("Hub configuration bundle", () => {
       },
       {
         source: workflow.replace(
-          "agent: ${{ paseo.inputs.agent }}",
-          "agent:\n      provider: ${{ paseo.inputs.agent }}",
+          "agent: ${{ clisbot.inputs.agent }}",
+          "agent:\n      provider: ${{ clisbot.inputs.agent }}",
         ),
         expected: /dynamic inline agent configurations are not allowed/iu,
       },
@@ -186,10 +186,10 @@ describe("Hub configuration bundle", () => {
     const second = workflow.replace("route-request", "another-request");
     const left = compileHubBundle([
       ...canonicalFiles(),
-      { path: ".paseo/workflows/a.yml", content: second },
+      { path: ".clisbot/workflows/a.yml", content: second },
     ]);
     const right = compileHubBundle([
-      { path: ".paseo/workflows/a.yml", content: second },
+      { path: ".clisbot/workflows/a.yml", content: second },
       ...canonicalFiles().toReversed(),
     ]);
 
@@ -209,13 +209,13 @@ describe("Hub configuration bundle", () => {
       () =>
         compileHubBundle([
           ...canonicalFiles(),
-          { path: ".paseo/workflows/duplicate.yml", content: workflow },
+          { path: ".clisbot/workflows/duplicate.yml", content: workflow },
         ]),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/workflows/route.yml.name",
-          /\.paseo\/workflows\/duplicate\.yml/u,
+          ".clisbot/workflows/route.yml.name",
+          /\.clisbot\/workflows\/duplicate\.yml/u,
         ),
     );
   });
@@ -225,16 +225,16 @@ describe("Hub configuration bundle", () => {
     assert.throws(
       () => compileHubBundle(filesWithWorkflow(malformedWorkflow)),
       (error) =>
-        hasBundleIssue(error, ".paseo/workflows/route.yml.name", /expected.*string|required/iu),
+        hasBundleIssue(error, ".clisbot/workflows/route.yml.name", /expected.*string|required/iu),
     );
 
-    const malformedEnvironment = hub.replace("    cwd: /workspace/paseo\n", "");
+    const malformedEnvironment = hub.replace("    cwd: /workspace/clisbot\n", "");
     assert.throws(
       () => compileHubBundle(filesWithHub(malformedEnvironment)),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/hub.yml.environments.paseo.cwd",
+          ".clisbot/hub.yml.environments.clisbot.cwd",
           /expected.*string|required/iu,
         ),
     );
@@ -242,15 +242,15 @@ describe("Hub configuration bundle", () => {
 
   it("attributes malformed expressions to their conceptual authored workflow field", () => {
     const malformedExpression = workflow.replace(
-      "    agent: ${{ paseo.inputs.agent }}",
-      "    agent: ${{ paseo.inputs.agent + }}",
+      "    agent: ${{ clisbot.inputs.agent }}",
+      "    agent: ${{ clisbot.inputs.agent + }}",
     );
     assert.throws(
       () => compileHubBundle(filesWithWorkflow(malformedExpression)),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/workflows/route.yml.steps.work.agent",
+          ".clisbot/workflows/route.yml.steps.work.agent",
           /expression|unexpected|expected/iu,
         ),
     );
@@ -258,16 +258,16 @@ describe("Hub configuration bundle", () => {
 
   it("attributes unsupported worktree expressions to the exact Hub source field", () => {
     const unsupported = hub.replace(
-      "    cwd: /workspace/paseo",
-      '    cwd: /workspace/paseo\n    worktree:\n      mode: branch-off\n      newBranch: "trigger-${{ paseo.event.github.delivery_id }}"',
+      "    cwd: /workspace/clisbot",
+      '    cwd: /workspace/clisbot\n    worktree:\n      mode: branch-off\n      newBranch: "trigger-${{ clisbot.event.github.delivery_id }}"',
     );
     assert.throws(
       () => compileHubBundle(filesWithHub(unsupported)),
       (error) =>
         hasBundleIssue(
           error,
-          ".paseo/hub.yml.environments.paseo.worktree.newBranch",
-          /unsupported path paseo\.event\.github\.delivery_id/iu,
+          ".clisbot/hub.yml.environments.clisbot.worktree.newBranch",
+          /unsupported path clisbot\.event\.github\.delivery_id/iu,
         ),
     );
   });
@@ -278,24 +278,24 @@ describe("Hub configuration bundle", () => {
         compileHubBundle([
           ...canonicalFiles(),
           {
-            path: ".paseo/workflows/partials/orphan.md",
+            path: ".clisbot/workflows/partials/orphan.md",
             content: "Never silently injected.",
           },
         ]),
-      (error) => hasBundleIssue(error, ".paseo/workflows/partials/orphan.md", /not referenced/iu),
+      (error) => hasBundleIssue(error, ".clisbot/workflows/partials/orphan.md", /not referenced/iu),
     );
   });
 
   it.each([
-    [".paseo/hub.toml", "TOML is not accepted"],
-    [".paseo/workflows/nested/run.yml", "direct child"],
-    [".paseo/workflows/run.yaml", "must use the .yml extension"],
-    [".paseo/workflows/partials/safety.txt", "must use the .md extension"],
+    [".clisbot/hub.toml", "TOML is not accepted"],
+    [".clisbot/workflows/nested/run.yml", "direct child"],
+    [".clisbot/workflows/run.yaml", "must use the .yml extension"],
+    [".clisbot/workflows/partials/safety.txt", "must use the .md extension"],
     ["../hub.yml", "unsafe bundle path"],
     // COMPAT(clisbot-channels): the channel directory is fork-owned (§4.3).
-    [".paseo/channels/slack/deep/work.yml", "channel files are policy.yml"],
-    [".paseo/channels/slack/work.yaml", "channel files are policy.yml"],
-    [".paseo/channels/stray.yml", "channel files are policy.yml"],
+    [".clisbot/channels/slack/deep/work.yml", "channel files are policy.yml"],
+    [".clisbot/channels/slack/work.yaml", "channel files are policy.yml"],
+    [".clisbot/channels/stray.yml", "channel files are policy.yml"],
   ])("rejects non-canonical bundle path %s", (path, message) => {
     assert.throws(
       () => compileHubBundle([...canonicalFiles(), { path, content: "name: ignored" }]),
@@ -305,9 +305,9 @@ describe("Hub configuration bundle", () => {
 
   it("accepts the fork channel directory layout (policy.yml + one account file)", () => {
     const channelFiles = [
-      { path: ".paseo/channels/policy.yml", content: "enabled: true" },
-      { path: ".paseo/channels/slack/work.yml", content: "enabled: true" },
-      { path: ".paseo/channels/telegram/personal.yml", content: "enabled: true" },
+      { path: ".clisbot/channels/policy.yml", content: "enabled: true" },
+      { path: ".clisbot/channels/slack/work.yml", content: "enabled: true" },
+      { path: ".clisbot/channels/telegram/personal.yml", content: "enabled: true" },
     ];
     assert.doesNotThrow(() => compileHubBundle([...canonicalFiles(), ...channelFiles]));
   });

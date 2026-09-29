@@ -22,7 +22,7 @@ import type {
   ChannelInboundEvent,
   ChannelInboundFacts,
   ChannelInboundKind,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import type { SlackMessageEvent } from "../../types.js";
 import type { SlackMessageEvent as SlackWireMessageEvent } from "../../transport/socket-event-filter.js";
 import { resolveSlackMessageSubtypeHandler } from "./message-subtype-handlers.js";

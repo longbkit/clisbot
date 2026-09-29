@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/channels-markdown-core",
+  "name": "@clisbot/channels-markdown-core",
   "version": "0.7.3-beta.1",
   "private": true,
   "description": "OpenClaw markdown-core ported for the in-repo channel verticals; mirrors upstream packages/markdown-core/src under src (docs/audits/2026-09-07-openclaw-channel-port-goal.md). Manifest: upstream-sync.json",

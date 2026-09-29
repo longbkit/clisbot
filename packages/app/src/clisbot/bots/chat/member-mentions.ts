@@ -6,7 +6,7 @@ import {
   isRoomWideMention,
   mentionTokens,
   ROOM_WIDE_MENTIONS,
-} from "@getpaseo/protocol/chats/mentions";
+} from "@clisbot/protocol/chats/mentions";
 
 export interface MentionMember {
   slug: string;

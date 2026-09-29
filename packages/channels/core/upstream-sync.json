@@ -2292,12 +2292,12 @@
     },
     {
       "id": "D-CORE-023",
-      "reason": "`src/agents/internal-runtime-context.ts` strips the `<runtime-context>` preamble OpenClaw injects into a model prompt. The Paseo daemon never injects it, so visible text passes through unchanged.",
+      "reason": "`src/agents/internal-runtime-context.ts` strips the `<runtime-context>` preamble OpenClaw injects into a model prompt. The Clisbot daemon never injects it, so visible text passes through unchanged.",
       "file": "src/agents/internal-runtime-context.host-adapter.ts"
     },
     {
       "id": "D-CORE-024",
-      "reason": "`src/agents/sandbox-paths.ts` maps container paths back to host paths for an OpenClaw sandbox (container workdir mapping, managed media roots, file: URL rewriting). Fusion agents run on the Paseo daemon's own filesystem and the Hub never sets `sandboxRoot`, so mapping is the identity; the data-URL guard is carried verbatim because it is an input rule.",
+      "reason": "`src/agents/sandbox-paths.ts` maps container paths back to host paths for an OpenClaw sandbox (container workdir mapping, managed media roots, file: URL rewriting). Fusion agents run on the Clisbot daemon's own filesystem and the Hub never sets `sandboxRoot`, so mapping is the identity; the data-URL guard is carried verbatim because it is an input rule.",
       "file": "src/agents/sandbox-paths.host-adapter.ts"
     },
     {
@@ -2412,7 +2412,7 @@
     },
     {
       "id": "D-CORE-047",
-      "reason": "`src/config/sessions.ts` and its `sessions/*` helpers own the file-backed session store: store paths, read-only entry access, the transcript writer and its concurrency fence. Fusion's transcripts are Paseo daemon agent sessions written by the daemon, so the channel plane never becomes a second writer: the store path is unavailable, the mirror append reports success without writing, and there is no fence to own.",
+      "reason": "`src/config/sessions.ts` and its `sessions/*` helpers own the file-backed session store: store paths, read-only entry access, the transcript writer and its concurrency fence. Fusion's transcripts are Clisbot daemon agent sessions written by the daemon, so the channel plane never becomes a second writer: the store path is unavailable, the mirror append reports success without writing, and there is no fence to own.",
       "file": "src/config/sessions.host-adapter.ts"
     },
     {
@@ -2462,7 +2462,7 @@
     },
     {
       "id": "D-CORE-057",
-      "reason": "`packages/tool-call-repair/src/index.ts` repairs models that emit tool calls as plain text inside the assistant message, and carries its own grammar and stream normalizer. Paseo providers emit native tool calls, so the port stops at this boundary and text passes through.",
+      "reason": "`packages/tool-call-repair/src/index.ts` repairs models that emit tool calls as plain text inside the assistant message, and carries its own grammar and stream normalizer. Clisbot providers emit native tool calls, so the port stops at this boundary and text passes through.",
       "file": "src/tool-call-repair/index.host-adapter.ts"
     },
     {

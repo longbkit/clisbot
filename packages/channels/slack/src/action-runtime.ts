@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/action-runtime.ts@5d8067a4483
 // Slack plugin module implements action runtime behavior.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
 import {
   createActionGate,
   imageResultFromFile,
@@ -11,13 +11,13 @@ import {
   readReactionParams,
   readStringParam,
   withNormalizedTimestamp,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { isSingleUseReplyToMode } from "@getpaseo/channels-core/plugin-sdk/reply-reference";
-import { resolveOpenProviderRuntimeGroupPolicy } from "@getpaseo/channels-core/plugin-sdk/runtime-group-policy";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { isSingleUseReplyToMode } from "@clisbot/channels-core/plugin-sdk/reply-reference";
+import { resolveOpenProviderRuntimeGroupPolicy } from "@clisbot/channels-core/plugin-sdk/runtime-group-policy";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ResolvedSlackAccount } from "./accounts.js";
 import {
   resolveSlackAutoThreadId,

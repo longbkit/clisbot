@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { useSessionStore } from "@/stores/session-store";
 import { useHostRuntimeClient, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import { useFormLifetime } from "../create/use-form-lifetime";

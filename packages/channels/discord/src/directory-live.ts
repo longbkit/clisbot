@@ -3,8 +3,8 @@
 import type {
   ChannelDirectoryEntry,
   DirectoryConfigParams,
-} from "@getpaseo/channels-core/plugin-sdk/directory-runtime";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/directory-runtime";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveDiscordAccount } from "./accounts.js";
 import { DISCORD_DIRECTORY_LOOKUP_TIMEOUT_MS, fetchDiscord } from "./api.js";
 import { rememberDiscordDirectoryUser } from "./directory-cache.js";

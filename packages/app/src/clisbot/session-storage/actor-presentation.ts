@@ -1,5 +1,5 @@
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
-import { sessionParticipantKey, type SessionActor } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey, type SessionActor } from "@clisbot/protocol/session-authorship";
 import { nameInitials } from "@/utils/name-initials";
 
 export type ActorAvatarPresentation =

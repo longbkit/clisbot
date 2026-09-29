@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { resolveMessageSender, type MessageSenderResolution } from "./actor-presentation";
 

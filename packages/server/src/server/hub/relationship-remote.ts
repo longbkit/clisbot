@@ -1,16 +1,16 @@
-import { SessionActorSchema } from "@getpaseo/protocol/session-authorship";
+import { SessionActorSchema } from "@clisbot/protocol/session-authorship";
 import {
   SessionOperationIdentitySchema,
   type VerifiedSessionOperationIdentity,
-} from "@getpaseo/protocol/session-operation";
+} from "@clisbot/protocol/session-operation";
 import type { Logger } from "pino";
 import { WebSocket } from "ws";
 import { z } from "zod";
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import type { WebSocketLike } from "../websocket-server.js";
 import { PROJECT_PRIVILEGES, type ManagedAccessAdmission } from "../managed-access/types.js";
-import { isProjectPrivilege } from "@getpaseo/protocol/managed-access-privileges";
+import { isProjectPrivilege } from "@clisbot/protocol/managed-access-privileges";
 import { parseDaemonPermissions } from "../authorization/index.js";
 
 export interface HubEnrollment {
@@ -307,7 +307,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${input.credential}`,
-          "x-paseo-daemon-id": input.daemonId,
+          "x-clisbot-daemon-id": input.daemonId,
         },
         body: JSON.stringify({
           accessTicket: input.accessTicket,
@@ -332,7 +332,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${input.credential}`,
-          "x-paseo-daemon-id": input.daemonId,
+          "x-clisbot-daemon-id": input.daemonId,
         },
         body: JSON.stringify({
           sessionOperationTicket: input.sessionOperationTicket,
@@ -358,7 +358,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${input.credential}`,
-          "x-paseo-daemon-id": input.daemonId,
+          "x-clisbot-daemon-id": input.daemonId,
         },
         body: JSON.stringify({ leaseId: input.leaseId }),
         signal,
@@ -415,13 +415,13 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       handshakeTimeout: this.requestTimeoutMs,
       headers: {
         authorization: `Bearer ${input.credential}`,
-        "x-paseo-daemon-id": input.daemonId,
-        "x-paseo-session-protocol": "1",
+        "x-clisbot-daemon-id": input.daemonId,
+        "x-clisbot-session-protocol": "1",
       },
     });
     let settled = false;
     socket.once("upgrade", (response) => {
-      if (response.headers["x-paseo-session-protocol"] === "1") {
+      if (response.headers["x-clisbot-session-protocol"] === "1") {
         sessionProtocol = "session-v1";
       }
     });
@@ -539,7 +539,7 @@ function stampAdmissionOrigin(
 
 /**
  * Hub refuses a daemon whose server ID another Host in the organization already uses, which
- * happens when a Paseo home is copied. Its message tells the operator how to reset the identity.
+ * happens when a Clisbot home is copied. Its message tells the operator how to reset the identity.
  */
 async function readServerIdConflict(response: Response): Promise<string | null> {
   if (response.status !== 409) return null;

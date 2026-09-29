@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/account-configured.ts@5d8067a4483
 // Slack helper module supports account configured behavior.
-import { hasConfiguredAccountValue } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { hasConfiguredSecretInput } from "@getpaseo/channels-core/plugin-sdk/secret-input";
+import { hasConfiguredAccountValue } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { hasConfiguredSecretInput } from "@clisbot/channels-core/plugin-sdk/secret-input";
 
 type SlackCredentialAccount = {
   identity: "bot" | "user";

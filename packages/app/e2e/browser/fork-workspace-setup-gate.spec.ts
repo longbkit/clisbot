@@ -22,9 +22,9 @@ test("fork workspace setup stays blocked until the user runs it", async ({ page 
   const client = await connectWorkspaceSetupClient();
   const repo = await createTempGitRepo("fork-setup-gate-", {
     withRemote: true,
-    originUrl: "https://github.com/paseo-e2e/local-fixture.git",
+    originUrl: "https://github.com/clisbot-e2e/local-fixture.git",
     branches: ["pr-branch-2"],
-    paseoConfig: {
+    clisbotConfig: {
       worktree: {
         setup: ["node -e \"setTimeout(() => console.log('setup complete'), 1500)\""],
       },
@@ -48,7 +48,7 @@ test("fork workspace setup stays blocked until the user runs it", async ({ page 
         "config",
         "--add",
         `url.${localRemote}.insteadOf`,
-        "https://github.com/paseo-e2e/local-fixture.git",
+        "https://github.com/clisbot-e2e/local-fixture.git",
       ],
       { cwd: repo.path },
     );

@@ -1,6 +1,6 @@
 // Fusion drive-surface bridge onto the ported Zalo Personal send path (D-ZU-018).
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and the carried
 // `channel.adapters.ts` send helpers. Every wire decision — the markdown text
 // mode and its style ranges, the 2000-char chunking with per-chunk style
@@ -13,7 +13,7 @@
 // it — as a quote on the target conversation — which is inbound-only metadata
 // today (`zalo-quote-metadata`); the outbound quote payload is not carried
 // (see `upstream-sync.json` omitted: `monitor.ts`).
-import type { SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
+import type { SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
 import {
   sendZalouserMediaFromContext,
   sendZalouserTextFromContext,

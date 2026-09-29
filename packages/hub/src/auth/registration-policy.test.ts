@@ -13,28 +13,34 @@ describe("registration policy configuration", () => {
 
   it("normalizes, deduplicates, and exactly matches allowlisted domains", () => {
     const policy = readInstanceAuthPolicy({
-      PASEO_REGISTRATION_MODE: "domain_self_registration",
-      PASEO_REGISTRATION_ALLOWED_DOMAINS: " Acme.com, acme.com ,eng.acme.com",
+      CLISBOT_REGISTRATION_MODE: "domain_self_registration",
+      CLISBOT_REGISTRATION_ALLOWED_DOMAINS: " Acme.com, acme.com ,eng.acme.com",
     });
     assert.deepEqual(policy.allowedDomains, ["acme.com", "eng.acme.com"]);
     assert.equal(emailDomain("Person@ACME.com"), "acme.com");
   });
 
   it("rejects invalid, public, or missing domains at startup", () => {
-    const domainMode = { PASEO_REGISTRATION_MODE: "domain_self_registration" };
+    const domainMode = { CLISBOT_REGISTRATION_MODE: "domain_self_registration" };
     assert.throws(() => readInstanceAuthPolicy(domainMode), /at least one domain/u);
     assert.throws(
       () =>
-        readInstanceAuthPolicy({ ...domainMode, PASEO_REGISTRATION_ALLOWED_DOMAINS: "gmail.com" }),
+        readInstanceAuthPolicy({
+          ...domainMode,
+          CLISBOT_REGISTRATION_ALLOWED_DOMAINS: "gmail.com",
+        }),
       /public email domain/u,
     );
     assert.throws(
       () =>
-        readInstanceAuthPolicy({ ...domainMode, PASEO_REGISTRATION_ALLOWED_DOMAINS: "*.acme.com" }),
+        readInstanceAuthPolicy({
+          ...domainMode,
+          CLISBOT_REGISTRATION_ALLOWED_DOMAINS: "*.acme.com",
+        }),
       /invalid domain/u,
     );
     assert.throws(
-      () => readInstanceAuthPolicy({ PASEO_REGISTRATION_MODE: "domain" }),
+      () => readInstanceAuthPolicy({ CLISBOT_REGISTRATION_MODE: "domain" }),
       /must be one of/u,
     );
   });
@@ -43,13 +49,13 @@ describe("registration policy configuration", () => {
     assert.equal(readGoogleAuthConfig({}), undefined);
     assert.deepEqual(
       readGoogleAuthConfig({
-        PASEO_GOOGLE_AUTH_CLIENT_ID: "id.apps.googleusercontent.com",
-        PASEO_GOOGLE_AUTH_CLIENT_SECRET: "secret",
+        CLISBOT_GOOGLE_AUTH_CLIENT_ID: "id.apps.googleusercontent.com",
+        CLISBOT_GOOGLE_AUTH_CLIENT_SECRET: "secret",
       }),
       { clientId: "id.apps.googleusercontent.com", clientSecret: "secret" },
     );
     assert.throws(
-      () => readGoogleAuthConfig({ PASEO_GOOGLE_AUTH_CLIENT_ID: "id" }),
+      () => readGoogleAuthConfig({ CLISBOT_GOOGLE_AUTH_CLIENT_ID: "id" }),
       /supplied together/u,
     );
   });

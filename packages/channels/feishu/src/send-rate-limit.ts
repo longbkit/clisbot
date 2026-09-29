@@ -1,5 +1,5 @@
 // upstream: extensions/feishu/src/send-rate-limit.ts@5d8067a4483
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const FEISHU_SEND_RATE_LIMIT_CODES = new Set([230020, 11232]);
 

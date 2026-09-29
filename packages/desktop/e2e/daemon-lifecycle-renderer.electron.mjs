@@ -6,7 +6,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import net from "node:net";
 import { _electron as electron, expect } from "playwright/test";
-import { readDaemonInstance } from "@getpaseo/server/daemon-control";
+import { readDaemonInstance } from "@clisbot/server/daemon-control";
 
 // Run under the test's private Xvfb display; native dialog input never targets
 // a user's desktop. All daemon operations still cross the real preload/IPC.
@@ -36,7 +36,7 @@ export async function verifyAttachedDaemonControls({ repo, root, env, home, port
         ...env,
         EXPO_NO_DOTENV: "1",
         CI: "1",
-        PASEO_WEB_PLATFORM: "electron",
+        CLISBOT_WEB_PLATFORM: "electron",
         EXPO_PUBLIC_LOCAL_DAEMON: `127.0.0.1:${port}`,
       },
     },
@@ -64,8 +64,8 @@ export async function verifyAttachedDaemonControls({ repo, root, env, home, port
       env: {
         ...env,
         EXPO_DEV_URL: `http://127.0.0.1:${metroPort}`,
-        PASEO_DISABLE_SINGLE_INSTANCE_LOCK: "1",
-        PASEO_ELECTRON_USER_DATA_DIR: path.join(root, "renderer-user-data"),
+        CLISBOT_DISABLE_SINGLE_INSTANCE_LOCK: "1",
+        CLISBOT_ELECTRON_USER_DATA_DIR: path.join(root, "renderer-user-data"),
       },
     });
     page = await desktop.firstWindow();

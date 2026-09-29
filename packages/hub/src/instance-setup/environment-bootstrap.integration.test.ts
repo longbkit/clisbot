@@ -19,7 +19,7 @@ const policy: InstanceAuthPolicy = {
   registrationMode: "invite_only",
   organizationCreation: "disabled",
   bootstrap: {
-    organizationName: "Paseo Customer",
+    organizationName: "Clisbot Customer",
     ownerEmail: "owner@example.test",
     ownerPassword: "temporary-owner-password",
   },
@@ -107,7 +107,7 @@ describe("instance bootstrap and first-login boundary", () => {
       }),
       (error: unknown) =>
         error instanceof InstanceBootstrapError &&
-        error.message.includes("PASEO_BOOTSTRAP_OWNER_PASSWORD"),
+        error.message.includes("CLISBOT_BOOTSTRAP_OWNER_PASSWORD"),
     );
     await pool.runtime.close();
     const result = await queryBootstrapState(isolated);
@@ -156,14 +156,14 @@ describe("instance bootstrap and first-login boundary", () => {
       policy.bootstrap!.ownerPassword!,
     );
     const state = await auth.browserAccount!(
-      new Request("http://localhost:3000/api/auth/paseo/state", { headers: { cookie } }),
+      new Request("http://localhost:3000/api/auth/clisbot/state", { headers: { cookie } }),
     );
     assert.equal(
       z.object({ status: z.string() }).parse(await state.json()).status,
       "passwordChangeRequired",
     );
     const organization = await auth.handle(
-      new Request("http://localhost:3000/api/auth/paseo/create-organization", {
+      new Request("http://localhost:3000/api/auth/clisbot/create-organization", {
         method: "POST",
         headers: { cookie, origin: "http://localhost:3000", "content-type": "application/json" },
         body: JSON.stringify({ name: "Blocked" }),
@@ -178,20 +178,22 @@ describe("instance bootstrap and first-login boundary", () => {
     );
     const signedIn = await signIn(auth, policy.bootstrap!.ownerEmail, "new-owner-password");
     const active = await auth.browserAccount!(
-      new Request("http://localhost:3000/api/auth/paseo/state", { headers: { cookie: signedIn } }),
+      new Request("http://localhost:3000/api/auth/clisbot/state", {
+        headers: { cookie: signedIn },
+      }),
     );
     assert.equal(
       z.object({ status: z.string() }).parse(await active.json()).status,
       "appSetupRequired",
     );
     await auth.completeAppOnboarding!(
-      new Request("http://localhost:3000/api/auth/paseo/complete-app-setup", {
+      new Request("http://localhost:3000/api/auth/clisbot/complete-app-setup", {
         method: "POST",
         headers: { cookie: signedIn, origin: "http://localhost:3000" },
       }),
     );
     const completed = await auth.browserAccount!(
-      new Request("http://localhost:3000/api/auth/paseo/state", {
+      new Request("http://localhost:3000/api/auth/clisbot/state", {
         headers: { cookie: signedIn },
       }),
     );

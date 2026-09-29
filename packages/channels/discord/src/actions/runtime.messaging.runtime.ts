@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/actions/runtime.messaging.runtime.ts@5d8067a4483
 // D-DC-004: the `voice_message` action is omitted with `send.voice.ts` /
 // `voice-message.ts` (ffmpeg + opus transcoding, @discordjs/voice).
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 // Discord plugin module implements runtime.messaging behavior.
 import { readDiscordComponentSpec } from "../components.js";
 import { sendDiscordComponentMessage } from "../send.components.js";

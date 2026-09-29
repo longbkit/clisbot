@@ -16,8 +16,8 @@ import {
   type GatewaySendPayload,
   type GatewayVoiceStateUpdateData,
 } from "discord-api-types/v10";
-import { asSafeIntegerInRange, MAX_TIMER_TIMEOUT_MS } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { asOptionalRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { asSafeIntegerInRange, MAX_TIMER_TIMEOUT_MS } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { asOptionalRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import * as ws from "ws";
 import { Plugin, type Client } from "./client.js";
 import { canResumeAfterGatewayClose, isFatalGatewayCloseCode } from "./gateway-close-codes.js";

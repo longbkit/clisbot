@@ -1,8 +1,8 @@
 // upstream: extensions/discord/src/actions/runtime.ts@5d8067a4483
 // Discord plugin module implements runtime behavior.
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import { readStringParam } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import { readStringParam } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { createDiscordActionGate } from "../accounts.js";
 import { handleDiscordGuildAction } from "./runtime.guild.js";
 import { handleDiscordMessagingAction } from "./runtime.messaging.js";

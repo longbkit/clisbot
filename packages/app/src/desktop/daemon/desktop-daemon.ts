@@ -2,7 +2,7 @@ import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { getDesktopHost, isElectronRuntime } from "@/desktop/host";
 import { invokeDesktopCommand } from "@/desktop/electron/invoke";
-import type { AgentSkillSelection } from "@getpaseo/protocol/messages";
+import type { AgentSkillSelection } from "@clisbot/protocol/messages";
 
 export type DesktopDaemonState = "starting" | "running" | "stopped" | "errored";
 export type DesktopDaemonStopReason =

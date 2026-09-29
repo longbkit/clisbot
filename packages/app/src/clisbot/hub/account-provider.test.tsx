@@ -7,7 +7,7 @@ import { HubAccountProvider, useHubAccount } from "./account-provider";
 import { hubClientAuthorizationContinuation } from "./account-entry-route";
 
 const testState = vi.hoisted(() => ({
-  url: "https://hub.example.test/settings/hub/account?invitation=invite&client_id=paseo-client&redirect_uri=paseo%3A%2F%2Fhub-auth%2Fcallback&state=pkce-state&code_challenge=challenge",
+  url: "https://hub.example.test/settings/hub/account?invitation=invite&client_id=clisbot-client&redirect_uri=clisbot%3A%2F%2Fhub-auth%2Fcallback&state=pkce-state&code_challenge=challenge",
   request: vi.fn(),
   setParams: vi.fn(),
 }));
@@ -79,7 +79,7 @@ describe("invitation consumption", () => {
     let accepted = false;
     let finishAccountRead!: (response: Response) => void;
     testState.request.mockImplementation(async (path: string) => {
-      if (path === "/api/auth/paseo/accept-invitation") {
+      if (path === "/api/auth/clisbot/accept-invitation") {
         accepted = true;
         return Response.json({ accepted: true });
       }
@@ -110,7 +110,7 @@ describe("invitation consumption", () => {
 
   it("keeps invitation recovery context when acceptance fails", async () => {
     testState.request.mockImplementation(async (path: string) =>
-      path === "/api/auth/paseo/accept-invitation"
+      path === "/api/auth/clisbot/accept-invitation"
         ? Response.json({ error: "unavailable" }, { status: 400 })
         : Response.json(pendingInvitation),
     );
@@ -136,7 +136,7 @@ describe("email self-registration", () => {
   it("asks the Hub for a sign-up link and reports each outcome", async () => {
     const statuses = [202, 403, 429, 503];
     testState.request.mockImplementation(async (path: string) =>
-      path === "/api/auth/paseo/registration/start"
+      path === "/api/auth/clisbot/registration/start"
         ? Response.json({}, { status: statuses.shift() ?? 500 })
         : Response.json(signedOut),
     );

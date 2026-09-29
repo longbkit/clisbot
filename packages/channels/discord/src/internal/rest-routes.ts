@@ -1,10 +1,10 @@
 // upstream: extensions/discord/src/internal/rest-routes.ts@5d8067a4483
 // Discord plugin module implements rest routes behavior.
-import { redactIdentifier } from "@getpaseo/channels-core/plugin-sdk/logging-core";
+import { redactIdentifier } from "@clisbot/channels-core/plugin-sdk/logging-core";
 import {
   asDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 type QueryValue = string | number | boolean;
 

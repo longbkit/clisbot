@@ -1,4 +1,4 @@
-import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
+import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import type { AgentConfigurationGrant } from "../access/contract.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type {

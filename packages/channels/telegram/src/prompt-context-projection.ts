@@ -3,8 +3,8 @@ import type { Message } from "grammy/types";
 import {
   resolveSendableOutboundReplyParts,
   type ReplyPayload,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export type TelegramPromptContextSource = { transcriptMessageId: string };
 export type TelegramPromptContextProjection = TelegramPromptContextSource & {

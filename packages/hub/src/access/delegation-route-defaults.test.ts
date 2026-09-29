@@ -39,24 +39,24 @@ ${controls}
 async function delegatedExecutions(
   routes?: Parameters<typeof assertChannelConfigurationDelegation>[0]["routes"],
 ): Promise<DelegatedAgentExecution[]> {
-  const bundle = compileHubBundle([{ path: ".paseo/hub.yml", content: HUB }], {
+  const bundle = compileHubBundle([{ path: ".clisbot/hub.yml", content: HUB }], {
     requireWorkflow: false,
   });
   const controlPlane = compileChannelControlPlane({
     files: [
       {
-        path: ".paseo/channels/policy.yml",
+        path: ".clisbot/channels/policy.yml",
         content: 'defaults:\n  approval:\n    - { match: "*", mode: require }\n',
       },
       {
-        path: ".paseo/channels/slack/support.yml",
+        path: ".clisbot/channels/slack/support.yml",
         content: account(
           "support",
           "support",
           "    agentControls: { provider: claude, model: claude-opus-5, mode: bypassPermissions }",
         ),
       },
-      { path: ".paseo/channels/slack/finance.yml", content: account("finance", "finance") },
+      { path: ".clisbot/channels/slack/finance.yml", content: account("finance", "finance") },
     ],
     agentNames: ["assistant"],
     environmentNames: ["support", "finance"],

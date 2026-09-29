@@ -193,7 +193,7 @@ describe("relay websocket URLs", () => {
 });
 
 describe("shouldUseTlsForDefaultHostedRelay", () => {
-  test("returns true for the hosted Paseo relay on port 443", () => {
+  test("returns true for the hosted Clisbot relay on port 443", () => {
     expect(shouldUseTlsForDefaultHostedRelay("relay.paseo.sh:443")).toBe(true);
   });
 

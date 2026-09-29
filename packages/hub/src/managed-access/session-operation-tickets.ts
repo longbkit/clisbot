@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   SessionOperationIdentitySchema,
   type VerifiedSessionOperationIdentity,
-} from "@getpaseo/protocol/session-operation";
+} from "@clisbot/protocol/session-operation";
 
 interface OperationTicket {
   daemonId: string;
@@ -21,7 +21,7 @@ export class SessionOperationTickets {
     for (const [key, ticket] of this.tickets) if (ticket.expiresAt <= now) this.tickets.delete(key);
     if (this.tickets.size >= MAX_TICKETS)
       throw new Error("Session identity ticket capacity exceeded");
-    const token = `paseo_sot_${randomBytes(32).toString("base64url")}`;
+    const token = `clisbot_sot_${randomBytes(32).toString("base64url")}`;
     this.tickets.set(this.key(token), {
       ...input,
       identity: SessionOperationIdentitySchema.parse(structuredClone(input.identity)),

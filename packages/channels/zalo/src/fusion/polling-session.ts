@@ -22,9 +22,9 @@
 // transport and it is why webhook mode, which can answer 500 and be
 // redelivered, is the durable one.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import {
   deleteWebhook,
   getUpdates,

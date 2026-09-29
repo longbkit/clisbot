@@ -4,7 +4,7 @@ import {
   sessionParticipantKey,
   type SessionActor,
   type SessionChannelReference,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 import {
   copySessionMetadata,
   matchesSessionMetadata,

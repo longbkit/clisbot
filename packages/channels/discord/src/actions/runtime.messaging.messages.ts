@@ -4,8 +4,8 @@ import {
   readPositiveIntegerParam,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { discordMessagingActionRuntime } from "./runtime.messaging.runtime.js";
 import type { DiscordMessagingActionContext } from "./runtime.messaging.shared.js";
 

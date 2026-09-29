@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/action-runtime.ts@5d8067a4483
 // Telegram plugin module implements action runtime behavior.
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
 import {
   jsonResult,
   readPositiveIntegerParam,
@@ -11,22 +11,22 @@ import {
   readStringParam,
   resolvePollMaxSelections,
   resolveReactionMessageId,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { normalizeOutboundLocation } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { normalizeOutboundLocation } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import {
   buildOutboundSessionContext,
   sendDurableMessageBatch,
   type DurableMessageBatchSendResult,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   normalizeMessagePresentation,
   renderMessagePresentationFallbackText,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import type { ReplyPayload } from "@getpaseo/channels-core/plugin-sdk/reply-runtime";
-import { resolveStorePath } from "@getpaseo/channels-core/plugin-sdk/session-store-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import type { ReplyPayload } from "@clisbot/channels-core/plugin-sdk/reply-runtime";
+import { resolveStorePath } from "@clisbot/channels-core/plugin-sdk/session-store-runtime";
 import { resolveTelegramAccountOwnerAgentId } from "./account-owner.js";
 import {
   createTelegramActionGate,

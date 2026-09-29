@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 import { createE2ETestContext } from "./helpers/test-daemon.ts";
 import { waitForTerminalOutput } from "./helpers/terminal.ts";
 
 const ctx = await createE2ETestContext({ timeout: 30_000 });
-const sdk = createPaseoClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
+const sdk = createClisbotClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
 
 async function cli(args: string[]) {
-  const result = await ctx.paseo([...args, "--json"]);
+  const result = await ctx.clisbot([...args, "--json"]);
   assert.equal(result.exitCode, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
@@ -34,7 +34,7 @@ try {
   assert.deepEqual(await cli(["terminal", "ls", "--workspace", second.id]), [feature]);
   assert.deepEqual(await cli(["terminal", "ls", "--cwd", ctx.workDir]), [main, feature]);
   assert.deepEqual(await cli(["terminal", "ls", "--all"]), [main, feature]);
-  const invalid = await ctx.paseo([
+  const invalid = await ctx.clisbot([
     "terminal",
     "create",
     "--workspace",
@@ -45,7 +45,7 @@ try {
   ]);
   assert.notEqual(invalid.exitCode, 0);
   assert.match(invalid.stderr, /not active or does not exist/);
-  const conflict = await ctx.paseo(["terminal", "ls", "--all", "--workspace", second.id]);
+  const conflict = await ctx.clisbot(["terminal", "ls", "--all", "--workspace", second.id]);
   assert.notEqual(conflict.exitCode, 0);
 
   const terminal = await second.terminals.create({
@@ -55,17 +55,17 @@ try {
       "process.stdin.setRawMode(true); process.stdin.resume(); console.log('READY'); let hex = ''; process.stdin.on('data', data => { hex += data.toString('hex'); console.log('HEX:' + hex); });",
     ],
   });
-  await waitForTerminalOutput(ctx.paseo, terminal.id, "READY");
+  await waitForTerminalOutput(ctx.clisbot, terminal.id, "READY");
   assert.deepEqual(await cli(["terminal", "send-keys", terminal.id, "-l", "Enter"]), {
     terminalId: terminal.id,
     keysSent: 5,
   });
-  await waitForTerminalOutput(ctx.paseo, terminal.id, "HEX:456e746572");
+  await waitForTerminalOutput(ctx.clisbot, terminal.id, "HEX:456e746572");
   assert.deepEqual(await cli(["terminal", "send-keys", terminal.id, "Enter"]), {
     terminalId: terminal.id,
     keysSent: 1,
   });
-  await waitForTerminalOutput(ctx.paseo, terminal.id, "HEX:456e7465720d");
+  await waitForTerminalOutput(ctx.clisbot, terminal.id, "HEX:456e7465720d");
   assert.deepEqual(await cli(["terminal", "kill", terminal.id]), {
     terminalId: terminal.id,
     success: true,

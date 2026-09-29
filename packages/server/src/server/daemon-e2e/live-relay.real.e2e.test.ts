@@ -2,16 +2,16 @@ import { afterEach, describe, expect, test } from "vitest";
 import pino from "pino";
 
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { generateLocalPairingOffer } from "../pairing-offer.js";
 import { CodexAppServerAgentClient } from "../agent/providers/codex-app-server-agent.js";
-import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 import {
   parseConnectionOfferFromUrl,
   type ConnectionOffer,
-} from "@getpaseo/protocol/connection-offer";
+} from "@clisbot/protocol/connection-offer";
 
-const relayEndpoint = process.env.PASEO_LIVE_RELAY_ENDPOINT ?? "paseo-relay-next.fly.dev:443";
+const relayEndpoint = process.env.CLISBOT_LIVE_RELAY_ENDPOINT ?? "clisbot-relay-next.fly.dev:443";
 const liveTest = process.env.RUN_LIVE_RELAY_E2E === "1" ? test : test.skip;
 
 function requireOffer(url: string): ConnectionOffer {
@@ -22,9 +22,9 @@ function requireOffer(url: string): ConnectionOffer {
   return offer;
 }
 
-async function pairingOfferFor(daemon: TestPaseoDaemon): Promise<ConnectionOffer> {
+async function pairingOfferFor(daemon: TestClisbotDaemon): Promise<ConnectionOffer> {
   const pairing = await generateLocalPairingOffer({
-    paseoHome: daemon.paseoHome,
+    clisbotHome: daemon.clisbotHome,
     relayEnabled: true,
     relayEndpoint,
     relayPublicEndpoint: relayEndpoint,
@@ -55,7 +55,7 @@ function clientFor(offer: ConnectionOffer): DaemonClient {
 }
 
 describe("live hosted relay", () => {
-  let daemon: TestPaseoDaemon | null = null;
+  let daemon: TestClisbotDaemon | null = null;
   let client: DaemonClient | null = null;
 
   afterEach(async () => {
@@ -67,7 +67,7 @@ describe("live hosted relay", () => {
     "carries a complete DaemonClient agent workflow through the hosted relay",
     async () => {
       const logger = pino({ level: "silent" });
-      daemon = await createTestPaseoDaemon({
+      daemon = await createTestClisbotDaemon({
         listen: "127.0.0.1",
         relayEnabled: true,
         relayEndpoint,

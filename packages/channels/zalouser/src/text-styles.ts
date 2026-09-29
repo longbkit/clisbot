@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/text-styles.ts@5d8067a4483
 import { randomUUID } from "node:crypto";
-import { renderMarkdownWithAttributedRanges } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { renderMarkdownWithAttributedRanges } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { collectBlockEdits } from "./text-styles-compile.js";
 import { projectLocalTokens } from "./text-styles-inline.js";
 import {

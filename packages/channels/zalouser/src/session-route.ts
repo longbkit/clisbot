@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/session-route.ts@5d8067a4483
 // Zalouser plugin module implements session route behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 function stripZalouserTargetPrefix(raw: string): string {
   return raw

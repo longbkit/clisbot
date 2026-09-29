@@ -7,7 +7,7 @@ import type {
   ChannelInboundEvent,
   HostRuntime,
   InboundQueueSink,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import { createGoogleChatAdmission } from "./admission.js";
 import { resolveGoogleChatWebhookMode, startGoogleChatWebhookSession } from "./webhook-session.js";
 import type { WebhookTarget } from "../monitor-types.js";
@@ -80,7 +80,7 @@ async function startSession(options: {
   processEvent?: (event: unknown) => Promise<void>;
 }): Promise<{ url: string; stop: () => Promise<void> }> {
   const { runtime } = createHostRuntime(options.queue);
-  const { createInboundEventProcessor } = await import("@getpaseo/channels-shared");
+  const { createInboundEventProcessor } = await import("@clisbot/channels-shared");
   const processor = createInboundEventProcessor({
     hostRuntime: runtime,
     channel: "googlechat",

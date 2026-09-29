@@ -1,4 +1,4 @@
-import type { ServerInfoStatusPayload } from "@getpaseo/protocol/messages";
+import type { ServerInfoStatusPayload } from "@clisbot/protocol/messages";
 import type { DaemonServerInfo } from "@/stores/session-store";
 
 /** Shared by cached handshake replay and subsequent live server-info updates. */

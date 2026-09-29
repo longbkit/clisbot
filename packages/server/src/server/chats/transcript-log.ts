@@ -2,8 +2,8 @@
 // here (docs/features/bots-and-chats/README.md, D5). Reuses `SessionEventLog`
 // for the file pair, the fsync'd append, the rebuildable index and seq-window
 // reads; this wrapper owns seq allocation and the id lookup.
-import type { ChatMessagePayload, ChatTranscriptDirection } from "@getpaseo/protocol/chats/types";
-import { normalizeChatSender } from "@getpaseo/protocol/chats/sender";
+import type { ChatMessagePayload, ChatTranscriptDirection } from "@clisbot/protocol/chats/types";
+import { normalizeChatSender } from "@clisbot/protocol/chats/sender";
 import { SessionEventLog } from "../agent/session-storage/session-event-log.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 

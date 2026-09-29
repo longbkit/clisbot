@@ -6,7 +6,7 @@
  * `src/channels/message/ingress-drain.ts` — which reads the whole pending set
  * out of SQLite and computes `blockedLaneKeys` in the process — is not portable
  * here. What is portable is the policy it applies, and that is imported
- * verbatim from `@getpaseo/channels-core`
+ * verbatim from `@clisbot/channels-core`
  * (`channels/message/ingress-retry-policy.ts`): backoff schedule, attempt
  * ceiling and the non-retryable hook. The Hub removes the 24-hour age floor so
  * eight failed attempts actually end a poison row and free its lane.
@@ -20,14 +20,14 @@
  * race abandons that row, and a slow dispatch holds only its own worker — the
  * others keep claiming the rest of the backlog.
  */
-import type { InboundQueueClaim, InboundQueueSink } from "@getpaseo/channels-shared";
+import type { InboundQueueClaim, InboundQueueSink } from "@clisbot/channels-shared";
 import {
   DEFAULT_INGRESS_RETRY_MAX_ATTEMPTS,
   resolveIngressFailureDisposition,
   resolveIngressRetryDelayMs,
   type IngressNonRetryableFailure,
   type IngressRetryPolicyConfig,
-} from "@getpaseo/channels-core/channels/message/ingress-retry-policy";
+} from "@clisbot/channels-core/channels/message/ingress-retry-policy";
 import { ChannelIngressQueueClaimConflictError } from "../../db/channels.js";
 import { CHANNEL_INGRESS_MAX_AGE_MS, CHANNEL_INGRESS_DISPATCH_TIMEOUT_MS } from "./budget.js";
 import {

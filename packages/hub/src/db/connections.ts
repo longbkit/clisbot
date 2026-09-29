@@ -1094,7 +1094,7 @@ async function lockExternal(
 ): Promise<void> {
   await locks.withTxLock(
     transaction,
-    JSON.stringify(["paseo-connection", provider, "external", externalId]),
+    JSON.stringify(["clisbot-connection", provider, "external", externalId]),
   );
 }
 

@@ -1,7 +1,7 @@
 type Environment = Record<string, string | undefined>;
 
 export function resolveAllowedHosts(environment: Environment = process.env): string[] {
-  const appUrl = environment["PASEO_HUB_APP_URL"]?.trim();
+  const appUrl = environment["CLISBOT_HUB_APP_URL"]?.trim();
   if (!appUrl) return [];
 
   try {

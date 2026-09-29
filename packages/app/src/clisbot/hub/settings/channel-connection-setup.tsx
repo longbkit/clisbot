@@ -57,7 +57,7 @@ export function ChannelConnectionSetup({
         {state.accountId === null ? null : (
           <Field
             label="Account name"
-            hint="How this Connection is named in Paseo."
+            hint="How this Connection is named in Clisbot."
             error={state.accountIdError}
           >
             <FormTextInput

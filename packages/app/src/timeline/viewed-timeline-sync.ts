@@ -17,7 +17,7 @@ import {
   type AgentTimelineState,
 } from "@/stores/session-store";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { getSendingClientMessageIds } from "@/composer/submission/model";
 import {
   getInitDeferred,
@@ -424,8 +424,8 @@ function acknowledgeHiddenSubmission(
 }
 
 let prefetchOwnerCounter = 0;
-const PREFETCH_REQUEST_PREFIX = "paseo-prefetch:";
-const ANCHOR_REQUEST_PREFIX = "paseo-anchor:";
+const PREFETCH_REQUEST_PREFIX = "clisbot-prefetch:";
+const ANCHOR_REQUEST_PREFIX = "clisbot-anchor:";
 
 export function createViewedTimelineOwner(input: {
   retentionBudget?: TimelinePageRetention;

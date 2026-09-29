@@ -11,7 +11,7 @@ import {
   SquarePen,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/icon-button-chrome";
 import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
-import { getTerminalProfileIcon } from "@getpaseo/protocol/terminal-profiles";
+import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { Theme } from "@/styles/theme";
 

@@ -2,13 +2,13 @@ import type {
   BotPayload as WireBot,
   BotKind,
   BotLaunchDefaults,
-} from "@getpaseo/protocol/bots/types";
+} from "@clisbot/protocol/bots/types";
 import type {
   ChatRules,
   ChatMessageSender,
   ChatMessagePayload,
   ChatPayload as WireChat,
-} from "@getpaseo/protocol/chats/types";
+} from "@clisbot/protocol/chats/types";
 export type { BotKind, BotLaunchDefaults, ChatRules, ChatMessageSender };
 // Display projections of canonical protocol records. The wire is never re-declared here.
 export type BotPayload = Pick<

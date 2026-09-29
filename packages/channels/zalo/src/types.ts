@@ -1,7 +1,7 @@
 // upstream: extensions/zalo/src/types.ts@5d8067a4483
 // Zalo type declarations define plugin contracts.
 import type { tryReadSecretFileSync } from "./fusion/secret-file.js";
-import type { SecretInput } from "@getpaseo/channels-core/plugin-sdk/secret-input";
+import type { SecretInput } from "@clisbot/channels-core/plugin-sdk/secret-input";
 
 export type ZaloAccountConfig = {
   /** Optional display name for this account (used in CLI/UI lists). */

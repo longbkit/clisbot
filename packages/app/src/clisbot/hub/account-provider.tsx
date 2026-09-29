@@ -226,7 +226,7 @@ function EnabledHubAccountProvider({
       run(async () => {
         const response = await accountCommand<{ state: "claimed" | "unavailable" }>(
           transport,
-          "/api/auth/paseo/claim-instance",
+          "/api/auth/clisbot/claim-instance",
           input,
         );
         if (response.state === "unavailable") {
@@ -241,13 +241,13 @@ function EnabledHubAccountProvider({
     [run, transport],
   );
   const completeAppSetup = useCallback(
-    () => run(() => accountCommand(transport, "/api/auth/paseo/complete-app-setup", {})),
+    () => run(() => accountCommand(transport, "/api/auth/clisbot/complete-app-setup", {})),
     [run, transport],
   );
   const acceptInvitation = useCallback(
     (pendingInvitationId: string) =>
       run(async () => {
-        await accountCommand(transport, "/api/auth/paseo/accept-invitation", {
+        await accountCommand(transport, "/api/auth/clisbot/accept-invitation", {
           invitationId: pendingInvitationId,
         });
         if (currentUrlRef.current !== currentUrl) return;
@@ -288,24 +288,24 @@ function EnabledHubAccountProvider({
   const selectOrganization = useCallback(
     (organizationId: string) =>
       run(() =>
-        accountCommand(transport, "/api/auth/paseo/select-organization", { organizationId }),
+        accountCommand(transport, "/api/auth/clisbot/select-organization", { organizationId }),
       ),
     [run, transport],
   );
   const createOrganization = useCallback(
     (name: string) =>
-      run(() => accountCommand(transport, "/api/auth/paseo/create-organization", { name })),
+      run(() => accountCommand(transport, "/api/auth/clisbot/create-organization", { name })),
     [run, transport],
   );
   const inviteMember = useCallback(
     (input: { email: string; role: "admin" | "member"; teamId?: string; teamIds?: string[] }) =>
-      run(() => accountCommand(transport, "/api/auth/paseo/create-invitation", input)),
+      run(() => accountCommand(transport, "/api/auth/clisbot/create-invitation", input)),
     [run, transport],
   );
   const cancelInvitation = useCallback(
     (pendingInvitationId: string) =>
       run(() =>
-        accountCommand(transport, "/api/auth/paseo/cancel-invitation", {
+        accountCommand(transport, "/api/auth/clisbot/cancel-invitation", {
           invitationId: pendingInvitationId,
         }),
       ),
@@ -313,12 +313,12 @@ function EnabledHubAccountProvider({
   );
   const changeMemberRole = useCallback(
     (input: { memberId: string; role: "owner" | "admin" | "member" }) =>
-      run(() => accountCommand(transport, "/api/auth/paseo/change-member-role", input)),
+      run(() => accountCommand(transport, "/api/auth/clisbot/change-member-role", input)),
     [run, transport],
   );
   const removeMember = useCallback(
     (memberId: string) =>
-      run(() => accountCommand(transport, "/api/auth/paseo/remove-member", { memberId })),
+      run(() => accountCommand(transport, "/api/auth/clisbot/remove-member", { memberId })),
     [run, transport],
   );
   const state = account.data ?? null;
@@ -414,8 +414,8 @@ async function readAccountState(
 ): Promise<HubAccountState> {
   const path =
     invitationId === null
-      ? "/api/auth/paseo/state"
-      : `/api/auth/paseo/state?invitation=${encodeURIComponent(invitationId)}`;
+      ? "/api/auth/clisbot/state"
+      : `/api/auth/clisbot/state?invitation=${encodeURIComponent(invitationId)}`;
   const response = await transport.request(path);
   if (!response.ok) throw new Error(`Hub account request failed (${response.status}).`);
   return HubAccountStateSchema.parse(await response.json());
@@ -457,7 +457,7 @@ async function registrationLinkRequest(
   operation: "inspect" | "complete",
   body: object,
 ): Promise<HubRegistrationLink> {
-  const response = await transport.request(`/api/auth/paseo/registration/${operation}`, {
+  const response = await transport.request(`/api/auth/clisbot/registration/${operation}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -518,7 +518,7 @@ async function startRegistrationRequest(
   transport: HubTransport,
   email: string,
 ): Promise<HubRegistrationStart> {
-  const response = await transport.request("/api/auth/paseo/registration/start", {
+  const response = await transport.request("/api/auth/clisbot/registration/start", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email }),

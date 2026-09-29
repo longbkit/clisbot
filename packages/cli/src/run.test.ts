@@ -30,9 +30,9 @@ describe("runCli", () => {
       createCliParseArgv({
         argv: [],
         cwd: process.cwd(),
-        nodeArgv: ["node", "paseo"],
+        nodeArgv: ["node", "clisbot"],
       }),
-    ).toEqual(["node", "paseo", "onboard"]);
+    ).toEqual(["node", "clisbot", "onboard"]);
   });
 
   it("routes explicit root relay flags to onboard", () => {
@@ -40,16 +40,16 @@ describe("runCli", () => {
       createCliParseArgv({
         argv: ["--relay"],
         cwd: process.cwd(),
-        nodeArgv: ["node", "paseo"],
+        nodeArgv: ["node", "clisbot"],
       }),
-    ).toEqual(["node", "paseo", "onboard", "--relay"]);
+    ).toEqual(["node", "clisbot", "onboard", "--relay"]);
     expect(
       createCliParseArgv({
         argv: ["--no-relay"],
         cwd: process.cwd(),
-        nodeArgv: ["node", "paseo"],
+        nodeArgv: ["node", "clisbot"],
       }),
-    ).toEqual(["node", "paseo", "onboard", "--no-relay"]);
+    ).toEqual(["node", "clisbot", "onboard", "--no-relay"]);
   });
 
   it("preserves known CLI command argv", () => {
@@ -57,9 +57,9 @@ describe("runCli", () => {
       createCliParseArgv({
         argv: ["daemon", "set-password"],
         cwd: process.cwd(),
-        nodeArgv: ["node", "paseo"],
+        nodeArgv: ["node", "clisbot"],
       }),
-    ).toEqual(["node", "paseo", "daemon", "set-password"]);
+    ).toEqual(["node", "clisbot", "daemon", "set-password"]);
   });
 
   it("preserves the hooks command argv", () => {
@@ -67,13 +67,13 @@ describe("runCli", () => {
       createCliParseArgv({
         argv: ["hooks", "claude", "UserPromptSubmit"],
         cwd: process.cwd(),
-        nodeArgv: ["node", "paseo"],
+        nodeArgv: ["node", "clisbot"],
       }),
-    ).toEqual(["node", "paseo", "hooks", "claude", "UserPromptSubmit"]);
+    ).toEqual(["node", "clisbot", "hooks", "claude", "UserPromptSubmit"]);
   });
 
   it("classifies existing unknown directories as open-project invocations", () => {
-    const root = mkdtempSync(path.join(tmpdir(), "paseo-cli-run-"));
+    const root = mkdtempSync(path.join(tmpdir(), "clisbot-cli-run-"));
     const project = path.join(root, "repository");
     mkdirSync(project);
 
@@ -82,7 +82,7 @@ describe("runCli", () => {
         createCliParseArgv({
           argv: ["repository"],
           cwd: root,
-          nodeArgv: ["node", "paseo"],
+          nodeArgv: ["node", "clisbot"],
         }),
       ).toEqual({
         kind: "open-project",

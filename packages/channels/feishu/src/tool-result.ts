@@ -1,8 +1,8 @@
 // upstream: extensions/feishu/src/tool-result.ts@5d8067a4483
 // Feishu plugin module implements tool result behavior.
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { wrapExternalContent } from "@getpaseo/channels-core/plugin-sdk/security-runtime";
-import { jsonResult } from "@getpaseo/channels-core/plugin-sdk/tool-results";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { wrapExternalContent } from "@clisbot/channels-core/plugin-sdk/security-runtime";
+import { jsonResult } from "@clisbot/channels-core/plugin-sdk/tool-results";
 
 export function feishuExternalToolResult<TDetails>(details: TDetails) {
   // Only model-visible text is fenced; structured callers retain the exact remote payload.

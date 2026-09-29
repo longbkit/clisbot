@@ -13,7 +13,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useShallow } from "zustand/react/shallow";
 import { useHosts } from "@/runtime/host-runtime";
 import { SIDEBAR_UNLABELLED_LABEL_KEY, useSidebarViewStore } from "@/stores/sidebar-view-store";
-import { workspaceLabelKey, type WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey, type WorkspaceLabelColor } from "@clisbot/protocol/workspace-labels";
 import { useWorkspaceLabelProjection } from "@/workspace-labels";
 import { WorkspaceLabelDot } from "@/workspace-labels/swatch";
 import type { Theme } from "@/styles/theme";

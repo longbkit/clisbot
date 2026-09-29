@@ -4,8 +4,8 @@
  * A daemon that advertises `terminalProfileGrants` answers per Project; any
  * other daemon has no Managed Access over terminals, so its own config applies.
  */
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
-import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
+import { resolveTerminalProfiles } from "@clisbot/protocol/terminal-profiles";
 
 export interface LaunchableTerminalProfiles {
   profiles: readonly TerminalProfile[];

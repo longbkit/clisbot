@@ -4,11 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 test("workspace archive publishes agent archive hooks for both live and closed agents", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-archive-hooks-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-archive-hooks-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await client.connect();

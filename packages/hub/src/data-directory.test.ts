@@ -12,7 +12,7 @@ describe("Hub data directory", () => {
         homeDirectory: resolve("fixtures", "home"),
         workingDirectory: resolve("fixtures", "work"),
       }),
-      join(dataHome, "paseo-hub"),
+      join(dataHome, "clisbot-hub"),
     );
   });
 
@@ -25,18 +25,18 @@ describe("Hub data directory", () => {
           homeDirectory,
           workingDirectory: resolve("fixtures", "work"),
         }),
-        join(homeDirectory, ".local", "share", "paseo-hub"),
+        join(homeDirectory, ".local", "share", "clisbot-hub"),
       );
     }
   });
 
-  it("keeps every defined PASEO_HUB_DATA_DIR as an explicit override", () => {
+  it("keeps every defined CLISBOT_HUB_DATA_DIR as an explicit override", () => {
     const explicitDirectory = resolve("fixtures", "explicit-data");
     const workingDirectory = resolve("fixtures", "work");
     assert.equal(
       resolveHubDataDirectory({
         environment: {
-          PASEO_HUB_DATA_DIR: explicitDirectory,
+          CLISBOT_HUB_DATA_DIR: explicitDirectory,
           XDG_DATA_HOME: resolve("fixtures", "xdg-data"),
         },
         homeDirectory: resolve("fixtures", "home"),
@@ -47,18 +47,18 @@ describe("Hub data directory", () => {
     assert.equal(
       resolveHubDataDirectory({
         environment: {
-          PASEO_HUB_DATA_DIR: "var/paseo-hub",
+          CLISBOT_HUB_DATA_DIR: "var/clisbot-hub",
           XDG_DATA_HOME: resolve("fixtures", "xdg-data"),
         },
         homeDirectory: resolve("fixtures", "home"),
         workingDirectory,
       }),
-      join(workingDirectory, "var", "paseo-hub"),
+      join(workingDirectory, "var", "clisbot-hub"),
     );
     assert.equal(
       resolveHubDataDirectory({
         environment: {
-          PASEO_HUB_DATA_DIR: "",
+          CLISBOT_HUB_DATA_DIR: "",
           XDG_DATA_HOME: resolve("fixtures", "xdg-data"),
         },
         homeDirectory: resolve("fixtures", "home"),

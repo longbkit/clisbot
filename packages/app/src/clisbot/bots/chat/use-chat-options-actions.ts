@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins } from "../sidebar/pins";

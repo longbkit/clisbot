@@ -3,7 +3,7 @@ import { ChatSession } from "./chat-session.js";
 import type { ChatService } from "../../chats/chat-service.js";
 import type { BotService } from "../../bots/index.js";
 import type { SessionOutboundMessage } from "../../messages.js";
-import type { StoredBot } from "@getpaseo/protocol/bots/types";
+import type { StoredBot } from "@clisbot/protocol/bots/types";
 import type { StoredChat } from "../../chats/chat-record.js";
 
 const bot = {

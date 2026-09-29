@@ -17,7 +17,7 @@ import {
 const githubConfiguration: ProviderApplicationConfiguration = {
   provider: "github",
   appId: "42",
-  appSlug: "paseo",
+  appSlug: "clisbot",
   clientId: "client",
   clientSecret: "client-secret",
   privateKey: "private-key",
@@ -54,7 +54,7 @@ describe("provider applications", () => {
     await fixture.store.save({
       provider: "github",
       configuration: githubConfiguration,
-      identity: { provider: "github", id: "42", name: "Paseo", ownerLogin: "acme" },
+      identity: { provider: "github", id: "42", name: "Clisbot", ownerLogin: "acme" },
       expectedVersion: undefined,
       updatedByUserId: "operator",
     });
@@ -88,7 +88,7 @@ describe("provider applications", () => {
     assert.equal(serialized.includes("webhook-secret"), false);
     assert.deepEqual(overview.providers.github.identifiers, {
       appId: "42",
-      appSlug: "paseo",
+      appSlug: "clisbot",
       clientId: "client",
     });
   });
@@ -118,7 +118,7 @@ describe("provider applications", () => {
     await fixture.store.save({
       provider: "github",
       configuration: githubConfiguration,
-      identity: { provider: "github", id: "42", name: "Paseo", ownerLogin: "acme" },
+      identity: { provider: "github", id: "42", name: "Clisbot", ownerLogin: "acme" },
       expectedVersion: undefined,
       updatedByUserId: "operator",
     });
@@ -213,7 +213,7 @@ describe("provider applications", () => {
     fixture.store.values.set("github", {
       provider: "github",
       configuration: githubConfiguration,
-      identity: { provider: "github", id: "42", name: "Paseo", ownerLogin: "acme" },
+      identity: { provider: "github", id: "42", name: "Clisbot", ownerLogin: "acme" },
       version: 1,
       verifiedAt: new Date("2026-08-14T10:00:00Z"),
       updatedAt: new Date("2026-08-14T10:00:00Z"),
@@ -231,7 +231,7 @@ describe("provider applications", () => {
       (error: unknown) =>
         error instanceof ProviderApplicationError &&
         error.code === "identityConflict" &&
-        error.safeContext === "Paseo",
+        error.safeContext === "Clisbot",
     );
     assert.equal(fixture.runtime.prepareCount("github"), 0);
   });
@@ -269,7 +269,7 @@ describe("provider applications", () => {
       (await resumed.applications.overview(request())).providers.github.identifiers,
       {
         appId: "42",
-        appSlug: "paseo",
+        appSlug: "clisbot",
         clientId: "client",
       },
     );
@@ -527,7 +527,7 @@ describe("provider applications", () => {
   it("uses the same verified Socket Mode activation for an authenticated local operator", async () => {
     const fixture = createFixture({ operator: false });
     const localRequest = request("POST");
-    localRequest.headers.set("x-paseo-trusted-request-origin", "https://hub.test");
+    localRequest.headers.set("x-clisbot-trusted-request-origin", "https://hub.test");
     await fixture.applications.configureLocalSlackSocket!(
       localRequest,
       { userId: "operator", organizationId: "org" },
@@ -636,7 +636,7 @@ describe("provider applications", () => {
 
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "appSetup");
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "apps");
-    await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "paseo");
+    await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "clisbot");
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org");
 
     assert.deepEqual(fixture.returnRoutes, ["/", "/apps", "/settings/hub/configuration", "/apps"]);
@@ -660,7 +660,7 @@ describe("provider applications", () => {
     assert.equal(providerApplicationReturnRoute(undefined), "/apps");
     assert.equal(providerApplicationReturnRoute("appSetup"), "/");
     assert.equal(providerApplicationReturnRoute("apps"), "/apps");
-    assert.equal(providerApplicationReturnRoute("paseo"), "/settings/hub/configuration");
+    assert.equal(providerApplicationReturnRoute("clisbot"), "/settings/hub/configuration");
   });
 });
 
@@ -670,7 +670,7 @@ function request(method = "GET", origin = "https://hub.test") {
     headers: {
       cookie: "session=operator",
       origin,
-      "x-paseo-trusted-request-origin": origin,
+      "x-clisbot-trusted-request-origin": origin,
     },
   });
 }
@@ -691,7 +691,7 @@ function createFixture(
   let verificationIdentity: ProviderApplicationIdentity = {
     provider: "github",
     id: "42",
-    name: "Paseo",
+    name: "Clisbot",
     ownerLogin: "acme",
   };
   const applications = createProviderApplications({
@@ -744,7 +744,7 @@ function createFixture(
         ),
     },
     callbackOrigin: (incoming) =>
-      Promise.resolve(incoming.headers.get("x-paseo-trusted-request-origin")!),
+      Promise.resolve(incoming.headers.get("x-clisbot-trusted-request-origin")!),
     beginCandidateConnection: (incoming, _organizationId, returnRoute, begin) => {
       returnRoutes.push(returnRoute);
       return begin(incoming);
@@ -769,9 +769,9 @@ function identityFor(
   github: ProviderApplicationIdentity,
 ): ProviderApplicationIdentity {
   if (provider === "github") return github;
-  if (provider === "discord") return { provider, id: "100", name: "Paseo" };
-  if (provider === "linear") return { provider, id: "linear-client", name: "Paseo" };
-  return { provider, id: "A1", name: "Paseo" };
+  if (provider === "discord") return { provider, id: "100", name: "Clisbot" };
+  if (provider === "linear") return { provider, id: "linear-client", name: "Clisbot" };
+  return { provider, id: "A1", name: "Clisbot" };
 }
 
 function connectedInventory(applicationId: string) {

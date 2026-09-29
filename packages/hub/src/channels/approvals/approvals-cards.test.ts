@@ -2,7 +2,7 @@
 // targeted tests (2026-08-27 slice): the E1 `inlineButtons` gating (card post +
 // in-place update + surface gate), the E5 question prompts (AskUserQuestion
 // render + `updatedInput.answers` keyed by the full question text), and the
-// exactly-once answer-path race (card click vs typed command vs a Paseo client
+// exactly-once answer-path race (card click vs typed command vs a Clisbot client
 // answer). The P0 text-mode scenarios live in `approvals.test.ts`; both files
 // share the harness + fixtures in `harness.ts` (one definition).
 import assert from "node:assert/strict";
@@ -259,7 +259,7 @@ describe("exactly-once resolver (race)", () => {
       "agent-1",
       requestOf({ id: "req-client", name: "Bash", input: { command: "ls -la" } }),
     );
-    // The paired Paseo client answered: the wire reports the resolution.
+    // The paired Clisbot client answered: the wire reports the resolution.
     engine.onPermissionResolved("agent-1", "req-client");
     const check = await engine.answerFromChannel("agent-1", INITIATOR, {
       decision: "allow",

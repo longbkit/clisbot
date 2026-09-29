@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
-import { ManagedAccessModeSchema } from "@getpaseo/protocol/managed-access";
+import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
+import { ManagedAccessModeSchema } from "@clisbot/protocol/managed-access";
 import { z } from "zod";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -307,7 +307,7 @@ function unavailableDaemon(): Response {
   return Response.json({ error: "daemon_unavailable" }, { status: 404 });
 }
 
-/** The daemon's Paseo home was likely copied from another enrolled computer. */
+/** The daemon's Clisbot home was likely copied from another enrolled computer. */
 export const DAEMON_SERVER_ID_CONFLICT_ERROR = "daemon_server_id_conflict";
 
 function daemonServerIdConflict(slug: string): Response {
@@ -315,7 +315,7 @@ function daemonServerIdConflict(slug: string): Response {
     {
       error: DAEMON_SERVER_ID_CONFLICT_ERROR,
       slug,
-      message: `Host "${slug}" in this organization already uses this daemon's identity, usually because the Paseo home was copied from that computer. On this computer run: paseo daemon stop && paseo daemon reset-identity, then connect again.`,
+      message: `Host "${slug}" in this organization already uses this daemon's identity, usually because the Clisbot home was copied from that computer. On this computer run: clisbot daemon stop && clisbot daemon reset-identity, then connect again.`,
     },
     { status: 409 },
   );

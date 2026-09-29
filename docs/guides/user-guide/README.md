@@ -1,4 +1,4 @@
-# Hướng dẫn sử dụng Paseo + Hub
+# Hướng dẫn sử dụng Clisbot + Hub
 
 Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn hướng dẫn theo việc cần làm. Tên nút và menu giữ nguyên tiếng Anh để dễ tìm trong app.
 

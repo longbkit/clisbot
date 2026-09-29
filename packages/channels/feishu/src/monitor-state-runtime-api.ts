@@ -6,4 +6,4 @@ export {
   createWebhookAnomalyTracker,
   WEBHOOK_ANOMALY_COUNTER_DEFAULTS,
   WEBHOOK_RATE_LIMIT_DEFAULTS,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
+} from "@clisbot/channels-core/plugin-sdk/webhook-ingress";

@@ -1,11 +1,11 @@
 // upstream: extensions/feishu/src/send-result.ts@5d8067a4483
 // Feishu plugin module implements send result behavior.
-import { createChannelPartialDeliveryError } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+import { createChannelPartialDeliveryError } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import {
   createMessageReceiptFromOutboundResults,
   type MessageReceipt,
   type MessageReceiptPartKind,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 
 type FeishuMessageApiResponse = {
   code?: number;

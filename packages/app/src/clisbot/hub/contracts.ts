@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
+import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
 
 const OrganizationRoleSchema = z.enum(["owner", "admin", "member"]);
 const OrganizationCapabilitiesSchema = z.object({
@@ -66,7 +66,7 @@ export function invitationTeams(invitation: {
   return invitation.teams ?? (invitation.team === undefined ? [] : [invitation.team]);
 }
 
-/** `POST /api/auth/paseo/registration/{inspect,complete}` for email-first self-registration. */
+/** `POST /api/auth/clisbot/registration/{inspect,complete}` for email-first self-registration. */
 export const HubRegistrationLinkSchema = z.object({
   status: z.enum([
     "valid",

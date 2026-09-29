@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/account-inspect.test.ts@5d8067a4483
 // Slack tests cover account inspection and credential status reporting.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
 import { isSlackPluginAccountConfigured } from "./account-configured.js";
 import { inspectSlackAccount } from "./account-inspect.js";

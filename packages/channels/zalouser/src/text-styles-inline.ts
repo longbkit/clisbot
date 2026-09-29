@@ -1,6 +1,6 @@
 // upstream: extensions/zalouser/src/text-styles-inline.ts@5d8067a4483
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { renderMarkdownWithAttributedRanges } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { renderMarkdownWithAttributedRanges } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import {
   LOCAL_TAG_PATTERN,
   TAG_STYLE_MAP,

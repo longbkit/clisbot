@@ -10,25 +10,25 @@ import {
   type MessageReceipt,
   type MessageReceiptPartKind,
   type MessageReceiptSourceResult,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { KeyedAsyncQueue } from "@getpaseo/channels-core/plugin-sdk/keyed-async-queue";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { KeyedAsyncQueue } from "@clisbot/channels-core/plugin-sdk/keyed-async-queue";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
 import { requireRuntimeConfig } from "./fusion/plugin-config.js";
 import {
   chunkMarkdownTextWithMode,
   resolveChunkMode,
   resolveTextChunkLimit,
-} from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
-import { resolveTextChunksWithFallback } from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { safeEqualSecret } from "@getpaseo/channels-core/plugin-sdk/security-runtime";
+} from "@clisbot/channels-core/plugin-sdk/reply-chunking";
+import { resolveTextChunksWithFallback } from "@clisbot/channels-core/plugin-sdk/reply-payload";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { safeEqualSecret } from "@clisbot/channels-core/plugin-sdk/security-runtime";
 import {
   normalizeOptionalString,
   normalizeOptionalString as normalizeSlackApiString,
   normalizeTrimmedStringList,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { sliceUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { sliceUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import type { SlackTokenSource } from "./accounts.js";
 import { resolveSlackAccount, resolveSlackOperationToken } from "./accounts.js";
 import type { SlackAuthoredTextPlacement } from "./authored-text.js";

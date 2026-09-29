@@ -1,12 +1,12 @@
 // upstream: extensions/slack/src/blocks-render.ts@5d8067a4483
 // Slack plugin module implements blocks render behavior.
 import type { Block, KnownBlock } from "@slack/web-api";
-import { parseExecApprovalCommandText } from "@getpaseo/channels-core/plugin-sdk/approval-reply-runtime";
+import { parseExecApprovalCommandText } from "@clisbot/channels-core/plugin-sdk/approval-reply-runtime";
 import {
   legacyInteractiveReplyToPresentation,
   resolveMessagePresentationButtonAction,
   resolveMessagePresentationOptionAction,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import type {
   LegacyInteractiveReply,
   MessagePresentation,
@@ -14,13 +14,13 @@ import type {
   MessagePresentationButtonsBlock,
   MessagePresentationChartBlock,
   MessagePresentationSelectBlock,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   resolveAskUserQuestionOptionIndex,
   type AskUserQuestionOptionIndices,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { chunkTextForOutbound } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { chunkTextForOutbound } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { encodeSlackApprovalAction } from "./approval-actions.js";
 import {
   buildSlackDataTableBlock,

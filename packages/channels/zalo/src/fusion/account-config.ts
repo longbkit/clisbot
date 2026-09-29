@@ -11,8 +11,8 @@
 //
 // The ported `accounts.ts` / `token.ts` keep their upstream shape and flow; they
 // just read the carrier instead of the OpenClaw config file.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { StartAccountContext } from "@getpaseo/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { StartAccountContext } from "@clisbot/channels-shared";
 import { resolveZaloAccount, type ResolvedZaloAccount } from "../accounts.js";
 
 /** The credential fields the Hub connection carries onto the account entry. */

@@ -67,14 +67,14 @@ it("says which interval is missing rather than showing a blank price", () => {
 
 it("keeps the plan name in the trial button's accessible name while the visible label stays short", () => {
   const action = planAction({
-    planName: "Paseo Hub",
+    planName: "Clisbot Hub",
     price: euros(1500),
     isCurrent: false,
     trialEligible: true,
   });
   assert.deepEqual(action, {
     label: "Start free trial",
-    name: "Start free trial with Paseo Hub",
+    name: "Start free trial with Clisbot Hub",
     disabled: false,
   });
   assert.ok(
@@ -85,14 +85,14 @@ it("keeps the plan name in the trial button's accessible name while the visible 
 
 it("offers a former subscriber ordinary checkout instead of a second trial", () => {
   const action = planAction({
-    planName: "Paseo Hub",
+    planName: "Clisbot Hub",
     price: euros(1500),
     isCurrent: false,
     trialEligible: false,
   });
   assert.deepEqual(action, {
     label: "Subscribe",
-    name: "Subscribe to Paseo Hub",
+    name: "Subscribe to Clisbot Hub",
     disabled: false,
   });
   assert.ok(
@@ -120,8 +120,8 @@ it("disables the plan the organization is already on and names it", () => {
 
 it("disables a plan the catalog does not price at the selected interval", () => {
   assert.deepEqual(
-    planAction({ planName: "Paseo Hub", price: null, isCurrent: false, trialEligible: true }),
-    { label: "Not available", name: "Not available: Paseo Hub", disabled: true },
+    planAction({ planName: "Clisbot Hub", price: null, isCurrent: false, trialEligible: true }),
+    { label: "Not available", name: "Not available: Clisbot Hub", disabled: true },
   );
 });
 
@@ -158,7 +158,7 @@ it("leads with the trial end date while a trial is running", () => {
   const summary = subscriptionSummary(
     subscription({
       planSlug: "hosted",
-      planName: "Paseo Hub",
+      planName: "Clisbot Hub",
       status: "trialing",
       trialEnd: "2026-09-11T00:00:00.000Z",
       currentPeriodEnd: "2026-09-11T00:00:00.000Z",
@@ -173,7 +173,7 @@ it("leads with the cancellation date once a subscription is set to end", () => {
   const summary = subscriptionSummary(
     subscription({
       planSlug: "hosted",
-      planName: "Paseo Hub",
+      planName: "Clisbot Hub",
       status: "active",
       cancelAtPeriodEnd: true,
       trialEnd: "2026-09-11T00:00:00.000Z",
@@ -186,11 +186,11 @@ it("leads with the cancellation date once a subscription is set to end", () => {
 
 it("warns on a payment problem and stays neutral on an unrecognised status", () => {
   assert.deepEqual(
-    subscriptionSummary(subscription({ planName: "Paseo Hub", status: "past_due" })).status,
+    subscriptionSummary(subscription({ planName: "Clisbot Hub", status: "past_due" })).status,
     { tone: "warning", label: "Past Due" },
   );
   assert.deepEqual(
-    subscriptionSummary(subscription({ planName: "Paseo Hub", status: "paused" })).status,
+    subscriptionSummary(subscription({ planName: "Clisbot Hub", status: "paused" })).status,
     { tone: "neutral", label: "Paused" },
   );
 });

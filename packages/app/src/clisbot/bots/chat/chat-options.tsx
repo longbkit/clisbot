@@ -3,7 +3,7 @@ import { Ellipsis } from "lucide-react-native";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { BotPayload } from "../data/contracts";
 import type { ChatResourceAction, ChatResourceActionId } from "./chat-resource-actions";

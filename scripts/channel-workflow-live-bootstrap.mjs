@@ -25,11 +25,11 @@ const [{ createEmbeddedRuntime }, { createDatabase }, credentials, providerAppli
   ]);
 
 const devHome = process.env.CLISBOT_HOME ?? `${homedir()}/.clisbot-dev`;
-const hubDataDir = process.env.PASEO_HUB_DATA_DIR;
-const masterKeyFile = process.env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE;
+const hubDataDir = process.env.CLISBOT_HUB_DATA_DIR;
+const masterKeyFile = process.env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE;
 if (!hubDataDir || !masterKeyFile) {
   throw new Error(
-    "set PASEO_HUB_DATA_DIR and PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE for the isolated Hub DB",
+    "set CLISBOT_HUB_DATA_DIR and CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE for the isolated Hub DB",
   );
 }
 
@@ -113,7 +113,7 @@ const target = await createEmbeddedRuntime(hubDataDir);
 try {
   await target.runtime.migrate();
   const cipher = await credentials.readCredentialCipherEnvironment(
-    { PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: masterKeyFile },
+    { CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE: masterKeyFile },
     { hubDataDirectory: hubDataDir },
   );
   const database = createDatabase(target.runtime, target.locks, cipher);
@@ -271,7 +271,7 @@ try {
             agent: { provider: "codex", model: "gpt-5.6-luna" },
             prompt: [
               {
-                text: "This is workflow step prepare. Read and remember the inbound request, answer briefly, then call the finish_execution MCP tool exactly once: ${{ paseo.prompt }}",
+                text: "This is workflow step prepare. Read and remember the inbound request, answer briefly, then call the finish_execution MCP tool exactly once: ${{ clisbot.prompt }}",
               },
             ],
             reuse: "binding",
@@ -389,10 +389,10 @@ try {
     { noRefs: true, lineWidth: -1 },
   );
   const files = [
-    { path: ".paseo/hub.yml", content: hubYaml },
-    { path: ".paseo/channels/policy.yml", content: policyYaml },
-    { path: ".paseo/channels/slack/work.yml", content: slackYaml },
-    { path: ".paseo/channels/telegram/work.yml", content: telegramYaml },
+    { path: ".clisbot/hub.yml", content: hubYaml },
+    { path: ".clisbot/channels/policy.yml", content: policyYaml },
+    { path: ".clisbot/channels/slack/work.yml", content: slackYaml },
+    { path: ".clisbot/channels/telegram/work.yml", content: telegramYaml },
   ].sort((left, right) => left.path.localeCompare(right.path));
   await database.saveChannelConfiguration({
     organizationId,

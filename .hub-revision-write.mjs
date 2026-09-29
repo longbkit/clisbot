@@ -51,7 +51,7 @@ import { HUB_RESOURCE_PATH } from "./packages/hub/dist/config/bundle-contract.js
 import { compileChannelControlPlane } from "./packages/hub/dist/channels/config/compile.js";
 
 const DATA_DIR =
-  process.env.CLISBOT_HOME || process.env.PASEO_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
+  process.env.CLISBOT_HOME || process.env.CLISBOT_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
 const BASELINE_FILE = `${DATA_DIR}/.w3-v16-baseline.json`;
 const DAEMON_WS = process.env.TRUSTED_CLIENT_URL || "ws://127.0.0.1:6867/ws";
 const scenario = process.argv[2];
@@ -71,13 +71,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() || "";
+    return process.env.CLISBOT_PASSWORD?.trim() || "";
   }
 }
 function openTrusted() {
   return new Promise((res, rej) => {
     const pw = password();
-    const sock = new WebSocket(DAEMON_WS, pw ? [`paseo.bearer.${pw}`] : undefined);
+    const sock = new WebSocket(DAEMON_WS, pw ? [`clisbot.bearer.${pw}`] : undefined);
     const timer = setTimeout(() => rej(new Error("daemon /ws connect timeout")), 15000);
     sock.on("open", () => {
       sock.send(
@@ -180,7 +180,7 @@ const filesByPath = (files) => new Map(files.map((f) => [f.path, f.content]));
 
 function transform(files, name) {
   const m = filesByPath(files);
-  const slackPath = ".paseo/channels/slack/work.yml";
+  const slackPath = ".clisbot/channels/slack/work.yml";
   const hubPath = HUB_RESOURCE_PATH;
   if (!m.has(slackPath)) fail(`no slack account file in baseline`);
   if (name === "baseline") return files.map((f) => ({ path: f.path, content: m.get(f.path) }));
@@ -224,7 +224,7 @@ function transform(files, name) {
     // (h5w3/h6w3 reference them; plain w3 leaves routes on codex — defined-but
     // unreferenced agents are not live-validated, see routeAgentTargets).
     // Model pins are box-bound (wave-2 register: no pin -> daemon default 401s).
-    const tgPath = ".paseo/channels/telegram/work.yml";
+    const tgPath = ".clisbot/channels/telegram/work.yml";
     if (!m.has(tgPath)) fail(`no telegram account file in baseline (w3 family needs it)`);
     const tg = load(m.get(tgPath));
     const tgRoutes = agentRoutes(tg, "telegram");
@@ -254,7 +254,7 @@ function transform(files, name) {
       for (const r of slackRoutes) r.agent = "grok-work";
       for (const r of tgRoutes) r.agent = "grok-work";
       tg.transport = { ...tg.transport, inlineButtons: "group" };
-      const policyPath = ".paseo/channels/policy.yml";
+      const policyPath = ".clisbot/channels/policy.yml";
       if (!m.has(policyPath)) fail(`no channel policy file in baseline (ibw3 needs it)`);
       const policy = load(m.get(policyPath));
       const ops = (policy.assignments ?? []).find(
@@ -298,7 +298,7 @@ function routeAgentTargets(files, bundle) {
   const m = filesByPath(files);
   const out = new Set();
   for (const [path, content] of m.entries()) {
-    if (!/\.paseo\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
+    if (!/\.clisbot\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
     if (path.endsWith("policy.yml")) continue;
     const doc = load(content);
     for (const r of doc?.routes ?? []) if (r?.agent) out.add(r.agent);

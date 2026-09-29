@@ -3,7 +3,7 @@ import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { SessionActorLabel } from "./actor";
 import { userProfilePanelRegistration } from "./profile-panel";
 import { WorkspaceMetadataRow } from "./workspace-metadata-row";

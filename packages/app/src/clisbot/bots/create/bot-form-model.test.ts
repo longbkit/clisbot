@@ -1,4 +1,4 @@
-import type { AgentModelDefinition, ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { AgentModelDefinition, ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { describe, expect, it } from "vitest";
 import type { BotPayload } from "../data/contracts";
 import {

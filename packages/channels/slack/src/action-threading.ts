@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/action-threading.ts@5d8067a4483
 // Slack plugin module implements action threading behavior.
-import { isSingleUseReplyToMode } from "@getpaseo/channels-core/plugin-sdk/reply-reference";
+import { isSingleUseReplyToMode } from "@clisbot/channels-core/plugin-sdk/reply-reference";
 import { slackContextTargetsMatch } from "./targets.js";
 
 export const SLACK_PRIVATE_ACTION_DELIVERY_RESULT = Symbol("slack.action.delivery-result");

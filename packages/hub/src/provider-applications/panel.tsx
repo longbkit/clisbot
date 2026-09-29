@@ -174,7 +174,7 @@ export function AppSetupEntry({
             Set up your apps
           </h1>
           <p className="text-sm text-balance text-muted-foreground">
-            Paseo Hub talks to GitHub, Slack, Discord, and Linear through apps you create and own.
+            Clisbot Hub talks to GitHub, Slack, Discord, and Linear through apps you create and own.
             Set up the ones you want to use.
           </p>
         </div>

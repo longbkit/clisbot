@@ -1,12 +1,12 @@
 // Fusion-owned: compile forwarded Markdown through the existing presentation sender.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { MessagePresentationBlock } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { MessagePresentationBlock } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
 import {
   getMarkdownTableSource,
   markdownToIRWithMeta,
   type MarkdownTableCell,
-} from "@getpaseo/channels-markdown-core/ir";
+} from "@clisbot/channels-markdown-core/ir";
 import { buildSlackDataTableBlock } from "./data-table.js";
 import { editSlackRenderedMessage } from "./actions.js";
 import type { WebClient } from "./client/web-api.js";
@@ -53,7 +53,7 @@ export function resolveSlackMarkdownTableMessages(params: {
   if (tables.length === 0) return [];
   // Parse the entire document once, with placeholders only for native tables.
   // This preserves reference definitions and quote/list context across tables.
-  let prefix = "PASEOSLACKTABLE";
+  let prefix = "CLISBOTSLACKTABLE";
   while (params.text.includes(prefix)) prefix += "X";
   let markdown = "";
   let cursor = 0;

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { BotPayload } from "@getpaseo/protocol/bots/types";
+import type { BotPayload } from "@clisbot/protocol/bots/types";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { SettingsCard, SettingsSection, SettingsAction } from "@/components/settings";
 import { MAX_CONTENT_WIDTH } from "@/constants/layout";

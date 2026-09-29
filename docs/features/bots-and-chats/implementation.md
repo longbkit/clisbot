@@ -128,7 +128,7 @@ acceptance run; those release checks remain outstanding.
 Plan corrections from wave 1: the chat service lives in `chats/chat-service.ts` (the server package
 forbids barrel `index.ts`); `chats/final-answer.ts` holds the shared final-answer rule;
 `StoredChatParticipant.resetAt` makes `/new` survive the crash-safe label scan;
-`PASEO_BOTS_ENABLED` also had to join `DAEMON_SETTING_ENV_KEYS` in `config-environment.ts`.
+`CLISBOT_BOTS_ENABLED` also had to join `DAEMON_SETTING_ENV_KEYS` in `config-environment.ts`.
 
 ## Conventions the plans must share
 
@@ -136,7 +136,7 @@ The plans were written in parallel and diverged on a few names. These are the se
 
 | Subject                        | Settled                                                                                                                                              | Plans that said otherwise                                     |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Agent labels                   | `clisbot.bot-id`, `clisbot.chat-id` (Fusion-owned, beside the existing `clisbot.assistant`)                                                          | server-chat used `paseo.chat-id` / `paseo.chat-bot-id`        |
+| Agent labels                   | `clisbot.bot-id`, `clisbot.chat-id` (Fusion-owned, beside the existing `clisbot.assistant`)                                                          | server-chat used `clisbot.chat-id` / `clisbot.chat-bot-id`    |
 | Protocol folders               | `packages/protocol/src/bots/` and `packages/protocol/src/chats/`; never `chat/`, which is the removed chat-rooms feature kept as `COMPAT(chatRooms)` | server-bot used `protocol/src/bot/`                           |
 | Server folders                 | `packages/server/src/server/bots/` and `packages/server/src/server/chats/`; RPC handlers under `session/bots/` and `session/chats/`                  | —                                                             |
 | Initial idle agent             | Not created. Sessions start per (bot, chat) on the first message (D2, D7)                                                                            | server-bot kept it optional                                   |

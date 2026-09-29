@@ -48,7 +48,7 @@ export class FileFindModel {
     // The widget floats over the editor as a sibling overlay, so this panel is an
     // inert placeholder that only reports whether Find is open. Hide the placeholder
     // itself, never the shared panel container — Go to line's dialog lives there too.
-    EditorView.theme({ ".cm-panel.paseo-file-find": { display: "none" } }),
+    EditorView.theme({ ".cm-panel.clisbot-file-find": { display: "none" } }),
     // Reveal matches clear of the widget instead of underneath it.
     EditorView.scrollMargins.of((view) => {
       const clearance = this.clearance(view);
@@ -125,7 +125,7 @@ export class FileFindModel {
   private createPanel(view: EditorView): Panel {
     this.view = view;
     const dom = document.createElement("div");
-    dom.className = "paseo-file-find";
+    dom.className = "clisbot-file-find";
     return {
       dom,
       top: true,

@@ -1,10 +1,10 @@
 // upstream: extensions/feishu/src/send.ts@5d8067a4483
 // Feishu plugin module implements send behavior.
-import { resolveMarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/markdown-table-runtime";
-import { parseStrictNonNegativeInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { convertMarkdownTables } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
+import { parseStrictNonNegativeInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { convertMarkdownTables } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import type { ClawdbotConfig } from "./fusion/runtime-api.js";
 import { resolveFeishuRuntimeAccount } from "./accounts.js";
 import { assertFeishuApiSuccess } from "./api-response.js";

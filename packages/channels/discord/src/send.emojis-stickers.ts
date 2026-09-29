@@ -4,8 +4,8 @@ import type { RESTGetAPIGuildEmojisResult } from "discord-api-types/v10";
 import {
   normalizeOptionalLowercaseString,
   normalizeStringEntries,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { loadWebMediaRaw } from "@getpaseo/channels-core/plugin-sdk/web-media";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { loadWebMediaRaw } from "@clisbot/channels-core/plugin-sdk/web-media";
 import { createGuildEmoji, createGuildSticker, listGuildEmojis } from "./internal/discord.js";
 import { normalizeEmojiName, resolveDiscordRest } from "./send.shared.js";
 import type { DiscordEmojiUpload, DiscordReactOpts, DiscordStickerUpload } from "./send.types.js";

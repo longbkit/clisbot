@@ -1,4 +1,4 @@
-import { SessionOperationIdentitySchema } from "@getpaseo/protocol/session-operation";
+import { SessionOperationIdentitySchema } from "@clisbot/protocol/session-operation";
 import {
   buildExecutionCapabilityMcpServer,
   deriveAgentExecutionCompletionToken,
@@ -1935,7 +1935,7 @@ export function durableExecutionId(
   >,
 ): string {
   const bytes = createHash("sha256")
-    .update("paseo-durable-execution-v1\0")
+    .update("clisbot-durable-execution-v1\0")
     .update(intent.triggerRunId)
     .update("\0")
     .update(intent.configurationRevisionId)
@@ -2336,9 +2336,9 @@ function buildAgentEnv(
 ): Record<string, string> {
   return {
     ...materializedEnv,
-    PASEO_AGENT_PROVIDER: intent.agent.provider,
-    ...(intent.agent.mode === undefined ? {} : { PASEO_AGENT_MODE: intent.agent.mode }),
-    PASEO_HUB_CONFIG_JSON: JSON.stringify(intent.hubConfig),
+    CLISBOT_AGENT_PROVIDER: intent.agent.provider,
+    ...(intent.agent.mode === undefined ? {} : { CLISBOT_AGENT_MODE: intent.agent.mode }),
+    CLISBOT_HUB_CONFIG_JSON: JSON.stringify(intent.hubConfig),
   };
 }
 

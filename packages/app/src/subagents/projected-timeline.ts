@@ -1,4 +1,4 @@
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { processTimelineResponse, type TimelineCursor } from "@/timeline/session-stream-reducers";
 import type { ProviderSubagentTimelineState } from "./provider-store";
 

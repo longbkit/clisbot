@@ -53,8 +53,8 @@ export interface ChannelDaemonClientOptions {
    * from the daemon's ConnectionOffer. Takes precedence over `url` and loopback
    * discovery; the reconnect loop rotates + fails over across them. */
   urls?: readonly string[];
-  /** The daemon password (carried as the `paseo.bearer.` WS subprotocol).
-   * The supervisor defaults this from the `PASEO_PASSWORD` env var. */
+  /** The daemon password (carried as the `clisbot.bearer.` WS subprotocol).
+   * The supervisor defaults this from the `CLISBOT_PASSWORD` env var. */
   password?: string;
   clientId?: string;
   resolveSessionOperationTicket?: ChannelOperationTicketResolver;

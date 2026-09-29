@@ -28,7 +28,7 @@ Hub also uses Discord as an [event trigger provider](/docs/hub/triggers/discord)
 
 ```sh
 umask 077 && printf '%s' '<bot token>' > /tmp/discord-token
-paseo channels add discord --account main --secret-file /tmp/discord-token
+clisbot channels add discord --account main --secret-file /tmp/discord-token
 rm /tmp/discord-token
 ```
 

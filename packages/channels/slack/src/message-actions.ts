@@ -1,9 +1,9 @@
 // upstream: extensions/slack/src/message-actions.ts@5d8067a4483
 // Slack plugin module implements message actions behavior.
-import { createActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionName } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { extractToolSend, type ChannelToolSend } from "@getpaseo/channels-core/plugin-sdk/tool-send";
+import { createActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionName } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { extractToolSend, type ChannelToolSend } from "@clisbot/channels-core/plugin-sdk/tool-send";
 import { inspectSlackAccount } from "./account-inspect.js";
 import { listSlackAccountIds } from "./accounts.js";
 import { normalizeSlackThreadTsCandidate, resolveSlackThreadTsValue } from "./thread-ts.js";

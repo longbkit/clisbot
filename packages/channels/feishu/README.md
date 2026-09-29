@@ -1,4 +1,4 @@
-# @getpaseo/channels-feishu
+# @clisbot/channels-feishu
 
 The in-repo Feishu/Lark channel vertical (goal ledger slice 15), ported from
 `extensions/feishu/src` at OpenClaw `5d8067a4483`. 69 files are byte-verbatim;

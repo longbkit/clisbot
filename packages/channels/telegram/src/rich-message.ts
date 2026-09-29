@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/rich-message.ts@5d8067a4483
 import type { Bot } from "grammy";
 import type { InputRichMessage, ReplyParameters } from "grammy/types";
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   inputRichBlocksToPlainText,
   type InputRichBlock,

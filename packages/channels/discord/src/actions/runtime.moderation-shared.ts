@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/actions/runtime.moderation-shared.ts@5d8067a4483
 // Discord plugin module implements runtime.moderation shared behavior.
 import { PermissionFlagsBits } from "discord-api-types/v10";
-import { readNonNegativeIntegerParam, readStringParam } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { readNonNegativeIntegerParam, readStringParam } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 
 export type DiscordModerationAction = "timeout" | "kick" | "ban";
 

@@ -97,7 +97,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
     const accessTickets = new AccessTicketService(runtime, new AccessStore(runtime), {
       leaseDurationMs: readAccessLeaseDuration(
-        process.env["PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION"],
+        process.env["CLISBOT_HUB_MANAGED_ACCESS_LEASE_DURATION"],
       ),
       publicBaseUrl: identity.appUrl,
     });
@@ -366,10 +366,10 @@ async function initializeDatabaseRuntime(
 
 function loadRuntimeConfig(): RuntimeConfig {
   const google = readGoogleAuthConfig(process.env);
-  const trustedClientIpHeader = process.env["PASEO_HUB_TRUSTED_CLIENT_IP_HEADER"];
+  const trustedClientIpHeader = process.env["CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER"];
   if (trustedClientIpHeader !== undefined) validateHeaderName(trustedClientIpHeader);
   return {
-    bind: process.env["PASEO_HUB_BIND"] ?? "0.0.0.0",
+    bind: process.env["CLISBOT_HUB_BIND"] ?? "0.0.0.0",
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     authPolicy: readInstanceAuthPolicy(process.env),
     ...(google === undefined ? {} : { google }),
@@ -387,8 +387,8 @@ async function resolveHubIdentity(
   effectivePort: number,
   credentialCipher: CredentialCipher,
 ): Promise<HubIdentity> {
-  const configuredAppUrl = nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]);
-  const configuredAuthSecret = process.env["PASEO_HUB_AUTH_SECRET"];
+  const configuredAppUrl = nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]);
+  const configuredAuthSecret = process.env["CLISBOT_HUB_AUTH_SECRET"];
   const configuration = createRuntimeConfiguration({
     database,
     environment: {
@@ -420,7 +420,7 @@ async function main(): Promise<void> {
   await build.startProductionRuntime();
   const config = loadRuntimeConfig();
   const port = readPort();
-  const canonicalRequestOrigin = nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]);
+  const canonicalRequestOrigin = nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]);
   // COMPAT(clisbot-control-plane): admission is closed before anything is torn
   // down (D-W4-05). Without it the first shutdown step disposed the runtime
   // while the listener was still accepting, so a request that arrived during
@@ -444,7 +444,7 @@ async function main(): Promise<void> {
     });
   });
   const appUrl =
-    nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]) ?? `http://localhost:${port}`;
+    nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]) ?? `http://localhost:${port}`;
   server.listen(port, config.bind, () => {
     logger.info(`server started, available at: ${appUrl}`);
   });

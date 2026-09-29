@@ -8,7 +8,7 @@
  */
 
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { readStringValue } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { readStringValue } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { cleanBlocksForDescendant } from "./docx-table-ops.js";
 import type { FeishuDocxBlock, FeishuDocxBlockChild } from "./docx-types.js";
 

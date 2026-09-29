@@ -8,7 +8,7 @@ import {
   type ChannelProgressDraftLine,
   formatChannelProgressDraftDiffStat,
   formatPlanChecklistLines,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import { SLACK_MAX_BLOCKS } from "./blocks-input.js";
 import { normalizeSlackOutboundText } from "./format.js";
 import { escapeSlackMrkdwn } from "./monitor/mrkdwn.js";

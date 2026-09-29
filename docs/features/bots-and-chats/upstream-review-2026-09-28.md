@@ -41,7 +41,7 @@ Mandatory gates after any upstream tab/panel change: ordinary IDs unchanged; sam
 
 ### P2 / CURRENT: Composer is shared, with multiple conversation branches
 
-`composer/index.tsx` adds three optional props, and conversation routing branches in queue selection, submit resolution and the explicit queue gesture. Defaults preserve ordinary agent behavior. This reuse is preferable to forking Composer; attachments, voice and provider controls must remain owned by Paseo.
+`composer/index.tsx` adds three optional props, and conversation routing branches in queue selection, submit resolution and the explicit queue gesture. Defaults preserve ordinary agent behavior. This reuse is preferable to forking Composer; attachments, voice and provider controls must remain owned by Clisbot.
 
 TARGET: keep public defaults and extract the submission decision into a small pure policy helper used by both normal submit and explicit queue paths. Keep the chat adapter responsible for transcript submission and capability checks. Do not treat the existing pure submission tests as full coverage of the conversation branches in the Composer component; add an integration test that proves a running bot's typed and explicit-queue submissions both call chat send, while ordinary agent mode still queues.
 
@@ -100,14 +100,14 @@ Not verified here: resolved upstream merge build/dependencies, native iOS/Androi
 This follow-up is implementation/verification, separate from the rehearsal above.
 
 - Target worktree: `feat/bots-and-chats`, starting at `8a540760f` (includes the latest chat layout and compact tab work).
-- Source: `https://github.com/getpaseo/paseo.git`, fetched as `refs/upstream-releases/v0.10.0-beta.1`, commit `52d345db7f271251787c1099a2fe48fde515f012`.
+- Source: `https://github.com/longbkit/clisbot.git`, fetched as `refs/upstream-releases/v0.10.0-beta.1`, commit `52d345db7f271251787c1099a2fe48fde515f012`.
 - Merged the release, not moving `upstream/main`. The reviewed main tip is one Nix dependency-hash commit beyond this tag.
 - Git reported 17 conflicted paths. All were resolved while retaining the bot/chat implementation; automatic merges were also checked for contract drift.
 
 ### Integration decisions
 
 - Keep upstream's single hello admission flow and `authenticating` state. Credential admission and Fusion managed access are separate gates: a valid password/local credential does not elevate a ticket holder to owner. Keep lease renewal, actor binding, fresh post-open ticket resolution, and structured password rejection. Password failures must not revoke Hub authorization or endlessly reconnect a managed Host.
-- Adapt the existing CLI retry wrapper to the new credential contract, retaining the selected Paseo home and refreshed local credential across ticket refresh. Regression tests cover both credential and ticket together.
+- Adapt the existing CLI retry wrapper to the new credential contract, retaining the selected Clisbot home and refreshed local credential across ticket refresh. Regression tests cover both credential and ticket together.
 - Initialize the canonical timeline store before upstream startup notices are emitted. Preserve canonical tool content and authorship; test storage enabled and disabled. This was a semantic bug in an otherwise cleanly merged part of agent registration.
 - Preserve ACP lifecycle timeouts while adding upstream spawn-error rejection; retain both cleanup paths in daemon shutdown.
 - Reuse upstream settings categorization, Host password storage and dropdown trigger contract. Keep Fusion account/access sections, wide table layout and management metadata. Extract only the small Host label decision to keep the combined upsert readable.

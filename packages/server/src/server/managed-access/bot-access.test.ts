@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { StoredBot } from "@getpaseo/protocol/bots/types";
+import type { StoredBot } from "@clisbot/protocol/bots/types";
 import { allowsBotInbound, allowsBotOutbound } from "./bot-access.js";
 import { PROJECT_CREATION_REPLIES } from "./workspace-management.js";
 

@@ -262,7 +262,7 @@ function injectConnectionHint(
     useTls,
     label,
   };
-  const script = `<script>window.__PASEO_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)}</script>`;
+  const script = `<script>window.__CLISBOT_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)}</script>`;
   const headClose = /<\/head>/i;
   if (headClose.test(html)) {
     return html.replace(headClose, `${script}</head>`);

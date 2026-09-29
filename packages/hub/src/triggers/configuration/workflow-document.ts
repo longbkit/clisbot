@@ -183,7 +183,7 @@ function expressionBody(expression: Expression): string {
       if (path.namespace === "steps")
         return `steps.${path.stepId}.outputs${path.path.length ? `.${path.path.join(".")}` : ""}`;
       if (path.namespace === "values") return `values.${path.name}`;
-      return `paseo.${Array.isArray(path.path) ? path.path.join(".") : path.path}`;
+      return `clisbot.${Array.isArray(path.path) ? path.path.join(".") : path.path}`;
     }
   }
   throw new Error("Unsupported workflow expression");

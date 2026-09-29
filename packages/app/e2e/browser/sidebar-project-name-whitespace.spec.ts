@@ -19,7 +19,7 @@ interface SeededProject {
  * owned until `cleanup`, which removes the daemon record before the directory.
  */
 async function seedProjectNamedWithTrailingSpace(): Promise<SeededProject> {
-  const parentDirectory = await mkdtemp(path.join(tmpdir(), "paseo-e2e-trailing-space-"));
+  const parentDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-trailing-space-"));
   const directoryPath = path.join(parentDirectory, `Reklamation-${randomUUID().slice(0, 8)} `);
   await mkdir(directoryPath);
   await writeFile(path.join(directoryPath, "README.md"), "# Trailing space\n");
@@ -55,7 +55,7 @@ async function expectProjectRow(page: Page, projectKey: string): Promise<void> {
 }
 
 async function expectAppShellRendered(page: Page): Promise<void> {
-  await expect(page.getByText("Paseo ran into a problem.")).toHaveCount(0);
+  await expect(page.getByText("Clisbot ran into a problem.")).toHaveCount(0);
 }
 
 // A project view key carries the project's path, so a directory whose name ends

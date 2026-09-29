@@ -10,7 +10,7 @@ const stored = {
   kind: "personal",
   projectId: "prj_0123456789abcdef",
   workspaceId: "wks_0123456789abcdef",
-  cwd: "/home/me/.paseo/workspaces/ops-bot",
+  cwd: "/home/me/.clisbot/workspaces/ops-bot",
   launch: { provider: "codex", model: "gpt-5.6-luna" },
   template: { id: "personal-assistant", seededAt: "2026-09-26T00:00:00.000Z" },
   owner: { kind: "user", id: "owner" },

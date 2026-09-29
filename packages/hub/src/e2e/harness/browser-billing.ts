@@ -31,7 +31,7 @@ export interface FixtureBillingPrice {
  *   template to stamp; it is not an offer, and `BillingRuntime.publicCatalog` withholds it. Its
  *   zero execution limit is the enforcement floor a customer without a subscription lands on —
  *   E2E asserts it is never rendered as a plan.
- * - `hosted` is the one purchasable plan: Paseo Hub, €15 per user per month, monthly only. There
+ * - `hosted` is the one purchasable plan: Clisbot Hub, €15 per user per month, monthly only. There
  *   is no annual price, so the picker has no interval to switch between.
  *
  * Keep this in step with the live Stripe catalog. A test that needs several plans to exercise
@@ -44,8 +44,8 @@ export const FIXTURE_BILLING_PRODUCTS: readonly FixtureBillingProduct[] = [
     name: "Free",
     active: true,
     metadata: {
-      paseo_plan: "true",
-      paseo_plan_slug: "free",
+      clisbot_plan: "true",
+      clisbot_plan_slug: "free",
       ent_seats_max: "1",
       ent_can_invite: "false",
       ent_executions_monthly_limit: "0",
@@ -54,11 +54,11 @@ export const FIXTURE_BILLING_PRODUCTS: readonly FixtureBillingProduct[] = [
   },
   {
     id: "prod_fixture_hosted",
-    name: "Paseo Hub",
+    name: "Clisbot Hub",
     active: true,
     metadata: {
-      paseo_plan: "true",
-      paseo_plan_slug: "hosted",
+      clisbot_plan: "true",
+      clisbot_plan_slug: "hosted",
       ent_seats_max: "unlimited",
       ent_can_invite: "true",
       ent_executions_monthly_limit: "unlimited",
@@ -110,7 +110,7 @@ export class FixtureStripeCatalogSource {
 
   async listProducts(): Promise<FixtureBillingProduct[]> {
     return [...this.products.values()].filter(
-      (product) => product.metadata["paseo_plan"] === "true",
+      (product) => product.metadata["clisbot_plan"] === "true",
     );
   }
 

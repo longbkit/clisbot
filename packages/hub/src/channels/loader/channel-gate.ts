@@ -1,5 +1,5 @@
 // The channel control-plane kill-switch (plan §14.8 / implementation doc §4.5,
-// env-alias table). `PASEO_HUB_CHANNELS_ENABLED` (operator name
+// env-alias table). `CLISBOT_HUB_CHANNELS_ENABLED` (operator name
 // `CLISBOT_HUB_CHANNELS_ENABLED`) defaults to "1"; the supervisor turns the whole
 // channel plane off with an explicit "0". The loader's entry point reads it and
 // short-circuits BEFORE touching any channel code — no vertical load, no account
@@ -10,7 +10,7 @@
 
 type EnvLike = Record<string, string | undefined>;
 
-const CHANNELS_ENABLED_KEY = "PASEO_HUB_CHANNELS_ENABLED";
+const CHANNELS_ENABLED_KEY = "CLISBOT_HUB_CHANNELS_ENABLED";
 
 function isDisabled(value: string | undefined): boolean {
   if (value === undefined) return false;
@@ -19,7 +19,7 @@ function isDisabled(value: string | undefined): boolean {
 }
 
 /** True when the channel control plane is enabled (the default). The internal
- * `PASEO_HUB_CHANNELS_ENABLED` name is authoritative — the `CLISBOT_*` alias is
+ * `CLISBOT_HUB_CHANNELS_ENABLED` name is authoritative — the `CLISBOT_*` alias is
  * resolved to it at process entry by `env-alias.ts`, so this reads the internal
  * name the fork code uses everywhere. */
 export function isChannelsEnabled(environment: EnvLike = process.env): boolean {

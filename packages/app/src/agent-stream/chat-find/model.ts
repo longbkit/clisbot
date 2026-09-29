@@ -1,4 +1,4 @@
-import type { AgentTimelineSearchPayload } from "@getpaseo/client/internal/daemon-client";
+import type { AgentTimelineSearchPayload } from "@clisbot/client/internal/daemon-client";
 import type { StreamItem } from "@/types/stream";
 
 /**

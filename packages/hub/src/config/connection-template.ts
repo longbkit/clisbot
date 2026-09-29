@@ -1,7 +1,7 @@
 import type { ConnectionResolutionContext, ConnectionResolver } from "./connections.js";
 
 const CONNECTION_EXPRESSION =
-  /^\s*paseo\.connections\.([a-z0-9]+(?:-[a-z0-9]+)*)\.([a-z][a-z0-9_-]*)\s*$/u;
+  /^\s*clisbot\.connections\.([a-z0-9]+(?:-[a-z0-9]+)*)\.([a-z][a-z0-9_-]*)\s*$/u;
 
 export interface ConnectionReference {
   slug: string;
@@ -25,14 +25,14 @@ export function parseConnectionTemplate(
     const end = template.indexOf("}}", start + 3);
     if (end < 0) {
       throw new Error(
-        `${path} contains an unterminated interpolation; expected paseo.connections.<slug>.<value>`,
+        `${path} contains an unterminated interpolation; expected clisbot.connections.<slug>.<value>`,
       );
     }
     const expression = template.slice(start + 3, end);
     const match = CONNECTION_EXPRESSION.exec(expression);
     if (match === null) {
       throw new Error(
-        `${path} contains unsupported interpolation ${template.slice(start, end + 2)}; expected paseo.connections.<slug>.<value>`,
+        `${path} contains unsupported interpolation ${template.slice(start, end + 2)}; expected clisbot.connections.<slug>.<value>`,
       );
     }
     references.push({ slug: match[1]!, value: match[2]! });
@@ -55,7 +55,7 @@ export async function resolveConnectionTemplate(
   let cursor = 0;
   let result = "";
   for (const reference of references) {
-    const expression = `paseo.connections.${reference.slug}.${reference.value}`;
+    const expression = `clisbot.connections.${reference.slug}.${reference.value}`;
     const start = template.indexOf("${{", cursor);
     const end = template.indexOf("}}", start + 3);
     if (start < 0 || end < 0) throw new Error(`invalid connection template at ${path}`);

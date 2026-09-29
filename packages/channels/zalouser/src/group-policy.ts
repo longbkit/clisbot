@@ -1,7 +1,7 @@
 // upstream: extensions/zalouser/src/group-policy.ts@5d8067a4483
 // Zalouser plugin module implements group policy behavior.
-import type { ScopeTree } from "@getpaseo/channels-core/plugin-sdk/channel-policy";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { ScopeTree } from "@clisbot/channels-core/plugin-sdk/channel-policy";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { ZalouserGroupConfig } from "./types.js";
 
 type ZalouserGroups = Record<string, ZalouserGroupConfig>;

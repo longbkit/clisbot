@@ -31,9 +31,9 @@ const registrationModeSchema = z.enum(REGISTRATION_MODES);
 const organizationCreationSchema = z.enum(ORGANIZATION_CREATION_MODES);
 const bootstrapPasswordSchema = z
   .string()
-  .min(PASSWORD_MIN_LENGTH, "PASEO_BOOTSTRAP_OWNER_PASSWORD must be at least 12 characters")
-  .max(128, "PASEO_BOOTSTRAP_OWNER_PASSWORD must not exceed 128 characters")
-  .refine((value) => value.trim().length > 0, "PASEO_BOOTSTRAP_OWNER_PASSWORD must not be blank")
+  .min(PASSWORD_MIN_LENGTH, "CLISBOT_BOOTSTRAP_OWNER_PASSWORD must be at least 12 characters")
+  .max(128, "CLISBOT_BOOTSTRAP_OWNER_PASSWORD must not exceed 128 characters")
+  .refine((value) => value.trim().length > 0, "CLISBOT_BOOTSTRAP_OWNER_PASSWORD must not be blank")
   .refine(
     (value) =>
       (() => {
@@ -43,7 +43,7 @@ const bootstrapPasswordSchema = z
         }
         return true;
       })(),
-    "PASEO_BOOTSTRAP_OWNER_PASSWORD must not contain control characters",
+    "CLISBOT_BOOTSTRAP_OWNER_PASSWORD must not contain control characters",
   );
 
 export function defaultInstanceAuthPolicy(): InstanceAuthPolicy {
@@ -58,26 +58,26 @@ export function readInstanceAuthPolicy(
   environment: Record<string, string | undefined>,
 ): InstanceAuthPolicy {
   const registrationMode = parsePolicyValue(
-    "PASEO_REGISTRATION_MODE",
-    environment["PASEO_REGISTRATION_MODE"],
+    "CLISBOT_REGISTRATION_MODE",
+    environment["CLISBOT_REGISTRATION_MODE"],
     registrationModeSchema,
     REGISTRATION_MODES,
     "invite_only",
   );
   const organizationCreation = parsePolicyValue(
-    "PASEO_ORGANIZATION_CREATION",
-    environment["PASEO_ORGANIZATION_CREATION"],
+    "CLISBOT_ORGANIZATION_CREATION",
+    environment["CLISBOT_ORGANIZATION_CREATION"],
     organizationCreationSchema,
     ORGANIZATION_CREATION_MODES,
     "disabled",
   );
   const allowedDomains = readAllowedDomains(
     registrationMode,
-    environment["PASEO_REGISTRATION_ALLOWED_DOMAINS"],
+    environment["CLISBOT_REGISTRATION_ALLOWED_DOMAINS"],
   );
-  const organizationName = environment["PASEO_BOOTSTRAP_ORGANIZATION"]?.trim() ?? "";
-  const ownerEmail = environment["PASEO_BOOTSTRAP_OWNER_EMAIL"]?.trim() ?? "";
-  const ownerPassword = environment["PASEO_BOOTSTRAP_OWNER_PASSWORD"] ?? "";
+  const organizationName = environment["CLISBOT_BOOTSTRAP_ORGANIZATION"]?.trim() ?? "";
+  const ownerEmail = environment["CLISBOT_BOOTSTRAP_OWNER_EMAIL"]?.trim() ?? "";
+  const ownerPassword = environment["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"] ?? "";
   const suppliedBootstrapFields = [organizationName, ownerEmail, ownerPassword].filter(
     (value) => value.length > 0,
   ).length;
@@ -100,14 +100,14 @@ export function readInstanceAuthPolicy(
   }
   if (suppliedBootstrapFields !== 3) {
     throw new Error(
-      "PASEO_BOOTSTRAP_ORGANIZATION, PASEO_BOOTSTRAP_OWNER_EMAIL, and PASEO_BOOTSTRAP_OWNER_PASSWORD must be supplied together",
+      "CLISBOT_BOOTSTRAP_ORGANIZATION, CLISBOT_BOOTSTRAP_OWNER_EMAIL, and CLISBOT_BOOTSTRAP_OWNER_PASSWORD must be supplied together",
     );
   }
 
   validateBootstrapIdentity(organizationName, ownerEmail);
   bootstrapPasswordSchema.parse(ownerPassword);
   if (normalizeEmail(ownerPassword) === normalizeEmail(ownerEmail)) {
-    throw new Error("PASEO_BOOTSTRAP_OWNER_PASSWORD must not equal the owner email");
+    throw new Error("CLISBOT_BOOTSTRAP_OWNER_PASSWORD must not equal the owner email");
   }
 
   return {
@@ -163,17 +163,17 @@ function readAllowedDomains(
   ];
   for (const domain of domains) {
     if (!DOMAIN_PATTERN.test(domain)) {
-      throw new Error(`PASEO_REGISTRATION_ALLOWED_DOMAINS contains an invalid domain: ${domain}`);
+      throw new Error(`CLISBOT_REGISTRATION_ALLOWED_DOMAINS contains an invalid domain: ${domain}`);
     }
     if (PUBLIC_EMAIL_DOMAINS.has(domain)) {
       throw new Error(
-        `PASEO_REGISTRATION_ALLOWED_DOMAINS must not contain a public email domain: ${domain}`,
+        `CLISBOT_REGISTRATION_ALLOWED_DOMAINS must not contain a public email domain: ${domain}`,
       );
     }
   }
   if (registrationMode === "domain_self_registration" && domains.length === 0) {
     throw new Error(
-      "PASEO_REGISTRATION_ALLOWED_DOMAINS must list at least one domain when PASEO_REGISTRATION_MODE is domain_self_registration",
+      "CLISBOT_REGISTRATION_ALLOWED_DOMAINS must list at least one domain when CLISBOT_REGISTRATION_MODE is domain_self_registration",
     );
   }
   return domains;
@@ -187,9 +187,9 @@ export function emailDomain(email: string): string {
 
 function validateBootstrapIdentity(organizationName: string, ownerEmail: string): void {
   const parsedEmail = z.string().email().safeParse(ownerEmail);
-  if (!parsedEmail.success) throw new Error("PASEO_BOOTSTRAP_OWNER_EMAIL must be a valid email");
+  if (!parsedEmail.success) throw new Error("CLISBOT_BOOTSTRAP_OWNER_EMAIL must be a valid email");
   if (organizationName.length > 100) {
-    throw new Error("PASEO_BOOTSTRAP_ORGANIZATION must not exceed 100 characters");
+    throw new Error("CLISBOT_BOOTSTRAP_ORGANIZATION must not exceed 100 characters");
   }
 }
 

@@ -2564,7 +2564,7 @@ function ChannelAccountForm({
         </View>
       )}
       {configurationKind === "account" ? (
-        // A Connection's first Route also names the bot in Paseo; the name
+        // A Connection's first Route also names the bot in Clisbot; the name
         // defaults from the Connection and is what the list shows.
         <Field
           label="Name"

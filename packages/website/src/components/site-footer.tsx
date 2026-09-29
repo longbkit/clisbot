@@ -120,7 +120,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
               Discord
             </a>
             <a
-              href="https://www.reddit.com/r/PaseoAI/"
+              href="https://www.reddit.com/r/ClisbotAI/"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"
@@ -128,7 +128,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
               Reddit
             </a>
             <a
-              href="https://github.com/getpaseo/paseo"
+              href="https://github.com/longbkit/clisbot"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"
@@ -157,7 +157,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
               Google Play
             </a>
             <a
-              href="https://github.com/getpaseo/paseo/releases"
+              href="https://github.com/longbkit/clisbot/releases"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"

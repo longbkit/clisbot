@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/native-data-blocks.ts@5d8067a4483
 // Shared detection and text fallback for Slack's native chart and table blocks.
-import { readResponseTextLimited } from "@getpaseo/channels-core/plugin-sdk/provider-http";
-import { asOptionalRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { readResponseTextLimited } from "@clisbot/channels-core/plugin-sdk/provider-http";
+import { asOptionalRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { renderSlackBlockFallbackText } from "./blocks-fallback.js";
 import {
   hasSlackDataTableBlock,

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, renderHook } from "@testing-library/react";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import type { BotPayload } from "../data/contracts";

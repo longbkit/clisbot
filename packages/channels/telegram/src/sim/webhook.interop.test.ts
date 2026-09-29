@@ -7,7 +7,7 @@
 // signer that got the header name wrong would still look fine against a
 // receiver that read the body first.
 import { afterEach, describe, expect, it } from "vitest";
-import { createSimWebhookClient, signWebhookRequest } from "@getpaseo/channels-shared/sim";
+import { createSimWebhookClient, signWebhookRequest } from "@clisbot/channels-shared/sim";
 import type { TelegramInboundBuild } from "../fusion/inbound-adapter.js";
 import { startTelegramWebhookSession } from "../fusion/webhook-session.js";
 

@@ -25,7 +25,7 @@ describe("identity colors", () => {
   });
 
   it("derives the same color a project key had before the palette moved", () => {
-    expect(identityColor(deriveIdentityColorName("paseo"))).toBe("#368080");
+    expect(identityColor(deriveIdentityColorName("clisbot"))).toBe("#368080");
     expect(identityColor(deriveIdentityColorName("my-project"))).toBe("#7a6aa8");
     expect(identityColor(deriveIdentityColorName("a"))).toBe("#b06260");
   });

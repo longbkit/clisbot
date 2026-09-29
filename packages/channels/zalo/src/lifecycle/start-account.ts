@@ -13,7 +13,7 @@
 // controller, the reply pipeline and the hosted-media route — are Hub-owned
 // (D-ZL-018).
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
 import { probeZalo } from "../probe.js";
 import { resolveZaloProxyFetch } from "../proxy.js";
 import { normalizeSecretInputString } from "../secret-input.js";

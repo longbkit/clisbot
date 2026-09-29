@@ -3,7 +3,7 @@
 //
 //  1. `registerWebhookTargetWithPluginRoute` binds the path on OpenClaw's
 //     process-wide gateway HTTP server (`src/plugins/http-registry.ts`), which
-//     Fusion does not have (`@getpaseo/channels-core` D-CORE-321). The vertical
+//     Fusion does not have (`@clisbot/channels-core` D-CORE-321). The vertical
 //     owns one `node:http` listener per account (`fusion/webhook-session.ts`)
 //     and registers into the caller-owned map `registerWebhookTarget` keeps, so
 //     the `route` option and its branch are dropped.
@@ -20,8 +20,8 @@
 // spool").
 // Zalo plugin module implements monitor.webhook behavior.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { safeEqualSecret } from "@getpaseo/channels-core/plugin-sdk/security-runtime";
-import { readWebhookBodyOrReject } from "@getpaseo/channels-core/plugin-sdk/webhook-request-guards";
+import { safeEqualSecret } from "@clisbot/channels-core/plugin-sdk/security-runtime";
+import { readWebhookBodyOrReject } from "@clisbot/channels-core/plugin-sdk/webhook-request-guards";
 import {
   createFixedWindowRateLimiter,
   createWebhookAnomalyTracker,

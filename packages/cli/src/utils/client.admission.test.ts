@@ -8,12 +8,12 @@ const mocks = vi.hoisted(() => ({
   resolveTicket: vi.fn(),
 }));
 
-vi.mock("@getpaseo/server/daemon-control", () => ({
+vi.mock("@clisbot/server/daemon-control", () => ({
   waitForDaemonReady: async () => ({ listen: "unix:///selected/daemon.sock" }),
-  resolvePaseoHome: () => "/default/home",
+  resolveClisbotHome: () => "/default/home",
   readLocalCredentialForTarget: mocks.readLocalCredential,
 }));
-vi.mock("@getpaseo/client/internal/daemon-client", () => ({
+vi.mock("@clisbot/client/internal/daemon-client", () => ({
   DaemonClient: class {
     lastError = null;
     constructor(config: Record<string, unknown>) {
@@ -45,7 +45,7 @@ describe("CLI credential and managed admission composition", () => {
     await connectToDaemon({ target: { kind: "instance", home: "/selected/home" } });
 
     expect(mocks.resolveTicket).toHaveBeenCalledWith({
-      paseoHome: "/selected/home",
+      clisbotHome: "/selected/home",
       clientId: "cli-test-id",
     });
     expect(mocks.configs).toHaveLength(2);

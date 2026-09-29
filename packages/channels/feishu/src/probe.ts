@@ -1,11 +1,11 @@
 // upstream: extensions/feishu/src/probe.ts@5d8067a4483
 // Feishu plugin module implements probe behavior.
 import { createHash } from "node:crypto";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import {
   asDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { raceWithTimeoutAndAbort } from "./async.js";
 import { createFeishuClient, type FeishuClientCredentials } from "./client.js";
 import type { FeishuProbeResult } from "./types.js";

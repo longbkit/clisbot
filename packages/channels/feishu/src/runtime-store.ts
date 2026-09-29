@@ -9,8 +9,8 @@ import type {
   ChannelInboundEvent,
   HostRuntime,
   InboundEventDecision,
-} from "@getpaseo/channels-shared";
-import { createInboundEventProcessor } from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
+import { createInboundEventProcessor } from "@clisbot/channels-shared";
 import { disposeFeishuRuntime } from "./fusion/runtime.js";
 
 interface AccountInbound {

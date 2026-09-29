@@ -2,7 +2,7 @@
 //
 // Upstream owns the file-backed session store: where it lives on disk and how an
 // assistant message is appended to a session transcript. Fusion's transcripts are
-// Paseo daemon agent sessions written by the daemon, so the store path is
+// Clisbot daemon agent sessions written by the daemon, so the store path is
 // unavailable and the mirror append reports "not mirrored" instead of becoming a
 // second writer.
 export function resolveSessionStorePathCore(

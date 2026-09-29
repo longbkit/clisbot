@@ -54,7 +54,7 @@ describe("interactive instance setup", () => {
       operatorEmail: "first.operator@example.test",
       operatorName: "first.operator",
       mustChangePassword: false,
-      organizationName: "Paseo Hub",
+      organizationName: "Clisbot Hub",
       completionMatchesOwner: true,
     });
     assert.equal(await setup.status(), "claimed");
@@ -80,7 +80,7 @@ describe("interactive instance setup", () => {
     const state = await durableState(instance.runtime);
     assert.equal(state.operatorEmail, "mo@example.com");
     assert.equal(state.operatorName, "mo");
-    assert.equal(state.organizationName, "Paseo Hub");
+    assert.equal(state.organizationName, "Clisbot Hub");
     await instance.close();
   }, 120_000);
 

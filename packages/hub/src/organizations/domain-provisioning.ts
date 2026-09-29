@@ -23,7 +23,7 @@ export async function provisionDomainMembership(
   input: { domain: string; userId: string },
   entitlement: ProvisioningEntitlement,
 ): Promise<DomainMembership> {
-  await locks.withTxLock(client, `paseo-organization-domain:${input.domain}`);
+  await locks.withTxLock(client, `clisbot-organization-domain:${input.domain}`);
   const claimed = await client.query<{ organization_id: string }>(
     `select organization_id from organization_email_domains where domain = $1`,
     [input.domain],
@@ -41,7 +41,7 @@ export async function provisionDomainMembership(
     );
     return { organizationId: created.id, role: "owner", created: true };
   }
-  await locks.withTxLock(client, `paseo-organization-membership:${organizationId}`);
+  await locks.withTxLock(client, `clisbot-organization-membership:${organizationId}`);
   await client.query(
     `insert into member (id, organization_id, user_id, role)
      values ($1, $2, $3, 'member')

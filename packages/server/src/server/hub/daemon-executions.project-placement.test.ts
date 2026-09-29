@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 test("Project-bound Hub execution rejects traversal and symlink cwd before Agent creation", async () => {
-  temporaryRoot = await mkdtemp(path.join(tmpdir(), "paseo-hub-project-placement-"));
+  temporaryRoot = await mkdtemp(path.join(tmpdir(), "clisbot-hub-project-placement-"));
   const projectRoot = path.join(temporaryRoot, "project");
   const foreignRoot = path.join(temporaryRoot, "foreign");
   await Promise.all([mkdir(projectRoot), mkdir(foreignRoot)]);
@@ -101,7 +101,7 @@ function workspaceRecord(
     branch: null,
     worktreeRoot: cwd,
     baseBranch: null,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: cwd,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",

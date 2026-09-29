@@ -25,9 +25,9 @@
 // lifecycle. This module keeps that path by NOT swallowing an admission error
 // once the retry budget is spent — it swallows only the individual attempt.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { sleep } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { sleep } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import { startZaloListener } from "../zalo-js.js";
 import type { Message } from "../zca-client.js";
 import { isZalouserAuthenticationFailure, type ZalouserAdmission } from "./admission.js";

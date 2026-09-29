@@ -1,6 +1,6 @@
 ---
 title: How Hub works
-description: How a provider event reaches a workflow and a Paseo daemon.
+description: How a provider event reaches a workflow and a Clisbot daemon.
 nav: How it works
 order: 62
 category: Hub
@@ -19,14 +19,14 @@ GitHub / Slack / Discord / manual request
                 workflow
           runs ordered agent steps
                     ↓
-             Paseo daemon
+             Clisbot daemon
              starts the agent
 ```
 
 ## The pieces
 
 - A **connection** lets Hub receive events from GitHub, Slack, or Discord.
-- A **daemon** is a registered machine running the Paseo daemon.
+- A **daemon** is a registered machine running the Clisbot daemon.
 - An **organization** owns Hub configuration, Connections, Members, and registered daemons. Hub has no Project.
 - A daemon **Project** is a filesystem root that owns its Workspaces.
 - A **Channel–Agent Route** selects an agent configuration and daemon environment for direct chat, creating or resuming sessions per conversation.
@@ -57,7 +57,7 @@ When Hub syncs the bundle, it validates every source file and resolves its refer
 - `environment.daemon` must match a registered daemon's friendly slug or immutable ID in the same organization.
 - Step ids, expressions, input filters, output schemas, and durations must be valid.
 - Every finite environment or named-agent result must exist and validate.
-- Prompt partials must resolve below `.paseo/workflows/partials/` at the exact commit.
+- Prompt partials must resolve below `.clisbot/workflows/partials/` at the exact commit.
 
 If activation fails, Hub keeps the previous active revision. The Configuration tab shows the failed sync and its validation error; Activity continues to reflect the last active revision.
 

@@ -4,19 +4,19 @@ workspace:
       path: /workspace/repo
   cwd: /workspace/repo
 triggers:
-  - name: paseo-mention
+  - name: clisbot-mention
     on:
       issue_comment:
-        contains: "@paseo"
+        contains: "@clisbot"
         from_users: []
       pull_request_review_comment:
-        contains: "@paseo"
+        contains: "@clisbot"
         from_users: []
       pull_request_review:
-        contains: "@paseo"
+        contains: "@clisbot"
         from_users: []
       issues:
-        contains: "@paseo"
+        contains: "@clisbot"
         from_users: []
     agent:
       provider: codex/gpt-5.5

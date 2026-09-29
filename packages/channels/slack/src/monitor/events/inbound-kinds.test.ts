@@ -36,13 +36,13 @@ describe("message and slash builders", () => {
   it("marks a native slash command and names the sub-command verb", () => {
     const event = buildSlackSlashCommandEvent(
       {
-        command: "/paseo",
+        command: "/clisbot",
         text: "status now",
         user_id: "U0ALICE",
         channel_id: "C0APP",
         trigger_id: "t1",
       },
-      "/paseo",
+      "/clisbot",
     );
     expect(event?.kind).toBe("command");
     expect(event?.facts?.command).toEqual({ name: "status", args: "now" });
@@ -50,8 +50,8 @@ describe("message and slash builders", () => {
 
   it("reads a bare registered command as help", () => {
     const event = buildSlackSlashCommandEvent(
-      { command: "/paseo", text: "", user_id: "U0ALICE", channel_id: "C0APP", trigger_id: "t2" },
-      "/paseo",
+      { command: "/clisbot", text: "", user_id: "U0ALICE", channel_id: "C0APP", trigger_id: "t2" },
+      "/clisbot",
     );
     expect(event?.facts?.command).toEqual({ name: "help", args: "" });
   });

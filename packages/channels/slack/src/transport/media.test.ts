@@ -8,8 +8,8 @@ import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { SLACK_MAX_MEDIA_BYTES } from "@getpaseo/channels-shared";
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import { SLACK_MAX_MEDIA_BYTES } from "@clisbot/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import type { SlackMessageEvent } from "./socket-event-filter.js";
 import {
   downloadSlackFile,

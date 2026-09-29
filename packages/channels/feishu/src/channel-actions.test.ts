@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createFeishuClient } from "./client.js";
 import { feishuChannelActions, FEISHU_MESSAGE_ACTIONS } from "./channel-actions.js";
 import { buildFeishuTestConfig } from "./fusion/test-config.js";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 
 /** Replaces namespaces on the cached SDK client the ported send path resolves. */
 function fakeSdk(namespaces: Record<string, unknown>): void {

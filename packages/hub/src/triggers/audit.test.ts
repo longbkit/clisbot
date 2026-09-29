@@ -25,7 +25,7 @@ describe("provider event audit logs", () => {
       provider: "github",
       source: "github.issue_comment",
       deliveryId: "delivery-1",
-      repository: "getpaseo/paseo",
+      repository: "longbkit/clisbot",
       acceptance: {
         status: "dropped",
         receiptId: "receipt-1",
@@ -38,7 +38,7 @@ describe("provider event audit logs", () => {
     assert.equal(entry["msg"], "provider event intake completed");
     assert.equal(entry["outcome"], "dropped");
     assert.equal(entry["reason"], "no_project_route");
-    assert.equal(entry["repository"], "getpaseo/paseo");
+    assert.equal(entry["repository"], "longbkit/clisbot");
     assert.equal("payload" in entry, false);
   });
 

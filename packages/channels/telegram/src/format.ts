@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/format.ts@5d8067a4483
-import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { MarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 // Telegram helper module supports format behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   FILE_REF_EXTENSIONS_WITH_TLD,
   isAutoLinkedFileRef,
@@ -10,7 +10,7 @@ import {
   type MarkdownIR,
   renderMarkdownIRChunksWithinLimit,
   tokenizeHtmlTags,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import {
   protectTelegramAssistantTranscriptRoleHeaders,
   TELEGRAM_ASSISTANT_TRANSCRIPT_PREFIX,

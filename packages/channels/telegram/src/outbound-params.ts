@@ -3,7 +3,7 @@
 import {
   parseStrictInteger,
   parseStrictNonNegativeInteger,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 function parseIntegerId(value: unknown): number | undefined {
   return parseStrictInteger(value);

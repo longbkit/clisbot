@@ -5,11 +5,11 @@
 import {
   getChannelStreamingConfigObject,
   resolveChannelStreamingNativeTransport,
-} from "@getpaseo/channels-core/plugin-sdk/channel-streaming-config";
+} from "@clisbot/channels-core/plugin-sdk/channel-streaming-config";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export type StreamingMode = "off" | "partial" | "block" | "progress";
 // Inbound-only: doctor migration still parses these legacy draft-mode values.

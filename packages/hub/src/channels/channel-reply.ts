@@ -34,7 +34,7 @@ import {
   type OutboundPostResult,
 } from "./plane/types.js";
 import type { StagedChannelMedia } from "./media/outbound-stager.js";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   executeChannelSend,
   sendText,
@@ -140,7 +140,7 @@ export function createChannelReplyServer(mcp: ChannelReplyMcp): ChannelReplyServ
     accepts: (token) => mcp.resolveCapability(token) !== undefined,
     async handle(request, token) {
       const server = new Server(
-        { name: "paseo-hub-channel-reply", version: "1.0.0" },
+        { name: "clisbot-hub-channel-reply", version: "1.0.0" },
         { capabilities: { tools: {} } },
       );
       server.setRequestHandler(ListToolsRequestSchema, () => {

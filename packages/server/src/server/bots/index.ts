@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Logger } from "pino";
-import type { BotLaunchDefaults, StoredBot } from "@getpaseo/protocol/bots/types";
+import type { BotLaunchDefaults, StoredBot } from "@clisbot/protocol/bots/types";
 import type { ProjectRegistry, WorkspaceRegistry } from "../workspace-registry.js";
 import {
   BotRequestError,
@@ -24,7 +24,7 @@ import {
  * authorization stays in the session, the service owns storage and provisioning.
  */
 export interface BotServiceDeps {
-  paseoHome: string;
+  clisbotHome: string;
   root: string;
   logger: Logger;
   projectRegistry: ProjectRegistry;
@@ -68,7 +68,7 @@ export function createBotServiceFromConfig(
 }
 
 export function createBotService(deps: BotServiceDeps): BotService {
-  const store = new BotStore(join(deps.paseoHome, "bots"), deps.logger.child({ module: "bots" }));
+  const store = new BotStore(join(deps.clisbotHome, "bots"), deps.logger.child({ module: "bots" }));
   const provisioning: BotProvisioningDeps = { ...deps, store };
   // Slug allocation, the directory and the record are decided under one queue so two
   // `bot.create` calls cannot pick the same home.

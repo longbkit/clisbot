@@ -6,10 +6,10 @@
 //
 // Invariant (STOP < WRITE < START): runs ONLY while the Hub is down — the
 // PGlite cluster in $CLISBOT_HOME is locked by the running Hub. The dev daemon
-// (127.0.0.1:6867, ~/.clisbot-dev) stays up; never ~/.paseo, never 6767.
+// (127.0.0.1:6867, ~/.clisbot-dev) stays up; never ~/.clisbot, never 6767.
 //
 // Scenarios (each derives from the CURRENT active revision, so they compose):
-//   policy   -> add `.paseo/channels/policy.yml`: the two live E2E senders are
+//   policy   -> add `.clisbot/channels/policy.yml`: the two live E2E senders are
 //               mapped to Hub users and assigned `admin`, without which
 //               `mayTrigger` denies every inbound on a `members` route
 //               (policy.ts isConfiguredChannelIdentity). Approval floor:
@@ -86,9 +86,9 @@ const POLICY = {
   },
 };
 
-const POLICY_PATH = ".paseo/channels/policy.yml";
-const SLACK_PATH = ".paseo/channels/slack/personal-assistant.yml";
-const TELEGRAM_PATH = ".paseo/channels/telegram/onboarding-telegram.yml";
+const POLICY_PATH = ".clisbot/channels/policy.yml";
+const SLACK_PATH = ".clisbot/channels/slack/personal-assistant.yml";
+const TELEGRAM_PATH = ".clisbot/channels/telegram/onboarding-telegram.yml";
 
 function routesOf(doc, path) {
   if (!Array.isArray(doc.routes)) fail(`${path} has no routes[]`);

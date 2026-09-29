@@ -12,12 +12,12 @@ This doc records _why_, so the question does not have to be re-litigated from sc
 "Is this file upstream?" has three answers here, and misfiling a path is how a cheap edit turns
 into a merge conflict.
 
-| Class            | Source              | Path mapping                                                  |
-| ---------------- | ------------------- | ------------------------------------------------------------- |
-| `getpaseo/paseo` | `upstream/main`     | identical paths                                               |
-| `getpaseo/hub`   | `hub-upstream/main` | **repo root → `packages/hub/`**                               |
-| OpenClaw         | pinned per package  | per-file `status` in `packages/channels/*/upstream-sync.json` |
-| fusion-original  | nowhere             | —                                                             |
+| Class              | Source              | Path mapping                                                  |
+| ------------------ | ------------------- | ------------------------------------------------------------- |
+| `longbkit/clisbot` | `upstream/main`     | identical paths                                               |
+| `getpaseo/hub`     | `hub-upstream/main` | **repo root → `packages/hub/`**                               |
+| OpenClaw           | pinned per package  | per-file `status` in `packages/channels/*/upstream-sync.json` |
+| fusion-original    | nowhere             | —                                                             |
 
 Two traps: `packages/hub` is **not** fusion code (its upstream lives at the root of
 `getpaseo/hub`), and a channel file's class is per file, not per folder — reformatting a
@@ -99,7 +99,7 @@ Kept here so the trade-offs are known if the question returns.
 | --- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | 1   | Un-split `UserMessage`: one optional `alignRight` prop upstream, gutter moves to a fusion `SessionUserMessage`                | 257 replaced lines → ~5. `message.tsx` takes 57 upstream commits/120d with **7 in the exact region the split moved**        | ~7 semantic conflicts per 4 months in the hottest shared UI file                         |
 | 2   | Stop enumerating fusion variants of `AgentManagerEvent`: one exhaustive `agentIdOf(event)` helper, or a separate subscription | Two variants already cost 5 narrowing sites in 3 upstream files; exclusion lists are O(n) in variants and fail **silently** | Each future fusion event pays again; a missed site is a runtime bug, not a compile error |
-| 3   | Offer `alignRight` to `getpaseo/paseo`                                                                                        | The only action that _eliminates_ divergence rather than shrinking it                                                       | The diff is managed forever                                                              |
+| 3   | Offer `alignRight` to `longbkit/clisbot`                                                                                      | The only action that _eliminates_ divergence rather than shrinking it                                                       | The diff is managed forever                                                              |
 
 If this is reopened, **re-run the measurements first** — several conclusions above inverted once
 measured, including three of my own recommendations.

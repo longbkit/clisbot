@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import { usePermissionHistory } from "./use-permission-history";
 
 interface Page {

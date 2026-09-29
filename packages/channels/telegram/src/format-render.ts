@@ -3,7 +3,7 @@ import {
   type MarkdownIR,
   type MarkdownLinkSpan,
   renderMarkdownWithMarkers,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 
 type TelegramRenderLink = {
   start: number;

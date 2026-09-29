@@ -204,7 +204,7 @@ Names are the contract users learn; these are chosen against
 - **`/cowork`** — the point is moving work between the channel and the app in
   both directions, so the verb names co-working across surfaces, not just "open".
   `/open` and `/app` are accepted aliases for discoverability.
-- **`/effort` = the thinking control** — Paseo's cross-provider term is **thinking
+- **`/effort` = the thinking control** — Clisbot's cross-provider term is **thinking
   option**; "effort" is Codex/OpenAI-native. `/effort` is the user-facing spelling
   and `/thinking` is an alias; both set `thinkingOptionId`.
 - **`/permission` = Mode** — a provider's Mode (plan / default / full-access …)
@@ -238,10 +238,10 @@ the parser runs.
   (console command with a numeric `commandId`) will not deliver an unregistered
   `/word`. Registering ~20 evolving commands per channel is per-channel setup
   that drifts. Instead each channel uses **one** umbrella command
-  (Slack/Google Chat `/paseo <sub>`, Discord one `/paseo` application command)
+  (Slack/Google Chat `/clisbot <sub>`, Discord one `/clisbot` application command)
   whose payload is rewritten to the plain-text form; the vocabulary stays in one
   place. Discord upserts its registration at startup; Google Chat requires
-  the operator to configure `/paseo` in the app console.
+  the operator to configure `/clisbot` in the app console.
 - **Some channels have no slash API at all.** Telegram group messages and Feishu
   are plain text only. There the words above are the whole interface, so the
   parser must accept a bare command with no channel affordance.
@@ -490,18 +490,18 @@ as the audience of every command you run there.
 app — as two short labeled links.
 
 Channels linkify `http(s):` and nothing else. Slack renders link markup around a
-`paseo://` URL as literal text; that is measured, not assumed (post a probe and
+`clisbot://` URL as literal text; that is measured, not assumed (post a probe and
 read `message.blocks` back: the https URL becomes a `link` element, the custom
-scheme stays `text`). And the app registers only the `paseo` scheme — no
+scheme stays `text`). And the app registers only the `clisbot` scheme — no
 `associatedDomains`, no verified intent filters — so no https URL opens it
 directly.
 
 So the app destination is an https URL on the Hub, `GET /api/open/agent/<id>?host=<serverId>`,
 which 302s into the deep link (`channels/session-open-link.ts`). It carries no
 authority: the app still authenticates to the Host, and the route only echoes
-ids that match the daemon's id shape. Without `PASEO_HUB_APP_WEB_URL` there is no
+ids that match the daemon's id shape. Without `CLISBOT_HUB_APP_WEB_URL` there is no
 origin to build either https URL from, and the reply falls back to one bare
-`paseo://` URL — long, but copyable, which link markup would not be.
+`clisbot://` URL — long, but copyable, which link markup would not be.
 
 ## Maintaining this doc
 

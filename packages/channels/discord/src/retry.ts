@@ -5,16 +5,16 @@ import {
   extractErrorCode,
   formatErrorMessage,
   readErrorName,
-} from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { parseStrictNonNegativeInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { parseStrictNonNegativeInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import {
   classifyTransientNetworkErrorCode,
   createChannelApiRetryRunner,
   resolveRetryConfig,
   retryAsync,
   type RetryConfig,
-} from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+} from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { RateLimitError } from "./internal/discord.js";
 
 const DISCORD_RETRY_DEFAULTS = {

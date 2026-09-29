@@ -5,7 +5,7 @@
 // OpenClaw's SQLite-backed `openChannelIngressQueue`, serializes the raw
 // envelope into it and runs its own drain: in Fusion the Hub owns the durable
 // queue (`channel_ingress_queue`) and one drain per account, and the shared
-// inbound processor (`@getpaseo/channels-shared`
+// inbound processor (`@clisbot/channels-shared`
 // `createInboundEventProcessor`) persists the normalized event before it
 // returns.
 //
@@ -17,8 +17,8 @@
 //   `invalid`  — the payload is not a Google Chat envelope; answer 400.
 //   THROW      — admission did NOT happen; answer 5xx so Google redelivers.
 
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/channel-secret-basic-runtime";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/channel-secret-basic-runtime";
 import {
   GoogleChatEventPayloadError,
   parseGoogleChatInboundPayload,

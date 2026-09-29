@@ -1,4 +1,4 @@
-# `@getpaseo/channels-zalouser`
+# `@clisbot/channels-zalouser`
 
 The in-repo **Zalo Personal** channel vertical (goal ledger slice 17), ported from
 `extensions/zalouser/src` at `5d8067a4483`. Hub wiring landed in a follow-up slice;

@@ -45,7 +45,7 @@ run:
     TEAM: core
   github:
     connection: company-github
-    repositories: [paseo/hub]
+    repositories: [clisbot/hub]
   output:
     schema:
       type: object
@@ -108,7 +108,7 @@ describe("trigger form YAML bridge", () => {
     expect(value.run.env).toEqual({ TEAM: "core" });
     expect(value.run.github).toEqual({
       connection: "company-github",
-      repositories: ["paseo/hub"],
+      repositories: ["clisbot/hub"],
     });
     expect(value.run.output).toBeDefined();
     expect(value.run.outputs).toEqual({ "slack.reply": { max: 3 } });
@@ -209,7 +209,7 @@ describe("trigger form YAML bridge", () => {
       githubRepositories: "",
       githubPermissions: "",
       githubDuration: "1h",
-      prompt: "${{ paseo.prompt }}",
+      prompt: "${{ clisbot.prompt }}",
     });
     const projection = projectTriggerForm(initial);
     if (projection.status !== "editable") throw new Error(projection.reason);

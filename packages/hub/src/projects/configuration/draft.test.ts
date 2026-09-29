@@ -18,9 +18,9 @@ import {
 
 const revision = {
   files: [
-    { path: ".paseo/workflows/triage.yml", content: "name: triage" },
-    { path: ".paseo/hub.yml", content: "environments: {}\nagents: {}\n" },
-    { path: ".paseo/workflows/partials/triage/preamble.md", content: "Triage first." },
+    { path: ".clisbot/workflows/triage.yml", content: "name: triage" },
+    { path: ".clisbot/hub.yml", content: "environments: {}\nagents: {}\n" },
+    { path: ".clisbot/workflows/partials/triage/preamble.md", content: "Triage first." },
   ],
 };
 
@@ -31,9 +31,9 @@ describe("configuration bundle draft", () => {
     assert.deepEqual(
       documentsOf(draft).map(({ label }) => label),
       [
-        ".paseo/hub.yml",
-        ".paseo/workflows/partials/triage/preamble.md",
-        ".paseo/workflows/triage.yml",
+        ".clisbot/hub.yml",
+        ".clisbot/workflows/partials/triage/preamble.md",
+        ".clisbot/workflows/triage.yml",
       ],
     );
   });
@@ -47,12 +47,12 @@ describe("configuration bundle draft", () => {
   it("edits only the selected source document", () => {
     const draft = configurationDraft(revision);
     const edited = editSelected(
-      selectDocument(draft, ".paseo/workflows/triage.yml"),
+      selectDocument(draft, ".clisbot/workflows/triage.yml"),
       "name: changed",
     );
     assert.equal(selectedDocument(edited).content, "name: changed");
     assert.equal(
-      edited.files.find(({ path }) => path === ".paseo/hub.yml")?.content,
+      edited.files.find(({ path }) => path === ".clisbot/hub.yml")?.content,
       revision.files[1]?.content,
     );
     assert.equal(isModified(edited, draft), true);
@@ -61,14 +61,14 @@ describe("configuration bundle draft", () => {
   it("adds and removes direct workflows and shared partials", () => {
     const baseline = configurationDraft(revision);
     const withWorkflow = addWorkflow(baseline, "review");
-    assert.equal(withWorkflow.selectedId, ".paseo/workflows/review.yml");
+    assert.equal(withWorkflow.selectedId, ".clisbot/workflows/review.yml");
     const withPartial = addPartial(withWorkflow, "review/checklist");
-    assert.equal(withPartial.selectedId, ".paseo/workflows/partials/review/checklist.md");
+    assert.equal(withPartial.selectedId, ".clisbot/workflows/partials/review/checklist.md");
     assert.equal(selectedDocument(withPartial).language, "markdown");
     assert.equal(
       removeWorkflow(
-        removePartial(withPartial, ".paseo/workflows/partials/review/checklist.md"),
-        ".paseo/workflows/review.yml",
+        removePartial(withPartial, ".clisbot/workflows/partials/review/checklist.md"),
+        ".clisbot/workflows/review.yml",
       ).files.length,
       baseline.files.length,
     );

@@ -85,7 +85,7 @@ function signedInHostView(input: HubWelcomeCardInput): HubWelcomeStatusView {
     return {
       tone: "error",
       badge: "Error",
-      message: "Paseo could not load the Hosts your organization shares.",
+      message: "Clisbot could not load the Hosts your organization shares.",
       actions: ["refreshHosts", "account"],
       primaryAction: "refreshHosts",
     };
@@ -111,7 +111,7 @@ function noHostView(canAddHost: boolean): HubWelcomeStatusView {
     tone: "warning",
     badge: "No Host",
     message: canAddHost
-      ? "No Host shared with you yet. Run `paseo hub login` on the computer you want to use, or connect one of your own below."
+      ? "No Host shared with you yet. Run `clisbot hub login` on the computer you want to use, or connect one of your own below."
       : "No Host shared with you yet. Ask an organization owner or admin for access, or connect one of your own below.",
     actions: ["refreshHosts", "account"],
     primaryAction: null,
@@ -161,7 +161,7 @@ function stalledView(items: readonly HubHostOnboardingItem[]): HubWelcomeStatusV
     message:
       item.serverId === null
         ? `${item.label}: ${hubHostOfferHint(item.status)}`
-        : `Paseo can't reach ${item.label}.`,
+        : `Clisbot can't reach ${item.label}.`,
     actions: ["refreshHosts", "account"],
     primaryAction: null,
   };

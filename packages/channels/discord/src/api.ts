@@ -1,17 +1,17 @@
 // upstream: extensions/discord/src/api.ts@5d8067a4483
 // Discord API module exposes the plugin public contract.
-import { resolveFetch } from "@getpaseo/channels-core/plugin-sdk/fetch-runtime";
-import { redactToolPayloadText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
-import { resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { readResponseTextLimited } from "@getpaseo/channels-core/plugin-sdk/provider-http";
-import { readResponseWithLimit } from "@getpaseo/channels-core/plugin-sdk/response-limit-runtime";
+import { resolveFetch } from "@clisbot/channels-core/plugin-sdk/fetch-runtime";
+import { redactToolPayloadText } from "@clisbot/channels-core/plugin-sdk/logging-core";
+import { resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { readResponseTextLimited } from "@clisbot/channels-core/plugin-sdk/provider-http";
+import { readResponseWithLimit } from "@clisbot/channels-core/plugin-sdk/response-limit-runtime";
 import {
   parseRetryAfterHeaderSeconds,
   resolveRetryConfig,
   retryAsync,
   type RetryConfig,
-} from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { sleepWithAbort } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+} from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { sleepWithAbort } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { isDiscordHtmlResponseBody, summarizeDiscordResponseBody } from "./error-body.js";
 import { parseDiscordRetryAfterBodySeconds } from "./retry-after.js";
 

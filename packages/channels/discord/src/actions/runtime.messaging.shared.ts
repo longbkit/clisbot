@@ -1,12 +1,12 @@
 // upstream: extensions/discord/src/actions/runtime.messaging.shared.ts@5d8067a4483
 import { ChannelType } from "discord-api-types/v10";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { ActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import { readStringParam, withNormalizedTimestamp } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { DiscordActionConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { ActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import { readStringParam, withNormalizedTimestamp } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { DiscordActionConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 // Discord plugin module implements runtime.messaging.shared behavior.
-import { resolveOpenProviderRuntimeGroupPolicy } from "@getpaseo/channels-core/plugin-sdk/runtime-group-policy";
+import { resolveOpenProviderRuntimeGroupPolicy } from "@clisbot/channels-core/plugin-sdk/runtime-group-policy";
 import { mergeDiscordAccountConfig, resolveDefaultDiscordAccountId } from "../accounts.js";
 import { isDiscordThreadChannelType } from "../channel-type.js";
 import { createDiscordRuntimeAccountContext } from "../client.js";

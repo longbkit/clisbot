@@ -1,5 +1,5 @@
 // upstream: extensions/slack/src/monitor/enterprise-install.test.ts@5d8067a4483
-import type { SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
 import {
   assertEnterpriseSlackBindingsAreWorkspaceQualified,

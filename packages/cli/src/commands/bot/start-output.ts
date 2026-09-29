@@ -7,7 +7,7 @@ import type { BotStartReport } from "./run.js";
 export function botRestartCommand(home: string, name: string, ownerEmail?: string): string {
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   const entry = process.argv[1];
-  const executable = entry && /[\\/]bin[\\/]paseo$/.test(entry) ? quote(entry) : "paseo";
+  const executable = entry && /[\\/]bin[\\/]clisbot$/.test(entry) ? quote(entry) : "clisbot";
   return (
     `${executable} bot start --home ${quote(home)} --bot-name ${quote(name)}` +
     (ownerEmail ? ` --owner-email ${quote(ownerEmail)}` : "")

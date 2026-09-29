@@ -11,7 +11,7 @@ import type {
   PluginStateEntry,
   PluginStateKeyedStore,
   PluginStateSyncKeyedStore,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
+} from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
 import { setTelegramRuntime } from "../runtime.js";
 
 function memoryStore<TValue>(map: Map<string, TValue>): PluginStateKeyedStore<TValue> {

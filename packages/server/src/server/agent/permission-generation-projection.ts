@@ -6,9 +6,9 @@ import {
 import type { AgentPermissionRequest } from "./agent-sdk-types.js";
 
 function projectRequest<T extends AgentPermissionRequest>(request: T): T {
-  if (!request.metadata || !("paseoPermissionGeneration" in request.metadata)) return request;
+  if (!request.metadata || !("clisbotPermissionGeneration" in request.metadata)) return request;
   const metadata = { ...request.metadata };
-  delete metadata.paseoPermissionGeneration;
+  delete metadata.clisbotPermissionGeneration;
   return { ...request, metadata };
 }
 function projectSnapshot<T extends AgentSnapshotPayload | null>(agent: T): T {

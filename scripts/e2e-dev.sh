@@ -2,9 +2,9 @@
 # Channel E2E dev loop — one command per step of the fix/restart/verify cycle
 # (2026-08-26 review: stop hand-typing env). Encodes the fixed dev state:
 #
-#   home     ~/.clisbot-dev   (CLISBOT_HOME — never ~/.paseo, never .dev/paseo-home)
-#   hub      127.0.0.1:6868   via `node packages/cli/bin/paseo hub start`
-#   daemon   127.0.0.1:6867   PASEO_PASSWORD sourced from ~/.clisbot-dev/.daemon-password (0600)
+#   home     ~/.clisbot-dev   (CLISBOT_HOME — never ~/.clisbot, never .dev/clisbot-home)
+#   hub      127.0.0.1:6868   via `node packages/cli/bin/clisbot hub start`
+#   daemon   127.0.0.1:6867   CLISBOT_PASSWORD sourced from ~/.clisbot-dev/.daemon-password (0600)
 #   hub data ~/.clisbot-dev/hub (PGlite + channel runtime)
 #   log      ~/.clisbot-dev/hub.log
 #
@@ -24,17 +24,17 @@ HOME_DEV="${CLISBOT_HOME:-$HOME/.clisbot-dev}"
 HUB_DATA_DIR="${CLISBOT_HUB_DATA_DIR:-$HOME_DEV/hub}"
 PW_FILE="$HOME_DEV/.daemon-password"
 LOG_FILE="$HOME_DEV/hub.log"
-CLI=(node "$REPO_ROOT/packages/cli/bin/paseo")
+CLI=(node "$REPO_ROOT/packages/cli/bin/clisbot")
 
 source_password() {
-  # PASEO_PASSWORD (daemon WS subprotocol auth) — never hand-typed.
+  # CLISBOT_PASSWORD (daemon WS subprotocol auth) — never hand-typed.
   if [ -f "$PW_FILE" ]; then
     set -a
     # shellcheck disable=SC1090
     . "$PW_FILE"
     set +a
   else
-    echo "warn: $PW_FILE not found — hub will start without PASEO_PASSWORD" >&2
+    echo "warn: $PW_FILE not found — hub will start without CLISBOT_PASSWORD" >&2
   fi
 }
 

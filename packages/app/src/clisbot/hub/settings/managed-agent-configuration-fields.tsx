@@ -1,7 +1,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import type { AgentProfilePicker } from "@/agent-profiles";
 import { useAgentProfiles } from "@/agent-profiles";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
@@ -48,7 +48,7 @@ function configurationHint(input: {
   return undefined;
 }
 
-/** Shared Agent controls for Channel and Automation authoring on every Paseo platform. */
+/** Shared Agent controls for Channel and Automation authoring on every Clisbot platform. */
 export function ManagedAgentConfigurationFields({
   serverId,
   cwd,

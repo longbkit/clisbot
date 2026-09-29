@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useSessionStore } from "@/stores/session-store";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 export function useChatVisibility(
   serverId: string,
   chatId: string,

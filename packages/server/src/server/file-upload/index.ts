@@ -4,14 +4,14 @@ import { createDurableDirectory, writeDurableJson } from "../agent/session-stora
 import { registerSessionUpload } from "./session-files.js";
 import { basename, dirname, extname, join } from "node:path";
 
-import { FileTransferOpcode, type FileTransferFrame } from "@getpaseo/protocol/binary-frames/index";
-import { getErrorMessage } from "@getpaseo/protocol/error-utils";
+import { FileTransferOpcode, type FileTransferFrame } from "@clisbot/protocol/binary-frames/index";
+import { getErrorMessage } from "@clisbot/protocol/error-utils";
 import type { AgentAttachment, FileUploadRequest, FileUploadResponse } from "../messages.js";
 
 type UploadedFileAttachment = Extract<AgentAttachment, { type: "uploaded_file" }>;
 
 interface FileUploadStoreOptions {
-  paseoHome: string;
+  clisbotHome: string;
   staleUploadTimeoutMs?: number;
   sessionStorageEnabled?: () => boolean;
   resolveAgentDirectory?: (agentId: string) => Promise<string>;
@@ -48,14 +48,14 @@ const MAX_COMPLETED_UPLOADS = 256;
 export class FileUploadStore {
   private static readonly defaultStaleUploadTimeoutMs = 10 * 60 * 1000;
 
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   private readonly staleUploadTimeoutMs: number;
   private readonly defaultSource = {};
   private readonly pending = new Map<object, Map<string, PendingUpload>>();
   private readonly completed = new Map<string, UploadedFileAttachment>();
 
   constructor(private readonly options: FileUploadStoreOptions) {
-    this.paseoHome = options.paseoHome;
+    this.clisbotHome = options.clisbotHome;
     this.staleUploadTimeoutMs =
       options.staleUploadTimeoutMs ?? FileUploadStore.defaultStaleUploadTimeoutMs;
   }
@@ -73,7 +73,7 @@ export class FileUploadStore {
     const fileName = sanitizeFileName(request.fileName);
     const durable = this.options.sessionStorageEnabled?.() === true;
     const id = `upload_${randomUUID()}`;
-    const uploadDir = join(this.paseoHome, "uploads", id);
+    const uploadDir = join(this.clisbotHome, "uploads", id);
     const upload: PendingUpload = {
       requestId: request.requestId,
       id,
@@ -167,7 +167,7 @@ export class FileUploadStore {
     for (const attachment of attachments) {
       if (attachment.type !== "uploaded_file" || !this.ownsUploadedFile(attachment)) continue;
       this.completed.delete(attachment.id);
-      const temporaryDirectory = join(this.paseoHome, "uploads", attachment.id);
+      const temporaryDirectory = join(this.clisbotHome, "uploads", attachment.id);
       if (dirname(attachment.path) === temporaryDirectory)
         await rm(temporaryDirectory, { recursive: true, force: true });
     }
@@ -218,7 +218,7 @@ export class FileUploadStore {
     }
     if (upload.durable) {
       upload.unregister = await registerSessionUpload(
-        upload.sessionDirectory ?? this.paseoHome,
+        upload.sessionDirectory ?? this.clisbotHome,
         async () => {
           this.clearPendingUpload(upload);
           await upload.queue;

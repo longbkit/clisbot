@@ -84,6 +84,6 @@ async function applyLoginConnection(
   await ensureDaemonConnection(origin, environment, true, DEFAULT_HUB_CONNECTION_PERMISSIONS);
   reportMessage(
     environment,
-    "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  paseo hub disconnect",
+    "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  clisbot hub disconnect",
   );
 }

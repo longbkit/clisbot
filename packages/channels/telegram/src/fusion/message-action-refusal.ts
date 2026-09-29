@@ -15,12 +15,12 @@
 // jsonResult, still `ok: false`, only `reason` and `hint` say what happened.
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import { jsonResult } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import { jsonResult } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 /** The distinct reason a swallowed refusal reports instead of `"error"`. */
 export const TELEGRAM_UNBOUND_MUTATION_REASON = "unbound_topic_mutation";

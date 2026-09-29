@@ -4,13 +4,13 @@ import {
   compileAllowlist,
   resolveCompiledAllowlistMatch,
   type AllowlistMatch,
-} from "@getpaseo/channels-core/plugin-sdk/allow-from";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/allow-from";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   normalizeHyphenSlug,
   normalizeStringEntries,
   normalizeStringEntriesLower,
-} from "@getpaseo/channels-core/plugin-sdk/string-normalization-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-normalization-runtime";
 import { parseSlackTarget } from "../target-parsing.js";
 
 const SLACK_SLUG_CACHE_MAX = 512;

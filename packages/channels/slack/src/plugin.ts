@@ -16,7 +16,7 @@
 //    upload functions under their upstream names, alongside the unchanged
 //    Fusion drive verbs `sendText` / `sendMedia` / `typing` / `updateText`.
 
-import type { ChannelPlugin } from "@getpaseo/channels-shared";
+import type { ChannelPlugin } from "@clisbot/channels-shared";
 import {
   deleteSlackMessage,
   downloadSlackFile,

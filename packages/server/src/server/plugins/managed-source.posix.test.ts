@@ -15,13 +15,13 @@ afterEach(async () => {
 });
 
 async function createRepository(): Promise<string> {
-  const repository = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-repository-"));
+  const repository = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-repository-"));
   roots.push(repository);
   await runGitCommand(["init", "-b", "main"], { cwd: repository });
-  await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
-  await runGitCommand(["config", "user.email", "paseo@example.test"], { cwd: repository });
+  await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
+  await runGitCommand(["config", "user.email", "clisbot@example.test"], { cwd: repository });
   await writeFile(
-    path.join(repository, "paseo-plugin.json"),
+    path.join(repository, "clisbot-plugin.json"),
     JSON.stringify({ id: "managed-example" }),
   );
   await writeFile(path.join(repository, "index.server.ts"), "export default () => () => {};\n");
@@ -38,7 +38,7 @@ async function commitAll(repository: string, message: string): Promise<string> {
 
 describe("managed Git plugin sources", () => {
   it("does not expose Git URL credentials when cloning fails", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-home-"));
     roots.push(home);
     const sources = new ManagedPluginSources(home);
 
@@ -50,7 +50,7 @@ describe("managed Git plugin sources", () => {
 
   it("normalizes explicit GitHub identifiers and shorthand to the same Git source", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-github-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-github-home-"));
     roots.push(home);
     const overlay = {
       GIT_CONFIG_COUNT: "1",
@@ -83,7 +83,7 @@ describe("managed Git plugin sources", () => {
 
   it("offers current default HEAD after installing a tag", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-home-"));
     roots.push(home);
     const remote = pathToFileURL(repository).href;
     const sources = new ManagedPluginSources(home);
@@ -152,7 +152,7 @@ describe("managed Git plugin sources", () => {
   }, 30_000);
   it("resolves branch, tag and commit installs against changed default HEAD and preserves the reviewed commit", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-review-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-review-"));
     roots.push(home);
     const remote = pathToFileURL(repository).href;
     const initial = (await runGitCommand(["rev-parse", "HEAD"], { cwd: repository })).stdout.trim();
@@ -214,7 +214,7 @@ describe("managed Git plugin sources", () => {
     const repository = await createRepository();
     const nested = path.join(repository, "plugins", "review");
     await mkdir(nested, { recursive: true });
-    for (const name of ["paseo-plugin.json", "index.server.ts"])
+    for (const name of ["clisbot-plugin.json", "index.server.ts"])
       await rename(path.join(repository, name), path.join(nested, name));
     await commitAll(repository, "nested plugin");
     await runGitCommand(["update-server-info"], { cwd: repository });
@@ -235,7 +235,7 @@ describe("managed Git plugin sources", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Expected HTTP port");
     const remote = `http://fixture:fake-secret@127.0.0.1:${address.port}/`;
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-credential-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-credential-"));
     roots.push(home);
     try {
       const sources = new ManagedPluginSources(home);
@@ -248,7 +248,7 @@ describe("managed Git plugin sources", () => {
         (
           await runGitCommand(["remote", "get-url", "origin"], { cwd: candidate.directory })
         ).stdout.trim(),
-      ).toBe("https://paseo.invalid/plugin.git");
+      ).toBe("https://clisbot.invalid/plugin.git");
       const before = await sources.describe("nested", candidate.directory);
       expect(before.identity).toEqual({
         kind: "git",

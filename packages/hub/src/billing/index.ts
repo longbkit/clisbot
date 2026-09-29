@@ -83,7 +83,7 @@ function billingLockKey(organizationId: string): string {
 
 /**
  * The internal entitlement record a hosted organization is stamped with before it pays and again
- * after it cancels. Identified by its `paseo_plan_slug` metadata, mirrored as `billing_plans.slug`
+ * after it cancels. Identified by its `clisbot_plan_slug` metadata, mirrored as `billing_plans.slug`
  * — so which product carries the floor is set in the Stripe dashboard, not hardcoded here (the
  * plan's "Stripe is the source of truth" rule).
  *

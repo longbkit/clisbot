@@ -17,8 +17,8 @@ import type {
   FetchRecentProviderSessionsRequestMessage,
   ImportAgentRequestMessageSchema,
   RecentProviderSessionDescriptorPayload,
-} from "@getpaseo/protocol/messages";
-import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+} from "@clisbot/protocol/messages";
+import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { createRealpathAwarePathMatcher } from "../../utils/path.js";
 
 type ImportAgentRequestMessage = z.infer<typeof ImportAgentRequestMessageSchema>;

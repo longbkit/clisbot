@@ -18,7 +18,7 @@
 // per process and is replaced on every drive, so it always reflects the Hub's
 // current revision.
 
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 let driveConfig: OpenClawConfig | undefined;
 

@@ -142,8 +142,8 @@ export class SessionTurns {
           }
         : {}),
       metadata: {
-        ...(options?.clientMessageId ? { paseoClientMessageId: options.clientMessageId } : {}),
-        ...(output ? { paseoOutputSchema: output.schema } : {}),
+        ...(options?.clientMessageId ? { clisbotClientMessageId: options.clientMessageId } : {}),
+        ...(output ? { clisbotOutputSchema: output.schema } : {}),
       },
     });
   }
@@ -215,7 +215,7 @@ export class SessionTurns {
       ...this.promptInput(prompt),
       delivery: "steer",
       metadata: options.clientMessageId
-        ? { paseoClientMessageId: options.clientMessageId }
+        ? { clisbotClientMessageId: options.clientMessageId }
         : undefined,
     });
     if (options.clearPendingPermissions) await this.options.clearPermissions();

@@ -12,7 +12,7 @@ import type {
   InboundReplyParams,
   InboundReplyResult,
   KeyedStoreEntry,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import type { API, LoginQRCallbackEvent, Message } from "../zca-client.js";
 
 /** A HostRuntime backed by in-process Maps, one per opened namespace. */

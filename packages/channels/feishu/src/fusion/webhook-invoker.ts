@@ -6,7 +6,7 @@
 // its own drain. In Fusion the Hub owns the durable queue
 // (`channel_ingress_queue`) and one drain per account, and the shared inbound
 // processor persists the normalized event before it returns
-// (`@getpaseo/channels-shared` `createInboundEventProcessor`). What survives is
+// (`@clisbot/channels-shared` `createInboundEventProcessor`). What survives is
 // the contract the ported webhook transport depends on, because it is what
 // makes the HTTP 200 honest: only a `durable` invocation may carry the
 // accepted marker; a throw means nothing was admitted and the caller answers

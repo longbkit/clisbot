@@ -1,5 +1,5 @@
 // upstream: extensions/slack/src/send-results.ts@5d8067a4483
-import { createMessageReceiptFromOutboundResults } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+import { createMessageReceiptFromOutboundResults } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import type { SlackSendResult } from "./send.js";
 
 export function mergeSlackSendResults(results: readonly SlackSendResult[]): SlackSendResult {

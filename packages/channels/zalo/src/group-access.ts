@@ -1,7 +1,7 @@
 // upstream: extensions/zalo/src/group-access.ts@5d8067a4483
 // Zalo plugin module implements group access behavior.
-import type { GroupPolicy } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveOpenProviderRuntimeGroupPolicy } from "@getpaseo/channels-core/plugin-sdk/runtime-group-policy";
+import type { GroupPolicy } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveOpenProviderRuntimeGroupPolicy } from "@clisbot/channels-core/plugin-sdk/runtime-group-policy";
 
 const ZALO_ALLOW_FROM_PREFIX_RE = /^(zalo|zl):/i;
 

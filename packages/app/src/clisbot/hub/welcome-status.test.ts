@@ -104,7 +104,7 @@ describe("Welcome Hub card", () => {
       kind: "status",
       view: {
         tone: "error",
-        message: "Paseo could not load the Hosts your organization shares.",
+        message: "Clisbot could not load the Hosts your organization shares.",
         primaryAction: "refreshHosts",
       },
     });
@@ -126,7 +126,7 @@ describe("Welcome Hub card", () => {
       view: {
         badge: "No Host",
         message:
-          "No Host shared with you yet. Run `paseo hub login` on the computer you want to use, or connect one of your own below.",
+          "No Host shared with you yet. Run `clisbot hub login` on the computer you want to use, or connect one of your own below.",
         primaryAction: null,
       },
     });
@@ -169,13 +169,13 @@ describe("Welcome Hub card", () => {
   );
 
   it.each(["offline", "error"] as const)(
-    "reports a saved Host Paseo cannot reach (%s)",
+    "reports a saved Host Clisbot cannot reach (%s)",
     (status) => {
       expect(resolveHubWelcomeCard(input({ items: [item(status, "mac-a")] }))).toMatchObject({
         kind: "status",
         view: {
           badge: hubHostStatusPresentation(status).label,
-          message: "Paseo can't reach mac-a.",
+          message: "Clisbot can't reach mac-a.",
           primaryAction: null,
         },
       });

@@ -9,7 +9,7 @@ and status first, then where to read more.
 One folder per agent. Three files carry everything.
 
 ```text
-$PASEO_HOME/
+$CLISBOT_HOME/
 ├── uploads/                                  # Temporary uploads, before an agent exists
 └── agents/{sanitized-cwd}/{agentId}/
     ├── session.json                          # Session record: config, workspace, resume, authorship
@@ -101,7 +101,7 @@ Known cleanups, not blocking:
 
 - `paged-journal.ts` now only imports pre-canonical sessions; its write path and crash tests no
   longer cover production and should be reduced to a reader.
-- The 100,000-row ceiling is an opt-in diagnostic (`PASEO_SESSION_STORAGE_CEILING`), passing at
+- The 100,000-row ceiling is an opt-in diagnostic (`CLISBOT_SESSION_STORAGE_CEILING`), passing at
   291 s. It stays optional.
 - Native, relay and real-provider behaviour are unchanged by the last iteration and unproven here.
 

@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { extensionForMime } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+import { extensionForMime } from "@clisbot/channels-core/plugin-sdk/media-runtime";
 import { normalizeFeishuExternalKey } from "../external-keys.js";
 import { createFeishuClient } from "../client.js";
 import { resolveFeishuRuntimeAccount } from "../accounts.js";

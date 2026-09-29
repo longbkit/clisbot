@@ -54,7 +54,7 @@ describe("local owner onboarding on embedded storage", () => {
       expect((await ops.addChannel(request("PUT", {}, false))).status).toBe(401);
       const crossOrigin = request("POST", {});
       crossOrigin.headers.set("origin", "https://untrusted.example");
-      crossOrigin.headers.set("x-paseo-trusted-request-origin", "http://localhost");
+      crossOrigin.headers.set("x-clisbot-trusted-request-origin", "http://localhost");
       expect((await ops.addChannel(crossOrigin)).status).toBe(401);
       const prepared = await ops.addChannel(request("PUT", {}));
       expect(prepared.status).toBe(200);
@@ -159,7 +159,7 @@ describe("local owner onboarding on embedded storage", () => {
         UNLIMITED_PROVISIONING,
       );
       expect(await database.listProjectsForOrganization(legacy.id)).toHaveLength(1);
-      vi.stubEnv("PASEO_HUB_CHANNELS_ENABLED", "0");
+      vi.stubEnv("CLISBOT_HUB_CHANNELS_ENABLED", "0");
       expect((await ops.addChannel(request("PUT", {}))).status).toBe(404);
     } finally {
       vi.unstubAllEnvs();

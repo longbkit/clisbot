@@ -111,16 +111,16 @@ describe("GitHub App authentication", () => {
           input instanceof Request && init === undefined ? input : new Request(input, init);
         assert.equal(request.headers.get("authorization"), "token scoped-installation-token");
         requests.push(`${request.method} ${new URL(request.url).pathname}`);
-        return Response.json({ id: 9876, login: "paseo[bot]" });
+        return Response.json({ id: 9876, login: "clisbot[bot]" });
       },
     });
 
-    const first = await auth.getAppBotIdentity("paseo", "scoped-installation-token");
-    const cached = await auth.getAppBotIdentity("paseo", "another-installation-token");
+    const first = await auth.getAppBotIdentity("clisbot", "scoped-installation-token");
+    const cached = await auth.getAppBotIdentity("clisbot", "another-installation-token");
 
-    assert.deepEqual(first, { id: 9876, login: "paseo[bot]" });
+    assert.deepEqual(first, { id: 9876, login: "clisbot[bot]" });
     assert.deepEqual(cached, first);
-    assert.deepEqual(requests, ["GET /users/paseo%5Bbot%5D"]);
+    assert.deepEqual(requests, ["GET /users/clisbot%5Bbot%5D"]);
   });
 });
 

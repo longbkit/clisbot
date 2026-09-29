@@ -4,18 +4,18 @@
 // (`openclaw/plugin-sdk/plugin-state-runtime`) through the global plugin runtime
 // store. The Hub owns channel state in Fusion and exposes one async keyed-store
 // root per account (`HostRuntime.state.openKeyedStore`,
-// `@getpaseo/channels-shared`). This module installs a `PluginRuntime` over it so
+// `@clisbot/channels-shared`). This module installs a `PluginRuntime` over it so
 // every ported store keeps its upstream interface and call flow. It is the same
 // adapter the Telegram vertical ships, minus the sync-store half: nothing in the
 // ported Google Chat closure opens a synchronous keyed store.
-import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@clisbot/channels-shared";
 import {
   clearChannelSubsystemLogSink,
   installChannelSubsystemLogSink,
-} from "@getpaseo/channels-shared";
-import type { PluginRuntime } from "@getpaseo/channels-core/plugin-sdk/channel-core";
-import type { PluginStateKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { setVerbose } from "@getpaseo/channels-core/globals";
+} from "@clisbot/channels-shared";
+import type { PluginRuntime } from "@clisbot/channels-core/plugin-sdk/channel-core";
+import type { PluginStateKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { setVerbose } from "@clisbot/channels-core/globals";
 import { currentGoogleChatAccountId, setGoogleChatRuntime } from "../runtime.js";
 
 function toPluginStateKeyedStore<TValue>(

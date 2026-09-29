@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import type { BotPayload } from "../data/contracts";
 import { ChatParticipantSettings } from "./chat-participant-settings";

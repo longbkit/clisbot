@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/recipient-resolution.ts@5d8067a4483
 // Discord plugin module implements recipient resolution behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
 import { resolveDiscordAccount } from "./accounts.js";
 import { parseAndResolveDiscordTarget } from "./target-resolver.js";
 import type { DiscordTargetParseOptions } from "./targets.js";

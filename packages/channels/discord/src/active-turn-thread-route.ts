@@ -1,5 +1,5 @@
 // upstream: extensions/discord/src/active-turn-thread-route.ts@5d8067a4483
-import { normalizeOptionalString as normalizeId } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString as normalizeId } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 type ActiveDiscordTurnThreadRoute = {
   accountId?: string;
   sourceChannelId: string;

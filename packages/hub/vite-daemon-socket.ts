@@ -51,7 +51,7 @@ export function attachDaemonSocketUpgrade(
 export function daemonSocketDevelopmentPlugin(): Plugin {
   let dispose: (() => void) | undefined;
   return {
-    name: "paseo-hub:daemon-socket",
+    name: "clisbot-hub:daemon-socket",
     apply: "serve",
     configureServer(server) {
       if (server.httpServer === null) return;
@@ -70,7 +70,7 @@ export function daemonSocketDevelopmentPlugin(): Plugin {
         },
         (error) => {
           const message = error instanceof Error ? error.message : "Unknown upgrade failure";
-          server.config.logger.error(`[paseo-hub:daemon-socket] ${message}`);
+          server.config.logger.error(`[clisbot-hub:daemon-socket] ${message}`);
         },
       );
     },

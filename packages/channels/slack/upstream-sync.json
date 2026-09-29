@@ -740,7 +740,7 @@
     {
       "id": "D-017",
       "file": "src/transport/media.ts",
-      "reason": "Provenance: gathers `monitor/media.ts` (download URL, Bearer headers, Slack-host allowlist) and `types.ts` (`SlackFile` fields) on top of the shared download/manifest helpers in `@getpaseo/channels-shared`.",
+      "reason": "Provenance: gathers `monitor/media.ts` (download URL, Bearer headers, Slack-host allowlist) and `types.ts` (`SlackFile` fields) on top of the shared download/manifest helpers in `@clisbot/channels-shared`.",
       "tests": ["src/transport/media.test.ts"]
     },
     {
@@ -872,7 +872,7 @@
     {
       "id": "D-045",
       "file": "src/markdown-tables.ts",
-      "reason": "Fusion Text forward and channel_reply.message carry raw Markdown without a presentation. The Slack drive adapter parses table source ranges with markdown-core and compiles ordered prose/table blocks through the existing presentation sender, rendering the document together to preserve reference links and container context. Slack defaults to block only for capable renderers; markdown.tables code/bullets/off remain opt-outs, with account overrides taking precedence. The same compiler serves edit-based drafts, letting the edit owner derive fallback text once. Fenced examples are ignored; quoted/list, empty-cell and oversized tables retain a code fallback. The Hub and Paseo wire contracts are unchanged.",
+      "reason": "Fusion Text forward and channel_reply.message carry raw Markdown without a presentation. The Slack drive adapter parses table source ranges with markdown-core and compiles ordered prose/table blocks through the existing presentation sender, rendering the document together to preserve reference links and container context. Slack defaults to block only for capable renderers; markdown.tables code/bullets/off remain opt-outs, with account overrides taking precedence. The same compiler serves edit-based drafts, letting the edit owner derive fallback text once. Fenced examples are ignored; quoted/list, empty-cell and oversized tables retain a code fallback. The Hub and Clisbot wire contracts are unchanged.",
       "tests": ["src/markdown-tables.test.ts", "src/outbound.test.ts", "src/send.blocks.test.ts"]
     }
   ]

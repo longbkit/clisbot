@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SessionOperationTickets } from "./session-operation-tickets.js";
-import { sessionOperationContent } from "@getpaseo/protocol/session-operation";
+import { sessionOperationContent } from "@clisbot/protocol/session-operation";
 
 describe("operation identity tickets", () => {
   it("binds the sender snapshot to daemon, channel socket and exact operation; redemption is repeatable", () => {

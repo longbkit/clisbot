@@ -1,4 +1,4 @@
-# Hub wiring for `@getpaseo/channels-zalouser`
+# Hub wiring for `@clisbot/channels-zalouser`
 
 Slice 17 built the vertical only. This file is the exact list of Hub changes the
 follow-up slice must make, in the shape slices 13b/13c made them for Discord. It
@@ -41,14 +41,14 @@ Add under `channels`, mirroring the Zalo Official Bot entry:
     "dist": { "integrity": "sha512-…" }   // sync reference only; nothing loads it
   },
   "loadMode": "in-repo",
-  "inRepoPackage": "@getpaseo/channels-zalouser",
+  "inRepoPackage": "@clisbot/channels-zalouser",
   "entry": "./dist/index.js",
   "plugin": { "specifier": "./dist/plugin.js", "exportName": "zalouserPlugin" },
   "notices": "zalouser"
 }
 ```
 
-The loader's in-repo allowlist needs `@getpaseo/channels-zalouser`.
+The loader's in-repo allowlist needs `@clisbot/channels-zalouser`.
 
 ## 3. Enums, schema, migration
 

@@ -1,5 +1,5 @@
 // upstream: extensions/zalouser/src/text-styles-shared.ts@5d8067a4483
-import type { MarkdownIR } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import type { MarkdownIR } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import { TextStyle, type Style } from "./zca-constants.js";
 
 export type MarkdownBlockMetadata = {

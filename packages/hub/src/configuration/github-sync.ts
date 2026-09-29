@@ -60,7 +60,7 @@ export async function synchronizeGitHubProjectConfiguration(input: {
       installationId: input.installationId,
       repositoryId: input.repositoryId,
       commitSha: input.commitSha,
-      prefix: ".paseo",
+      prefix: ".clisbot",
     });
   } catch (error) {
     reportConfigurationSyncFailure(error, "bundle-list", input.projectId);

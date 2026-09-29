@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/authored-text.ts@5d8067a4483
 // Slack-private authored text placement after block compilation.
-import type { LegacyInteractiveReply } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { LegacyInteractiveReply } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export type SlackAuthoredTextPlacement = "none" | "blocks" | "outside-blocks";
 

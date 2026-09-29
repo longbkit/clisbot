@@ -179,7 +179,7 @@ export class HubFaultProxy {
       this.events.push(
         `${generation}: daemon accepted ${
           request.url ?? "/"
-        } daemon=${String(request.headers["x-paseo-daemon-id"])}`,
+        } daemon=${String(request.headers["x-clisbot-daemon-id"])}`,
       );
       const target = new URL(request.url ?? "/", this.targetOrigin);
       target.protocol = "ws:";

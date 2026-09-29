@@ -1,4 +1,4 @@
-import type { SessionAuthorship } from "@getpaseo/protocol/session-authorship";
+import type { SessionAuthorship } from "@clisbot/protocol/session-authorship";
 import type { PrHint } from "@/git/pr-hint";
 import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { type HostProjectListItem } from "@/projects/host-project-model";

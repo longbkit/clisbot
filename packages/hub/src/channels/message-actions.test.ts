@@ -289,11 +289,11 @@ describe("the Hub's binding decides what an action may address", () => {
 // `typing.test.ts` uses), so every Bot API method name and parameter asserted below
 // is the one the vertical would put on the wire.
 //
-// The vertical is imported from its build output because `@getpaseo/channels-telegram`
+// The vertical is imported from its build output because `@clisbot/channels-telegram`
 // is a workspace sibling the Hub loads at runtime rather than a declared dependency;
-// `npm run build --workspace=@getpaseo/channels-telegram` must have run.
-import { telegramActionRuntime } from "@getpaseo/channels-telegram/dist/action-runtime.js";
-import { telegramMessageActions } from "@getpaseo/channels-telegram/dist/channel-actions.js";
+// `npm run build --workspace=@clisbot/channels-telegram` must have run.
+import { telegramActionRuntime } from "@clisbot/channels-telegram/dist/action-runtime.js";
+import { telegramMessageActions } from "@clisbot/channels-telegram/dist/channel-actions.js";
 
 interface BotApiCall {
   method: string;
@@ -501,8 +501,8 @@ describe("Telegram message actions over the Hub seam", () => {
 // is faked, through upstream's own `SlackActionClientOpts.client` seam, so
 // every Web API method and payload asserted below is what the vertical would
 // put on the wire.
-import { slackActionRuntime } from "@getpaseo/channels-slack/dist/action-runtime.js";
-import { slackPlugin } from "@getpaseo/channels-slack/dist/plugin.js";
+import { slackActionRuntime } from "@clisbot/channels-slack/dist/action-runtime.js";
+import { slackPlugin } from "@clisbot/channels-slack/dist/plugin.js";
 import {
   forgetChannelMessageToolCatalog,
   listChannelMessageToolActions,
@@ -711,16 +711,16 @@ import { join } from "node:path";
 import {
   sendMedia as telegramSendMedia,
   sendText as telegramSendText,
-} from "@getpaseo/channels-telegram/dist/outbound.js";
+} from "@clisbot/channels-telegram/dist/outbound.js";
 import {
   sendMedia as slackSendMedia,
   sendSlackText,
-} from "@getpaseo/channels-slack/dist/outbound.js";
+} from "@clisbot/channels-slack/dist/outbound.js";
 import {
   registerSlackWriteClientForTest,
   slackWebClientStubForTest,
   type WebClient,
-} from "@getpaseo/channels-slack/dist/client/web-api.js";
+} from "@clisbot/channels-slack/dist/client/web-api.js";
 import type { HostRuntime } from "./loader/host.js";
 import { createChannelMediaStager } from "./media/outbound-stager.js";
 import type { HubOutboundSendParams, HubOutboundSendResult } from "./message-actions.js";
@@ -1001,7 +1001,7 @@ describe("native media over the Hub seam", () => {
 // against a fake Web API / Bot API: Slack's blocks reach `chat.postMessage` and
 // Telegram's table reaches `sendRichMessage` as a native Bot API 10.3 `table`
 // block (wave 6d, D-TG-057) — both verticals declare `presentationCapabilities`.
-import { telegramPlugin } from "@getpaseo/channels-telegram/dist/plugin.js";
+import { telegramPlugin } from "@clisbot/channels-telegram/dist/plugin.js";
 
 const SLACK_PRESENTATION_TOKEN = "xoxb-hub-presentation-token";
 const SLACK_PRESENTATION_SCOPE = scope("slack", "present");
@@ -1195,12 +1195,12 @@ describe("presentation over the Hub outbound seam", () => {
 // real path — `runChannelMessageAction` → the vertical's registered adapter →
 // the ported action runtime → a fake grammY `Api` — with a real inbound
 // admission and a real vertical send doing the recording.
-import { buildTelegramAdmission } from "@getpaseo/channels-telegram/dist/fusion/admission.js";
-import { buildTelegramMessageEvent } from "@getpaseo/channels-telegram/dist/fusion/inbound-adapter.js";
+import { buildTelegramAdmission } from "@clisbot/channels-telegram/dist/fusion/admission.js";
+import { buildTelegramMessageEvent } from "@clisbot/channels-telegram/dist/fusion/inbound-adapter.js";
 import {
   disposeTelegramRuntime,
   installTelegramRuntime,
-} from "@getpaseo/channels-telegram/dist/fusion/runtime.js";
+} from "@clisbot/channels-telegram/dist/fusion/runtime.js";
 
 const TOPIC_ACCOUNT = "default";
 const TOPIC_SCOPE = scope("telegram", TOPIC_ACCOUNT);

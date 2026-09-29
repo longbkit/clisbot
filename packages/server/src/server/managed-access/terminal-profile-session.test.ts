@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROMPT_SENTINEL } from "@getpaseo/protocol/terminal-profiles";
+import { PROMPT_SENTINEL } from "@clisbot/protocol/terminal-profiles";
 import { resolveProfileLaunch } from "./terminal-profile-session.js";
 
 const profiles = [

@@ -2,7 +2,7 @@
 // nothing else: it opens the ported gateway plugin's WebSocket, normalizes each
 // `MESSAGE_CREATE` dispatch into the shared `ChannelInboundEvent`, and hands it
 // to the L3 monitor. Dedupe, the durable queue admission and the Hub handoff all
-// live in `@getpaseo/channels-shared`'s `createInboundEventProcessor`.
+// live in `@clisbot/channels-shared`'s `createInboundEventProcessor`.
 //
 // D-DC-008: upstream's transport wiring is `monitor/gateway-plugin.ts`, which
 // pulls OpenClaw's debug proxy-capture recorder (`plugin-sdk/proxy-capture`),
@@ -19,11 +19,11 @@
 // admission ordering is preserved by construction.
 import { Agent as HttpsAgent } from "node:https";
 import * as ws from "ws";
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import type { APIMessage } from "discord-api-types/v10";
-import type { DiscordIntentsConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { DiscordIntentsConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { Client } from "../internal/client.js";
-import { PaseoInteractionListener, registerDiscordPaseoCommand } from "../fusion/commands.js";
+import { ClisbotInteractionListener, registerDiscordClisbotCommand } from "../fusion/commands.js";
 import * as discordGateway from "../internal/gateway.js";
 import type { DiscordMessageDispatchData } from "../internal/listeners.js";
 import { MessageCreateListener } from "../internal/listeners.js";
@@ -231,11 +231,11 @@ export async function runDiscordGateway(
       disableInteractionsRoute: true,
       disableEventsRoute: true,
     },
-    { listeners: [new InboundMessageListener(), new PaseoInteractionListener(params.applicationId, params.onEvent)] },
+    { listeners: [new InboundMessageListener(), new ClisbotInteractionListener(params.applicationId, params.onEvent)] },
     [gateway],
   );
   try {
-    await registerDiscordPaseoCommand(client);
+    await registerDiscordClisbotCommand(client);
     return await stopped.outcome;
   } finally {
     stopped.release();

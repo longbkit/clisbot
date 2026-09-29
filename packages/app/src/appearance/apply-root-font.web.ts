@@ -7,9 +7,9 @@
 // beats both RN-web's base font and Unistyles' generated classes (0,1,0) — no reliance
 // on stylesheet order. Code/diff/terminal surfaces carry `data-pmono` (and have their
 // subtree excluded via `:not([data-pmono] *)`) so they keep their monospace font.
-const STYLE_ID = "paseo-ui-font";
+const STYLE_ID = "clisbot-ui-font";
 const RULE =
-  ":is(#root, #overlay-root) *:not([data-pmono]):not([data-pmono] *){font-family:var(--paseo-ui-font);}";
+  ":is(#root, #overlay-root) *:not([data-pmono]):not([data-pmono] *){font-family:var(--clisbot-ui-font);}";
 
 export function applyRootUiFont(uiFontStack: string): void {
   if (typeof document === "undefined") return;
@@ -21,7 +21,7 @@ export function applyRootUiFont(uiFontStack: string): void {
     .trim();
   if (value.length === 0) return;
 
-  document.documentElement.style.setProperty("--paseo-ui-font", value);
+  document.documentElement.style.setProperty("--clisbot-ui-font", value);
 
   // The rule itself is static (references the variable); inject it once.
   let style = document.getElementById(STYLE_ID);

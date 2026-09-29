@@ -112,7 +112,7 @@ test.describe("metered usage", () => {
         daemon: "slice-three-runner",
         cwd: "/workspace",
         agent: "opencode",
-        prompt: "${{ paseo.prompt }}",
+        prompt: "${{ clisbot.prompt }}",
       });
       await triggers.save("deploy");
     });

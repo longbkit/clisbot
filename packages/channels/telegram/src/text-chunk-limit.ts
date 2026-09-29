@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/text-chunk-limit.ts@5d8067a4483
-import type { OutboundDeliveryFormattingOptions } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveTextChunkLimit } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
+import type { OutboundDeliveryFormattingOptions } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveTextChunkLimit } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
 import { mergeTelegramAccountConfig, resolveDefaultTelegramAccountId } from "./accounts.js";
 import { TELEGRAM_RICH_TEXT_LIMIT } from "./rich-message.js";
 

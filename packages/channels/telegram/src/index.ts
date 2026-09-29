@@ -1,4 +1,4 @@
-// @getpaseo/channels-telegram — the in-repo Telegram channel vertical
+// @clisbot/channels-telegram — the in-repo Telegram channel vertical
 // (blueprint §6.5). Exports:
 // - `default` — the bundled-channel entry (`id: "telegram"`);
 // - `telegramPlugin` — the pinned drive-surface name (startAccount + sendText);

@@ -1,9 +1,9 @@
 // upstream: extensions/discord/src/account-inspect.ts@5d8067a4483
 // Discord plugin module implements account inspect behavior.
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
-import type { DiscordAccountConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeSecretInputString } from "@getpaseo/channels-core/plugin-sdk/secret-input";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
+import type { DiscordAccountConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeSecretInputString } from "@clisbot/channels-core/plugin-sdk/secret-input";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   inspectDiscordAccountTokenState,
   resolveDiscordAccountAvailability,

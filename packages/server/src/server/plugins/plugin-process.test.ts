@@ -7,10 +7,10 @@ it("keeps React out of the plugin host's runtime dependency graph", async () => 
     build({
       entryPoints: [
         fileURLToPath(new URL("./plugin-process.ts", import.meta.url)),
-        "@getpaseo/plugin",
-        "@getpaseo/plugin/server",
-        "@getpaseo/plugin/server/provider",
-        "@getpaseo/plugin/server/acp",
+        "@clisbot/plugin",
+        "@clisbot/plugin/server",
+        "@clisbot/plugin/server/provider",
+        "@clisbot/plugin/server/acp",
       ],
       outdir: "unused",
       conditions: ["source"],

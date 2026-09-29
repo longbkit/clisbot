@@ -27,7 +27,7 @@ function createFacts(cwd: string): CheckoutSnapshotFacts {
     remoteUrl: null,
     absoluteGitDir: path.join(cwd, ".git"),
     gitCommonDir: path.join(cwd, ".git"),
-    paseoWorktree: { isPaseoOwnedWorktree: false },
+    clisbotWorktree: { isClisbotOwnedWorktree: false },
     storedBaseRef: null,
     resolvedBaseRef: "main",
     mainRepoRoot: null,
@@ -51,7 +51,7 @@ function createStatus(cwd: string): CheckoutStatusGit {
     behindOfOrigin: null,
     hasRemote: false,
     remoteUrl: null,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
   };
 }
 
@@ -64,7 +64,7 @@ afterEach(async () => {
 });
 
 test("recursive observation updates tracked state and prunes ignored storms", async () => {
-  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-observation-")));
+  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-git-observation-")));
   const repoDir = path.join(tempDir, "repo");
   const trackedPath = path.join(repoDir, "src", "tracked.txt");
   const ignoredDir = path.join(repoDir, "build");
@@ -172,7 +172,7 @@ test("recursive observation updates tracked state and prunes ignored storms", as
   });
   const service = new WorkspaceGitServiceImpl({
     logger: createLogger(),
-    paseoHome: path.join(tempDir, "paseo-home"),
+    clisbotHome: path.join(tempDir, "clisbot-home"),
     fileObserver,
     deps: {
       getCheckoutSnapshotFacts,
@@ -185,7 +185,7 @@ test("recursive observation updates tracked state and prunes ignored storms", as
   });
   const diffManager = new CheckoutDiffManager({
     logger: createLogger(),
-    paseoHome: path.join(tempDir, "paseo-home"),
+    clisbotHome: path.join(tempDir, "clisbot-home"),
     workspaceGitService: service,
   });
   const summaryListener = vi.fn();
@@ -416,7 +416,7 @@ test("recursive observation updates tracked state and prunes ignored storms", as
 }, 30_000);
 
 test("a late Git-ignored tree is pruned while tracked changes still notify consumers", async () => {
-  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-real-ignore-")));
+  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-real-ignore-")));
   const repoDir = path.join(tempDir, "repo");
   mkdirSync(repoDir);
   const git = (...args: string[]) =>
@@ -461,7 +461,7 @@ test("a late Git-ignored tree is pruned while tracked changes still notify consu
   };
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(tempDir, "home"),
+    clisbotHome: path.join(tempDir, "home"),
     fileObserver,
   });
   let subscription: Awaited<ReturnType<typeof service.requestWorkingTreeWatch>> | undefined;

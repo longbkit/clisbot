@@ -1,13 +1,13 @@
 // Fusion drive-surface bridge onto the ported Google Chat send path (D-GC-016).
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and upstream's
 // `api.ts` entry points. Every wire decision — markdown rendering, byte-bounded
 // chunking, the thread-name validity rule, the message resource shape — lives in
 // the ported source, not here. Mirrors the Discord vertical's `outbound.ts`.
-import { createChannelPartialDeliveryError } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { createChannelPartialDeliveryError } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import type { HostRuntime, SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveGoogleChatAccount, type ResolvedGoogleChatAccount } from "./accounts.js";
 import {
   deleteGoogleChatMessage,

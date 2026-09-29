@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/sticker-cache-store.ts@5d8067a4483
 // Telegram plugin module implements sticker cache store behavior.
-import type { PluginStateSyncKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { PluginStateSyncKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { getTelegramRuntime } from "./runtime.js";
 import {
   normalizeCachedStickerForStore,

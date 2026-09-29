@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/resolve-channels.ts@5d8067a4483
 // Slack plugin module implements resolve channels behavior.
 import type { WebClient } from "@slack/web-api";
-import { resolveDirectoryAllowlistEntries } from "@getpaseo/channels-core/plugin-sdk/directory-runtime";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { resolveDirectoryAllowlistEntries } from "@clisbot/channels-core/plugin-sdk/directory-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { createSlackLookupClient } from "./client.js";
 import { collectSlackCursorPages, fetchSlackChannelListPage } from "./cursor-pages.js";
 import { formatSlackTarget, parseSlackTarget } from "./target-parsing.js";

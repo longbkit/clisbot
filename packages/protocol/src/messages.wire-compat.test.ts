@@ -106,9 +106,9 @@ describe("wire schema compatibility", () => {
         clientId: "managed-client",
         clientType: "mobile",
         protocolVersion: 1,
-        accessTicket: "paseo_dat_example",
+        accessTicket: "clisbot_dat_example",
       }),
-    ).toMatchObject({ accessTicket: "paseo_dat_example" });
+    ).toMatchObject({ accessTicket: "clisbot_dat_example" });
 
     expect(
       WSHelloMessageSchema.parse({
@@ -399,7 +399,11 @@ test("blocked setup preserves the legacy failed shape and optional provenance", 
     status: legacyStatus,
   });
   expect(legacySnapshot.safeParse(snapshot).success).toBe(false);
-  const failed = { ...snapshot, status: "failed", error: "Update Paseo to review and run setup." };
+  const failed = {
+    ...snapshot,
+    status: "failed",
+    error: "Update Clisbot to review and run setup.",
+  };
   expect(legacySnapshot.safeParse(failed).success).toBe(true);
   const progress = {
     type: "workspace_setup_progress",

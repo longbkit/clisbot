@@ -100,7 +100,7 @@ async function withPlanReview(
   testInfo: TestInfo,
   review: (context: PlanReview) => Promise<void>,
 ): Promise<void> {
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-plan-lifecycle-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-plan-lifecycle-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({

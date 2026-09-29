@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import type { AgentTimelineItem } from "../agent-sdk-types.js";
 import type { SessionOperationIdentity } from "../session-authorship.js";
 import type { TimelinePromptIndex } from "../timeline-prompt-index.js";

@@ -1,7 +1,7 @@
 // upstream: extensions/googlechat/src/auth.ts@5d8067a4483
 // Googlechat plugin module implements auth behavior.
-import { readProviderJsonResponse } from "@getpaseo/channels-core/plugin-sdk/provider-http";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { readProviderJsonResponse } from "@clisbot/channels-core/plugin-sdk/provider-http";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { fetchWithSsrFGuard } from "./fusion/ssrf-fetch.js";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import {

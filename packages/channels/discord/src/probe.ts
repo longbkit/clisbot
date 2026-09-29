@@ -1,10 +1,10 @@
 // upstream: extensions/discord/src/probe.ts@5d8067a4483
 // Discord plugin module implements probe behavior.
-import type { BaseProbeResult } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { resolveFetch } from "@getpaseo/channels-core/plugin-sdk/fetch-runtime";
-import { readResponseWithLimit } from "@getpaseo/channels-core/plugin-sdk/response-limit-runtime";
-import { fetchWithTimeout, runChannelProbe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import type { BaseProbeResult } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { resolveFetch } from "@clisbot/channels-core/plugin-sdk/fetch-runtime";
+import { readResponseWithLimit } from "@clisbot/channels-core/plugin-sdk/response-limit-runtime";
+import { fetchWithTimeout, runChannelProbe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { DiscordApiError, fetchDiscord } from "./api.js";
 import { normalizeDiscordToken } from "./token.js";
 

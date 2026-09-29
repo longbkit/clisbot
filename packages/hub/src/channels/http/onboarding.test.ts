@@ -14,7 +14,7 @@ const input: ChannelOnboarding = {
   cwd: "/workspace",
   provider: "codex",
 };
-const accountPath = ".paseo/channels/slack/assistant.yml";
+const accountPath = ".clisbot/channels/slack/assistant.yml";
 const initial = [
   {
     path: accountPath,
@@ -76,7 +76,7 @@ describe("onboarding configuration defaults", () => {
       provider: "claude",
     });
     expect(load(restarted.find((f) => f.path === accountPath)!.content)).toEqual(account);
-    expect(restarted.find((f) => f.path === ".paseo/hub.yml")?.content).toContain(
+    expect(restarted.find((f) => f.path === ".clisbot/hub.yml")?.content).toContain(
       "provider: codex",
     );
     const updated = configureOnboardingRoute(edited, "slack", "assistant", {
@@ -84,7 +84,9 @@ describe("onboarding configuration defaults", () => {
       provider: "claude",
       update: true,
     });
-    expect(updated.find((f) => f.path === ".paseo/hub.yml")?.content).toContain("provider: claude");
+    expect(updated.find((f) => f.path === ".clisbot/hub.yml")?.content).toContain(
+      "provider: claude",
+    );
     expect(load(updated.find((f) => f.path === accountPath)!.content)).toEqual(account);
   });
 });

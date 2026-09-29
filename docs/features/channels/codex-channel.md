@@ -75,11 +75,11 @@ turn. The current default's two successes also coincide with a model change to
 
 Three layers, in order. Each rules out the one above it.
 
-| Question                            | Where                                                                                                                                                                         |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Did the Hub send the current block? | `$PASEO_HOME/agents/<project>/<agentId>/session.json` → `config.systemPrompt`. A running Hub keeps the code it booted with, so a source edit means nothing until you restart. |
-| Did the agent call the tool?        | the same directory's `events.jsonl` → a `tool_call` item named `channel_reply.message`.                                                                                       |
-| Did the message land?               | read the thread back from the channel API and match the timestamp.                                                                                                            |
+| Question                            | Where                                                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Did the Hub send the current block? | `$CLISBOT_HOME/agents/<project>/<agentId>/session.json` → `config.systemPrompt`. A running Hub keeps the code it booted with, so a source edit means nothing until you restart. |
+| Did the agent call the tool?        | the same directory's `events.jsonl` → a `tool_call` item named `channel_reply.message`.                                                                                         |
+| Did the message land?               | read the thread back from the channel API and match the timestamp.                                                                                                              |
 
 The endpoint answers `tools/list` over plain HTTP, so you can check it without
 an agent:

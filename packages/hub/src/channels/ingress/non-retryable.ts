@@ -9,8 +9,8 @@
  * succeed on replay are Hub errors, not channel errors. The drain still accepts
  * an override so a vertical can add its own classes later.
  */
-import { createChannelIngressError } from "@getpaseo/channels-core/channels/message/ingress-errors";
-import type { IngressNonRetryableFailure } from "@getpaseo/channels-core/channels/message/ingress-retry-policy";
+import { createChannelIngressError } from "@clisbot/channels-core/channels/message/ingress-errors";
+import type { IngressNonRetryableFailure } from "@clisbot/channels-core/channels/message/ingress-retry-policy";
 
 /** A stored ingress payload that cannot be decoded into an inbound event. */
 export const ChannelIngressPayloadError = createChannelIngressError("ChannelIngressPayloadError");

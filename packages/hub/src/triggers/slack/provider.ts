@@ -428,7 +428,7 @@ async function failWithNotice(
     teamId: event.teamId,
     channelId: event.channelId,
     threadTs: event.threadTs,
-    content: `Paseo agent failed: ${reason}`,
+    content: `Clisbot agent failed: ${reason}`,
   });
 }
 

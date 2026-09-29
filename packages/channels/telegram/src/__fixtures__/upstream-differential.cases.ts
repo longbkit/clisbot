@@ -7,7 +7,7 @@
 //
 // Add a case when a ported pure function gains upstream coverage; never edit
 // the JSON by hand.
-import type { DifferentialCase } from "@getpaseo/channels-shared";
+import type { DifferentialCase } from "@clisbot/channels-shared";
 import type { Message } from "grammy/types";
 import { hasBotMention, hasBotMentionInText } from "../bot/body-helpers.js";
 import {

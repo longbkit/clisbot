@@ -1,12 +1,12 @@
-import { ChatUpdatePatchSchema, type ChatUpdatePatch } from "@getpaseo/protocol/chats/rpc-schemas";
-// `ChatStore`: every `chat.json` under `$PASEO_HOME/chats/{chatId}/`, cached after one scan,
+import { ChatUpdatePatchSchema, type ChatUpdatePatch } from "@clisbot/protocol/chats/rpc-schemas";
+// `ChatStore`: every `chat.json` under `$CLISBOT_HOME/chats/{chatId}/`, cached after one scan,
 // written with the session record's durable write (temp file, fsync, rename, directory
 // sync). Mutations under one chat run in order; chats never wait on each other.
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Logger } from "pino";
-import type { ChatRules } from "@getpaseo/protocol/chats/types";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { ChatRules } from "@clisbot/protocol/chats/types";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { writeDurableJson } from "../agent/session-storage/durable-file.js";
 import { assertSessionId } from "../agent/session-storage/layout.js";
 import {
@@ -46,7 +46,7 @@ export class ChatStore {
     this.logger = logger.child({ module: "chats", component: "chat-store" });
   }
 
-  /** `$PASEO_HOME/chats/{chatId}`; the id is checked before it joins a path. */
+  /** `$CLISBOT_HOME/chats/{chatId}`; the id is checked before it joins a path. */
   directory(chatId: string): string {
     assertSessionId(chatId);
     return path.join(this.rootDir, chatId);

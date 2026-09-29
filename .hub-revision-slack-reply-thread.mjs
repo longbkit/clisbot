@@ -22,7 +22,7 @@ import { HUB_RESOURCE_PATH } from "./packages/hub/dist/config/bundle-contract.js
 import { compileChannelControlPlane } from "./packages/hub/dist/channels/config/compile.js";
 
 const DATA_DIR =
-  process.env.CLISBOT_HOME || process.env.PASEO_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
+  process.env.CLISBOT_HOME || process.env.CLISBOT_HUB_DATA_DIR || `${homedir()}/.clisbot-dev`;
 const DAEMON_WS = process.env.TRUSTED_CLIENT_URL || "ws://127.0.0.1:6867/ws";
 const t0 = Date.now();
 const log = (x) => console.log(`[t+${Date.now() - t0}ms] ${x}`);
@@ -40,13 +40,13 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() || "";
+    return process.env.CLISBOT_PASSWORD?.trim() || "";
   }
 }
 function openTrusted() {
   return new Promise((res, rej) => {
     const pw = password();
-    const sock = new WebSocket(DAEMON_WS, pw ? [`paseo.bearer.${pw}`] : undefined);
+    const sock = new WebSocket(DAEMON_WS, pw ? [`clisbot.bearer.${pw}`] : undefined);
     const timer = setTimeout(() => rej(new Error("daemon /ws connect timeout")), 15000);
     sock.on("open", () => {
       sock.send(
@@ -146,7 +146,7 @@ const filesByPath = (files) => new Map(files.map((f) => [f.path, f.content]));
 
 function transform(files) {
   const m = filesByPath(files);
-  const slackPath = ".paseo/channels/slack/work.yml";
+  const slackPath = ".clisbot/channels/slack/work.yml";
   if (!m.has(slackPath)) fail("no slack account file in the active revision");
   const slack = load(m.get(slackPath));
   if (!Array.isArray(slack.routes)) fail("slack account file has no routes[]");
@@ -177,7 +177,7 @@ function routeAgentTargets(files, bundle) {
   const m = filesByPath(files);
   const out = new Set();
   for (const [path, content] of m.entries()) {
-    if (!/\.paseo\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
+    if (!/\.clisbot\/channels\/(slack|telegram)\/[^/]+\.yml$/.test(path)) continue;
     if (path.endsWith("policy.yml")) continue;
     const doc = load(content);
     for (const r of doc?.routes ?? []) if (r?.agent) out.add(r.agent);
@@ -202,10 +202,10 @@ const main = async () => {
 
   const files = transform(baseFiles);
   const m = filesByPath(files);
-  if (m.has(".paseo/channels/policy.yml"))
-    log(`---- policy.yml (untouched) ----\n${m.get(".paseo/channels/policy.yml")}`);
+  if (m.has(".clisbot/channels/policy.yml"))
+    log(`---- policy.yml (untouched) ----\n${m.get(".clisbot/channels/policy.yml")}`);
   log(
-    `---- .paseo/channels/slack/work.yml (transformed) ----\n${m.get(".paseo/channels/slack/work.yml")}`,
+    `---- .clisbot/channels/slack/work.yml (transformed) ----\n${m.get(".clisbot/channels/slack/work.yml")}`,
   );
 
   const bundle = preCompileGuard(files);

@@ -7,7 +7,7 @@ import {
 } from "@/runtime/replica-cache/row-store-sqlite";
 import { TimelinePageRetention } from "./timeline-page-retention";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import type { CachedTimeline } from "@/runtime/replica-cache";
 import { selectAgentTimelineState, useSessionStore } from "@/stores/session-store";
 import { useCreateFlowStore, type PendingCreateAttempt } from "@/stores/create-flow-store";

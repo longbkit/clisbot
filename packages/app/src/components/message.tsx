@@ -1,4 +1,4 @@
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import {
   ActorAvatar,
   SessionActorAvatar,
@@ -67,8 +67,8 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from "reac
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { MarkdownRenderer, type MarkdownStyles } from "@/components/markdown/renderer";
 import type { TaskActivity, TodoEntry, UserMessageImageAttachment } from "@/types/stream";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
-import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
+import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
 import { buildToolCallPresentation } from "@/tool-calls/presentation";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
@@ -107,9 +107,9 @@ import {
   AttachmentThumbnail,
 } from "@/components/attachment-pill";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { isWeb, isNative } from "@/constants/platform";
-import type { AgentCapabilityFlags } from "@getpaseo/protocol/agent-types";
+import type { AgentCapabilityFlags } from "@clisbot/protocol/agent-types";
 import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { AssistantForkMenu, type AssistantForkTarget } from "@/components/assistant-fork-menu";
@@ -165,8 +165,8 @@ function useDisableOuterSpacing(disableOuterSpacing: boolean | undefined) {
   return disableOuterSpacing ?? contextValue;
 }
 
-const WEB_TOOLCALL_SHIMMER_KEYFRAME_ID = "paseo-toolcall-shimmer-keyframes";
-const WEB_TOOLCALL_SHIMMER_ANIMATION_NAME = "paseo-toolcall-shimmer";
+const WEB_TOOLCALL_SHIMMER_KEYFRAME_ID = "clisbot-toolcall-shimmer-keyframes";
+const WEB_TOOLCALL_SHIMMER_ANIMATION_NAME = "clisbot-toolcall-shimmer";
 const MARKDOWN_ALLOWED_IMAGE_HANDLERS = [
   "data:image/png;base64",
   "data:image/gif;base64",
@@ -198,10 +198,10 @@ const warningColorMapping = (theme: Theme) => ({ color: theme.colors.palette.amb
 const WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS = `
   @keyframes ${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} {
     0% {
-      background-position: var(--paseo-shimmer-start, -200px) 0;
+      background-position: var(--clisbot-shimmer-start, -200px) 0;
     }
     100% {
-      background-position: var(--paseo-shimmer-end, 200px) 0;
+      background-position: var(--clisbot-shimmer-end, 200px) 0;
     }
   }
 `;
@@ -2823,8 +2823,8 @@ function buildShimmerTextStyle(input: {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     animation: `${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} ${input.shimmerDuration}s linear infinite`,
-    "--paseo-shimmer-start": `${input.webShimmerTrackStart - input.offsetX}px`,
-    "--paseo-shimmer-end": `${input.webShimmerTrackEnd - input.offsetX}px`,
+    "--clisbot-shimmer-start": `${input.webShimmerTrackStart - input.offsetX}px`,
+    "--clisbot-shimmer-end": `${input.webShimmerTrackEnd - input.offsetX}px`,
   });
 }
 

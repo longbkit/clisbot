@@ -18,7 +18,7 @@
 // event is durably admitted, with a 503 otherwise so Google redelivers.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import {
   canonicalizeWebhookRouteKey,
   createFixedWindowRateLimiter,
@@ -26,8 +26,8 @@ import {
   registerWebhookTarget,
   resolveWebhookPath,
   WEBHOOK_RATE_LIMIT_DEFAULTS,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+} from "@clisbot/channels-core/plugin-sdk/webhook-ingress";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import type { WebhookTarget } from "../monitor-types.js";
 import { createGoogleChatWebhookRequestHandler } from "../monitor-webhook.js";
 import type { GoogleChatEvent } from "../types.js";

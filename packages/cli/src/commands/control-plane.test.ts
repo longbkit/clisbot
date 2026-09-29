@@ -65,7 +65,7 @@ describe("resolveControlPlaneTarget", () => {
   test("a recorded, live local Hub resolves to its loopback URL without an API key", async () => {
     const home = await createHome();
     writeHubState(home, process.pid, 6900);
-    const target = resolveControlPlaneTarget({}, { PASEO_HOME: home } as NodeJS.ProcessEnv);
+    const target = resolveControlPlaneTarget({}, { CLISBOT_HOME: home } as NodeJS.ProcessEnv);
     expect(target.origin).toBe("http://127.0.0.1:6900");
     expect(target.source).toBe("local");
   });

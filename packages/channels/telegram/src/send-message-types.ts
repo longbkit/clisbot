@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/send-message-types.ts@5d8067a4483
-import type { MessageReceipt } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { MarkdownTableMode, ReplyToMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { OutboundMediaAccess } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import type { RetryConfig } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
+import type { MessageReceipt } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { MarkdownTableMode, ReplyToMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { OutboundMediaAccess } from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import type { RetryConfig } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
 import type { TelegramInlineButtons } from "./button-types.js";
 import type { createTelegramPromptContextProjectionCursor } from "./prompt-context-projection.js";
 import type { TelegramApiOverride } from "./send-context.js";

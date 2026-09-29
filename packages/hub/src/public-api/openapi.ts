@@ -13,7 +13,7 @@ const registry = new OpenAPIRegistry();
 registry.registerComponent("securitySchemes", "bearerAuth", {
   type: "http",
   scheme: "bearer",
-  bearerFormat: "Paseo organization credential",
+  bearerFormat: "Clisbot organization credential",
   description:
     "An organization API key or durable CLI login credential. Each operation requires the scope shown on the operation.",
 });
@@ -23,7 +23,7 @@ registry.registerPath({
   path: "/api/v1/cli-authorizations",
   operationId: "startCliAuthorization",
   summary: "Start CLI login",
-  description: "Starts an anonymous, expiring browser authorization for the Paseo CLI.",
+  description: "Starts an anonymous, expiring browser authorization for the Clisbot CLI.",
   tags: ["CLI login"],
   request: {
     body: {
@@ -125,10 +125,10 @@ export const publicOpenApiDocument = new OpenApiGeneratorV31(registry.definition
   {
     openapi: "3.1.0",
     info: {
-      title: "Paseo Hub Public API",
+      title: "Clisbot Hub Public API",
       version: "1.0.0",
       description:
-        "Log in the CLI, list projects, validate and install configuration, dispatch manual runs, and enroll Paseo daemons.",
+        "Log in the CLI, list projects, validate and install configuration, dispatch manual runs, and enroll Clisbot daemons.",
     },
     servers: [{ url: "/", description: "This Hub instance" }],
     tags: [

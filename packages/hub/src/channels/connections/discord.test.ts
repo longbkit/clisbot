@@ -6,10 +6,7 @@
 // Discord REST and must agree on identity, application id and rejection.
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vitest";
-import {
-  parseApplicationIdFromToken,
-  probeDiscord,
-} from "@getpaseo/channels-discord/dist/probe.js";
+import { parseApplicationIdFromToken, probeDiscord } from "@clisbot/channels-discord/dist/probe.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import {
   configureDiscordConnection,

@@ -1,4 +1,4 @@
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import { isDatabaseUnavailableError } from "../../db/errors.js";
 import type { Database } from "../../db/types.js";
 import { reportFailure } from "../../failures/index.js";

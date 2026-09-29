@@ -37,7 +37,7 @@ const LIVE: ChannelStatusAccount[] = [
   {
     channel: "telegram",
     account: "personal-assistant",
-    pin: "paseo-telegram@0.1.0",
+    pin: "clisbot-telegram@0.1.0",
     integrity: "ok",
     loadTrace: "ok",
     transport: "polling",
@@ -53,7 +53,7 @@ describe("buildStatusReport", () => {
     assert.equal(report.transport, "polling");
     assert.equal(report.integrity, "ok");
     assert.equal(report.loadTrace, "ok");
-    assert.equal(report.pin, "paseo-telegram@0.1.0");
+    assert.equal(report.pin, "clisbot-telegram@0.1.0");
   });
 
   it("marks an absent account as not running", () => {

@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { CHAT_ROOM_INSTRUCTIONS_MAX_CHARS } from "@getpaseo/protocol/chats/rpc-schemas";
-import { DEFAULT_ROOM_INSTRUCTIONS } from "@getpaseo/protocol/chats/room";
+import { CHAT_ROOM_INSTRUCTIONS_MAX_CHARS } from "@clisbot/protocol/chats/rpc-schemas";
+import { DEFAULT_ROOM_INSTRUCTIONS } from "@clisbot/protocol/chats/room";
 import { FormTextInput } from "@/components/ui/form-field";
 
 /**

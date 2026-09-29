@@ -201,7 +201,7 @@ export function createLinearConnectionClient(options: {
         response_type: "code",
         scope: LINEAR_REQUIRED_SCOPES.join(","),
         state,
-        // Keep workflow results visibly attributable to the installed Paseo application instead
+        // Keep workflow results visibly attributable to the installed Clisbot application instead
         // of impersonating the administrator who completed the connection.
         actor: "app",
       });
@@ -322,7 +322,7 @@ export function createLinearApiClient(options: {
     async readIssue(input) {
       const result = IssueResponseSchema.parse(
         await graphql(request, await accessTokenFor(input.linearOrganizationId), {
-          query: `query PaseoIssue($id: String!) {
+          query: `query ClisbotIssue($id: String!) {
             issue(id: $id) {
               id identifier title description url
               project { id }
@@ -352,7 +352,7 @@ export function createLinearApiClient(options: {
     async readIssueComments(input) {
       const result = IssueCommentHistoryResponseSchema.parse(
         await graphql(request, await accessTokenFor(input.linearOrganizationId), {
-          query: `query PaseoIssueCommentHistory($issueId: String!, $before: DateTime!) {
+          query: `query ClisbotIssueCommentHistory($issueId: String!, $before: DateTime!) {
             comments(
               last: ${LINEAR_ISSUE_COMMENT_CONTEXT_LIMIT}
               orderBy: createdAt
@@ -392,7 +392,7 @@ export function createLinearApiClient(options: {
     async createComment(input) {
       const result = CommentResponseSchema.parse(
         await graphql(request, await accessTokenFor(input.linearOrganizationId), {
-          query: `mutation PaseoComment($issueId: String!, $body: String!) {
+          query: `mutation ClisbotComment($issueId: String!, $body: String!) {
             commentCreate(input: { issueId: $issueId, body: $body }) { success }
           }`,
           variables: { issueId: input.issueId, body: input.body },
@@ -446,7 +446,7 @@ async function exchangeToken(
 async function readViewer(request: typeof fetch, accessToken: string) {
   const result = ViewerResponseSchema.parse(
     await graphql(request, accessToken, {
-      query: `query PaseoViewer { viewer { id organization { id name } } }`,
+      query: `query ClisbotViewer { viewer { id organization { id name } } }`,
       variables: {},
     }),
   );

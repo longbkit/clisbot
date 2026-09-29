@@ -1,6 +1,6 @@
 import type { Href } from "expo-router";
 import { buildHubSettingsRoute } from "./navigation";
-import { PASEO_CLIENT_ID } from "./transport/oauth";
+import { CLISBOT_CLIENT_ID } from "./transport/oauth";
 
 // Match Hub's first-party account entry contract. Hub remains responsible for validating the
 // client, redirect URI, scopes, and PKCE request before issuing any authorization code.
@@ -82,7 +82,7 @@ function passthroughParams(url: URL, names: readonly string[]): Record<string, s
 function clientAuthorizationQuery(url: URL): URLSearchParams | null {
   const current = url.searchParams;
   if (
-    current.get("client_id") !== PASEO_CLIENT_ID ||
+    current.get("client_id") !== CLISBOT_CLIENT_ID ||
     !current.has("redirect_uri") ||
     !current.has("code_challenge")
   ) {

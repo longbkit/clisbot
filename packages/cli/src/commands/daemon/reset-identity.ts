@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
-import { readDaemonInstance, resolvePaseoHome } from "@getpaseo/server/daemon-control";
+import { readDaemonInstance, resolveClisbotHome } from "@clisbot/server/daemon-control";
 import type { Command } from "commander";
 import type {
   CommandError,
@@ -10,7 +10,7 @@ import type {
 } from "../../output/index.js";
 
 /**
- * The files that make a daemon one particular daemon. Copying a Paseo home copies them, so two
+ * The files that make a daemon one particular daemon. Copying a Clisbot home copies them, so two
  * computers end up with the same identity; Hub refuses the second one until it is reset.
  */
 const IDENTITY_FILES = ["server-id", "daemon-keypair.json", "hub-relationship.json"] as const;
@@ -39,19 +39,19 @@ export async function resetDaemonIdentity(
   options: { home?: string; env?: NodeJS.ProcessEnv } = {},
 ): Promise<ResetIdentityResult> {
   const env = options.env ?? process.env;
-  const home = resolvePaseoHome({ PASEO_HOME: options.home ?? env.PASEO_HOME });
+  const home = resolveClisbotHome({ CLISBOT_HOME: options.home ?? env.CLISBOT_HOME });
   if (await readDaemonInstance(home)) {
     throw commandError(
       "DAEMON_RUNNING",
       "Stop the daemon before resetting its identity.",
-      "Run: paseo daemon stop",
+      "Run: clisbot daemon stop",
     );
   }
-  if (env.PASEO_SERVER_ID?.trim()) {
+  if (env.CLISBOT_SERVER_ID?.trim()) {
     throw commandError(
       "SERVER_ID_OVERRIDE",
-      "PASEO_SERVER_ID is set, so the daemon would start with the same identity again.",
-      "Remove PASEO_SERVER_ID from the environment, then run this command again.",
+      "CLISBOT_SERVER_ID is set, so the daemon would start with the same identity again.",
+      "Remove CLISBOT_SERVER_ID from the environment, then run this command again.",
     );
   }
   const removed = IDENTITY_FILES.filter((file) => existsSync(path.join(home, file)));
@@ -62,8 +62,8 @@ export async function resetDaemonIdentity(
     removed: removed.join(", ") || "none",
     nextSteps: [
       "Next:",
-      "  1. paseo daemon start",
-      "  2. paseo hub login <hub-url>   (connects this daemon to Hub as a new Host)",
+      "  1. clisbot daemon start",
+      "  2. clisbot hub login <hub-url>   (connects this daemon to Hub as a new Host)",
       "The previous Host stays in Hub as offline; an owner can remove it there.",
     ].join("\n"),
   };

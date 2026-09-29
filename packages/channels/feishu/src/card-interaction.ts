@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/card-interaction.ts@5d8067a4483
 // Feishu plugin module implements card interaction behavior.
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export const FEISHU_CARD_INTERACTION_VERSION = "ocf1";
 

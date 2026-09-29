@@ -1,8 +1,8 @@
 display_information:
-  name: Paseo
+  name: Clisbot
 features:
   bot_user:
-    display_name: Paseo
+    display_name: Clisbot
     always_online: false
 oauth_config:
   redirect_urls:

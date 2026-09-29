@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore } from "@/stores/session-store";
 import { useAddProjectFlowStore } from "@/stores/add-project-flow-store";
 import { useOpenAddProject } from "./use-open-add-project";

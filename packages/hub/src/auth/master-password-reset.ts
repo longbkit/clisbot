@@ -5,7 +5,7 @@ import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { readBoundedRequestBody } from "../http/request-body.js";
 import { PASSWORD_MIN_LENGTH } from "./instance-policy.js";
 
-export const MASTER_PASSWORD_RESET_PATH = "/api/auth/paseo/reset-password";
+export const MASTER_PASSWORD_RESET_PATH = "/api/auth/clisbot/reset-password";
 const bodySchema = z
   .object({
     email: z.string().trim().toLowerCase().email(),

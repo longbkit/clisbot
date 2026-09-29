@@ -1,24 +1,24 @@
 // upstream: extensions/googlechat/src/accounts.ts@5d8067a4483
 // Googlechat plugin module implements accounts behavior.
-import { createAccountListHelpers } from "@getpaseo/channels-core/plugin-sdk/account-helpers";
+import { createAccountListHelpers } from "@clisbot/channels-core/plugin-sdk/account-helpers";
 import {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
   type OpenClawConfig,
   resolveAccountEntry,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { mergePairLoopGuardConfig } from "@getpaseo/channels-core/plugin-sdk/pair-loop-guard-runtime";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { mergePairLoopGuardConfig } from "@clisbot/channels-core/plugin-sdk/pair-loop-guard-runtime";
 import { tryReadSecretFileSync } from "./fusion/secret-file.js";
 import {
   isSecretRef,
   resolveSecretInputString,
   type SecretInputStringResolutionMode,
-} from "@getpaseo/channels-core/plugin-sdk/secret-input";
+} from "@clisbot/channels-core/plugin-sdk/secret-input";
 import {
   asNullableObjectRecord,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { resolveUserPath } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { resolveUserPath } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { MAX_GOOGLE_CHAT_SERVICE_ACCOUNT_FILE_BYTES } from "./google-auth-limits.js";
 import type { GoogleChatAccountConfig } from "./types.config.js";
 

@@ -2,7 +2,7 @@ import { postgresDatabaseRuntime } from "./runtime/index.js";
 
 async function main(): Promise<void> {
   const databaseUrl =
-    process.env["DATABASE_URL"] ?? "postgres://postgres:postgres@localhost:5432/paseo_hub";
+    process.env["DATABASE_URL"] ?? "postgres://postgres:postgres@localhost:5432/clisbot_hub";
   const { runtime } = await postgresDatabaseRuntime(databaseUrl);
 
   try {

@@ -7,15 +7,15 @@
 Trên máy chạy daemon, dùng lệnh ở mục **Add a Host** trong **Settings → Hosts**, hoặc:
 
 ```sh
-paseo hub login https://hub.example.com
-paseo hub connect
-paseo hub status
+clisbot hub login https://hub.example.com
+clisbot hub connect
+clisbot hub status
 ```
 
 Thay URL bằng Hub của bạn. Khi chạy trong terminal, `login` hỏi **một câu** trước khi mở link duyệt:
 
-- **Connect and let Hub run agents here:** kết nối daemon. Automations và Channels của tổ chức được tạo workspace, chạy agent trên máy này. Ngắt bằng `paseo hub disconnect`.
-- **Don't connect now:** chỉ CLI đăng nhập; kết nối sau bằng `paseo hub connect`.
+- **Connect and let Hub run agents here:** kết nối daemon. Automations và Channels của tổ chức được tạo workspace, chạy agent trên máy này. Ngắt bằng `clisbot hub disconnect`.
+- **Don't connect now:** chỉ CLI đăng nhập; kết nối sau bằng `clisbot hub connect`.
 
 Không có lựa chọn "chỉ kết nối": Channels dùng kết nối Hub như client tin cậy, nên daemon đã kết nối thì Hub chạy agent được qua Channels dù chưa cấp `hub.execute`.
 
@@ -31,11 +31,11 @@ Quy tắc này cũng áp dụng cho bộ chọn Host ở New Workspace, Sessions
 
 Khi mở workspace, Host đã biết là offline được báo ngay. Host managed không có quyền sẽ hướng dẫn xin quyền; lỗi tải danh sách quyền được báo riêng. Nếu kết nối hoặc tải workspace vẫn chưa có kết quả sau 20 giây, app hiện thông báo hết thời gian chờ cùng **Retry** và **Manage host**. Retry kết nối tạo lại kết nối của Host đó; Retry quyền tải lại danh sách từ Hub. App giữ nguyên URL để bạn tiếp tục khi Host sẵn sàng, không tự chuyển sang Host khác.
 
-Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `PASEO_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
+Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `CLISBOT_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
 
-Hub báo **Host "…" already uses this daemon's identity** khi `PASEO_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `paseo daemon stop`, `paseo daemon reset-identity`, `paseo daemon start` rồi `paseo hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
+Hub báo **Host "…" already uses this daemon's identity** khi `CLISBOT_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `clisbot daemon stop`, `clisbot daemon reset-identity`, `clisbot daemon start` rồi `clisbot hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
 
-Host báo **Offline** ở **Settings → Hosts**: bấm **Reconnect**. Vẫn offline thì kiểm tra Paseo đang chạy trên máy đó rồi mở **Connections**.
+Host báo **Offline** ở **Settings → Hosts**: bấm **Reconnect**. Vẫn offline thì kiểm tra Clisbot đang chạy trên máy đó rồi mở **Connections**.
 
 Khi chạy không tương tác hoặc `--json`, `login` chỉ đăng nhập CLI: chạy `connect` rồi kiểm tra `status`.
 
@@ -58,21 +58,21 @@ Tên ban đầu lấy từ hostname máy, chuẩn hóa thành slug chữ thườ
 3. Cấp Connect theo từng Host, rồi cấp quyền theo từng Project. Quyền ở Host A không tự lan sang Host B.
 4. Bật `external` riêng trên từng daemon cần phân quyền. Kiểm tra Host và đường dẫn trước khi tạo Workspace hoặc chạy Agent.
 
-Nếu chạy nhiều daemon trên cùng máy, dùng cấu hình/thư mục dữ liệu riêng (`PASEO_HOME`) và endpoint riêng. Không sao chép danh tính/credential daemon để tạo Host thứ hai.
+Nếu chạy nhiều daemon trên cùng máy, dùng cấu hình/thư mục dữ liệu riêng (`CLISBOT_HOME`) và endpoint riêng. Không sao chép danh tính/credential daemon để tạo Host thứ hai.
 
 ## Unenroll
 
 Trên máy daemon:
 
 ```sh
-paseo hub disconnect
-paseo hub status
+clisbot hub disconnect
+clisbot hub status
 ```
 
 Hoặc dùng **Disconnect** của Host trong phần cấu hình Hub khi tài khoản có cả quyền cấu hình tổ chức và quyền quản trị daemon cần thiết.
 
 Disconnect gỡ quan hệ enrollment, thu hồi quyền kết nối liên quan và làm gián đoạn công việc phụ thuộc Hub. App tự gỡ Host do Hub quản lý — cùng workspace của nó — khi daemon rời khỏi danh sách Hub; Host bạn tự thêm vẫn được giữ. Nó không xóa thư mục mã nguồn của bạn. Muốn dùng lại, enroll lại và kiểm tra Access/cấu hình phụ thuộc.
 
-Nếu Hub không liên lạc được, `paseo hub disconnect --force` cho phép dọn quan hệ local. Đây không phải xác nhận Hub đã thu hồi credential từ xa; cần dọn/thu hồi bản ghi phía Hub khi truy cập lại được.
+Nếu Hub không liên lạc được, `clisbot hub disconnect --force` cho phép dọn quan hệ local. Đây không phải xác nhận Hub đã thu hồi credential từ xa; cần dọn/thu hồi bản ghi phía Hub khi truy cập lại được.
 
-`paseo hub logout` xóa đăng nhập CLI; không đồng nghĩa unenroll. Nếu CLI hỏi có disconnect kèm theo, lựa chọn đó mới gỡ quan hệ daemon.
+`clisbot hub logout` xóa đăng nhập CLI; không đồng nghĩa unenroll. Nếu CLI hỏi có disconnect kèm theo, lựa chọn đó mới gỡ quan hệ daemon.

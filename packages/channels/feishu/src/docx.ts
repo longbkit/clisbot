@@ -2,8 +2,8 @@
 // Feishu plugin module implements docx behavior.
 import { resolve } from "node:path";
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { normalizeOptionalString, uniqueStrings } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { normalizeOptionalString, uniqueStrings } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { Type } from "typebox";
 import type { OpenClawPluginApi } from "./fusion/runtime-api.js";
 import { resolveConfiguredHttpTimeoutMs } from "./client-timeout.js";

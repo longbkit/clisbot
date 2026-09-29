@@ -2,7 +2,7 @@
 // Fusion-owned boundary for `resolveChannelMediaMaxBytes` (D-ZU-022).
 //
 // Upstream's barrel `plugin-sdk/account-helpers` re-exports it;
-// `@getpaseo/channels-core` deliberately omits that member (D-CORE-303, "the
+// `@clisbot/channels-core` deliberately omits that member (D-CORE-303, "the
 // Hub owns media ceilings"). The ported `accounts.ts` and `tool.ts` still need
 // the ACCOUNT-level ceiling, which is channel config and not a Hub policy, so
 // the function is carried here with its upstream body and call shape. The

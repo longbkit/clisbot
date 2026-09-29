@@ -3,7 +3,7 @@ import {
   asOptionalRecord,
   normalizeOptionalString,
   readNonBlankString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { escapeSlackMrkdwn } from "./monitor/mrkdwn.js";
 
 const RICH_TEXT_CONTAINER_TYPES = new Set<unknown>([

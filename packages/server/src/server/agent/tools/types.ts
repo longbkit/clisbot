@@ -1,47 +1,47 @@
 import type { z } from "zod";
-import type { ProviderPaseoToolsPolicy } from "@getpaseo/protocol/provider-config";
+import type { ProviderClisbotToolsPolicy } from "@clisbot/protocol/provider-config";
 
-export interface PaseoToolExecutionContext {
+export interface ClisbotToolExecutionContext {
   signal?: AbortSignal;
-  sendUpdate?: (update: PaseoToolResult) => void;
+  sendUpdate?: (update: ClisbotToolResult) => void;
 }
 
-export interface PaseoToolResult {
+export interface ClisbotToolResult {
   content: Array<{ type: string; text?: string; [key: string]: unknown }>;
   structuredContent?: unknown;
   isError?: boolean;
 }
 
-export interface PaseoToolConfig {
+export interface ClisbotToolConfig {
   title?: string;
   description?: string;
   inputSchema?: z.ZodRawShape | z.ZodType;
   outputSchema?: z.ZodRawShape;
 }
 
-export interface PaseoToolDefinition extends PaseoToolConfig {
+export interface ClisbotToolDefinition extends ClisbotToolConfig {
   name: string;
   description: string;
-  handler: (input: unknown, context: PaseoToolExecutionContext) => Promise<PaseoToolResult>;
+  handler: (input: unknown, context: ClisbotToolExecutionContext) => Promise<ClisbotToolResult>;
 }
 
-export interface PaseoToolCatalog {
-  tools: ReadonlyMap<string, PaseoToolDefinition>;
-  getTool(name: string): PaseoToolDefinition | undefined;
+export interface ClisbotToolCatalog {
+  tools: ReadonlyMap<string, ClisbotToolDefinition>;
+  getTool(name: string): ClisbotToolDefinition | undefined;
   executeTool(
     name: string,
     input: unknown,
-    context?: PaseoToolExecutionContext,
-  ): Promise<PaseoToolResult>;
+    context?: ClisbotToolExecutionContext,
+  ): Promise<ClisbotToolResult>;
 }
 
-export interface PaseoToolRuntimeContext {
+export interface ClisbotToolRuntimeContext {
   callerAgentId?: string;
-  paseoToolPolicy?: ProviderPaseoToolsPolicy;
+  clisbotToolPolicy?: ProviderClisbotToolsPolicy;
   enableVoiceTools?: boolean;
   voiceOnly?: boolean;
 }
 
-export type PaseoToolCatalogFactory = (
-  context: PaseoToolRuntimeContext,
-) => PaseoToolCatalog | Promise<PaseoToolCatalog>;
+export type ClisbotToolCatalogFactory = (
+  context: ClisbotToolRuntimeContext,
+) => ClisbotToolCatalog | Promise<ClisbotToolCatalog>;

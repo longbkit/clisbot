@@ -5,17 +5,17 @@ import {
   listTokenSourcedAccounts,
   readStringParam,
   resolveReactionMessageId,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
   ChannelMessageToolDiscovery,
   ChannelMessageToolSchemaContribution,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { TelegramActionConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { asNonArrayRecord, readStringValue } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { extractToolSend } from "@getpaseo/channels-core/plugin-sdk/tool-send";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { TelegramActionConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { asNonArrayRecord, readStringValue } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { extractToolSend } from "@clisbot/channels-core/plugin-sdk/tool-send";
 import { inspectTelegramAccount } from "./account-inspect.js";
 import {
   createTelegramActionGate,

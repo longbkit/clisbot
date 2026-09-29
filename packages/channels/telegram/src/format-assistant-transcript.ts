@@ -1,5 +1,5 @@
 // upstream: extensions/telegram/src/format-assistant-transcript.ts@5d8067a4483
-import { markdownToIR, tokenizeHtmlTags } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import { markdownToIR, tokenizeHtmlTags } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import {
   decodeTelegramHtmlEntities,
   findTelegramHtmlEntityEnd,

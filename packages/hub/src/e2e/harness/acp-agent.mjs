@@ -71,10 +71,10 @@ class PhaseFiveAgent {
         replySucceeded,
         duplicateRejected,
         secretCompletionEnvPresent: [
-          "PASEO_HUB_EXECUTION_ID",
-          "PASEO_HUB_EXECUTION_DONE_URL",
-          "PASEO_HUB_EXECUTION_DONE_TOKEN",
-          "PASEO_HUB_EXECUTION_ID",
+          "CLISBOT_HUB_EXECUTION_ID",
+          "CLISBOT_HUB_EXECUTION_DONE_URL",
+          "CLISBOT_HUB_EXECUTION_DONE_TOKEN",
+          "CLISBOT_HUB_EXECUTION_ID",
         ].some((name) => process.env[name] !== undefined),
       })}\n`,
     );

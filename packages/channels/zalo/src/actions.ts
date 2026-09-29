@@ -1,13 +1,13 @@
 // upstream: extensions/zalo/src/actions.ts@5d8067a4483
 // Zalo plugin module implements actions behavior.
-import { jsonResult, readStringParam } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { jsonResult, readStringParam } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createLazyRuntimeNamedExport } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
-import { extractToolSend } from "@getpaseo/channels-core/plugin-sdk/tool-send";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createLazyRuntimeNamedExport } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
+import { extractToolSend } from "@clisbot/channels-core/plugin-sdk/tool-send";
 import { inspectZaloAccount, listZaloAccountIds } from "./accounts.js";
 
 const loadZaloActionsRuntime = createLazyRuntimeNamedExport(

@@ -4,8 +4,8 @@ import type {
   AgentModelDefinition,
   AgentSelectOption,
   ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/agent-types";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { formatAgentModeLabel, formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { applyFeatureValues, pruneFeatureValues } from "@/hooks/feature-preferences";
 import { filterSelectableModels } from "@/provider-selection/model-catalog";

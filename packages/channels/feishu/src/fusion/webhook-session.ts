@@ -13,7 +13,7 @@
 // that the encrypt key is required in this mode. This module is only the seam:
 // it builds the dispatcher, registers the Fusion admission handlers, and passes
 // the durable invoker in.
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import { createEventDispatcher } from "../client.js";
 import { monitorWebhook } from "../monitor.transport.js";
 import type { ResolvedFeishuAccount } from "../types.js";

@@ -1,10 +1,10 @@
 // upstream: extensions/discord/src/actions/runtime.presence.ts@5d8067a4483
 // Discord plugin module implements runtime.presence behavior.
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import type { ActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import { jsonResult, readStringParam } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { DiscordActionConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import type { ActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import { jsonResult, readStringParam } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { DiscordActionConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveDefaultDiscordAccountId } from "../accounts.js";
 import type { Activity, UpdatePresenceData } from "../internal/gateway.js";
 import { getGateway } from "../monitor/gateway-registry.js";

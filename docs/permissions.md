@@ -1,6 +1,6 @@
 # Daemon permissions
 
-For setup steps and user-facing access levels, see the [Paseo + Hub user guide](guides/user-guide/README.md) and [Daemon Administrator guide](guides/user-guide/access/daemon-administrator.md).
+For setup steps and user-facing access levels, see the [Clisbot + Hub user guide](guides/user-guide/README.md) and [Daemon Administrator guide](guides/user-guide/access/daemon-administrator.md).
 
 The daemon authorizes principals with semantic permissions. RPC names and protocol namespaces are not authority.
 
@@ -37,7 +37,7 @@ A Hub drives the daemon the way a local client does — it creates agents and wo
 them, answers their prompts, and reads which providers exist to offer them — so asking for
 `hub.execute` alone left half of that refused. Administration stays with the operator:
 `daemon.manage`, `access.manage`, `tunnel.manage` and `automation.manage` are not in the default.
-Narrow a connection with `paseo hub permissions revoke <permission>`.
+Narrow a connection with `clisbot hub permissions revoke <permission>`.
 
 Agents and terminals use workspace authority. Both can execute code and mutate the workspace, so separate write permissions would claim an isolation boundary the daemon cannot enforce.
 

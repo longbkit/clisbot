@@ -1,7 +1,7 @@
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import { createHash, randomUUID } from "node:crypto";
-import { SessionInboundMessageSchema } from "@getpaseo/protocol/messages";
-import { sessionOperationContent } from "@getpaseo/protocol/session-operation";
+import { SessionInboundMessageSchema } from "@clisbot/protocol/messages";
+import { sessionOperationContent } from "@clisbot/protocol/session-operation";
 import type { AccessStore } from "../../access/store.js";
 import type { Database } from "../../db/types.js";
 import { normalizeHubOrigin } from "../../managed-access/hub-origin.js";

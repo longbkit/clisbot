@@ -1,12 +1,12 @@
 // Fusion drive-surface bridge onto the ported Feishu send path (D-FS-020).
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and upstream's send
 // entry points. Every wire decision — the markdown → Lark post projection, the
 // envelope size assertion, the reply-vs-thread rule, the receipt shape — lives
 // in the ported `send.ts`, not here. Mirrors the Discord and Google Chat
 // verticals' `outbound.ts`.
-import type { HostRuntime, SendTextFn } from "@getpaseo/channels-shared";
+import type { HostRuntime, SendTextFn } from "@clisbot/channels-shared";
 import { mergeAccountCarrier } from "./fusion/account-config.js";
 import { installFeishuRuntime } from "./fusion/runtime.js";
 import type { OpenClawConfig } from "./fusion/runtime-api.js";

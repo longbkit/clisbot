@@ -1,4 +1,4 @@
-import type { PluginAttachmentSearchPayload, RpcInput } from "@getpaseo/plugin";
+import type { PluginAttachmentSearchPayload, RpcInput } from "@clisbot/plugin";
 import { searchIssuesRpc } from "../shared/issues";
 import { createLinearIssueSearch } from "./linear";
 

@@ -2,16 +2,16 @@
 import {
   compileAllowlist,
   resolveAllowlistMatchByCandidates,
-} from "@getpaseo/channels-core/plugin-sdk/allow-from";
-import { ToolAuthorizationError } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/core";
-import type { OpenClawPluginToolContext } from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
+} from "@clisbot/channels-core/plugin-sdk/allow-from";
+import { ToolAuthorizationError } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/core";
+import type { OpenClawPluginToolContext } from "@clisbot/channels-core/plugin-sdk/plugin-entry";
 import {
   resolveDefaultGroupPolicy,
   resolveOpenProviderRuntimeGroupPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/runtime-group-policy";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/runtime-group-policy";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { normalizeFeishuChatType } from "./chat-type.js";
 import {
   hasExplicitFeishuGroupConfig,

@@ -157,7 +157,7 @@ describe("GitHub webhook", () => {
           ...createWebhookPayload(),
           ref: "refs/heads/main",
           after: "commit-config-only",
-          sender: { login: "paseo" },
+          sender: { login: "clisbot" },
         },
         "push",
       ),

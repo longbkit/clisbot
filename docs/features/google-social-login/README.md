@@ -45,9 +45,9 @@ reads these four from the repo `.env` itself (`DEV_ENV_FILE_KEYS` in
 `scripts/dev-clisbot.mjs`); do not export the whole file, its channel
 credentials stop the Hub from starting. The `CLISBOT_` prefix is the operator-facing
 namespace for this fork: `packages/hub/src/env-alias.ts` copies each variable to
-its internal `PASEO_*` name (`PASEO_REGISTRATION_MODE`,
-`PASEO_REGISTRATION_ALLOWED_DOMAINS`, `PASEO_GOOGLE_AUTH_CLIENT_ID`,
-`PASEO_GOOGLE_AUTH_CLIENT_SECRET`), and an explicit `PASEO_*` value wins.
+its internal `CLISBOT_*` name (`CLISBOT_REGISTRATION_MODE`,
+`CLISBOT_REGISTRATION_ALLOWED_DOMAINS`, `CLISBOT_GOOGLE_AUTH_CLIENT_ID`,
+`CLISBOT_GOOGLE_AUTH_CLIENT_SECRET`), and an explicit `CLISBOT_*` value wins.
 
 The upstream modes `open` and `disabled` remain valid values. `open` admits every
 signup without domain rules; `disabled` rejects every new account, invitations
@@ -63,7 +63,7 @@ configuration, which is Resend's HTTP API (there is no SMTP adapter):
 
 ```env
 CLISBOT_RESEND_API_KEY=re_...
-CLISBOT_RESEND_FROM="Paseo <accounts@acme.com>"
+CLISBOT_RESEND_FROM="Clisbot <accounts@acme.com>"
 ```
 
 The sender domain must be verified in Resend. Without these variables, email
@@ -101,8 +101,8 @@ A single operator on a personal address needs neither mail nor an allowlist
    domain), so colleagues join it instead of starting a second one. A password
    claim never claims a domain, because its email is unverified.
 3. Without Google, claim with email and password in the browser, or set
-   `PASEO_BOOTSTRAP_ORGANIZATION` and `PASEO_BOOTSTRAP_OWNER_EMAIL` /
-   `PASEO_BOOTSTRAP_OWNER_PASSWORD`. These create the operator without an email
+   `CLISBOT_BOOTSTRAP_ORGANIZATION` and `CLISBOT_BOOTSTRAP_OWNER_EMAIL` /
+   `CLISBOT_BOOTSTRAP_OWNER_PASSWORD`. These create the operator without an email
    confirmation: whoever controls the instance is trusted to name the address. That
    operator keeps signing in with the password; Google sign-in with the same address
    is refused (`unable_to_link_account`), see
@@ -184,7 +184,7 @@ chosen before verification would let anyone who types a colleague's address own
 that account once the colleague clicks the link, so the password is set on the
 page the link opens.
 
-1. `POST /api/auth/paseo/registration/start` `{ email }` checks the allowlist and
+1. `POST /api/auth/clisbot/registration/start` `{ email }` checks the allowlist and
    mails a link. It answers `202` whether or not an account already uses the
    address, and sends nothing in that case. It answers `403` for a domain that
    is not allowlisted, `429` inside the cooldown, `503` without mail
@@ -193,10 +193,10 @@ page the link opens.
    hash in `email_verification_tokens`, valid for 30 minutes, used once. Links per
    email are limited to one a minute and five an hour. The page removes the token
    from the address bar as soon as it reads it.
-3. `POST /api/auth/paseo/registration/inspect` `{ token }` returns the email for
+3. `POST /api/auth/clisbot/registration/inspect` `{ token }` returns the email for
    the form. Opening the page never uses the link, so mail scanners that prefetch
    it cannot burn it.
-4. `POST /api/auth/paseo/registration/complete` `{ token, name, password }`
+4. `POST /api/auth/clisbot/registration/complete` `{ token, name, password }`
    rechecks the policy, allowlist, and invitations, creates the verified account,
    completes admission, and signs the browser in with the granted organization
    active. It answers `invalid` (404), `expired` (410), `used` or
@@ -237,7 +237,7 @@ records, so the next login can use either method.
 
 If the existing password account has an unverified email, the verified Google
 login proves ownership of the address. Before the Google account row is
-inserted, Hub deletes the user's sessions and Paseo client OAuth tokens, revokes
+inserted, Hub deletes the user's sessions and Clisbot client OAuth tokens, revokes
 the CLI credentials the user approved, and deletes the password credential. Hub
 has no email password-reset flow, so password login for that account ends; the
 user signs in with Google. API keys the user created are not revoked.
@@ -285,11 +285,11 @@ An owner renames the organization through Better Auth's
 (`packages/hub/src/auth/organization-profile.ts`) refuses non-owners
 (`organization_owner_required`) and any field other than `name`
 (`organization_field_not_editable`). The slug stays fixed, because CLI and daemon
-flows address the organization by it. The Paseo web app shows the active
+flows address the organization by it. The Clisbot web app shows the active
 organization at the top of the sidebar and as the first card on Account.
 
 Hub stores no image files, so uploads wait for a storage decision. The signed-in
-state returns `account.image`. The Paseo web app edits the profile on the Hub
+state returns `account.image`. The Clisbot web app edits the profile on the Hub
 origin; native and desktop clients hold OAuth tokens rather than the session cookie
 `update-user` needs, so they do not show the editor.
 
@@ -312,7 +312,7 @@ credential's organization and shows the Hub, account, organization, and role
 before daemon enrollment. The daemon never chooses an organization from an
 email domain.
 
-`GET /api/auth/paseo/credential` (Bearer CLI credential, or an API key with
+`GET /api/auth/clisbot/credential` (Bearer CLI credential, or an API key with
 `daemons:enroll`) returns `hub`, `organization`, the approving `account`, and its
 current `role`. `hub login` and `hub connect` print it; `hub status` adds
 ORGANIZATION, ACCOUNT, and ROLE when a stored credential matches the connected
@@ -326,7 +326,7 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
   `{ provider: "google", callbackURL?, invitation? }`. Hub accepts only Google,
   keeps `callbackURL` a same-origin path, and passes the invitation through
   Better Auth's server-side OAuth state (state and PKCE are Better Auth's).
-- Register `<PASEO_HUB_APP_URL>/api/auth/callback/google` as the authorized
+- Register `<CLISBOT_HUB_APP_URL>/api/auth/callback/google` as the authorized
   redirect URI of a Google Cloud OAuth web client.
 - A refused callback redirects back to `callbackURL` with `?error=<code>`:
   `registration_closed`, `google_email_unverified`,
@@ -339,8 +339,8 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
   admission for a new Google user, `account.create.before` revokes access before
   linking, and `session.create.before` completes admission for pending accounts
   on every sign-in path.
-- The Paseo web app is the sign-in surface; see
-  [The Paseo web app is the primary sign-in surface](#the-paseo-web-app-is-the-primary-sign-in-surface).
+- The Clisbot web app is the sign-in surface; see
+  [The Clisbot web app is the primary sign-in surface](#the-clisbot-web-app-is-the-primary-sign-in-surface).
   Its Hub account screen shows "Continue with Google" when the signed-out state
   reports `googleSignIn: true` and "Email me a sign-up link" when it reports
   `emailSelfRegistration: true`. `packages/app/src/clisbot/hub/account-entry-route.ts`
@@ -361,32 +361,32 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
 
 ## Decisions
 
-### The Paseo web app is the primary sign-in surface
+### The Clisbot web app is the primary sign-in surface
 
 - **Date:** 2026-09-15.
-- **Context:** Hub's own web UI (`packages/hub/src/auth/*.tsx`) and the Paseo web
+- **Context:** Hub's own web UI (`packages/hub/src/auth/*.tsx`) and the Clisbot web
   app's Hub account screen (`packages/app/src/clisbot/hub/`) both render sign-in.
-  In the Clisbot deployment one origin serves `/` from the Paseo web app and
+  In the Clisbot deployment one origin serves `/` from the Clisbot web app and
   `/api` from Hub, so the Better Auth login page (`loginPage: "/"`), invitation
-  links, registration links, and Google error redirects all land in the Paseo web
+  links, registration links, and Google error redirects all land in the Clisbot web
   app. Native and desktop clients open that same origin to sign in. Hub's own UI is
   reachable only when Hub runs alone.
 - **Problem:** registration built only in Hub's UI would break in the real
-  deployment: `/?emailRegistration=` opened the Paseo web app, which had no page to
+  deployment: `/?emailRegistration=` opened the Clisbot web app, which had no page to
   finish it.
 - **Options considered:**
-  1. Treat the Paseo web app as primary and give it every sign-in and registration
+  1. Treat the Clisbot web app as primary and give it every sign-in and registration
      step.
   2. Proxy those links to Hub's UI.
   3. Keep both UIs equal.
 - **Decision:** option 1. Hub's UI keeps working the same flows for a standalone
   Hub, since it is upstream code, but Clisbot behavior is designed and tested in
-  the Paseo web app first.
+  the Clisbot web app first.
 - **Rationale:**
   - Users see one surface.
   - Native and desktop sign-in already lands there.
   - Option 2 would mix two apps on one origin.
-- **Consequence:** registration UX exists twice (Hub UI and Paseo web app). Change
+- **Consequence:** registration UX exists twice (Hub UI and Clisbot web app). Change
   both, or remove Hub UI copies if standalone Hub stops being supported.
 - **Dev testing:** local `npm run dev:clisbot` without a proxy serves the app and
   Hub on different ports, so the app cannot reach Hub. Test through one origin, for
@@ -459,7 +459,7 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
 ### Operator accounts are not linked to Google
 
 - **Date:** 2026-09-14.
-- **Context:** instance setup (browser claim or `PASEO_BOOTSTRAP_*`) creates the
+- **Context:** instance setup (browser claim or `CLISBOT_BOOTSTRAP_*`) creates the
   first operator with `email_verified = true` and sends no confirmation. The
   address is the operator's word, not proof of ownership. Automatic Google
   linking treats a verified email as owned.

@@ -1,7 +1,7 @@
 // upstream: extensions/feishu/src/types.ts@5d8067a4483
 // Feishu type declarations define plugin contracts.
-import type { MessageReceipt } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { BaseProbeResult } from "@getpaseo/channels-core/plugin-sdk/core";
+import type { MessageReceipt } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { BaseProbeResult } from "@clisbot/channels-core/plugin-sdk/core";
 import type { FeishuConfigSchema, FeishuAccountConfigSchema, z } from "./config-schema.js";
 import type { MentionTarget } from "./mention-target.types.js";
 
@@ -92,7 +92,7 @@ export interface FeishuProbeResult extends BaseProbeResult {
 export type FeishuMediaInfo = {
   path?: string;
   contentType?: string;
-  kind: Exclude<import("@getpaseo/channels-core/plugin-sdk/media-runtime").MediaKind, "unknown">;
+  kind: Exclude<import("@clisbot/channels-core/plugin-sdk/media-runtime").MediaKind, "unknown">;
 };
 
 export type FeishuToolsConfig = {

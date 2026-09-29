@@ -6,10 +6,10 @@ describe("session open link", () => {
     expect(sessionOpenUrl("https://hub.test/", "srv_1", "agent-1")).toBe(
       "https://hub.test/api/open/agent/agent-1?host=srv_1",
     );
-    expect(sessionDeepLink("srv_1", "agent-1")).toBe("paseo://h/srv_1/agent/agent-1");
+    expect(sessionDeepLink("srv_1", "agent-1")).toBe("clisbot://h/srv_1/agent/agent-1");
   });
   it("redirects into the scheme only for ids the daemon could have issued", () => {
-    expect(sessionOpenRedirect("agent-1", "srv_1")).toBe("paseo://h/srv_1/agent/agent-1");
+    expect(sessionOpenRedirect("agent-1", "srv_1")).toBe("clisbot://h/srv_1/agent/agent-1");
     expect(sessionOpenRedirect("agent-1", null)).toBeUndefined();
     expect(sessionOpenRedirect("agent-1", "")).toBeUndefined();
     expect(sessionOpenRedirect("agent-1", "srv\r\nLocation: https://evil.test")).toBeUndefined();

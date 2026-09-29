@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 async function temporaryRoot(): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-hub-client-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-hub-client-"));
   roots.push(root);
   return root;
 }
@@ -85,7 +85,7 @@ describe("DesktopHubClient", () => {
       body: '{"ok":true}',
     });
     expect(authorization?.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(authorization?.searchParams.get("client_id")).toBe("paseo-client");
+    expect(authorization?.searchParams.get("client_id")).toBe("clisbot-client");
     const verifier = tokenBody?.get("code_verifier") ?? "";
     expect(createHash("sha256").update(verifier).digest("base64url")).toBe(
       authorization?.searchParams.get("code_challenge"),
@@ -189,7 +189,7 @@ describe("DesktopHubClient", () => {
     ).toMatchObject({ status: 200 });
     expect(Object.fromEntries(refreshBody ?? [])).toMatchObject({
       grant_type: "refresh_token",
-      client_id: "paseo-client",
+      client_id: "clisbot-client",
       resource: "https://hub.example.com",
       refresh_token: "refresh-one",
     });
@@ -264,7 +264,7 @@ describe("DesktopHubClient", () => {
     await expect(
       constrained.request({
         origin: "https://hub.example.com",
-        path: "/api/auth/paseo/api-keys",
+        path: "/api/auth/clisbot/api-keys",
       }),
     ).resolves.toMatchObject({ status: 200 });
     expect(fetchMock).toHaveBeenCalledOnce();

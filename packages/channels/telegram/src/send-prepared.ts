@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/send-prepared.ts@5d8067a4483
 import type { InlineKeyboardMarkup, Message } from "grammy/types";
-import { createChannelApiRetryRunner } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import type { RuntimeEnv } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { createChannelApiRetryRunner } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import type { RuntimeEnv } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { withTelegramApiErrorLogging } from "./api-logging.js";
 import {
   createTelegramChunkDeliveryTracker,

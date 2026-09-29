@@ -14,7 +14,7 @@
 
 import type { PlaneLogger } from "../plane/types.js";
 
-const SEAM_LOGGER = Symbol.for("@getpaseo/hub/channel-seam-logger");
+const SEAM_LOGGER = Symbol.for("@clisbot/hub/channel-seam-logger");
 
 type SeamLoggerGlobal = typeof globalThis & { [SEAM_LOGGER]?: PlaneLogger };
 

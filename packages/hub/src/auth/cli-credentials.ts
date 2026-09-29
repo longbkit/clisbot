@@ -3,7 +3,7 @@ import type { DatabaseRuntime, QueryHandle, QueryRow } from "../db/runtime/index
 import { API_KEY_SCOPES, type ApiKeyScope } from "./api-key-contract.js";
 import type { OperationAuthorizationResult } from "./api-keys.js";
 
-export const CLI_CREDENTIAL_PREFIX = "paseo_cli_";
+export const CLI_CREDENTIAL_PREFIX = "clisbot_cli_";
 const CLI_CREDENTIAL_PREFIX_LENGTH = 12;
 
 interface CliCredentialRow extends QueryRow {

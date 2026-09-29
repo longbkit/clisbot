@@ -120,12 +120,12 @@ test("focused contracts stay inside existing required checks", () => {
   assert.doesNotMatch(changes, /Install dependencies|npm run build/);
 
   assert.match(server, /test:hub-cli-contract/);
-  assert.match(server, /npm run test --workspace=@getpaseo\/server/);
+  assert.match(server, /npm run test --workspace=@clisbot\/server/);
   assert.ok(!jobs.has("hub-cli-contract"));
 
   assert.match(desktop, /test:e2e:renderer/);
   assert.match(desktop, /test:e2e:browser-tabs/);
-  assert.match(desktop, /npm run test --workspace=@getpaseo\/desktop/);
+  assert.match(desktop, /npm run test --workspace=@clisbot\/desktop/);
   assert.ok(!jobs.has("desktop-browser-bridge"));
   assert.ok(!jobs.has("playwright-desktop"));
 });
@@ -241,7 +241,7 @@ test("browser and desktop tests have exclusive, directory-owned suites", () => {
   for (const path of browserSpecs) {
     assert.doesNotMatch(
       readFileSync(new URL(path, repoRoot), "utf8"),
-      /paseoDesktop|injectDesktopBridge/,
+      /clisbotDesktop|injectDesktopBridge/,
     );
   }
   for (const path of desktopSpecs) {

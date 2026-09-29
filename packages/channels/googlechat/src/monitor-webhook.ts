@@ -1,22 +1,22 @@
 // upstream: extensions/googlechat/src/monitor-webhook.ts@5d8067a4483
 // Googlechat plugin module implements monitor webhook behavior.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/channel-secret-basic-runtime";
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/channel-secret-basic-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   canonicalizeWebhookRouteKey,
   resolveRequestClientIp,
   type FixedWindowRateLimiter,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
+} from "@clisbot/channels-core/plugin-sdk/webhook-ingress";
 import {
   readJsonWebhookBodyOrReject,
   runDetachedWebhookWork,
   type WebhookInFlightLimiter,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-request-guards";
+} from "@clisbot/channels-core/plugin-sdk/webhook-request-guards";
 import {
   resolveWebhookTargetWithAuthOrReject,
   withResolvedWebhookRequestPipeline,
-} from "@getpaseo/channels-core/plugin-sdk/webhook-targets";
+} from "@clisbot/channels-core/plugin-sdk/webhook-targets";
 import { verifyGoogleChatRequest } from "./auth.js";
 import { parseGoogleChatInboundPayload as normalizeGoogleChatInboundPayload } from "./monitor-event.js";
 import type { WebhookTarget } from "./monitor-types.js";

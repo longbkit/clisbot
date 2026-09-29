@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/message-tool-schema.ts@5d8067a4483
 // Telegram helper module supports message tool schema behavior.
-import { optionalPositiveIntegerSchema } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { optionalPositiveIntegerSchema } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import { Type } from "typebox";
 
 export function createTelegramPollExtraToolSchemas() {

@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/send-actions.ts@5d8067a4483
 import type { ReactionType, ReactionTypeEmoji } from "grammy/types";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 import { buildTypingThreadParams } from "./bot/helpers.js";
 import { isRecoverableTelegramNetworkError } from "./network-errors.js";
 import {

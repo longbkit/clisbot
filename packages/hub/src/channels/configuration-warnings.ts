@@ -4,7 +4,7 @@
 // publish-time delegation check already decides what they may hand out, so
 // these are information for the person saving, never a refusal.
 
-import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
+import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import type { CompiledHubBundle } from "../config/bundle.js";
 import type { Database } from "../db/types.js";
 import {

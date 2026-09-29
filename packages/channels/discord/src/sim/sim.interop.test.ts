@@ -8,7 +8,7 @@
 // our own code, so nothing external would catch a sim that got them close but
 // not right. These cases drive that code, unmodified, against the sim.
 import { afterEach, describe, expect, it } from "vitest";
-import { startDiscordSim, type SimDiscord } from "@getpaseo/channels-shared/sim";
+import { startDiscordSim, type SimDiscord } from "@clisbot/channels-shared/sim";
 import type { APIMessage, APIUser } from "discord-api-types/v10";
 import { Client } from "../internal/client.js";
 import { GatewayIntents, GatewayPlugin } from "../internal/gateway.js";

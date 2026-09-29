@@ -259,7 +259,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const rawConfiguration = includeConfiguration();
     const files = [
       ...configurationBundleFixture(dump(rawConfiguration)),
-      { path: ".paseo/workflows/partials/triage.md", content: PARTIAL_CONTENT },
+      { path: ".clisbot/workflows/partials/triage.md", content: PARTIAL_CONTENT },
     ];
     const revision = await store.insertGitHubBundleRevision({
       files,
@@ -325,7 +325,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
       formErrors: [],
       issues: [
         {
-          path: [".paseo/workflows/discord-mention.yml", "filters", "connection"],
+          path: [".clisbot/workflows/discord-mention.yml", "filters", "connection"],
           message:
             '"missing-discord" does not match any Discord connection (connected: discord-primary "Primary guild")',
         },
@@ -356,7 +356,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
       formErrors: [],
       issues: [
         {
-          path: [".paseo/workflows/discord-mention.yml", "filters", "guild"],
+          path: [".clisbot/workflows/discord-mention.yml", "filters", "guild"],
           message:
             '"1481169421832814616" does not match any Discord connection (connected: discord-primary "Primary guild")',
         },
@@ -402,7 +402,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
       formErrors: [],
       issues: [
         {
-          path: [".paseo/hub.yml", "environments", "runner", "daemon"],
+          path: [".clisbot/hub.yml", "environments", "runner", "daemon"],
           message: '"missing-daemon" does not match any daemon (connected: none)',
         },
       ],

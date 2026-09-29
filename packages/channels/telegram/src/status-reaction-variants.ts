@@ -1,12 +1,12 @@
 // upstream: extensions/telegram/src/status-reaction-variants.ts@5d8067a4483
 // Telegram plugin module implements status reaction variants behavior.
 import type { ReactionTypeCustomEmoji, ReactionTypeEmoji } from "grammy/types";
-import { DEFAULT_EMOJIS, type StatusReactionEmojis } from "@getpaseo/channels-core/plugin-sdk/channel-feedback";
+import { DEFAULT_EMOJIS, type StatusReactionEmojis } from "@clisbot/channels-core/plugin-sdk/channel-feedback";
 import {
   normalizeOptionalString,
   normalizeStringEntries,
   uniqueStrings,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { TelegramChatDetails, TelegramGetChat } from "./bot/types.js";
 
 type StatusReactionEmojiKey = keyof Required<StatusReactionEmojis>;

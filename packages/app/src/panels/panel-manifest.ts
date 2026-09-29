@@ -1,4 +1,4 @@
-import { sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
+import { sessionParticipantKey } from "@clisbot/protocol/session-authorship";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 export type PaneHost = "main" | "explorer";

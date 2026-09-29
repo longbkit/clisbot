@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { CHAT_ID_LABEL } from "@getpaseo/protocol/bots/labels";
+import { CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { StoredAgentRecord } from "../../agent/agent-storage.js";
 import { routeChatSpokenInput } from "./spoken-input.js";
 function storage(labels: Record<string, string>) {

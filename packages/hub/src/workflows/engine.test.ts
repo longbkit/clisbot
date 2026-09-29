@@ -91,7 +91,7 @@ describe("durable multi-step workflow engine", () => {
     },
   );
 
-  it("materializes ambient context only for the step that authors paseo.context", async () => {
+  it("materializes ambient context only for the step that authors clisbot.context", async () => {
     const fixture = await workflowFixture({
       rawConfiguration: contextOptInConfiguration(),
     });
@@ -561,14 +561,14 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("launches the exact committed partial content with inline-equivalent interpolation", async () => {
-    const content = "Committed partial for ${{ paseo.prompt }} / ${{ paseo.inputs.repo }}";
+    const content = "Committed partial for ${{ clisbot.prompt }} / ${{ clisbot.inputs.repo }}";
     const fixture = await workflowFixture({
       rawConfiguration: partialRuntimeConfiguration(),
       resolvedPromptPartials: new Map([
         [
-          ".paseo/workflows/partials/instructions.md",
+          ".clisbot/workflows/partials/instructions.md",
           {
-            path: ".paseo/workflows/partials/instructions.md",
+            path: ".clisbot/workflows/partials/instructions.md",
             content,
             contentHash: hashPromptPartialContent(content),
           },
@@ -615,7 +615,7 @@ describe("durable multi-step workflow engine", () => {
       [
         ["classify", "skipped"],
         ["work-hub", "running"],
-        ["work-paseo", "pending"],
+        ["work-clisbot", "pending"],
       ],
     );
     assert.deepEqual(dispatches, ["work-hub"]);
@@ -637,7 +637,7 @@ describe("durable multi-step workflow engine", () => {
       [
         ["classify", "skipped"],
         ["work-hub", "succeeded"],
-        ["work-paseo", "skipped"],
+        ["work-clisbot", "skipped"],
       ],
     );
   });
@@ -661,12 +661,12 @@ describe("durable multi-step workflow engine", () => {
       executionId: classifier.id,
       executionStatus: "succeeded",
       stepStatus: "succeeded",
-      result: { status: "succeeded", output: { repo: "paseo" } },
-      stepOutput: { repo: "paseo" },
+      result: { status: "succeeded", output: { repo: "clisbot" } },
+      stepOutput: { repo: "clisbot" },
       completedByAgent: true,
     });
     await engine.processAvailable();
-    assert.deepEqual(dispatches, ["classify", "work-paseo"]);
+    assert.deepEqual(dispatches, ["classify", "work-clisbot"]);
     assert.equal(
       (await fixture.database.listWorkflowStepRunsForTriggerRun(run.id))[1]!.status,
       "skipped",
@@ -1133,7 +1133,7 @@ describe("durable multi-step workflow engine", () => {
     assert.equal(intents.length, 1);
     assert.equal(intents[0]?.github, undefined);
     assert.deepEqual(intents[0]?.env, {
-      SOME_TOKEN: "${{ paseo.connections.some-connection.token }}",
+      SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}",
     });
   });
 
@@ -1797,7 +1797,7 @@ describe("author access re-check", () => {
       },
     });
 
-    await handler(fixture.trigger("run repo=paseo"));
+    await handler(fixture.trigger("run repo=clisbot"));
     await engine.processAvailable();
 
     assert.deepEqual(checked, [`${fixture.workflowId}:${fixture.revisionId}`]);
@@ -1950,7 +1950,7 @@ function partialRuntimeConfiguration(): Record<string, unknown> {
             agent: { provider: "codex" },
             prompt: [
               { include: "partials/instructions.md" },
-              { text: "Inline ${{ paseo.prompt }} / ${{ paseo.inputs.repo }}" },
+              { text: "Inline ${{ clisbot.prompt }} / ${{ clisbot.inputs.repo }}" },
             ],
           },
         ],
@@ -2032,7 +2032,7 @@ function contextOptInConfiguration(): Record<string, unknown> {
             max_runtime: "10m",
             idle_timeout: "1m",
             agent: { provider: "codex" },
-            prompt: [{ text: "Trigger: ${{ paseo.prompt }}" }],
+            prompt: [{ text: "Trigger: ${{ clisbot.prompt }}" }],
           },
           {
             id: "with-context",
@@ -2042,7 +2042,7 @@ function contextOptInConfiguration(): Record<string, unknown> {
             agent: { provider: "codex" },
             prompt: [
               {
-                text: "Context: ${{ paseo.context }}\nTrigger: ${{ paseo.prompt }}",
+                text: "Context: ${{ clisbot.context }}\nTrigger: ${{ clisbot.prompt }}",
               },
             ],
           },
@@ -2135,10 +2135,10 @@ function namedSelectionConfiguration(): Record<string, unknown> {
   return {
     environments: [
       {
-        name: "paseo",
+        name: "clisbot",
         kind: "daemon",
         daemon: "runner",
-        cwd: "/workspace/paseo",
+        cwd: "/workspace/clisbot",
       },
       { name: "hub", kind: "daemon", daemon: "runner", cwd: "/workspace/hub" },
     ],
@@ -2154,7 +2154,7 @@ function namedSelectionConfiguration(): Record<string, unknown> {
         steps: [
           {
             id: "classifier",
-            environment: "paseo",
+            environment: "clisbot",
             max_runtime: "2m",
             idle_timeout: "30s",
             agent: { provider: "codex" },
@@ -2165,7 +2165,7 @@ function namedSelectionConfiguration(): Record<string, unknown> {
                 additionalProperties: false,
                 required: ["environment", "agent"],
                 properties: {
-                  environment: { enum: ["paseo", "hub"] },
+                  environment: { enum: ["clisbot", "hub"] },
                   agent: { enum: ["codex", "claude"] },
                 },
               },
@@ -2204,7 +2204,7 @@ function skippedAuthorityConfiguration(): Record<string, unknown> {
             prompt: [{ text: "Classify" }],
             github: {
               connection: "getpaseo-github",
-              repositories: ["getpaseo/paseo"],
+              repositories: ["longbkit/clisbot"],
               permissions: { contents: "write" },
             },
           },
@@ -2217,7 +2217,7 @@ function skippedAuthorityConfiguration(): Record<string, unknown> {
             agent: { provider: "codex" },
             prompt: [{ text: "Work" }],
             env: {
-              SOME_TOKEN: "${{ paseo.connections.some-connection.token }}",
+              SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}",
             },
           },
         ],
@@ -2295,17 +2295,17 @@ function baseConfiguration(options: { unavailableValue?: boolean }): Record<stri
         name: "route-request",
         on: "manual.run",
         max_runtime: "1h",
-        inputs: { repo: { type: "string", choices: ["paseo", "hub"] } },
+        inputs: { repo: { type: "string", choices: ["clisbot", "hub"] } },
         values: {
           repo:
             options.unavailableValue === true
               ? "${{ steps.classify.outputs.repo }}"
-              : "${{ paseo.inputs.repo ?? steps.classify.outputs.repo }}",
+              : "${{ clisbot.inputs.repo ?? steps.classify.outputs.repo }}",
         },
         steps: [
           {
             id: "classify",
-            if: "${{ paseo.inputs.repo == null }}",
+            if: "${{ clisbot.inputs.repo == null }}",
             environment: "runner",
             max_runtime: "2m",
             idle_timeout: "30s",
@@ -2316,7 +2316,7 @@ function baseConfiguration(options: { unavailableValue?: boolean }): Record<stri
                 type: "object",
                 additionalProperties: false,
                 required: ["repo"],
-                properties: { repo: { enum: ["paseo", "hub"] } },
+                properties: { repo: { enum: ["clisbot", "hub"] } },
               },
             },
           },
@@ -2330,13 +2330,13 @@ function baseConfiguration(options: { unavailableValue?: boolean }): Record<stri
             prompt: [{ text: "Work hub" }],
           },
           {
-            id: "work-paseo",
-            if: "${{ values.repo == 'paseo' }}",
+            id: "work-clisbot",
+            if: "${{ values.repo == 'clisbot' }}",
             environment: "runner",
             max_runtime: "10m",
             idle_timeout: "1m",
             agent: { provider: "codex" },
-            prompt: [{ text: "Work paseo" }],
+            prompt: [{ text: "Work clisbot" }],
           },
         ],
       },
@@ -2364,7 +2364,7 @@ function terminalRecoveryConfiguration(): Record<string, unknown> {
           },
           {
             id: "downstream",
-            if: "${{ paseo.inputs.repo == 'hub' }}",
+            if: "${{ clisbot.inputs.repo == 'hub' }}",
             environment: "runner",
             max_runtime: "2m",
             idle_timeout: "30s",
@@ -2395,7 +2395,7 @@ function executionWorktreeConfiguration(): Record<string, unknown> {
         cwd: "/workspace",
         worktree: {
           mode: "branch-off",
-          newBranch: "trigger-${{ paseo.execution.id }}",
+          newBranch: "trigger-${{ clisbot.execution.id }}",
         },
       },
     ],
@@ -2418,7 +2418,7 @@ function dispatchLabel(intent: {
   if (intent.prompt === "Downstream") return "downstream";
   if (intent.triggerName !== "route-request") return "unknown";
   if (intent.prompt.startsWith("Classify")) return "classify";
-  return intent.prompt.includes("paseo") ? "work-paseo" : "work-hub";
+  return intent.prompt.includes("clisbot") ? "work-clisbot" : "work-hub";
 }
 
 async function settlesQuickly<T>(promise: Promise<T>): Promise<boolean> {

@@ -2,7 +2,7 @@
 //
 // Upstream strips OpenClaw's own `<runtime-context>` preamble (session, workspace
 // and channel facts it injects into the model prompt) back out of model-authored
-// text. Paseo's daemon never injects that preamble, so there is nothing to strip
+// text. Clisbot's daemon never injects that preamble, so there is nothing to strip
 // and the text passes through unchanged.
 
 /** Opening delimiter for protected OpenClaw runtime context blocks. */

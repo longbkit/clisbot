@@ -48,12 +48,12 @@ import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../../test-utils/project-con
 import { createChannelSupervisor } from "./index.js";
 import type { ChannelSupervisor, ChannelSupervisorOptions } from "./types.js";
 
-// --- Fixed dev state (e2e-dev.sh): never ~/.paseo, never .dev/paseo-home -----
+// --- Fixed dev state (e2e-dev.sh): never ~/.clisbot, never .dev/clisbot-home -----
 
 const DEV_HOME = process.env["CLISBOT_HOME"] ?? join(homedir(), ".clisbot-dev");
 const DEV_HUB_DATA_DIR =
   process.env["CLISBOT_HUB_DATA_DIR"] ??
-  process.env["PASEO_HUB_DATA_DIR"] ??
+  process.env["CLISBOT_HUB_DATA_DIR"] ??
   (existsSync(join(DEV_HOME, "hub", "PG_VERSION")) ? join(DEV_HOME, "hub") : DEV_HOME);
 // The test file's location: packages/hub/src/channels/supervisor/ — six
 // levels up (the file itself is the first) reaches the repo root.
@@ -68,9 +68,9 @@ const PINS_PATH = join(REPO_ROOT, "packages", "hub", "channel-pins.json");
 function inRepoPackageDir(packageName: string): string {
   return realpathSync(join(REPO_ROOT, "node_modules", packageName));
 }
-const SLACK_IN_REPO = inRepoPackageDir("@getpaseo/channels-slack");
-const TELEGRAM_IN_REPO = inRepoPackageDir("@getpaseo/channels-telegram");
-const DISCORD_IN_REPO = inRepoPackageDir("@getpaseo/channels-discord");
+const SLACK_IN_REPO = inRepoPackageDir("@clisbot/channels-slack");
+const TELEGRAM_IN_REPO = inRepoPackageDir("@clisbot/channels-telegram");
+const DISCORD_IN_REPO = inRepoPackageDir("@clisbot/channels-discord");
 
 // Every hub-side log line (info/warn/error), captured for assertions: a
 // dropped marker must be named by a log line, never asserted by silence.
@@ -153,7 +153,7 @@ function discordSkip(): string | false {
     return "DISCORD_BOT_TOKEN / DISCORD_TEST_CHANNEL_ID are not configured";
   }
   if (!existsSync(join(DISCORD_IN_REPO, "dist", "plugin.js"))) {
-    return "the in-repo Discord vertical is not built (@getpaseo/channels-discord dist missing)";
+    return "the in-repo Discord vertical is not built (@clisbot/channels-discord dist missing)";
   }
   return false;
 }
@@ -176,7 +176,7 @@ function supplyPresent(): boolean {
 
 const SKIP = supplyPresent()
   ? false
-  : "in-repo channel verticals not built (@getpaseo/channels-{slack,telegram} dist missing), " +
+  : "in-repo channel verticals not built (@clisbot/channels-{slack,telegram} dist missing), " +
     `or the live-test credential fixtures / .env are absent under ${DEV_HOME} (build the workspace packages first)`;
 
 // --- Fake daemon (the stock local-client wire, trimmed to the P0 surface) ---
@@ -527,23 +527,23 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       userId: null,
     });
     const files = [
-      { path: ".paseo/hub.yml", content: HUB_YAML },
+      { path: ".clisbot/hub.yml", content: HUB_YAML },
       {
-        path: ".paseo/channels/policy.yml",
+        path: ".clisbot/channels/policy.yml",
         content: policyYaml(liveSenderId),
       },
       {
-        path: ".paseo/channels/slack/work.yml",
+        path: ".clisbot/channels/slack/work.yml",
         content: slackAccountYaml("00000000-0000-4000-8000-000000000001"),
       },
       {
-        path: ".paseo/channels/telegram/work.yml",
+        path: ".clisbot/channels/telegram/work.yml",
         content: telegramAccountYaml("00000000-0000-4000-8000-000000000002"),
       },
       ...(DISCORD_SKIP === false
         ? [
             {
-              path: ".paseo/channels/discord/work.yml",
+              path: ".clisbot/channels/discord/work.yml",
               content: discordAccountYaml(DISCORD_CONNECTION_ID),
             },
           ]
@@ -557,7 +557,7 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     });
 
     // 4. The supervisor: real install dir + real pins, loopback fake daemon,
-    // and an env WITHOUT PASEO_PASSWORD (the fake upgrade carries no subprotocol).
+    // and an env WITHOUT CLISBOT_PASSWORD (the fake upgrade carries no subprotocol).
     // The verticals run IN THIS process, so the native verbose log lever is
     // process.env, not the supervisor's env copy (the supervisor only reads it
     // for the channels flag + daemon password). shouldLogVerbose ->
@@ -566,8 +566,8 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     // debug to the openclaw file log — a drop must be named, not guessed.
     process.env["OPENCLAW_LOG_LEVEL"] = "debug";
     const env = { ...process.env } as NodeJS.ProcessEnv;
-    delete env["PASEO_PASSWORD"];
-    env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+    delete env["CLISBOT_PASSWORD"];
+    env["CLISBOT_HUB_CHANNELS_ENABLED"] = "1";
     env["OPENCLAW_LOG_LEVEL"] = "debug";
     supervisor = createChannelSupervisor({
       database,

@@ -1,4 +1,4 @@
-// @getpaseo/channels-googlechat — the in-repo Google Chat channel vertical
+// @clisbot/channels-googlechat — the in-repo Google Chat channel vertical
 // (goal ledger slice 14). Exports:
 // - `default` — the bundled-channel entry (`id: "googlechat"`);
 // - `googlechatPlugin` — the pinned drive-surface name (startAccount + sendText);

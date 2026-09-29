@@ -4,11 +4,11 @@
 
 Managed Access là cấu hình **từng daemon**, quyết định daemon có buộc kết nối app đi qua kiểm tra quyền Hub hay không.
 
-Bản Clisbot để mặc định `external` từ lần chạy đầu, không cần biến môi trường hay flag. Daemon chỉ đòi vé khi đã thuộc một Hub: trước khi enroll chưa có Hub nào cấp vé, nên bạn vẫn kết nối, đăng nhập và chạy `paseo hub connect` như bình thường. Enroll xong, daemon đóng các phiên không có vé và từ đó mọi kết nối cần vé. Mất Hub (bị thu hồi hoặc đang disconnect) vẫn giữ yêu cầu vé; chỉ khi Owner disconnect xong daemon mới hết đòi vé. Ghi `daemon.managedAccess.mode` trong `config.json` thì giá trị đó thắng mặc định.
+Bản Clisbot để mặc định `external` từ lần chạy đầu, không cần biến môi trường hay flag. Daemon chỉ đòi vé khi đã thuộc một Hub: trước khi enroll chưa có Hub nào cấp vé, nên bạn vẫn kết nối, đăng nhập và chạy `clisbot hub connect` như bình thường. Enroll xong, daemon đóng các phiên không có vé và từ đó mọi kết nối cần vé. Mất Hub (bị thu hồi hoặc đang disconnect) vẫn giữ yêu cầu vé; chỉ khi Owner disconnect xong daemon mới hết đòi vé. Ghi `daemon.managedAccess.mode` trong `config.json` thì giá trị đó thắng mặc định.
 
 |                                  | `off`                                             | `external`                                   |
 | -------------------------------- | ------------------------------------------------- | -------------------------------------------- |
-| Kết nối app                      | Luồng Paseo tin cậy thông thường                  | Cần vé truy cập do Hub cấp                   |
+| Kết nối app                      | Luồng Clisbot tin cậy thông thường                | Cần vé truy cập do Hub cấp                   |
 | Hub Connect                      | Kiểm soát việc Hub đưa thông tin kết nối          | Cần có để xin vé kết nối daemon              |
 | Quyền trên daemon sau kết nối    | Session tin cậy có quyền owner của daemon         | Theo người đăng nhập, Team và các grant      |
 | Giới hạn Project trong Hub       | Không được daemon áp dụng cho session tin cậy này | Daemon kiểm tra Project và thao tác được cấp |
@@ -16,7 +16,7 @@ Bản Clisbot để mặc định `external` từ lần chạy đầu, không c�
 
 ## Off có phải ai cũng kết nối được?
 
-Không phải cứ biết daemon là vào được: vẫn cần đường kết nối hợp lệ, thông tin ghép nối và điều kiện xác thực của endpoint nếu có. Nhưng người có pairing link/QR/thông tin kết nối hợp lệ có thể dùng app Paseo tương thích mà không cần đăng nhập Hub.
+Không phải cứ biết daemon là vào được: vẫn cần đường kết nối hợp lệ, thông tin ghép nối và điều kiện xác thực của endpoint nếu có. Nhưng người có pairing link/QR/thông tin kết nối hợp lệ có thể dùng app Clisbot tương thích mà không cần đăng nhập Hub.
 
 Với `off`, việc là Member hay chỉ được Connect trên Hub **không biến session daemon thành session giới hạn theo Project**. Đừng dùng chế độ này để chia quyền nhiều người theo Hub.
 
@@ -38,11 +38,11 @@ Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối n
 
 ## CLI trên Host ở chế độ external
 
-CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `paseo hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên CLI không có nhiều quyền hơn người đó.
+CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `clisbot hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên CLI không có nhiều quyền hơn người đó.
 
-- Chưa đăng nhập Hub đó thì CLI báo: chạy `paseo hub login` rồi thử lại.
-- `paseo hub connect` chạy trước khi daemon thuộc Hub, lúc daemon chưa đòi vé. Daemon trả kết quả enroll xong mới đóng phiên đó.
-- Host enroll bằng `--api-key` mà máy không có phiên `paseo hub login`: CLI không xin được vé (API key không đại diện cho người nào). Dùng `paseo hub login`, hoặc đường socket/pipe local.
+- Chưa đăng nhập Hub đó thì CLI báo: chạy `clisbot hub login` rồi thử lại.
+- `clisbot hub connect` chạy trước khi daemon thuộc Hub, lúc daemon chưa đòi vé. Daemon trả kết quả enroll xong mới đóng phiên đó.
+- Host enroll bằng `--api-key` mà máy không có phiên `clisbot hub login`: CLI không xin được vé (API key không đại diện cho người nào). Dùng `clisbot hub login`, hoặc đường socket/pipe local.
 
 ## Tắt external
 

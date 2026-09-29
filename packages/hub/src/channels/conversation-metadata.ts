@@ -3,7 +3,7 @@ import type {
   ChannelConversationMetadata,
   HostRuntime,
   ResolveConversationFn,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import { z } from "zod";
 
 const metadataSchema = z

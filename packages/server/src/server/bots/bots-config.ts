@@ -16,7 +16,7 @@ export interface PersistedBotsConfig {
   root?: string;
 }
 
-export const BOTS_ENABLED_ENV = "PASEO_BOTS_ENABLED";
+export const BOTS_ENABLED_ENV = "CLISBOT_BOTS_ENABLED";
 const DEFAULT_ROOT_DIRECTORY = "workspaces";
 
 function parseBooleanEnv(value: string | undefined): boolean | undefined {
@@ -27,25 +27,25 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
   return undefined;
 }
 
-/** Trim, expand `~`, absolute as is, relative under `paseoHome`; absent → `workspaces`. */
-export function resolveBotsRoot(paseoHome: string, configuredRoot: string | undefined): string {
+/** Trim, expand `~`, absolute as is, relative under `clisbotHome`; absent → `workspaces`. */
+export function resolveBotsRoot(clisbotHome: string, configuredRoot: string | undefined): string {
   const trimmed = configuredRoot?.trim();
-  if (!trimmed) return path.join(paseoHome, DEFAULT_ROOT_DIRECTORY);
+  if (!trimmed) return path.join(clisbotHome, DEFAULT_ROOT_DIRECTORY);
   const expanded = expandTilde(trimmed);
-  return path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(paseoHome, expanded);
+  return path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(clisbotHome, expanded);
 }
 
 export function resolveBotsConfig(input: {
   env: NodeJS.ProcessEnv;
   persisted: PersistedBotsConfig | undefined;
-  paseoHome: string;
+  clisbotHome: string;
 }): BotsConfig {
   return {
-    // COMPAT(clisbot-bots-default): upstream Paseo has no Bots. The Clisbot fusion runs them
-    // unless `daemon.bots.enabled: false` or `PASEO_BOTS_ENABLED=0` says otherwise; off stays
+    // COMPAT(clisbot-bots-default): upstream Clisbot has no Bots. The Clisbot fusion runs them
+    // unless `daemon.bots.enabled: false` or `CLISBOT_BOTS_ENABLED=0` says otherwise; off stays
     // byte-for-byte upstream (README D10).
     enabled: parseBooleanEnv(input.env[BOTS_ENABLED_ENV]) ?? input.persisted?.enabled ?? true,
-    root: resolveBotsRoot(input.paseoHome, input.persisted?.root),
+    root: resolveBotsRoot(input.clisbotHome, input.persisted?.root),
   };
 }
 

@@ -40,7 +40,7 @@ describe("Hub account navigation bootstrap", () => {
     });
   });
 
-  it("leaves disabled Hub builds and ordinary Paseo startup to the upstream router", () => {
+  it("leaves disabled Hub builds and ordinary Clisbot startup to the upstream router", () => {
     state.enabled = false;
     const screen = render(<HubAccountEntryNavigation navigationReady />);
     expect(state.replace).not.toHaveBeenCalled();

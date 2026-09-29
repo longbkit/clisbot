@@ -2,7 +2,7 @@
 // Discord plugin module implements send.messages behavior.
 import type { APIChannel, APIMessage } from "discord-api-types/v10";
 import { ChannelType } from "discord-api-types/v10";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import {
   createThread,
   deleteChannelMessage,

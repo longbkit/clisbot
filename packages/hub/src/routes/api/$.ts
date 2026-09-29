@@ -18,7 +18,7 @@ function apiNotFound(): Response {
     {
       error: "not_found",
       message:
-        "This Paseo Hub API endpoint does not exist. Check the request path and API version.",
+        "This Clisbot Hub API endpoint does not exist. Check the request path and API version.",
     },
     { status: 404 },
   );

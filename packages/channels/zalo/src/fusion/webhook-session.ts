@@ -7,7 +7,7 @@
 //
 // Upstream binds its webhook path on OpenClaw's process-wide gateway HTTP
 // server (`monitor.ts` → `registerWebhookTargetWithPluginRoute` →
-// `src/plugins/http-registry.ts`, `@getpaseo/channels-core` D-CORE-321). Fusion
+// `src/plugins/http-registry.ts`, `@clisbot/channels-core` D-CORE-321). Fusion
 // has no such server, so this module owns one `node:http` listener per account
 // and keeps everything else upstream: the target is registered through the
 // ported registry, the ported `handleZaloWebhookRequest` owns the guards, the
@@ -21,9 +21,9 @@
 // budget so a stuck delete cannot hold a shutdown.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { resolveWebhookPath } from "@getpaseo/channels-core/plugin-sdk/webhook-ingress";
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { resolveWebhookPath } from "@clisbot/channels-core/plugin-sdk/webhook-ingress";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import { deleteWebhook, setWebhook, type ZaloFetch } from "../api.js";
 import { zaloWebhookRuntime } from "../monitor.webhook.js";
 import type { ResolvedZaloAccount } from "../accounts.js";

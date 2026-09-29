@@ -1,11 +1,11 @@
 // upstream: extensions/discord/src/mentions.ts@5d8067a4483
 // Discord plugin module implements mentions behavior.
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
   normalizeOptionalStringifiedId,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { normalizeDiscordHandleKey, resolveDiscordDirectoryUserId } from "./directory-cache.js";
 
 type DiscordMentionAliasesConfig = Record<string, string>;

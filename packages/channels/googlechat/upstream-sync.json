@@ -408,7 +408,7 @@
     },
     {
       "id": "D-GC-019",
-      "reason": "Test-only, mechanical: `vi.mock(\"openclaw/plugin-sdk/...\")` targets are rewritten to the local module the ported file now imports \u2014 `@getpaseo/channels-core/plugin-sdk/webhook-request-guards` / `.../webhook-targets` in `monitor-webhook.test.ts`, and `./fusion/ssrf-fetch.js` in `google-auth.runtime.test.ts` (D-GC-005). The sync check's normalizer collapses `from`/`import()` specifiers but not `vi.mock`'s first argument, so these two files cannot be marked verbatim. No case, fixture or assertion differs.",
+      "reason": "Test-only, mechanical: `vi.mock(\"openclaw/plugin-sdk/...\")` targets are rewritten to the local module the ported file now imports \u2014 `@clisbot/channels-core/plugin-sdk/webhook-request-guards` / `.../webhook-targets` in `monitor-webhook.test.ts`, and `./fusion/ssrf-fetch.js` in `google-auth.runtime.test.ts` (D-GC-005). The sync check's normalizer collapses `from`/`import()` specifiers but not `vi.mock`'s first argument, so these two files cannot be marked verbatim. No case, fixture or assertion differs.",
       "file": "src/monitor-webhook.test.ts"
     }
   ]

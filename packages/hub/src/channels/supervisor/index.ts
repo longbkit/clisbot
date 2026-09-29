@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { registerChannelDriveConfig } from "../message-actions.js";
 import { createConversationMetadataResolver } from "../conversation-metadata.js";
-import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
+import type { ChannelConversationMetadata } from "@clisbot/channels-shared";
 import { channelTestMessage } from "../test-message.js";
 // The channel supervisor (plan §4-S1 / implementation doc §4.3.9): the
 // coordinate/mount module that drives the per-account lifecycle —
@@ -83,7 +83,7 @@ import { createStreamingDriver } from "../streaming/index.js";
 import { HostLossNotifier } from "./host-loss.js";
 import { isEnabled } from "../policy.js";
 import { isSupportedChannel } from "../catalog.js";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import { buildAccountCarriers } from "./account-carriers.js";
 import type {
   ApprovalCallbackParams,
@@ -1519,10 +1519,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       },
     };
     // The daemon password defaults to the same env var the stock CLI client
-    // reads (PASEO_PASSWORD): a password-protected local daemon otherwise
+    // reads (CLISBOT_PASSWORD): a password-protected local daemon otherwise
     // rejects the trusted session at the WS upgrade.
     if (daemonOptions.password === undefined) {
-      const password = this.env["PASEO_PASSWORD"]?.trim();
+      const password = this.env["CLISBOT_PASSWORD"]?.trim();
       if (password !== undefined && password !== "") daemonOptions.password = password;
     }
     const daemon = await this.connectAccountDaemon(daemonOptions, handle, compiled, snapshot);
@@ -1766,7 +1766,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           candidates: info.candidates,
           attempts: info.attempts,
           ...(info.lastError !== undefined ? { lastError: info.lastError } : {}),
-          hint: "verify the daemon's ConnectionOffer / PASEO_HUB_CHANNEL_DAEMON_URL / daemon reachability",
+          hint: "verify the daemon's ConnectionOffer / CLISBOT_HUB_CHANNEL_DAEMON_URL / daemon reachability",
         },
       );
     };

@@ -110,7 +110,7 @@ export type HubConfigurationResources = z.infer<typeof configurationResourcesSch
 export type HubInstallResult = z.infer<typeof installResponseSchema>;
 export type HubValidationResult = z.infer<typeof validationResponseSchema>;
 
-/** `GET /api/auth/paseo/credential`. Not strict: a newer Hub may describe more. */
+/** `GET /api/auth/clisbot/credential`. Not strict: a newer Hub may describe more. */
 export const credentialIdentitySchema = z.object({
   hub: z.string().min(1),
   credential: z.enum(["cliCredential", "apiKey"]),

@@ -77,7 +77,7 @@ What each vertical implements. A blank cell means the platform or the vertical h
 ⁴ Card clicks arrive inbound; Hub renders no Lark card of its own.
 ⁵ Slash commands and interaction callbacks are not wired yet.
 
-The same matrix appears per account under **Channels → Channel Integrations** in the Paseo app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
+The same matrix appears per account under **Channels → Channel Integrations** in the Clisbot app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
 
 ## Commands in a conversation
 
@@ -283,7 +283,7 @@ whose rule covers them.
 Talking to a bot and reaching a Host or Project stay separate. A chatting
 sender can start sessions with the route's configuration and use `/status`,
 `/stop`, `/new`, `/fork`, `/side`, `/quick`, `/steer`, `/queue`, `/skill` and
-`/command`; chat gives no access to the Host, the Project, or the Paseo app.
+`/command`; chat gives no access to the Host, the Project, or the Clisbot app.
 `/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/cowork` and
 `/resume` need the sender's own Access grants on the route's Project, and
 answering an approval needs an `approval.*` privilege.
@@ -410,10 +410,10 @@ A Route's **Reply method** decides what reaches the conversation:
 | Text forward      | The agent's answer as text. The agent cannot send files or act on messages.                                                                    |
 | Channel tool only | Only what the agent sends with its `message` tool, including short progress updates on long work.                                              |
 
-The Paseo app shows the same answer the conversation got on the first two. On
+The Clisbot app shows the same answer the conversation got on the first two. On
 **Channel tool only**, the agent's own messages stay in the app and the
 conversation sees the tool's posts; if the agent finishes without sending a
-reply, its last message is sent instead. A turn started in the Paseo app is not
+reply, its last message is sent instead. A turn started in the Clisbot app is not
 sent to the conversation on this method. Progress updates are limited to one
 every 30 seconds.
 
@@ -440,10 +440,10 @@ attachment by name. See each channel's page.
 Four verbs, all against a running Hub:
 
 ```sh
-paseo channels add <channel> --account <id> [--connection-id <uuid> | --secret-file <path>]
-paseo channels ls
-paseo channels status
-paseo channels rm <channel> --account <id> --yes
+clisbot channels add <channel> --account <id> [--connection-id <uuid> | --secret-file <path>]
+clisbot channels ls
+clisbot channels status
+clisbot channels rm <channel> --account <id> --yes
 ```
 
 `add` never takes a credential on the command line — a secret in argv lands in `ps` output and shell history. Pass a file and delete it afterwards. Each channel's page shows the file shape it expects.

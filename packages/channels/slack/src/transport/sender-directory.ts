@@ -10,7 +10,7 @@
  * back to the id. A token without `users:read` answers `missing_scope`; that is
  * logged once and every later lookup is skipped.
  */
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import { extractSlackApiError } from "../client/web-api.js";
 
 /** A person's display facts; both absent when Slack would not say. */

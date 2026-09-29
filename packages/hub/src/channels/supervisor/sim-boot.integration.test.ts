@@ -11,7 +11,7 @@
 // credentials.
 //
 // Slow by design (a real boot per file). Set `RUN_CHANNEL_SIM_BOOT=1` to run it;
-// `npm run test:sim-boot --workspace=@getpaseo/hub` does that for you.
+// `npm run test:sim-boot --workspace=@clisbot/hub` does that for you.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ChannelStore } from "../../db/channels.js";
 import {

@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/threading.ts@5d8067a4483
 // Slack plugin module implements threading behavior.
-import type { ReplyToMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { ReplyToMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import type { SlackAppMentionEvent, SlackMessageEvent } from "./types.js";
 
 type SlackThreadContext = {

@@ -1,12 +1,12 @@
 // upstream: extensions/slack/src/channel-type.ts@5d8067a4483
 // Slack plugin module implements channel type behavior.
 import { createHash } from "node:crypto";
-import { pruneMapToMaxSize } from "@getpaseo/channels-core/plugin-sdk/collection-runtime";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { pruneMapToMaxSize } from "@clisbot/channels-core/plugin-sdk/collection-runtime";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveSlackAccount, resolveSlackOperationToken } from "./accounts.js";
 import { createSlackReadClient, createSlackWebClient } from "./client.js";
 import { assertSlackDetachedTargetAllowed } from "./detached-target-admission.js";

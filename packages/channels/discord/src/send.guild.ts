@@ -11,9 +11,9 @@ import type {
 import {
   resolveExpiresAtMsFromDurationMs,
   timestampMsToIsoString,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { normalizeOptionalLowercaseString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { loadWebMediaRaw } from "@getpaseo/channels-core/plugin-sdk/web-media";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { loadWebMediaRaw } from "@clisbot/channels-core/plugin-sdk/web-media";
 import {
   addGuildMemberRole,
   createGuildBan,

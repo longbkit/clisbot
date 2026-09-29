@@ -1,16 +1,16 @@
 // Fusion drive-surface bridge onto the ported OpenClaw send path.
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and upstream's
 // `send.ts` entry points. Every wire decision — chunking, rich/HTML rendering,
 // topic and reply params, retries, receipts, media routing, the sent-message
 // cache — now lives in the ported source, not here.
 import { readFile } from "node:fs/promises";
 import { dirname, extname } from "node:path";
-import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { MessagePresentationBlockNote } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { HostRuntime, SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
+import { evaluateOutboundMedia, mediaFileName } from "@clisbot/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { MessagePresentationBlockNote } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   accountRendersRichMessages,
   resolveTelegramOutboundPresentation,

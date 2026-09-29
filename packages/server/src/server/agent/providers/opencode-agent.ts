@@ -300,8 +300,8 @@ function buildOpenCodeAutoAcceptFeature(config: AgentSessionConfig): AgentFeatur
     type: "toggle",
     id: OPENCODE_AUTO_ACCEPT_FEATURE_ID,
     label: "Auto Accept",
-    description: "When on, Paseo approves OpenCode tool permission prompts without asking you.",
-    tooltip: "Paseo auto-accepts permission prompts",
+    description: "When on, Clisbot approves OpenCode tool permission prompts without asking you.",
+    tooltip: "Clisbot auto-accepts permission prompts",
     icon: "shield-check",
     value: isOpenCodeAutoAcceptEnabled(config),
   };
@@ -350,7 +350,7 @@ type OpenCodeAgentConfig = Omit<AgentSessionConfig, "providerOptions"> & {
   providerOptions: OpenCodeProviderOptions;
 };
 
-const OPENCODE_SESSION_ENV_KEYS = new Set(["PASEO_AGENT_ID", "PASEO_AGENT_CWD"]);
+const OPENCODE_SESSION_ENV_KEYS = new Set(["CLISBOT_AGENT_ID", "CLISBOT_AGENT_CWD"]);
 
 function requiresDedicatedOpenCodeServer(
   config: OpenCodeAgentConfig,
@@ -1421,7 +1421,7 @@ export class OpenCodeAgentClient implements AgentClient {
     this.bridge = deps.bridge;
     this.capabilities = {
       ...OPENCODE_CAPABILITIES,
-      ...(this.bridge ? { supportsNativePaseoTools: true } : {}),
+      ...(this.bridge ? { supportsNativeClisbotTools: true } : {}),
     };
     this.runtimeSettings = runtimeSettings;
     this.createOpenCodeClient = deps.createClient ?? createSdkOpenCodeClient;
@@ -1620,7 +1620,7 @@ export class OpenCodeAgentClient implements AgentClient {
     return this.bridge.bindSession({
       sessionId,
       env: launchContext.env ?? {},
-      tools: launchContext.paseoTools,
+      tools: launchContext.clisbotTools,
     });
   }
 
@@ -3503,7 +3503,7 @@ class OpenCodeAgentSession implements AgentSession {
   }
 
   /**
-   * The OpenCode session outlives the server process that served it, and Paseo starts the
+   * The OpenCode session outlives the server process that served it, and Clisbot starts the
    * next server on a new port. Move to the current server before talking to OpenCode again,
    * so the session does not keep calling a port nothing listens on.
    */

@@ -4,7 +4,7 @@
 // the send path, or a vertical's own tool: a short line of text the model reads,
 // plus structured content when the caller has facts to report.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/infra/errors";
+import { formatErrorMessage } from "@clisbot/channels-core/infra/errors";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundFailure } from "./plane/outbound-failure.js";
 

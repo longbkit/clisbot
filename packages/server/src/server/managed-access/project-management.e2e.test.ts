@@ -7,7 +7,7 @@ import { Session, type SessionOptions } from "../session.js";
 import type { SessionOutboundMessage } from "../messages.js";
 import { FileBackedProjectRegistry, FileBackedWorkspaceRegistry } from "../workspace-registry.js";
 import { WorkspaceGitServiceImpl } from "../workspace-git-service.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { createStub } from "../test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "../test-utils/session-stubs.js";
 import type { DaemonPermission } from "../authorization/index.js";
@@ -29,12 +29,12 @@ afterEach(async () => {
 
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "managed-project-e2e-"));
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const logger = pino({ level: "silent" });
   const projects = new FileBackedProjectRegistry(path.join(root, "projects.json"), logger);
   const workspaces = new FileBackedWorkspaceRegistry(path.join(root, "workspaces.json"), logger);
   await Promise.all([projects.initialize(), workspaces.initialize()]);
-  const git = new WorkspaceGitServiceImpl({ logger, paseoHome: daemon.paseoHome });
+  const git = new WorkspaceGitServiceImpl({ logger, clisbotHome: daemon.clisbotHome });
   cleanups.push(async () => {
     await git.dispose();
     await daemon.close();
@@ -80,7 +80,7 @@ async function fixture() {
         ...(grant.projectFolders ? { projectFolders: grant.projectFolders } : {}),
       },
       logger,
-      paseoHome: daemon.paseoHome,
+      clisbotHome: daemon.clisbotHome,
       onMessage: (message) => messages.push(message),
       downloadTokenStore: createStub<SessionOptions["downloadTokenStore"]>({}),
       pushNotifications: createStub<SessionOptions["pushNotifications"]>({}),

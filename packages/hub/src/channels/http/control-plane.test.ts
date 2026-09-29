@@ -113,9 +113,9 @@ async function withActiveConfiguration(database: Database): Promise<void> {
     userId: null,
   });
   const files = [
-    { path: ".paseo/hub.yml", content: HUB_YAML },
-    { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
-    { path: ".paseo/channels/slack/work.yml", content: ACCOUNT_YAML },
+    { path: ".clisbot/hub.yml", content: HUB_YAML },
+    { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
+    { path: ".clisbot/channels/slack/work.yml", content: ACCOUNT_YAML },
   ];
   await database.saveChannelConfiguration({
     organizationId: ORG_ID,
@@ -194,7 +194,7 @@ function jsonRequest(
   } = {},
 ): Request {
   const headers: Record<string, string> = {
-    "x-paseo-client-address": "127.0.0.1",
+    "x-clisbot-client-address": "127.0.0.1",
     ...init.headers,
   };
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
@@ -206,11 +206,11 @@ function jsonRequest(
   });
 }
 
-const ORIGINAL_FLAG = process.env["PASEO_HUB_CHANNELS_ENABLED"];
+const ORIGINAL_FLAG = process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
 
 afterEach(() => {
-  if (ORIGINAL_FLAG === undefined) delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
-  else process.env["PASEO_HUB_CHANNELS_ENABLED"] = ORIGINAL_FLAG;
+  if (ORIGINAL_FLAG === undefined) delete process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
+  else process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = ORIGINAL_FLAG;
 });
 
 describe("channel control-plane ops", () => {
@@ -219,13 +219,13 @@ describe("channel control-plane ops", () => {
     await withActiveConfiguration(database);
     const snapshot = await loadChannelControlPlane(database);
     const files = snapshot.files.map((file) => {
-      if (file.path === ".paseo/hub.yml") {
+      if (file.path === ".clisbot/hub.yml") {
         return {
           ...file,
           content: `environments:\n  candidate-env:\n    kind: daemon\n    daemon: daemon-10000000\n    cwd: /workspace/candidate\nagents:\n  candidate-agent:\n    provider: codex\n`,
         };
       }
-      if (file.path === ".paseo/channels/slack/work.yml") {
+      if (file.path === ".clisbot/channels/slack/work.yml") {
         return {
           ...file,
           content: `${ACCOUNT_YAML}\nroutes:\n  - audience: [{ who: { roles: [member] }, where: { groups: all } }]\n    agent: candidate-agent\n    environment: candidate-env\n`,
@@ -263,7 +263,7 @@ describe("channel control-plane ops", () => {
   });
 
   it("answers the exact absent-404 when the kill-switch is off, before db or auth", async () => {
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "0";
     // Even with a database the flag-off body is the public API's unknown-route
     // 404; with no database it must NOT be the 503 — the flag off means the
     // routes do not exist at all.
@@ -277,7 +277,7 @@ describe("channel control-plane ops", () => {
         assert.equal(response.status, 404);
         assert.equal(response.headers.get("content-type"), "application/problem+json");
         const body = await response.json();
-        assert.equal(body.type, "https://paseo.sh/problems/not-found");
+        assert.equal(body.type, "https://clisbot.com/problems/not-found");
         assert.equal(body.title, "Not found");
         assert.equal(body.status, 404);
         assert.equal(body.detail, "No canonical API route matches this path.");
@@ -323,7 +323,7 @@ describe("channel control-plane ops", () => {
     let response = await list();
     {
       const noLoopback = new Request("http://hub.test/api/v1/channels", {
-        headers: { "x-paseo-client-address": "10.1.2.3" },
+        headers: { "x-clisbot-client-address": "10.1.2.3" },
       });
       response = await application.operations.handleChannelList(noLoopback);
       assert.equal(response.status, 401);
@@ -343,7 +343,7 @@ describe("channel control-plane ops", () => {
       jsonRequest("/api/v1/channels", {
         headers: {
           authorization: "Bearer hub-secret",
-          "x-paseo-client-address": "10.1.2.3",
+          "x-clisbot-client-address": "10.1.2.3",
         },
       }),
     );
@@ -361,7 +361,7 @@ describe("channel control-plane ops", () => {
         {
           channel: "slack",
           account: "work",
-          pin: "paseo-channel-slack@1.0.0",
+          pin: "clisbot-channel-slack@1.0.0",
           integrity: "ok",
           loadTrace: "ok",
           transport: "started",
@@ -399,7 +399,7 @@ describe("channel control-plane ops", () => {
         {
           channel: "slack",
           account: "work",
-          pin: "paseo-channel-slack@1.0.0",
+          pin: "clisbot-channel-slack@1.0.0",
           integrity: "ok",
           loadTrace: "ok",
           transport: "started",
@@ -422,7 +422,7 @@ describe("channel control-plane ops", () => {
         {
           channel: "slack",
           account: "work",
-          pin: "paseo-channel-slack@1.0.0",
+          pin: "clisbot-channel-slack@1.0.0",
           integrity: "ok",
           loadTrace: "ok",
           transport: "started",
@@ -444,7 +444,7 @@ describe("channel control-plane ops", () => {
 
   it("gates the channel-reply MCP endpoint: flag-off 404, no-server 503, non-loopback 401", async () => {
     // Flag off → the exact absent-404, before db or server state is consulted.
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "0";
     {
       const application = buildApp(null, {
         channelReplyServer: {
@@ -460,7 +460,7 @@ describe("channel control-plane ops", () => {
       const body = await response.json();
       assert.equal(body.code, "not_found");
     }
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "1";
     // Flag on but the server is null (composition degraded) → the shared 503,
     // before auth is consulted.
     {
@@ -469,7 +469,7 @@ describe("channel control-plane ops", () => {
       });
       const noLoopback = new Request("http://hub.test/mcp/channel/ref", {
         method: "POST",
-        headers: { "x-paseo-client-address": "10.1.2.3" },
+        headers: { "x-clisbot-client-address": "10.1.2.3" },
       });
       const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
       assert.equal(response.status, 503);
@@ -486,7 +486,7 @@ describe("channel control-plane ops", () => {
       });
       const noLoopback = new Request("http://hub.test/mcp/channel/ref", {
         method: "POST",
-        headers: { "x-paseo-client-address": "10.1.2.3" },
+        headers: { "x-clisbot-client-address": "10.1.2.3" },
       });
       const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
       assert.equal(response.status, 401);
@@ -506,7 +506,7 @@ describe("channel control-plane ops", () => {
       const response = await application.operations.handleChannelReplyMcp(
         new Request("http://hub.test/mcp/channel/valid-capability", {
           method: "POST",
-          headers: { "x-paseo-client-address": "10.1.2.3" },
+          headers: { "x-clisbot-client-address": "10.1.2.3" },
         }),
         "valid-capability",
       );
@@ -527,7 +527,7 @@ describe("channel control-plane ops", () => {
         method: "POST",
         headers: {
           authorization: "Bearer hub-secret",
-          "x-paseo-client-address": "10.1.2.3",
+          "x-clisbot-client-address": "10.1.2.3",
         },
       });
 
@@ -643,7 +643,7 @@ describe("channel control-plane ops", () => {
     assert.notEqual(after.revision!.id, before.revision!.id);
     assert.deepEqual(after.controlPlane.accounts, []);
     assert.equal(
-      after.files.some((file) => file.path === ".paseo/channels/slack/work.yml"),
+      after.files.some((file) => file.path === ".clisbot/channels/slack/work.yml"),
       false,
     );
     // The credential Connection outlives the account — another one can hold it

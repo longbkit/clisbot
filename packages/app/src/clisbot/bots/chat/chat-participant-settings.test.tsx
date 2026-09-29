@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { BotPayload } from "../data/contracts";
 import { ChatParticipantSettings } from "./chat-participant-settings";
 

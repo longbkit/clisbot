@@ -98,9 +98,9 @@ Test shorthand:
 
 ## H. Benchmark contract
 
-| #   | Acceptance                                                                                       | Proof                                                           |
-| --- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ---------------- |
-| 40  | 1,000 rows is a required clean gate                                                              | `projection` — bounded cold projected page over 1000 rows       |
-| 41  | 10,000 rows is a required stress gate                                                            | `projection` — bounded cold projected page over 10000 rows      |
-| 42  | 100,000 rows is an optional ceiling with a ~5 minute hard timeout that cannot fail the iteration | `projection` — skipped unless `PASEO_SESSION_STORAGE_CEILING=1` |
-| 43  | Upstream full-load stays the parity baseline; projection stress does not replace it              | `packages/server/scripts/session-storage-benchmark/`            | benchmark report |
+| #   | Acceptance                                                                                       | Proof                                                             |
+| --- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ---------------- |
+| 40  | 1,000 rows is a required clean gate                                                              | `projection` — bounded cold projected page over 1000 rows         |
+| 41  | 10,000 rows is a required stress gate                                                            | `projection` — bounded cold projected page over 10000 rows        |
+| 42  | 100,000 rows is an optional ceiling with a ~5 minute hard timeout that cannot fail the iteration | `projection` — skipped unless `CLISBOT_SESSION_STORAGE_CEILING=1` |
+| 43  | Upstream full-load stays the parity baseline; projection stress does not replace it              | `packages/server/scripts/session-storage-benchmark/`              | benchmark report |

@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/monitor/message-handler/preview-finalize.ts@5d8067a4483
 // Slack plugin module implements preview finalize behavior.
 import type { Block, KnownBlock, WebClient } from "@slack/web-api";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { editSlackRenderedMessage } from "../../actions.js";
 import { buildSlackBlocksFallbackText } from "../../blocks-fallback.js";
 import { buildSlackEditTextPayload } from "../../edit-text.js";

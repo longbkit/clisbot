@@ -1,5 +1,5 @@
 // upstream: extensions/telegram/src/rich-blocks-list.ts@5d8067a4483
-import type { MarkdownIR } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+import type { MarkdownIR } from "@clisbot/channels-core/plugin-sdk/text-chunking";
 import type { InputRichBlock, InputRichBlockListItem } from "./rich-block-model.js";
 
 type MarkdownRichListItemSource = {

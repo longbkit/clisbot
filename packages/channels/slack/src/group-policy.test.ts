@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/group-policy.test.ts@5d8067a4483
 // Slack tests cover group policy plugin behavior.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
 import { resolveSlackGroupRequireMention, resolveSlackGroupToolPolicy } from "./group-policy.js";
 import { registerSlackInstallationState } from "./installation-identity-state.js";

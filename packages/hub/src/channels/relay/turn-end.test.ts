@@ -264,7 +264,7 @@ describe("a completed Channel tool turn", () => {
     assert.deepEqual(posted, [NO_REPLY_NOTICE]);
   });
 
-  it("posts nothing for a turn started from the Paseo app", async () => {
+  it("posts nothing for a turn started from the Clisbot app", async () => {
     start("tool", "app");
     await say("t1", "m1", "An answer for the app user");
     await complete("t1");

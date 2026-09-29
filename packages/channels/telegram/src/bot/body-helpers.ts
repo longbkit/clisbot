@@ -13,11 +13,11 @@ import type {
 import type {
   ChannelInboundMediaInput,
   NormalizedLocation,
-} from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-inbound";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { renderTelegramTextEntities } from "./inbound-text-entities.js";
 
 type TelegramMediaMessage = Pick<

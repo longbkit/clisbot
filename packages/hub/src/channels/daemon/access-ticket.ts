@@ -1,4 +1,4 @@
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 
 // Channel-plane daemon admission, Phase 1 (docs/audits/2026-09-10-channel-vs-app-admission.md).
 // A channel account's trusted-client socket is a managed subject: in managed-access

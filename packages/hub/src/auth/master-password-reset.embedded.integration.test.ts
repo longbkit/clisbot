@@ -71,7 +71,7 @@ beforeAll(async () => {
   });
   await auth.initialize?.();
   const claimed = await auth.handle(
-    new Request(`${origin}/api/auth/paseo/claim-instance`, {
+    new Request(`${origin}/api/auth/clisbot/claim-instance`, {
       method: "POST",
       headers: { origin, "content-type": "application/json" },
       body: JSON.stringify({ email, password: "original-owner-password" }),
@@ -85,7 +85,7 @@ beforeAll(async () => {
   userId = session.rows[0]!.user_id;
   originalSession = session.rows[0]!.id;
   const completed = await auth.handle(
-    new Request(`${origin}/api/auth/paseo/complete-app-setup`, {
+    new Request(`${origin}/api/auth/clisbot/complete-app-setup`, {
       method: "POST",
       headers: { origin, cookie: originalCookie, "content-type": "application/json" },
       body: "{}",
@@ -161,13 +161,13 @@ it("resets via the HTTP boundary, revokes sessions and OAuth credentials, preser
   await runtime.query(
     `insert into oauth_refresh_token
     (id, token, client_id, session_id, user_id, expires_at, created_at, scopes)
-    values ('test-refresh', 'private-refresh', 'paseo-client', $1, $2, now() + interval '1 day', now(), '{}')`,
+    values ('test-refresh', 'private-refresh', 'clisbot-client', $1, $2, now() + interval '1 day', now(), '{}')`,
     [originalSession, userId],
   );
   await runtime.query(
     `insert into oauth_access_token
     (id, token, client_id, session_id, user_id, expires_at, created_at, scopes)
-    values ('test-access', 'private-access', 'paseo-client', $1, $2, now() + interval '1 day', now(), '{}')`,
+    values ('test-access', 'private-access', 'clisbot-client', $1, $2, now() + interval '1 day', now(), '{}')`,
     [originalSession, userId],
   );
   expect((await auth.resolveAccount(bearer(originalJwt))).account.id).toBe(userId);
@@ -230,7 +230,7 @@ it("rolls back the password and session revocation together if the audit write f
 });
 
 function bearer(token: string): Request {
-  return new Request(`${origin}/api/auth/paseo/account`, {
+  return new Request(`${origin}/api/auth/clisbot/account`, {
     headers: { authorization: `Bearer ${token}` },
   });
 }
@@ -243,7 +243,7 @@ async function authorize(cookie: string): Promise<string> {
     )
   ).rows[0]!;
   const selected = await auth.handle(
-    new Request(`${origin}/api/auth/paseo/select-organization`, {
+    new Request(`${origin}/api/auth/clisbot/select-organization`, {
       method: "POST",
       headers: { origin, cookie, "content-type": "application/json" },
       body: JSON.stringify({ organizationId: organization.organization_id }),
@@ -255,7 +255,7 @@ async function authorize(cookie: string): Promise<string> {
   const url = new URL(`${origin}/api/auth/oauth2/authorize`);
   url.search = new URLSearchParams({
     response_type: "code",
-    client_id: "paseo-client",
+    client_id: "clisbot-client",
     redirect_uri: redirectUri,
     scope: "hub:access offline_access",
     state: "recovery-test-state",
@@ -272,7 +272,7 @@ async function authorize(cookie: string): Promise<string> {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "authorization_code",
-        client_id: "paseo-client",
+        client_id: "clisbot-client",
         redirect_uri: redirectUri,
         code: code!,
         code_verifier: verifier,

@@ -3,9 +3,9 @@
 import type {
   ChannelThreadingContext,
   ChannelThreadingToolContext,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveSlackAccount, resolveSlackReplyToMode } from "./accounts.js";
 import { formatSlackTarget, parseSlackTarget } from "./target-parsing.js";
 import { normalizeSlackThreadTsCandidate } from "./thread-ts.js";

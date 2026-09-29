@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Stage immutable official Paseo artifacts without changing this checkout or installing dependencies. */
+/** Stage immutable official Clisbot artifacts without changing this checkout or installing dependencies. */
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, readdir, realpath, symlink, writeFile } from "node:fs/promises";
@@ -20,13 +20,13 @@ if (!/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(version))
 await mkdir(directory); // Never modify or replace an existing staging directory.
 const nodeModules = join(directory, "node_modules");
 const artifacts = join(directory, "artifacts");
-await mkdir(join(nodeModules, "@getpaseo"), { recursive: true });
+await mkdir(join(nodeModules, "@clisbot"), { recursive: true });
 await mkdir(artifacts);
-const queue = ["@getpaseo/server", "@getpaseo/client", "@getpaseo/cli"];
+const queue = ["@clisbot/server", "@clisbot/client", "@clisbot/cli"];
 const manifest = {
   version,
   sourceReference: "fa93c4290eaa87ae58452ab6e2012f85ae6e0c6b",
-  note: "Published official Paseo tarballs; unchanged third-party dependencies shared with the Fusion checkout. Diagnostic, not a clean npm-install proof. gitHead is recorded separately from the source reference.",
+  note: "Published official Clisbot tarballs; unchanged third-party dependencies shared with the Fusion checkout. Diagnostic, not a clean npm-install proof. gitHead is recorded separately from the source reference.",
   packages: [],
   sharedDependencies: [],
 };
@@ -69,7 +69,7 @@ for (let index = 0; index < queue.length; index++) {
     bytes: total,
   });
   for (const [dependency, expectedVersion] of Object.entries(installed.dependencies ?? {})) {
-    if (!dependency.startsWith("@getpaseo/")) continue;
+    if (!dependency.startsWith("@clisbot/")) continue;
     if (expectedVersion !== version)
       throw new Error(`Unexpected internal version ${dependency}: ${expectedVersion}`);
     queue.push(dependency);
@@ -82,7 +82,7 @@ async function shareDependencies(sourceDirectory, targetDirectory, scope) {
   });
   await mkdir(targetDirectory, { recursive: true });
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === "@getpaseo") continue;
+    if (entry.name.startsWith(".") || entry.name === "@clisbot") continue;
     const source = await realpath(join(sourceDirectory, entry.name));
     await symlink(source, join(targetDirectory, entry.name), "dir");
     if (!entry.name.startsWith("@")) {

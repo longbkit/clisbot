@@ -38,8 +38,8 @@ function soloProduct(overrides: Partial<StripeCatalogProduct> = {}): StripeCatal
     name: "Solo",
     active: true,
     metadata: {
-      paseo_plan: "true",
-      paseo_plan_slug: "solo",
+      clisbot_plan: "true",
+      clisbot_plan_slug: "solo",
       ent_seats_max: "5",
       ent_can_invite: "true",
       ent_executions_monthly_limit: "2000",
@@ -179,7 +179,7 @@ describe("syncBillingCatalog", () => {
     await syncBillingCatalog(source, database);
     assert.equal((await database.listBillingPlans())[0]?.active, true);
 
-    // The product lost its paseo_plan tag or was deleted: the snapshot no longer contains it.
+    // The product lost its clisbot_plan tag or was deleted: the snapshot no longer contains it.
     source.setProducts([]);
     await syncBillingCatalog(source, database);
 

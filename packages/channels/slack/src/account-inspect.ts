@@ -4,13 +4,13 @@ import {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
   type OpenClawConfig,
-} from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   hasConfiguredSecretInput,
   normalizeSecretInputString,
-} from "@getpaseo/channels-core/plugin-sdk/secret-input";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/secret-input";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { hasSlackAccountCredentials } from "./account-configured.js";
 import type { SlackAccountSurfaceFields } from "./account-surface-fields.js";
 import {

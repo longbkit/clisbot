@@ -2,7 +2,7 @@
 import { PollLayoutType } from "discord-api-types/payloads/v10";
 import type { RESTAPIPoll } from "discord-api-types/rest/v10";
 import type { APIChannel } from "discord-api-types/v10";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 // Discord plugin module implements send.shared behavior.
 import {
   buildOutboundMediaLoadOptions,
@@ -11,12 +11,12 @@ import {
   normalizePollInput,
   type OutboundMediaAccess,
   type PollInput,
-} from "@getpaseo/channels-core/plugin-sdk/media-runtime";
-import { requireRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/plugin-config-runtime";
-import type { ChunkMode } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
-import { resolveTextChunksWithFallback } from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-import { normalizeStringEntries } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { loadWebMedia } from "@getpaseo/channels-core/plugin-sdk/web-media";
+} from "@clisbot/channels-core/plugin-sdk/media-runtime";
+import { requireRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/plugin-config-runtime";
+import type { ChunkMode } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
+import { resolveTextChunksWithFallback } from "@clisbot/channels-core/plugin-sdk/reply-payload";
+import { normalizeStringEntries } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { loadWebMedia } from "@clisbot/channels-core/plugin-sdk/web-media";
 import { isDiscordThreadChannelType } from "./channel-type.js";
 import { chunkDiscordTextWithMode } from "./chunk.js";
 import { createDiscordClient, resolveDiscordRest, type DiscordClientOpts } from "./client.js";

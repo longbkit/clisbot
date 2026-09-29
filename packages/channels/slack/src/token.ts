@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/token.ts@5d8067a4483
 // Slack plugin module implements token behavior.
 import type { AuthTestResponse } from "@slack/web-api";
-import { normalizeResolvedSecretInputString } from "@getpaseo/channels-core/plugin-sdk/secret-input";
+import { normalizeResolvedSecretInputString } from "@clisbot/channels-core/plugin-sdk/secret-input";
 
 export function formatSlackBotTokenIdentityWarning(params: {
   auth: Pick<AuthTestResponse, "bot_id" | "user_id">;

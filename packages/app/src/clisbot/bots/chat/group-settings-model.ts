@@ -1,9 +1,9 @@
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import {
   CHAT_ROOM_INSTRUCTIONS_MAX_CHARS,
   type ChatUpdatePatch,
-} from "@getpaseo/protocol/chats/rpc-schemas";
-import { DEFAULT_CHAT_ROUNDS_MAX } from "@getpaseo/protocol/chats/room";
+} from "@clisbot/protocol/chats/rpc-schemas";
+import { DEFAULT_CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/room";
 export interface GroupSettingsDraft {
   title: string;
   requireMention: boolean;

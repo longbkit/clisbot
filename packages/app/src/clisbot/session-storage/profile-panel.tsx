@@ -2,7 +2,7 @@ import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { UserRound } from "lucide-react-native";
 import invariant from "tiny-invariant";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { definePanel } from "@/panels/panel-registry";
 import { usePaneContext } from "@/panels/pane-context";
 import {

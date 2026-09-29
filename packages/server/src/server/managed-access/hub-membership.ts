@@ -18,11 +18,11 @@ export function relationshipRequiresTickets(state: string | null): boolean {
   return state !== null && state !== "pending";
 }
 
-/** The same rule read from a Paseo home, for callers outside the daemon. */
-export function homeRequiresTickets(paseoHome: string): boolean {
+/** The same rule read from a Clisbot home, for callers outside the daemon. */
+export function homeRequiresTickets(clisbotHome: string): boolean {
   let raw: string;
   try {
-    raw = readFileSync(path.join(paseoHome, HUB_RELATIONSHIP_FILE_NAME), "utf8");
+    raw = readFileSync(path.join(clisbotHome, HUB_RELATIONSHIP_FILE_NAME), "utf8");
   } catch {
     return false;
   }

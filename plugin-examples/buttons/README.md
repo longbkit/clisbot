@@ -4,13 +4,13 @@ Install this directory as a plugin, open an agent, and choose **Button examples:
 Command Center. One header button and one composer pill appear. Choose another mode to update
 those same registrations. Switching agents moves the example to that agent's workspace and composer.
 
-| Command Center command                | Header                                | Composer                        | Try                                                                                                                   |
-| ------------------------------------- | ------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Button examples: action**           | Refresh icon only                     | Refresh icon and label          | Refresh reads the workspace from the daemon and updates the label and tooltip. Paseo owns pending and error feedback. |
-| **Button examples: menu**             | Wrench, Tools, chevron                | Wrench and Tools                | Refresh, a separator, custom details, a Display submenu, and a disabled item.                                         |
-| **Button examples: popover**          | Reactive status dot, Details, chevron | Reactive status dot and Details | Workspace data updates through `useWorkspace`; Done closes the surface.                                               |
-| **Button examples: hide / show**      | Hide or restore the button            | Hide or restore the pill        | Visibility changes through `registration.update({ visible })`.                                                        |
-| **Button examples: disable / enable** | Disable or enable the button          | Disable or enable the pill      | Disabled state changes through `registration.update({ disabled })`.                                                   |
+| Command Center command                | Header                                | Composer                        | Try                                                                                                                     |
+| ------------------------------------- | ------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Button examples: action**           | Refresh icon only                     | Refresh icon and label          | Refresh reads the workspace from the daemon and updates the label and tooltip. Clisbot owns pending and error feedback. |
+| **Button examples: menu**             | Wrench, Tools, chevron                | Wrench and Tools                | Refresh, a separator, custom details, a Display submenu, and a disabled item.                                           |
+| **Button examples: popover**          | Reactive status dot, Details, chevron | Reactive status dot and Details | Workspace data updates through `useWorkspace`; Done closes the surface.                                                 |
+| **Button examples: hide / show**      | Hide or restore the button            | Hide or restore the pill        | Visibility changes through `registration.update({ visible })`.                                                          |
+| **Button examples: disable / enable** | Disable or enable the button          | Disable or enable the pill      | Disabled state changes through `registration.update({ disabled })`.                                                     |
 
 On compact layouts the header button is borderless and icon-only. Menus and custom content open
 bottom sheets. Composer pills keep their icon and label, without a chevron, on every layout.
@@ -27,15 +27,15 @@ descriptors, updates, and React content. Return `.remove()` cleanup when the exa
 See the [button reference](../../public-docs/plugins/reference.md#button-descriptor) and
 [composer migration](../../public-docs/plugins/migration.md#composer-pills).
 
-From the repository root, `npm run typecheck --workspace=@getpaseo/plugin` checks this example
-against the SDK. Existing plugin projects must update `@getpaseo/plugin` before running their own
+From the repository root, `npm run typecheck --workspace=@clisbot/plugin` checks this example
+against the SDK. Existing plugin projects must update `@clisbot/plugin` before running their own
 `npm run typecheck` to detect the old `Component`/`onPress` pill shape and callable cleanup handle.
 
 The browser regression installs this exact directory in an isolated daemon and exercises both
 layouts, updates, and cleanup:
 
 ```sh
-npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/plugin-button-example.spec.ts
+npm run test:e2e --workspace=@clisbot/app -- e2e/browser/plugin-button-example.spec.ts
 ```
 
 The captures use Chromium at desktop and phone widths; native iOS and Android were not exercised.

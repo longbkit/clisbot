@@ -1,7 +1,7 @@
 import { copySessionMetadata } from "@/clisbot/session-storage/directory";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
-import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
-import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
+import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
+import { getParentAgentIdFromLabels } from "@clisbot/protocol/agent-labels";
 import {
   TURN_LIVENESS_IDLE,
   type ActiveTurnIdentity,

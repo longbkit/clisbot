@@ -10,7 +10,7 @@ import { withSessionStorageIo } from "./session-storage/paged-journal.js";
 import { isDeepStrictEqual } from "node:util";
 import { copySessionAuthorship } from "./session-authorship.js";
 import type { DurableSessionSummary } from "./session-storage/session-summary.js";
-import { SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
+import { SessionAuthorshipShape } from "@clisbot/protocol/session-authorship";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";

@@ -3,7 +3,7 @@
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { RuntimeEnv } from "./fusion/runtime-api.js";
 import { readCachedFeishuBotIdentity, writeCachedFeishuBotIdentity } from "./bot-identity-cache.js";
 import { resolveStartupProbeTimeoutMs } from "./monitor-startup-timeout.js";

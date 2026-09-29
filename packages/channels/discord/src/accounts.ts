@@ -3,21 +3,21 @@
 import {
   createAccountActionGate,
   createAccountListHelpers,
-} from "@getpaseo/channels-core/plugin-sdk/account-helpers";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
+} from "@clisbot/channels-core/plugin-sdk/account-helpers";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
 import {
   mapAllowFromEntries,
   normalizeChannelDmPolicy,
   type ChannelDmPolicy,
-} from "@getpaseo/channels-core/plugin-sdk/channel-config-helpers";
-import { resolveConfiguredFromCredentialStatuses } from "@getpaseo/channels-core/plugin-sdk/channel-status";
+} from "@clisbot/channels-core/plugin-sdk/channel-config-helpers";
+import { resolveConfiguredFromCredentialStatuses } from "@clisbot/channels-core/plugin-sdk/channel-status";
 import type {
   DiscordAccountConfig,
   DiscordActionConfig,
   OpenClawConfig,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveAccountEntry } from "@getpaseo/channels-core/plugin-sdk/routing";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveAccountEntry } from "@clisbot/channels-core/plugin-sdk/routing";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveDiscordAccountAvailability } from "./account-token-inspect.js";
 import { selectDiscordRuntimeConfig } from "./runtime-config.js";
 import { resolveDiscordToken, type DiscordCredentialStatus } from "./token.js";

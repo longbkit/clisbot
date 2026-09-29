@@ -1,5 +1,5 @@
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
-import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
+import type { ToolPolicy } from "@clisbot/protocol/agent-types";
 import { z } from "zod";
 
 /**

@@ -74,12 +74,12 @@ function daemonOnboardingStatus(
 
 export function hubHostConnectionOfferHint(presence: string): string {
   if (presence === "offline") {
-    return "This Host is not connected to Hub. Start Paseo on that computer and check paseo hub status, then refresh Hosts.";
+    return "This Host is not connected to Hub. Start Clisbot on that computer and check clisbot hub status, then refresh Hosts.";
   }
   if (presence === "connected") {
     return "This Host is connected to Hub but has not shared connection details. Check that relay is enabled on that computer, then refresh Hosts.";
   }
-  return "This Host's connection status is unavailable. Check paseo hub status on that computer, then refresh Hosts.";
+  return "This Host's connection status is unavailable. Check clisbot hub status on that computer, then refresh Hosts.";
 }
 
 function hostOnboardingStatus(
@@ -88,8 +88,8 @@ function hostOnboardingStatus(
   return status === "online" || status === "offline" || status === "error" ? status : "connecting";
 }
 
-/** `cliCommand` is `paseo` for users; the dev runner substitutes this checkout's CLI and home. */
-export function buildHubLoginCommand(hubOrigin: string, cliCommand = "paseo"): string {
+/** `cliCommand` is `clisbot` for users; the dev runner substitutes this checkout's CLI and home. */
+export function buildHubLoginCommand(hubOrigin: string, cliCommand = "clisbot"): string {
   return `${cliCommand} hub login ${hubOrigin}`;
 }
 
@@ -105,7 +105,7 @@ export function hubHostStatusPresentation(status: HubHostOnboardingStatus): {
   if (status === "connecting") {
     return {
       label: "Connecting",
-      description: "Paseo is connecting to this Host",
+      description: "Clisbot is connecting to this Host",
       variant: "muted",
     };
   }
@@ -126,13 +126,14 @@ export function hubHostStatusPresentation(status: HubHostOnboardingStatus): {
   if (status === "offline" || status === "error") {
     return {
       label: status === "offline" ? "Offline" : "Connection failed",
-      description: "Paseo can't reach this Host. Reconnect, or check its daemon on that computer:",
+      description:
+        "Clisbot can't reach this Host. Reconnect, or check its daemon on that computer:",
       variant: status === "offline" ? "muted" : "error",
     };
   }
   return {
     label: "Registering",
-    description: "Paseo is adding this Daemon as a Host",
+    description: "Clisbot is adding this Daemon as a Host",
     variant: "muted",
   };
 }

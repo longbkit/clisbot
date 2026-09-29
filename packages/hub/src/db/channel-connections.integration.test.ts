@@ -188,7 +188,7 @@ function sealV1(owner: string, value: unknown): string {
   const key = Buffer.from(Array.from({ length: 32 }, (_, index) => index));
   const nonce = Buffer.alloc(12, 7);
   const cipher = createCipheriv("aes-256-gcm", key, nonce, { authTagLength: 16 });
-  cipher.setAAD(Buffer.from(`paseo-hub:credential:1:${owner}`, "utf8"));
+  cipher.setAAD(Buffer.from(`clisbot-hub:credential:1:${owner}`, "utf8"));
   const ciphertext = Buffer.concat([
     cipher.update(Buffer.from(JSON.stringify(value), "utf8")),
     cipher.final(),

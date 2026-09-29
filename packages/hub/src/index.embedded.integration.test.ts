@@ -12,16 +12,16 @@ import { createCredentialCipher } from "./credentials/credential-cipher.js";
 
 const ENVIRONMENT_NAMES = [
   "DATABASE_URL",
-  "PASEO_HUB_DATA_DIR",
+  "CLISBOT_HUB_DATA_DIR",
   "XDG_DATA_HOME",
-  "PASEO_HUB_AUTH_SECRET",
-  "PASEO_HUB_APP_URL",
-  "PASEO_REGISTRATION_MODE",
-  "PASEO_ORGANIZATION_CREATION",
-  "PASEO_BOOTSTRAP_ORGANIZATION",
-  "PASEO_BOOTSTRAP_OWNER_EMAIL",
-  "PASEO_BOOTSTRAP_OWNER_PASSWORD",
-  "PASEO_HUB_CREDENTIAL_MASTER_KEY",
+  "CLISBOT_HUB_AUTH_SECRET",
+  "CLISBOT_HUB_APP_URL",
+  "CLISBOT_REGISTRATION_MODE",
+  "CLISBOT_ORGANIZATION_CREATION",
+  "CLISBOT_BOOTSTRAP_ORGANIZATION",
+  "CLISBOT_BOOTSTRAP_OWNER_EMAIL",
+  "CLISBOT_BOOTSTRAP_OWNER_PASSWORD",
+  "CLISBOT_HUB_CREDENTIAL_MASTER_KEY",
 ] as const;
 
 const APP_URL = "http://localhost:3000";
@@ -36,15 +36,15 @@ beforeEach(async () => {
   process.chdir(root);
   previousEnvironment = new Map(ENVIRONMENT_NAMES.map((name) => [name, process.env[name]]));
   delete process.env["DATABASE_URL"];
-  process.env["PASEO_HUB_DATA_DIR"] = join(root, "database");
-  delete process.env["PASEO_HUB_AUTH_SECRET"];
-  delete process.env["PASEO_HUB_APP_URL"];
-  process.env["PASEO_REGISTRATION_MODE"] = "invite_only";
-  process.env["PASEO_ORGANIZATION_CREATION"] = "disabled";
-  process.env["PASEO_BOOTSTRAP_ORGANIZATION"] = "Embedded owner";
-  process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"] = "owner@embedded.test";
-  process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"] = "embedded-owner-password";
-  process.env["PASEO_HUB_CREDENTIAL_MASTER_KEY"] = MASTER_KEY;
+  process.env["CLISBOT_HUB_DATA_DIR"] = join(root, "database");
+  delete process.env["CLISBOT_HUB_AUTH_SECRET"];
+  delete process.env["CLISBOT_HUB_APP_URL"];
+  process.env["CLISBOT_REGISTRATION_MODE"] = "invite_only";
+  process.env["CLISBOT_ORGANIZATION_CREATION"] = "disabled";
+  process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"] = "Embedded owner";
+  process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"] = "owner@embedded.test";
+  process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"] = "embedded-owner-password";
+  process.env["CLISBOT_HUB_CREDENTIAL_MASTER_KEY"] = MASTER_KEY;
 });
 
 afterEach(async () => {
@@ -55,28 +55,28 @@ afterEach(async () => {
 });
 
 it("opens first-run setup when nothing is configured and no data exists", async () => {
-  delete process.env["PASEO_BOOTSTRAP_ORGANIZATION"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"];
+  delete process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"];
 
   const runtime = await startProductionRuntime();
-  const state = await runtime.browserAccount!(new Request(`${APP_URL}/api/auth/paseo/state`));
+  const state = await runtime.browserAccount!(new Request(`${APP_URL}/api/auth/clisbot/state`));
 
   assert.equal(state.status, 200);
   assert.deepEqual(await state.json(), { status: "instanceSetupRequired" });
 });
 
 it("ignores dotenv files during production startup", async () => {
-  delete process.env["PASEO_BOOTSTRAP_ORGANIZATION"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"];
+  delete process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"];
   await writeFile(
     join(root, ".env"),
-    "DATABASE_URL=postgres://dotenv-must-not-load.invalid/paseo_hub\n",
+    "DATABASE_URL=postgres://dotenv-must-not-load.invalid/clisbot_hub\n",
   );
 
   const runtime = await startProductionRuntime();
-  const state = await runtime.browserAccount!(new Request(`${APP_URL}/api/auth/paseo/state`));
+  const state = await runtime.browserAccount!(new Request(`${APP_URL}/api/auth/clisbot/state`));
 
   assert.equal(state.status, 200);
   assert.deepEqual(await state.json(), { status: "instanceSetupRequired" });
@@ -87,7 +87,7 @@ it("logs an embedded database startup failure exactly once", async () => {
   const stream = new FailureLogStream();
   const blockedPath = join(root, canary);
   await writeFile(blockedPath, "not a directory");
-  process.env["PASEO_HUB_DATA_DIR"] = blockedPath;
+  process.env["CLISBOT_HUB_DATA_DIR"] = blockedPath;
 
   await assert.rejects(() =>
     runWithFailureTracking(() => startProductionRuntime(), createLogger(stream)),
@@ -101,10 +101,10 @@ it("logs an embedded database startup failure exactly once", async () => {
 });
 
 it("keeps an interactive claim across a restart and then shows ordinary sign-in", async () => {
-  delete process.env["PASEO_BOOTSTRAP_ORGANIZATION"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"];
-  delete process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"];
-  process.env["PASEO_HUB_APP_URL"] = APP_URL;
+  delete process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"];
+  delete process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"];
+  process.env["CLISBOT_HUB_APP_URL"] = APP_URL;
   const operator = {
     email: "restart-operator@example.test",
     password: "restart-operator-password",
@@ -119,7 +119,7 @@ it("keeps an interactive claim across a restart and then shows ordinary sign-in"
   // A new process against the same embedded storage: setup is over, and the chosen password
   // still signs the operator in without a temporary-password gate.
   const restarted = await startProductionRuntime();
-  const state = await restarted.browserAccount!(new Request(`${APP_URL}/api/auth/paseo/state`));
+  const state = await restarted.browserAccount!(new Request(`${APP_URL}/api/auth/clisbot/state`));
   assert.deepEqual(await state.json(), { status: "signedOut", registration: "invite_only" });
   await restarted.signInEmail!(
     { email: operator.email, password: operator.password },
@@ -128,7 +128,7 @@ it("keeps an interactive claim across a restart and then shows ordinary sign-in"
 });
 
 it("releases embedded storage when runtime configuration is invalid", async () => {
-  process.env["PASEO_HUB_APP_URL"] = "not a URL";
+  process.env["CLISBOT_HUB_APP_URL"] = "not a URL";
 
   await assert.rejects(() => startProductionRuntime(), TypeError);
 
@@ -136,12 +136,12 @@ it("releases embedded storage when runtime configuration is invalid", async () =
 });
 
 it("releases embedded storage when auth initialization fails", async () => {
-  const bundle = await embeddedDatabaseRuntime(process.env["PASEO_HUB_DATA_DIR"]!);
+  const bundle = await embeddedDatabaseRuntime(process.env["CLISBOT_HUB_DATA_DIR"]!);
   await bundle.runtime.migrate();
   await bundle.runtime.query(
     `insert into "user" (id, name, email, email_verified)
      values ('existing-user', 'Existing user', $1, true)`,
-    [process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"]!],
+    [process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"]!],
   );
   await bundle.runtime.close();
 
@@ -164,7 +164,7 @@ it("selects embedded storage without DATABASE_URL and preserves it across restar
   await startProductionRuntime();
   await stopProductionRuntime();
 
-  const bundle = await embeddedDatabaseRuntime(process.env["PASEO_HUB_DATA_DIR"]!);
+  const bundle = await embeddedDatabaseRuntime(process.env["CLISBOT_HUB_DATA_DIR"]!);
   const result = await bundle.runtime.query<{
     organizations: number;
     bootstraps: number;
@@ -188,13 +188,13 @@ it("selects embedded storage without DATABASE_URL and preserves it across restar
 
 it("selects the XDG data directory when no explicit data directory is configured", async () => {
   const dataHome = join(root, "xdg-data");
-  delete process.env["PASEO_HUB_DATA_DIR"];
+  delete process.env["CLISBOT_HUB_DATA_DIR"];
   process.env["XDG_DATA_HOME"] = dataHome;
 
   await startProductionRuntime();
   await stopProductionRuntime();
 
-  const bundle = await embeddedDatabaseRuntime(join(dataHome, "paseo-hub"));
+  const bundle = await embeddedDatabaseRuntime(join(dataHome, "clisbot-hub"));
   const result = await bundle.runtime.query<{ runtime_configurations: number }>(
     `select count(*)::integer as runtime_configurations from runtime_configuration`,
   );
@@ -204,7 +204,7 @@ it("selects the XDG data directory when no explicit data directory is configured
 });
 
 async function storedAuthSecret(): Promise<string> {
-  const bundle = await embeddedDatabaseRuntime(process.env["PASEO_HUB_DATA_DIR"]!);
+  const bundle = await embeddedDatabaseRuntime(process.env["CLISBOT_HUB_DATA_DIR"]!);
   const result = await bundle.runtime.query<{ auth_secret_envelope: unknown }>(
     `select auth_secret_envelope from runtime_configuration`,
   );
@@ -219,7 +219,7 @@ async function storedAuthSecret(): Promise<string> {
 }
 
 async function reopenEmbeddedStorage(): Promise<void> {
-  const bundle = await embeddedDatabaseRuntime(process.env["PASEO_HUB_DATA_DIR"]!);
+  const bundle = await embeddedDatabaseRuntime(process.env["CLISBOT_HUB_DATA_DIR"]!);
   await bundle.runtime.migrate();
   await bundle.runtime.close();
 }

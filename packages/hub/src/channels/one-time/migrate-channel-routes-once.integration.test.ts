@@ -9,7 +9,7 @@ import { migrateChannelRoutesOnce } from "./migrate-channel-routes-once.js";
 
 const ORG = "org-once";
 const ORG_WITHOUT_CHANNELS = "org-no-channels";
-const ACCOUNT_FILE = ".paseo/channels/slack/work.yml";
+const ACCOUNT_FILE = ".clisbot/channels/slack/work.yml";
 
 // The old shape on every axis: `match` + one-value `audience`, and an enabled catch-all.
 const LEGACY_ACCOUNT = `channel: slack

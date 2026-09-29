@@ -143,14 +143,14 @@ describe("Hub sign-in on Welcome", () => {
   it("shows nothing at all when this build has no Hub", () => {
     env.hub = hubWith({ enabled: false });
     render(<HubWelcomeSignIn />);
-    expect(screen.queryByText("Paseo Hub")).toBeNull();
+    expect(screen.queryByText("Clisbot Hub")).toBeNull();
   });
 
   it("keeps the card after sign-in, naming the account and what its Hosts are doing", () => {
     env.hub = signedInHub();
     env.daemons = { daemons: [daemon()] };
     render(<HubWelcomeSignIn />);
-    expect(screen.getByText("Paseo Hub")).toBeTruthy();
+    expect(screen.getByText("Clisbot Hub")).toBeTruthy();
     expect(screen.getByText("a@vexere.com · Vexere")).toBeTruthy();
     expect(screen.getByText("Connecting to acme-mac…")).toBeTruthy();
     expect(env.replace).not.toHaveBeenCalled();

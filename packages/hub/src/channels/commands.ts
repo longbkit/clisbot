@@ -7,7 +7,7 @@
 //     manifest (Socket Mode delivers `slash_commands` events). Because
 //     `/approve` and `/deny` are reserved by the approval commands below,
 //     the native manifest command is a single alias whose first word picks
-//     the sub-command (`/paseo status`, bare `/paseo` = help). Any free
+//     the sub-command (`/clisbot status`, bare `/clisbot` = help). Any free
 //     name the team registered works; the Slack vertical's start-account
 //     reads `transport.slashCommand` and rewrites the native event to the
 //     plain-text form before the plane sees it, so both spellings ride
@@ -119,7 +119,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: false,
     usage: "/cowork",
-    description: "open this session in Paseo",
+    description: "open this session in Clisbot",
   },
   {
     name: "resume",
@@ -304,10 +304,10 @@ const COMMAND_ALIASES = new Map<string, ChannelCommandName>(
 );
 
 export function isReservedChannelCommand(name: string): boolean {
-  return COMMAND_ALIASES.has(name.toLowerCase()) || /^(approve|deny|paseo|link)$/iu.test(name);
+  return COMMAND_ALIASES.has(name.toLowerCase()) || /^(approve|deny|clisbot|link)$/iu.test(name);
 }
 
-const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "link", "paseo"].join(
+const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "link", "clisbot"].join(
   "|",
 );
 
@@ -421,7 +421,7 @@ export function parseApprovalCommand(text: string): ApprovalCommand | null {
  * Settings — out of one inbound message; null for any other text. The code is
  * returned as typed; the challenge store normalizes and verifies it. Every
  * addressing form the other commands accept reaches it (`@bot /link`,
- * `/link@bot`, `<@U…> /link`, `\link`, `/paseo link`).
+ * `/link@bot`, `<@U…> /link`, `\link`, `/clisbot link`).
  */
 export function parseChannelIdentityLinkCode(text: string): string | null {
   const match = /^\s*[/\\]link\s+([A-Za-z0-9_-]+)\s*$/iu.exec(normalizeChannelCommandText(text));
@@ -466,7 +466,7 @@ export function textCommandHelpText(routeKind?: "agent" | "workflow"): string {
 /** Normalize addressing and the single native umbrella before either parser. */
 export function normalizeChannelCommandText(text: string, dynamic = false): string {
   const normalized = stripMentions(text, dynamic);
-  return normalized.replace(/^\s*[/\\]paseo(?:\s+|$)/iu, "/").replace(/^\/\s*$/u, "/help");
+  return normalized.replace(/^\s*[/\\]clisbot(?:\s+|$)/iu, "/").replace(/^\/\s*$/u, "/help");
 }
 
 /**

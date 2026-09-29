@@ -55,7 +55,7 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
     const designTeamId = await insertTeam(runtime, organizationId, "design");
     const supportTeamId = await insertTeam(runtime, organizationId, "Support");
 
-    const missingTeam = await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, {
+    const missingTeam = await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, {
       email: "missing@example.test",
       role: "member",
       teamIds: [teamId, randomUUID()],
@@ -70,7 +70,7 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
       0,
     );
 
-    const invitation = await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, {
+    const invitation = await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, {
       email: "member@example.test",
       role: "member",
       teamIds: [teamId, designTeamId, teamId],
@@ -88,7 +88,7 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
       `update invitation set expires_at = now() + interval '1 hour' where id = $1`,
       [invitationBody.id],
     );
-    const reinvite = await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, {
+    const reinvite = await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, {
       email: "member@example.test",
       role: "admin",
       teamIds: [designTeamId],
@@ -101,7 +101,7 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
     assert.ok(Date.parse(reinviteBody.expiresAt) > Date.now() + 47 * 60 * 60 * 1000);
 
     // COMPAT(invitationTeamId): the single-Team body merges into the Team set.
-    const legacy = await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, {
+    const legacy = await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, {
       email: "member@example.test",
       role: "member",
       teamId,
@@ -133,7 +133,7 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
       email: "member@example.test",
       password: "member-password-long-enough",
     });
-    const accepted = await post(auth, "/api/auth/paseo/accept-invitation", memberCookie, {
+    const accepted = await post(auth, "/api/auth/clisbot/accept-invitation", memberCookie, {
       invitationId: invitationBody.id,
     });
     assert.equal(accepted.status, 200);
@@ -156,17 +156,22 @@ it("preserves setup-pending Account context and adds an invited Member to its Te
     // An incomplete optional setup must not hide an invitation to another organization.
     const otherOrganization = await post(
       auth,
-      "/api/auth/paseo/create-organization",
+      "/api/auth/clisbot/create-organization",
       memberCookie,
       {
         name: "Another organization",
       },
     );
     assert.equal(otherOrganization.status, 201);
-    const incomingInvitation = await post(auth, "/api/auth/paseo/create-invitation", memberCookie, {
-      email: "owner@example.test",
-      role: "member",
-    });
+    const incomingInvitation = await post(
+      auth,
+      "/api/auth/clisbot/create-invitation",
+      memberCookie,
+      {
+        email: "owner@example.test",
+        role: "member",
+      },
+    );
     assert.equal(incomingInvitation.status, 201);
     const incoming = z.object({ id: z.string() }).parse(await incomingInvitation.json());
     const invitedOwner = await state(auth, ownerCookie, incoming.id);
@@ -219,7 +224,7 @@ async function pendingInvitationCount(
 
 async function claimOwner(auth: ReturnType<typeof createAuthServer>): Promise<string> {
   const response = await auth.handle(
-    new Request(`${ORIGIN}/api/auth/paseo/claim-instance`, {
+    new Request(`${ORIGIN}/api/auth/clisbot/claim-instance`, {
       method: "POST",
       headers: { origin: ORIGIN, "content-type": "application/json" },
       body: JSON.stringify({
@@ -267,7 +272,7 @@ async function state(
   cookie: string,
   invitationId?: string,
 ) {
-  const url = new URL("/api/auth/paseo/state", ORIGIN);
+  const url = new URL("/api/auth/clisbot/state", ORIGIN);
   if (invitationId !== undefined) url.searchParams.set("invitation", invitationId);
   const response = await auth.handle(new Request(url, { headers: { cookie } }));
   assert.equal(response.status, 200);

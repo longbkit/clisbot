@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/topic-name-cache.ts@5d8067a4483
 // Telegram plugin module implements topic name cache behavior.
 import { createHash } from "node:crypto";
-import { readJsonFileWithFallback } from "@getpaseo/channels-core/plugin-sdk/json-store";
+import { readJsonFileWithFallback } from "@clisbot/channels-core/plugin-sdk/json-store";
 import { getTelegramRuntime } from "./runtime.js";
 
 export const TELEGRAM_TOPIC_NAME_CACHE_MAX_ENTRIES = 2_048;

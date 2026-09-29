@@ -1,4 +1,4 @@
-# Releasing Paseo Hub
+# Releasing Clisbot Hub
 
 Hub releases publish the npm executable locally, then push a Git tag that publishes the container image and GitHub release.
 
@@ -19,14 +19,14 @@ Publish from a clean `main` checkout:
 
 ```sh
 npm publish --access public
-npm view @getpaseo/hub version
+npm view @clisbot/hub version
 ```
 
 Verify the public package from a directory outside the repository before creating the release tag:
 
 ```sh
 cd "$(mktemp -d)"
-npx @getpaseo/hub
+npx @clisbot/hub
 ```
 
 Open the URL printed by Hub and stop it with Ctrl+C after the first-run page loads.

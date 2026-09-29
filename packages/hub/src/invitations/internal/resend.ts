@@ -52,7 +52,7 @@ export function createResendInvitationMailer(
       deliver(
         config,
         sendRequest,
-        `paseo-invitation-${invitation.id}`,
+        `clisbot-invitation-${invitation.id}`,
         message(config.from, invitation),
         "invitation",
       ),
@@ -68,7 +68,7 @@ export function createResendVerificationMailer(
       deliver(
         config,
         sendRequest,
-        `paseo-verification-${verification.id}`,
+        `clisbot-verification-${verification.id}`,
         verificationMessage(config.from, verification),
         "verification",
       ),
@@ -84,7 +84,7 @@ export function createResendNotificationMailer(
       deliver(
         config,
         sendRequest,
-        `paseo-notification-${notification.id}`,
+        `clisbot-notification-${notification.id}`,
         notificationMessage(config.from, notification),
         "notification",
       ),
@@ -115,13 +115,13 @@ async function deliver(
 
 function verificationMessage(from: string, verification: VerificationEmail) {
   const introduction =
-    "Use this link to create your Paseo Hub account. If you didn't ask for it, ignore this email.";
+    "Use this link to create your Clisbot Hub account. If you didn't ask for it, ignore this email.";
   const expiry = `This link expires at ${verification.expiresAt.toISOString()} and works once.`;
   const link = escapeHtml(verification.link);
   return {
     from,
     to: [verification.email],
-    subject: "Create your Paseo Hub account",
+    subject: "Create your Clisbot Hub account",
     text: `${introduction}\n\nCreate your account: ${verification.link}\n\n${expiry}`,
     html: `<p>${escapeHtml(introduction)}</p><p><a href="${link}">Create account</a></p><p>${escapeHtml(expiry)}</p>`,
   };
@@ -136,7 +136,7 @@ function message(from: string, invitation: InvitationEmail) {
   return {
     from,
     to: [invitation.email],
-    subject: `Join ${invitation.organizationName} on Paseo`,
+    subject: `Join ${invitation.organizationName} on Clisbot`,
     text: `${introduction}\n\nAccept the invitation: ${invitation.link}\n\n${expiry}`,
     html: `<p>${escapeHtml(introduction)}</p><p><a href="${invitationLink}">Join ${organizationName}</a></p><p>${escapeHtml(expiry)}</p>`,
   };

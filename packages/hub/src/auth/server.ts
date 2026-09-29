@@ -44,7 +44,7 @@ import {
   type AccountSession,
   type OrganizationAccessValue,
 } from "./organization-access.js";
-import { paseoOrganizationPlugin } from "./organization-policy.js";
+import { clisbotOrganizationPlugin } from "./organization-policy.js";
 import type { EntitlementsService } from "../entitlements/service.js";
 import {
   UNLIMITED_PROVISIONING,
@@ -59,7 +59,7 @@ import {
   HUB_ACCESS_SCOPE,
   HUB_AUTHORIZATION_SCOPES,
   HUB_ORGANIZATION_CLAIM,
-  PASEO_CLIENT_ID,
+  CLISBOT_CLIENT_ID,
 } from "./client-authorization.js";
 
 export interface AuthServer {
@@ -266,7 +266,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       },
     },
     plugins: [
-      paseoOrganizationPlugin(),
+      clisbotOrganizationPlugin(),
       jwt({
         jwt: { issuer: options.baseURL, audience: options.baseURL },
       }),
@@ -275,7 +275,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         consentPage: "/",
         scopes: [...HUB_AUTHORIZATION_SCOPES],
         validAudiences: [options.baseURL],
-        cachedTrustedClients: new Set([PASEO_CLIENT_ID]),
+        cachedTrustedClients: new Set([CLISBOT_CLIENT_ID]),
         grantTypes: ["authorization_code", "refresh_token"],
         accessTokenExpiresIn: 300,
         allowDynamicClientRegistration: false,
@@ -342,7 +342,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           },
           scopes: [HUB_ACCESS_SCOPE],
         });
-        if (payload["azp"] !== PASEO_CLIENT_ID || typeof payload.sub !== "string") return undefined;
+        if (payload["azp"] !== CLISBOT_CLIENT_ID || typeof payload.sub !== "string")
+          return undefined;
         if (!(await recoverySessionValid(options.database, payload.sub, payload["sid"])))
           return undefined;
         const organizationId = payload[HUB_ORGANIZATION_CLAIM];
@@ -406,7 +407,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       const path = new URL(request.url).pathname;
       const registrationResponse = registrationRoutes.handle(path, request);
       if (registrationResponse !== undefined) return registrationResponse;
-      if (path.startsWith("/api/auth/paseo/")) {
+      if (path.startsWith("/api/auth/clisbot/")) {
         const rejected = rejectCrossOriginCookieMutation(
           request,
           requestBrowserOrigin(request, browserOrigin),
@@ -414,7 +415,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         if (rejected !== undefined) return Promise.resolve(rejected);
         if (path === MASTER_PASSWORD_RESET_PATH) return passwordRecovery.handle(request);
         if (path === CREDENTIAL_IDENTITY_PATH) return credentialIdentity.handle(request);
-        if (path === "/api/auth/paseo/claim-instance") {
+        if (path === "/api/auth/clisbot/claim-instance") {
           return claimInstanceRequest(request);
         }
         return access.handle(request);

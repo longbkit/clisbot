@@ -2,8 +2,8 @@
 import {
   createChannelPartialDeliveryError,
   isChannelPartialDeliveryError,
-} from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
 import { isSafeToRetrySendError, isTelegramBadRequestError } from "./network-errors.js";
 
 // A missing chat/thread invalidates the route for every remaining chunk.

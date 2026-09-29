@@ -256,7 +256,7 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
   }) => {
     test.setTimeout(300_000);
     expect(
-      process.env.PASEO_AGENT_SESSION_STORAGE,
+      process.env.CLISBOT_AGENT_SESSION_STORAGE,
       "Run this contract with the actual durable backend enabled",
     ).toBe("1");
 

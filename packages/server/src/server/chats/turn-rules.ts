@@ -2,7 +2,7 @@
 // plans/server-chat.md §2.2). Pure: the engine hands in the participants, the
 // resolved rules and the line, and gets back the bot ids to deliver to and the
 // system notice a stopped hop chain owes the user.
-import type { ChatMessagePayload } from "@getpaseo/protocol/chats/types";
+import type { ChatMessagePayload } from "@clisbot/protocol/chats/types";
 import { limitValue, type ResolvedChatRules } from "./chat-record.js";
 import { parseMentions, type MentionableParticipant } from "./mentions.js";
 

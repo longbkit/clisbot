@@ -43,7 +43,7 @@ export function CodeEditor({
       state: EditorState.create({
         doc: value,
         extensions: [
-          syntaxHighlighting(paseoHighlight, { fallback: true }),
+          syntaxHighlighting(clisbotHighlight, { fallback: true }),
           basicSetup,
           editorTheme,
           languageCompartment.of(languageExtension(language)),
@@ -103,7 +103,7 @@ function modeExtensions(readOnly: boolean, label: string) {
 }
 
 /** Tokens follow the dashboard palette in src/styles.css rather than a vendor theme. */
-const paseoHighlight = HighlightStyle.define([
+const clisbotHighlight = HighlightStyle.define([
   {
     tag: [tags.definition(tags.propertyName), tags.propertyName, tags.attributeName],
     color: "var(--link)",

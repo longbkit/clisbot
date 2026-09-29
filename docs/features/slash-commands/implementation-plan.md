@@ -40,7 +40,7 @@ unique test count. The final execution skip is the existing local-media relay te
 
 Hub TypeScript checks passed for Node, the Start app and E2E sources. App,
 Discord, Google Chat and Feishu TypeScript checks passed. Targeted lint passed
-on **53 files**. `npm run db:check --workspace=@getpaseo/hub` passed with no schema
+on **53 files**. `npm run db:check --workspace=@clisbot/hub` passed with no schema
 or generated-migration drift, and the final diff passed whitespace checks.
 
 The existing database migration canary
@@ -180,7 +180,7 @@ collisions, and steer/queue across the channel→automation layers.
 
 ## Native adapter delivery
 
-Discord startup upserts one `/paseo` application command with the optional text
+Discord startup upserts one `/clisbot` application command with the optional text
 option `command`; it does not replace other application registrations. The
 interaction listener converts the selected subcommand to `/verb`, admits the
 normalized event durably, then acknowledges the native interaction privately.
@@ -188,8 +188,8 @@ Interaction tokens are not persisted. The Hub's command-output privacy rules
 apply separately from this transport acknowledgement.
 
 Google Chat normalizes native `SLASH_COMMAND` payloads or command annotations,
-including the configured `/paseo` umbrella, into the shared vocabulary and marks
-them addressed. An operator must register the single `/paseo` command in the
+including the configured `/clisbot` umbrella, into the shared vocabulary and marks
+them addressed. An operator must register the single `/clisbot` command in the
 Google Chat console; the adapter does not register it through an API. Feishu's
 native `@all` exclusion is regression-tested. Native adapter tests do not replace
 live registration and delivery checks; no such live checks ran in this change.
@@ -264,7 +264,7 @@ agent <name> | model <name>` (`ChannelTextCommand`, `commands.ts:47`) plus
   (Slack/Discord) and the `initiatorOnly` command pattern (`policy.ts:427`,
   `approvals/harness.ts:59`).
 - **Deep link exists.** `buildAgentDeepLink` →
-  `paseo://h/<serverId>/agent/<agentId>`, `buildAgentDeepLinkRoute` → the same
+  `clisbot://h/<serverId>/agent/<agentId>`, `buildAgentDeepLinkRoute` → the same
   path (`packages/protocol/src/agent-deep-link.ts`); the app/web SPA serves that
   route (`app/h/[serverId]/agent/[agentId].tsx`). There is **no** universal
   `https://` link and no Hub web agent page.
@@ -310,15 +310,15 @@ trigger that audit named for centralizing metadata. Replace the ad-hoc union wit
 a **command registry**: each entry declares name, aliases, argument shape,
 minimum access, applicable route kinds, and a handler. The parser, `/help`,
 `list`, and `search` all derive from it, so adding a command is one entry, not
-edits in five places. This is PaseoClaw-owned code in `packages/hub/src/channels/`
-and stays out of upstream Paseo files.
+edits in five places. This is ClisbotClaw-owned code in `packages/hub/src/channels/`
+and stays out of upstream Clisbot files.
 
 ### 2. Slack / Discord / Google Chat native-command conflicts
 
 These channels require **pre-registering** each command (Slack manifest, Discord
 `application.commands`, Google Chat console `commandId`) and collide with reserved
 or team-owned names. Registering ~20 evolving commands per channel is per-channel
-setup that drifts. Do not. Register **one umbrella command per channel** (`/paseo
+setup that drifts. Do not. Register **one umbrella command per channel** (`/clisbot
 <sub>`, already the Slack pattern in `commands.ts`) whose payload is rewritten to
 the plain-text form before the shared parser; keep the `\` backslash spelling as
 the conflict-free fallback. Same recipe for Discord and Google Chat when their
@@ -379,10 +379,10 @@ crutch.
   `policy/roles.ts`), with `mayUseChannel`/`mayTrigger` as the "may act at all"
   floor. New verbs just add a `CHANNEL_COMMAND_ROLE` entry. The org Access grant
   model is a separate layer, not the channel command gate.
-- **No universal https link.** `/cowork` can emit `paseo://…` today; an
+- **No universal https link.** `/cowork` can emit `clisbot://…` today; an
   `https://<origin>/h/<serverId>/agent/<agentId>` link needs the app's public web
   origin — resolved below to an instance-level `appWebUrl`, emitted beside the
-  `paseo://` link rather than replacing it.
+  `clisbot://` link rather than replacing it.
 - **`/command add` needs a store + pass-through.** Dynamic commands are the
   largest new surface: a store of `name → prompt` plus expanding `/name` into the
   stored prompt before it reaches the agent. Scope resolved below to the channel
@@ -399,7 +399,7 @@ crutch.
 - **Command registry** in `packages/hub/src/channels/commands.ts` (or a new
   `commands/` folder if it crosses the 500-line file target): typed entries with
   `{ name, aliases, args, privilege, routeKinds, handler }`. Parser, help,
-  `list`, `search` derive from it. Keep functions ≤50 lines (PaseoClaw limits).
+  `list`, `search` derive from it. Keep functions ≤50 lines (ClisbotClaw limits).
 - **Argument grammar.** Extend the whole-message match to `verb + rest`, then
   per-command arg parsing (id, keyword, free text). Preserve "whole message only"
   so mid-sentence words never trigger.
@@ -440,7 +440,7 @@ crutch.
 - **Deep link** via `buildAgentDeepLink` / `buildAgentDeepLinkRoute`
   (`packages/protocol/src/agent-deep-link.ts`); prepend an instance-level app web
   origin (`appWebUrl`, same pattern as `RuntimeConfiguration.publicUrl()` /
-  `publicBaseUrl`) for the https form; the `paseo://` link is always emitted
+  `publicBaseUrl`) for the https form; the `clisbot://` link is always emitted
   beside it.
 - **Dynamic commands** live in a Hub DB table keyed by `(org, channel, accountId,
 name)` — shared, listable account config, not transient keyed-store state.
@@ -460,7 +460,7 @@ name)` — shared, listable account config, not transient keyed-store state.
 ## Original phased delivery and acceptance criteria
 
 Each phase is independently shippable behind the existing channel feature gating
-and leaves both the base Paseo experience and unmodified-client pairing intact.
+and leaves both the base Clisbot experience and unmodified-client pairing intact.
 
 **Phase 0 — Registry + argument grammar + generated help.** Convert the parser to
 a metadata registry; add `verb + rest` parsing; generate `/help`. No new command
@@ -538,7 +538,7 @@ conversation.
   `provider.usage.list` RPC being wired into the channel client.
 - **Web origin — instance-level `appWebUrl`.** One per Hub deployment (the app's
   public origin, distinct from the Hub's own UI origin), reusing the
-  `RuntimeConfiguration` pattern; only the `paseo://` link when unset.
+  `RuntimeConfiguration` pattern; only the `clisbot://` link when unset.
 - **`/provider` kept, complementary to `/agent`.** `/agent <name>` picks a preset
   bundle from the route menu; `/provider`/`/model`/`/effort` tune single axes. Both
   obey the provider→model→effort hierarchy (scoped lists, qualified names,
@@ -568,16 +568,16 @@ default.**
 
 ## Upstream boundary
 
-All of this is PaseoClaw-owned channel code under `packages/hub/src/channels/` and
+All of this is ClisbotClaw-owned channel code under `packages/hub/src/channels/` and
 `packages/channels/*`, plus reuse of existing protocol RPCs — the deep-link helper
 and the `set_agent_*` / `agent.config.apply` live-config messages the daemon
 already handles. No daemon protocol change is required; the only new client code is
 Hub-side facade methods over those existing RPCs. The one part beyond `channels/`
 is Hub-core, not channel-local: org Access gains a **Guest** subject
 (`access/contract.ts`, `access/store.ts`, `db/schema.ts`) — still Hub, still no
-daemon/protocol change, but treat it as its own reviewed change. Upstream Paseo
+daemon/protocol change, but treat it as its own reviewed change. Upstream Clisbot
 files are not renamed, split, or reformatted. With the channel feature gate
-off, the base Paseo experience and unmodified-client pairing are unchanged — verify
+off, the base Clisbot experience and unmodified-client pairing are unchanged — verify
 both before calling any phase done.
 
 ## Retry and interrupted commands

@@ -2,7 +2,7 @@
 // Slack tests cover streaming plugin behavior.
 import { WebClient } from "@slack/web-api";
 import { ChatStreamer } from "@slack/web-api/dist/chat-stream.js";
-import { createDeferred } from "@getpaseo/channels-core/plugin-sdk/extension-shared";
+import { createDeferred } from "@clisbot/channels-core/plugin-sdk/extension-shared";
 import { describe, expect, it, vi } from "vitest";
 import { getSlackListenerWriteClient } from "./client.js";
 import {

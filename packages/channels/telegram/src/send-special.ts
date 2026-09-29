@@ -1,5 +1,5 @@
 // upstream: extensions/telegram/src/send-special.ts@5d8067a4483
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { resolveTelegramMessageThreadSpec, type TelegramThreadSpec } from "./bot/helpers.js";
 import { resolveTelegramEffectiveGroupPolicy } from "./group-access.js";
 import { resolveTelegramScopedGroupConfig } from "./group-config-helpers.js";

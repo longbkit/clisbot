@@ -21,8 +21,8 @@ const inspectionSchema = z.object({ organization: z.object({ name: z.string() })
 
 describe("CLI authorizations", () => {
   it("keeps URL-safe underscores inside the public credential prefix", () => {
-    const token = "paseo_cli_ab_cd1234567_secret";
-    assert.equal(cliCredentialParts(token).prefix, "paseo_cli_ab_cd1234567");
+    const token = "clisbot_cli_ab_cd1234567_secret";
+    assert.equal(cliCredentialParts(token).prefix, "clisbot_cli_ab_cd1234567");
   });
 
   it("approves one organization credential and discloses it exactly once", async () => {
@@ -66,7 +66,7 @@ describe("CLI authorizations", () => {
     );
     assert.equal(first.status, "authorized");
     assert.equal(first.organizationId, "org-acme");
-    assert.match(first.credential!, /^paseo_cli_/u);
+    assert.match(first.credential!, /^clisbot_cli_/u);
 
     const replay = pollSchema.parse(
       await json(

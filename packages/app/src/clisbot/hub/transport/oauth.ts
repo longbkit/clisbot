@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PASEO_CLIENT_ID = "paseo-client";
+export const CLISBOT_CLIENT_ID = "clisbot-client";
 export const HUB_ACCESS_SCOPE = "hub:access";
 
 export const OAuthTokenResponseSchema = z.object({
@@ -48,7 +48,7 @@ export function oauthAuthorizeUrl(input: {
     input.origin,
   );
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", PASEO_CLIENT_ID);
+  url.searchParams.set("client_id", CLISBOT_CLIENT_ID);
   url.searchParams.set("redirect_uri", input.redirectUri);
   url.searchParams.set("scope", `${HUB_ACCESS_SCOPE} offline_access`);
   url.searchParams.set("state", input.state);
@@ -69,7 +69,7 @@ export function tokenRequestBody(input: {
 }): URLSearchParams {
   const body = new URLSearchParams({
     grant_type: input.refreshToken === undefined ? "authorization_code" : "refresh_token",
-    client_id: PASEO_CLIENT_ID,
+    client_id: CLISBOT_CLIENT_ID,
     resource: input.origin,
   });
   if (input.redirectUri !== undefined) body.set("redirect_uri", input.redirectUri);

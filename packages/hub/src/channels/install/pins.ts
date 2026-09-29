@@ -62,11 +62,11 @@ export type ChannelPin = z.infer<typeof ChannelPinSchema>;
 export const LoadModeSchema = z.enum(["published", "bundled", "in-repo"]);
 export type LoadMode = z.infer<typeof LoadModeSchema>;
 
-/** The in-repo channel package name (`@getpaseo/channels-<channel>`). Present
+/** The in-repo channel package name (`@clisbot/channels-<channel>`). Present
  * exactly when `loadMode` is `in-repo`. */
 const inRepoPackageSchema = z
   .string()
-  .regex(/^@getpaseo\/channels-[a-z0-9-]+$/, "in-repo packages are @getpaseo/channels-<channel>");
+  .regex(/^@clisbot\/channels-[a-z0-9-]+$/, "in-repo packages are @clisbot/channels-<channel>");
 
 /** The channel's plugin chunk reference (implementation doc §4.8 D1): the entry
  * object is a `defineBundledChannelEntry` result whose plugin lives at a

@@ -9,7 +9,7 @@ import { reportFailure, withReference, type FailureKind } from "../failures/inde
 
 export type { AttachmentProvider } from "../db/types.js";
 
-const SIGNING_DOMAIN = "paseo-hub/attachment-download/v1";
+const SIGNING_DOMAIN = "clisbot-hub/attachment-download/v1";
 const DEFAULT_LIFETIME_SECONDS = 15 * 60;
 const MAX_FILENAME_LENGTH = 255;
 const MAX_SOURCE_ID_LENGTH = 255;

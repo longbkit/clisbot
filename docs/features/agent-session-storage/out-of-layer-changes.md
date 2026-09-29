@@ -36,7 +36,7 @@ silently absorb such a change.
   styled workspace shell.
 - Blast radius: additive test file only; no wire, no app behavior, no upstream-merge impact. Runs
   against the production static export with an isolated per-worker daemon and
-  `PASEO_AGENT_SESSION_STORAGE=1`. The `openSub`/`settleOpenMenu` helpers are test-local and only
+  `CLISBOT_AGENT_SESSION_STORAGE=1`. The `openSub`/`settleOpenMenu` helpers are test-local and only
   work around a transient ~150ms menu-entrance clip (documented); they do not mask a defect — the
   settled geometry was probed and confirmed the rows are reachable.
 - Recommendation: DO. This is the lane's owned deliverable; keep the spec lint/format clean.
@@ -93,7 +93,7 @@ workspace-metadata-row.tsx,use-permission-history.test.tsx}`,
   component to get `AgentStreamView` back under the complexity ceiling.
 - Known remaining: `packages/server/src/server/config.ts` — `resolveConfigFromPersisted` has a
   complexity of 30. **Pre-existing at `HEAD`** (verified by linting the `HEAD` blob); this
-  feature's 12 added lines raise it by zero. It is a `getpaseo/paseo` file, so it is left alone
+  feature's 12 added lines raise it by zero. It is a `longbkit/clisbot` file, so it is left alone
   and the commit skips the hook rather than refactoring upstream code to satisfy a lint rule.
 
 ## storage-iteration-source-position-gate — feature gate wiring in the subagent store
@@ -117,7 +117,7 @@ workspace-metadata-row.tsx,use-permission-history.test.tsx}`,
 - Lane: ui_route_evidence (**not** the storage iteration — filed here by the storage lane for
   the owning lane's attention)
 - Layer touched: `packages/app/src/components/message.tsx`,
-  `packages/app/src/agent-stream/view.tsx` — both `getpaseo/paseo` files.
+  `packages/app/src/agent-stream/view.tsx` — both `longbkit/clisbot` files.
 - Reason: the authorship UI (AC1/AC2) needs an avatar/name gutter. The implementation extracted
   a new `UserMessageBody` out of upstream's `UserMessage` and wrapped JSX, replacing 257
   upstream lines — 170 of which only moved or re-indented.
@@ -129,7 +129,7 @@ workspace-metadata-row.tsx,use-permission-history.test.tsx}`,
 - Recommendation: DO-with-guard, **by the UI lane, not by the storage iteration**. Compose
   instead of splitting: upstream gains one optional `alignRight` prop (~5 lines), the gutter
   moves to a fusion `SessionUserMessage`. Needs a screenshot re-baseline. Consider offering
-  `alignRight` to `getpaseo/paseo` so the divergence goes to zero.
+  `alignRight` to `longbkit/clisbot` so the divergence goes to zero.
 - Status: **deferred** (2026-09-14 decision: keep the code as it is). Measurements and the
   worked alternative are preserved in
   [upstream-blast-radius.md](upstream-blast-radius.md#considered-not-taken) for whoever picks it up.

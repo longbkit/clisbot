@@ -71,7 +71,7 @@ const SCOPE_DETAILS: Record<ApiKeyScope, { label: string; description: string }>
   },
 };
 
-/** Shared API-key administration for Paseo web, native, and Electron. */
+/** Shared API-key administration for Clisbot web, native, and Electron. */
 export function ApiKeySettings() {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
@@ -171,7 +171,7 @@ export function ApiKeySettings() {
       <Alert
         variant="info"
         title="For external integrations and CLI automation"
-        description="Paseo itself does not need an API key. Create one only for a machine or script, and grant only the operations it needs."
+        description="Clisbot itself does not need an API key. Create one only for a machine or script, and grant only the operations it needs."
       />
       {query.error ? <Alert variant="error" title={query.error.message} /> : null}
       {error ? <Alert variant="error" title={error} /> : null}
@@ -254,7 +254,7 @@ function ApiKeyList({
 }) {
   if (loading) return <InfoRow title="Loading API keys…" />;
   if (keys.length === 0) {
-    return <InfoRow title="No active API keys" hint="Paseo works without one." />;
+    return <InfoRow title="No active API keys" hint="Clisbot works without one." />;
   }
   return keys.map((key, index) => (
     <ApiKeyRow key={key.id} apiKey={key} bordered={index > 0} pending={pending} revoke={revoke} />

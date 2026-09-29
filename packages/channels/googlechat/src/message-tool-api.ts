@@ -1,6 +1,6 @@
 // upstream: extensions/googlechat/src/message-tool-api.ts@5d8067a4483
 // Google Chat message-tool discovery stays read-only and account-isolated.
-import type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelMessageActionAdapter } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import { inspectGoogleChatAccount, listGoogleChatAccountIds } from "./accounts.js";
 
 export function describeGoogleChatMessageTool({

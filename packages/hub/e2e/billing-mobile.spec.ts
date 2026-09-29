@@ -25,7 +25,7 @@ test("the cardless trial can be started and read on a phone", async ({ hub, page
   });
 
   await test.step("starting the trial leaves a readable trial card behind", async () => {
-    await hub.choosePlan("owner", "Paseo Hub");
+    await hub.choosePlan("owner", "Clisbot Hub");
     await hub.deliverSubscriptionWebhook("owner");
     await hub.expectActiveTrial("owner");
     await page.screenshot({ path: `${SCREENSHOT_DIR}/02-active-trial.png`, fullPage: true });

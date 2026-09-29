@@ -10,7 +10,7 @@ function message(id: string, kind: "user_message" | "assistant_message"): Stream
 }
 
 afterEach(() => {
-  Reflect.deleteProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS");
+  Reflect.deleteProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS");
 });
 
 describe("useStreamHistoryWindow", () => {
@@ -28,7 +28,7 @@ describe("useStreamHistoryWindow", () => {
   });
 
   it("reveals loaded history before requesting an older daemon page", async () => {
-    Object.defineProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
+    Object.defineProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
       value: 2,
       configurable: true,
     });
@@ -56,7 +56,7 @@ describe("useStreamHistoryWindow", () => {
   });
 
   it("keeps its boundary at the same item when loaded history is prepended", () => {
-    Object.defineProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
+    Object.defineProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
       value: 2,
       configurable: true,
     });
@@ -80,7 +80,7 @@ describe("useStreamHistoryWindow", () => {
   });
 
   it("keeps live appends inside the rendered window", () => {
-    Object.defineProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
+    Object.defineProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
       value: 2,
       configurable: true,
     });
@@ -103,7 +103,7 @@ describe("useStreamHistoryWindow", () => {
   });
 
   it("restarts at a recent window when an item replacement removes the boundary", () => {
-    Object.defineProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
+    Object.defineProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
       value: 2,
       configurable: true,
     });
@@ -136,7 +136,7 @@ describe("useStreamHistoryWindow", () => {
   });
 
   it("does not claim to reveal a missing or already-visible item", () => {
-    Object.defineProperty(globalThis, "__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
+    Object.defineProperty(globalThis, "__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS", {
       value: 2,
       configurable: true,
     });

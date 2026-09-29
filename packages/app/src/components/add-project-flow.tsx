@@ -2,7 +2,7 @@ import { useToast } from "@/contexts/toast-api-context";
 import { canManageHostProjects, PROJECT_ACCESS_DENIED } from "@/add-project-flow/permissions";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { router } from "expo-router";
-import type { WorkspaceProjectDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceProjectDescriptorPayload } from "@clisbot/protocol/messages";
 import {
   ArrowLeft,
   Folder,

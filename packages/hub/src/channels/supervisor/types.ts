@@ -1,4 +1,4 @@
-import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
+import type { ChannelConversationMetadata } from "@clisbot/channels-shared";
 // The channel supervisor's public surface (plan §4-S1 / implementation doc §4.3.9):
 // the per-account lifecycle the control plane drives — install → load → start →
 // drive, plus teardown. This file is the shared contract the control-plane ops
@@ -27,7 +27,7 @@ import type { CompiledChannelAccount } from "../config/compile.js";
 import type { QrLoginResult, QrLoginVerb } from "./qr-login.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 import type { StagedChannelMedia } from "../media/outbound-stager.js";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 
 /** The per-account transport state the ops layer reports (`channels status`). */
 export type ChannelTransportState =
@@ -91,7 +91,7 @@ export interface ChannelSupervisorOptions {
   databaseRuntime: DatabaseRuntime;
   /** Test seam; production resolves encrypted credentials through `database`. */
   resolveConnection?: Database["resolveChannelConnection"];
-  /** The Hub data directory (`PASEO_HUB_DATA_DIR`): installs and state. */
+  /** The Hub data directory (`CLISBOT_HUB_DATA_DIR`): installs and state. */
   dataDir: string;
   /** Pass-through for `connectChannelDaemon` (loopback host/home or relay url). */
   daemon?: ChannelDaemonClientOptions;
@@ -104,7 +104,7 @@ export interface ChannelSupervisorOptions {
   resolveSessionIdentity?: (
     target: import("../daemon/session-operation.js").ChannelIdentityTarget,
     source: import("../plane/types.js").InboundMessage,
-  ) => Promise<import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity>;
+  ) => Promise<import("@clisbot/protocol/session-operation").VerifiedSessionOperationIdentity>;
   buildSessionOperationTicketResolver?: (
     target: import("../daemon/session-operation.js").ChannelOperationTarget,
   ) => import("../daemon/session-operation.js").ChannelOperationTicketResolver;

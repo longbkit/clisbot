@@ -40,7 +40,7 @@ const CHAT_BOT_SCOPE = "https://www.googleapis.com/auth/chat.bot";
 /** Upstream's `MAX_GOOGLE_CHAT_SERVICE_ACCOUNT_FILE_BYTES`. */
 export const MAX_SERVICE_ACCOUNT_BYTES = 64 * 1024;
 /** Where the FILE form may read from (colon-separated). `CLISBOT_`-aliased. */
-export const SERVICE_ACCOUNT_DIRECTORY_VARIABLE = "PASEO_HUB_CHANNEL_SECRETS_DIR";
+export const SERVICE_ACCOUNT_DIRECTORY_VARIABLE = "CLISBOT_HUB_CHANNEL_SECRETS_DIR";
 /** The container secret-mount convention, used when nothing is configured. */
 const DEFAULT_SERVICE_ACCOUNT_DIR = "/run/secrets";
 

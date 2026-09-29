@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/target-resolver.ts@5d8067a4483
 // Discord plugin module implements target resolver behavior.
-import { buildMessagingTarget, type MessagingTarget } from "@getpaseo/channels-core/plugin-sdk/channel-targets";
-import type { DirectoryConfigParams } from "@getpaseo/channels-core/plugin-sdk/directory-runtime";
+import { buildMessagingTarget, type MessagingTarget } from "@clisbot/channels-core/plugin-sdk/channel-targets";
+import type { DirectoryConfigParams } from "@clisbot/channels-core/plugin-sdk/directory-runtime";
 import { resolveDiscordAccount, resolveDiscordAccountAllowFrom } from "./accounts.js";
 import { rememberDiscordDirectoryUser } from "./directory-cache.js";
 import { listDiscordDirectoryPeersLive } from "./directory-live.js";

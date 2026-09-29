@@ -1,13 +1,13 @@
 // upstream: extensions/telegram/src/send-context.ts@5d8067a4483
 import { type ApiClientOptions, Bot, HttpError } from "grammy";
-import { isDiagnosticFlagEnabled } from "@getpaseo/channels-core/plugin-sdk/diagnostic-flags";
-import { formatUncaughtError } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { redactSensitiveText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
-import { parseStrictInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { createChannelApiRetryRunner, type RetryConfig } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
-import { createSubsystemLogger } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isDiagnosticFlagEnabled } from "@clisbot/channels-core/plugin-sdk/diagnostic-flags";
+import { formatUncaughtError } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { redactSensitiveText } from "@clisbot/channels-core/plugin-sdk/logging-core";
+import { parseStrictInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { createChannelApiRetryRunner, type RetryConfig } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
+import { createSubsystemLogger } from "@clisbot/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/ssrf-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveTelegramAccountOwnerAgentId } from "./account-owner.js";
 import { getOrCreateAccountThrottler } from "./account-throttler.js";
 import { type ResolvedTelegramAccount, resolveTelegramAccount } from "./accounts.js";

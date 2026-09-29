@@ -4,7 +4,7 @@
 //
 // Invariant (STOP < WRITE < START): runs ONLY while the Hub is down — the
 // PGlite cluster in $CLISBOT_HOME is locked by the running Hub. The dev daemon
-// (127.0.0.1:6867, ~/.clisbot-dev) stays up; never ~/.paseo, never 6767.
+// (127.0.0.1:6867, ~/.clisbot-dev) stays up; never ~/.clisbot, never 6767.
 //
 // Scenarios:
 //   dump   -> read-only: print the active revision's files, write nothing.

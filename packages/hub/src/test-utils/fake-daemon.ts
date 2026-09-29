@@ -1,4 +1,4 @@
-// A loopback Paseo daemon for channel integration tests.
+// A loopback Clisbot daemon for channel integration tests.
 //
 // The daemon leg is the one thing a channel sim-boot cannot run in process, so
 // it gets the same treatment the platforms do: a real WebSocket server speaking

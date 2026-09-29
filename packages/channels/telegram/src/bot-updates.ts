@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/bot-updates.ts@5d8067a4483
 // Telegram plugin module implements bot updates behavior.
 import type { Message } from "grammy/types";
-import { createDedupeCache } from "@getpaseo/channels-core/plugin-sdk/dedupe-runtime";
+import { createDedupeCache } from "@clisbot/channels-core/plugin-sdk/dedupe-runtime";
 import type { TelegramAmbientTranscriptWatermark } from "./bot-message-context.types.js";
 import type { TelegramContext } from "./bot/types.js";
 

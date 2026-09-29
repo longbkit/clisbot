@@ -2,8 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { createPaseoDaemon } from "../bootstrap.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createClisbotDaemon } from "../bootstrap.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import type { HubRelationshipRemote } from "../hub/relationship-remote.js";
 import type { ManagedAccessAdmission } from "../managed-access/types.js";
@@ -53,12 +53,12 @@ test("shared Bot grants protect private Chat and ordinary agent timelines over W
     revoke: async () => {},
     openSocket: () => ({ close: () => {} }),
   };
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: root,
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: root,
     agentSessionStorage: true,
     bots: { enabled: true, root: path.join(root, "homes") },
     createDaemon: (config, logger, deps) =>
-      createPaseoDaemon({ ...config, managedAccessMode: "external" }, logger, {
+      createClisbotDaemon({ ...config, managedAccessMode: "external" }, logger, {
         ...deps,
         hubRelationshipRemote: remote,
       }),

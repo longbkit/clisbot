@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/monitor/reconnect-policy.ts@5d8067a4483
 // Slack plugin module implements reconnect policy behavior.
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { formatSlackError } from "../errors.js";
 
 const SLACK_AUTH_ERROR_RE =

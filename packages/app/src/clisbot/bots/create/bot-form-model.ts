@@ -1,10 +1,10 @@
-import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
+import type { AgentProfile } from "@clisbot/protocol/agent-profile";
 import type {
   AgentMode,
   AgentModelDefinition,
   AgentProvider,
   ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import {
   buildSelectableProviderSelectorProviders,

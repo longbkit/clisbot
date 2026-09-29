@@ -3,18 +3,18 @@
 import {
   type AllowlistMatch,
   resolveAllowlistMatchByCandidates,
-} from "@getpaseo/channels-core/plugin-sdk/allow-from";
+} from "@clisbot/channels-core/plugin-sdk/allow-from";
 import {
   buildChannelKeyCandidates,
   resolveChannelEntryMatchWithFallback,
   resolveChannelMatchConfig,
   type ChannelMatchSource,
-} from "@getpaseo/channels-core/plugin-sdk/channel-targets";
-import type { DiscordGuildEntry } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/channel-targets";
+import type { DiscordGuildEntry } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { Guild, User } from "../internal/discord.js";
 import { formatDiscordUserTag } from "./format.js";
 

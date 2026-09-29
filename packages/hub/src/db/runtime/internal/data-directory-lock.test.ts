@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { acquireDataDirectoryLock } from "./data-directory-lock.js";
 
-const LOCK_FILE_NAME = ".paseo-hub.lock";
+const LOCK_FILE_NAME = ".clisbot-hub.lock";
 
 function esrchError(): NodeJS.ErrnoException {
   const error = new Error("kill (4242) ESRCH: no such process") as NodeJS.ErrnoException;

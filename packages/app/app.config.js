@@ -5,11 +5,11 @@ const withAndroidAsyncStorageSize = require("./plugins/with-android-async-storag
 const withAndroidProfileable = require("./plugins/with-android-profileable");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
-const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
+const withAndroidScroll = require("./modules/clisbot-scroll/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
-const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
-const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
+const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
+const isProfileBuild = process.env.CLISBOT_PROFILE_BUILD === "1";
 
 function resolveHubOrigin(value) {
   if (typeof value !== "string" || value.trim().length === 0) return undefined;
@@ -90,8 +90,8 @@ function resolveSecretFile(params) {
 
 const variants = {
   production: {
-    name: "Paseo",
-    packageId: "sh.paseo",
+    name: "Clisbot",
+    packageId: "com.clisbot.app",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_PROD",
       fallbackRelativePath: "./.secrets/google-services.prod.json",
@@ -102,8 +102,8 @@ const variants = {
     }),
   },
   development: {
-    name: "Paseo Debug",
-    packageId: "sh.paseo.debug",
+    name: "Clisbot Debug",
+    packageId: "com.clisbot.app.dev",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_DEBUG",
       fallbackRelativePath: "./.secrets/google-services.debug.json",
@@ -121,11 +121,11 @@ const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
 export default {
   expo: {
     name: variant.name,
-    slug: "voice-mobile",
+    slug: "clisbot",
     version: nativeReleaseVersion.appVersion,
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "paseo",
+    scheme: "clisbot",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
@@ -216,9 +216,9 @@ export default {
       ...(clisbotHubOrigin === undefined ? {} : { clisbotHub: { origin: clisbotHubOrigin } }),
       router: {},
       eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
+        projectId: process.env.CLISBOT_EXPO_PROJECT_ID,
       },
     },
-    owner: "getpaseo",
+    owner: process.env.CLISBOT_EXPO_OWNER,
   },
 };

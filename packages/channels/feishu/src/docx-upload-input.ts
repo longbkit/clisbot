@@ -6,7 +6,7 @@ import {
   canonicalizeBase64,
   estimateBase64DecodedBytes,
   extensionForMime,
-} from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+} from "@clisbot/channels-core/plugin-sdk/media-runtime";
 import { getFeishuRuntime } from "./runtime.js";
 
 type DocxUploadInput = {

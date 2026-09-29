@@ -1,8 +1,8 @@
 // upstream: extensions/feishu/src/tool-account.ts@5d8067a4483
 // Feishu plugin module implements tool account behavior.
 import type * as Lark from "@larksuiteoapi/node-sdk";
-import { normalizeOptionalAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { OpenClawPluginApi } from "./fusion/runtime-api.js";
 import {
   listEnabledFeishuAccounts,

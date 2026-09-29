@@ -4,10 +4,10 @@ import equal from "fast-deep-equal";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { refreshProviderSubagents, useProviderSubagentStore } from "./provider-store";
-import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { ProviderSubagentDescriptorPayload } from "@clisbot/protocol/messages";
 
-export interface PaseoSubagentRow {
-  kind: "paseo";
+export interface ClisbotSubagentRow {
+  kind: "clisbot";
   id: Agent["id"];
   provider: Agent["provider"];
   title: Agent["title"];
@@ -37,7 +37,7 @@ export interface ProviderSubagentRow {
   createdAt: Date;
 }
 
-export type SubagentRow = PaseoSubagentRow | ProviderSubagentRow;
+export type SubagentRow = ClisbotSubagentRow | ProviderSubagentRow;
 
 type SessionStoreSnapshot = ReturnType<typeof useSessionStore.getState>;
 type ProviderSubagentStoreSnapshot = ReturnType<typeof useProviderSubagentStore.getState>;
@@ -54,7 +54,7 @@ const EMPTY_PROVIDER_SUBAGENT_ROWS: ProviderSubagentRow[] = [];
 
 function toSubagentRow(agent: Agent): SubagentRow {
   return {
-    kind: "paseo",
+    kind: "clisbot",
     id: agent.id,
     provider: agent.provider,
     title: agent.title,
@@ -134,7 +134,7 @@ export function selectProviderSubagentsForParent(
 
 export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRow[] {
   const pendingArchiveIds = usePendingArchiveAgentIds(params.serverId);
-  const paseoRows = useStoreWithEqualityFn(
+  const clisbotRows = useStoreWithEqualityFn(
     useSessionStore,
     (state) => selectSubagentsForParent(state, params, pendingArchiveIds),
     equal,
@@ -162,9 +162,9 @@ export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRo
 
   return useMemo(() => {
     if (params.providerParentSubagentId) return providerRows;
-    if (providerRows.length === 0) return paseoRows;
-    const rows = [...paseoRows, ...providerRows];
+    if (providerRows.length === 0) return clisbotRows;
+    const rows = [...clisbotRows, ...providerRows];
     rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
     return rows;
-  }, [params.providerParentSubagentId, paseoRows, providerRows]);
+  }, [params.providerParentSubagentId, clisbotRows, providerRows]);
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 

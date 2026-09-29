@@ -3,12 +3,12 @@
 import type { Agent } from "node:https";
 import { createRequire } from "node:module";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { bufferToBlobPart } from "@getpaseo/channels-core/plugin-sdk/blob-runtime";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/channel-secret-basic-runtime";
+import { bufferToBlobPart } from "@clisbot/channels-core/plugin-sdk/blob-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/channel-secret-basic-runtime";
 import {
   readPluginPackageVersion,
   resolveAmbientNodeProxyAgent,
-} from "@getpaseo/channels-core/plugin-sdk/extension-shared";
+} from "@clisbot/channels-core/plugin-sdk/extension-shared";
 import { resolveConfiguredHttpTimeoutMs } from "./client-timeout.js";
 import type { FeishuConfig, FeishuDomain, ResolvedFeishuAccount } from "./types.js";
 

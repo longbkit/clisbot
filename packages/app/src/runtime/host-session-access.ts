@@ -7,7 +7,7 @@ interface HostSessionAccessBinding {
   management?: HubHostManagement;
 }
 
-const GLOBAL_KEY = "__paseoHostSessionAccessBindings";
+const GLOBAL_KEY = "__clisbotHostSessionAccessBindings";
 const listeners = new Set<() => void>();
 
 function emitChange(): void {

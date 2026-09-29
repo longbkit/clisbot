@@ -15,8 +15,8 @@
 import type { AnyChunk, MessageMetadata } from "@slack/types";
 import type { WebClient, WebClientOptions } from "@slack/web-api";
 import type { ChatStreamer } from "@slack/web-api/dist/chat-stream.js";
-import { pruneMapToMaxSize } from "@getpaseo/channels-core/plugin-sdk/collection-runtime";
-import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { pruneMapToMaxSize } from "@clisbot/channels-core/plugin-sdk/collection-runtime";
+import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { getSlackListenerWriteClient } from "./client.js";
 import type { SlackSendIdentity } from "./send.js";
 

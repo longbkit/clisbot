@@ -86,8 +86,8 @@ describe.skipIf(!SUPPLY_PRESENT)("pin-supply contract (static, audit 2026-08-26)
     // — no tarball fetch, no integrity gate at load.
     assert.equal(slack.loadMode, "in-repo");
     assert.equal(telegram.loadMode, "in-repo");
-    assert.equal(slack.inRepoPackage, "@getpaseo/channels-slack");
-    assert.equal(telegram.inRepoPackage, "@getpaseo/channels-telegram");
+    assert.equal(slack.inRepoPackage, "@clisbot/channels-slack");
+    assert.equal(telegram.inRepoPackage, "@clisbot/channels-telegram");
     // The loader's import targets: the built workspace package's entry + a
     // separate plugin chunk under the pinned export names.
     assert.equal(slack.entry, "./dist/index.js");

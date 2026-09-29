@@ -1,7 +1,7 @@
 import { lstat, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { BotErrorCode } from "@getpaseo/protocol/bots/types";
+import type { BotErrorCode } from "@clisbot/protocol/bots/types";
 import { expandTilde } from "../../utils/path.js";
 import { isSameOrDescendantPath } from "../path-utils.js";
 import { uniqueBotSlug } from "./bot-slug.js";

@@ -79,8 +79,8 @@ function Welcome({ googleSignIn, onBegin }: { googleSignIn: boolean; onBegin: ()
     <AuthLayout>
       <AuthCard
         titleId="welcome-heading"
-        title="Welcome to Paseo Hub"
-        description="Set up an account to start operating Paseo Hub."
+        title="Welcome to Clisbot Hub"
+        description="Set up an account to start operating Clisbot Hub."
       >
         <ErrorSummary message={readSignInError(true)} />
         <GoogleSignInButton
@@ -90,7 +90,7 @@ function Welcome({ googleSignIn, onBegin }: { googleSignIn: boolean; onBegin: ()
           claimInstance
         />
         <Button type="button" variant={googleSignIn ? "ghost" : "default"} onClick={onBegin}>
-          {googleSignIn ? "Set up with email and password instead" : "Set up Paseo Hub"}
+          {googleSignIn ? "Set up with email and password instead" : "Set up Clisbot Hub"}
         </Button>
       </AuthCard>
     </AuthLayout>

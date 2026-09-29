@@ -24,7 +24,7 @@ const INITIAL = {
 
 function bundle(partial = "Safety instructions") {
   return {
-    ".paseo/hub.yml": [
+    ".clisbot/hub.yml": [
       "environments:",
       "  runner:",
       "    kind: daemon",
@@ -32,7 +32,7 @@ function bundle(partial = "Safety instructions") {
       "    cwd: /repo",
       "agents: {}",
     ].join("\n"),
-    ".paseo/workflows/request.yml": [
+    ".clisbot/workflows/request.yml": [
       "name: request",
       "on: manual.run",
       "max_runtime: 1h",
@@ -44,9 +44,9 @@ function bundle(partial = "Safety instructions") {
       "    agent: { provider: codex }",
       "    prompt:",
       "      - include: partials/safety.md",
-      "      - text: 'Request: ${{ paseo.prompt }}'",
+      "      - text: 'Request: ${{ clisbot.prompt }}'",
     ].join("\n"),
-    ".paseo/workflows/partials/safety.md": partial,
+    ".clisbot/workflows/partials/safety.md": partial,
   };
 }
 
@@ -61,16 +61,16 @@ describe("exact-commit GitHub configuration bundle sync", () => {
     assert.equal(result.outcome, "activated");
     if (result.outcome !== "activated") return;
     const compiled = parseCompiledHubConfig(result.revision.normalizedConfiguration);
-    assert.equal(compiled.triggers[0]?.sourceFile, ".paseo/workflows/request.yml");
+    assert.equal(compiled.triggers[0]?.sourceFile, ".clisbot/workflows/request.yml");
     assert.deepEqual(compiled.triggers[0]?.steps[0]?.prompt[0], {
       kind: "partial",
-      path: ".paseo/workflows/partials/safety.md",
+      path: ".clisbot/workflows/partials/safety.md",
       content: "Safety instructions",
       contentHash: hashPromptPartialContent("Safety instructions"),
     });
     assert.deepEqual(
       client.lists.map(({ commitSha, prefix }) => ({ commitSha, prefix })),
-      [{ commitSha: "sha", prefix: ".paseo" }],
+      [{ commitSha: "sha", prefix: ".clisbot" }],
     );
     assert.deepEqual(
       client.reads.map(({ path }) => path),
@@ -87,7 +87,7 @@ describe("exact-commit GitHub configuration bundle sync", () => {
     await enrollTestDaemon(database);
     const invalid = {
       ...bundle(),
-      ".paseo/hub.yml": `${bundle()[".paseo/hub.yml"]}\ntriggers: []`,
+      ".clisbot/hub.yml": `${bundle()[".clisbot/hub.yml"]}\ntriggers: []`,
     };
     const client = new GitHubBundleFake({ valid: bundle(), invalid });
 
@@ -125,7 +125,7 @@ describe("exact-commit GitHub configuration bundle sync", () => {
     const client = new GitHubBundleFake(
       { sha: bundle() },
       {
-        sha: { ".paseo/workflows/partials/safety.md": "symlink" },
+        sha: { ".clisbot/workflows/partials/safety.md": "symlink" },
       },
     );
     const result = await sync(database, client, project.id, "sha");

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import { Button } from "@/components/ui/button";
 import { SessionActorLabel, actorLabel } from "./actor";
 import type { TimelinePosition } from "@/types/stream";

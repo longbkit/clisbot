@@ -11,7 +11,7 @@ Every `path:line` below was read on 2026-09-26 at the repo state of branch `feat
 
 ## Module layout
 
-Fusion-owned, one folder, every file under 500 lines. Nothing touches upstream Paseo files except
+Fusion-owned, one folder, every file under 500 lines. Nothing touches upstream Clisbot files except
 the wiring rows listed in [§4](#4-rpcs-and-pushes).
 
 | File                                                       | Owns                                                                                                                                                                                        |
@@ -32,8 +32,8 @@ the wiring rows listed in [§4](#4-rpcs-and-pushes).
 | `packages/protocol/src/chats/rpc-schemas.ts`, `types.ts`   | Wire schemas. Not `packages/protocol/src/chat/`: that folder is the removed chat-rooms feature kept as `COMPAT(chatRooms)` until 2027-02-09 (`packages/protocol/src/chat/rpc-schemas.ts:4`) |
 | `packages/protocol/src/conversation-prompt.ts`             | `senderLabel`, `CONTEXT_HEADER`, `MESSAGE_HEADER`, `renderConversationPrompt` moved out of the Hub so daemon and Hub render one shape ([§2.4](#24-context-what-a-bot-receives))             |
 
-`@getpaseo/server` does not depend on `@getpaseo/hub` (`packages/server/package.json:113` lists
-only `@getpaseo/protocol`), so Hub code can only be shared by moving it into the protocol package.
+`@clisbot/server` does not depend on `@clisbot/hub` (`packages/server/package.json:113` lists
+only `@clisbot/protocol`), so Hub code can only be shared by moving it into the protocol package.
 
 ## 1. Storage
 
@@ -68,7 +68,7 @@ only `@getpaseo/protocol`), so Hub code can only be shared by moving it into the
   (`packages/server/src/server/agent/agent-storage.ts:229`). `writeJsonFileAtomic`
   (`packages/server/src/server/atomic-file.ts:23`) has no fsync and is the weaker choice.
 - `ChatStore` copies the `AgentStorage` shape: cache map, `pendingWrites: Map<id, Promise>` chain
-  (`agent-storage.ts:205-226`), `load()` once, scan `$PASEO_HOME/chats/*/chat.json`. Validate ids
+  (`agent-storage.ts:205-226`), `load()` once, scan `$CLISBOT_HOME/chats/*/chat.json`. Validate ids
   with `assertSessionId` (`agent/session-storage/layout.ts:5`) before joining a path. Reject unknown
   keys with `.strict()` like the persisted config does (`packages/server/src/server/persisted-config.ts:286-297`).
 
@@ -109,7 +109,7 @@ Two small changes to that module (it is Fusion-owned by the agent-session-storag
 2. File names are the private getters `eventPath`/`indexPath` (`session-event-log.ts:120-125`):
    `events.jsonl` / `events.index.json`. D5 names `transcript.jsonl`. Add an optional file stem to
    `SessionEventLog.for(directory, { stem: "transcript" })` keyed into the registry map with the
-   stem, so `$PASEO_HOME/chats/{chatId}/transcript.jsonl` + `transcript.index.json`. If the
+   stem, so `$CLISBOT_HOME/chats/{chatId}/transcript.jsonl` + `transcript.index.json`. If the
    naming pass drops the file-name requirement, skip this change.
 
 `TranscriptLog` is then a ~120-line wrapper: `append(line)` allocates `seq = state().maxSeq + 1`
@@ -216,8 +216,8 @@ Labels on the agent (D2), declared in `packages/protocol/src/agent-labels.ts` be
 `PARENT_AGENT_ID_LABEL` (`:1`):
 
 ```ts
-export const CHAT_ID_LABEL = "paseo.chat-id";
-export const CHAT_BOT_ID_LABEL = "paseo.chat-bot-id";
+export const CHAT_ID_LABEL = "clisbot.chat-id";
+export const CHAT_BOT_ID_LABEL = "clisbot.chat-bot-id";
 ```
 
 Lookup order in `bot-sessions.ts`:
@@ -339,7 +339,7 @@ Dotted names per `docs/rpc-namespacing.md`; every field optional on the wire bey
 `requestId`; no `.transform()`/`.default()` on item schemas (`docs/protocol-compatibility.md:16-18`).
 File: `packages/protocol/src/chats/rpc-schemas.ts`, registered in `packages/protocol/src/messages.ts`
 where the checkout schemas are (inbound union list around `:3401`, outbound around `:7107`, type
-exports around `:7478`), then `npm run generate:validators -w @getpaseo/protocol`
+exports around `:7478`), then `npm run generate:validators -w @clisbot/protocol`
 (`packages/protocol/package.json:27`) — inbound validation is zod-aot generated
 (`docs/protocol-validation.md`).
 
@@ -395,7 +395,7 @@ line's `sender.actor` and the same identity flows into the bot's `user_message` 
 ### 4.3 Feature flag
 
 Config leaf `daemon.bots.enabled` in `persisted-config.ts` next to `serviceProxy` (`:286-297`),
-env `PASEO_BOTS_ENABLED` resolved in `config.ts` the way `PASEO_AGENT_SESSION_STORAGE` is
+env `CLISBOT_BOTS_ENABLED` resolved in `config.ts` the way `CLISBOT_AGENT_SESSION_STORAGE` is
 (`:639`) and listed as an override-controlled path (`:786-800`). `bootstrap.ts` gets one
 `createBotsWiring(config, …)` function with a single branch, the shape of
 `createSessionStorageWiring` (`:661-680`): off → `chatService` undefined, no directory created,
@@ -446,7 +446,7 @@ Unit (`packages/server/src/server/chats/*.test.ts`):
 E2E (`packages/server/src/server/chats/chat-engine.e2e.test.ts`): `createDaemonTestContext`
 (`packages/server/src/server/test-utils/daemon-test-context.ts:35`) with
 `createTestAgentClients()` (`test-utils/fake-agent-client.ts:1287`) and a daemon option that turns
-the flag on (`createTestPaseoDaemon` options, `test-utils/paseo-daemon.ts:16-58`; add
+the flag on (`createTestClisbotDaemon` options, `test-utils/clisbot-daemon.ts:16-58`; add
 `bots?: boolean` beside `agentSessionStorage`). The fake provider answers
 `respond with exactly: X` with `X` (`fake-agent-client.ts:986-990`), streams it in chunks
 (`:782-796`), and fails on `emit a turn failure` (`:751-759`); it needs no credentials.
@@ -462,10 +462,10 @@ the flag on (`createTestPaseoDaemon` options, `test-utils/paseo-daemon.ts:16-58`
 5. Idempotent send: same `messageId` twice → one transcript line, one `user_message` in the timeline.
 6. Failed turn: `emit a turn failure` → system line, no hop, next message still works.
 7. Restart: send, stop the daemon before the reply is appended (kill the tracker by closing the
-   daemon right after `turn_started`), start on the same `paseoHome` with `agentSessionStorage: true`,
+   daemon right after `turn_started`), start on the same `clisbotHome` with `agentSessionStorage: true`,
    assert the backfilled line.
 8. Flag off (`bots: false`): `server_info.features.bots` absent; `chat.create.request` gets the
-   unknown-message response; `$PASEO_HOME/chats` does not exist after a session that sent agents
+   unknown-message response; `$CLISBOT_HOME/chats` does not exist after a session that sent agents
    messages. Also assert the upstream-compat suite still passes:
    `packages/server/src/server/upstream-compatibility.test.ts` and
    `packages/protocol/src/messages.wire-compat.test.ts` (optional fields only).
@@ -515,8 +515,8 @@ Each under ~2 h; order respects dependencies. Run `npm run typecheck` and `npm r
    rows; `session.ts` dispatch cases behind `this.chatSession?`; push forwarding with
    `wantsEvent` + Managed Access project check; `websocket-server.ts` feature flag and
    `chatService` threading.
-10. **Flag + bootstrap** — `daemon.bots.enabled`, `PASEO_BOTS_ENABLED`, override path,
-    `createBotsWiring` in `bootstrap.ts`, `stop()` on shutdown; `createTestPaseoDaemon` option.
+10. **Flag + bootstrap** — `daemon.bots.enabled`, `CLISBOT_BOTS_ENABLED`, override path,
+    `createBotsWiring` in `bootstrap.ts`, `stop()` on shutdown; `createTestClisbotDaemon` option.
 11. **Reconcile** — `chats/reconcile.ts` + unit test; call from `ChatService.start()`.
 12. **`whenBusy: queue`** — hold lines per (bot, chat) until the tracker reports turn end; test.
 13. **E2E** — `chats/chat-engine.e2e.test.ts` scenarios 1–8 from §6, including flag-off checks.

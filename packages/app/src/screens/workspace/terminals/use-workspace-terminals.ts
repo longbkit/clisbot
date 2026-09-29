@@ -1,9 +1,9 @@
 import { toErrorMessage } from "@/utils/error-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
-import { resolveTerminalProfileLaunch } from "@getpaseo/protocol/terminal-profiles";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
+import { resolveTerminalProfileLaunch } from "@clisbot/protocol/terminal-profiles";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import { useTranslation } from "react-i18next";
 import { useReplicaQuery } from "@/data/query";

@@ -36,7 +36,7 @@ export type {
   PluginComposerPillContribution,
   PluginHeaderButtonContribution,
 } from "./buttons.js";
-export { usePaseo } from "./paseo-context.js";
+export { useClisbot } from "./clisbot-context.js";
 export { useAgent, useWorkspace } from "./client-state.js";
 export { useRpc } from "./rpc-context.js";
 import type { SettingsDefinition } from "../settings.js";
@@ -55,6 +55,6 @@ export interface PluginHostSummary {
 /** Live configured hosts. Supplied by the app's client bundle loader. */
 export declare function useHosts(): readonly PluginHostSummary[];
 /** Borrow an online host's API under this installation's lifetime. */
-export declare function getPaseoClient(serverId: string): import("@getpaseo/client").PaseoApi;
+export declare function getClisbotClient(serverId: string): import("@clisbot/client").ClisbotApi;
 /** Open an absolute HTTP(S) URL using the client platform’s external opener. */
 export declare function openExternalUrl(url: string): Promise<void>;

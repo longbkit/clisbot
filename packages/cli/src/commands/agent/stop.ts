@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { Command } from "commander";
 import { connectToDaemon } from "../../utils/client.js";
 import { isSameOrDescendantPath } from "../../utils/paths.js";
@@ -47,7 +47,7 @@ export async function runStopCommand(
     const error: CommandError = {
       code: "MISSING_ARGUMENT",
       message: "Agent ID required unless --all or --cwd is specified",
-      details: "Usage: paseo agent stop <id> | --all | --cwd <path>",
+      details: "Usage: clisbot agent stop <id> | --all | --cwd <path>",
     };
     throw error;
   }
@@ -75,7 +75,7 @@ export async function runStopCommand(
         const error: CommandError = {
           code: "AGENT_NOT_FOUND",
           message: `No agent found matching: ${id}`,
-          details: "Use `paseo ls` to list available agents",
+          details: "Use `clisbot ls` to list available agents",
         };
         throw error;
       }

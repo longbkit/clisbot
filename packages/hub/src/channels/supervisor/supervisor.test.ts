@@ -95,11 +95,11 @@ async function seedConfiguration(database: Database): Promise<void> {
     userId: null,
   });
   const files = [
-    { path: ".paseo/hub.yml", content: HUB_YAML },
-    { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
-    { path: ".paseo/channels/slack/work.yml", content: accountYaml("work", true) },
-    { path: ".paseo/channels/slack/ops.yml", content: accountYaml("ops", true) },
-    { path: ".paseo/channels/slack/off.yml", content: accountYaml("off", false) },
+    { path: ".clisbot/hub.yml", content: HUB_YAML },
+    { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
+    { path: ".clisbot/channels/slack/work.yml", content: accountYaml("work", true) },
+    { path: ".clisbot/channels/slack/ops.yml", content: accountYaml("ops", true) },
+    { path: ".clisbot/channels/slack/off.yml", content: accountYaml("off", false) },
   ];
   await database.saveChannelConfiguration({
     organizationId: ORG_ID,
@@ -155,7 +155,7 @@ describe("createChannelSupervisor", () => {
       await seedConfiguration(database);
       const supervisor = supervisorFor({
         database,
-        env: { PASEO_HUB_CHANNELS_ENABLED: "0" },
+        env: { CLISBOT_HUB_CHANNELS_ENABLED: "0" },
       });
       const result = await supervisor.startAccount("slack", "work");
       assert.deepEqual(result, {
@@ -175,7 +175,7 @@ describe("createChannelSupervisor", () => {
       await seedConfiguration(database);
       const supervisor = supervisorFor({
         database,
-        env: { PASEO_HUB_CHANNELS_ENABLED: "off" },
+        env: { CLISBOT_HUB_CHANNELS_ENABLED: "off" },
       });
       await supervisor.startAll();
       assert.deepEqual(await supervisor.reconcile(), { accounts: [], stopped: [] });
@@ -242,10 +242,10 @@ describe("createChannelSupervisor", () => {
       await database.saveChannelConfiguration({
         organizationId: ORG_ID,
         files: [
-          { path: ".paseo/hub.yml", content: HUB_YAML },
-          { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
+          { path: ".clisbot/hub.yml", content: HUB_YAML },
+          { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
           {
-            path: ".paseo/channels/discord/guild.yml",
+            path: ".clisbot/channels/discord/guild.yml",
             content: `
 channel: discord
 accountId: guild

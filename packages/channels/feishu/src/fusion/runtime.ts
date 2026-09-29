@@ -18,15 +18,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@clisbot/channels-shared";
 import {
   clearChannelSubsystemLogSink,
   installChannelSubsystemLogSink,
-} from "@getpaseo/channels-shared";
-import type { PluginRuntime } from "@getpaseo/channels-core/plugin-sdk/channel-core";
-import type { PluginStateKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { setVerbose } from "@getpaseo/channels-core/globals";
-import { extensionForMime } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+} from "@clisbot/channels-shared";
+import type { PluginRuntime } from "@clisbot/channels-core/plugin-sdk/channel-core";
+import type { PluginStateKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { setVerbose } from "@clisbot/channels-core/globals";
+import { extensionForMime } from "@clisbot/channels-core/plugin-sdk/media-runtime";
 import {
   currentFeishuAccountId,
   setFeishuRuntime,

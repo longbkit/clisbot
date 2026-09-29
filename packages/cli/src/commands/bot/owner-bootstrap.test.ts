@@ -8,10 +8,10 @@ describe("initial owner credentials", () => {
       { ownerEmail: "owner@example.test", ownerPassword: "${TEST_PASSWORD}" },
       env,
     );
-    expect(result.PASEO_BOOTSTRAP_OWNER_PASSWORD).toBe(env.TEST_PASSWORD);
-    expect(result.PASEO_BOOTSTRAP_OWNER_EMAIL).toBe("owner@example.test");
-    expect(result.PASEO_BOOTSTRAP_ORGANIZATION).toBe("Clisbot");
-    expect(env).not.toHaveProperty("PASEO_BOOTSTRAP_OWNER_PASSWORD");
+    expect(result.CLISBOT_BOOTSTRAP_OWNER_PASSWORD).toBe(env.TEST_PASSWORD);
+    expect(result.CLISBOT_BOOTSTRAP_OWNER_EMAIL).toBe("owner@example.test");
+    expect(result.CLISBOT_BOOTSTRAP_ORGANIZATION).toBe("Clisbot");
+    expect(env).not.toHaveProperty("CLISBOT_BOOTSTRAP_OWNER_PASSWORD");
   });
   it("requires the owner's email and a valid password before starting processes", () => {
     expect(() => ownerBootstrapEnvironment({ ownerPassword: "long-test-password" }, {})).toThrow(

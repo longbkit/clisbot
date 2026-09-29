@@ -4,7 +4,7 @@ import {
   createMessageReceiptFromOutboundResults,
   type MessageReceipt,
   type MessageReceiptPartKind,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 
 export function createZalouserSendReceipt(params: {
   messageId?: string;

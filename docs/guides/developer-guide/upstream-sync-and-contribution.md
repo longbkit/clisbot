@@ -127,15 +127,22 @@ official Clisbot `main`.
 
 Git command skeleton for one release, run from a clean checkout after the
 cutover. `<main-worktree>` is the worktree with `main` checked out; the two
-other paths are new disposable worktrees. The rename command and old-name scan
-are still to be implemented, so this is not yet a runnable release recipe.
+other paths are new disposable worktrees. Run the same
+`scripts/rebrand-clisbot.mjs` from the Fusion checkout against each raw
+upstream worktree. Stage renamed paths before `--check` because the script
+enumerates the Git index.
 
 ```bash
 git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
 git rev-parse 'refs/upstream-releases/vX.Y.Z^{}' # verify the raw upstream commit
 git worktree add -b sync/rebranded-vX.Y.Z <rebrand-worktree> refs/upstream-releases/vX.Y.Z
-# Run the version-controlled rename against <rebrand-worktree>; scan paths and contents.
+node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --apply \
+  --expo-owner <company-expo-owner> --expo-project-id <clisbot-project-uuid>
+# In <rebrand-worktree>, install dependencies, then run npm run format and
+# npm run lint. The broad rename changes wrapping in many docs/source files.
 git -C <rebrand-worktree> add -A
+node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --check \
+  --expo-owner <company-expo-owner> --expo-project-id <clisbot-project-uuid>
 git -C <rebrand-worktree> diff --cached --check
 git -C <rebrand-worktree> commit -m "Rebrand upstream vX.Y.Z for Clisbot sync"
 
@@ -162,8 +169,16 @@ live checks required by the release being promoted.
 
 Use the same transform and checks for disposable `upstream/main` rehearsals.
 No legacy `paseo://` handler or `PASEO_*` environment alias is part of the
-target Clisbot product. The executable command and scan allowlist will be
-added here when the transformation is implemented.
+target Clisbot product. The script preserves dated audits, lessons, and this
+upstream playbook as historical/provenance records. During the isolated test
+phase, add `--keep-upstream-endpoints` to both rename commands: live
+`app.paseo.sh`, `relay.paseo.sh`, and `hub.paseo.sh` remain reachable, while
+site/documentation links to `paseo.sh` become `clisbot.com`. Do not use that
+flag for the official cutover. Until the company supplies Expo owner and
+project ID, the test app config reads `CLISBOT_EXPO_OWNER` and
+`CLISBOT_EXPO_PROJECT_ID` from the environment; local Expo config works, but
+EAS publishing needs those values. The temporary service endpoints and app
+artwork still need review before the cutover.
 
 ### Current promotion procedure before the cutover
 

@@ -264,7 +264,7 @@
     },
     {
       "upstream": "extensions/zalo/index.ts",
-      "reason": "The OpenClaw bundled-channel entry (`defineBundledChannelEntry`). Fusion's equivalent is `src/entry.ts` over `@getpaseo/channels-shared` `createChannelEntry`."
+      "reason": "The OpenClaw bundled-channel entry (`defineBundledChannelEntry`). Fusion's equivalent is `src/entry.ts` over `@clisbot/channels-shared` `createChannelEntry`."
     },
     {
       "upstream": "extensions/zalo/api.ts",
@@ -303,7 +303,7 @@
     {
       "id": "D-ZL-001",
       "file": "src/runtime-api.ts",
-      "reason": "`runtime-api.ts` \u2014 upstream's file is the plugin's OpenClaw host binding: ~60 re-exports of `openclaw/plugin-sdk/*` (pairing controller, reply pipeline, setup/wizard helpers, gateway webhook registry) so a bundled plugin can be loaded without importing `openclaw`. Fusion has no OpenClaw host; the members this closure reads come from `@getpaseo/channels-core`, which mirrors the same upstream source modules. Kept at the same name and job so the ported `monitor.webhook.ts` keeps upstream's import block; the Hub-owned members (setup, pairing, reply delivery, plugin HTTP routes) are dropped rather than re-implemented."
+      "reason": "`runtime-api.ts` \u2014 upstream's file is the plugin's OpenClaw host binding: ~60 re-exports of `openclaw/plugin-sdk/*` (pairing controller, reply pipeline, setup/wizard helpers, gateway webhook registry) so a bundled plugin can be loaded without importing `openclaw`. Fusion has no OpenClaw host; the members this closure reads come from `@clisbot/channels-core`, which mirrors the same upstream source modules. Kept at the same name and job so the ported `monitor.webhook.ts` keeps upstream's import block; the Hub-owned members (setup, pairing, reply delivery, plugin HTTP routes) are dropped rather than re-implemented."
     },
     {
       "id": "D-ZL-002",
@@ -318,7 +318,7 @@
     {
       "id": "D-ZL-004",
       "file": "src/secret-input.ts",
-      "reason": "`buildSecretInputSchema` is dropped from the re-export: it is the zod builder upstream's `config-schema.ts` composes, and the Hub owns the channel config schema (`config-schema.ts` is omitted), so the builder is not carried in `@getpaseo/channels-core` either. The two readers the ported token/account code calls are unchanged."
+      "reason": "`buildSecretInputSchema` is dropped from the re-export: it is the zod builder upstream's `config-schema.ts` composes, and the Hub owns the channel config schema (`config-schema.ts` is omitted), so the builder is not carried in `@clisbot/channels-core` either. The two readers the ported token/account code calls are unchanged."
     },
     {
       "id": "D-ZL-005",
@@ -351,7 +351,7 @@
     {
       "id": "D-ZL-010",
       "file": "src/monitor.webhook.ts",
-      "reason": "Two cuts at the OpenClaw gateway boundary. (1) `registerWebhookTargetWithPluginRoute` binds the path on OpenClaw's process-wide gateway HTTP server (`src/plugins/http-registry.ts`), which Fusion does not have (`@getpaseo/channels-core` D-CORE-321): the `route` option and its branch are dropped and the vertical owns one `node:http` listener per account (D-ZL-014). (2) upstream's `resolveClientIp` reads the already-validated client ip out of the gateway request scope before falling back to headers; Fusion has no such scope, so the header resolver IS the resolver (`resolveRequestClientIp`), which fails closed the same way. Everything the 200 depends on is unchanged: the rate-limit/method guards, the constant-time secret compare answering 401 BEFORE the body is read, the 415 ordering, the bounded body read and the ack written only after `acceptWebhook` resolves. The ported test drops upstream's plugin-registry reset for the same reason.",
+      "reason": "Two cuts at the OpenClaw gateway boundary. (1) `registerWebhookTargetWithPluginRoute` binds the path on OpenClaw's process-wide gateway HTTP server (`src/plugins/http-registry.ts`), which Fusion does not have (`@clisbot/channels-core` D-CORE-321): the `route` option and its branch are dropped and the vertical owns one `node:http` listener per account (D-ZL-014). (2) upstream's `resolveClientIp` reads the already-validated client ip out of the gateway request scope before falling back to headers; Fusion has no such scope, so the header resolver IS the resolver (`resolveRequestClientIp`), which fails closed the same way. Everything the 200 depends on is unchanged: the rate-limit/method guards, the constant-time secret compare answering 401 BEFORE the body is read, the 415 ordering, the bounded body read and the ack written only after `acceptWebhook` resolves. The ported test drops upstream's plugin-registry reset for the same reason.",
       "tests": ["src/monitor.webhook.test.ts", "src/fusion/webhook-session.test.ts"]
     },
     {
@@ -409,7 +409,7 @@
     {
       "id": "D-ZL-020",
       "file": "src/api.test.ts",
-      "reason": "Two ported expectations move with the core provider-HTTP boundary (`@getpaseo/channels-core` D-CORE-036 / D-CORE-306): upstream throws a size-named error at the JSON cap and re-raises the caller's abort when a body read is cut short, while the Fusion reader stops at the cap / at its own 10s per-chunk idle deadline and the truncated body fails to parse. The invariants the cases exist for are asserted unchanged: the oversized stream is bounded and cancelled exactly once, and a hanging response body cannot hold the send."
+      "reason": "Two ported expectations move with the core provider-HTTP boundary (`@clisbot/channels-core` D-CORE-036 / D-CORE-306): upstream throws a size-named error at the JSON cap and re-raises the caller's abort when a body read is cut short, while the Fusion reader stops at the cap / at its own 10s per-chunk idle deadline and the truncated body fails to parse. The invariants the cases exist for are asserted unchanged: the oversized stream is bounded and cancelled exactly once, and a hanging response body cannot hold the send."
     }
   ]
 }

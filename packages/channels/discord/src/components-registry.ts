@@ -5,9 +5,9 @@ import {
   isFutureDateTimestampMs,
   resolveDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { createPluginStateErrorReporter } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { uniqueStrings } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { createPluginStateErrorReporter } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { uniqueStrings } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   discordComponentRegistryState,
   type DiscordRegistryStore,

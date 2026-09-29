@@ -2,12 +2,12 @@
 //
 // The one place a built `TelegramInboundBuild` becomes a durably admitted Hub
 // event: fold the run's media into the body, then hand the event to the
-// account's shared inbound processor (`@getpaseo/channels-shared`
+// account's shared inbound processor (`@clisbot/channels-shared`
 // `createInboundEventProcessor`), which persists it into `channel_ingress_queue`
 // before returning. A throw from here is the transport's signal that admission
 // did NOT happen, so the update watermark must not advance.
 
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
 import type { Message } from "grammy/types";
 import { resolveTelegramMessageThreadSpec } from "../bot/helpers.js";
 import { foldInboundTelegramMediaGroup, type TelegramMessageShape } from "../transport/media.js";

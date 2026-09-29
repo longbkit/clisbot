@@ -256,7 +256,7 @@ describe("GitHub trigger matching", () => {
   );
 
   it("matches the compiled one-step trigger by repository, text, and actor", () => {
-    const config = configFor({ repo: "boudra/faro", contains: "@paseo", from_users: ["boudra"] });
+    const config = configFor({ repo: "boudra/faro", contains: "@clisbot", from_users: ["boudra"] });
     const matches = matchTriggers(config, createEvent());
 
     assert.equal(matches.length, 1);
@@ -292,13 +292,13 @@ describe("GitHub trigger matching", () => {
   });
 
   it("keeps repository and pattern filters literal", () => {
-    const config = configFor({ repo: "boudra/faro", pattern: "@paseo", from_users: ["boudra"] });
+    const config = configFor({ repo: "boudra/faro", pattern: "@clisbot", from_users: ["boudra"] });
     assert.equal(
       matchTriggers(
         config,
         createEvent({
           payload: {
-            comment: { id: 123, body: "@paseo please explain", user: { login: "boudra" } },
+            comment: { id: 123, body: "@clisbot please explain", user: { login: "boudra" } },
             sender: { login: "boudra" },
           },
         }),
@@ -328,7 +328,7 @@ describe("GitHub trigger matching", () => {
           name: "review-comment",
           on: "github.pull_request_review_comment",
           max_runtime: "2h",
-          filters: { repo: "boudra/faro", contains: "@paseo", from_users: ["boudra"] },
+          filters: { repo: "boudra/faro", contains: "@clisbot", from_users: ["boudra"] },
           steps: [
             {
               id: "reply",
@@ -346,7 +346,7 @@ describe("GitHub trigger matching", () => {
       ...createEvent(),
       type: "pull_request_review_comment",
       payload: {
-        comment: { id: 999, body: "@paseo review this", user: { login: "boudra" } },
+        comment: { id: 999, body: "@clisbot review this", user: { login: "boudra" } },
         sender: { login: "boudra" },
         pull_request: { head: { ref: "topic" } },
       },
@@ -415,7 +415,7 @@ function createEvent(
     repositoryId: 7,
     installationId: 42,
     payload: options.payload ?? {
-      comment: { id: 123, body: "hi @paseo", user: { login: "boudra" } },
+      comment: { id: 123, body: "hi @clisbot", user: { login: "boudra" } },
       sender: { login: "boudra" },
     },
     createdAt: "2026-05-19T00:00:00.000Z",

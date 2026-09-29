@@ -147,16 +147,16 @@ async function compileControlPlaneSnapshot(
   options: { publicBaseUrl?: string } = {},
 ): Promise<ChannelControlPlaneSnapshot> {
   const files = revision?.files ?? [];
-  if (files.some((file) => file.path.startsWith(".paseo/workflows/"))) {
+  if (files.some((file) => file.path.startsWith(".clisbot/workflows/"))) {
     throw new ChannelControlPlaneError(
       "bundle_unavailable",
       "Channel revisions cannot contain Workflow documents; use organization Triggers",
     );
   }
   const resourceFiles = [...files];
-  if (!resourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
+  if (!resourceFiles.some(({ path }) => path === ".clisbot/hub.yml")) {
     resourceFiles.push({
-      path: ".paseo/hub.yml",
+      path: ".clisbot/hub.yml",
       content: EMPTY_CHANNEL_RESOURCE,
     });
   }

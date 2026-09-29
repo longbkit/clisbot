@@ -75,7 +75,7 @@ export class RegistrationCompletion {
     const organizationId = await this.options.pool.transaction(async (client) => {
       const account = await lockedAccount(client, userId);
       const email = normalizeEmail(account.email);
-      await this.options.locks.withTxLock(client, `paseo:registration-completion:${email}`);
+      await this.options.locks.withTxLock(client, `clisbot:registration-completion:${email}`);
       if (!(await this.isPending(email, client))) return null;
       if (await hasMembership(client, account.id)) {
         // Only completion grants a pending account its first membership, and it deletes the

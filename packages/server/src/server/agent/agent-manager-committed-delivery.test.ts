@@ -311,7 +311,7 @@ test("after a failed write nothing the failed history would certify is published
 });
 
 /** Set to a report path to run the manager-level write benchmark. */
-const benchmarkReport = process.env.PASEO_AGENT_MANAGER_WRITE_BENCHMARK;
+const benchmarkReport = process.env.CLISBOT_AGENT_MANAGER_WRITE_BENCHMARK;
 
 test.skipIf(!benchmarkReport)(
   "benchmark: 10 agents stream 1,000 rows each through the manager",

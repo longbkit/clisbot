@@ -1,4 +1,4 @@
-// @getpaseo/channels-zalouser — the in-repo Zalo Personal (`zalouser`) channel
+// @clisbot/channels-zalouser — the in-repo Zalo Personal (`zalouser`) channel
 // vertical (goal ledger slice 17). Exports:
 // - `default` — the bundled-channel entry (`id: "zalouser"`);
 // - `zalouserPlugin` — the pinned drive-surface name (startAccount + sendText);

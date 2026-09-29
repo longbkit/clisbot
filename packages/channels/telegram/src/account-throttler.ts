@@ -1,8 +1,8 @@
 // upstream: extensions/telegram/src/account-throttler.ts@5d8067a4483
 // Telegram plugin module implements account throttler behavior.
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { parseStrictInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { logVerbose, sleepWithAbort, waitForAbortSignal } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { parseStrictInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { logVerbose, sleepWithAbort, waitForAbortSignal } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { apiThrottler } from "./bot.runtime.js";
 import { TELEGRAM_CHAT_ACTION_INTERVAL_MS } from "./chat-action-timing.js";
 import { createTelegramSendChatActionHandler } from "./sendchataction-401-backoff.js";

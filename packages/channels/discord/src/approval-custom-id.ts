@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/approval-custom-id.ts@5d8067a4483
 // Discord plugin module owns its transport-private approval callback envelope.
-import { buildApprovalResolutionRef } from "@getpaseo/channels-core/plugin-sdk/approval-reference-runtime";
-import type { MessagePresentationAction } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import { buildApprovalResolutionRef } from "@clisbot/channels-core/plugin-sdk/approval-reference-runtime";
+import type { MessagePresentationAction } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import type { ComponentData } from "./internal/discord.js";
 
 type DiscordApprovalAction = Extract<MessagePresentationAction, { type: "approval" }>;

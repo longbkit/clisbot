@@ -26,9 +26,9 @@ it("keeps organization management and account-auth resources on their canonical 
       path: "/api/management/v1/organizations/organization%2Fone/daemons",
       input: {},
     },
-    { path: "/api/auth/paseo/api-keys", input: {} },
+    { path: "/api/auth/clisbot/api-keys", input: {} },
     {
-      path: "/api/auth/paseo/revoke-api-key",
+      path: "/api/auth/clisbot/revoke-api-key",
       input: {
         method: "POST",
         headers: { "content-type": "application/json" },

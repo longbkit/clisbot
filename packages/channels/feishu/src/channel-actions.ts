@@ -16,11 +16,11 @@
 // and then failing at the transport. `supportsAction` answering false makes the
 // Hub reply `unsupported_action` instead of a transport error.
 
-import { createActionGate, jsonResult } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { createActionGate, jsonResult } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   inspectFeishuCredentials,
   listEnabledFeishuAccounts,

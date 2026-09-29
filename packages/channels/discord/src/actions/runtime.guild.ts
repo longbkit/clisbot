@@ -1,16 +1,16 @@
 // upstream: extensions/discord/src/actions/runtime.guild.ts@5d8067a4483
 // Discord plugin module implements runtime.guild behavior.
 import { PermissionFlagsBits } from "discord-api-types/v10";
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import type { ActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import type { ActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import {
   jsonResult,
   readNonNegativeIntegerParam,
   readPositiveIntegerParam,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { DiscordActionConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { DiscordActionConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveDefaultDiscordAccountId } from "../accounts.js";
 import { isDiscordThreadChannelType } from "../channel-type.js";
 import { getGateway } from "../monitor/gateway-registry.js";

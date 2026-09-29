@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { forkPaseoHomeMetadata, resolvePaseoHomePath } from "./paseo-home-fork";
+import { forkClisbotHomeMetadata, resolveClisbotHomePath } from "./clisbot-home-fork";
 import { startIsolatedHostDaemon } from "./isolated-host-daemon";
 
 export interface E2EWorker {
@@ -12,7 +12,7 @@ export interface E2EWorker {
 
 export interface E2EWorkerOptions {
   forkProviders?: string[];
-  injectPaseoTools?: boolean;
+  injectClisbotTools?: boolean;
   daemonConfig?: Record<string, unknown>;
   environment?: Record<string, string>;
 }
@@ -20,11 +20,11 @@ export interface E2EWorkerOptions {
 function resolveOptionalHome(value: string | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
-  return resolvePaseoHomePath(trimmed === "current" ? "~/.paseo" : trimmed);
+  return resolveClisbotHomePath(trimmed === "current" ? "~/.clisbot" : trimmed);
 }
 
 async function createFakeEditorBin(): Promise<string> {
-  const binDir = await mkdtemp(path.join(tmpdir(), "paseo-e2e-editor-bin-"));
+  const binDir = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-editor-bin-"));
   let realGhPath = "";
   try {
     const locator = process.platform === "win32" ? "where.exe" : "which";
@@ -43,7 +43,7 @@ async function createFakeEditorBin(): Promise<string> {
   const fakeEditorSource = `#!/usr/bin/env node
 const fs = require("fs");
 const path = require("path");
-const recordPath = process.env.PASEO_E2E_EDITOR_RECORD_PATH;
+const recordPath = process.env.CLISBOT_E2E_EDITOR_RECORD_PATH;
 if (recordPath) {
   fs.appendFileSync(recordPath, JSON.stringify({
     command: path.basename(process.argv[1]),
@@ -66,7 +66,7 @@ if (recordPath) {
   const fakeGhSource = `#!/usr/bin/env node
 const { spawnSync } = require("child_process");
 const args = process.argv.slice(2);
-const fixtureRemote = "https://github.com/paseo-e2e/local-fixture.git";
+const fixtureRemote = "https://github.com/clisbot-e2e/local-fixture.git";
 const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], {
   encoding: "utf8",
   stdio: ["ignore", "pipe", "ignore"]
@@ -76,7 +76,7 @@ if (origin === fixtureRemote) {
   const command = args.slice(0, 2).join(" ");
   if (command === "auth status") process.exit(0);
   if (command === "repo view") {
-    process.stdout.write(JSON.stringify({ owner: { login: "paseo-e2e" }, name: "local-fixture", parent: null }));
+    process.stdout.write(JSON.stringify({ owner: { login: "clisbot-e2e" }, name: "local-fixture", parent: null }));
     process.exit(0);
   }
   if (command === "issue list") {
@@ -88,7 +88,7 @@ if (origin === fixtureRemote) {
     const pr = {
       number: isFork ? 2 : 1,
       title: "Use pasted PR as start ref",
-      url: "https://github.com/paseo-e2e/local-fixture/pull/" + (isFork ? 2 : 1),
+      url: "https://github.com/clisbot-e2e/local-fixture/pull/" + (isFork ? 2 : 1),
       state: "OPEN",
       body: null,
       labels: [],
@@ -107,9 +107,9 @@ if (origin === fixtureRemote) {
         baseRefName: "main",
         headRefName: isFork ? "pr-branch-2" : "pr-branch-1",
         isCrossRepository: isFork,
-        headRepositoryOwner: { login: isFork ? "fork-owner" : "paseo-e2e" },
+        headRepositoryOwner: { login: isFork ? "fork-owner" : "clisbot-e2e" },
         headRepository: {
-          sshUrl: isFork ? "git@github.com:fork-owner/local-fixture.git" : "git@github.com:paseo-e2e/local-fixture.git",
+          sshUrl: isFork ? "git@github.com:fork-owner/local-fixture.git" : "git@github.com:clisbot-e2e/local-fixture.git",
           url: isFork ? "https://github.com/fork-owner/local-fixture" : fixtureRemote
         }
       } } }
@@ -134,11 +134,11 @@ process.exit(result.status ?? 1);
 }
 
 async function applyMetadataFork(targetHome: string, providerIds: string[]): Promise<void> {
-  const sourceHome = resolveOptionalHome(process.env.E2E_FORK_PASEO_HOME_FROM);
+  const sourceHome = resolveOptionalHome(process.env.E2E_FORK_CLISBOT_HOME_FROM);
   if (!sourceHome) return;
-  const result = await forkPaseoHomeMetadata({ sourceHome, targetHome });
-  process.env.E2E_FORK_SOURCE_PASEO_HOME = result.sourceHome;
-  process.env.E2E_FORK_TARGET_PASEO_HOME = result.targetHome;
+  const result = await forkClisbotHomeMetadata({ sourceHome, targetHome });
+  process.env.E2E_FORK_SOURCE_CLISBOT_HOME = result.sourceHome;
+  process.env.E2E_FORK_TARGET_CLISBOT_HOME = result.targetHome;
   process.env.E2E_FORK_COPIED_FILES = String(result.copiedFiles);
   process.env.E2E_FORK_COPIED_BYTES = String(result.copiedBytes);
 
@@ -167,48 +167,48 @@ export async function startE2EWorker(
   workerIndex: number,
   options: E2EWorkerOptions = {},
 ): Promise<E2EWorker> {
-  const requestedRoot = resolveOptionalHome(process.env.E2E_PASEO_HOME);
-  const paseoHome = requestedRoot
+  const requestedRoot = resolveOptionalHome(process.env.E2E_CLISBOT_HOME);
+  const clisbotHome = requestedRoot
     ? path.join(requestedRoot, `worker-${workerIndex}`)
-    : await mkdtemp(path.join(tmpdir(), `paseo-e2e-worker-${workerIndex}-`));
-  const preserveHome = Boolean(requestedRoot) || process.env.E2E_KEEP_PASEO_HOME === "1";
+    : await mkdtemp(path.join(tmpdir(), `clisbot-e2e-worker-${workerIndex}-`));
+  const preserveHome = Boolean(requestedRoot) || process.env.E2E_KEEP_CLISBOT_HOME === "1";
   const fakeEditorBin = await createFakeEditorBin();
-  const editorRecordPath = path.join(paseoHome, "editor-open-records.jsonl");
+  const editorRecordPath = path.join(clisbotHome, "editor-open-records.jsonl");
   const serverId = `srv_e2e_worker_${workerIndex}`;
 
   try {
-    await applyMetadataFork(paseoHome, options.forkProviders ?? []);
+    await applyMetadataFork(clisbotHome, options.forkProviders ?? []);
     // Worker-scoped fixture config lets a spec exercise provider discovery without
     // reading the developer's provider state or sharing configuration with other specs.
     if (options.daemonConfig) {
       await writeFile(
-        path.join(paseoHome, "config.json"),
+        path.join(clisbotHome, "config.json"),
         `${JSON.stringify(options.daemonConfig, null, 2)}\n`,
       );
     }
-    if (options.injectPaseoTools) {
-      await enablePaseoTools(paseoHome);
+    if (options.injectClisbotTools) {
+      await enableClisbotTools(clisbotHome);
     }
     const daemon = await startIsolatedHostDaemon(serverId, {
-      paseoHome,
+      clisbotHome,
       preserveHome,
       environment: {
         NODE_ENV: "development",
         PATH: `${fakeEditorBin}${path.delimiter}${process.env.PATH ?? ""}`,
-        PASEO_E2E_EDITOR_RECORD_PATH: editorRecordPath,
+        CLISBOT_E2E_EDITOR_RECORD_PATH: editorRecordPath,
         ...options.environment,
       },
     });
 
     process.env.E2E_DAEMON_PORT = String(daemon.port);
     process.env.E2E_SERVER_ID = daemon.serverId;
-    process.env.E2E_PASEO_HOME = daemon.paseoHome;
+    process.env.E2E_CLISBOT_HOME = daemon.clisbotHome;
     process.env.E2E_EDITOR_RECORD_PATH = editorRecordPath;
     delete process.env.E2E_RELAY_PORT;
     delete process.env.E2E_RELAY_DAEMON_PUBLIC_KEY;
 
     console.log(
-      `[e2e] Worker ${workerIndex} daemon started on port ${daemon.port}, home: ${daemon.paseoHome}`,
+      `[e2e] Worker ${workerIndex} daemon started on port ${daemon.port}, home: ${daemon.clisbotHome}`,
     );
     return {
       close: async () => {
@@ -219,13 +219,13 @@ export async function startE2EWorker(
     };
   } catch (error) {
     await rm(fakeEditorBin, { recursive: true, force: true });
-    if (!preserveHome) await rm(paseoHome, { recursive: true, force: true });
+    if (!preserveHome) await rm(clisbotHome, { recursive: true, force: true });
     throw error;
   }
 }
 
-async function enablePaseoTools(paseoHome: string): Promise<void> {
-  const configPath = path.join(paseoHome, "config.json");
+async function enableClisbotTools(clisbotHome: string): Promise<void> {
+  const configPath = path.join(clisbotHome, "config.json");
   const existing = existsSync(configPath)
     ? JSON.parse(await readFile(configPath, "utf8"))
     : { version: 1 };

@@ -1,16 +1,16 @@
 // upstream: extensions/discord/src/send.webhook.ts@5d8067a4483
 // Discord plugin module implements send.webhook behavior.
-import { recordChannelActivity } from "@getpaseo/channels-core/plugin-sdk/channel-activity-runtime";
-import { recordOutboundMessageIdentity } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { buildTimeoutAbortSignal } from "@getpaseo/channels-core/plugin-sdk/extension-shared";
+import { recordChannelActivity } from "@clisbot/channels-core/plugin-sdk/channel-activity-runtime";
+import { recordOutboundMessageIdentity } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { buildTimeoutAbortSignal } from "@clisbot/channels-core/plugin-sdk/extension-shared";
 import {
   readProviderJsonResponse,
   readResponseTextLimited,
-} from "@getpaseo/channels-core/plugin-sdk/provider-http";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+} from "@clisbot/channels-core/plugin-sdk/provider-http";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { chunkDiscordTextWithMode } from "./chunk.js";
 import { resolveDiscordClientAccountContext } from "./client.js";
 import {

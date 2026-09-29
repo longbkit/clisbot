@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import {
   mergePermissionHistory,
   permissionActivityLabel,

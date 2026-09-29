@@ -1,12 +1,12 @@
 import { withSessionOperationIdentity } from "../agent/session-operation-context.js";
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import type {
   AgentSnapshotPayload,
   AgentStreamEventPayload,
   CreateAgentWorktreeTarget,
   HubExecutionControlAction,
-} from "@getpaseo/protocol/messages";
-import type { ProviderOptions, ToolPolicy } from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/messages";
+import type { ProviderOptions, ToolPolicy } from "@clisbot/protocol/agent-types";
 
 import type { AgentManager, AgentManagerEvent, ManagedAgent } from "../agent/agent-manager.js";
 import type { McpServerConfig } from "../agent/agent-sdk-types.js";
@@ -14,7 +14,7 @@ import type { AgentStorage, StoredAgentRecord } from "../agent/agent-storage.js"
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import { sendPromptToAgent } from "../agent/agent-prompt.js";
 import type { Logger } from "pino";
-import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
+import type { CreateClisbotWorktreeWorkflowResult } from "../worktree-session.js";
 import { buildStoredAgentPayload } from "../agent/agent-projections.js";
 import { serializeAgentSnapshot, serializeAgentStreamEvent } from "../messages.js";
 import { daemonExecutionKey, type DaemonAgentOwner } from "../agent/agent-owner.js";
@@ -70,7 +70,7 @@ interface DaemonExecutionsOptions {
   archiveWorkspace: (workspaceId: string, requestId: string) => Promise<unknown>;
   logger: Logger;
   cleanupFailedCreate?: (input: {
-    createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
+    createdWorktree: CreateClisbotWorktreeWorkflowResult | null;
     createdAgentId: string | null;
   }) => Promise<void>;
 }
@@ -223,7 +223,7 @@ export class DaemonExecutions implements HubExecutionAgents {
       return this.reuseAgent(owner, input, authorityGeneration);
     }
 
-    let createdWorktree: CreatePaseoWorktreeWorkflowResult | null = null;
+    let createdWorktree: CreateClisbotWorktreeWorkflowResult | null = null;
     let createdAgentId: string | null = null;
     let result: Awaited<ReturnType<BoundCreateAgentCommand>>;
     try {
@@ -482,8 +482,8 @@ export class DaemonExecutions implements HubExecutionAgents {
 }
 
 function requireHubMcpNamespace(mcpServers: Record<string, McpServerConfig> | undefined): void {
-  if (mcpServers && Object.hasOwn(mcpServers, "paseo")) {
-    throw new Error('Hub execution MCP server name "paseo" is reserved by the daemon');
+  if (mcpServers && Object.hasOwn(mcpServers, "clisbot")) {
+    throw new Error('Hub execution MCP server name "clisbot" is reserved by the daemon');
   }
 }
 
@@ -503,8 +503,8 @@ function requireToolPolicyServers(
 }
 
 function ownedCreatedWorktree(
-  worktree: CreatePaseoWorktreeWorkflowResult | null,
-): CreatePaseoWorktreeWorkflowResult | null {
+  worktree: CreateClisbotWorktreeWorkflowResult | null,
+): CreateClisbotWorktreeWorkflowResult | null {
   return worktree?.created === true ? worktree : null;
 }
 

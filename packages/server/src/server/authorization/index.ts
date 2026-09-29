@@ -1,6 +1,6 @@
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
-import { DAEMON_PERMISSIONS, type DaemonPermission } from "@getpaseo/protocol/messages";
-import type { ProjectFolderRules } from "@getpaseo/protocol/project-folders";
+import { DAEMON_PERMISSIONS, type DaemonPermission } from "@clisbot/protocol/messages";
+import type { ProjectFolderRules } from "@clisbot/protocol/project-folders";
 import {
   type PermissionRequirement,
   requiredPermissionForInbound,
@@ -53,7 +53,7 @@ export class SessionAuthorization {
     );
   }
 
-  // Managed Access owns this narrow exception; ordinary Paseo retains workspace.manage.
+  // Managed Access owns this narrow exception; ordinary Clisbot retains workspace.manage.
   // Exact project/source checks remain with ManagedResourceAuthorizer before dispatch.
   private allowsManagedWorkspaceCreation(): boolean {
     return (

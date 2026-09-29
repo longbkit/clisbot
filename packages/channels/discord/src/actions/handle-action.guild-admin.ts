@@ -1,14 +1,14 @@
 // upstream: extensions/discord/src/actions/handle-action.guild-admin.ts@5d8067a4483
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
 import {
   readNonNegativeIntegerParam,
   readPositiveIntegerParam,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/agent-runtime";
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/agent-runtime";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { handleDiscordAction } from "../actions/runtime.js";
 import { isTrustedRequesterGuildAdminAction } from "../trusted-requester-actions.js";
 import type { DiscordMessagingActionOptions } from "./runtime.messaging.shared.js";

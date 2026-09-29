@@ -3,7 +3,7 @@ import { withSessionOperationIdentity } from "../agent/session-operation-context
 // D2, D7). The labels on the agent are the truth; `participants[bot].agentId` is a
 // cache of the lookup. A session that cannot resume, or was archived from the
 // cowork view, is replaced by a new one and the caller writes the system line.
-import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@getpaseo/protocol/bots/labels";
+import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 import { formatProviderModel, type BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import type { ChatBot, StoredChat } from "./chat-record.js";

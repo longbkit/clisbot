@@ -3,8 +3,8 @@ import {
   buildChannelGroupsScopeTree,
   resolveScopeRequireMention,
   type ScopeTree,
-} from "@getpaseo/channels-core/plugin-sdk/channel-policy";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+} from "@clisbot/channels-core/plugin-sdk/channel-policy";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 type GroupContext = { cfg: OpenClawConfig; accountId?: string | null; groupId?: string | null };
 

@@ -3,7 +3,7 @@
 import {
   hasConfiguredSecretInput,
   normalizeSecretInputString,
-} from "@getpaseo/channels-core/plugin-sdk/secret-input";
+} from "@clisbot/channels-core/plugin-sdk/secret-input";
 import type { DiscordCredentialStatus } from "./token.js";
 
 type InspectedDiscordConfiguredToken = {

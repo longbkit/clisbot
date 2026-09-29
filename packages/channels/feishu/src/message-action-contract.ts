@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/message-action-contract.ts@5d8067a4483
 // Feishu plugin module implements message action contract behavior.
-import type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+import type { ChannelMessageActionAdapter } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 
 const FEISHU_NATIVE_CHAT_TARGET_ALIASES = ["chatId", "chat_id", "channel_id"];
 

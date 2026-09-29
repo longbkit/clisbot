@@ -1,4 +1,4 @@
-import type { ResolveConversationFn } from "@getpaseo/channels-shared";
+import type { ResolveConversationFn } from "@clisbot/channels-shared";
 // Load a channel vertical in-process (plan §14.5 / implementation doc §4.1 + §4.8
 // D1). `loadChannelVertical` applies the loader hooks for one channel, imports its
 // entry module AND its plugin chunk (both through the Hub's own resolve/load hooks,
@@ -84,7 +84,7 @@ export interface LoadChannelVerticalOptions {
  * reads `outbound` (§4.8 D1/D3); unknown keys stay open. */
 export interface ChannelPlugin {
   directory?: { resolveConversation?: ResolveConversationFn | undefined };
-  /** Per-account teardown the vertical opts into (`@getpaseo/channels-shared`
+  /** Per-account teardown the vertical opts into (`@clisbot/channels-shared`
    * declares it on the drive surface); called from `dispose()`. */
   disposeAccount?: ((accountId: string) => void) | undefined;
   gateway?: { startAccount?: (ctx: unknown) => unknown };
@@ -127,7 +127,7 @@ export class LoadTraceError extends ChannelLoaderError {
  *
  * An `in-repo` channel (blueprint §6.5) adds three explicit roots: its own
  * workspace package dir (already the channel root above), the shared in-repo
- * contract package (`@getpaseo/channels-shared`, workspace-linked — its module
+ * contract package (`@clisbot/channels-shared`, workspace-linked — its module
  * URLs are the symlink's REALPATH, which resolves OUTSIDE the channel install
  * dir), and the hoisted npm deps under the repo's root node_modules (the
  * vertical's pinned third-party deps — grammy, @slack/* — hoist to the root). */
@@ -154,9 +154,9 @@ function allowlistRoots(options: LoadChannelVerticalOptions): string[] {
  * dir and the repo's root `node_modules`. This list is closed on purpose: a
  * vertical may not reach a sibling channel's package. */
 const IN_REPO_CONTRACT_PACKAGES = [
-  "@getpaseo/channels-shared",
-  "@getpaseo/channels-core",
-  "@getpaseo/channels-markdown-core",
+  "@clisbot/channels-shared",
+  "@clisbot/channels-core",
+  "@clisbot/channels-markdown-core",
 ] as const;
 
 /** The in-repo dependency roots:

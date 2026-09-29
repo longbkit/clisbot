@@ -2,10 +2,10 @@
 // D-ZU-022: see `accounts.ts`.
 import { resolveChannelMediaMaxBytes } from "./fusion/media-limits.js";
 // Zalouser plugin module implements tool behavior.
-import { stringEnum } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { stringEnum } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type { AnyAgentTool, OpenClawPluginToolContext } from "./runtime-api.js";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { jsonResult as json, type AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/tool-results";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { jsonResult as json, type AgentToolResult } from "@clisbot/channels-core/plugin-sdk/tool-results";
 import { Type } from "typebox";
 import { resolveZalouserAccountSync } from "./accounts.js";
 import { sendImageZalouser, sendLinkZalouser, sendMessageZalouser } from "./send.js";

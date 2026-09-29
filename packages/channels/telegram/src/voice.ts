@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/voice.ts@5d8067a4483
 // Telegram plugin module implements voice behavior.
-import { isVoiceMessageCompatibleAudio } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+import { isVoiceMessageCompatibleAudio } from "@clisbot/channels-core/plugin-sdk/media-runtime";
 
 function resolveTelegramVoiceDecision(opts: {
   wantsVoice: boolean;

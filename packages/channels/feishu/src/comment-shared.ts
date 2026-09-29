@@ -1,12 +1,12 @@
 // upstream: extensions/feishu/src/comment-shared.ts@5d8067a4483
 // Feishu plugin module implements comment shared behavior.
-import { retryAsync } from "@getpaseo/channels-core/plugin-sdk/retry-runtime";
+import { retryAsync } from "@clisbot/channels-core/plugin-sdk/retry-runtime";
 import {
   isRecord,
   normalizeOptionalString as normalizeString,
   normalizeStringEntries,
   readStringValue as readString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { FEISHU_COMMENT_FILE_TYPES, type CommentFileType } from "./comment-target.js";
 import {
   getFeishuSendRateLimitCode,

@@ -1,10 +1,10 @@
-import type { OwnedSubscription } from "@getpaseo/client";
+import type { OwnedSubscription } from "@clisbot/client";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import type {
   DaemonClient,
   FetchAgentsEntry,
   FetchAgentsOptions,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 import { fetchAgentTimelineOnce } from "@/timeline/fetch-agent-timeline-once";
 import {
   normalizeProjectDescriptor,

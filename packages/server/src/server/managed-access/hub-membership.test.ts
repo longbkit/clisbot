@@ -18,14 +18,14 @@ function saveRelationship(contents: string): void {
   writeFileSync(path.join(home, HUB_RELATIONSHIP_FILE_NAME), contents);
 }
 
-describe("Managed Access in a Paseo home", () => {
+describe("Managed Access in a Clisbot home", () => {
   it("defaults to external, and an explicit mode wins", () => {
-    expect(loadConfig(home, { env: { PASEO_HOME: home } }).managedAccessMode).toBe("external");
+    expect(loadConfig(home, { env: { CLISBOT_HOME: home } }).managedAccessMode).toBe("external");
     writeFileSync(
       path.join(home, "config.json"),
       JSON.stringify({ version: 1, daemon: { managedAccess: { mode: "off" } } }),
     );
-    expect(loadConfig(home, { env: { PASEO_HOME: home } }).managedAccessMode).toBe("off");
+    expect(loadConfig(home, { env: { CLISBOT_HOME: home } }).managedAccessMode).toBe("off");
   });
 
   it("asks for tickets only once the home belongs to a Hub", () => {

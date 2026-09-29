@@ -5,7 +5,7 @@ import {
   resolveMessagePresentationActionValue,
   resolveMessagePresentationButtonAction,
   resolveMessagePresentationOptionAction,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import type {
   InteractiveButtonStyle,
   LegacyInteractiveReply,
@@ -13,11 +13,11 @@ import type {
   MessagePresentationButton,
   MessagePresentationOption,
   MessagePresentationSelectBlock,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   resolveAskUserQuestionOptionIndex,
   type AskUserQuestionOptionIndices,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
 import { buildDiscordApprovalCustomId } from "./approval-custom-id.js";
 import {
   buildDiscordActivityCustomId,

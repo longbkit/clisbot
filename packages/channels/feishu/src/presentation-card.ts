@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/presentation-card.ts@5d8067a4483
 // Feishu plugin module implements presentation card behavior.
-import type { ChannelOutboundAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-send-result";
+import type { ChannelOutboundAdapter } from "@clisbot/channels-core/plugin-sdk/channel-send-result";
 import {
   legacyInteractiveReplyToPresentation,
   normalizeLegacyInteractiveReply,
@@ -12,8 +12,8 @@ import {
   resolveLegacyInteractiveTextFallback,
   type MessagePresentationBlock,
   type MessagePresentationButton,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { OutboundIdentity, ReplyPayload } from "./fusion/runtime-api.js";
 import { createFeishuCardInteractionEnvelope } from "./card-interaction.js";
 import { parseFeishuCommentTarget } from "./comment-target.js";

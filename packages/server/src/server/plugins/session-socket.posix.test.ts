@@ -15,7 +15,7 @@ describe("PluginSessionSocket child-process transport", () => {
     const received: Array<string | Uint8Array> = [];
     socket.on("message", (data) => received.push(data as string | Uint8Array));
     child.on("message", (message: PluginProcessMessage) => {
-      if (message.type === "paseo_frame") socket.receive(message.data, message.isBinary);
+      if (message.type === "clisbot_frame") socket.receive(message.data, message.isBinary);
     });
 
     try {

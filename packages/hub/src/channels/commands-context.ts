@@ -85,7 +85,7 @@ export function channelSessionLinks(
 /**
  * Markdown link syntax, so a channel renders two short labels instead of two
  * URLs that wrap over four lines. Only an `http(s)` URL survives that: a
- * `paseo://` link inside link markup is shown as literal markup by Slack, which
+ * `clisbot://` link inside link markup is shown as literal markup by Slack, which
  * is why the app destination goes through the Hub's redirect when an origin is
  * configured — and stays a bare, copyable URL when one is not.
  */

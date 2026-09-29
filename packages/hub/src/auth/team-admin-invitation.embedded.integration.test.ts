@@ -41,7 +41,7 @@ it("lets a Team Admin invite Members into their own Teams only", async () => {
 
     const leadCookie = await joinAsMember(auth, ownerCookie, "lead@example.test");
     const invite = (body: unknown) =>
-      post(auth, "/api/auth/paseo/create-invitation", leadCookie, body);
+      post(auth, "/api/auth/clisbot/create-invitation", leadCookie, body);
     // An ordinary Member invites nobody.
     assert.equal(
       (await invite({ email: "a@example.test", role: "member", teamIds: [qcTeam] })).status,
@@ -73,7 +73,7 @@ it("lets a Team Admin invite Members into their own Teams only", async () => {
       z
         .object({ id: z.string() })
         .parse(
-          await (await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, body)).json(),
+          await (await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, body)).json(),
         ).id;
     const adminInvitation = await ownerInvite({
       email: "e@example.test",
@@ -97,7 +97,7 @@ it("lets a Team Admin invite Members into their own Teams only", async () => {
       403,
     );
     const cancel = (invitationId: string) =>
-      post(auth, "/api/auth/paseo/cancel-invitation", leadCookie, { invitationId });
+      post(auth, "/api/auth/clisbot/cancel-invitation", leadCookie, { invitationId });
     assert.equal((await cancel(adminInvitation)).status, 403);
     assert.equal((await cancel(designInvitation)).status, 403);
     const own = leadState.team.invitations?.[0]?.id;
@@ -114,7 +114,7 @@ it("lets a Team Admin invite Members into their own Teams only", async () => {
 
 /** The owner invites, the invitee signs up and accepts; returns the new Member's cookie. */
 async function joinAsMember(auth: Auth, ownerCookie: string, email: string): Promise<string> {
-  const invited = await post(auth, "/api/auth/paseo/create-invitation", ownerCookie, {
+  const invited = await post(auth, "/api/auth/clisbot/create-invitation", ownerCookie, {
     email,
     role: "member",
   });
@@ -125,7 +125,7 @@ async function joinAsMember(auth: Auth, ownerCookie: string, email: string): Pro
     email,
     password: "member-password-long-enough",
   });
-  const accepted = await post(auth, "/api/auth/paseo/accept-invitation", cookie, {
+  const accepted = await post(auth, "/api/auth/clisbot/accept-invitation", cookie, {
     invitationId: id,
   });
   assert.equal(accepted.status, 200);
@@ -170,7 +170,7 @@ async function pendingInvitationCount(runtime: Runtime): Promise<unknown> {
 
 async function claimOwner(auth: Auth): Promise<string> {
   const response = await auth.handle(
-    new Request(`${ORIGIN}/api/auth/paseo/claim-instance`, {
+    new Request(`${ORIGIN}/api/auth/clisbot/claim-instance`, {
       method: "POST",
       headers: { origin: ORIGIN, "content-type": "application/json" },
       body: JSON.stringify({ email: "owner@example.test", password: "owner-password-long-enough" }),
@@ -207,7 +207,7 @@ function post(auth: Auth, path: string, cookie: string, body: unknown): Promise<
 
 async function state(auth: Auth, cookie: string) {
   const response = await auth.handle(
-    new Request(new URL("/api/auth/paseo/state", ORIGIN), { headers: { cookie } }),
+    new Request(new URL("/api/auth/clisbot/state", ORIGIN), { headers: { cookie } }),
   );
   assert.equal(response.status, 200);
   return accountStateSchema.parse(await response.json());

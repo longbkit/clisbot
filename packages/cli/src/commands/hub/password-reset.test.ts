@@ -38,7 +38,7 @@ it("sends recovery authority only in the authorization header and rejects redire
     const input = { ...credentials, origin: `http://127.0.0.1:${address.port}` };
     await resetHubPassword(input);
     expect(seen[0]).toEqual({
-      url: "/api/auth/paseo/reset-password",
+      url: "/api/auth/clisbot/reset-password",
       authorization: `Bearer ${masterPassword}`,
       body: { email: credentials.email, newPassword: credentials.newPassword },
     });

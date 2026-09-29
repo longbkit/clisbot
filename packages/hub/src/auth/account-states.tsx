@@ -27,7 +27,7 @@ export function ErrorSummary({ message }: { message: string | undefined }) {
 export function LoadingEntry() {
   return (
     <main
-      aria-label="Loading Paseo Hub"
+      aria-label="Loading Clisbot Hub"
       aria-busy="true"
       className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6"
     >
@@ -40,7 +40,7 @@ export function LoadingEntry() {
 export function FailedEntry({ message }: { message: string }) {
   return (
     <AuthLayout>
-      <AuthCard title="Sign in to Paseo Hub">
+      <AuthCard title="Sign in to Clisbot Hub">
         <Alert variant="destructive">
           <AlertDescription>{message}</AlertDescription>
         </Alert>
@@ -62,7 +62,7 @@ export function UnavailableInvitation({ message }: { message: string | undefined
           </Alert>
         )}
         <Button asChild>
-          <a href="/">Continue to Paseo Hub</a>
+          <a href="/">Continue to Clisbot Hub</a>
         </Button>
       </AuthCard>
     </AuthLayout>

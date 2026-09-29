@@ -112,7 +112,7 @@ export class EmailVerification {
   ): Promise<"sent" | "failed" | "rate_limited"> {
     const token = randomBytes(32).toString("base64url");
     const link = await this.options.pool.transaction(async (client) => {
-      await this.options.locks.withTxLock(client, `paseo:email-verification:${email}`);
+      await this.options.locks.withTxLock(client, `clisbot:email-verification:${email}`);
       const recent = await client.query<{ hourly: number; cooling: boolean }>(
         `select count(*)::integer as hourly,
                 coalesce(bool_or(created_at > now() - make_interval(secs => $2)), false) as cooling
@@ -157,7 +157,7 @@ export class EmailVerification {
     if (!input.success) return Response.json({ error: "invalid_request" }, { status: 400 });
     const link = await this.link(input.data.token);
     if (link === undefined) return linkResponse("invalid");
-    return this.options.locks.withLock(`paseo:registration-email:${link.email}`, async () => {
+    return this.options.locks.withLock(`clisbot:registration-email:${link.email}`, async () => {
       // Recheck under the lock: a concurrent submit of the same link may have used it.
       const current = await this.link(input.data.token);
       const status = linkStatus(current);
@@ -247,7 +247,7 @@ function accepted(): Response {
 
 function tokenHash(token: string): string {
   return createHash("sha256")
-    .update("paseo-email-verification\0")
+    .update("clisbot-email-verification\0")
     .update(token)
     .digest("base64url");
 }

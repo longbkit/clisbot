@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it, expect, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { runBotStart, type BotStartDeps } from "./run.js";
 import { initializeAssistantWorkspace } from "./init.js";
 import { readBotManifest, writeBotManifest } from "./manifest.js";

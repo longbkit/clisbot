@@ -1,4 +1,4 @@
-import type { DaemonPermission } from "@getpaseo/protocol/messages";
+import type { DaemonPermission } from "@clisbot/protocol/messages";
 import type { Command } from "commander";
 import { withOutput, type ListResult, type OutputSchema } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
@@ -18,7 +18,7 @@ import { hubStatusResult } from "./status-output.js";
  *
  * Administration is deliberately not in here: `daemon.manage`, `access.manage`,
  * `tunnel.manage` and `automation.manage` stay with the operator. Narrow this
- * further per daemon with `paseo hub permissions revoke <permission>`.
+ * further per daemon with `clisbot hub permissions revoke <permission>`.
  */
 export const DEFAULT_HUB_CONNECTION_PERMISSIONS: readonly DaemonPermission[] = [
   "hub.execute",

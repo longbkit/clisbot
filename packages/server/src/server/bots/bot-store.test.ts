@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 import { afterEach, describe, expect, it } from "vitest";
-import type { StoredBot } from "@getpaseo/protocol/bots/types";
+import type { StoredBot } from "@clisbot/protocol/bots/types";
 import { BotStore } from "./bot-store.js";
 
 const dirs: string[] = [];

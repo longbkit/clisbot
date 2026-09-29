@@ -1,5 +1,5 @@
 // upstream: extensions/discord/src/internal/component-registry.ts@5d8067a4483
-import { resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { parseCustomId } from "./components.js";
 import type { Message } from "./structures.js";
 

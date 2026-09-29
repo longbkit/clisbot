@@ -362,7 +362,7 @@ function createThreadName(content: string): string {
     .slice(0, 50)
     .trim();
 
-  return name.length === 0 ? "paseo response" : name;
+  return name.length === 0 ? "clisbot response" : name;
 }
 
 function normalizeContextMessage(message: Message): NormalizedDiscordContextMessage {

@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { members, users } from "../db/schema.js";
 import { normalizeHubOrigin } from "./hub-origin.js";

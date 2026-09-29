@@ -2,16 +2,16 @@
 // Slack plugin module implements media behavior.
 import fs from "node:fs/promises";
 import type { WebClient as SlackWebClient } from "@slack/web-api";
-import { runTasksWithConcurrency } from "@getpaseo/channels-core/plugin-sdk/concurrency-runtime";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { normalizeHostname } from "@getpaseo/channels-core/plugin-sdk/host-runtime";
-import { redactToolPayloadText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
-import { resolveRequestUrl } from "@getpaseo/channels-core/plugin-sdk/request-url";
+import { runTasksWithConcurrency } from "@clisbot/channels-core/plugin-sdk/concurrency-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { normalizeHostname } from "@clisbot/channels-core/plugin-sdk/host-runtime";
+import { redactToolPayloadText } from "@clisbot/channels-core/plugin-sdk/logging-core";
+import { resolveRequestUrl } from "@clisbot/channels-core/plugin-sdk/request-url";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
   normalizeOptionalLowercaseString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { formatSlackFileReference } from "../file-reference.js";
 import type { SlackAttachment, SlackFile } from "../types.js";
 import { MAX_SLACK_MEDIA_FILES, type SlackMediaResult } from "./media-types.js";

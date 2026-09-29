@@ -14,7 +14,7 @@ timeline content not fully reloaded — are closed by `createSessionStorageWirin
 ## Intended outcome
 
 A creates the workspace/session, B continues the chat, C answers a question or approves: the
-creator, the sender and the responder each stay correct. This holds for the Paseo app, direct
+creator, the sender and the responder each stay correct. This holds for the Clisbot app, direct
 channels and Automation. An Automation records whoever triggered it; with no trigger it shows
 Automation. Show/Hide only changes presentation, never access.
 
@@ -182,10 +182,10 @@ the [existing generator](../../../packages/app/src/types/stream.ts#L29). Follow 
 ## Settled storage layout
 
 ```text
-$PASEO_HOME/
+$CLISBOT_HOME/
 ├── uploads/                                  # Temporary uploads; older files not yet migrated
 └── agents/{sanitized-cwd}/{agentId}/
-    ├── session.json                          # The Paseo session record
+    ├── session.json                          # The Clisbot session record
     ├── events.jsonl                          # Timeline + submission + permission
     ├── events.index.json                     # Offsets, anchors, id lookup (rebuildable)
     ├── uploads/{uploadId}/{fileName}
@@ -206,7 +206,7 @@ original `epoch` and `seq`; from then on only the layout above is written.
   the folder is organisation only and never replaces `agentId` or `workspaceId`.
 - **Standardise on `subagents/` and `session.json`.** A provider subagent keeps its original id,
   descriptor and own timeline through `ProviderSubagentStore`; `encodedSubagentId` is only a
-  filename-safe encoding of that id. Multi-level relationships live in metadata. A Paseo subagent
+  filename-safe encoding of that id. Multi-level relationships live in metadata. A Clisbot subagent
   already has its own `agentId` and therefore its own session folder; keep the
   [existing relationship rules](../../agent-lifecycle.md#the-subagents-track).
 - **`session.json` holds metadata; events hold interactions.** The main record holds
@@ -227,7 +227,7 @@ original `epoch` and `seq`; from then on only the layout above is written.
 ## Uploads before and after an agent exists
 
 **Today:** the [upload request carries no `agentId`](../../../packages/protocol/src/messages.ts#L2725),
-so both the first message and later ones use `$PASEO_HOME/uploads/`. The flow below is the new
+so both the first message and later ones use `$CLISBOT_HOME/uploads/`. The flow below is the new
 design, and it keys on **whether an agent exists**, not on the message number.
 
 | When the file is chosen                                             | Upload destination and when it attaches to the conversation                                                                             |
@@ -242,7 +242,7 @@ agent, that the file belongs to a sender allowed to send, and that the agent is 
 never trusts a client-declared path. A file still transferring is not treated as complete.
 
 The file–agent–message link must be durably written before the prompt is sent; a retry reuses the
-link and file already accepted. Store ids and relative paths in Paseo's data and resolve them to
+link and file already accepted. Store ids and relative paths in Clisbot's data and resolve them to
 real paths only when handing off to the agent tool. A sent file is retained with the session; a
 newly chosen but unsent file stays a draft even once it sits in the agent folder. Initially each
 session uses its own copy of a file; a `/fork` that carries files must copy them and re-link the
@@ -257,13 +257,13 @@ storage too, not only handling `uploaded_file`.
 
 ## Data lifecycle
 
-| State / operation                                 | Rule                                                                                                                                                             |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not archived, including an agent that is `closed` | Keep the record, events, provider subagents and sent files. Never clean up based on whether a process is running.                                                |
-| Archive                                           | Marked on the session record; data belonging to the session follows that state. Folders and files stay. Paseo subagents keep the existing cascade/detach rules.  |
-| Restore                                           | Reuse the data in place; there is no separate `active/` or `archived/` folder.                                                                                   |
-| Permanent delete                                  | Block new operations, wait for in-flight writes and uploads to finish, then delete the session's data. Deleting a timeline must never delete the record as well. |
-| Unsent uploads and drafts                         | Have their own retention window; never clean up a file still transferring or one already attached to a message.                                                  |
+| State / operation                                 | Rule                                                                                                                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not archived, including an agent that is `closed` | Keep the record, events, provider subagents and sent files. Never clean up based on whether a process is running.                                                 |
+| Archive                                           | Marked on the session record; data belonging to the session follows that state. Folders and files stay. Clisbot subagents keep the existing cascade/detach rules. |
+| Restore                                           | Reuse the data in place; there is no separate `active/` or `archived/` folder.                                                                                    |
+| Permanent delete                                  | Block new operations, wait for in-flight writes and uploads to finish, then delete the session's data. Deleting a timeline must never delete the record as well.  |
+| Unsent uploads and drafts                         | Have their own retention window; never clean up a file still transferring or one already attached to a message.                                                   |
 
 Read/download permission for files and subagents inherits from the owning session. Sharing a
 folder does not create multi-file transactions or a consistent backup during writes. If changing
@@ -321,7 +321,7 @@ a rewind never return to the live timeline. Missing ids in ACP history is
 | A question/tool pending while the agent runs                               | History does not recover in-flight progress or pending callbacks. Continue only when the connector confirms the request is still valid; never reuse an old request automatically.      |
 | Rewind, import, or external history change                                 | Use a new epoch when the timeline is replaced; move authorship only on a confident match. No guarantee of merging new parts of a history that lacks ids.                               |
 | Channel not linked; old history; feature previously disabled               | A channel that was recorded keeps its own identity. History written without identity stays empty; re-enabling never infers authorship for the gap.                                     |
-| Provider subagents and uploads/images stored per this design               | Descriptors, timelines and written files recover. Never infer that a subagent is still running from old state, and never recover provider data Paseo never received.                   |
+| Provider subagents and uploads/images stored per this design               | Descriptors, timelines and written files recover. Never infer that a subagent is still running from old state, and never recover provider data Clisbot never received.                 |
 | Lost files, expired avatar URLs, or results outside the session folder     | Without a backup, lost data does not come back. This layout does not back up workspace files, the provider's own history, or running processes.                                        |
 
 ## Compatibility and rollout scope
@@ -381,7 +381,7 @@ Every criterion below **must hold at implementation**, together with the rules a
 | AC3 — older history           | A message with no `sender` from the current app session carries the reader's identity: the Hub account when signed in; with no account it still right-aligns but hides both name and avatar — never inventing a name or a different sender. An old session receiving new messages with metadata shows authorship only on the new ones. An app against an official daemon with no metadata can still chat and read history; profile/avatar never block opening a conversation.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | AC4 — fast open               | With stored history, the first open reads and returns only the most recent page plus the index it needs; it never starts a provider or scans the whole log to get that page while the index is valid. Reuses the merged 40-item page — not 40 JSONL lines. A valid cache may render immediately and reconcile afterwards. Old history not yet stored, or an index that needs rebuilding, must have a clear state and must not be reported as fully loaded.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | AC5 — fast, correct scrolling | Reuses virtualization and holds the reading position when a page is added, an avatar finishes loading, or new output arrives. Prefetches at most one page in the scroll direction and stops on session change, end of history, or cache budget. Never auto-loads to the start of a conversation just because a cursor changed. Keeps the [paging/sync contract](../../timeline-sync.md#gap-recovery-is-paged-but-complete), including a short page that does not fill the viewport, tool updates and epoch changes.                                                                                                                                                                                                                                                                                                                                                                                                         |
-| AC6 — bounded RAM             | Daemon and app both cap cache by size, per session and overall, counting indexes, subagents and hidden tabs. Evicts least-used stored pages while keeping the reading region and any unfinished send/write state within its own budget. Reopening reads by page; nothing pending is lost, no message is duplicated, and no cursor is certified for an evicted range. Restart does not load all history. Long runs, or opening many sessions in turn, never retain full history; measure Paseo's RAM separately from provider processes.                                                                                                                                                                                                                                                                                                                                                                                     |
+| AC6 — bounded RAM             | Daemon and app both cap cache by size, per session and overall, counting indexes, subagents and hidden tabs. Evicts least-used stored pages while keeping the reading region and any unfinished send/write state within its own budget. Reopening reads by page; nothing pending is lost, no message is duplicated, and no cursor is certified for an evicted range. Restart does not load all history. Long runs, or opening many sessions in turn, never retain full history; measure Clisbot's RAM separately from provider processes.                                                                                                                                                                                                                                                                                                                                                                                   |
 | AC7 — fast, safe writes       | Batched appends, one serialized writer per journal; bounded total I/O and a byte-bounded queue with overload handling, never blocking the event loop or rewriting the whole conversation per chunk. Record writes replace safely; data is acknowledged as stored only after it is synced to disk. A full disk or write error must be reported clearly, never acknowledged as success or silently dropped. A crash during append/rename/rotation keeps acknowledged data; an incomplete tail recovers safely and mid-file corruption is not skipped. A lost or inconsistent index must be rebuildable.                                                                                                                                                                                                                                                                                                                       |
 | AC8 — full lifecycle          | Verifies migration/duplicate records, restart, retry and response races, rewind and missing ids, fork with files, deletion while an upload is in flight, and archive/restore including subagents and files, per the sections above. Stored data is readable when the agent is not running or is archived; never infer a live tool or process from history.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | AC9 — compatibility           | Verifies Fusion app ↔ Fusion daemon with the feature on and off, official app ↔ Fusion daemon with Managed Access off, Fusion app ↔ official daemon, and a mixed multi-host list. Creating workspaces/sessions, sending messages and files, approving, paging, reconnecting and the older CLI all keep working within the published scope. Disabling the feature still reads a layout already created; rolling a daemon back requires exercising the reverse-conversion path on its own.                                                                                                                                                                                                                                                                                                                                                                                                                                    |

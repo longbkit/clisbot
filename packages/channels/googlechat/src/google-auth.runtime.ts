@@ -1,14 +1,14 @@
 // upstream: extensions/googlechat/src/google-auth.runtime.ts@5d8067a4483
 import fs from "node:fs/promises";
 import type { ConnectionOptions } from "node:tls";
-import { parseMediaContentLength } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+import { parseMediaContentLength } from "@clisbot/channels-core/plugin-sdk/media-runtime";
 import type { PinnedDispatcherPolicy } from "./fusion/ssrf-fetch.js";
 import {
   buildHostnameAllowlistPolicyFromSuffixAllowlist,
   fetchWithSsrFGuard,
 } from "./fusion/ssrf-fetch.js";
-import { asNullableObjectRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { resolveUserPath } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { asNullableObjectRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { resolveUserPath } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import { MAX_GOOGLE_CHAT_SERVICE_ACCOUNT_FILE_BYTES } from "./google-auth-limits.js";
 

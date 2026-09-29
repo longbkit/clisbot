@@ -5,7 +5,7 @@
 // turn. The identity probe and the transport session are stubbed: this case is
 // about what the lifecycle hands the ported download path.
 import { describe, expect, it, vi } from "vitest";
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
 import { resolveFeishuMediaDownloadDir } from "../fusion/media-resource.js";
 
 vi.mock("../monitor.startup.js", () => ({

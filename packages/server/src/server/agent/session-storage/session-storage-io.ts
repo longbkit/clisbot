@@ -36,14 +36,14 @@ function positiveInteger(value: string | undefined): number | undefined {
 }
 
 /**
- * Concurrent session-log writes. `PASEO_SESSION_LOG_WRITE_CONCURRENCY` overrides it. With an
+ * Concurrent session-log writes. `CLISBOT_SESSION_LOG_WRITE_CONCURRENCY` overrides it. With an
  * explicit `UV_THREADPOOL_SIZE` (the supervisor sets one) it is half the pool, never below 4.
  * Without one it is unbounded, as before this limit: on libuv's 4-thread default a whole-append
  * limit measured ~17% slower than letting appends interleave, and every supported entry point
  * starts the daemon through the supervisor anyway.
  */
 export function resolveSessionLogWriteConcurrency(env: NodeJS.ProcessEnv = process.env): number {
-  const configured = positiveInteger(env.PASEO_SESSION_LOG_WRITE_CONCURRENCY);
+  const configured = positiveInteger(env.CLISBOT_SESSION_LOG_WRITE_CONCURRENCY);
   if (configured) return configured;
   const threadpool = positiveInteger(env.UV_THREADPOOL_SIZE);
   if (!threadpool) return Number.POSITIVE_INFINITY;

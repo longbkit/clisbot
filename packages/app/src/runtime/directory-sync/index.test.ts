@@ -9,8 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type {
   DaemonClient,
   WorkspaceLabelListPayload,
-} from "@getpaseo/client/internal/daemon-client";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+} from "@clisbot/client/internal/daemon-client";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import {
   normalizeProjectDescriptor,
   normalizeWorkspaceDescriptor,
@@ -335,7 +335,7 @@ describe("DirectorySync session readiness", () => {
     const cachedWorkspace = normalizeWorkspaceDescriptor({
       id: "workspace-1",
       projectId: "project-1",
-      projectDisplayName: "Paseo",
+      projectDisplayName: "Clisbot",
       projectRootPath: "/repo",
       workspaceDirectory: "/repo",
       projectKind: "git",
@@ -414,7 +414,7 @@ describe("DirectorySync session readiness", () => {
     const workspace = normalizeWorkspaceDescriptor({
       id: "workspace-1",
       projectId: "project-1",
-      projectDisplayName: "Paseo",
+      projectDisplayName: "Clisbot",
       projectRootPath: "/repo",
       workspaceDirectory: "/repo",
       projectKind: "git",
@@ -448,9 +448,9 @@ describe("DirectorySync session readiness", () => {
           {
             scriptName: "web",
             type: "service",
-            hostname: "web.paseo.localhost",
+            hostname: "web.clisbot.localhost",
             port: 3000,
-            proxyUrl: "http://web.paseo.localhost:6767",
+            proxyUrl: "http://web.clisbot.localhost:6767",
             lifecycle: "running",
             health: "healthy",
             exitCode: null,

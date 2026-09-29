@@ -7,8 +7,8 @@
 //
 // Add a case when a ported pure function gains upstream coverage; never edit
 // the JSON by hand.
-import type { ChannelGroupContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { DifferentialCase } from "@getpaseo/channels-shared";
+import type { ChannelGroupContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { DifferentialCase } from "@clisbot/channels-shared";
 import {
   chunkSlackMrkdwnText,
   markdownToSlackMrkdwnChunks,

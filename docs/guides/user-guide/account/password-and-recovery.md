@@ -4,7 +4,7 @@
 
 Tài khoản tạo bằng Google không có mật khẩu: đăng nhập bằng Google, các lệnh dưới đây không áp dụng.
 
-Các lệnh dùng đúng `--home` đã onboarding. Nếu chạy từ repository, dùng hàm `paseo` ở bước chuẩn bị của [onboarding](../getting-started/onboarding.md#1-chuẩn-bị).
+Các lệnh dùng đúng `--home` đã onboarding. Nếu chạy từ repository, dùng hàm `clisbot` ở bước chuẩn bị của [onboarding](../getting-started/onboarding.md#1-chuẩn-bị).
 
 ## Còn biết mật khẩu cũ
 
@@ -14,7 +14,7 @@ Nhập kín và export hai biến rồi đổi mật khẩu qua API:
 read -rsp 'Current password: ' CURRENT_OWNER_PASSWORD; printf '\n'
 read -rsp 'New password: ' NEW_OWNER_PASSWORD; printf '\n'
 export CURRENT_OWNER_PASSWORD NEW_OWNER_PASSWORD
-paseo hub password change --home "$HOME/.clisbot-dev-01" \
+clisbot hub password change --home "$HOME/.clisbot-dev-01" \
   --email "$OWNER_EMAIL" \
   --current-password '${CURRENT_OWNER_PASSWORD}' \
   --new-password '${NEW_OWNER_PASSWORD}'
@@ -31,8 +31,8 @@ Nếu đã lưu trong `.env`, nạp lại file như bước onboarding. Nếu ch
 ```bash
 read -rsp 'Hub master password: ' CLISBOT_MASTER_PASSWORD; printf '\n'
 export CLISBOT_MASTER_PASSWORD
-paseo hub stop --home "$HOME/.clisbot-dev-01"
-paseo hub start --home "$HOME/.clisbot-dev-01"
+clisbot hub stop --home "$HOME/.clisbot-dev-01"
+clisbot hub start --home "$HOME/.clisbot-dev-01"
 ```
 
 Chỉ Hub cần restart; daemon có thể giữ nguyên. Export chỉ tồn tại trong shell và tiến trình con; chạy Hub bằng service thì cấu hình biến trong service. Đổi/xóa master password cũng cần restart Hub; bỏ biến sẽ tắt recovery.
@@ -42,7 +42,7 @@ Khi cần reset:
 ```bash
 read -rsp 'New account password: ' NEW_OWNER_PASSWORD; printf '\n'
 export NEW_OWNER_PASSWORD
-paseo hub password reset --home "$HOME/.clisbot-dev-01" \
+clisbot hub password reset --home "$HOME/.clisbot-dev-01" \
   --email "$OWNER_EMAIL" \
   --master-password '${CLISBOT_MASTER_PASSWORD}' \
   --new-password '${NEW_OWNER_PASSWORD}'

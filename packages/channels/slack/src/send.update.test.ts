@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/send.update.test.ts@5d8067a4483
 // Slack tests cover updateMessageSlack chat.update edit-limit behavior.
 import type { Block, KnownBlock, WebClient } from "@slack/web-api";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { registerSlackInstallationState } from "./installation-identity-state.js";
 import { SLACK_EDIT_TEXT_MAX_BYTES } from "./limits.js";

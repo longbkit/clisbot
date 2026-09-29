@@ -6,7 +6,7 @@
 // must agree on identity and rejection.
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vitest";
-import { probeZalo } from "@getpaseo/channels-zalo/dist/probe.js";
+import { probeZalo } from "@clisbot/channels-zalo/dist/probe.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import { ChannelCredentialProbeError } from "./probe.js";
 import { configureZaloConnection, probeZaloBotToken } from "./zalo.js";

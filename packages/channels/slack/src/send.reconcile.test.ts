@@ -1,10 +1,10 @@
 // upstream: extensions/slack/src/send.reconcile.test.ts@5d8067a4483
-import { expectDefined } from "@getpaseo/channels-core/normalization-core/expect";
+import { expectDefined } from "@clisbot/channels-core/normalization-core/expect";
 // Slack tests cover exact delivery-queue reconciliation through message metadata.
 import type { MessageMetadata } from "@slack/types";
 import type { ChatPostMessageArguments, WebClient } from "@slack/web-api";
-import type { ChannelMessageUnknownSendContext } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { ChannelMessageUnknownSendContext } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { registerSlackInstallationState } from "./installation-identity-state.js";
 import { reconcileSlackUnknownSend, sendMessageSlack } from "./send.js";

@@ -1,4 +1,4 @@
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import type { ProjectedTimelineRow } from "./timeline-projection.js";
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
 import type { ProjectedTimelinePageSelection } from "./timeline-projection.js";

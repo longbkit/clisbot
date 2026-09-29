@@ -29,7 +29,7 @@ export interface StreamingDraftTarget {
 }
 
 /** One line of a running turn's progress, in the ported compositor's shape
- * (`@getpaseo/channels-core` `ChannelProgressDraftLine`). The Hub produces the
+ * (`@clisbot/channels-core` `ChannelProgressDraftLine`). The Hub produces the
  * snapshot itself — upstream's compositor factory reads OpenClaw agent events,
  * which this repo does not have (core D-CORE-403). */
 export interface ChannelProgressLine {

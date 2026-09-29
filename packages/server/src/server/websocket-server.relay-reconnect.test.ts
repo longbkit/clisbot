@@ -16,8 +16,8 @@ import {
   decodeTerminalStreamFrame,
   encodeTerminalStreamFrame,
   TerminalStreamOpcode,
-} from "@getpaseo/protocol/terminal-stream-protocol";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+} from "@clisbot/protocol/terminal-stream-protocol";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { APPLICATION_SOCKET_LEASE_MS } from "./websocket/physical-socket.js";
 
 type SocketListener = (...args: unknown[]) => void;
@@ -306,7 +306,7 @@ function createServer(options?: {
     }),
     createStub<AgentStorage>({}),
     createStub<DownloadTokenStore>({}),
-    "/tmp/paseo-test",
+    "/tmp/clisbot-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
     null,
     {
@@ -746,12 +746,12 @@ describe("relay external socket reconnect behavior", () => {
     externalDirectSocket.emit("message", JSON.stringify(createHelloMessage("direct-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
       proxiedExternalSocket,
-      createDirectRequest("127.0.0.1", "paseo.example.com"),
+      createDirectRequest("127.0.0.1", "clisbot.example.com"),
     );
     proxiedExternalSocket.emit("message", JSON.stringify(createHelloMessage("proxied-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
       publicOriginSocket,
-      createDirectRequest("127.0.0.1", "localhost:6767", "https://paseo.example.com"),
+      createDirectRequest("127.0.0.1", "localhost:6767", "https://clisbot.example.com"),
     );
     publicOriginSocket.emit("message", JSON.stringify(createHelloMessage("public-origin-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
@@ -761,7 +761,7 @@ describe("relay external socket reconnect behavior", () => {
     loopbackSocket.emit("message", JSON.stringify(createHelloMessage("loopback-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
       localhostSubdomainSocket,
-      createDirectRequest("127.0.0.1", "paseo.localhost:6767"),
+      createDirectRequest("127.0.0.1", "clisbot.localhost:6767"),
     );
     localhostSubdomainSocket.emit(
       "message",
@@ -802,7 +802,7 @@ describe("relay external socket reconnect behavior", () => {
         socket,
         { transport: "relay" },
         undefined,
-        createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+        createHelloMessage("managed-client", { accessTicket: "clisbot_dat_ticket" }),
       );
 
       await vi.waitFor(() => expect(closed).toHaveBeenCalledTimes(1));
@@ -900,12 +900,12 @@ describe("relay external socket reconnect behavior", () => {
       { transport: "relay" },
       undefined,
       createHelloMessage("managed-client", {
-        accessTicket: "paseo_dat_ticket",
+        accessTicket: "clisbot_dat_ticket",
       }),
     );
 
     expect(resolver).toHaveBeenCalledWith({
-      accessTicket: "paseo_dat_ticket",
+      accessTicket: "clisbot_dat_ticket",
       clientId: "managed-client",
       transport: "relay",
       peer: "external",
@@ -957,7 +957,7 @@ describe("relay external socket reconnect behavior", () => {
 
       const withTicket = new MockSocket();
       await server.attachExternalSocket(withTicket, { transport: "relay" }, null, {
-        ...createHelloMessage("with-ticket", { accessTicket: "paseo_dat_ticket" }),
+        ...createHelloMessage("with-ticket", { accessTicket: "clisbot_dat_ticket" }),
         auth,
       });
       expect(sessionMock.instances).toHaveLength(1);
@@ -995,7 +995,7 @@ describe("relay external socket reconnect behavior", () => {
       first,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "paseo_dat_first" }),
+      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_first" }),
     );
     await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(1));
 
@@ -1005,7 +1005,7 @@ describe("relay external socket reconnect behavior", () => {
       window,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "paseo_dat_window" }),
+      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_window" }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     expect(first.readyState).not.toBe(3);
@@ -1017,7 +1017,7 @@ describe("relay external socket reconnect behavior", () => {
       { transport: "relay" },
       undefined,
       createHelloMessage("managed-client", {
-        accessTicket: "paseo_dat_second",
+        accessTicket: "clisbot_dat_second",
       }),
     );
     await vi.waitFor(() => expect(second.readyState).toBe(1));
@@ -1069,7 +1069,7 @@ describe("relay external socket reconnect behavior", () => {
         { transport: "relay" },
         undefined,
         createHelloMessage("managed-client", {
-          accessTicket: "paseo_dat_ticket",
+          accessTicket: "clisbot_dat_ticket",
         }),
       );
 
@@ -1129,7 +1129,7 @@ describe("relay external socket reconnect behavior", () => {
         socket,
         { transport: "relay" },
         undefined,
-        createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+        createHelloMessage("managed-client", { accessTicket: "clisbot_dat_ticket" }),
       );
 
       await vi.advanceTimersByTimeAsync(advanceMs);
@@ -1183,7 +1183,7 @@ describe("relay external socket reconnect behavior", () => {
         { transport: "relay" },
         undefined,
         createHelloMessage("managed-client", {
-          accessTicket: "paseo_dat_ticket",
+          accessTicket: "clisbot_dat_ticket",
         }),
       );
 
@@ -1199,7 +1199,7 @@ describe("relay external socket reconnect behavior", () => {
         { transport: "relay" },
         undefined,
         createHelloMessage("managed-client", {
-          accessTicket: "paseo_dat_rebind",
+          accessTicket: "clisbot_dat_rebind",
         }),
       );
 
@@ -1239,7 +1239,7 @@ describe("relay external socket reconnect behavior", () => {
       first,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "paseo_dat_first" }),
+      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_first" }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     first.close();
@@ -1249,7 +1249,7 @@ describe("relay external socket reconnect behavior", () => {
       second,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "paseo_dat_second" }),
+      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_second" }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     expect(second.readyState).toBe(1);
@@ -1281,7 +1281,7 @@ describe("relay external socket reconnect behavior", () => {
       { transport: "relay" },
       undefined,
       createHelloMessage("managed-client", {
-        accessTicket: "paseo_dat_ticket",
+        accessTicket: "clisbot_dat_ticket",
       }),
     );
 

@@ -11,7 +11,7 @@ Hub exposes organization-scoped operator operations under `/api/v1`:
 | Dispatch a durable manual run               | `runs:dispatch`          | `POST /api/v1/manual-runs`               |
 | Issue a short-lived daemon enrollment token | `daemons:enroll`         | `POST /api/v1/daemons/enrollment-tokens` |
 
-Create a scoped API key in the Hub dashboard or approve `paseo hub login` in the browser, then send the resulting organization credential as `Authorization: Bearer <credential>`. CLI credentials carry all current operator scopes, are stored server-side only as verifiers, and can be revoked under Settings → API keys → CLI logins. They are not daemon credentials.
+Create a scoped API key in the Hub dashboard or approve `clisbot hub login` in the browser, then send the resulting organization credential as `Authorization: Bearer <credential>`. CLI credentials carry all current operator scopes, are stored server-side only as verifiers, and can be revoked under Settings → API keys → CLI logins. They are not daemon credentials.
 
 CLI login starts anonymously at `POST /api/v1/cli-authorizations` and polls at `POST /api/v1/cli-authorizations/poll`. An authenticated owner or admin explicitly approves the active organization at `/cli-login`. The expiring grant is poll-throttled and discloses its durable credential exactly once. Daemons enroll only through the short-lived, single-use token issued by the authenticated enrollment-token operation. A daemon may connect with no permissions and remain available for identity and presence only; only daemons that explicitly grant `hub.execute` are eligible workflow targets.
 
@@ -29,9 +29,9 @@ Hub sends each daemon the authored rendered prompt unchanged. Execution tools ar
 
 ## Trigger prompt and optional context
 
-`${{ paseo.prompt }}` is exactly the complete text received by any textual trigger, including provider mentions, command markers, typed-input headers, and whitespace. Parsing those elements can select a trigger or populate `${{ paseo.inputs }}`, but never rewrites the prompt. Structured manual input without a textual prompt produces an empty string. `${{ paseo.context }}` is a separate opt-in merge value containing safe ambient provider data. Each workflow step opts in independently: a step that does not author `${{ paseo.context }}` receives no ambient context, no automatic attachment list, and no prompt mutation. Context history and attachment descriptors are fetched and materialized only when an opting step launches; attachment descriptors are Hub URLs scoped to that execution. Provider credentials, raw tokens, private provider download URLs, and unrelated webhook fields are not exposed. There is no alias or fallback for the removed automatic prompt behavior.
+`${{ clisbot.prompt }}` is exactly the complete text received by any textual trigger, including provider mentions, command markers, typed-input headers, and whitespace. Parsing those elements can select a trigger or populate `${{ clisbot.inputs }}`, but never rewrites the prompt. Structured manual input without a textual prompt produces an empty string. `${{ clisbot.context }}` is a separate opt-in merge value containing safe ambient provider data. Each workflow step opts in independently: a step that does not author `${{ clisbot.context }}` receives no ambient context, no automatic attachment list, and no prompt mutation. Context history and attachment descriptors are fetched and materialized only when an opting step launches; attachment descriptors are Hub URLs scoped to that execution. Provider credentials, raw tokens, private provider download URLs, and unrelated webhook fields are not exposed. There is no alias or fallback for the removed automatic prompt behavior.
 
-Daemon environments may author `worktree.newBranch: "trigger-${{ paseo.execution.id }}"` for a stable branch name unique to each agent execution. Hub materializes the execution UUID before persisting or dispatching the launch intent; recovery reuses that fully rendered intent. This is independent of whether a manual, Slack, Discord, GitHub, or Linear trigger selected the reusable environment. No prompt, context, input, value, step output, or provider event namespace is available in environment configuration, and unsupported expressions fail bundle activation at the authored `newBranch` field.
+Daemon environments may author `worktree.newBranch: "trigger-${{ clisbot.execution.id }}"` for a stable branch name unique to each agent execution. Hub materializes the execution UUID before persisting or dispatching the launch intent; recovery reuses that fully rendered intent. This is independent of whether a manual, Slack, Discord, GitHub, or Linear trigger selected the reusable environment. No prompt, context, input, value, step output, or provider event namespace is available in environment configuration, and unsupported expressions fail bundle activation at the authored `newBranch` field.
 
 `deliveryKey` is caller-supplied request identity for the existing durable manual-event path. Hub namespaces it by the authenticated organization and resolved project before persistence, so the same caller key can be used independently in different tenants or projects. Existing receipt/run de-duplication applies, but this API does not promise exactly-once execution or guaranteed response replay; retries can still fail or conflict during restart and timing races. A successful representation contains `deliveryKey`, `providerEventReceiptId`, `triggerRunId`, `configuredTriggerName`, and the durable `workflowStatus`.
 
@@ -42,7 +42,7 @@ The self-hosted Scalar reference is served with a restrictive Content Security P
 `GET /api/billing/plans` is unauthenticated and read-only. It returns the plan catalog mirrored
 from Stripe (see docs/billing.md) as marketing copy and pricing only. It never includes the
 entitlement template (`granted` caps/flags/meters); that stays internal to `src/billing/` and
-`src/entitlements/`. This is the shape the marketing site (paseo.sh) fetches to render pricing;
+`src/entitlements/`. This is the shape the marketing site (clisbot.com) fetches to render pricing;
 Hub itself has no pricing page.
 
 It returns the plans that are for sale. The catalog also carries the internal record that
@@ -54,7 +54,7 @@ customer can see. Today the hosted offer is one plan:
   "plans": [
     {
       "slug": "hosted",
-      "name": "Paseo Hub",
+      "name": "Clisbot Hub",
       "marketingFeatures": [
         "Unlimited daemons",
         "GitHub, Linear, Slack, and Discord triggers",

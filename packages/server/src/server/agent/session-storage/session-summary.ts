@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { SessionAuthorshipShape } from "@getpaseo/protocol/session-authorship";
+import { SessionAuthorshipShape } from "@clisbot/protocol/session-authorship";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
   SessionAuthorship,
   AgentPermissionResponseRecord,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
 import { recordSessionInteraction } from "../session-authorship.js";
 import {

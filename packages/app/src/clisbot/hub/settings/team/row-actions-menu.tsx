@@ -24,7 +24,7 @@ export interface RowAction {
   disabled?: boolean;
 }
 
-/** The overflow menu of a People row: infrequent actions behind Paseo's menu presentation. */
+/** The overflow menu of a People row: infrequent actions behind Clisbot's menu presentation. */
 export function RowActionsMenu({
   label,
   actions,

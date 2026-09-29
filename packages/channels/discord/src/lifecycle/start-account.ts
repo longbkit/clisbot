@@ -4,8 +4,8 @@
 // The startAccount promise resolves only when `ctx.abortSignal` fires — "start"
 // is the transport lifetime.
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveDiscordAccount } from "../accounts.js";
 import { parseApplicationIdFromToken, probeDiscord } from "../probe.js";
 import { installDiscordRuntime } from "../fusion/runtime.js";

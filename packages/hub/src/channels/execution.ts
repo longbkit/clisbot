@@ -248,7 +248,7 @@ function identityLinkReplyText(
   if (status === "identity_conflict") {
     return "This provider identity is already linked to another Hub account.";
   }
-  return "That link code is invalid or expired, or was created for another workspace or bot. Create a new code in Paseo Settings.";
+  return "That link code is invalid or expired, or was created for another workspace or bot. Create a new code in Clisbot Settings.";
 }
 
 /** How far the new link reaches, so people neither re-link each bot nor assume a bot-scoped link covers the rest. */

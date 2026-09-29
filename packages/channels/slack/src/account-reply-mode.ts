@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/account-reply-mode.ts@5d8067a4483
 // Slack plugin module implements account reply mode behavior.
-import type { SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
 type SlackReplyToMode = "off" | "first" | "all" | "batched";
 

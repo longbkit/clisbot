@@ -242,7 +242,7 @@ describe("Slack Phase 1 trigger provider", () => {
         teamId: "T1",
         channelId: "C1",
         threadTs: "1700000000.000001",
-        content: "Paseo agent failed: boom",
+        content: "Clisbot agent failed: boom",
       },
     ]);
   });
@@ -700,7 +700,7 @@ function inputConfiguration() {
       {
         ...trigger,
         inputs: {
-          repo: { type: "string", choices: ["paseo", "hub"] },
+          repo: { type: "string", choices: ["clisbot", "hub"] },
           agent: { type: "string", default: "codex", choices: ["codex", "opus"] },
         },
         filters: { ...trigger.filters, inputs: { repo: "hub" } },
@@ -708,7 +708,7 @@ function inputConfiguration() {
           {
             ...trigger.steps[0]!,
             agent: { provider: "codex", mode: "full-access" },
-            prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+            prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
           },
         ],
       },
@@ -723,7 +723,11 @@ function inputFilterFanoutConfiguration() {
     ...base,
     triggers: [
       { ...first, name: "hub-only" },
-      { ...first, name: "paseo-only", filters: { ...first.filters, inputs: { repo: "paseo" } } },
+      {
+        ...first,
+        name: "clisbot-only",
+        filters: { ...first.filters, inputs: { repo: "clisbot" } },
+      },
     ],
   };
 }

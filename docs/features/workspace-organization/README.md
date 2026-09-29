@@ -73,7 +73,7 @@ For the two shipped items — `/side` and `/fork` keep the source workspace, and
 | A3  | When the channel path creates a **new workspace**, the first request and its attachments ride on `firstAgentContext` and the daemon names the workspace with `WorkspaceAutoName`, exactly as the app path does. No channel-specific naming rule. A session joining an existing workspace is not covered by this (see A5). |
 | A4  | Auto-naming never overwrites a name the user set.                                                                                                                                                                                                                                                                         |
 | A5  | Adding a session to an existing workspace does not rename that workspace.                                                                                                                                                                                                                                                 |
-| A6  | The feature can be turned off. Off, `/side`, `/fork` and naming behave as unmodified Paseo, and an official app or daemon keeps working as before.                                                                                                                                                                        |
+| A6  | The feature can be turned off. Off, `/side`, `/fork` and naming behave as unmodified Clisbot, and an official app or daemon keeps working as before.                                                                                                                                                                      |
 
 ### Evidence
 
@@ -88,8 +88,8 @@ For the two shipped items — `/side` and `/fork` keep the source workspace, and
 
 Two tiers ran for real, beyond the unit tests:
 
-- **Sim-boot** (`npm run test:sim-boot --workspace=@getpaseo/hub`): the real supervisor, plane and YAML revision against simulated platforms and daemon — a first mention in a fresh chat sends `workspace.create.request` carrying the message, then `create_agent_request` carrying that workspace id.
-- **A real daemon** (Paseo 0.7.3-beta.1, isolated home, 2026-09-14): the workspace created with `firstAgentContext` is titled `Fix the flaky login test in the checkout flow` instead of the directory name `wo-verify-repo`; a session created with that `workspaceId` reports back the same workspace; a second session in it leaves the title alone; a session created without a workspace still gets one from the daemon (title `null`) — the off behavior.
+- **Sim-boot** (`npm run test:sim-boot --workspace=@clisbot/hub`): the real supervisor, plane and YAML revision against simulated platforms and daemon — a first mention in a fresh chat sends `workspace.create.request` carrying the message, then `create_agent_request` carrying that workspace id.
+- **A real daemon** (Clisbot 0.7.3-beta.1, isolated home, 2026-09-14): the workspace created with `firstAgentContext` is titled `Fix the flaky login test in the checkout flow` instead of the directory name `wo-verify-repo`; a session created with that `workspaceId` reports back the same workspace; a second session in it leaves the title alone; a session created without a workspace still gets one from the daemon (title `null`) — the off behavior.
 
 ## Later
 

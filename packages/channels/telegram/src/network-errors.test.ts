@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/network-errors.test.ts@5d8067a4483
 // Telegram tests cover network errors plugin behavior.
-import { PlatformMessageNotDispatchedError } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { PlatformMessageNotDispatchedError } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import { describe, expect, it } from "vitest";
 import {
   isRecoverableTelegramNetworkError,

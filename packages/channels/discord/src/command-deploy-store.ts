@@ -1,5 +1,5 @@
 // upstream: extensions/discord/src/command-deploy-store.ts@5d8067a4483
-import type { PluginStateKeyedStore } from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
+import type { PluginStateKeyedStore } from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
 
 export const DISCORD_COMMAND_DEPLOY_HASH_NAMESPACE = "command-deploy-hashes";
 export const DISCORD_COMMAND_DEPLOY_HASH_MAX_ENTRIES = 10_000;

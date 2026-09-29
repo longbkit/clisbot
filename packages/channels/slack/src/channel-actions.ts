@@ -1,11 +1,11 @@
 // upstream: extensions/slack/src/channel-actions.ts@5d8067a4483
 // Slack plugin module implements channel actions behavior.
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionContext,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { createLazyRuntimeModule } from "@getpaseo/channels-core/plugin-sdk/lazy-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { createLazyRuntimeModule } from "@clisbot/channels-core/plugin-sdk/lazy-runtime";
 import type { SlackActionContext } from "./action-runtime.js";
 import { handleSlackMessageAction } from "./message-action-dispatch.js";
 import { extractSlackToolSend } from "./message-actions.js";

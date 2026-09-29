@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
 import {
   resolveExistingRunWorkspace,
   resolveRunCallerAgentId,
@@ -22,18 +22,18 @@ function daemonWithAgents(...agentIds: string[]) {
 }
 
 describe("managed agent caller context", () => {
-  it("uses a trimmed PASEO_AGENT_ID when the target daemon runs that agent", async () => {
+  it("uses a trimmed CLISBOT_AGENT_ID when the target daemon runs that agent", async () => {
     await expect(
       resolveRunCallerAgentId(daemonWithAgents("parent-agent"), {
-        PASEO_AGENT_ID: "  parent-agent  ",
+        CLISBOT_AGENT_ID: "  parent-agent  ",
       }),
     ).resolves.toBe("parent-agent");
   });
 
-  it("runs without a caller when PASEO_AGENT_ID belongs to another daemon", async () => {
+  it("runs without a caller when CLISBOT_AGENT_ID belongs to another daemon", async () => {
     await expect(
       resolveRunCallerAgentId(daemonWithAgents("other-agent"), {
-        PASEO_AGENT_ID: "parent-agent",
+        CLISBOT_AGENT_ID: "parent-agent",
       }),
     ).resolves.toBeUndefined();
   });
@@ -46,13 +46,13 @@ describe("managed agent caller context", () => {
     };
 
     await expect(
-      resolveRunCallerAgentId(disconnectedDaemon, { PASEO_AGENT_ID: "parent-agent" }),
+      resolveRunCallerAgentId(disconnectedDaemon, { CLISBOT_AGENT_ID: "parent-agent" }),
     ).rejects.toBeInstanceOf(DaemonConnectionError);
   });
 
   it("omits blank caller ids", async () => {
     await expect(
-      resolveRunCallerAgentId(daemonWithAgents(), { PASEO_AGENT_ID: "   " }),
+      resolveRunCallerAgentId(daemonWithAgents(), { CLISBOT_AGENT_ID: "   " }),
     ).resolves.toBeUndefined();
   });
 });
@@ -92,17 +92,17 @@ describe("existing run workspace resolution", () => {
 // validateRunOptions runs before the CLI ever connects to a daemon, so these
 // invalid combinations reject without one running.
 describe("runRunCommand option validation", () => {
-  const originalWorkspaceId = process.env.PASEO_WORKSPACE_ID;
+  const originalWorkspaceId = process.env.CLISBOT_WORKSPACE_ID;
 
   beforeEach(() => {
-    delete process.env.PASEO_WORKSPACE_ID;
+    delete process.env.CLISBOT_WORKSPACE_ID;
   });
 
   afterEach(() => {
     if (originalWorkspaceId === undefined) {
-      delete process.env.PASEO_WORKSPACE_ID;
+      delete process.env.CLISBOT_WORKSPACE_ID;
     } else {
-      process.env.PASEO_WORKSPACE_ID = originalWorkspaceId;
+      process.env.CLISBOT_WORKSPACE_ID = originalWorkspaceId;
     }
   });
 

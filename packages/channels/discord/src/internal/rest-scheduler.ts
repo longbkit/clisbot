@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/internal/rest-scheduler.ts@5d8067a4483
 // Discord plugin module implements rest scheduler behavior.
-import { resolveIntegerOption, resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { resolveIntegerOption, resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { RateLimitError, readDiscordRateLimitBucket, readRetryAfter } from "./rest-errors.js";
 import {
   createBucketKey,

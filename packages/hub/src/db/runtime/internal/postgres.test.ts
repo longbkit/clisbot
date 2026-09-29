@@ -12,12 +12,15 @@ it("handles errors emitted by idle PostgreSQL pool clients", async () => {
   await pool.end();
 });
 
-it("sizes the pool from PASEO_HUB_DATABASE_POOL_SIZE, defaulting past pg's 10", async () => {
+it("sizes the pool from CLISBOT_HUB_DATABASE_POOL_SIZE, defaulting past pg's 10", async () => {
   assert.equal(postgresPoolSize({}), DEFAULT_POSTGRES_POOL_SIZE);
-  assert.equal(postgresPoolSize({ PASEO_HUB_DATABASE_POOL_SIZE: " 48 " }), 48);
-  assert.throws(() => postgresPoolSize({ PASEO_HUB_DATABASE_POOL_SIZE: "0" }), /positive integer/);
+  assert.equal(postgresPoolSize({ CLISBOT_HUB_DATABASE_POOL_SIZE: " 48 " }), 48);
   assert.throws(
-    () => postgresPoolSize({ PASEO_HUB_DATABASE_POOL_SIZE: "ten" }),
+    () => postgresPoolSize({ CLISBOT_HUB_DATABASE_POOL_SIZE: "0" }),
+    /positive integer/,
+  );
+  assert.throws(
+    () => postgresPoolSize({ CLISBOT_HUB_DATABASE_POOL_SIZE: "ten" }),
     /positive integer/,
   );
 

@@ -68,7 +68,7 @@ const HUB_ORGANIZATION_ID = "org_1";
 const HUB_PROJECT_ID = "00000000-0000-4000-8000-000000000001";
 const HUB_PROJECT_SLUG = "default";
 const HUB_USER_ID = "hub-harness";
-const HUB_API_KEY = "paseo_pk_hub-harness_test";
+const HUB_API_KEY = "clisbot_pk_hub-harness_test";
 const HUB_API_KEY_ID = "00000000-0000-4000-8000-0000000000aa";
 const hubOperationAuth: OperationAuthenticator = {
   async authorize(request: Request, _scope: ApiKeyScope) {
@@ -249,7 +249,7 @@ export class HubHarness {
     return TestDaemon.create(this.origin).enroll(issued.token, hostname);
   }
 
-  /** A fresh daemon enrolling with a chosen identity, as a copied Paseo home would. */
+  /** A fresh daemon enrolling with a chosen identity, as a copied Clisbot home would. */
   async enrollIdentity(identity: { serverId: string; daemonPublicKey: string }) {
     const issued = await this.issueEnrollment();
     if (issued.status !== 201 || !("token" in issued)) {
@@ -289,7 +289,7 @@ export class HubHarness {
     }
   }
 
-  async seedSlackWorkspace(teamId: string, slug = "paseo"): Promise<string> {
+  async seedSlackWorkspace(teamId: string, slug = "clisbot"): Promise<string> {
     if (this.postgres === undefined) throw new Error("Postgres is unavailable");
     const id = "00000000-0000-4000-8000-0000000000c1";
     const providerApplicationId = "A-TEST";
@@ -303,7 +303,7 @@ export class HubHarness {
       `insert into slack_connections
          (id, organization_id, provider_application_id, team_id, slug, team_name, bot_user_id,
           credential_envelope, scopes)
-       values ($1, $2, $3, $4, $5, 'Paseo', 'UBOT', $6, $7)
+       values ($1, $2, $3, $4, $5, 'Clisbot', 'UBOT', $6, $7)
        on conflict (provider_application_id, team_id) do nothing`,
       [
         id,
@@ -320,7 +320,7 @@ export class HubHarness {
   }
 
   async seedCurrentProjectResources(): Promise<string> {
-    const slackId = await this.seedSlackWorkspace("paseo");
+    const slackId = await this.seedSlackWorkspace("clisbot");
     if (this.postgres === undefined) throw new Error("Postgres is unavailable");
     const client = await createPostgresQueryRuntime(this.postgres.getConnectionUri());
 
@@ -328,7 +328,7 @@ export class HubHarness {
     await client.query(
       `insert into discord_connections
          (id, organization_id, guild_id, slug, guild_name)
-       values ('00000000-0000-4000-8000-0000000000c3', $1, 'paseo', 'paseo', 'Paseo')
+       values ('00000000-0000-4000-8000-0000000000c3', $1, 'clisbot', 'clisbot', 'Clisbot')
        on conflict (guild_id) do nothing`,
       [HUB_ORGANIZATION_ID],
     );
@@ -344,7 +344,7 @@ export class HubHarness {
          (organization_id, connection_id, repository_id, full_name, default_branch)
        values
          ($1, $2, 9101, 'getpaseo/hub', 'main'),
-         ($1, $2, 9102, 'getpaseo/paseo', 'main')
+         ($1, $2, 9102, 'longbkit/clisbot', 'main')
        on conflict (connection_id, repository_id) do nothing`,
       [HUB_ORGANIZATION_ID, githubId],
     );
@@ -1370,7 +1370,7 @@ export class HubHarness {
       "        agent:",
       "          provider: opencode",
       "          mode: full-access",
-      '        prompt: [{ text: "Review ${{ paseo.prompt }}\\nContext: ${{ paseo.context }}" }]',
+      '        prompt: [{ text: "Review ${{ clisbot.prompt }}\\nContext: ${{ clisbot.context }}" }]',
     ].join("\n");
   }
 
@@ -1413,14 +1413,14 @@ export class HubHarness {
         organizationId: HUB_ORGANIZATION_ID,
         workflowId: this.workflowId,
         connectionId,
-        resourceId: "paseo",
+        resourceId: "clisbot",
         source: "slack.mention",
         deliveryId: "current-project-slack-1",
         receivedAt: "2026-08-10T10:00:00.000Z",
         payload: {
           type: "mention",
           id: "Ev-current-project-1",
-          teamId: "paseo",
+          teamId: "clisbot",
           appId: "A1",
           channelId: "C1",
           messageTs: "1700000000.000100",
@@ -1609,7 +1609,7 @@ export class HubHarness {
     );
     await client.query(
       `insert into "user" (id, name, email, email_verified)
-       values ($1, 'Hub harness', 'hub-harness@paseo.test', true)`,
+       values ($1, 'Hub harness', 'hub-harness@clisbot.test', true)`,
       [HUB_USER_ID],
     );
     await client.query(
@@ -1620,7 +1620,7 @@ export class HubHarness {
     await client.query(
       `insert into organization_api_keys
          (id, organization_id, name, prefix, verifier, scopes, created_by_user_id)
-       values ($1, $2, 'Hub harness', 'paseo_pk_harness', 'hub-harness-verifier',
+       values ($1, $2, 'Hub harness', 'clisbot_pk_harness', 'hub-harness-verifier',
                $3, $4)`,
       [
         HUB_API_KEY_ID,
@@ -1816,7 +1816,7 @@ export class HubHarness {
             token: `durable-scoped-token-${this.authorityTokenCount}`,
             expiresAt: Date.now() + 60 * 60_000,
             botUserId: 1234,
-            botLogin: "paseo[bot]",
+            botLogin: "clisbot[bot]",
           };
         },
         revoke: async (token) => {
@@ -2303,7 +2303,7 @@ class TestDaemon {
     const socket = new WebSocket(this.webSocketUrl, {
       headers: {
         authorization: `Bearer ${this.credential}`,
-        "x-paseo-daemon-id": this.daemonId,
+        "x-clisbot-daemon-id": this.daemonId,
       },
     });
     socket.on("message", (data) => this.receive(data));
@@ -2320,7 +2320,7 @@ class TestDaemon {
       const socket = new WebSocket(this.webSocketUrl!, {
         headers: {
           authorization: `Bearer ${secret}`,
-          "x-paseo-daemon-id": this.daemonId,
+          "x-clisbot-daemon-id": this.daemonId,
         },
       });
       socket.once("unexpected-response", (_request, response) => {
@@ -2803,7 +2803,7 @@ async function availablePort(): Promise<number> {
 
 function machineHeaders(auth: "valid" | "missing" | "wrong"): Record<string, string> {
   if (auth === "valid") return { authorization: `Bearer ${HUB_API_KEY}` };
-  if (auth === "wrong") return { authorization: "Bearer paseo_pk_wrong" };
+  if (auth === "wrong") return { authorization: "Bearer clisbot_pk_wrong" };
   return {};
 }
 

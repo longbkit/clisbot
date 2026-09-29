@@ -18,10 +18,10 @@ step() {
   fi
 }
 for pkg in core markdown-core shared slack telegram discord googlechat feishu zalo zalouser; do
-  step "build-$pkg" npm run build --workspace="@getpaseo/channels-$pkg"
+  step "build-$pkg" npm run build --workspace="@clisbot/channels-$pkg"
 done
-step typecheck-hub npm run typecheck:node --workspace=@getpaseo/hub
-step typecheck-cli npm run typecheck --workspace=@getpaseo/cli
+step typecheck-hub npm run typecheck:node --workspace=@clisbot/hub
+step typecheck-cli npm run typecheck --workspace=@clisbot/cli
 step sync-check node scripts/channel-upstream-sync.mjs check
 step fixtures-check node --import tsx scripts/channel-differential-fixtures.mjs check
 step format-check npm run format:check
@@ -43,6 +43,6 @@ run_vitest hub-channels packages/hub \
 run_vitest hub-db packages/hub src/db/channels.test.ts src/db/migrations.test.ts src/db/channel-connections.integration.test.ts
 run_vitest hub-mgmt packages/hub src/management-api src/state src/shutdown.test.ts src/credentials src/daemons/lifecycle.test.ts
 run_vitest cli packages/cli src/commands/channels
-step loader-native npm run test:loader:native --workspace=@getpaseo/hub
-step contract-native npm run test:contract:native --workspace=@getpaseo/hub
+step loader-native npm run test:loader:native --workspace=@clisbot/hub
+step contract-native npm run test:contract:native --workspace=@clisbot/hub
 exit $fail

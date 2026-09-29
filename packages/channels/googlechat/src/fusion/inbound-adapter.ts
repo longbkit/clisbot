@@ -6,7 +6,7 @@
 // agent runtime, the reply pipeline and the typing indicator. Fusion's Hub owns
 // every one of those, so this module does only the part the Hub cannot: turn the
 // native event into the channel-agnostic `ChannelInboundEvent` the shared L3
-// monitor admits (`@getpaseo/channels-shared`).
+// monitor admits (`@clisbot/channels-shared`).
 //
 // `extractMentionInfo` below is upstream's function from `monitor-access.ts`,
 // carried unchanged: the rest of that file is the OpenClaw pairing controller,
@@ -16,8 +16,8 @@ import {
   readSlashCommand,
   type ChannelInboundEvent,
   type ChannelInboundKind,
-} from "@getpaseo/channels-shared";
-import { parseDateStringTimestampMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-shared";
+import { parseDateStringTimestampMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { normalizeGoogleChatUserId } from "../ingress-identity.js";
 import { isGoogleChatGroupSpace } from "../targets.js";
 import type { GoogleChatEvent } from "../types.js";
@@ -121,7 +121,7 @@ function buildMessage(
   }
   // `argumentText` is the text with the leading app mention removed; upstream
   // prefers it so a mention-addressed turn does not carry the mention twice.
-  const nativeCommand = normalizeGoogleChatPaseoCommand(message);
+  const nativeCommand = normalizeGoogleChatClisbotCommand(message);
   const body = nativeCommand ?? (message.argumentText ?? message.text ?? "").trim();
   if (body === "") return { admit: false, reason: "empty-body" };
   const { wasMentioned } = extractMentionInfo(message.annotations ?? [], params.botUser);
@@ -235,12 +235,12 @@ function buildRoomEvent(
 }
 
 /** Google Chat registration lives in its console; consume only the named umbrella annotation. */
-export function normalizeGoogleChatPaseoCommand(message: NonNullable<GoogleChatEvent["message"]>): string | undefined {
+export function normalizeGoogleChatClisbotCommand(message: NonNullable<GoogleChatEvent["message"]>): string | undefined {
   const annotation = message.annotations?.find((entry) => entry.type === "SLASH_COMMAND" &&
-    (entry.slashCommand?.["commandName"] === "/paseo" || entry.slashCommand?.["commandName"] === "paseo" ||
-      /^\/paseo(?:\s|$)/iu.test((message.argumentText ?? message.text ?? "").trim())));
+    (entry.slashCommand?.["commandName"] === "/clisbot" || entry.slashCommand?.["commandName"] === "clisbot" ||
+      /^\/clisbot(?:\s|$)/iu.test((message.argumentText ?? message.text ?? "").trim())));
   if (!annotation) return undefined;
   const text = (message.argumentText ?? message.text ?? "").trim();
-  const args = text.replace(/^\/paseo(?:\s|$)/iu, "").trim().replace(/^[/\\]/u, "");
+  const args = text.replace(/^\/clisbot(?:\s|$)/iu, "").trim().replace(/^[/\\]/u, "");
   return `/${args || "help"}`;
 }

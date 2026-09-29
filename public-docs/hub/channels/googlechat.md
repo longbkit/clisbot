@@ -38,7 +38,7 @@ The listener answers `200` only after the event is durably stored. A failed stor
 The secret file is the downloaded service-account document itself:
 
 ```sh
-paseo channels add googlechat --account main --secret-file ./chat-service-account.json
+clisbot channels add googlechat --account main --secret-file ./chat-service-account.json
 ```
 
 It may instead be JSON naming `serviceAccountFile` (an absolute path on the daemon host) or `serviceAccount` (the document inline). Hub verifies the credential by minting an RS256 token before storing it.
@@ -73,7 +73,7 @@ Nothing. Blocked on the public HTTPS endpoint and Workspace admin approval. The 
 
 ## Troubleshooting
 
-**Google reports the app is not responding.** The reverse proxy is not reaching the account's listener, or the account is not running. Check `paseo channels status` first.
+**Google reports the app is not responding.** The reverse proxy is not reaching the account's listener, or the account is not running. Check `clisbot channels status` first.
 
 **Every request is rejected as unauthenticated.** `audienceType` and `audience` disagree with what the Chat app configuration says. For `app-url` they must be the exact app URL, and `appPrincipal` must be the numeric client id.
 

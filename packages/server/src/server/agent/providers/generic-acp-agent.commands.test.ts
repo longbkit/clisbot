@@ -49,7 +49,7 @@ async function withFakeACPAgent(
   mode: "commands-after-session-new" | "silent",
   run: (command: [string, ...string[]], cwd: string) => Promise<void>,
 ): Promise<void> {
-  const testDir = await mkdtemp(path.join(tmpdir(), "paseo-acp-commands-"));
+  const testDir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-commands-"));
   try {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     await writeFile(scriptPath, fakeACPAgentScript, "utf8");

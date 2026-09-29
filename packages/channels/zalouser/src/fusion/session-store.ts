@@ -44,7 +44,7 @@
 // and only a key no account holds goes to the most recently bound one (which is
 // the account whose QR login is minting it).
 
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import type { ZaloCredentialStateRecord } from "../session-state.js";
 
 /** The async persistence port. Keys are `session-state.ts`'s hashed

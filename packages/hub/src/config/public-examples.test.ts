@@ -6,15 +6,15 @@ import { compileHubBundle, type HubBundleFile } from "./bundle.js";
 
 const exampleRoot = "examples/single-repo-team-bot";
 const exampleFiles = [
-  ".paseo/hub.yml",
-  ".paseo/workflows/discord.yml",
-  ".paseo/workflows/github.yml",
-  ".paseo/workflows/slack.yml",
-  ".paseo/workflows/partials/classifier.md",
-  ".paseo/workflows/partials/github-progress.md",
-  ".paseo/workflows/partials/progress.md",
-  ".paseo/workflows/partials/safety.md",
-  ".paseo/workflows/partials/worker.md",
+  ".clisbot/hub.yml",
+  ".clisbot/workflows/discord.yml",
+  ".clisbot/workflows/github.yml",
+  ".clisbot/workflows/slack.yml",
+  ".clisbot/workflows/partials/classifier.md",
+  ".clisbot/workflows/partials/github-progress.md",
+  ".clisbot/workflows/partials/progress.md",
+  ".clisbot/workflows/partials/safety.md",
+  ".clisbot/workflows/partials/worker.md",
 ] as const;
 
 describe("public Hub examples", () => {

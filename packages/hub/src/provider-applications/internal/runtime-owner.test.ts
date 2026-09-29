@@ -370,7 +370,7 @@ describe("dynamic provider runtime", () => {
       installationId: 1,
       repositoryId: 2,
       commitSha: "sha",
-      path: ".paseo/hub.yml",
+      path: ".clisbot/hub.yml",
     });
     await new Promise((resolve) => setImmediate(resolve));
     const second = await runtime.prepare(
@@ -814,7 +814,7 @@ function downstreamRegistration(
             token: `authority:${id}`,
             expiresAt: Date.now() + 60_000,
             botUserId: 1,
-            botLogin: "paseo-bot",
+            botLogin: "clisbot-bot",
           });
         },
         revoke: () => {

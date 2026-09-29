@@ -1,7 +1,7 @@
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
-import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import type pino from "pino";
@@ -177,7 +177,7 @@ export interface HubRelationshipRetryPolicy {
 }
 
 export interface HubRelationshipControllerOptions {
-  paseoHome: string;
+  clisbotHome: string;
   hostname: string;
   serverId: string;
   daemonPublicKey: string;
@@ -251,7 +251,7 @@ export class HubRelationshipController implements HubRelationshipManagement {
   private connectionOfferReplacement: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: HubRelationshipControllerOptions) {
-    this.filePath = path.join(options.paseoHome, FILE_NAME);
+    this.filePath = path.join(options.clisbotHome, FILE_NAME);
     this.clock = options.clock ?? systemClock;
     this.retryPolicy = options.retryPolicy ?? new BoundedExponentialHubRetryPolicy();
     this.record = this.load();

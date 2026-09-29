@@ -7,7 +7,7 @@
 // without re-deriving a send path, and `setup` carries the QR verbs a
 // token-based channel does not need (HUB-WIRING.md §7).
 
-import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { zalouserChannelActions } from "./channel-actions.js";
 import { listZalouserDirectoryGroupMembers } from "./directory.js";
 import {

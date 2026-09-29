@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { BotPayload } from "@getpaseo/protocol/bots/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { BotPayload } from "@clisbot/protocol/bots/types";
 import { provisionDaemonBot, listDaemonBots } from "./daemon-bot.js";
 import { buildAssistantPlan } from "./plan.js";
 

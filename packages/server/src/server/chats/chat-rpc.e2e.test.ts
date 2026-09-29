@@ -2,18 +2,18 @@ import { mkdtemp, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 test("real socket: bot homes, direct and group transcripts, mentions and restart", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "bots-rpc-"));
   const options = {
-    paseoHomeRoot: root,
+    clisbotHomeRoot: root,
     cleanup: false,
     agentSessionStorage: true,
     bots: { enabled: true, root: path.join(root, "homes") },
   };
-  let daemon = await createTestPaseoDaemon(options);
+  let daemon = await createTestClisbotDaemon(options);
   let client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -103,7 +103,7 @@ test("real socket: bot homes, direct and group transcripts, mentions and restart
     )!.participants[0]!.agentId;
     await client.close();
     await daemon.close();
-    daemon = await createTestPaseoDaemon(options);
+    daemon = await createTestClisbotDaemon(options);
     client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     await client.connect();
     expect((await client.listBots()).bots).toHaveLength(2);

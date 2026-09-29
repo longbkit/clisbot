@@ -30,12 +30,12 @@ export const HOMEPAGE_SPOT_PRICE = "$500";
 /** Stripe Payment Link for the monthly spot subscription. */
 export const SPONSOR_SPOT_CHECKOUT_URL = "https://buy.stripe.com/8x24gBczR7LNaokcve2sM00";
 
-export const SPONSOR_CONTACT_EMAIL = "hello@paseo.sh";
+export const SPONSOR_CONTACT_EMAIL = "hello@clisbot.com";
 
 export const GITHUB_SPONSORS_URL = "https://github.com/sponsors/boudra";
 export const OPEN_COLLECTIVE_URL =
-  "https://opencollective.com/paseo-ai/donate?interval=month&amount=10&contributeAs=me";
-export const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/paseo";
+  "https://opencollective.com/clisbot-ai/donate?interval=month&amount=10&contributeAs=me";
+export const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/clisbot";
 
 export function openSpotCount(): number {
   return Math.max(0, HOMEPAGE_SPOT_COUNT - HOMEPAGE_SPONSORS.length);

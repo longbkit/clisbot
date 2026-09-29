@@ -70,7 +70,7 @@ export const accountState = createServerFn({ method: "GET" })
   .validator(invitationSchema)
   .handler(async ({ data }): Promise<Result<z.infer<typeof accountStateSchema>>> => {
     const request = getRequest();
-    const url = new URL("/api/auth/paseo/state", request.url);
+    const url = new URL("/api/auth/clisbot/state", request.url);
     if (data.invitation !== undefined) url.searchParams.set("invitation", data.invitation);
     try {
       const response = await (
@@ -232,7 +232,7 @@ export const listApiKeys = createServerFn({ method: "GET" }).handler(
       cliCredentials: z.infer<typeof cliCredentialSummarySchema>[];
     }>
   > => {
-    const response = await sendAccountQuery("/api/auth/paseo/api-keys");
+    const response = await sendAccountQuery("/api/auth/clisbot/api-keys");
     if (response instanceof AccountRequestError)
       return accountTransportFailure(
         response,
@@ -265,7 +265,7 @@ export const listApiKeys = createServerFn({ method: "GET" }).handler(
 export const createApiKey = createServerFn({ method: "POST" })
   .validator(apiKeyCreateSchema)
   .handler(async ({ data }): Promise<Result<z.infer<typeof apiKeyCreateResultSchema>>> => {
-    const response = await sendAccountCommand("/api/auth/paseo/api-keys", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/api-keys", data);
     if (response instanceof AccountRequestError)
       return accountTransportFailure(
         response,
@@ -292,7 +292,7 @@ export const createApiKey = createServerFn({ method: "POST" })
 export const revokeApiKey = createServerFn({ method: "POST" })
   .validator(apiKeyIdSchema)
   .handler(async ({ data }): Promise<Result<Record<string, never>>> => {
-    const response = await sendAccountCommand("/api/auth/paseo/revoke-api-key", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/revoke-api-key", data);
     if (response instanceof AccountRequestError || !response.ok) {
       return response instanceof AccountRequestError
         ? accountTransportFailure(
@@ -312,7 +312,7 @@ export const revokeApiKey = createServerFn({ method: "POST" })
 export const revokeCliCredential = createServerFn({ method: "POST" })
   .validator(apiKeyIdSchema)
   .handler(async ({ data }): Promise<Result<Record<string, never>>> => {
-    const response = await sendAccountCommand("/api/auth/paseo/revoke-cli-credential", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/revoke-cli-credential", data);
     if (response instanceof AccountRequestError || !response.ok) {
       return response instanceof AccountRequestError
         ? accountTransportFailure(
@@ -341,7 +341,7 @@ type CreateOrganizationCommandResult = Result<{
 export const createOrganization = createServerFn({ method: "POST" })
   .validator(createOrganizationSchema)
   .handler(async ({ data }): Promise<CreateOrganizationCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/create-organization", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/create-organization", data);
     if (response instanceof AccountRequestError) {
       return accountTransportFailure(
         response,
@@ -370,7 +370,7 @@ export const createOrganization = createServerFn({ method: "POST" })
 export const selectOrganization = createServerFn({ method: "POST" })
   .validator(selectOrganizationSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/select-organization", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/select-organization", data);
     if (response instanceof AccountRequestError) {
       return accountTransportFailure(
         response,
@@ -392,7 +392,7 @@ export const selectOrganization = createServerFn({ method: "POST" })
 export const createInvitation = createServerFn({ method: "POST" })
   .validator(createInvitationSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/create-invitation", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/create-invitation", data);
     if (response instanceof AccountRequestError) {
       return accountTransportFailure(
         response,
@@ -437,7 +437,7 @@ function invitationDenialMessage(denial: EntitlementDenialPayload): string {
 export const cancelInvitation = createServerFn({ method: "POST" })
   .validator(invitationIdSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/cancel-invitation", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/cancel-invitation", data);
     if (response instanceof AccountRequestError) {
       return accountTransportFailure(
         response,
@@ -461,7 +461,7 @@ export const cancelInvitation = createServerFn({ method: "POST" })
 export const acceptInvitation = createServerFn({ method: "POST" })
   .validator(invitationIdSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/accept-invitation", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/accept-invitation", data);
     if (response instanceof AccountRequestError)
       return accountTransportFailure(
         response,
@@ -482,7 +482,7 @@ export const acceptInvitation = createServerFn({ method: "POST" })
 export const changeMemberRole = createServerFn({ method: "POST" })
   .validator(changeRoleSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/change-member-role", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/change-member-role", data);
     if (response instanceof AccountRequestError)
       return accountTransportFailure(
         response,
@@ -505,7 +505,7 @@ export const changeMemberRole = createServerFn({ method: "POST" })
 export const removeMember = createServerFn({ method: "POST" })
   .validator(memberIdSchema)
   .handler(async ({ data }): Promise<AccountCommandResult> => {
-    const response = await sendAccountCommand("/api/auth/paseo/remove-member", data);
+    const response = await sendAccountCommand("/api/auth/clisbot/remove-member", data);
     if (response instanceof AccountRequestError)
       return accountTransportFailure(
         response,

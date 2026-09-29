@@ -15,7 +15,7 @@ import type {
   ChannelInboundEvent,
   HostRuntime,
   StartAccountContext,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import {
   buildTelegramClientOptions,
   createTelegramApi,

@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { test, expect, type Page } from "../support/fixtures";
 import {
   closeModelPicker,
@@ -21,7 +21,7 @@ async function rememberModel(page: Page) {
   await page.addInitScript(
     ({ provider, model }) => {
       localStorage.setItem(
-        "@paseo:create-agent-preferences",
+        "@clisbot:create-agent-preferences",
         JSON.stringify({
           provider,
           providerPreferences: { [provider]: { model } },
@@ -46,7 +46,7 @@ async function setProviderAvailability(client: DaemonClient, cwd: string, availa
   await client.patchDaemonConfig({
     providers: {
       [PROVIDER]: {
-        command: [available ? process.execPath : "/missing-paseo-diagnostic-provider"],
+        command: [available ? process.execPath : "/missing-clisbot-diagnostic-provider"],
       },
     },
   });

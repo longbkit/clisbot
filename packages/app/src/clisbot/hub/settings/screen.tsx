@@ -459,7 +459,7 @@ function BrowserHubAuthentication({
       <Alert
         variant="info"
         title={browserAuthenticationTitle(state)}
-        description="Authentication opens securely in your system browser and returns to Paseo when complete."
+        description="Authentication opens securely in your system browser and returns to Clisbot when complete."
       />
       <Button disabled={pending} loading={pending} onPress={signIn}>
         Continue in browser

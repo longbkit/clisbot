@@ -26,7 +26,7 @@ export function shouldAdjustScrollForVirtualRowResize(input: {
 }
 
 type BottomAnchorE2ETestGlobals = typeof globalThis & {
-  __PASEO_E2E_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD?: unknown;
+  __CLISBOT_E2E_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD?: unknown;
 };
 
 function readPositiveIntegerOverride(value: unknown): number | null {
@@ -39,7 +39,7 @@ function readPositiveIntegerOverride(value: unknown): number | null {
 
 export function getWebPartialVirtualizationThreshold(): number {
   const override = readPositiveIntegerOverride(
-    (globalThis as BottomAnchorE2ETestGlobals).__PASEO_E2E_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD,
+    (globalThis as BottomAnchorE2ETestGlobals).__CLISBOT_E2E_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD,
   );
   return override ?? DEFAULT_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD;
 }

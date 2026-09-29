@@ -1,4 +1,4 @@
-import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
+import type { VerifiedSessionOperationIdentity } from "@clisbot/protocol/session-operation";
 import type { WorktreeTarget } from "../config/index.js";
 import type { JsonValue } from "../config/compiler.js";
 import type {

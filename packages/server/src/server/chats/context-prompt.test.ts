@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { ChatMessagePayload } from "@getpaseo/protocol/chats/types";
-import { CONTEXT_HEADER, MESSAGE_HEADER } from "@getpaseo/protocol/conversation-prompt";
+import type { ChatMessagePayload } from "@clisbot/protocol/chats/types";
+import { CONTEXT_HEADER, MESSAGE_HEADER } from "@clisbot/protocol/conversation-prompt";
 import { renderChatPrompt, senderLineOf, sessionTitleFor } from "./context-prompt.js";
 
 const bots: Record<string, { slug: string; displayName: string }> = {

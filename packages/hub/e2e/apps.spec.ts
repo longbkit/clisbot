@@ -7,7 +7,7 @@ import {
 } from "./helpers/apps.js";
 import { expectOneFailure, recordsFor, stripAnsi } from "./helpers/logs.js";
 import { SHOTS, type AppSetupSession } from "./helpers/app-evidence.js";
-import type { PaseoHub } from "./helpers/hub.js";
+import type { ClisbotHub } from "./helpers/hub.js";
 
 // Every journey claims a second, genuinely pristine application beside the fixture's own.
 test.describe.configure({ timeout: 150_000 });
@@ -22,7 +22,7 @@ const OPERATOR = {
 const SAVE = "provider_application.verify_and_save";
 
 async function openSetup(
-  hub: PaseoHub,
+  hub: ClisbotHub,
   environmentApps?: readonly ("github" | "slack" | "discord" | "linear")[],
 ): Promise<AppSetupSession> {
   return await hub.openAppSetup({
@@ -62,7 +62,7 @@ test("a first account continues to app setup, and skipping it is durable", async
     await expect(
       page
         .getByRole("navigation", { name: "Breadcrumb", exact: true })
-        .getByText("Paseo Hub", { exact: true }),
+        .getByText("Clisbot Hub", { exact: true }),
     ).toBeVisible();
     await surface.shoot(SHOTS, "apps-14-skip-dashboard.desktop");
     // Business as usual once the transition completes: reloading never returns here.
@@ -125,7 +125,7 @@ test("GitHub repository access is set up on plain HTTP while event triggers wait
     // Verified is not green: credentials a provider accepted are not a working integration.
     await github.expectStatus("Verified");
     await github.expectSummary({
-      App: "Paseo Hub",
+      App: "Clisbot Hub",
       Owner: "acme-inc",
       Installations: "None yet",
       Events: "Needs a public HTTPS address",
@@ -217,7 +217,7 @@ test("a rejected GitHub key names the key, and a wrong App ID names the mismatch
     await github.expectStatus("Not set up");
     // Retry is the same button with the operator's work still in the form.
     expect(await github.value("App ID")).toBe("42");
-    expect(await github.value("App slug")).toBe("paseo");
+    expect(await github.value("App slug")).toBe("clisbot");
     await surface.accessible();
     await surface.shoot(SHOTS, "apps-04-github-verify-failed.desktop");
 
@@ -329,7 +329,7 @@ test("Discord walks its portal in order and proves both secrets before saying Ve
     await discord.expectFocusedResult("Discord accepted this application.");
     await discord.expectStatus("Verified");
     await discord.expectSummary({
-      Application: "Paseo",
+      Application: "Clisbot",
       "Application ID": "900",
       Servers: "None yet",
     });
@@ -545,7 +545,7 @@ test("Slack webhooks use the exact built zero-env PGlite HTTPS proxy journey", a
     await surface.slack.chooseSlackTransport("Webhooks");
     await surface.slack.fill(SLACK_WEBHOOK_CREDENTIALS);
     await surface.slack.save();
-    await expect(page.getByRole("heading", { name: "Install Paseo in Acme" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Install Clisbot in Acme" })).toBeVisible();
     await page.getByRole("link", { name: "Accept installation" }).click();
     await surface.slack.expectStatus("Connected");
   } finally {
@@ -664,7 +664,7 @@ test("an environment-managed app is read-only, connectable, and names its variab
     await expect(github.action("Verify and save")).toHaveCount(0);
     await expect(github.action("Replace credentials")).toHaveCount(0);
     // Identifiers are shown; secrets are not, and were never sent to the browser.
-    await github.expectSummary({ "App ID": "42", "App slug": "paseo" });
+    await github.expectSummary({ "App ID": "42", "App slug": "clisbot" });
     await expect(github.body().getByText("fixture-private-key")).toHaveCount(0);
     await surface.accessible();
     await surface.shoot(SHOTS, "apps-16-instance-apps-environment.desktop");
@@ -705,7 +705,7 @@ test("the operator finishes, then manages the same apps from the account menu", 
     await surface.linear.expand();
     await surface.linear.fillWorkingCredentials();
     await surface.linear.save();
-    await expect(page.getByRole("heading", { name: "Install Paseo in Acme" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Install Clisbot in Acme" })).toBeVisible();
     await page.getByRole("link", { name: "Accept installation" }).click();
     await surface.linear.expectStatus("Connected");
     await surface.linear.expectSummary({
@@ -768,7 +768,7 @@ test("an exit that never reaches Hub says so, keeps the work, and retries in pla
     const { surface, page } = session;
     const github = surface.github;
     await github.expand();
-    await github.fill({ "App ID": "42", "App slug": "paseo" });
+    await github.fill({ "App ID": "42", "App slug": "clisbot" });
 
     // The browser drops the request. Hub never sees it, so nobody but this page can report it.
     let dropped = false;
@@ -789,7 +789,7 @@ test("an exit that never reaches Hub says so, keeps the work, and retries in pla
     await expect(page.getByRole("heading", { name: "Set up your apps" })).toBeVisible();
     await github.expectExpanded();
     expect(await github.value("App ID")).toBe("42");
-    expect(await github.value("App slug")).toBe("paseo");
+    expect(await github.value("App slug")).toBe("clisbot");
     await surface.accessible();
     await surface.shoot(SHOTS, "apps-22-exit-transport-failed.desktop");
 

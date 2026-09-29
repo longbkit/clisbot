@@ -3,7 +3,7 @@
 //
 // The channel plane lives entirely in the Hub and in `packages/channels/*`.
 // The claim this file has to keep true is that none of it reaches the daemon:
-// an unmodified Paseo app, built against upstream `@getpaseo/protocol`, still
+// an unmodified Clisbot app, built against upstream `@clisbot/protocol`, still
 // connects to a Fusion daemon, reads a stock `server_info`, and pairs. If a
 // slice ever adds a daemon-side channel capability, a feature flag or an RPC,
 // one of these assertions fails before an upstream app finds out.
@@ -15,34 +15,34 @@ import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { afterAll, beforeAll, expect, test } from "vitest";
 
-import { parseServerInfoStatusPayload } from "@getpaseo/protocol/messages";
+import { parseServerInfoStatusPayload } from "@clisbot/protocol/messages";
 import { DaemonClient } from "./test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 /** Every in-repo channel vertical and its shared layers. */
 const CHANNEL_PACKAGES = [
-  "@getpaseo/channels-core",
-  "@getpaseo/channels-shared",
-  "@getpaseo/channels-markdown-core",
-  "@getpaseo/channels-slack",
-  "@getpaseo/channels-telegram",
-  "@getpaseo/channels-discord",
-  "@getpaseo/channels-feishu",
-  "@getpaseo/channels-googlechat",
-  "@getpaseo/channels-zalo",
-  "@getpaseo/channels-zalouser",
+  "@clisbot/channels-core",
+  "@clisbot/channels-shared",
+  "@clisbot/channels-markdown-core",
+  "@clisbot/channels-slack",
+  "@clisbot/channels-telegram",
+  "@clisbot/channels-discord",
+  "@clisbot/channels-feishu",
+  "@clisbot/channels-googlechat",
+  "@clisbot/channels-zalo",
+  "@clisbot/channels-zalouser",
 ] as const;
 
 /** Anything the fork could have leaked into the daemon's advertised contract. */
 const FORK_TERMS =
   /channel|clisbot|fusion|slack|telegram|discord|feishu|googlechat|zalo|openclaw|\bbots?\b/i;
 
-let daemon: TestPaseoDaemon;
+let daemon: TestClisbotDaemon;
 
 beforeAll(async () => {
   // Relay on so `daemon.get_pairing_offer` produces the real offer URL an app
   // scans; the endpoint is never dialled by the offer itself.
-  daemon = await createTestPaseoDaemon({ relayEnabled: true, relayEndpoint: "127.0.0.1:9" });
+  daemon = await createTestClisbotDaemon({ relayEnabled: true, relayEndpoint: "127.0.0.1:9" });
 }, 30_000);
 
 afterAll(async () => {
@@ -56,7 +56,7 @@ test("every channel package is installed in this workspace", () => {
   }
 });
 
-test("an unmodified Paseo app reads a stock server_info from a Fusion daemon", async () => {
+test("an unmodified Clisbot app reads a stock server_info from a Fusion daemon", async () => {
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     clientId: `cid-upstream-compat-${randomUUID()}`,
@@ -82,7 +82,7 @@ test("an unmodified Paseo app reads a stock server_info from a Fusion daemon", a
   }
 }, 20_000);
 
-test("an unmodified Paseo app pairs with a Fusion daemon", async () => {
+test("an unmodified Clisbot app pairs with a Fusion daemon", async () => {
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     clientId: `cid-upstream-pairing-${randomUUID()}`,

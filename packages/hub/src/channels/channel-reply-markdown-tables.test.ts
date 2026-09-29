@@ -1,8 +1,8 @@
 // The observed resend path: MCP message(action=send, text=Markdown), with no presentation.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { slackPlugin } from "@getpaseo/channels-slack/dist/plugin.js";
-import { sendSlackText } from "@getpaseo/channels-slack/dist/outbound.js";
-import { slackWebClientStubForTest } from "@getpaseo/channels-slack/dist/client/web-api.js";
+import { slackPlugin } from "@clisbot/channels-slack/dist/plugin.js";
+import { sendSlackText } from "@clisbot/channels-slack/dist/outbound.js";
+import { slackWebClientStubForTest } from "@clisbot/channels-slack/dist/client/web-api.js";
 import type { ChannelStore } from "../db/channels.js";
 import { createChannelReplyServer, type ChannelReplyMcp } from "./channel-reply.js";
 import { ChannelReplyCapabilityRegistry } from "./channel-reply-capabilities.js";

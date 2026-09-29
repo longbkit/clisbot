@@ -1,4 +1,4 @@
-# @getpaseo/channels-discord
+# @clisbot/channels-discord
 
 The in-repo Discord channel vertical (goal ledger slice 13). Ported from
 `extensions/discord/src@5d8067a4483` — see `upstream-sync.json` for the

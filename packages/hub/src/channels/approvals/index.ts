@@ -13,7 +13,7 @@
 //
 // EXACTLY-ONCE (2026-08-27 card decision): a prompt resolves to exactly one
 // `agent_permission_response` no matter how many answer paths race — card
-// click, typed command, and a paired Paseo client answer all land on this
+// click, typed command, and a paired Clisbot client answer all land on this
 // engine's open-prompt entry. The entry carries a `resolved` flag set the
 // moment ANY path dispatches (or the wire reports a client resolution); every
 // later path finds the flag and is an inert no-op. The daemon's own
@@ -200,7 +200,7 @@ export class ApprovalEngine {
     await this.postPrompt(context, request, decision.initiatorOnly);
   }
 
-  /** A `permission_resolved` arriving from the wire (answered in a Paseo
+  /** A `permission_resolved` arriving from the wire (answered in a Clisbot
    * client): the prompt is answered EXTERNALLY — latch it resolved so a racing
    * channel-side answer (card click / typed command in flight) is an inert
    * no-op, and drop it. */

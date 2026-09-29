@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   createNodeEntrypointInvocation: vi.fn(() => ({
     command: "node",
     args: ["runner.js", "node-script", "cli.js"],
-    env: { PASEO_NODE_ENV: "production" },
+    env: { CLISBOT_NODE_ENV: "production" },
   })),
   resolveExternalCliEntrypoint: vi.fn(() => ({
     entryPath: "cli.js",
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   spawnProcess: vi.fn(),
 }));
 
-vi.mock("@getpaseo/server/process", () => ({
+vi.mock("@clisbot/server/process", () => ({
   spawnProcess: mocks.spawnProcess,
 }));
 
@@ -75,7 +75,7 @@ describe("external CLI", () => {
       ["runner.js", "node-script", "cli.js"],
       {
         envMode: "internal",
-        env: { PASEO_NODE_ENV: "production" },
+        env: { CLISBOT_NODE_ENV: "production" },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );

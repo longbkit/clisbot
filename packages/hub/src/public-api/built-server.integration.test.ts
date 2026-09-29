@@ -366,7 +366,7 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
     const response = await post("/api/v1/configurations/install", secrets["organization-a"], {
       projectSlug: "same-project",
       files: configurationBundleFixture(
-        "environments:\n  - name: runner\n    kind: docker\n    image: paseo/valid\ntriggers: []",
+        "environments:\n  - name: runner\n    kind: docker\n    image: clisbot/valid\ntriggers: []",
       ),
     });
     const restore = await createPostgresQueryRuntime(databaseUrl);
@@ -385,14 +385,14 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
     const yaml = partialConfigurationYaml();
     const baseFiles = configurationBundleFixture(yaml);
     const partial = (content: unknown) => ({
-      path: ".paseo/workflows/partials/docs/safety.md",
+      path: ".clisbot/workflows/partials/docs/safety.md",
       content,
     });
     const cases = [
       {
         name: "missing",
         body: { projectSlug: "bundle-project", files: baseFiles },
-        expectedPath: [".paseo/workflows/partials/docs/safety.md"],
+        expectedPath: [".clisbot/workflows/partials/docs/safety.md"],
       },
       {
         name: "unsafe",
@@ -408,15 +408,15 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
           projectSlug: "bundle-project",
           files: [...baseFiles, partial("one"), partial("two")],
         },
-        expectedPath: [".paseo/workflows/partials/docs/safety.md"],
+        expectedPath: [".clisbot/workflows/partials/docs/safety.md"],
       },
       {
         name: "toml",
         body: {
           projectSlug: "bundle-project",
-          files: [...baseFiles, { path: ".paseo/hub.toml", content: "" }],
+          files: [...baseFiles, { path: ".clisbot/hub.toml", content: "" }],
         },
-        expectedPath: [".paseo/hub.toml"],
+        expectedPath: [".clisbot/hub.toml"],
       },
     ] as const;
     for (const testCase of cases) {
@@ -461,7 +461,7 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
       `select raw_yaml,
               jsonb_path_query_first(
                 source_evidence,
-                '$.bundle.files[*] ? (@.path == ".paseo/workflows/partials/docs/safety.md")'
+                '$.bundle.files[*] ? (@.path == ".clisbot/workflows/partials/docs/safety.md")'
               )->>'content' as partial_content
        from project_configuration_revisions revision
        join projects project on project.id = revision.project_id

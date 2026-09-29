@@ -1,16 +1,16 @@
 import {
   normalizeHostPort,
   normalizeLoopbackToLocalhost,
-} from "@getpaseo/protocol/daemon-endpoints";
+} from "@clisbot/protocol/daemon-endpoints";
 import {
   DirectTcpHostConnectionSchema,
   type DirectTcpHostConnection as WireDirectTcpHostConnection,
-} from "@getpaseo/protocol/host-connection-schema";
+} from "@clisbot/protocol/host-connection-schema";
 import {
   DEFAULT_SSH_DAEMON_PORT,
   validatePort,
   validateSshHost,
-} from "@getpaseo/protocol/ssh-transport";
+} from "@clisbot/protocol/ssh-transport";
 import {
   type HostAppearance,
   defaultHostAppearance,

@@ -1,13 +1,13 @@
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type { DaemonPermission } from "../authorization/index.js";
-import type { ManagedAccessMode as ProtocolManagedAccessMode } from "@getpaseo/protocol/managed-access";
-import type { ProjectFolderRules } from "@getpaseo/protocol/project-folders";
+import type { ManagedAccessMode as ProtocolManagedAccessMode } from "@clisbot/protocol/managed-access";
+import type { ProjectFolderRules } from "@clisbot/protocol/project-folders";
 // One definition of the product privilege vocabulary, shared with the Hub via a
 // pure fusion protocol module (build-time reuse, not a wire contract).
 import {
   PROJECT_PRIVILEGES,
   type ProjectPrivilege,
-} from "@getpaseo/protocol/managed-access-privileges";
+} from "@clisbot/protocol/managed-access-privileges";
 
 export type ManagedAccessMode = ProtocolManagedAccessMode;
 

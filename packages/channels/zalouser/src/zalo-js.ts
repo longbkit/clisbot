@@ -1,10 +1,10 @@
 // upstream: extensions/zalouser/src/zalo-js.ts@5d8067a4483
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 // Zalouser plugin module implements zalo js behavior.
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { extensionForMime } from "@getpaseo/channels-core/plugin-sdk/media-mime";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { extensionForMime } from "@clisbot/channels-core/plugin-sdk/media-mime";
 import {
   asDateTimestampMs,
   asFiniteNumberInRange,
@@ -13,8 +13,8 @@ import {
   parseStrictNonNegativeInteger,
   resolveExpiresAtMsFromDurationMs,
   resolveTimerTimeoutMs,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { loadOutboundMediaFromUrl } from "@getpaseo/channels-core/plugin-sdk/outbound-media";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { loadOutboundMediaFromUrl } from "@clisbot/channels-core/plugin-sdk/outbound-media";
 // D-ZU-008: upstream reads `withTimeout` from `plugin-sdk/security-runtime`,
 // which re-exports it from the `@openclaw/fs-safe` workspace package; Fusion's
 // boundary is `fusion/with-timeout.ts`.
@@ -23,8 +23,8 @@ import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { sleep, truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { sleep, truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { normalizeZaloReactionIcon } from "./reaction.js";
 import { createZalouserSendReceipt } from "./send-receipt.js";
 import {

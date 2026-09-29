@@ -46,7 +46,7 @@ Both gates ran clean. What the numbers say:
 
 ## Optional 100,000-row ceiling
 
-Run under `PASEO_SESSION_STORAGE_CEILING=1` against
+Run under `CLISBOT_SESSION_STORAGE_CEILING=1` against
 `projected-timeline.test.ts > reads a bounded cold projected page over 100000 canonical rows`.
 It **completed in 291.4 s**, inside the contract's ~5 minute cap. Wall clock is dominated by
 seeding 100,000 rows durably (391 batched appends, each fsynced); the measured read is the

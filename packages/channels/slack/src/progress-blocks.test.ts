@@ -1,5 +1,5 @@
 // upstream: extensions/slack/src/progress-blocks.test.ts@5d8067a4483
-import type { ChannelProgressDraftLine } from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
+import type { ChannelProgressDraftLine } from "@clisbot/channels-core/plugin-sdk/channel-outbound";
 import { describe, expect, it } from "vitest";
 import {
   buildSlackProgressStreamChunks,

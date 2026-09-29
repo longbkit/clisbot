@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { PermissionRequestCard } from "@/agent-stream/view";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo, type ReactNode } from "react";

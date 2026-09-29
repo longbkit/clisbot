@@ -4,7 +4,7 @@ import type {
   HubExecutionAgentCreateRequest,
   HubExecutionAgentValidateRequest,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 import type {
   HubExecutionAgentCreateInput,
@@ -143,7 +143,7 @@ describe("HubExecutionController", () => {
       requestId: "shutdown-create",
       executionId: "execution-shutdown",
       provider: "codex",
-      cwd: "/tmp/paseo",
+      cwd: "/tmp/clisbot",
       prompt: "sleep 30",
     } satisfies HubExecutionAgentCreateRequest);
     await agents.creationStarted();
@@ -169,7 +169,7 @@ describe("HubExecutionController", () => {
       requestId: "tool-policy-create",
       executionId: "execution-shutdown",
       provider: "hub-e2e",
-      cwd: "/tmp/paseo",
+      cwd: "/tmp/clisbot",
       prompt: "finish",
       mcpServers: { hub: { type: "http", url: "http://127.0.0.1/execution" } },
       toolPolicy: {
@@ -204,7 +204,7 @@ describe("HubExecutionController", () => {
       executionId: "execution-next",
       reuseAgentId: "agent-existing",
       provider: "codex",
-      cwd: "/tmp/paseo",
+      cwd: "/tmp/clisbot",
       prompt: "follow up",
     });
     await agents.creationStarted();
@@ -228,7 +228,7 @@ describe("HubExecutionController", () => {
       requestId: "racing-create",
       executionId: "execution-shutdown",
       provider: "codex",
-      cwd: "/tmp/paseo",
+      cwd: "/tmp/clisbot",
       prompt: "finish quickly",
     });
     await agents.creationStarted();
@@ -282,7 +282,7 @@ describe("HubExecutionController", () => {
       requestId: "rejected-create",
       executionId: "rejected-execution",
       provider: "codex",
-      cwd: "/tmp/paseo",
+      cwd: "/tmp/clisbot",
       prompt: "run unattended",
     });
 

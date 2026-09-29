@@ -1,4 +1,4 @@
-import { SessionOperationIdentitySchema } from "@getpaseo/protocol/session-operation";
+import { SessionOperationIdentitySchema } from "@clisbot/protocol/session-operation";
 import { z } from "zod";
 import { parseCompiledHubConfig } from "../../config/compiler.js";
 import type { Database } from "../../db/types.js";

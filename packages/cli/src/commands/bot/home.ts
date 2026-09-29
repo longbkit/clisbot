@@ -1,5 +1,5 @@
 // COMPAT(clisbot-bot): shared home resolution for the `bot` verbs. The `--home`
-// flag (or the CLISBOT_HOME/PASEO_HOME env) picks the shared Clisbot home the
+// flag (or the CLISBOT_HOME/CLISBOT_HOME env) picks the shared Clisbot home the
 // manifest, daemon, and embedded Hub live under.
 
 import type { CommandOptions } from "../../output/index.js";

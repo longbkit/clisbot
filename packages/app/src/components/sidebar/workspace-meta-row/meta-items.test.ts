@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
+import type { WorkspaceLabelDefinition } from "@clisbot/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
 import { DEFAULT_SIDEBAR_CHECKS_DISPLAY } from "@/components/sidebar/display-preferences/checks-display";
 import { DEFAULT_SIDEBAR_ROW_ITEMS } from "@/components/sidebar/display-preferences/row-items";
@@ -25,7 +25,7 @@ const OPERATIONAL_ITEMS = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: false, project
 function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {}) {
   return selectMetaRowItems({
     currentBranch: "feature/sidebar-badges",
-    projectName: "Paseo",
+    projectName: "Clisbot",
     hasHostBadge: true,
     prHint: PR_HINT,
     serviceSummary: SERVICE,

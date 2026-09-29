@@ -1,8 +1,8 @@
 // upstream: extensions/feishu/src/dedupe-key.ts@5d8067a4483
 // Feishu plugin module implements dedupe key behavior.
 import { createHash } from "node:crypto";
-import { parseStrictNonNegativeInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { asNullableRecord as readRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { parseStrictNonNegativeInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { asNullableRecord as readRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { FeishuMessageEvent } from "./event-types.js";
 import { normalizeFeishuExternalKey } from "./external-keys.js";
 import { parsePostContent } from "./post.js";

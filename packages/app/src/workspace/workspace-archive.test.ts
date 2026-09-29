@@ -1,6 +1,6 @@
 import { seedSessionHosts } from "@/test/seed-session";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearWorkspaceArchivePending,

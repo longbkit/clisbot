@@ -21,7 +21,7 @@ const accountStateSchema = z
   })
   .passthrough();
 
-it("claims and completes a pristine instance through the shared Paseo HTTP contract on PGlite", async () => {
+it("claims and completes a pristine instance through the shared Clisbot HTTP contract on PGlite", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-browser-claim-"));
   const { runtime, locks } = await embeddedDatabaseRuntime(join(root, "database"));
   await runtime.migrate();
@@ -43,7 +43,7 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
   try {
     await auth.initialize?.();
     const claim = await auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/claim-instance`, {
+      new Request(`${ORIGIN}/api/auth/clisbot/claim-instance`, {
         method: "POST",
         headers: { origin: ORIGIN, "content-type": "application/json" },
         body: JSON.stringify({
@@ -67,7 +67,7 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
     assert.equal(beforeCompletion.isInstanceOperator, true);
 
     const completed = await auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/complete-app-setup`, {
+      new Request(`${ORIGIN}/api/auth/clisbot/complete-app-setup`, {
         method: "POST",
         headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
         body: "{}",
@@ -78,7 +78,7 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
     assert.equal((await readAccountState(auth, cookie)).status, "active");
 
     const createdKey = await auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/api-keys`, {
+      new Request(`${ORIGIN}/api/auth/clisbot/api-keys`, {
         method: "POST",
         headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
         body: JSON.stringify({ name: "Embedded integration", scopes: ["projects:read"] }),
@@ -88,11 +88,11 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
     const createdKeyBody = z
       .object({
         key: z.object({ id: z.string(), prefix: z.string(), scopes: z.array(z.string()) }),
-        secret: z.string().startsWith("paseo_pk_"),
+        secret: z.string().startsWith("clisbot_pk_"),
       })
       .parse(await createdKey.json());
     const listedKeys = await auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/api-keys`, { headers: { cookie } }),
+      new Request(`${ORIGIN}/api/auth/clisbot/api-keys`, { headers: { cookie } }),
     );
     assert.equal(listedKeys.status, 200);
     const listedBody = await listedKeys.json();
@@ -105,7 +105,7 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
     );
 
     const second = await auth.handle(
-      new Request(`${ORIGIN}/api/auth/paseo/claim-instance`, {
+      new Request(`${ORIGIN}/api/auth/clisbot/claim-instance`, {
         method: "POST",
         headers: { origin: ORIGIN, "content-type": "application/json" },
         body: JSON.stringify({
@@ -126,7 +126,7 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
 
 async function readAccountState(auth: ReturnType<typeof createAuthServer>, cookie: string) {
   const response = await auth.handle(
-    new Request(`${ORIGIN}/api/auth/paseo/state`, { headers: { cookie } }),
+    new Request(`${ORIGIN}/api/auth/clisbot/state`, { headers: { cookie } }),
   );
   assert.equal(response.status, 200);
   return accountStateSchema.parse(await response.json());

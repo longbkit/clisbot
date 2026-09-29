@@ -17,7 +17,7 @@
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import { zalouserMessageActions } from "./channel.adapters.js";
 import { mergeAccountCarrier } from "./fusion/account-config.js";
 import type { OpenClawConfig } from "./runtime-api.js";

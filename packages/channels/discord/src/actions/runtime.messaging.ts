@@ -1,8 +1,8 @@
 // upstream: extensions/discord/src/actions/runtime.messaging.ts@5d8067a4483
 // Discord plugin module implements runtime.messaging behavior.
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
-import type { ActionGate } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { DiscordActionConfig, OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
+import type { ActionGate } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { DiscordActionConfig, OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { handleDiscordMessageManagementAction } from "./runtime.messaging.messages.js";
 import { handleDiscordReactionMessagingAction } from "./runtime.messaging.reactions.js";
 import { handleDiscordMessageSendAction } from "./runtime.messaging.send.js";

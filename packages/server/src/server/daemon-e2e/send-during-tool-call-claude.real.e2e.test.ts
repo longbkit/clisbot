@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { ClaudeAgentClient } from "../agent/providers/claude/agent.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import {
@@ -308,7 +308,7 @@ describe("daemon E2E (real claude) - send message during tool call", () => {
   let canRun = false;
   interface SteeringResources {
     cwd: string | null;
-    daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>> | null;
+    daemon: Awaited<ReturnType<typeof createTestClisbotDaemon>> | null;
     client: DaemonClient | null;
     collector: ReturnType<typeof createMessageCollector> | null;
   }
@@ -332,7 +332,7 @@ describe("daemon E2E (real claude) - send message during tool call", () => {
       collector: null,
     };
     try {
-      resources.daemon = await createTestPaseoDaemon({
+      resources.daemon = await createTestClisbotDaemon({
         // Use the installed SDK's configured authentication so this regression
         // exercises the native streaming-input path.
         agentClients: { claude: new ClaudeAgentClient({ logger }) },
@@ -507,7 +507,7 @@ describe("daemon E2E (real claude) - send message during tool call", () => {
   test("Stop cancels a queued Claude steer before it can resume the interrupted turn", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: { claude: new ClaudeAgentClient({ logger }) },
       logger,
     });
@@ -578,7 +578,7 @@ describe("daemon E2E (real claude) - send message during tool call", () => {
   test("sending a message while a tool call is running replaces the turn without error, idle flash, or autonomous fallback", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["claude"], logger),
       logger,
     });

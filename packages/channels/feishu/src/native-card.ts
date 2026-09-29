@@ -3,7 +3,7 @@
 import {
   isRecord,
   normalizeOptionalLowercaseString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export type FeishuNativeCard = Record<string, unknown> & {
   body: { elements: Record<string, unknown>[] };

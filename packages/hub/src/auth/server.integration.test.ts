@@ -20,7 +20,7 @@ import {
 import { createAuthServer, type AuthServer } from "./server.js";
 import { composeEntitlements, type ComposedEntitlements } from "./entitlements.js";
 import type { InvitationEmail, InvitationMailer } from "../invitations/index.js";
-import { HUB_ACCESS_SCOPE, PASEO_CLIENT_ID } from "./client-authorization.js";
+import { HUB_ACCESS_SCOPE, CLISBOT_CLIENT_ID } from "./client-authorization.js";
 
 type ActiveState = ActiveAccountState;
 
@@ -63,7 +63,7 @@ describe("account and organization boundary", () => {
     assert.equal(await alice.createOrganizationWithMetadata(), 400);
   });
 
-  it("authorizes the Paseo client with PKCE and rechecks live organization membership", async () => {
+  it("authorizes the Clisbot client with PKCE and rechecks live organization membership", async () => {
     const hub = await startAccounts(postgres);
     const alice = await hub.signUp("Alice", "alice@example.com");
     const organizationId = await alice.createOrganization("Acme");
@@ -288,7 +288,7 @@ describe("account and organization boundary", () => {
       headers: {
         cookie: "session=operator",
         origin: "https://hub.example.test",
-        "x-paseo-trusted-request-origin": "https://hub.example.test",
+        "x-clisbot-trusted-request-origin": "https://hub.example.test",
       },
     });
 
@@ -396,13 +396,13 @@ interface ResourceIds {
 const RESOURCE_NAMES = ["machine", "daemon", "execution"] as const;
 const MISSING_RESOURCES = ["missing", "missing", "missing"] as const;
 
-const activeAccounts: PaseoAccounts[] = [];
+const activeAccounts: ClisbotAccounts[] = [];
 
 async function startAccounts(
   postgres: StartedPostgreSqlContainer,
   invitationMailer?: InvitationMailer,
-): Promise<PaseoAccounts> {
-  const accounts = await PaseoAccounts.start(postgres, invitationMailer);
+): Promise<ClisbotAccounts> {
+  const accounts = await ClisbotAccounts.start(postgres, invitationMailer);
   activeAccounts.push(accounts);
   return accounts;
 }
@@ -411,7 +411,7 @@ async function stopAccounts(): Promise<void> {
   await Promise.all(activeAccounts.splice(0).map(async (accounts) => accounts.stop()));
 }
 
-class PaseoAccounts {
+class ClisbotAccounts {
   private readonly resources: OrganizationResources;
 
   private constructor(
@@ -426,7 +426,7 @@ class PaseoAccounts {
   static async start(
     postgres: StartedPostgreSqlContainer,
     invitationMailer?: InvitationMailer,
-  ): Promise<PaseoAccounts> {
+  ): Promise<ClisbotAccounts> {
     const url = isolatedDatabaseUrl(postgres);
     const database = await createDatabase(url);
     const entitlements = composeEntitlements(database, testDatabaseRuntime(database));
@@ -444,7 +444,7 @@ class PaseoAccounts {
       ...(invitationMailer === undefined ? {} : { invitationMailer }),
     });
     await auth.initialize?.();
-    return new PaseoAccounts(url, database, entitlements, auth);
+    return new ClisbotAccounts(url, database, entitlements, auth);
   }
 
   async signUp(name: string, email: string): Promise<AccountBrowser> {
@@ -770,7 +770,7 @@ class AccountBrowser {
 
   async createOrganizationWithMetadata(): Promise<number> {
     return (
-      await this.post("/api/auth/paseo/create-organization", {
+      await this.post("/api/auth/clisbot/create-organization", {
         name: "Unbounded",
         metadata: { plan: "phase-two" },
       })
@@ -783,7 +783,7 @@ class AccountBrowser {
     const redirectUri = "http://127.0.0.1:49152/hub-auth/callback";
     const authorize = new URL("http://localhost:3000/api/auth/oauth2/authorize");
     authorize.searchParams.set("response_type", "code");
-    authorize.searchParams.set("client_id", PASEO_CLIENT_ID);
+    authorize.searchParams.set("client_id", CLISBOT_CLIENT_ID);
     authorize.searchParams.set("redirect_uri", redirectUri);
     authorize.searchParams.set("scope", `${HUB_ACCESS_SCOPE} offline_access`);
     authorize.searchParams.set("state", "oauth-test-state");
@@ -802,7 +802,7 @@ class AccountBrowser {
 
     return this.exchangeHubCredential({
       grant_type: "authorization_code",
-      client_id: PASEO_CLIENT_ID,
+      client_id: CLISBOT_CLIENT_ID,
       redirect_uri: redirectUri,
       code,
       code_verifier: verifier,
@@ -816,7 +816,7 @@ class AccountBrowser {
   }> {
     return this.exchangeHubCredential({
       grant_type: "refresh_token",
-      client_id: PASEO_CLIENT_ID,
+      client_id: CLISBOT_CLIENT_ID,
       refresh_token: refreshToken,
       resource: "http://localhost:3000",
     });
@@ -826,7 +826,7 @@ class AccountBrowser {
     return (
       await this.tokenRequest({
         grant_type: "refresh_token",
-        client_id: PASEO_CLIENT_ID,
+        client_id: CLISBOT_CLIENT_ID,
         refresh_token: refreshToken,
         resource: "http://localhost:3000",
       })
@@ -835,7 +835,7 @@ class AccountBrowser {
 
   async bearerState(accessToken: string): Promise<AccountState> {
     const response = await this.auth.handle(
-      new Request("http://localhost:3000/api/auth/paseo/state", {
+      new Request("http://localhost:3000/api/auth/clisbot/state", {
         headers: { authorization: `Bearer ${accessToken}` },
       }),
     );
@@ -858,7 +858,7 @@ class AccountBrowser {
   }
 
   async state(): Promise<AccountState> {
-    const response = await this.get("/api/auth/paseo/state");
+    const response = await this.get("/api/auth/clisbot/state");
     assert.equal(response.status, 200);
     return accountStateSchema.parse(await response.json());
   }
@@ -870,7 +870,7 @@ class AccountBrowser {
   }
 
   async createOrganization(name: string): Promise<string> {
-    const response = await this.post("/api/auth/paseo/create-organization", {
+    const response = await this.post("/api/auth/clisbot/create-organization", {
       name,
     });
     assert.equal(response.status, 201);
@@ -882,11 +882,11 @@ class AccountBrowser {
   }
 
   async selectUnavailableOrganization(organizationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/select-organization", { organizationId })).status;
+    return (await this.post("/api/auth/clisbot/select-organization", { organizationId })).status;
   }
 
   async invite(email: string, role: "admin" | "member"): Promise<InvitationCredential> {
-    const response = await this.post("/api/auth/paseo/create-invitation", {
+    const response = await this.post("/api/auth/clisbot/create-invitation", {
       email,
       role,
     });
@@ -895,7 +895,7 @@ class AccountBrowser {
   }
 
   async createInvitation(email: string, role: "admin" | "member"): Promise<number> {
-    return (await this.post("/api/auth/paseo/create-invitation", { email, role })).status;
+    return (await this.post("/api/auth/clisbot/create-invitation", { email, role })).status;
   }
 
   async createInvitationDenied(
@@ -908,7 +908,7 @@ class AccountBrowser {
     limit: number | null;
     current: number | null;
   }> {
-    const response = await this.post("/api/auth/paseo/create-invitation", {
+    const response = await this.post("/api/auth/clisbot/create-invitation", {
       email,
       role,
     });
@@ -934,7 +934,7 @@ class AccountBrowser {
 
   async createInvitationWithTenantOverride(organizationId: string): Promise<number> {
     return (
-      await this.post("/api/auth/paseo/create-invitation", {
+      await this.post("/api/auth/clisbot/create-invitation", {
         email: "target@example.com",
         role: "member",
         organizationId,
@@ -943,11 +943,11 @@ class AccountBrowser {
   }
 
   async cancelInvitation(invitationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/cancel-invitation", { invitationId })).status;
+    return (await this.post("/api/auth/clisbot/cancel-invitation", { invitationId })).status;
   }
 
   async acceptInvitation(invitationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/accept-invitation", { invitationId })).status;
+    return (await this.post("/api/auth/clisbot/accept-invitation", { invitationId })).status;
   }
 
   async acceptInvitationSuccessfully(invitationId: string): Promise<void> {
@@ -956,15 +956,15 @@ class AccountBrowser {
 
   async acceptConcurrently(invitationId: string): Promise<number[]> {
     const responses = await Promise.all([
-      this.post("/api/auth/paseo/accept-invitation", { invitationId }),
-      this.post("/api/auth/paseo/accept-invitation", { invitationId }),
+      this.post("/api/auth/clisbot/accept-invitation", { invitationId }),
+      this.post("/api/auth/clisbot/accept-invitation", { invitationId }),
     ]);
     return responses.map(({ status }) => status);
   }
 
   async changeRole(memberId: string, role: "owner" | "admin" | "member"): Promise<number> {
     return (
-      await this.post("/api/auth/paseo/change-member-role", {
+      await this.post("/api/auth/clisbot/change-member-role", {
         memberId,
         role,
       })
@@ -979,34 +979,34 @@ class AccountBrowser {
   }
 
   async removeMember(memberId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/remove-member", { memberId })).status;
+    return (await this.post("/api/auth/clisbot/remove-member", { memberId })).status;
   }
 
   async lastOwnerRace(memberId: string): Promise<number[]> {
     const responses = await Promise.all([
-      this.post("/api/auth/paseo/change-member-role", {
+      this.post("/api/auth/clisbot/change-member-role", {
         memberId,
         role: "member",
       }),
-      this.post("/api/auth/paseo/remove-member", { memberId }),
+      this.post("/api/auth/clisbot/remove-member", { memberId }),
     ]);
     return responses.map(({ status }) => status);
   }
 
   async teamMutationStatuses(): Promise<number[]> {
     const responses = await Promise.all([
-      this.post("/api/auth/paseo/create-invitation", {
+      this.post("/api/auth/clisbot/create-invitation", {
         email: "target@example.com",
         role: "member",
       }),
-      this.post("/api/auth/paseo/cancel-invitation", {
+      this.post("/api/auth/clisbot/cancel-invitation", {
         invitationId: randomUUID(),
       }),
-      this.post("/api/auth/paseo/change-member-role", {
+      this.post("/api/auth/clisbot/change-member-role", {
         memberId: randomUUID(),
         role: "member",
       }),
-      this.post("/api/auth/paseo/remove-member", { memberId: randomUUID() }),
+      this.post("/api/auth/clisbot/remove-member", { memberId: randomUUID() }),
     ]);
     return responses.map(({ status }) => status);
   }
@@ -1035,7 +1035,7 @@ class AccountBrowser {
 
   private get(path: string): Promise<Response> {
     const request = this.request(path);
-    if (path.startsWith("/api/auth/paseo/")) {
+    if (path.startsWith("/api/auth/clisbot/")) {
       assert.ok(this.auth.browserAccount !== undefined);
       return this.auth.browserAccount(request);
     }
@@ -1074,7 +1074,7 @@ class AccountBrowser {
       },
       body: JSON.stringify(body),
     });
-    if (path.startsWith("/api/auth/paseo/")) {
+    if (path.startsWith("/api/auth/clisbot/")) {
       assert.ok(this.auth.browserAccount !== undefined);
       return this.auth.browserAccount(request);
     }

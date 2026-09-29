@@ -29,7 +29,7 @@ on:
   github.issue_comment:
     connection: getpaseo-github
     filters:
-      contains: "@paseo-bot"
+      contains: "@clisbot-bot"
       from_users: [boudra]
 inputs:
   model:
@@ -42,7 +42,7 @@ run:
     projectId: project-company
     cwd: /workspace/company
   agent:
-    select: \${{ paseo.inputs.model }}
+    select: \${{ clisbot.inputs.model }}
     choices:
       codex:
         provider: codex
@@ -54,13 +54,13 @@ run:
   idle_timeout: 10m
   github:
     connection: getpaseo-github
-    repositories: [getpaseo/paseo, getpaseo/hub]
+    repositories: [longbkit/clisbot, getpaseo/hub]
     permissions:
       contents: write
       pull_requests: write
   prompt: |
-    Use Paseo when delegation is useful.
-    \${{ paseo.prompt }}
+    Use Clisbot when delegation is useful.
+    \${{ clisbot.prompt }}
   outputs:
     slack.reply:
       max: 5
@@ -108,7 +108,7 @@ run:
       ["slack.mention", "github.issue_comment"],
     );
     assert.deepEqual(compiled.events[0]?.steps[0]?.agent, {
-      selector: "${{ paseo.inputs.model }}",
+      selector: "${{ clisbot.inputs.model }}",
       choices: {
         codex: { provider: "codex", model: "gpt-5.6-sol" },
         claude: { provider: "claude", model: "claude-opus-5" },

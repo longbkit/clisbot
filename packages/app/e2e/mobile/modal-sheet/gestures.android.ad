@@ -1,8 +1,8 @@
 # Install plugin-examples/modal-ui on the connected host and set EXAMPLES_URL to
-# paseo://h/<serverId>/plugin/modal-ui-example/surface/main.
+# clisbot://h/<serverId>/plugin/modal-ui-example/surface/main.
 # Gesture coordinates target a 1080x1920 Android emulator at density 420.
 context platform=android timeout=120000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 
 open "${APP_ID}" "${EXAMPLES_URL}"
 wait "label=\"Open ScrollView\"" 20000

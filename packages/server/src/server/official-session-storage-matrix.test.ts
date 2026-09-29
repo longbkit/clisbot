@@ -6,23 +6,23 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, test } from "vitest";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { createPaseoDaemon } from "./bootstrap.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { createClisbotDaemon } from "./bootstrap.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 const execute = promisify(execFile);
-const artifacts = process.env.PASEO_OFFICIAL_ARTIFACT_DIR;
+const artifacts = process.env.CLISBOT_OFFICIAL_ARTIFACT_DIR;
 let OfficialClient: typeof DaemonClient;
-let createOfficialDaemon: typeof createPaseoDaemon;
+let createOfficialDaemon: typeof createClisbotDaemon;
 let officialCli: string;
 
 async function artifactFile(name: string, file: string): Promise<string> {
-  const root = resolve(artifacts!, "node_modules", "@getpaseo", name);
+  const root = resolve(artifacts!, "node_modules", "@clisbot", name);
   const target = await realpath(join(root, file));
   if (!target.startsWith(`${root}/`)) throw new Error(`Artifact escaped isolated package: ${name}`);
   return target;
 }
-function connect(Client: typeof DaemonClient, daemon: TestPaseoDaemon, clientId: string) {
+function connect(Client: typeof DaemonClient, daemon: TestClisbotDaemon, clientId: string) {
   if (daemon.port === 6767) throw new Error("Production daemon port is forbidden");
   // Fail before creating any agent if the published bootstrap did not preserve the fixture seam.
   const clients: unknown = Reflect.get(daemon.daemon.agentManager, "clients");
@@ -40,7 +40,7 @@ async function complete(client: DaemonClient, agentId: string): Promise<void> {
   expect(result.error).toBeNull();
   expect(result.status).toBe("idle");
 }
-async function exerciseClient(Client: typeof DaemonClient, daemon: TestPaseoDaemon) {
+async function exerciseClient(Client: typeof DaemonClient, daemon: TestClisbotDaemon) {
   const clientId = `official-matrix-${randomUUID()}`;
   let client = connect(Client, daemon, clientId);
   await client.connect();
@@ -48,7 +48,7 @@ async function exerciseClient(Client: typeof DaemonClient, daemon: TestPaseoDaem
     expect(client.getLastServerInfoMessage()?.serverId).toBeTruthy();
     const agent = await client.createAgent({
       provider: "codex",
-      cwd: daemon.paseoHome,
+      cwd: daemon.clisbotHome,
       modeId: "bypassPermissions",
       initialPrompt: "matrix initial message",
     });
@@ -85,7 +85,7 @@ async function exerciseClient(Client: typeof DaemonClient, daemon: TestPaseoDaem
     expect((await client.fetchAgentTimeline(agent.id, { limit: 2 })).entries).toEqual(page.entries);
     const ask = await client.createAgent({
       provider: "codex",
-      cwd: daemon.paseoHome,
+      cwd: daemon.clisbotHome,
       modeId: "default",
     });
     await client.sendMessage(ask.id, "echo hello");
@@ -105,7 +105,7 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
     expect(manifest.version).toBe("0.8.0");
     for (const name of ["server", "client", "cli", "protocol"]) {
       const entry = manifest.packages.find(
-        (pkg: { name: string }) => pkg.name === `@getpaseo/${name}`,
+        (pkg: { name: string }) => pkg.name === `@clisbot/${name}`,
       );
       expect(entry?.integrity).toMatch(/^sha512-/);
       expect(
@@ -118,15 +118,15 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
     expect(
       await readFile(await artifactFile("server", "dist/server/server/bootstrap.js"), "utf8"),
     ).toMatch(/extraClients:\s*config\.agentClients/);
-    ({ createPaseoDaemon: createOfficialDaemon } = await import(
+    ({ createClisbotDaemon: createOfficialDaemon } = await import(
       pathToFileURL(await artifactFile("server", "dist/server/server/exports.js")).href
     ));
-    officialCli = await artifactFile("cli", "bin/paseo");
+    officialCli = await artifactFile("cli", "bin/clisbot");
   }, 30_000);
   test.each([false, true])(
     "official client against Fusion capture=%s",
     async (enabled) => {
-      const daemon = await createTestPaseoDaemon({ agentSessionStorage: enabled });
+      const daemon = await createTestClisbotDaemon({ agentSessionStorage: enabled });
       try {
         await exerciseClient(OfficialClient, daemon);
       } finally {
@@ -136,7 +136,7 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
     60_000,
   );
   test("Fusion client against the official daemon", async () => {
-    const daemon = await createTestPaseoDaemon({ createDaemon: createOfficialDaemon });
+    const daemon = await createTestClisbotDaemon({ createDaemon: createOfficialDaemon });
     try {
       await exerciseClient(DaemonClient, daemon);
     } finally {
@@ -144,17 +144,17 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
     }
   }, 60_000);
   test("official CLI creates, sends an image, approves, pages logs, and reconnects to Fusion off", async () => {
-    const daemon = await createTestPaseoDaemon({ agentSessionStorage: false });
+    const daemon = await createTestClisbotDaemon({ agentSessionStorage: false });
     const client = connect(OfficialClient, daemon, `cli-observer-${randomUUID()}`);
     const cli = async (args: string[]) =>
       execute(process.execPath, [officialCli, ...args], {
         env: {
           ...process.env,
-          PASEO_AGENT_ID: undefined,
-          PASEO_AGENT_CWD: undefined,
-          PASEO_HOST: `127.0.0.1:${daemon.port}`,
-          PASEO_HOME: daemon.paseoHome,
-          PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
+          CLISBOT_AGENT_ID: undefined,
+          CLISBOT_AGENT_CWD: undefined,
+          CLISBOT_HOST: `127.0.0.1:${daemon.port}`,
+          CLISBOT_HOME: daemon.clisbotHome,
+          CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
         },
         timeout: 20_000,
         maxBuffer: 1024 * 1024,
@@ -170,13 +170,13 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
         "--mode",
         "bypassPermissions",
         "--cwd",
-        daemon.paseoHome,
+        daemon.clisbotHome,
         "official CLI start",
       ]);
       const id = created.stdout.trim();
       expect(id).toMatch(/^[a-f0-9-]{36}$/);
       await complete(client, id);
-      const image = join(daemon.paseoHome, "pixel.png");
+      const image = join(daemon.clisbotHome, "pixel.png");
       await writeFile(
         image,
         Buffer.from(
@@ -189,7 +189,7 @@ describe.skipIf(!artifacts)("published official artifact session-storage matrix"
       expect(logs.stdout.length).toBeGreaterThan(0);
       const ask = await client.createAgent({
         provider: "codex",
-        cwd: daemon.paseoHome,
+        cwd: daemon.clisbotHome,
         modeId: "default",
       });
       await client.sendMessage(ask.id, "echo hello");

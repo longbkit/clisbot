@@ -1,7 +1,7 @@
 // Fusion-owned host adapter for `src/config/sessions/transcript.ts` (D-CORE-047).
 //
 // Only the mirror's transcript-entry shape is needed; the writer itself stays
-// with the Paseo daemon. See `config/sessions.host-adapter.ts`.
+// with the Clisbot daemon. See `config/sessions.host-adapter.ts`.
 export type SessionTranscriptEntry = {
   role: "assistant" | "user";
   content?: string;

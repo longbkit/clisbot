@@ -888,7 +888,7 @@ describe("database migration application", () => {
       const files = [
         ...configurationBundleFixture(dump(rawConfiguration)),
         {
-          path: ".paseo/workflows/partials/triage.md",
+          path: ".clisbot/workflows/partials/triage.md",
           content: partialContent,
         },
       ];
@@ -1449,7 +1449,7 @@ async function createLegacySchema(postgres: StartedPostgreSqlContainer, prefix: 
   const client = await createPostgresQueryRuntime(url);
 
   await client.query(`
-    create table paseo_hub_migrations (
+    create table clisbot_hub_migrations (
       filename text primary key,
       applied_at timestamp with time zone not null default now()
     )
@@ -1460,7 +1460,7 @@ async function createLegacySchema(postgres: StartedPostgreSqlContainer, prefix: 
     for (const statement of migration.split("--> statement-breakpoint")) {
       if (statement.trim().length > 0) await client.query(statement);
     }
-    await client.query("insert into paseo_hub_migrations (filename) values ($1)", [file]);
+    await client.query("insert into clisbot_hub_migrations (filename) values ($1)", [file]);
   }
   return { client, url };
 }
@@ -1593,7 +1593,7 @@ async function historicalShape(url: string) {
         to_regclass('public.registered_daemons')::text as legacy_artifacts,
         to_regclass('public.operator_principals')::text as legacy_operator_principals,
         (select organization_id from instance_bootstrap where id = 'default') as bootstrap_organization_id,
-        (select count(*)::integer from paseo_hub_migrations) as legacy_journal_entries,
+        (select count(*)::integer from clisbot_hub_migrations) as legacy_journal_entries,
         (select count(*)::integer from agent_executions
          where status in ('spawning', 'running')
            and deadline_at is distinct from started_at + interval '30 minutes') as pending_executions_without_legacy_deadline,
@@ -1652,7 +1652,7 @@ class LegacyUpgrade {
     legacyToken: string,
     url: string,
   ) {
-    const apiKey = "paseo_pk_migration_test";
+    const apiKey = "clisbot_pk_migration_test";
     const apiKeyId = "00000000-0000-4000-8000-0000000000bb";
     const client = await createPostgresQueryRuntime(url);
 
@@ -1660,7 +1660,7 @@ class LegacyUpgrade {
       await client.query(
         `insert into organization_api_keys
            (id, organization_id, name, prefix, verifier, scopes)
-         values ($1, $2, 'Migration test', 'paseo_pk_migration', 'migration-verifier', $3)`,
+         values ($1, $2, 'Migration test', 'clisbot_pk_migration', 'migration-verifier', $3)`,
         [apiKeyId, organizationId, ["configuration:install", "runs:dispatch", "daemons:enroll"]],
       );
     } finally {
@@ -1736,11 +1736,11 @@ class LegacyUpgrade {
           projectSlug: "default",
           files: [
             {
-              path: ".paseo/hub.yml",
+              path: ".clisbot/hub.yml",
               content: `environments:\n  production:\n    kind: daemon\n    daemon: daemon-${this.legacyDaemonId.slice(0, 8)}\n    cwd: /repo\nagents: {}`,
             },
             {
-              path: ".paseo/workflows/noop.yml",
+              path: ".clisbot/workflows/noop.yml",
               content:
                 "name: noop\non: manual.run\nmax_runtime: 1h\nsteps:\n  - id: work\n    environment: production\n    max_runtime: 10m\n    idle_timeout: 1m\n    agent: { provider: test }\n    prompt: [{ text: noop }]",
             },

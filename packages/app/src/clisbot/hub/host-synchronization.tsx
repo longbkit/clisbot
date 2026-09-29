@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
@@ -222,7 +222,7 @@ function HubHostBinding({
       unregister();
       if (!disposed) {
         setHubHostSynchronizationFailure(synchronizationKey, {
-          message: error instanceof Error ? error.message : "Unable to add this Host to Paseo.",
+          message: error instanceof Error ? error.message : "Unable to add this Host to Clisbot.",
           retry,
         });
       }

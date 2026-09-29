@@ -1,6 +1,6 @@
 // upstream: extensions/slack/src/file-reference.ts@5d8067a4483
 // Slack plugin module implements file reference behavior.
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { SlackFile } from "./types.js";
 
 export function formatSlackFileReference(file: SlackFile | undefined): string {

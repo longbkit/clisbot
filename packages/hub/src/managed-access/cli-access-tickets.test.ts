@@ -4,7 +4,7 @@ import { AccessTicketError } from "./tickets.js";
 
 const PATH = ["organizations", "org-1", "daemons", "daemon-1", "access-tickets"];
 
-function ticketRequest(authorization = "Bearer paseo_cli_abc_secret") {
+function ticketRequest(authorization = "Bearer clisbot_cli_abc_secret") {
   return new Request(
     "https://hub.test/api/management/v1/organizations/org-1/daemons/daemon-1/access-tickets",
     {
@@ -23,7 +23,7 @@ function service(options: {
   const issue = vi.fn(
     options.issue ??
       (async () => ({
-        accessTicket: "paseo_dat_ticket",
+        accessTicket: "clisbot_dat_ticket",
         expiresAt: new Date("2026-09-15T00:00:00Z"),
       })),
   );
@@ -52,7 +52,7 @@ function service(options: {
 describe("CLI daemon access tickets", () => {
   test("only claims CLI bearer requests for a daemon ticket", () => {
     expect(isCliAccessTicketRequest(ticketRequest(), PATH)).toBe(true);
-    expect(isCliAccessTicketRequest(ticketRequest("Bearer paseo_key_x"), PATH)).toBe(false);
+    expect(isCliAccessTicketRequest(ticketRequest("Bearer clisbot_key_x"), PATH)).toBe(false);
     expect(isCliAccessTicketRequest(ticketRequest(), PATH.slice(0, 4))).toBe(false);
   });
 
@@ -61,7 +61,7 @@ describe("CLI daemon access tickets", () => {
     const response = await tickets.handle(ticketRequest(), "org-1", "daemon-1");
 
     expect(response.status).toBe(201);
-    expect(await response.json()).toMatchObject({ accessTicket: "paseo_dat_ticket" });
+    expect(await response.json()).toMatchObject({ accessTicket: "clisbot_dat_ticket" });
     expect(issue).toHaveBeenCalledWith({
       organizationId: "org-1",
       daemonId: "daemon-1",

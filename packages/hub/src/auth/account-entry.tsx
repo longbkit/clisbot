@@ -114,7 +114,7 @@ export function AccountEntry({ account }: { account: AccountState & { status: "s
     title = `Join ${account.invitation?.organization.name}`;
     description = `${account.invitation?.inviterName} invited you as ${account.invitation?.role}.`;
   } else if (mode === "signIn") {
-    title = "Sign in to Paseo Hub";
+    title = "Sign in to Clisbot Hub";
     description = "Your agent operations, in one place.";
   }
 
@@ -174,7 +174,7 @@ function readInvitationSignInRequest(): boolean {
   return (
     historyState !== null &&
     typeof historyState === "object" &&
-    Reflect.get(historyState, "paseoInvitationMode") === "sign-in"
+    Reflect.get(historyState, "clisbotInvitationMode") === "sign-in"
   );
 }
 
@@ -228,7 +228,7 @@ function SignedOutFooter({
       </p>
     );
   }
-  let message = "Paseo Hub isn't accepting new accounts.";
+  let message = "Clisbot Hub isn't accepting new accounts.";
   if (registration === "invite_only") {
     message = "Accounts are created by invitation. Ask an organization owner to invite you.";
   } else if (registration === "domain_self_registration") {
@@ -428,7 +428,7 @@ function useAccountCommandResult(
         const url = new URL(window.location.href);
         if (url.searchParams.has("invitation")) {
           window.history.replaceState(
-            Object.assign({}, window.history.state, { paseoInvitationMode: "sign-in" }),
+            Object.assign({}, window.history.state, { clisbotInvitationMode: "sign-in" }),
             "",
             url,
           );

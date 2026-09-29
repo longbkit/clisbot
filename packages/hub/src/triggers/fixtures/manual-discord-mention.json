@@ -5,6 +5,6 @@
     "guildId": "guild-1",
     "channelId": "channel-1",
     "messageId": "message-1",
-    "content": "@paseo ping"
+    "content": "@clisbot ping"
   }
 }

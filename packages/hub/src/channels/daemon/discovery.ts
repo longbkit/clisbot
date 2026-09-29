@@ -16,7 +16,7 @@ export interface DaemonDiscoveryResult {
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 6767;
-const PID_FILE_NAME = "paseo.pid";
+const PID_FILE_NAME = "clisbot.pid";
 
 /**
  * Resolve the local daemon WebSocket URL. Precedence: an explicit host (the
@@ -49,8 +49,8 @@ export function discoverLocalDaemon(
 
 /**
  * The daemon/Hub shared home, by precedence: an explicit `home` (the operator
- * override) > `PASEO_HOME` (the env-alias sets it to the shared `~/.clisbot`
- * home, or the operator's `CLISBOT_HOME`) > the stock `~/.paseo`. Exported so
+ * override) > `CLISBOT_HOME` (the env-alias sets it to the shared `~/.clisbot`
+ * home, or the operator's `CLISBOT_HOME`) > the stock `~/.clisbot`. Exported so
  * the channel plane's media home-root fallback (relay media posts) resolves
  * the home with the SAME precedence as daemon discovery — one home, one rule.
  */
@@ -58,12 +58,12 @@ export function resolveHome(
   home?: string,
   environment: Record<string, string | undefined> = process.env,
 ): string {
-  const value = home?.trim() ?? environment["PASEO_HOME"]?.trim();
+  const value = home?.trim() ?? environment["CLISBOT_HOME"]?.trim();
   if (value !== undefined && value !== "") return value.replace(/^~$/, homedir());
-  // Fork path: the env-alias (src/env-alias.ts) sets PASEO_HOME to the shared
-  // ~/.clisbot home at process entry, so this `~/.paseo` fallback is only live
+  // Fork path: the env-alias (src/env-alias.ts) sets CLISBOT_HOME to the shared
+  // ~/.clisbot home at process entry, so this `~/.clisbot` fallback is only live
   // on the stock upstream path. If that ordering ever changes, pass home in.
-  return join(homedir(), ".paseo");
+  return join(homedir(), ".clisbot");
 }
 
 function readPidLockListen(path: string): string | undefined {

@@ -1,4 +1,4 @@
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
 // `ChatEngine`: a user line is written, then fanned out; a bot's turn end is
 // written as a bot line, then forwarded to the bots it mentions
@@ -6,9 +6,9 @@ import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
 // Every prompt goes through one delivery path; every bound that runs out ends
 // in a `system` line, never in silence.
 import type { Logger } from "pino";
-import type { ChatMessagePayload, ChatPayload } from "@getpaseo/protocol/chats/types";
-import { chatUserSender } from "@getpaseo/protocol/chats/sender";
-import type { SessionActor } from "@getpaseo/protocol/session-authorship";
+import type { ChatMessagePayload, ChatPayload } from "@clisbot/protocol/chats/types";
+import { chatUserSender } from "@clisbot/protocol/chats/sender";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { PromptDispatchDisposition } from "../agent/agent-prompt.js";
 import { resolveClientMessageId } from "../client-message-id.js";

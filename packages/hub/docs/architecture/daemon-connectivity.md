@@ -28,7 +28,7 @@ daemon's `/ws` session. So anything interactive must reach the daemon via `/ws`.
 
 ## Who uses which
 
-- **paseo web / app / CLI / phone** → the daemon's **`/ws`** (with a Hub-issued
+- **clisbot web / app / CLI / phone** → the daemon's **`/ws`** (with a Hub-issued
   `accessTicket` when the daemon is in managed-access `external` mode).
 - **Hub channel supervisor** → the daemon's **`/ws`**, as an ordinary trusted
   client (the channel plane: create + steer + approvals + stream).
@@ -37,7 +37,7 @@ daemon's `/ws` session. So anything interactive must reach the daemon via `/ws`.
 ## Connect modes (candidates come from the daemon's `ConnectionOffer`)
 
 A daemon publishes a `ConnectionOffer` (`packages/protocol/src/connection-offer.ts`)
-built from its own `PASEO_DIRECT_ENDPOINT` / config; the Hub persists it. It yields
+built from its own `CLISBOT_DIRECT_ENDPOINT` / config; the Hub persists it. It yields
 up to three ways to reach the same daemon's `/ws`:
 
 - **direct** — WSS to `offer.direct.endpoint` (VPN / in-cluster), via
@@ -68,20 +68,20 @@ The channel supervisor connects exactly as any other trusted client:
 - **Per-daemon target.** It resolves **each route's daemon → that daemon's stored
   `ConnectionOffer`** (`application-runtime.ts` `createChannelDaemonTargetFactory`),
   so the target is per-daemon (multi-daemon by construction, determined when the
-  daemon connects). The global `PASEO_HUB_CHANNEL_DAEMON_URL` is only a fallback;
-  `PASEO_HUB_CHANNEL_DAEMON_TRANSPORT` (`auto|direct|relay|loopback`) orders the
+  daemon connects). The global `CLISBOT_HUB_CHANNEL_DAEMON_URL` is only a fallback;
+  `CLISBOT_HUB_CHANNEL_DAEMON_TRANSPORT` (`auto|direct|relay|loopback`) orders the
   candidates (`auto` = direct then relay).
 - **Direct and relay.** `channels/daemon/ws-client.ts` dials a direct candidate
   straight; for a relay candidate it opens the same **relay-E2EE tunnel** the app
-  uses (`@getpaseo/relay/e2ee` `createClientChannel`, keyed by the offer's
+  uses (`@clisbot/relay/e2ee` `createClientChannel`, keyed by the offer's
   `daemonPublicKeyB64`) and rides the trusted-client wire through it.
 - **Failover + loud failure.** The reconnect loop rotates across candidates
   (re-preferring the top after a connected drop) and emits **one loud
   `channel daemon unreachable`** line per failed cycle instead of a silent
   `channel daemon disconnected` loop.
 
-This stays **fork-local** in `packages/hub/src/channels/**` (dep `@getpaseo/relay`,
-not `@getpaseo/client`) and leaves the daemon **unchanged** — it only dials the
+This stays **fork-local** in `packages/hub/src/channels/**` (dep `@clisbot/relay`,
+not `@clisbot/client`) and leaves the daemon **unchanged** — it only dials the
 daemon's existing `/ws`.
 
 **Known limitation:** the candidate list and relay public key are resolved once at

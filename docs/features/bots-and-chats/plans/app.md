@@ -307,7 +307,7 @@ with one participant) and navigate to it. Persist the chosen controls into form 
 
 ### How the app calls the daemon
 
-The app does not use the `PaseoApi` facade (`packages/client/src/index.ts:488`; that is the
+The app does not use the `ClisbotApi` facade (`packages/client/src/index.ts:488`; that is the
 CLI/SDK surface). It holds a `DaemonClient` per host: `useHostRuntimeClient(serverId)`
 (`runtime/host-runtime.ts:2713`) or `getHostRuntimeStore().getClient(serverId)` (`:2510`).
 Fusion RPCs are methods on `DaemonClient` calling the private
@@ -319,7 +319,7 @@ observed with `client.on("<type>", handler)` (precedent
 Add to `daemon-client.ts`, in one contiguous block marked `// Clisbot bots (README D10)`:
 `botList`, `botCreate`, `botUpdate`, `botArchive`, `chatList`, `chatCreate`,
 `chatParticipantAdd`, `chatParticipantRemove`, `chatMessageSend`, `chatTranscriptFetch`. Types
-come from the protocol module the daemon plan adds (assumed `@getpaseo/protocol/bots`); the app
+come from the protocol module the daemon plan adds (assumed `@clisbot/protocol/bots`); the app
 imports types only from there and never re-declares them (CLAUDE.md "Build workspace packages
 before diagnosing cross-package type errors" — `npm run build:client` after the protocol lands).
 
@@ -382,7 +382,7 @@ Playwright: `packages/app/e2e/browser/*.spec.ts`.
 | `clisbot/bots/chat/transcript-store.test.ts`               | unit       | Page prepend, append dedupe by message id, per-chat isolation                                                                                                                                                       |
 | `clisbot/bots/routes.test.ts`                              | unit       | Builders encode ids like `utils/host-routes.ts`; parser round-trips                                                                                                                                                 |
 | `clisbot/bots/chat/chat-list.browser.test.tsx`             | browser    | A direct and a group transcript render sender rows and a streaming live head (pattern: `clisbot/session-storage/user-message-avatar.browser.test.tsx`)                                                              |
-| `packages/app/e2e/browser/bots-and-chats.spec.ts`          | Playwright | Harness daemon with `PASEO_BOTS_ENABLED=1` and the mock provider: create by name → chat opens → send → reply row → Open in cowork lands on `/h/:id/workspace/:id` with the tab revealed                             |
+| `packages/app/e2e/browser/bots-and-chats.spec.ts`          | Playwright | Harness daemon with `CLISBOT_BOTS_ENABLED=1` and the mock provider: create by name → chat opens → send → reply row → Open in cowork lands on `/h/:id/workspace/:id` with the tab revealed                           |
 | `packages/app/e2e/browser/bots-and-chats-flag-off.spec.ts` | Playwright | Flag off: no Chats/Bots sections, `/h/:id/chat/x` shows the unavailable state, Projects list unchanged — the "flag-off navigation" proof Automations ships as `Hub-enabled/disabled navigation`                     |
 
 Add a native regression only if a route-tree change is suspected (docs/expo-router.md

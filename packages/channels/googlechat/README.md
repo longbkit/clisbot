@@ -1,4 +1,4 @@
-# @getpaseo/channels-googlechat
+# @clisbot/channels-googlechat
 
 The in-repo Google Chat channel vertical (goal ledger slice 14). Ported from
 `extensions/googlechat/src@5d8067a4483` — see `upstream-sync.json` for the

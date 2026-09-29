@@ -17,16 +17,16 @@ export function requiresDaemonAccessTicket(error: unknown): boolean {
 }
 
 /**
- * Tickets for the daemon in this Paseo home, issued by the Hub it is enrolled in to the account
+ * Tickets for the daemon in this Clisbot home, issued by the Hub it is enrolled in to the account
  * that logged this CLI in. The CLI reaches a managed-access daemon the way the app does.
  * Returns `null` when the daemon is not enrolled or this CLI is not logged in to its Hub.
  */
 export function createDaemonAccessTicketResolver(input: {
-  paseoHome: string;
+  clisbotHome: string;
   clientId: string;
   env?: Readonly<Record<string, string | undefined>>;
 }): (() => Promise<string>) | null {
-  const enrollment = readEnrollment(input.paseoHome);
+  const enrollment = readEnrollment(input.clisbotHome);
   if (enrollment === null) return null;
   const stored = new PrivateHubCredentialStore(input.env).get(enrollment.hubOrigin);
   if (stored === null) return null;
@@ -49,10 +49,10 @@ export function createDaemonAccessTicketResolver(input: {
   };
 }
 
-function readEnrollment(paseoHome: string): { daemonId: string; hubOrigin: string } | null {
+function readEnrollment(clisbotHome: string): { daemonId: string; hubOrigin: string } | null {
   try {
     const record = relationshipSchema.parse(
-      JSON.parse(readFileSync(path.join(paseoHome, "hub-relationship.json"), "utf8")),
+      JSON.parse(readFileSync(path.join(clisbotHome, "hub-relationship.json"), "utf8")),
     );
     return record.state === "active" ? record.relationship : null;
   } catch {

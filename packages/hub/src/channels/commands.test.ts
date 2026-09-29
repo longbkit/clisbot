@@ -148,7 +148,7 @@ describe("parseChannelIdentityLinkCode", () => {
       "@longluong3bot /link ABCDE-23456",
       "/link@longluong3bot ABCDE-23456",
       "<@U0BOT> /link ABCDE-23456",
-      "/paseo link ABCDE-23456",
+      "/clisbot link ABCDE-23456",
     ]) {
       assert.equal(parseChannelIdentityLinkCode(text), "ABCDE-23456", text);
     }
@@ -224,8 +224,11 @@ describe("parseChannelTextCommand", () => {
 
 describe("extended platform registry", () => {
   it("normalizes umbrella commands, aliases and Discord addressing", () => {
-    expect(parseChannelTextCommand("/paseo model list")).toEqual({ name: "model", value: "list" });
-    expect(parseChannelTextCommand("/paseo")).toEqual({ name: "help" });
+    expect(parseChannelTextCommand("/clisbot model list")).toEqual({
+      name: "model",
+      value: "list",
+    });
+    expect(parseChannelTextCommand("/clisbot")).toEqual({ name: "help" });
     expect(parseChannelTextCommand("<@!123456789> /thinking high")).toEqual({
       name: "effort",
       value: "high",
@@ -234,7 +237,7 @@ describe("extended platform registry", () => {
       name: "permission",
       value: "plan",
     });
-    expect(parseApprovalCommand("/paseo APPROVE req-1")).toEqual({
+    expect(parseApprovalCommand("/clisbot APPROVE req-1")).toEqual({
       decision: "allow",
       requestId: "req-1",
     });
@@ -259,7 +262,7 @@ it("keeps every registered alias and addressing form in the shared vocabulary", 
         `\\${name}`,
         `@bot/${name}`,
         `/${name}@bot`,
-        `/paseo ${name}`,
+        `/clisbot ${name}`,
       ]) {
         expect(parseChannelTextCommand(text)).toEqual({ name: command.name });
       }

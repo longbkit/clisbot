@@ -58,7 +58,7 @@ channels through APIs. It does not write or deploy a Hub Project bundle. Update
 resources through their APIs or the Hub UI; exports are optional portability files.
 `CLISBOT_ONBOARDING_ENABLED=0` exposes the inherited scaffold/project/deploy commands
 only for rollout fallback. A future directory-import command is not implied by this
-migration; the upstream description of `.paseo/triggers/` deployment was not an
+migration; the upstream description of `.clisbot/triggers/` deployment was not an
 implemented contract of the inherited CLI at the audited revision.
 
 The old project bundle API remains temporarily available so an installed older CLI does not fail

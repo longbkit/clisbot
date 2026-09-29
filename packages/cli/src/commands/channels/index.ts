@@ -205,7 +205,7 @@ export function createChannelsCommand(): Command {
 
   addJsonOption(
     addControlPlaneTargetOptions(
-      // `ls` is the house verb (`paseo ls`, `provider ls`); `list` is the name
+      // `ls` is the house verb (`clisbot ls`, `provider ls`); `list` is the name
       // this command shipped under and stays as its alias.
       channels.command("ls").alias("list").description("List channel accounts"),
     ),

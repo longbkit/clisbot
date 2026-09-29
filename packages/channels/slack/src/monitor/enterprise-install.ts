@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/monitor/enterprise-install.ts@5d8067a4483
 // Slack plugin module implements detected Enterprise Grid installation policy.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import type { OpenClawConfig, SlackAccountConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import type { OpenClawConfig, SlackAccountConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { resolveDefaultSlackAccountId } from "../accounts.js";
 import { parseSlackTarget } from "../target-parsing.js";
 

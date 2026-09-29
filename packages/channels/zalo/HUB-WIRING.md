@@ -1,4 +1,4 @@
-# Hub wiring for `@getpaseo/channels-zalo`
+# Hub wiring for `@clisbot/channels-zalo`
 
 Slice 16 built the vertical; **slice 16b wired it into the Hub** (2026-09-07).
 The sections below are the contract that wiring was written against, kept as the
@@ -16,7 +16,7 @@ reference for the next change. Three things ended up different from the text:
   package's `probe.ts` by `zalo.test.ts`. A rejected token fails
   `channels add zalo` instead of installing an account that can never start.
 
-Install: `paseo channels add zalo --account <id> --secret-file <path>`, where the
+Install: `clisbot channels add zalo --account <id> --secret-file <path>`, where the
 file is a raw token or `{"botToken": "…", "webhookSecret": "…"}`.
 
 Every field name below is one the vertical already reads at runtime. The two
@@ -61,14 +61,14 @@ Add, mirroring the Discord entry:
     "dist": { "integrity": "sha512-…", "gitHead": "…" }   // sync reference only
   },
   "loadMode": "in-repo",
-  "inRepoPackage": "@getpaseo/channels-zalo",
+  "inRepoPackage": "@clisbot/channels-zalo",
   "entry": "./dist/index.js",
   "plugin": { "specifier": "./dist/plugin.js", "exportName": "zaloPlugin" },
   "notices": "zalo"
 }
 ```
 
-Also add `@getpaseo/channels-zalo` to the loader's in-repo allowlist
+Also add `@clisbot/channels-zalo` to the loader's in-repo allowlist
 (`packages/hub/src/channels/loader/`), the same place `channels-discord` was
 added in 13b.
 
@@ -146,7 +146,7 @@ Zalo delivers webhook events by POSTing to a **public HTTPS URL** registered wit
 is read, so what is missing is only reachability. The two options and their gaps
 are exactly the ones written up for Google Chat —
 [`../googlechat/HUB-WIRING.md` §6](../googlechat/HUB-WIRING.md#6-the-public-endpoint--the-one-real-blocker)
-(reverse proxy in front of the Hub, or the Paseo service proxy); the supervisor
+(reverse proxy in front of the Hub, or the Clisbot service proxy); the supervisor
 must allocate and persist a port per account so a restart keeps the same
 endpoint, and the account's `gateway.trustedProxies` must list the proxy or the
 rate limiter keys every request into one bucket.

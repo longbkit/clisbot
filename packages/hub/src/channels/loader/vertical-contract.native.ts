@@ -56,10 +56,10 @@ function inRepoPackageDir(packageName: string): string {
   return realpathSync(join(REPO_ROOT, "node_modules", packageName));
 }
 
-const SLACK_IN_REPO = inRepoPackageDir("@getpaseo/channels-slack");
-const TELEGRAM_IN_REPO = inRepoPackageDir("@getpaseo/channels-telegram");
-const DISCORD_IN_REPO = inRepoPackageDir("@getpaseo/channels-discord");
-const SHARED_IN_REPO = inRepoPackageDir("@getpaseo/channels-shared");
+const SLACK_IN_REPO = inRepoPackageDir("@clisbot/channels-slack");
+const TELEGRAM_IN_REPO = inRepoPackageDir("@clisbot/channels-telegram");
+const DISCORD_IN_REPO = inRepoPackageDir("@clisbot/channels-discord");
+const SHARED_IN_REPO = inRepoPackageDir("@clisbot/channels-shared");
 /** The verticals wired in slices 14b/15b/16b, with the drive verbs each one
  * actually publishes. They share one case body: the contract is identical and
  * only the surface differs, so a fourth copy of the Slack case would only be a
@@ -67,27 +67,27 @@ const SHARED_IN_REPO = inRepoPackageDir("@getpaseo/channels-shared");
 const LATER_IN_REPO_CHANNELS = [
   {
     channel: "googlechat",
-    dir: inRepoPackageDir("@getpaseo/channels-googlechat"),
+    dir: inRepoPackageDir("@clisbot/channels-googlechat"),
     exportName: "googlechatPlugin",
     // No `typing`: Google Chat has no typing-indicator API.
     outbound: ["sendText", "updateText"],
   },
   {
     channel: "feishu",
-    dir: inRepoPackageDir("@getpaseo/channels-feishu"),
+    dir: inRepoPackageDir("@clisbot/channels-feishu"),
     exportName: "feishuPlugin",
     outbound: ["sendText", "updateText"],
   },
   {
     channel: "zalo",
-    dir: inRepoPackageDir("@getpaseo/channels-zalo"),
+    dir: inRepoPackageDir("@clisbot/channels-zalo"),
     exportName: "zaloPlugin",
     // The Zalo Bot API has no edit endpoint, so there is no `updateText`.
     outbound: ["sendText"],
   },
   {
     channel: "zalouser",
-    dir: inRepoPackageDir("@getpaseo/channels-zalouser"),
+    dir: inRepoPackageDir("@clisbot/channels-zalouser"),
     exportName: "zalouserPlugin",
     // Zalo Personal has no edit endpoint either; `sendMedia` is its native
     // outbound file upload.
@@ -127,7 +127,7 @@ function scoutSupplyPresent(): boolean {
 
 const SKIP_IN_REPO = inRepoSupplyPresent()
   ? false
-  : "the in-repo channel verticals are not built (@getpaseo/channels-{slack,telegram,discord,googlechat,feishu,zalo,zalouser,shared} dist missing)";
+  : "the in-repo channel verticals are not built (@clisbot/channels-{slack,telegram,discord,googlechat,feishu,zalo,zalouser,shared} dist missing)";
 const SKIP_SCOUT = scoutSupplyPresent()
   ? false
   : `pinned OpenClaw supply not extracted under ${SCOUT} (OPENCLAW_SCOUT); the live E2E covers the published/bundled regression via the registry`;
@@ -162,7 +162,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
     assert.ok(telegram !== undefined, "telegram pin entry");
     assert.ok(discord !== undefined, "discord pin entry");
     assert.equal(discord.loadMode, "in-repo");
-    assert.equal(discord.inRepoPackage, "@getpaseo/channels-discord");
+    assert.equal(discord.inRepoPackage, "@clisbot/channels-discord");
     assert.equal(discord.entry, "./dist/index.js");
     assert.equal(discord.plugin.specifier, "./dist/plugin.js");
     assert.equal(discord.plugin.exportName, "discordPlugin");
@@ -172,8 +172,8 @@ describe("pinned vertical contract (import + drive surface)", () => {
     // — no tarball fetch, no integrity gate at load.
     assert.equal(slack.loadMode, "in-repo");
     assert.equal(telegram.loadMode, "in-repo");
-    assert.equal(slack.inRepoPackage, "@getpaseo/channels-slack");
-    assert.equal(telegram.inRepoPackage, "@getpaseo/channels-telegram");
+    assert.equal(slack.inRepoPackage, "@clisbot/channels-slack");
+    assert.equal(telegram.inRepoPackage, "@clisbot/channels-telegram");
     assert.equal(slack.entry, "./dist/index.js");
     assert.equal(telegram.entry, "./dist/index.js");
     // The drive pins: a separate plugin chunk under the pinned export names.
@@ -195,7 +195,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       const pin = pins.channels[entry.channel];
       assert.ok(pin !== undefined, `${entry.channel} pin entry`);
       assert.equal(pin.loadMode, "in-repo");
-      assert.equal(pin.inRepoPackage, `@getpaseo/channels-${entry.channel}`);
+      assert.equal(pin.inRepoPackage, `@clisbot/channels-${entry.channel}`);
       assert.equal(pin.entry, "./dist/index.js");
       assert.equal(pin.plugin.specifier, "./dist/plugin.js");
       assert.equal(pin.plugin.exportName, entry.exportName);

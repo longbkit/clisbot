@@ -1,5 +1,5 @@
 
- RUN  v4.1.7 /home/node/projects/clisbot-paseoclaw-fusion
+ RUN  v4.1.7 /home/node/projects/clisbot-clisbotclaw-fusion
 
 
  Test Files  1 passed (1)

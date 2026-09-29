@@ -2,7 +2,7 @@
 // two surfaces that outlive a single slice — the organization-scoped management
 // contract and the vertical loader.
 //
-// `PASEO_HUB_CHANNELS_ENABLED=0` (operator name `CLISBOT_HUB_CHANNELS_ENABLED`)
+// `CLISBOT_HUB_CHANNELS_ENABLED=0` (operator name `CLISBOT_HUB_CHANNELS_ENABLED`)
 // must leave a Hub that boots with no channel tools, no channel endpoints and
 // no channel verticals (`loader/channel-gate.ts`). The supervisor's own flag-off
 // no-ops are pinned in `supervisor/supervisor.test.ts`; what that file cannot
@@ -72,8 +72,8 @@ const MANAGEMENT_RESOURCES: Record<string, () => unknown> = {
 };
 
 function withChannels(value: string | undefined): void {
-  if (value === undefined) delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
-  else process.env["PASEO_HUB_CHANNELS_ENABLED"] = value;
+  if (value === undefined) delete process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
+  else process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = value;
 }
 
 /** The `not_found` an unrouted resource would have produced. */

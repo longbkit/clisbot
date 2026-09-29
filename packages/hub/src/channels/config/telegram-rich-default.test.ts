@@ -6,8 +6,8 @@
 // same reason `account-carriers.test.ts` does (`npm run build --workspace=…`).
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "vitest";
-import { sendText } from "@getpaseo/channels-telegram/dist/outbound.js";
-import { setChannelHostRuntime } from "@getpaseo/channels-telegram/dist/runtime-store.js";
+import { sendText } from "@clisbot/channels-telegram/dist/outbound.js";
+import { setChannelHostRuntime } from "@clisbot/channels-telegram/dist/runtime-store.js";
 import { compileChannelControlPlane } from "./compile.js";
 import { buildAccountCarriers } from "../supervisor/account-carriers.js";
 
@@ -46,7 +46,7 @@ ${config}
 
 function compileTelegramConfig(config: string): Record<string, unknown> {
   const plane = compileChannelControlPlane({
-    files: [{ path: `.paseo/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
+    files: [{ path: `.clisbot/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
     agentNames: ["assistant"],
     environmentNames: ["repo"],
     workflowNames: [],
@@ -77,7 +77,7 @@ function fakeApi(calls: ApiCall[]): Record<string, unknown> {
  * post the showcase with the vertical's own outbound entry point. */
 async function driveShowcase(config: string): Promise<ApiCall[]> {
   const compiled = compileChannelControlPlane({
-    files: [{ path: `.paseo/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
+    files: [{ path: `.clisbot/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
     agentNames: ["assistant"],
     environmentNames: ["repo"],
     workflowNames: [],
@@ -154,7 +154,7 @@ describe("Telegram richMessages default", () => {
     const plane = compileChannelControlPlane({
       files: [
         {
-          path: ".paseo/channels/slack/work.yml",
+          path: ".clisbot/channels/slack/work.yml",
           content: `
 channel: slack
 accountId: work

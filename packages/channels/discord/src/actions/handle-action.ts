@@ -1,20 +1,20 @@
 // upstream: extensions/discord/src/actions/handle-action.ts@5d8067a4483
-import type { AgentToolResult } from "@getpaseo/channels-core/plugin-sdk/agent-core";
+import type { AgentToolResult } from "@clisbot/channels-core/plugin-sdk/agent-core";
 import {
   readPositiveIntegerParam,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/agent-runtime";
-import { readBooleanParam } from "@getpaseo/channels-core/plugin-sdk/boolean-param";
-import { resolveReactionMessageId } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+} from "@clisbot/channels-core/plugin-sdk/agent-runtime";
+import { readBooleanParam } from "@clisbot/channels-core/plugin-sdk/boolean-param";
+import { resolveReactionMessageId } from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import {
   adaptMessagePresentationForChannel,
   normalizeLegacyInteractiveReply,
   normalizeMessagePresentation,
   renderMessagePresentationFallbackText,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { normalizeOptionalStringifiedId } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { normalizeOptionalStringifiedId } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { handleDiscordAction } from "../actions/runtime.js";
 import {
   notifyDiscordActiveTurnThreadCreated,

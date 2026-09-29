@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import type { Command } from "commander";
 import { connectToDaemon, resolveAgentId } from "../../utils/client.js";
 import type {

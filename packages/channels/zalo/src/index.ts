@@ -1,4 +1,4 @@
-// @getpaseo/channels-zalo — the in-repo Zalo Official Account (Bot API) channel
+// @clisbot/channels-zalo — the in-repo Zalo Official Account (Bot API) channel
 // vertical (goal ledger slice 16). Exports:
 // - `default` — the bundled-channel entry (`id: "zalo"`);
 // - `zaloPlugin` — the pinned drive-surface name (startAccount + sendText);

@@ -3,14 +3,14 @@ import {
   normalizeMessagePresentation,
   renderMessagePresentationFallbackText,
   type MessagePresentation,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 // Slack plugin module implements reply blocks behavior.
 import {
   resolveAskUserQuestionOptionIndices,
   type AskUserQuestionOptionIndices,
   type ReplyPayload,
-} from "@getpaseo/channels-core/plugin-sdk/reply-payload";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/reply-payload";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import {
   resolveSlackAuthoredTextPlacement,
   type SlackAuthoredTextPlacement,

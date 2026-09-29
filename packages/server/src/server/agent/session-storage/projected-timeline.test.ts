@@ -261,10 +261,10 @@ describe("durable projected timeline", () => {
     expect(legacy.entries).toHaveLength(99);
   });
   // Required gates are 1,000 and 10,000 rows; 100,000 is an optional ceiling diagnostic
-  // that only runs under PASEO_SESSION_STORAGE_CEILING. See the iteration benchmark contract.
+  // that only runs under CLISBOT_SESSION_STORAGE_CEILING. See the iteration benchmark contract.
   for (const canonicalRows of [1_000, 10_000, 100_000]) {
     const ceiling = canonicalRows > 10_000;
-    (ceiling && !process.env.PASEO_SESSION_STORAGE_CEILING ? it.skip : it)(
+    (ceiling && !process.env.CLISBOT_SESSION_STORAGE_CEILING ? it.skip : it)(
       `reads a bounded cold projected page over ${canonicalRows} canonical rows`,
       async () => {
         const { directory, store } = await fixture();
@@ -326,9 +326,9 @@ describe("durable projected timeline", () => {
           derivedBytes,
           rssBytes: process.memoryUsage().rss,
         };
-        if (process.env.PASEO_SESSION_STORAGE_METRICS)
+        if (process.env.CLISBOT_SESSION_STORAGE_METRICS)
           await fs.appendFile(
-            process.env.PASEO_SESSION_STORAGE_METRICS,
+            process.env.CLISBOT_SESSION_STORAGE_METRICS,
             `${JSON.stringify(metrics)}\n`,
           );
         // A tail page reads its own window, not the history behind it.

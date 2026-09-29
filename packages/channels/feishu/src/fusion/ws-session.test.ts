@@ -1,6 +1,6 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import type { ResolvedFeishuAccount } from "../types.js";
 
 // The SDK boundary: `monitorWebSocket` constructs the real `WSClient`, which

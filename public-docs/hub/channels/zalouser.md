@@ -26,7 +26,7 @@ A phone signed in to the Zalo account you want the agent to act as, and someone 
 Create the account first — it has no credential, so there is no secret file:
 
 ```sh
-paseo channels add zalouser --account main --profile main
+clisbot channels add zalouser --account main --profile main
 ```
 
 `--profile` names the stored session and defaults to the account id. The account starts, finds no session, and reports the transport state **`needs-login`**. That is the designed first state, not a failure.

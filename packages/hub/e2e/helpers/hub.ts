@@ -14,7 +14,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { WebSocket, type RawData } from "ws";
 import { z } from "zod";
 import { dump } from "js-yaml";
-import type { SourcePaseo } from "./source-paseo.js";
+import type { SourceClisbot } from "./source-clisbot.js";
 import type { HubBundleFile } from "../../src/config/bundle.js";
 import type { BrowserDiscordEvent } from "../../src/e2e/harness/browser-providers.js";
 import type { BrowserProviderScenario } from "../../src/e2e/harness/browser-providers.js";
@@ -90,7 +90,7 @@ export interface BuiltApplicationOptions {
   environmentApps?: readonly ("github" | "slack" | "discord" | "linear")[];
   /** Run the built app with direct local TLS for provider journeys that require real HTTPS. */
   https?: boolean;
-  /** Terminate HTTPS at a trusted proxy and intentionally omit PASEO_HUB_APP_URL. */
+  /** Terminate HTTPS at a trusted proxy and intentionally omit CLISBOT_HUB_APP_URL. */
   reverseProxy?: boolean;
   bootstrap?: {
     organizationName: string;
@@ -98,7 +98,7 @@ export interface BuiltApplicationOptions {
     ownerPassword: string;
   };
   /** Configures billing with the fixture Stripe catalog (internal free record plus the one
-   * purchasable Paseo Hub plan). Default: unconfigured. */
+   * purchasable Clisbot Hub plan). Default: unconfigured. */
   billing?: boolean;
 }
 
@@ -108,7 +108,7 @@ export interface Account {
   password: string;
 }
 
-const INTERACTIVE_ORGANIZATION_NAME = "Paseo Hub";
+const INTERACTIVE_ORGANIZATION_NAME = "Clisbot Hub";
 
 /** The flat organization sidebar entries, in rendered order. */
 const ORGANIZATION_DESTINATIONS = [
@@ -155,12 +155,12 @@ interface OrganizationIsolationJourney {
 }
 
 type StartBuiltApplication = (options?: BuiltApplicationOptions) => Promise<BuiltApplication>;
-type StartSourcePaseo = () => Promise<SourcePaseo>;
+type StartSourceClisbot = () => Promise<SourceClisbot>;
 
-export class PaseoHub {
+export class ClisbotHub {
   private readonly users = new Map<string, HubUser>();
   private readonly hubCredentials = new Map<string, string>();
-  private sourcePaseo: SourcePaseo | undefined;
+  private sourceClisbot: SourceClisbot | undefined;
 
   constructor(
     private readonly primary: BuiltApplication,
@@ -168,7 +168,7 @@ export class PaseoHub {
     private readonly page: Page,
     private readonly requests: APIRequestContext,
     private readonly startApplication: StartBuiltApplication,
-    private readonly startSourcePaseo: StartSourcePaseo,
+    private readonly startSourceClisbot: StartSourceClisbot,
   ) {}
 
   primaryApplication(): BuiltApplication {
@@ -235,7 +235,7 @@ export class PaseoHub {
   }
 
   async expectWelcome(): Promise<void> {
-    await expect(this.page.getByRole("heading", { name: "Sign in to Paseo Hub" })).toBeVisible();
+    await expect(this.page.getByRole("heading", { name: "Sign in to Clisbot Hub" })).toBeVisible();
   }
 
   async expectSignedOut(): Promise<void> {
@@ -250,7 +250,7 @@ export class PaseoHub {
 
   async expectSignedOutAccountEntry(): Promise<void> {
     await this.visitHome();
-    await expect(this.page.getByRole("heading", { name: "Sign in to Paseo Hub" })).toBeVisible();
+    await expect(this.page.getByRole("heading", { name: "Sign in to Clisbot Hub" })).toBeVisible();
     await expect(this.page.getByRole("form", { name: "Sign in" })).toBeVisible();
     await expectAccessible(this.page);
   }
@@ -473,9 +473,9 @@ export class PaseoHub {
     const page = await context.newPage();
     try {
       await page.goto(application.origin);
-      await expect(page.getByRole("heading", { name: "Sign in to Paseo Hub" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sign in to Clisbot Hub" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Create an account" })).toHaveCount(0);
-      await expect(page.getByText("Paseo Hub isn't accepting new accounts.")).toBeVisible();
+      await expect(page.getByText("Clisbot Hub isn't accepting new accounts.")).toBeVisible();
       await expectAccessible(page);
       const response = await page.evaluate(async (origin) => {
         const result = await fetch(`${origin}/api/auth/sign-up/email`, {
@@ -515,7 +515,7 @@ export class PaseoHub {
       await expect(page.getByText("Ask an organization owner to invite you.")).toBeVisible();
       await expectAccessible(page);
       const response = await page.evaluate(async (origin) => {
-        const result = await fetch(`${origin}/api/auth/paseo/create-organization`, {
+        const result = await fetch(`${origin}/api/auth/clisbot/create-organization`, {
           method: "POST",
           headers: { "content-type": "application/json", origin },
           body: JSON.stringify({ name: "Blocked Organization" }),
@@ -866,7 +866,7 @@ export class PaseoHub {
    * internal free entitlement record, which is in the same Stripe catalog. Second: a Stripe
    * dashboard typo (invalid `ent_seats_max`) delivered as a real HMAC-signed `product.updated`
    * is rejected by the sync, logged loudly, and leaves the previously synced row serving. Third:
-   * a product that loses its `paseo_plan` tag is deactivated by the reconciled snapshot, so the
+   * a product that loses its `clisbot_plan` tag is deactivated by the reconciled snapshot, so the
    * catalog stops offering it rather than leaving a removed plan selectable — and what is left is
    * an empty offer, never the free record promoted into one. Re-tagging restores it, because the
    * mirror is a reconciled snapshot rather than a one-way delete.
@@ -877,11 +877,11 @@ export class PaseoHub {
 
     await application.setBillingProduct({
       id: "prod_fixture_hosted",
-      name: "Paseo Hub",
+      name: "Clisbot Hub",
       active: true,
       metadata: {
-        paseo_plan: "true",
-        paseo_plan_slug: "hosted",
+        clisbot_plan: "true",
+        clisbot_plan_slug: "hosted",
         ent_seats_max: "not-a-number",
         ent_can_invite: "true",
         ent_executions_monthly_limit: "unlimited",
@@ -897,9 +897,9 @@ export class PaseoHub {
 
     await application.setBillingProduct({
       id: "prod_fixture_hosted",
-      name: "Paseo Hub",
+      name: "Clisbot Hub",
       active: true,
-      metadata: { paseo_plan: "false" },
+      metadata: { clisbot_plan: "false" },
       marketingFeatures: [],
     });
     await this.deliverBillingWebhook(application, "product.updated", "prod_fixture_hosted");
@@ -1550,9 +1550,9 @@ export class PaseoHub {
   }
 
   async startDaemonRegistration(alias: string): Promise<void> {
-    this.sourcePaseo ??= await this.startSourcePaseo();
-    const credential = `paseo_cli_${randomUUID().replaceAll("-", "").slice(0, 12)}_${randomUUID().replaceAll("-", "")}`;
-    const prefix = credential.slice(0, "paseo_cli_".length + 12);
+    this.sourceClisbot ??= await this.startSourceClisbot();
+    const credential = `clisbot_cli_${randomUUID().replaceAll("-", "").slice(0, 12)}_${randomUUID().replaceAll("-", "")}`;
+    const prefix = credential.slice(0, "clisbot_cli_".length + 12);
     await this.queryDatabase(
       this.primary,
       `insert into organization_cli_credentials
@@ -1573,7 +1573,7 @@ export class PaseoHub {
 
   async approveDaemon(alias: string, displayName: string): Promise<string> {
     const credential = this.requireHubCredential(alias);
-    const result = await this.requireSourcePaseo().connectWithCredential(
+    const result = await this.requireSourceClisbot().connectWithCredential(
       this.primary.origin,
       credential,
     );
@@ -1610,7 +1610,7 @@ export class PaseoHub {
 
   async revokeDaemon(alias: string, displayName: string): Promise<void> {
     await this.requireUser(alias).revokeDaemon(displayName);
-    const source = this.requireSourcePaseo();
+    const source = this.requireSourceClisbot();
     await source.waitForRelationshipState("revoked");
     expect(await source.reconnectWithRevokedCredential()).toBe(403);
     await source.restart();
@@ -2000,14 +2000,14 @@ export class PaseoHub {
     return credential;
   }
 
-  private requireSourcePaseo(): SourcePaseo {
-    if (this.sourcePaseo === undefined) throw new Error("Source-built Paseo has not started");
-    return this.sourcePaseo;
+  private requireSourceClisbot(): SourceClisbot {
+    if (this.sourceClisbot === undefined) throw new Error("Source-built Clisbot has not started");
+    return this.sourceClisbot;
   }
 
   private expectRegistrationSecretsAbsentFromLogs(deviceCode: string): void {
     const credentialSecret = createHash("sha256")
-      .update("paseo-cli-credential\0")
+      .update("clisbot-cli-credential\0")
       .update(deviceCode)
       .digest("base64url");
     expect(this.primary.logs()).not.toContain(deviceCode);
@@ -2196,8 +2196,8 @@ export class PaseoHub {
     const document = await home.text();
     // The server render precedes session resolution, so the shell it paints must not
     // claim either signed-in or signed-out.
-    expect(document).toContain("Loading Paseo Hub");
-    expect(document).not.toContain("Sign in to Paseo Hub");
+    expect(document).toContain("Loading Clisbot Hub");
+    expect(document).not.toContain("Sign in to Clisbot Hub");
     const assetPath = z.string().parse(document.match(/\/assets\/[A-Za-z0-9._-]+\.css/u)?.[0]);
     const asset = await this.requests.get(`${application.origin}${assetPath}`);
     expect(asset.status()).toBe(200);
@@ -2346,9 +2346,9 @@ export class PaseoHub {
   }
 
   /**
-   * What `paseo hub login` leaves behind on the operator's own machine: a daemon enrolled into
+   * What `clisbot hub login` leaves behind on the operator's own machine: a daemon enrolled into
    * their organization and holding a live connection. The enrollment token is written straight
-   * to the database because the CLI's own path through it is the Paseo repository's to prove.
+   * to the database because the CLI's own path through it is the Clisbot repository's to prove.
    */
   private async enrollOperatorDaemon(application: BuiltApplication): Promise<string> {
     const enrollmentToken = randomUUID();
@@ -2457,7 +2457,7 @@ export class PaseoHub {
     daemon: ContractDaemon,
   ): Promise<void> {
     const capability = await daemon.executionCapability(executionId);
-    const client = new McpClient({ name: "paseo-hub-browser-contract", version: "1.0.0" });
+    const client = new McpClient({ name: "clisbot-hub-browser-contract", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL(capability.url), {
       requestInit: { headers: capability.headers },
     });
@@ -2588,8 +2588,8 @@ class HubUser {
 
     await this.signOut();
     await this.page.goto(this.origin);
-    await expect(this.page.getByRole("heading", { name: "Sign in to Paseo Hub" })).toBeVisible();
-    await expect(this.page.getByRole("heading", { name: "Welcome to Paseo Hub" })).toHaveCount(0);
+    await expect(this.page.getByRole("heading", { name: "Sign in to Clisbot Hub" })).toBeVisible();
+    await expect(this.page.getByRole("heading", { name: "Welcome to Clisbot Hub" })).toHaveCount(0);
     await expectAccessible(this.page);
 
     // The chosen password is final — there is no temporary-password gate to pass through.
@@ -2605,10 +2605,10 @@ class HubUser {
   private async expectFirstRunWelcome(): Promise<void> {
     await this.page.setViewportSize({ width: 390, height: 844 });
     await this.page.goto(this.origin);
-    const welcome = this.page.getByRole("heading", { name: "Welcome to Paseo Hub" });
+    const welcome = this.page.getByRole("heading", { name: "Welcome to Clisbot Hub" });
     await expect(welcome).toBeVisible();
     await expect(welcome).toBeFocused();
-    await expect(this.page.getByRole("button", { name: "Set up Paseo Hub" })).toBeInViewport();
+    await expect(this.page.getByRole("button", { name: "Set up Clisbot Hub" })).toBeInViewport();
     await expectAccessible(this.page);
     await this.page.setViewportSize({ width: 1280, height: 800 });
     await expect(welcome).toBeVisible();
@@ -2616,7 +2616,7 @@ class HubUser {
 
   async openFirstRunSetupForm(): Promise<void> {
     await this.page.goto(this.origin);
-    const begin = this.page.getByRole("button", { name: "Set up Paseo Hub" });
+    const begin = this.page.getByRole("button", { name: "Set up Clisbot Hub" });
     await expect(begin).toBeVisible();
     await this.page.keyboard.press("Tab");
     await expect(begin).toBeFocused();
@@ -2643,7 +2643,7 @@ class HubUser {
   /** Leaving setup returns to the welcome card, and takes focus back with it. */
   private async expectFirstRunBackReturnsToWelcome(): Promise<void> {
     await this.page.getByRole("button", { name: "Back" }).click();
-    const welcome = this.page.getByRole("heading", { name: "Welcome to Paseo Hub" });
+    const welcome = this.page.getByRole("heading", { name: "Welcome to Clisbot Hub" });
     await expect(welcome).toBeVisible();
     await expect(welcome).toBeFocused();
   }
@@ -2708,11 +2708,11 @@ class HubUser {
    */
   async expectSetupFormFallsBackToSignIn(account: Account): Promise<void> {
     await this.fillFirstRunSetupForm(account);
-    const signIn = this.page.getByRole("heading", { name: "Sign in to Paseo Hub" });
+    const signIn = this.page.getByRole("heading", { name: "Sign in to Clisbot Hub" });
     await expect(signIn).toBeVisible();
     await expect(signIn).toBeFocused();
     await expect(this.page.getByRole("form", { name: "Sign in" })).toBeVisible();
-    await expect(this.page.getByRole("button", { name: "Set up Paseo Hub" })).toHaveCount(0);
+    await expect(this.page.getByRole("button", { name: "Set up Clisbot Hub" })).toHaveCount(0);
     await expect(this.page.getByRole("alert")).toHaveCount(0);
     await expectAccessible(this.page);
   }
@@ -2721,7 +2721,7 @@ class HubUser {
   async claimInstance(account: Account): Promise<void> {
     this.email = account.email.toLowerCase();
     await this.page.goto(this.origin);
-    await this.page.getByRole("button", { name: "Set up Paseo Hub" }).click();
+    await this.page.getByRole("button", { name: "Set up Clisbot Hub" }).click();
     await this.fillFirstRunSetupForm(account);
   }
 
@@ -2737,7 +2737,7 @@ class HubUser {
     await expect(this.page.getByRole("heading", { name: "API keys", exact: true })).toBeVisible();
     await expect(
       this.page.getByRole("link", { name: "API reference", exact: true }),
-    ).toHaveAttribute("href", "https://paseo.sh/docs/hub/api");
+    ).toHaveAttribute("href", "https://clisbot.com/docs/hub/api");
     await expect(this.page.getByText("No API keys", { exact: true })).toBeVisible();
     await expectAccessible(this.page);
 
@@ -2753,7 +2753,7 @@ class HubUser {
     await expectAccessible(this.page);
     const secret = dialog.getByLabel("Generated API key");
     const revealedSecret = await secret.inputValue();
-    expect(revealedSecret).toMatch(/^paseo_pk_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+$/u);
+    expect(revealedSecret).toMatch(/^clisbot_pk_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+$/u);
     await expect(
       this.page.evaluate(async (key) => {
         const response = await fetch(`${window.location.origin}/api/v1/daemons/enrollment-tokens`, {
@@ -2770,7 +2770,7 @@ class HubUser {
     await dialog.getByRole("button", { name: "Copy API key" }).click();
     await expect(dialog.getByRole("status")).toHaveText("API key copied.");
     await expect(this.page.evaluate(() => navigator.clipboard.readText())).resolves.toMatch(
-      /^paseo_pk_/u,
+      /^clisbot_pk_/u,
     );
     await dialog.getByRole("button", { name: "Done" }).click();
 
@@ -3431,7 +3431,7 @@ class HubUser {
     const form = await this.openDaemonRename(currentName);
     await form.getByLabel("Daemon slug").fill(displayName);
     await form.getByRole("button", { name: "Rename" }).click();
-    await expect(this.page.getByRole("heading", { name: "Sign in to Paseo Hub" })).toBeVisible();
+    await expect(this.page.getByRole("heading", { name: "Sign in to Clisbot Hub" })).toBeVisible();
     await expect(this.page.getByText(currentName, { exact: true })).toHaveCount(0);
     await expect(this.page.getByText(displayName, { exact: true })).toHaveCount(0);
   }
@@ -5056,7 +5056,7 @@ class ContractDaemon {
     const socket = new WebSocket(this.webSocketUrl, {
       headers: {
         authorization: `Bearer ${this.credential}`,
-        "x-paseo-daemon-id": this.daemonId,
+        "x-clisbot-daemon-id": this.daemonId,
       },
     });
     socket.on("message", (data) => this.acceptExecution(data));
@@ -5183,7 +5183,7 @@ interface PublicBillingPlanExpectation {
 const FIXTURE_BILLING_PLAN_EXPECTATIONS: readonly PublicBillingPlanExpectation[] = [
   {
     slug: "hosted",
-    name: "Paseo Hub",
+    name: "Clisbot Hub",
     marketingFeatures: [
       "Unlimited daemons",
       "GitHub, Linear, Slack, and Discord triggers",
@@ -5194,13 +5194,13 @@ const FIXTURE_BILLING_PLAN_EXPECTATIONS: readonly PublicBillingPlanExpectation[]
   },
 ];
 /** The one plan the fixture catalog — and the live Stripe catalog — publishes. */
-const HOSTED_PLAN_NAME = "Paseo Hub";
+const HOSTED_PLAN_NAME = "Clisbot Hub";
 const HOSTILE_ORIGIN = "https://hostile.invalid";
 const JSON_TYPE = "application/json";
 const PROBLEM_TYPE = "application/problem+json";
 const ORGANIZATION_POST_PATHS = [
-  "/api/auth/paseo/create-organization",
-  "/api/auth/paseo/select-organization",
+  "/api/auth/clisbot/create-organization",
+  "/api/auth/clisbot/select-organization",
 ] as const;
 const TEXT_TYPE = "text/plain;charset=UTF-8";
 const HTML_TYPE = "text/html; charset=utf-8";
@@ -5218,7 +5218,7 @@ function manualFailureContracts(machineKey: string): readonly HttpContract[] {
         401,
         "unauthorized",
         "Authentication required",
-        "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+        "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
       ),
       PROBLEM_TYPE,
       { "x-request-id": "phase-zero-contract" },
@@ -5257,7 +5257,7 @@ function manualFailureContracts(machineKey: string): readonly HttpContract[] {
         401,
         "unauthorized",
         "Authentication required",
-        "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+        "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
       ),
       PROBLEM_TYPE,
       { "x-request-id": "phase-zero-contract" },
@@ -5272,7 +5272,7 @@ function manualFailureContracts(machineKey: string): readonly HttpContract[] {
         401,
         "unauthorized",
         "Authentication required",
-        "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+        "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
       ),
       PROBLEM_TYPE,
       { "x-request-id": "phase-zero-contract" },
@@ -5298,7 +5298,7 @@ function manualFailureContracts(machineKey: string): readonly HttpContract[] {
         "invalid_configuration_bundle",
         "Invalid configuration bundle",
         "Correct the canonical Hub bundle files and submit them again.",
-        [{ path: [".paseo/hub.yml"], message: "invalid YAML: line 2, column 1" }],
+        [{ path: [".clisbot/hub.yml"], message: "invalid YAML: line 2, column 1" }],
       ),
       PROBLEM_TYPE,
       {
@@ -5308,7 +5308,7 @@ function manualFailureContracts(machineKey: string): readonly HttpContract[] {
       },
       JSON.stringify({
         projectSlug: "default",
-        files: [{ path: ".paseo/hub.yml", content: "environments: [" }],
+        files: [{ path: ".clisbot/hub.yml", content: "environments: [" }],
       }),
     ),
     exact(
@@ -5411,7 +5411,7 @@ function problemBody(
   issues?: readonly { path: readonly (string | number)[]; message: string }[],
 ): string {
   return JSON.stringify({
-    type: `https://paseo.sh/problems/${code.replaceAll("_", "-")}`,
+    type: `https://clisbot.com/problems/${code.replaceAll("_", "-")}`,
     title,
     status,
     detail,
@@ -5521,7 +5521,7 @@ function githubIssueCommentPayload(installationId: number, repo: string, actor: 
   return {
     action: "created",
     sender: { login: actor },
-    comment: { id: installationId, body: "@paseo run tenant dispatch", user: { login: actor } },
+    comment: { id: installationId, body: "@clisbot run tenant dispatch", user: { login: actor } },
     issue: { number: installationId },
     repository: { id: installationId, full_name: repo },
     installation: { id: installationId },

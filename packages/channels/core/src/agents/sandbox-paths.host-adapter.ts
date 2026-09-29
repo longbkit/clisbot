@@ -2,7 +2,7 @@
 //
 // Upstream maps a container path back to the host path of an OpenClaw sandbox
 // (container workdir mapping, managed media roots, `file:` URL rewriting). Fusion
-// agents run on the Paseo daemon's own filesystem and the Hub never sets
+// agents run on the Clisbot daemon's own filesystem and the Hub never sets
 // `sandboxRoot`, so mapping is the identity. The data-URL guard is carried
 // verbatim because it is an input rule, not a sandbox mapping.
 const DATA_URL_RE = /^data:/i;

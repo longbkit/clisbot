@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { HostRuntime } from "@getpaseo/channels-shared";
+import type { HostRuntime } from "@clisbot/channels-shared";
 import { registerAccountInbound, unregisterAccountInbound } from "./runtime-store.js";
 import { withTelegramAccount } from "./runtime.js";
 import { writeTelegramUpdateOffset } from "./update-offset-store.js";

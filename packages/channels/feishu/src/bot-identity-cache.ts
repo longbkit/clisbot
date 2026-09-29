@@ -1,7 +1,7 @@
 // upstream: extensions/feishu/src/bot-identity-cache.ts@5d8067a4483
 // Feishu plugin module implements provider-verified bot identity cache behavior.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-resolution";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-resolution";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { getFeishuRuntime } from "./runtime.js";
 
 const FEISHU_BOT_IDENTITY_CACHE_NAMESPACE = "feishu.bot-identity-cache";

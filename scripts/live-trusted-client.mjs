@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // The scripted trusted client for the two-surface approval live wave — the
-// Paseo-side answerer. It connects to the channel-E2E dev daemon
-// (~/.clisbot-dev, 127.0.0.1:6867; NEVER ~/.paseo / 6767) exactly like the
+// Clisbot-side answerer. It connects to the channel-E2E dev daemon
+// (~/.clisbot-dev, 127.0.0.1:6867; NEVER ~/.clisbot / 6767) exactly like the
 // Hub's own trusted session: hello -> trusted session, scopes ["*"], the
-// daemon password on the `paseo.bearer.<password>` WS subprotocol (read from
+// daemon password on the `clisbot.bearer.<password>` WS subprotocol (read from
 // ~/.clisbot-dev/.daemon-password — referenced by name, never printed).
 //
 // Usage (repo root; `ws` resolves from the root node_modules):
@@ -30,14 +30,14 @@ const t0 = Date.now();
 const stamp = (extra = "") => `[t+${Date.now() - t0}ms]${extra ? " " + extra : ""}`;
 
 function password() {
-  // The dev-home file is a single `PASEO_PASSWORD=<value>` line (same shape the
+  // The dev-home file is a single `CLISBOT_PASSWORD=<value>` line (same shape the
   // repo .env carries), not the bare value — split on the first `=`.
   try {
     const raw = readFileSync(`${DEV_HOME}/.daemon-password`, "utf8").trim();
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() ?? "";
+    return process.env.CLISBOT_PASSWORD?.trim() ?? "";
   }
 }
 
@@ -60,7 +60,7 @@ if (mode !== "list" && agentId === undefined) {
 const passwordValue = password();
 const socket = new WebSocket(
   URL,
-  passwordValue !== "" ? [`paseo.bearer.${passwordValue}`] : undefined,
+  passwordValue !== "" ? [`clisbot.bearer.${passwordValue}`] : undefined,
 );
 const seen = { permissionResolved: 0, agentPermissionResolved: 0, rpcErrors: 0 };
 let settled = false;

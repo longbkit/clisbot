@@ -13,7 +13,7 @@ import {
   UnsupportedForgeCheckoutTargetError,
   type WorktreeCreationIntent,
 } from "./resolve-worktree-creation-intent.js";
-import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@getpaseo/protocol/messages";
+import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@clisbot/protocol/messages";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import { runWithGitCommandPriority } from "../utils/run-git-command.js";
 
@@ -26,7 +26,7 @@ export interface CreateWorktreeCoreInput {
   checkoutSource?: ChangeRequestCheckoutSource;
   githubPrNumber?: number;
   firstAgentContext?: FirstAgentContext;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
   runSetup?: boolean;
 }
@@ -121,7 +121,7 @@ async function createWorktreeCoreWithPriority(
       worktreeSlug: normalizedSlug,
       source: intent,
       runSetup: input.runSetup ?? true,
-      paseoHome: input.paseoHome,
+      clisbotHome: input.clisbotHome,
       worktreesRoot: input.worktreesRoot,
     }),
     intent,
@@ -160,7 +160,7 @@ async function resolveDefaultBranch(
 }
 
 export async function resolveWorktreeRepoRoot(
-  input: Pick<CreateWorktreeCoreInput, "cwd" | "paseoHome">,
+  input: Pick<CreateWorktreeCoreInput, "cwd" | "clisbotHome">,
   workspaceGitService?: Pick<WorkspaceGitService, "resolveRepoRoot">,
 ): Promise<string> {
   if (!workspaceGitService) {

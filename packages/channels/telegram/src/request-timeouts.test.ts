@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/request-timeouts.test.ts@5d8067a4483
 // Telegram tests cover request timeouts plugin behavior.
-import { MAX_TIMER_TIMEOUT_MS } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { MAX_TIMER_TIMEOUT_MS } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { describe, expect, it } from "vitest";
 import {
   resolveTelegramLongPollTimeoutSeconds,

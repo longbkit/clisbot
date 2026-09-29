@@ -15,11 +15,11 @@
 import {
   jsonResult,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
 import { resolveGoogleChatAccount } from "./accounts.js";
 import { googlechatMessageActions } from "./actions.js";
 import { deleteGoogleChatMessage, updateGoogleChatMessage } from "./api.js";

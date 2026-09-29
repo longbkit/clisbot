@@ -11,7 +11,7 @@ describe("desktop dev runtime isolation", () => {
     expect(
       resolveDevUserDataDir({
         devRoot: "/worktrees/feature-a",
-        inheritedUserDataDir: "/checkouts/paseo/.dev/user-data",
+        inheritedUserDataDir: "/checkouts/clisbot/.dev/user-data",
       }),
     ).toBe(path.join("/worktrees/feature-a", ".dev", "user-data"));
   });
@@ -19,10 +19,10 @@ describe("desktop dev runtime isolation", () => {
   test("keeps an explicit user data override outside a managed dev root", () => {
     expect(
       resolveDevUserDataDir({
-        inheritedUserDataDir: "/tmp/paseo-user-data",
-        fallbackRoot: "/checkouts/paseo",
+        inheritedUserDataDir: "/tmp/clisbot-user-data",
+        fallbackRoot: "/checkouts/clisbot",
       }),
-    ).toBe("/tmp/paseo-user-data");
+    ).toBe("/tmp/clisbot-user-data");
   });
 
   test("replaces an inherited CDP flag with this instance's selected port", () => {
@@ -33,7 +33,7 @@ describe("desktop dev runtime isolation", () => {
 
   test("lets Chromium atomically allocate the default CDP port", async () => {
     const runtime = await resolveDevRuntime({
-      PASEO_DEV_RUNTIME_FALLBACK_ROOT: "/checkouts/paseo",
+      CLISBOT_DEV_RUNTIME_FALLBACK_ROOT: "/checkouts/clisbot",
     });
 
     expect(runtime.electronFlags).toBe("--remote-debugging-port=0");
@@ -41,8 +41,8 @@ describe("desktop dev runtime isolation", () => {
 
   test("honors an explicit CDP port without silently changing it", async () => {
     const runtime = await resolveDevRuntime({
-      PASEO_DEV_RUNTIME_FALLBACK_ROOT: "/checkouts/paseo",
-      PASEO_ELECTRON_REMOTE_DEBUGGING_PORT: "9333",
+      CLISBOT_DEV_RUNTIME_FALLBACK_ROOT: "/checkouts/clisbot",
+      CLISBOT_ELECTRON_REMOTE_DEBUGGING_PORT: "9333",
     });
 
     expect(runtime.electronFlags).toBe("--remote-debugging-port=9333");

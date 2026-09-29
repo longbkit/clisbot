@@ -4,11 +4,11 @@ import {
   createMessageReceiptFromOutboundResults,
   type MessageReceipt,
   type MessageReceiptPartKind,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { stripChannelTargetPrefix, stripTargetKindPrefix } from "@getpaseo/channels-core/plugin-sdk/core";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { stripChannelTargetPrefix, stripTargetKindPrefix } from "@clisbot/channels-core/plugin-sdk/core";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { resolveZaloAccount } from "./accounts.js";
 import type { ZaloFetch } from "./api.js";
 import { sendMessage, sendPhoto } from "./api.js";

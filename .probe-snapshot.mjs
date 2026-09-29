@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // READ-ONLY provider-snapshot probe against the channel-E2E dev daemon
-// (127.0.0.1:6867, ~/.clisbot-dev; NEVER ~/.paseo / 6767). Mirrors the
+// (127.0.0.1:6867, ~/.clisbot-dev; NEVER ~/.clisbot / 6767). Mirrors the
 // live-trusted-client handshake: hello (clientType cli) -> trusted session,
 // then the plain-session RPC `get_providers_snapshot_request` — the
 // authoritative standalone substitute for `hub.execution.agent.validate.request`
@@ -25,14 +25,14 @@ function password() {
     const eq = raw.indexOf("=");
     return eq > 0 ? raw.slice(eq + 1).trim() : raw;
   } catch {
-    return process.env.PASEO_PASSWORD?.trim() ?? "";
+    return process.env.CLISBOT_PASSWORD?.trim() ?? "";
   }
 }
 const targets = ["grok", "pi", "codex", "opencode", "claude", "copilot"];
 const t0 = Date.now();
 const st = (x) => console.log(`[t+${Date.now() - t0}ms] ${x}`);
 const pw = password();
-const sock = new WebSocket(URL, pw ? [`paseo.bearer.${pw}`] : undefined);
+const sock = new WebSocket(URL, pw ? [`clisbot.bearer.${pw}`] : undefined);
 let settled = false;
 function done(c = 0) {
   if (settled) return;

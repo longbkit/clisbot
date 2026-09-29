@@ -5,7 +5,7 @@ import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
 import { FolderOpen, Inbox, Plug, Server, Smartphone } from "lucide-react-native";
-import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
@@ -70,7 +70,7 @@ export function OpenProjectScreen() {
       <View style={styles.content}>
         <TitlebarDragRegion />
         <View style={styles.logo}>
-          <PaseoLogo size={52} />
+          <ClisbotLogo size={52} />
         </View>
         {hosts.map((host) => (
           <HostError key={host.serverId} serverId={host.serverId} label={host.label} />

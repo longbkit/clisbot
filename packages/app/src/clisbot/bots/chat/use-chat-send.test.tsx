@@ -2,8 +2,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useChatSend } from "./use-chat-send";
 vi.mock("@/utils/encode-images", () => ({
   encodeImages: async (images: unknown[]) =>

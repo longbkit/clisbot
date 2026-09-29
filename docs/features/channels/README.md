@@ -18,11 +18,11 @@ Every boundary dispute resolves the same way: if the answer changes when the pla
 
 Ports keep upstream's tree so the next sync is a diff, not a re-read.
 
-| Upstream root                                                                                           | Local root                                        | Package                            |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------- |
-| `extensions/<channel>/src/`                                                                             | `packages/channels/<channel>/src/`                | `@getpaseo/channels-<channel>`     |
-| `packages/markdown-core/src/`                                                                           | `packages/channels/markdown-core/src/`            | `@getpaseo/channels-markdown-core` |
-| `src/agents/tools/`, `src/channels/plugins/`, `src/infra/outbound/`, `src/plugin-sdk/` (selected files) | `packages/channels/core/src/<same relative path>` | `@getpaseo/channels-core`          |
+| Upstream root                                                                                           | Local root                                        | Package                           |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------- |
+| `extensions/<channel>/src/`                                                                             | `packages/channels/<channel>/src/`                | `@clisbot/channels-<channel>`     |
+| `packages/markdown-core/src/`                                                                           | `packages/channels/markdown-core/src/`            | `@clisbot/channels-markdown-core` |
+| `src/agents/tools/`, `src/channels/plugins/`, `src/infra/outbound/`, `src/plugin-sdk/` (selected files) | `packages/channels/core/src/<same relative path>` | `@clisbot/channels-core`          |
 
 Relative paths and file names under a root stay identical to upstream. Only import specifiers are rewritten. Fusion-owned code — anything with no upstream counterpart — lives outside those roots, which in practice means `src/fusion/` and `packages/hub/**`.
 
@@ -114,7 +114,7 @@ A Host is private: no public address, and nothing dials into it. The daemon open
 
 Nothing pings to find out whether a Host is there. The Hub is the server for that socket, so a Host that is away fails the call at once with `host_not_connected`, and reconnect stays with the daemon's own retry loop. The app reads the same fact: `presence` on the Hub's `daemons` resource is what both the Hosts screen and a Route row show.
 
-Dialing the daemon back (`channels/daemon/ws-client.ts`) is kept for the two cases that ask for it: an explicit daemon target (`PASEO_HUB_CHANNEL_DAEMON_URL`, or a dev/self-host that wants it), and an account whose Host this Hub cannot resolve. It is not a fallback — a private Host reached that way has to cross the public relay, and a relay socket can go dead with the Hub none the wiser.
+Dialing the daemon back (`channels/daemon/ws-client.ts`) is kept for the two cases that ask for it: an explicit daemon target (`CLISBOT_HUB_CHANNEL_DAEMON_URL`, or a dev/self-host that wants it), and an account whose Host this Hub cannot resolve. It is not a fallback — a private Host reached that way has to cross the public relay, and a relay socket can go dead with the Hub none the wiser.
 
 ### What a carrier is
 
@@ -169,7 +169,7 @@ agent can tell "nothing posted" from "the text posted, the file did not".
 
 ### Why the queue exists at all
 
-Upstream's `ingress-queue.ts` / `ingress-drain.ts` are not portable: they are written against a single-process SQLite file with `pid@boot-id` claim ownership and `blockedLaneKeys` computed in memory. The Hub serializes lanes inside the claim statement instead (`db/channels.ts`). The retry policy is ported verbatim into `@getpaseo/channels-core`; the Hub supplies its non-retryable classes and sets `deadLetterMinAgeMs: 0`. The eight-attempt ceiling therefore frees a failed lane after about two minutes of backoff, plus dispatch time. The ceiling is also checked before dispatch, so recovered claims cannot bypass it. Upstream's default requires both eight attempts and 24 hours, which allowed hundreds of duplicate status replies in the 2026-09-27 incident. Back-pressure uses its separate release budget (50 releases) and does not spend failed attempts. Both paths stop dispatching at ten minutes from admission or explicit operator resubmission; resubmission keeps the original FIFO position. Retry and deferral wake times are capped at that expiry. These are Hub-owned defaults in `ingress/budget.ts`, not changes to the upstream retry policy.
+Upstream's `ingress-queue.ts` / `ingress-drain.ts` are not portable: they are written against a single-process SQLite file with `pid@boot-id` claim ownership and `blockedLaneKeys` computed in memory. The Hub serializes lanes inside the claim statement instead (`db/channels.ts`). The retry policy is ported verbatim into `@clisbot/channels-core`; the Hub supplies its non-retryable classes and sets `deadLetterMinAgeMs: 0`. The eight-attempt ceiling therefore frees a failed lane after about two minutes of backoff, plus dispatch time. The ceiling is also checked before dispatch, so recovered claims cannot bypass it. Upstream's default requires both eight attempts and 24 hours, which allowed hundreds of duplicate status replies in the 2026-09-27 incident. Back-pressure uses its separate release budget (50 releases) and does not spend failed attempts. Both paths stop dispatching at ten minutes from admission or explicit operator resubmission; resubmission keeps the original FIFO position. Retry and deferral wake times are capped at that expiry. These are Hub-owned defaults in `ingress/budget.ts`, not changes to the upstream retry policy.
 
 The queue owns durable admission and completion. The inbound ledger is an audit: the drain records it before dispatch, including queued events with a missing audit row. A consume-mark failure after successful dispatch is logged and does not replay the command or block the lane. This does not make an external post and queue completion atomic; a process crash between them still needs the operation's own idempotency protection. Do not move audit recording back behind transport admission: waking the drain before that second write allows the missing-ledger state found in the same incident. The precise original crash or failed write that produced those rows was not established.
 
@@ -310,7 +310,7 @@ anywhere: the one-time script folded stored grants into rules, and
 `authorizeChannelPrivilege` answers only Project privileges.
 
 The **sender gate** is upstream's. `resolveDmGroupAccessWithLists` is ported
-verbatim into `@getpaseo/channels-core/security/dm-policy-shared`, and
+verbatim into `@clisbot/channels-core/security/dm-policy-shared`, and
 `policy/access.ts` supplies only the three things upstream reads from its own
 config and its own SQLite store: the folded `access:` block, the operator-approved
 pairing list, and whether the conversation is a group. Nothing about `dmPolicy`,
@@ -366,7 +366,7 @@ Three shapes are worth knowing:
   the first turn as often as after one, and `/new` deletes that row.
   `channel_conversation_selections` outlives every session in the conversation
   and is read in `bindings/session-create.ts` at the one place a session is minted.
-  Switching ends the running session because a Paseo agent's model is fixed at
+  Switching ends the running session because a Clisbot agent's model is fixed at
   create time — there is no set-model RPC, and pretending otherwise would report
   a model the agent is not running.
 
@@ -398,7 +398,7 @@ starts every window empty and drops outbound sends still waiting. Replacing a
 configuration cancels only open-audience runs (`cancelOnReplace`).
 
 The database pool is the other shared limit. It holds 30 connections by
-default (`PASEO_HUB_DATABASE_POOL_SIZE`, alias `CLISBOT_HUB_DATABASE_POOL_SIZE`;
+default (`CLISBOT_HUB_DATABASE_POOL_SIZE`, alias `CLISBOT_HUB_DATABASE_POOL_SIZE`;
 `pg`'s own default of 10 is fewer than one busy account's drain workers). Each
 account's drain runs at most half the pool, capped at 12 workers
 (`accountDrainConcurrency` in `ingress/drain.ts`). There is no Hub-wide cap on

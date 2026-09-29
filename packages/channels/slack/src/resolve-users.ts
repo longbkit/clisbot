@@ -1,11 +1,11 @@
 // upstream: extensions/slack/src/resolve-users.ts@5d8067a4483
 // Slack plugin module implements resolve users behavior.
 import type { WebClient } from "@slack/web-api";
-import { resolveDirectoryAllowlistEntries } from "@getpaseo/channels-core/plugin-sdk/directory-runtime";
+import { resolveDirectoryAllowlistEntries } from "@clisbot/channels-core/plugin-sdk/directory-runtime";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { createSlackLookupClient } from "./client.js";
 import { collectSlackCursorPages } from "./cursor-pages.js";
 import { formatSlackTarget, parseSlackTarget } from "./target-parsing.js";

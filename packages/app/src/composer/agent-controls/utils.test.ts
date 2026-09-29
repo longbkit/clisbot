@@ -40,11 +40,11 @@ describe("feature metadata helpers", () => {
       getFeatureToggleTooltip(
         {
           label: "Auto Accept",
-          tooltip: "Paseo auto-accepts permission prompts",
+          tooltip: "Clisbot auto-accepts permission prompts",
         },
         "On",
       ),
-    ).toBe("Paseo auto-accepts permission prompts (On)");
+    ).toBe("Clisbot auto-accepts permission prompts (On)");
   });
 
   it("maps feature highlight colors by feature id", () => {

@@ -1,7 +1,7 @@
 /**
  * AC6 whole-daemon steady-state open/close/scroll loop.
  *
- * Boots a real in-process daemon (createTestPaseoDaemon) with the durable
+ * Boots a real in-process daemon (createTestClisbotDaemon) with the durable
  * session-layout backend, seeds N sessions into the daemon's shared
  * FileAgentTimelineStore (the same 128-owner LRU the daemon reads through),
  * then repeatedly opens + scrolls + closes every session through the daemon's
@@ -21,7 +21,7 @@ import { monitorEventLoopDelay, performance } from "node:perf_hooks";
 import pino from "pino";
 import { FileAgentTimelineStore } from "../../src/server/agent/session-storage/file-agent-timeline-store.js";
 import type { StoredAgentRecord } from "../../src/server/agent/agent-storage.js";
-import { createTestPaseoDaemon } from "../../src/server/test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../../src/server/test-utils/clisbot-daemon.js";
 import { sourceState } from "./source-state.js";
 import { mixedRow } from "./fixtures.js";
 
@@ -60,14 +60,14 @@ function procIo(): Promise<Record<string, number>> {
     .catch(() => ({}) as Record<string, number>);
 }
 
-const paseoHomeRoot = await fs.mkdtemp(path.join(os.tmpdir(), "whole-daemon-"));
-const daemonHandle = await createTestPaseoDaemon({
+const clisbotHomeRoot = await fs.mkdtemp(path.join(os.tmpdir(), "whole-daemon-"));
+const daemonHandle = await createTestClisbotDaemon({
   agentSessionStorage: true,
   mcpEnabled: false,
   relayEnabled: false,
   webUi: { enabled: false, distDir: null },
   logger: pino({ level: "silent" }),
-  paseoHomeRoot,
+  clisbotHomeRoot,
   cleanup: false,
 });
 const staticDir = daemonHandle.staticDir;
@@ -187,13 +187,13 @@ const ioEnd = await procIo();
 // Restart proof: a fresh daemon over the same home still reads every session
 // without loading all history up front (bounded inspection, on-demand pages).
 await daemonHandle.daemon.stop().catch(() => undefined);
-const restarted = await createTestPaseoDaemon({
+const restarted = await createTestClisbotDaemon({
   agentSessionStorage: true,
   mcpEnabled: false,
   relayEnabled: false,
   webUi: { enabled: false, distDir: null },
   logger: pino({ level: "silent" }),
-  paseoHomeRoot,
+  clisbotHomeRoot,
   cleanup: false,
 });
 const restartedList = await restarted.daemon.agentStorage.list();
@@ -224,7 +224,7 @@ const report = {
     totalMemoryBytes: os.totalmem(),
     loadAverage: os.loadavg(),
     build:
-      "Real in-process daemon via createTestPaseoDaemon; fake agent clients; no provider or browser process",
+      "Real in-process daemon via createTestClisbotDaemon; fake agent clients; no provider or browser process",
     backend:
       "Durable session layout; shared FileAgentTimelineStore 128-owner LRU behind agentManager",
   },
@@ -269,7 +269,7 @@ await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.writeFile(output, `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`Report ${output}\n`);
 await fs
-  .rm(paseoHomeRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  .rm(clisbotHomeRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   .catch(() => undefined);
 await fs
   .rm(staticDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })

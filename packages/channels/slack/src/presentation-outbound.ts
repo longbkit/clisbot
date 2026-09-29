@@ -16,8 +16,8 @@ import {
   adaptMessagePresentationForChannel,
   admitMessagePresentation,
   type MessagePresentationBlockNote,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import type { ChannelOutboundAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-send-result";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import type { ChannelOutboundAdapter } from "@clisbot/channels-core/plugin-sdk/channel-send-result";
 import { SLACK_PRESENTATION_CAPABILITIES } from "./presentation.js";
 import {
   resolveSlackReplyBlockResolution,

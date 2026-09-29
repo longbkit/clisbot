@@ -24,7 +24,7 @@ function deps(
       resolveOwner: async () => ({ membershipId: "member-owner", userId: "user-owner" }),
       issueTicket: async (input) => {
         issued.push(input);
-        return { accessTicket: "paseo_dat_minted" };
+        return { accessTicket: "clisbot_dat_minted" };
       },
       ...overrides,
     },
@@ -41,7 +41,7 @@ describe("createChannelAccessTicketResolver", () => {
   it("mints under the org owner membership for an external daemon", async () => {
     const { deps: d, issued } = deps();
     const ticket = await createChannelAccessTicketResolver(d, target)();
-    assert.equal(ticket, "paseo_dat_minted");
+    assert.equal(ticket, "clisbot_dat_minted");
     assert.deepEqual(issued, [
       {
         organizationId: "org-1",
@@ -75,10 +75,10 @@ describe("createChannelAccessTicketResolver", () => {
   it("re-mints on every call (fresh single-use ticket per reconnect)", async () => {
     let n = 0;
     const { deps: d } = deps({
-      issueTicket: async () => ({ accessTicket: `paseo_dat_${n++}` }),
+      issueTicket: async () => ({ accessTicket: `clisbot_dat_${n++}` }),
     });
     const resolve = createChannelAccessTicketResolver(d, target);
-    assert.equal(await resolve(), "paseo_dat_0");
-    assert.equal(await resolve(), "paseo_dat_1");
+    assert.equal(await resolve(), "clisbot_dat_0");
+    assert.equal(await resolve(), "clisbot_dat_1");
   });
 });

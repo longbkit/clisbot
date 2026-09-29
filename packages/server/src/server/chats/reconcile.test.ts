@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ChatMessagePayload } from "@getpaseo/protocol/chats/types";
+import type { ChatMessagePayload } from "@clisbot/protocol/chats/types";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentTimelineRow } from "../agent/agent-timeline-store-types.js";
 import type { StoredChat } from "./chat-record.js";

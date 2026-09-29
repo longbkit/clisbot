@@ -4,10 +4,10 @@ import type { Message } from "grammy/types";
 import {
   createFinalizableDraftStreamControlsForState,
   takeMessageIdAfterStop,
-} from "@getpaseo/channels-core/plugin-sdk/channel-outbound";
-import type { MarkdownTableMode, ReplyToMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import { isSingleUseReplyToMode } from "@getpaseo/channels-core/plugin-sdk/reply-reference";
+} from "@clisbot/channels-core/plugin-sdk/channel-outbound";
+import type { MarkdownTableMode, ReplyToMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import { isSingleUseReplyToMode } from "@clisbot/channels-core/plugin-sdk/reply-reference";
 import { buildTelegramThreadParams, type TelegramThreadSpec } from "./bot/helpers.js";
 import { escapeTelegramHtml, telegramHtmlToPlainTextFallback } from "./format.js";
 import {

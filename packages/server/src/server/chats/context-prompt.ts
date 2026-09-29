@@ -1,11 +1,11 @@
 // What a bot receives for a turn (docs/features/bots-and-chats/plans/server-chat.md,
 // §2.4): the same sender lines and context / message headers a channel session
 // gets, rendered by the protocol's `renderConversationPrompt`. Pure.
-import type { ChatMessagePayload, ChatMessageSender } from "@getpaseo/protocol/chats/types";
+import type { ChatMessagePayload, ChatMessageSender } from "@clisbot/protocol/chats/types";
 import {
   renderConversationPrompt,
   type ConversationLine,
-} from "@getpaseo/protocol/conversation-prompt";
+} from "@clisbot/protocol/conversation-prompt";
 
 /** The identity and name of a participant, for the sender line. */
 export type BotNameResolver = (botId: string) => { slug: string; displayName: string } | null;

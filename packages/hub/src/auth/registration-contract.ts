@@ -34,11 +34,11 @@ export const ORGANIZATION_PROFILE_ERROR_CODES = {
 
 export const EMAIL_REGISTRATION_PATHS = {
   /** `{ email }` → 202 once a link is on its way (or an account already uses the address). */
-  start: "/api/auth/paseo/registration/start",
+  start: "/api/auth/clisbot/registration/start",
   /** `{ token }` → the link state and, while valid, its email. Never consumes the link. */
-  inspect: "/api/auth/paseo/registration/inspect",
+  inspect: "/api/auth/clisbot/registration/inspect",
   /** `{ token, name, password }` → creates, admits, and signs in the account. */
-  complete: "/api/auth/paseo/registration/complete",
+  complete: "/api/auth/clisbot/registration/complete",
 } as const;
 
 /** The query parameter a registration link carries to the Hub entry page. */

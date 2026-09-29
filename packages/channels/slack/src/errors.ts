@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/errors.ts@5d8067a4483
 // Slack plugin module implements errors behavior.
-import { redactSensitiveText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { redactSensitiveText } from "@clisbot/channels-core/plugin-sdk/logging-core";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const NO_ERROR_DETAIL = "no error detail";
 

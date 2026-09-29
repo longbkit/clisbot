@@ -174,12 +174,12 @@ export function normalizeUserCode(value: string): string {
 
 function deriveCredential(deviceCode: string): string {
   const prefix = `${CLI_CREDENTIAL_PREFIX}${createHash("sha256")
-    .update("paseo-cli-prefix\0")
+    .update("clisbot-cli-prefix\0")
     .update(deviceCode)
     .digest("base64url")
     .slice(0, 12)}`;
   const secret = createHash("sha256")
-    .update("paseo-cli-credential\0")
+    .update("clisbot-cli-credential\0")
     .update(deviceCode)
     .digest("base64url");
   return `${prefix}_${secret}`;

@@ -25,16 +25,16 @@
 // Only a capability bound to an account whose loaded vertical publishes
 // `plugin.agentTools` lists anything at all; every other channel lists nothing.
 
-import type { AnyAgentTool } from "@getpaseo/channels-core/agents/tools/common.host-adapter";
+import type { AnyAgentTool } from "@clisbot/channels-core/agents/tools/common.host-adapter";
 import type {
   OpenClawPluginToolContext,
   OpenClawPluginToolFactory,
   OpenClawPluginToolOptions,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
-import type { OpenClawConfig } from "@getpaseo/channels-core/channels/plugins/types.public.host-adapter";
+} from "@clisbot/channels-core/plugin-sdk/plugin-entry";
+import type { OpenClawConfig } from "@clisbot/channels-core/channels/plugins/types.public.host-adapter";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
-import { formatErrorMessage } from "@getpaseo/channels-core/infra/errors";
+import { formatErrorMessage } from "@clisbot/channels-core/infra/errors";
 import type { ChannelReplyCapability } from "./channel-reply-capabilities.js";
 import { getChannelDriveConfig, type ChannelAccountScope } from "./message-actions.js";
 

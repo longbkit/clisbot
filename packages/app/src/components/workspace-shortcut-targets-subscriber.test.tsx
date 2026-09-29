@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { act } from "@testing-library/react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";

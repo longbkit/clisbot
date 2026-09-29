@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
-import type { ChatParticipantPayload } from "@getpaseo/protocol/chats/types";
+import type { ChatParticipantPayload } from "@clisbot/protocol/chats/types";
 import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
 import type { ChatLiveHead } from "./render-model";
 

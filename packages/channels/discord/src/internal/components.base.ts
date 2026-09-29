@@ -1,6 +1,6 @@
 // upstream: extensions/discord/src/internal/components.base.ts@5d8067a4483
 // Discord plugin module implements components.base behavior.
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
 import type { BaseComponentInteraction } from "./interactions.js";
 export { stripUndefinedFields as clean } from "./undefined-fields.js";
 

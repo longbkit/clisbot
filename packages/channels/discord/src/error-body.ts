@@ -1,7 +1,7 @@
 // upstream: extensions/discord/src/error-body.ts@5d8067a4483
 // Discord plugin module implements error body behavior.
-import { redactToolPayloadText } from "@getpaseo/channels-core/plugin-sdk/logging-core";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { redactToolPayloadText } from "@clisbot/channels-core/plugin-sdk/logging-core";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 
 const DISCORD_RESPONSE_BODY_SUMMARY_MAX_CHARS = 240;
 

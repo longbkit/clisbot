@@ -45,7 +45,7 @@ describe.skipIf(!SHOULD_RUN)("Discord real E2E", () => {
         throw new Error("bot not initialised");
       }
 
-      const probe = `paseo e2e ${Date.now()}`;
+      const probe = `clisbot e2e ${Date.now()}`;
       const seen = new Promise<NormalizedDiscordMessageEvent>((resolve) => {
         const handler = (trigger: ExternalTrigger) => {
           const parsed = NormalizedDiscordMessageEventSchema.safeParse(trigger.payload);

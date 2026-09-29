@@ -3,4 +3,4 @@
 // (allow-from matching, pairing, warn dedupe) for the Telegram inbound pipeline.
 // That pipeline is Hub-owned in Fusion (goal slices 1-3). Only the config
 // precedence helper the ported group/send code reuses is carried.
-export { firstDefined } from "@getpaseo/channels-core/channels/allow-from";
+export { firstDefined } from "@clisbot/channels-core/channels/allow-from";

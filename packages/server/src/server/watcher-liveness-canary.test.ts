@@ -13,7 +13,7 @@ afterEach(async () => {
 });
 
 test("requires the canary event to round-trip through the watcher callback", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot, { timeoutMs: 1_000 });
 
@@ -25,7 +25,7 @@ test("requires the canary event to round-trip through the watcher callback", asy
 });
 
 test("rejects when the watcher never reports the canary", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot, { timeoutMs: 10 });
 

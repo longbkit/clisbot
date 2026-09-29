@@ -5,7 +5,7 @@ App interaction contract: [2026-09-27 navigation, creation and shared panes](app
 Date: 2026-09-26. Status: implementation in progress; see [verification and remaining work](implementation.md). Names decided 2026-09-26: **Bot** and
 **Chat**, with **Bot kind** and **Transcript**, in [the glossary](../../glossary.md).
 
-Grok-style teammates inside the Paseo app: create a bot by name, chat with it, put several bots in
+Grok-style teammates inside the Clisbot app: create a bot by name, chat with it, put several bots in
 one chat, inspect files beside the chat, and explicitly open a bot session in the cowork view. The bot layer lives on the daemon and the app;
 the Hub adds external channels, cross-Host chats, and chats with several humans later.
 
@@ -53,7 +53,7 @@ that line still holds for the Channel account; the Bot is a Host resource beside
 
 ### D2. The bot record
 
-One JSON file per bot at `$PASEO_HOME/bots/{botId}.json`, written atomically, following
+One JSON file per bot at `$CLISBOT_HOME/bots/{botId}.json`, written atomically, following
 [data-model](../../data-model.md). Durable facts only:
 
 - identity: `id` (opaque), `slug` (immutable directory name), display name, title, description, avatar;
@@ -70,7 +70,7 @@ finds its bot and chat through labels on the agent, the way open tabs are marked
 
 ### D3. Where the directory goes
 
-`<root>/<slug>`. `root` is a daemon config leaf, default `$PASEO_HOME/workspaces`. An explicit path
+`<root>/<slug>`. `root` is a daemon config leaf, default `$CLISBOT_HOME/workspaces`. An explicit path
 at creation wins. The slug is derived from the name at creation, unique per Host (a numeric suffix
 on collision), and never changes; the display name changes freely. No folder name is derived from
 the bot kind. `workspaces/default` stays as the already-shipped assistant.
@@ -100,7 +100,7 @@ not misclassified. Settings › Projects remains unchanged.
 
 ### D5. Transcript is separate from timelines
 
-`$PASEO_HOME/chats/{chatId}/chat.json` (participants, rules, times; atomic writes) and
+`$CLISBOT_HOME/chats/{chatId}/chat.json` (participants, rules, times; atomic writes) and
 `transcript.jsonl` (append-only, one line per message), mirroring the
 `session.json` + `events.jsonl` layout of [agent session storage](../agent-session-storage/design.md).
 
@@ -166,7 +166,7 @@ by a new one and the transcript gets a system line saying so.
 
 A bot in several chats runs several sessions on the same cwd, concurrently. Overlapping writes to
 memory files are the agent's problem, as they already are for any workspace with several sessions.
-A per-bot queue was rejected: it breaks the native feel and Paseo runs sessions freely everywhere else.
+A per-bot queue was rejected: it breaks the native feel and Clisbot runs sessions freely everywhere else.
 
 ### D9. Group turn rules follow the channel Route model
 
@@ -188,10 +188,10 @@ current values with an update hint. Direct and archived chats cannot use this op
 
 ### D10. Feature flag
 
-`daemon.bots.enabled` in persisted config, `PASEO_BOTS_ENABLED` override, `server_info.features.bots`
+`daemon.bots.enabled` in persisted config, `CLISBOT_BOTS_ENABLED` override, `server_info.features.bots`
 with a `COMPAT` tag; the app gates on `useHostFeature`. **On by default** since 2026-09-29
 (`COMPAT(clisbot-bots-default)` in `packages/server/src/server/bots/bots-config.ts`): a fusion daemon
-runs Bots & Chats unless `daemon.bots.enabled: false` or `PASEO_BOTS_ENABLED=0`; the environment
+runs Bots & Chats unless `daemon.bots.enabled: false` or `CLISBOT_BOTS_ENABLED=0`; the environment
 wins, then the file, then the default. Off: no RPC registered, no storage touched,
 no sidebar entry; the daemon behaves byte-for-byte as upstream. The app is behavior-equivalent: its
 two route files and three sidebar insertion points exist in the bundle and return nothing while the

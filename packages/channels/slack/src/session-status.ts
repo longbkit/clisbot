@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/session-status.ts@5d8067a4483
 import type { WebAPICallResult, WebClient } from "@slack/web-api";
 import { defaultRuntime, logVerbose, warn, type RuntimeEnv } from "./fusion/runtime-env.js";
-import { truncateUtf16Safe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import { truncateUtf16Safe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { formatSlackError } from "./errors.js";
 
 type SlackSessionStatus = "processing" | "active" | "suspended";

@@ -6,15 +6,15 @@
 // contracts and the plugin runtime setter — so a bundled plugin can be loaded
 // by an OpenClaw host without importing `openclaw` itself. Fusion has no
 // OpenClaw host: the members this vertical's ported closure reads come from
-// `@getpaseo/channels-core`, which carries the same upstream source modules,
+// `@clisbot/channels-core`, which carries the same upstream source modules,
 // and the Hub owns the rest (setup, pairing, reply delivery, session keys).
 //
 // Import specifiers are the only thing the ported files change: every ported
 // `import … from "../runtime-api.js"` was rewritten to this module.
 
-export type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-export type { ChannelGroupContext } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { AnyAgentTool as CoreAnyAgentTool } from "@getpaseo/channels-core/agents/tools/common.host-adapter";
+export type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+export type { ChannelGroupContext } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { AnyAgentTool as CoreAnyAgentTool } from "@clisbot/channels-core/agents/tools/common.host-adapter";
 
 /** D-ZU-021: the core host adapter also makes `execute` optional (it types a
  * tool the same way it types a factory's partial). Upstream's `AnyAgentTool`
@@ -28,12 +28,12 @@ export type {
   OpenClawPluginToolFactory,
   OpenClawPluginToolOptions,
   PluginLogger,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
+} from "@clisbot/channels-core/plugin-sdk/plugin-entry";
 
-import type { OpenClawPluginToolContext as CoreToolContext } from "@getpaseo/channels-core/plugin-sdk/plugin-entry";
-import type { OpenClawConfig as ToolRuntimeConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawPluginToolContext as CoreToolContext } from "@clisbot/channels-core/plugin-sdk/plugin-entry";
+import type { OpenClawConfig as ToolRuntimeConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 
-/** D-ZU-021: `@getpaseo/channels-core` carries the tool context as a host
+/** D-ZU-021: `@clisbot/channels-core` carries the tool context as a host
  * adapter that narrows away upstream's two runtime-config readers. The ported
  * `tool.ts` prefers them (`getRuntimeConfig()` over `runtimeConfig` over
  * `config`) so a media ceiling changed mid-session is honoured, so the barrel

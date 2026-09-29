@@ -22,7 +22,7 @@ export const TriggerYamlRequestSchema = z
   .object({ yaml: z.string().min(1).max(1_000_000) })
   .strict()
   .openapi("TriggerYamlRequest", {
-    description: "One self-contained Paseo trigger YAML document.",
+    description: "One self-contained Clisbot trigger YAML document.",
   });
 
 export const ValidatedTriggerSchema = z
@@ -95,7 +95,7 @@ export const ProblemSchema = z
   .strict()
   .openapi("Problem", {
     example: {
-      type: "https://paseo.sh/problems/invalid-request",
+      type: "https://clisbot.com/problems/invalid-request",
       title: "Invalid request",
       status: 400,
       detail: "The request body contains invalid fields.",
@@ -112,8 +112,8 @@ export const ConfigurationFileSchema = z
   })
   .strict()
   .openapi("ConfigurationFile", {
-    description: "One UTF-8 file in the canonical .paseo Hub bundle.",
-    example: { path: ".paseo/hub.yml", content: "environments: {}\nagents: {}\n" },
+    description: "One UTF-8 file in the canonical .clisbot Hub bundle.",
+    example: { path: ".clisbot/hub.yml", content: "environments: {}\nagents: {}\n" },
   });
 
 export const InstallConfigurationRequestSchema = z
@@ -124,12 +124,12 @@ export const InstallConfigurationRequestSchema = z
   .strict()
   .openapi("InstallConfigurationRequest", {
     description:
-      "Install the complete canonical bundle: .paseo/hub.yml, direct-child .paseo/workflows/*.yml files, and referenced .paseo/workflows/partials/*.md files.",
+      "Install the complete canonical bundle: .clisbot/hub.yml, direct-child .clisbot/workflows/*.yml files, and referenced .clisbot/workflows/partials/*.md files.",
     example: {
       projectSlug: "payments",
       files: [
         {
-          path: ".paseo/hub.yml",
+          path: ".clisbot/hub.yml",
           content: [
             "name: payments",
             "environments:",
@@ -143,7 +143,7 @@ export const InstallConfigurationRequestSchema = z
           ].join("\n"),
         },
         {
-          path: ".paseo/workflows/deploy.yml",
+          path: ".clisbot/workflows/deploy.yml",
           content: [
             "name: deploy",
             "on: manual.run",
@@ -159,7 +159,7 @@ export const InstallConfigurationRequestSchema = z
           ].join("\n"),
         },
         {
-          path: ".paseo/workflows/partials/safety.md",
+          path: ".clisbot/workflows/partials/safety.md",
           content: "Follow the safety checklist.",
         },
       ],

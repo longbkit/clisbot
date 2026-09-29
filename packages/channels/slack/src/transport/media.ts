@@ -13,8 +13,8 @@
 // host allowlist) — trimmed to the P0 fold (no audio preflight, no
 // fresh-URL refetch, no concurrency pool: one download per file, in order).
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
-import type { HostChildLogger, InboundAttachedFile } from "@getpaseo/channels-shared";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
+import type { HostChildLogger, InboundAttachedFile } from "@clisbot/channels-shared";
 import {
   buildAttachedFilesManifest,
   downloadMediaFile,
@@ -22,7 +22,7 @@ import {
   mediaInboundMaxBytesForChannel,
   MEDIA_DOWNLOAD_TIMEOUT_MS,
   type ChannelInboundEvent,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import type { SlackMessageEvent } from "./socket-event-filter.js";
 
 /** The carrier kinds the manifest reports (classified from the file's

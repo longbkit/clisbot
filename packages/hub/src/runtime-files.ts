@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 
-const RUNTIME_ROOT = Symbol.for("@getpaseo/hub/runtime-root");
+const RUNTIME_ROOT = Symbol.for("@clisbot/hub/runtime-root");
 
 type RuntimeGlobal = typeof globalThis & { [RUNTIME_ROOT]?: string };
 

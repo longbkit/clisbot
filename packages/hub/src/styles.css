@@ -3,18 +3,18 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Palette ported from the Paseo app (packages/app/src/styles/theme.ts) so the hub
+ * Palette ported from the Clisbot app (packages/app/src/styles/theme.ts) so the hub
  * reads as the same product. Light mirrors `lightSemanticColors`; dark mirrors
- * `paseoDarkColors`, the green-tinted default theme.
+ * `clisbotDarkColors`, the green-tinted default theme.
  *
- * Naming trap: Paseo's `accent` is the brand CTA colour, while shadcn's `--accent`
- * is the subtle hover surface. They are different concepts. Paseo `accent` maps to
+ * Naming trap: Clisbot's `accent` is the brand CTA colour, while shadcn's `--accent`
+ * is the subtle hover surface. They are different concepts. Clisbot `accent` maps to
  * `--primary` here; `--accent` stays a surface. Do not collide the two again.
  *
  * A brand colour needs two values, not one. `--primary` is the fill behind
  * `--primary-foreground`; `--link` is the same brand read as text on a surface. On
  * dark, one value cannot do both — the fill that carries white text sits at 2.8:1 as
- * text. `--link` is Paseo's `accentBright` for exactly this reason.
+ * text. `--link` is Clisbot's `accentBright` for exactly this reason.
  */
 
 :root {
@@ -115,7 +115,7 @@
 }
 
 @theme inline {
-  /* Matches Paseo's BORDER_RADIUS scale: sm 4, md 6, lg 8, xl 12. */
+  /* Matches Clisbot's BORDER_RADIUS scale: sm 4, md 6, lg 8, xl 12. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

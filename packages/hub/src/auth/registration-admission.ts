@@ -7,7 +7,7 @@ import { reportFailure } from "../failures/index.js";
 import { runInRegistrationScope } from "./registration-scope.js";
 
 const signupEmailBody = z.object({ email: z.string().email() }).passthrough();
-const INVITATION_LOCK_PREFIX = "paseo:invitation:";
+const INVITATION_LOCK_PREFIX = "clisbot:invitation:";
 
 export function invitationLockName(invitationId: string): string {
   return `${INVITATION_LOCK_PREFIX}${invitationId}`;

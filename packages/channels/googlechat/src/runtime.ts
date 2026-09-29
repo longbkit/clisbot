@@ -16,7 +16,7 @@
 // install. This mirrors the Discord vertical's `runtime.ts` (D-DC-003) and the
 // Telegram vertical's (D-TG-046).
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { PluginRuntime } from "@getpaseo/channels-core/plugin-sdk/channel-core";
+import type { PluginRuntime } from "@clisbot/channels-core/plugin-sdk/channel-core";
 
 /** Installed runtimes by account id; `""` is the unkeyed single-account slot. */
 const runtimes = new Map<string, PluginRuntime>();

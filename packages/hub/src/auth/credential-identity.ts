@@ -2,7 +2,7 @@ import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
 import type { OperationAuthenticator } from "./operation-auth.js";
 import { parseOrganizationRole } from "./organization-policy.js";
 
-export const CREDENTIAL_IDENTITY_PATH = "/api/auth/paseo/credential";
+export const CREDENTIAL_IDENTITY_PATH = "/api/auth/clisbot/credential";
 
 interface IdentityRow extends QueryRow {
   organization_id: string;

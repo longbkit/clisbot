@@ -1,7 +1,7 @@
 // upstream: extensions/zalo/src/probe.ts@5d8067a4483
 // Zalo plugin module implements probe behavior.
-import type { BaseProbeResult } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { runChannelProbe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import type { BaseProbeResult } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { runChannelProbe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { getMe, ZaloApiError, type ZaloBotInfo, type ZaloFetch } from "./api.js";
 
 export type ZaloProbeResult = BaseProbeResult<string> & {

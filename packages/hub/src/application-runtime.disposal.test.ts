@@ -67,7 +67,7 @@ describe("channel plane disposal chain", () => {
   });
 
   it("stops the channel plane when the application runtime stops", async () => {
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "1";
     try {
       const database = runtimeDatabase();
       const runtime = await createApplicationRuntime({
@@ -97,12 +97,12 @@ describe("channel plane disposal chain", () => {
       assert.deepEqual(supervisorModule.events, ["start begun", "start finished", "stopAll"]);
       assert.deepEqual(supervisorModule.stopAllCalls, ["channel-plane-disposal-test"]);
     } finally {
-      delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
+      delete process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
     }
   });
 
   it("registers nothing channel-specific when the kill-switch is off", async () => {
-    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";
+    process.env["CLISBOT_HUB_CHANNELS_ENABLED"] = "0";
     try {
       const database = runtimeDatabase();
       const runtime = await createApplicationRuntime({
@@ -121,7 +121,7 @@ describe("channel plane disposal chain", () => {
       await runtime.stop();
       assert.deepEqual(supervisorModule.stopAllCalls, []);
     } finally {
-      delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
+      delete process.env["CLISBOT_HUB_CHANNELS_ENABLED"];
     }
   });
 });

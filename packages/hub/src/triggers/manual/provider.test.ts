@@ -18,7 +18,7 @@ describe("manual invocation provider", () => {
               on: "manual.run",
               max_runtime: "1h",
               filters: { from_users: ["*"] },
-              inputs: { repo: { type: "string", required: true, choices: ["paseo", "hub"] } },
+              inputs: { repo: { type: "string", required: true, choices: ["clisbot", "hub"] } },
               steps: [
                 {
                   id: "work",
@@ -26,7 +26,7 @@ describe("manual invocation provider", () => {
                   max_runtime: "10m",
                   idle_timeout: "1m",
                   agent: { provider: "codex" },
-                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                  prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
                 },
               ],
             },
@@ -74,7 +74,7 @@ describe("manual invocation provider", () => {
               max_runtime: "1h",
               filters: { from_users: ["*"], inputs: { repo: "hub" } },
               inputs: {
-                repo: { type: "string", choices: ["paseo", "hub"] },
+                repo: { type: "string", choices: ["clisbot", "hub"] },
                 agent: {
                   type: "string",
                   default: "codex",
@@ -88,7 +88,7 @@ describe("manual invocation provider", () => {
                   max_runtime: "10m",
                   idle_timeout: "1m",
                   agent: { provider: "codex" },
-                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                  prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
                 },
               ],
             },
@@ -143,7 +143,7 @@ describe("manual invocation provider", () => {
                   max_runtime: "10m",
                   idle_timeout: "1m",
                   agent: { provider: "codex" },
-                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                  prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
                 },
               ],
             },

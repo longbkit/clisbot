@@ -8,17 +8,17 @@ category: Hub
 
 # Hub quickstart
 
-`paseo hub init` creates a local assistant workspace with starter instructions and an initial agent you can open in the app. Supply channel credentials to also enroll the daemon, configure a Connection and member routes, and prepare owner access. Configuration is updated through APIs.
+`clisbot hub init` creates a local assistant workspace with starter instructions and an initial agent you can open in the app. Supply channel credentials to also enroll the daemon, configure a Connection and member routes, and prepare owner access. Configuration is updated through APIs.
 
-You need Paseo installed and an available agent provider on the daemon. The examples use Codex; select another configured provider with `--provider`.
+You need Clisbot installed and an available agent provider on the daemon. The examples use Codex; select another configured provider with `--provider`.
 
 ## Create your assistant workspace
 
 ```sh
-paseo hub init --provider codex
+clisbot hub init --provider codex
 ```
 
-The command starts the local daemon and Hub as needed. Its default directory is `<Clisbot home>/workspaces/default`, regardless of the directory from which you run it. Home resolution is `--home`, then `CLISBOT_HOME`, then `PASEO_HOME`, then `~/.clisbot`. `~` in a configured home is expanded. Use `--workspace /absolute/path` to select another directory.
+The command starts the local daemon and Hub as needed. Its default directory is `<Clisbot home>/workspaces/default`, regardless of the directory from which you run it. Home resolution is `--home`, then `CLISBOT_HOME`, then `CLISBOT_HOME`, then `~/.clisbot`. `~` in a configured home is expanded. Use `--workspace /absolute/path` to select another directory.
 
 The daemon owns the **Project** and **Workspace**. Hub has no Project to create or select. For worktree isolation, templates are written into the actual worktree directory returned by the daemon.
 
@@ -31,7 +31,7 @@ Open the local Hub address printed by the command and finish Account setup. For 
 For Telegram:
 
 ```sh
-paseo hub init --provider codex \
+clisbot hub init --provider codex \
   --telegram-bot-token '${TELEGRAM_BOT_TOKEN}' \
   --owner-email you@example.com \
   --owner-identity YOUR_TELEGRAM_USER_ID
@@ -40,7 +40,7 @@ paseo hub init --provider codex \
 For Slack Socket Mode:
 
 ```sh
-paseo hub init --provider codex \
+clisbot hub init --provider codex \
   --slack-app-token '${SLACK_APP_TOKEN}' \
   --slack-bot-token '${SLACK_BOT_TOKEN}' \
   --owner-email you@example.com \
@@ -56,7 +56,7 @@ When the owner is linked and transport is started, DM the bot or mention it in a
 ## Run again and update configuration
 
 ```sh
-paseo bot start --bot-name personal-assistant
+clisbot bot start --bot-name personal-assistant
 ```
 
 The saved manifest reuses the workspace, initial agent, and encrypted Connection; it contains no channel token. `hub init` also resumes a saved bot. A failed channel install retains the daemon resource IDs for retry. Existing user files and unrelated routes are preserved.
@@ -69,7 +69,7 @@ Use the Hub configuration UI or its resource APIs to change configuration. Expor
 
 Each home starts its own daemon and Hub. On first setup, if a default loopback port is occupied,
 onboarding selects another available port and prints the actual addresses. Background Hub
-restarts retain the selected port and fail if another process has since taken it. An explicit `PASEO_LISTEN` or `hub start --port`
+restarts retain the selected port and fail if another process has since taken it. An explicit `CLISBOT_LISTEN` or `hub start --port`
 choice must be free. A supervisor PID alone does not mean the daemon is ready;
 startup failures point to the selected home's logs rather than contacting another
 home's server. An existing connection to a different Hub must be disconnected
@@ -88,7 +88,7 @@ existing password. To change a password you still know, export the current and n
 passwords as environment variables, then run:
 
 ```sh
-paseo hub password change --home "$HOME/.clisbot-dev-01" \
+clisbot hub password change --home "$HOME/.clisbot-dev-01" \
   --email "$OWNER_EMAIL" \
   --current-password '${CURRENT_OWNER_PASSWORD}' \
   --new-password '${NEW_OWNER_PASSWORD}'
@@ -123,8 +123,8 @@ Start the Hub from that environment. If already running, restart **that Hub** to
 load the setting (the daemon can stay running):
 
 ```sh
-paseo hub stop --home "$HOME/.clisbot-dev-01"
-paseo hub start --home "$HOME/.clisbot-dev-01"
+clisbot hub stop --home "$HOME/.clisbot-dev-01"
+clisbot hub start --home "$HOME/.clisbot-dev-01"
 ```
 
 An exported shell variable lasts only for that shell and its children. For service
@@ -139,7 +139,7 @@ terminal, then use references so values are not exposed in process arguments:
 read -rsp 'New account password: ' NEW_OWNER_PASSWORD
 printf '\n'
 export NEW_OWNER_PASSWORD
-paseo hub password reset --home "$HOME/.clisbot-dev-01" \
+clisbot hub password reset --home "$HOME/.clisbot-dev-01" \
   --email "$OWNER_EMAIL" \
   --master-password '${CLISBOT_MASTER_PASSWORD}' \
   --new-password '${NEW_OWNER_PASSWORD}'
@@ -169,7 +169,7 @@ the recovery secret or ask them to perform recovery on your behalf.
 ## Explicitly replace the seed template
 
 ```sh
-paseo hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
+clisbot hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
 ```
 
 This replaces the nine bundled template files, including `USER.md`, `MEMORY.md`,

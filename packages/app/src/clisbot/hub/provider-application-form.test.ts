@@ -29,7 +29,7 @@ describe("Hub Provider Application form", () => {
   it("builds a GitHub Application without trimming secret material", () => {
     const form = openHubProviderApplicationForm();
     form.setField("appId", " 42 ");
-    form.setField("appSlug", " paseo ");
+    form.setField("appSlug", " clisbot ");
     form.setField("clientId", " client ");
     form.setField("clientSecret", " secret ");
     form.setField("privateKey", "-----BEGIN KEY-----\nkey\n-----END KEY-----\n");
@@ -37,7 +37,7 @@ describe("Hub Provider Application form", () => {
     expect(form.getState().submission).toEqual({
       provider: "github",
       appId: "42",
-      appSlug: "paseo",
+      appSlug: "clisbot",
       clientId: "client",
       clientSecret: " secret ",
       privateKey: "-----BEGIN KEY-----\nkey\n-----END KEY-----\n",
@@ -49,7 +49,7 @@ describe("Hub Provider Application form", () => {
     const form = openHubProviderApplicationForm({
       provider: "github",
       application: {
-        identifiers: { appId: "42", appSlug: "paseo", clientId: "client" },
+        identifiers: { appId: "42", appSlug: "clisbot", clientId: "client" },
         configurationVersion: 3,
       },
     });

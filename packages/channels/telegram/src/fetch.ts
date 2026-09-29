@@ -8,7 +8,7 @@
 // fetch: DNS ordering and IPv4 fallback are host concerns here. Callers'
 // lifecycle contract is unchanged — `close()` is idempotent and a
 // caller-supplied `proxyFetch` owns its own dispatcher.
-import type { TelegramNetworkConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { TelegramNetworkConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import {
   resolveTelegramAutoSelectFamilyDecision,
   resolveTelegramDnsResultOrderDecision,

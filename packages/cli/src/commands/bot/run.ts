@@ -11,10 +11,10 @@ import {
   verifyOnboardingDaemon,
   waitForOnboardingHub,
 } from "./local-runtime.js";
-import type { BotTemplateResult } from "@getpaseo/protocol/bots/rpc-schemas";
+import type { BotTemplateResult } from "@clisbot/protocol/bots/rpc-schemas";
 type WorkspaceTemplateResult = BotTemplateResult & { directory: string; backupDirectory?: string };
 import { connectOnboardingDaemon, isOnboardingEnabled } from "./onboarding-client.js";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandError } from "../../output/index.js";
 import { resolveControlPlaneTarget, type ControlPlaneTarget } from "../control-plane.js";
@@ -33,7 +33,7 @@ import {
   startLocalHubDetached,
 } from "../hub/local-hub.js";
 import { resolveTcpHostFromListen, startLocalDaemonDetached } from "../daemon/local-daemon.js";
-import { readDaemonInstance, daemonLogPath } from "@getpaseo/server/daemon-control";
+import { readDaemonInstance, daemonLogPath } from "@clisbot/server/daemon-control";
 import { assertBotName, readBotManifest, writeBotManifest, type BotManifest } from "./manifest.js";
 import {
   buildBotManifest,

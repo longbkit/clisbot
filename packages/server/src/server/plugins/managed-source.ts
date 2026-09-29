@@ -13,7 +13,7 @@ import {
   type PluginUpdateProposal,
   type PluginUpdateSelection,
   type PluginUpdateTarget,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { runGitCommand } from "../../utils/run-git-command.js";
 import { ensurePrivateDirectory, writePrivateFileAtomicSync } from "../private-files.js";
 import { readPluginManifest, type PluginManifest } from "./manifest.js";
@@ -49,8 +49,8 @@ export class ManagedPluginSources {
   private readonly root: string;
   private readonly metadataPath: string;
   private readonly records: Record<string, ManagedPluginRecord>;
-  constructor(paseoHome: string) {
-    this.root = path.resolve(paseoHome, "plugins");
+  constructor(clisbotHome: string) {
+    this.root = path.resolve(clisbotHome, "plugins");
     this.metadataPath = path.join(this.root, "sources.json");
     this.records = existsSync(this.metadataPath)
       ? z
@@ -443,7 +443,7 @@ function assertPluginPath(checkoutRoot: string, directory: string): void {
 
 async function clone(remote: string, checkoutRoot: string): Promise<void> {
   const publicRemote = redactRemoteCredentials(remote);
-  const cloneRemote = publicRemote === remote ? remote : "https://paseo.invalid/plugin.git";
+  const cloneRemote = publicRemote === remote ? remote : "https://clisbot.invalid/plugin.git";
   const envOverlay =
     cloneRemote === remote
       ? GIT_ENV
@@ -516,7 +516,7 @@ async function resolveRemoteCommit(remote: string, cwd: string, ref?: string): P
   if (ref?.startsWith("-")) throw new Error("Plugin Git ref cannot start with '-'");
   if (ref && /^[0-9a-f]{40,64}$/.test(ref)) return ref;
   const publicRemote = redactRemoteCredentials(remote);
-  const cloneRemote = publicRemote === remote ? remote : "https://paseo.invalid/plugin.git";
+  const cloneRemote = publicRemote === remote ? remote : "https://clisbot.invalid/plugin.git";
   const envOverlay =
     cloneRemote === remote
       ? GIT_ENV

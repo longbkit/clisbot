@@ -335,7 +335,7 @@ function thirdPartyDeps(pkgJson) {
   const out = {};
   for (const [name, range] of Object.entries(deps)) {
     // Third-party only: the OpenClaw runtime and the Fusion workspace are not sync surface.
-    if (name === "openclaw" || name.startsWith("@openclaw/") || name.startsWith("@getpaseo/"))
+    if (name === "openclaw" || name.startsWith("@openclaw/") || name.startsWith("@clisbot/"))
       continue;
     if (typeof range === "string" && /^(workspace|file|link|catalog):/.test(range)) continue;
     out[name] = range;

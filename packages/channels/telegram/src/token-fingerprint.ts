@@ -1,7 +1,7 @@
 // upstream: extensions/telegram/src/token-fingerprint.ts@5d8067a4483
 // Telegram plugin module implements token fingerprint behavior.
 import { createHash } from "node:crypto";
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 /**
  * Derive a short, non-reversible fingerprint of a Telegram bot token suitable

@@ -1,4 +1,4 @@
-import { SessionActorSchema, sessionParticipantKey } from "@getpaseo/protocol/session-authorship";
+import { SessionActorSchema, sessionParticipantKey } from "@clisbot/protocol/session-authorship";
 import { normalizeWorkspaceFileLocation, workspaceFileLocationsEqual } from "@/workspace/file-open";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 

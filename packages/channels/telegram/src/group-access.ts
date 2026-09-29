@@ -9,8 +9,8 @@ import type {
   TelegramAccountConfig,
   TelegramGroupConfig,
   TelegramTopicConfig,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { resolveOpenProviderRuntimeGroupPolicy } from "@getpaseo/channels-core/config/runtime-group-policy";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { resolveOpenProviderRuntimeGroupPolicy } from "@clisbot/channels-core/config/runtime-group-policy";
 import { firstDefined } from "./bot-access.js";
 
 export const resolveTelegramRuntimeGroupPolicy = (params: {

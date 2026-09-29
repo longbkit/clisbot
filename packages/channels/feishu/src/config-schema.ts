@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/config-schema.ts@5d8067a4483
 // Feishu helper module supports config schema behavior.
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
 import {
   ContextVisibilityModeSchema,
   DmPolicySchema,
@@ -9,7 +9,7 @@ import {
   buildChannelConfigSchema,
   buildGroupEntrySchema,
   buildMultiAccountChannelSchema,
-} from "@getpaseo/channels-core/plugin-sdk/channel-config-schema";
+} from "@clisbot/channels-core/plugin-sdk/channel-config-schema";
 import { z } from "zod";
 import { FEISHU_EXTERNAL_KEY_PATTERN } from "./external-keys.js";
 import { buildSecretInputSchema, hasConfiguredSecretInput } from "./secret-input.js";

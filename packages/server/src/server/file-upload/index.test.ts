@@ -8,7 +8,7 @@ import {
   encodeFileTransferFrame,
   FileTransferOpcode,
   type FileTransferFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import { FileUploadStore } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -22,8 +22,8 @@ describe("file uploads", () => {
   });
 
   it("stores chunked upload bytes and returns an uploaded-file attachment", async () => {
-    const paseoHome = makePaseoHome();
-    const uploads = new FileUploadStore({ paseoHome });
+    const clisbotHome = makeClisbotHome();
+    const uploads = new FileUploadStore({ clisbotHome });
 
     uploads.beginUpload({
       type: "file.upload.request",
@@ -37,7 +37,7 @@ describe("file uploads", () => {
     await expect(uploads.receiveFrame(uploadChunk("req-upload", "hello"))).resolves.toBeNull();
     await expect(uploads.receiveFrame(uploadChunk("req-upload", " world"))).resolves.toBeNull();
 
-    const guessedPath = join(paseoHome, "uploads", "upload_req-upload", "notes.txt");
+    const guessedPath = join(clisbotHome, "uploads", "upload_req-upload", "notes.txt");
     expect(
       uploads.ownsUploadedFile({
         type: "uploaded_file",
@@ -48,7 +48,7 @@ describe("file uploads", () => {
         path: guessedPath,
       }),
     ).toBe(false);
-    const path = uploadedPath(paseoHome, "notes.txt");
+    const path = uploadedPath(clisbotHome, "notes.txt");
     const response = await uploads.receiveFrame(uploadEnds("req-upload"));
     expect(response).toEqual({
       type: "file.upload.response",
@@ -82,14 +82,14 @@ describe("file uploads", () => {
         fileName: "notes.txt",
         mimeType: "text/plain",
         size: 11,
-        path: join(paseoHome, "uploads", "another-session", "notes.txt"),
+        path: join(clisbotHome, "uploads", "another-session", "notes.txt"),
       }),
     ).toBe(false);
     expect(readFileSync(path, "utf8")).toBe("hello world");
   });
 
   it("keeps the original file name for non-ASCII and punctuated names", async () => {
-    const uploads = new FileUploadStore({ paseoHome: makePaseoHome() });
+    const uploads = new FileUploadStore({ clisbotHome: makeClisbotHome() });
 
     for (const fileName of [
       "2026年9月绩效计划表.xlsx",
@@ -105,7 +105,7 @@ describe("file uploads", () => {
   });
 
   it("replaces path separators, control characters, and characters Windows rejects", async () => {
-    const uploads = new FileUploadStore({ paseoHome: makePaseoHome() });
+    const uploads = new FileUploadStore({ clisbotHome: makeClisbotHome() });
 
     await expect(uploadNamed(uploads, "../../etc/passwd")).resolves.toMatchObject({
       fileName: "passwd",
@@ -122,7 +122,7 @@ describe("file uploads", () => {
   });
 
   it("shortens a long non-ASCII name to the file system limit and keeps its extension", async () => {
-    const uploads = new FileUploadStore({ paseoHome: makePaseoHome() });
+    const uploads = new FileUploadStore({ clisbotHome: makeClisbotHome() });
 
     const file = await uploadNamed(uploads, `${"绩".repeat(100)}.xlsx`);
 
@@ -132,8 +132,8 @@ describe("file uploads", () => {
   });
 
   it("rejects chunks beyond the declared size and removes the partial file", async () => {
-    const paseoHome = makePaseoHome();
-    const uploads = new FileUploadStore({ paseoHome });
+    const clisbotHome = makeClisbotHome();
+    const uploads = new FileUploadStore({ clisbotHome });
 
     uploads.beginUpload({
       type: "file.upload.request",
@@ -145,7 +145,7 @@ describe("file uploads", () => {
     });
     await expect(uploads.receiveFrame(uploadBegins("req-overflow"))).resolves.toBeNull();
 
-    const path = uploadedPath(paseoHome, "notes.txt");
+    const path = uploadedPath(clisbotHome, "notes.txt");
     const uploadDir = dirname(path);
     await expect(uploads.receiveFrame(uploadChunk("req-overflow", "hello!"))).resolves.toEqual({
       type: "file.upload.response",
@@ -160,8 +160,8 @@ describe("file uploads", () => {
   });
 
   it("preserves chunk order when frames arrive before earlier disk writes finish", async () => {
-    const paseoHome = makePaseoHome();
-    const uploads = new FileUploadStore({ paseoHome });
+    const clisbotHome = makeClisbotHome();
+    const uploads = new FileUploadStore({ clisbotHome });
 
     uploads.beginUpload({
       type: "file.upload.request",
@@ -181,15 +181,15 @@ describe("file uploads", () => {
 
     expect(results.slice(0, 3)).toEqual([null, null, null]);
     expect(results[3]?.payload.error).toBeNull();
-    expect(readFileSync(uploadedPath(paseoHome, "notes.txt"), "utf8")).toBe("hello world");
+    expect(readFileSync(uploadedPath(clisbotHome, "notes.txt"), "utf8")).toBe("hello world");
   });
 
   it("replaces duplicate upload starts without letting the old stale timeout evict the replacement", async () => {
     vi.useFakeTimers();
 
-    const paseoHome = makePaseoHome();
+    const clisbotHome = makeClisbotHome();
     const uploads = new FileUploadStore({
-      paseoHome,
+      clisbotHome,
       staleUploadTimeoutMs: 50,
     });
 
@@ -217,7 +217,7 @@ describe("file uploads", () => {
 
     await expect(uploads.receiveFrame(uploadBegins("req-duplicate"))).resolves.toBeNull();
     await expect(uploads.receiveFrame(uploadChunk("req-duplicate", "new"))).resolves.toBeNull();
-    const path = uploadedPath(paseoHome, "new.txt");
+    const path = uploadedPath(clisbotHome, "new.txt");
     await expect(uploads.receiveFrame(uploadEnds("req-duplicate"))).resolves.toEqual({
       type: "file.upload.response",
       payload: {
@@ -239,9 +239,9 @@ describe("file uploads", () => {
   it("keeps an active upload alive beyond the initial stale timeout", async () => {
     vi.useFakeTimers();
 
-    const paseoHome = makePaseoHome();
+    const clisbotHome = makeClisbotHome();
     const uploads = new FileUploadStore({
-      paseoHome,
+      clisbotHome,
       staleUploadTimeoutMs: 50,
     });
 
@@ -263,7 +263,7 @@ describe("file uploads", () => {
       uploads.receiveFrame(uploadChunk("req-slow-active", " world")),
     ).resolves.toBeNull();
 
-    const path = uploadedPath(paseoHome, "notes.txt");
+    const path = uploadedPath(clisbotHome, "notes.txt");
     await expect(uploads.receiveFrame(uploadEnds("req-slow-active"))).resolves.toEqual({
       type: "file.upload.response",
       payload: {
@@ -302,7 +302,7 @@ async function uploadNamed(uploads: FileUploadStore, fileName: string) {
   return response?.payload.file;
 }
 
-function makePaseoHome(): string {
+function makeClisbotHome(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "file-upload-test-")));
   tempDirs.push(root);
   return root;
@@ -351,8 +351,8 @@ function decodeUploadFrame(bytes: Uint8Array): FileTransferFrame {
   return frame;
 }
 
-function uploadedPath(paseoHome: string, fileName: string): string {
-  const root = join(paseoHome, "uploads");
+function uploadedPath(clisbotHome: string, fileName: string): string {
+  const root = join(clisbotHome, "uploads");
   const file = readdirSync(root)
     .map((id) => join(root, id, fileName))
     .find((candidate) => existsSync(candidate));

@@ -5,7 +5,7 @@ import {
   listDirectoryGroupEntriesFromMapKeysAndAllowFrom,
   listDirectoryUserEntriesFromAllowFrom,
   listDirectoryUserEntriesFromAllowFromAndMapKeys,
-} from "@getpaseo/channels-core/plugin-sdk/directory-runtime";
+} from "@clisbot/channels-core/plugin-sdk/directory-runtime";
 import type { ClawdbotConfig } from "./fusion/runtime-api.js";
 import { resolveFeishuAccount } from "./accounts.js";
 import { isFeishuGroupReadAllowed } from "./read-policy.js";

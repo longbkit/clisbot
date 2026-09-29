@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/probe.ts@5d8067a4483
 // Slack plugin module implements probe behavior.
-import type { BaseProbeResult } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { runChannelProbe } from "@getpaseo/channels-core/plugin-sdk/text-utility-runtime";
+import type { BaseProbeResult } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { runChannelProbe } from "@clisbot/channels-core/plugin-sdk/text-utility-runtime";
 import { createSlackReadClient } from "./client.js";
 import { formatSlackError } from "./errors.js";
 import { formatSlackBotTokenIdentityWarning } from "./token.js";

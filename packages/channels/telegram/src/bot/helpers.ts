@@ -7,7 +7,7 @@
 // `body-helpers` re-export block (slice 20 restored it for the inbound
 // adapter and the message cache), verbatim from upstream.
 import type { Chat, Message } from "grammy/types";
-import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import {
   buildSenderLabel,
   buildSenderName,

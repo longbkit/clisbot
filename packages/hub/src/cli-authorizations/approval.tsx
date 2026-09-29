@@ -148,7 +148,7 @@ function CodeEntry({ onCode }: { onCode: (code: string) => void }) {
   );
   return (
     <Centered>
-      <AuthCard title="Log in the Paseo CLI" description="Enter the code shown in your terminal.">
+      <AuthCard title="Log in the Clisbot CLI" description="Enter the code shown in your terminal.">
         <form className="grid gap-6" onSubmit={submit}>
           <Field>
             <FieldLabel htmlFor="cli-login-code">Verification code</FieldLabel>

@@ -610,7 +610,7 @@ export class ManagementApi {
       request,
       input.provider,
       providerApplicationConfiguration(input),
-      "paseo",
+      "clisbot",
     );
     return Response.json(result, {
       status: result.status === "continuing" ? 202 : 201,
@@ -664,7 +664,7 @@ export class ManagementApi {
           input.provider,
           input.providerApplicationId,
           access.organization.id,
-          "paseo",
+          "clisbot",
         );
         return Response.json(
           {

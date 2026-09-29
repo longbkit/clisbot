@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/polling-session-restart-policy.ts@5d8067a4483
 // Telegram polling restart policy stays shared by the session and focused tests.
-import { computeBackoff } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { computeBackoff } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 
 const TELEGRAM_POLL_RESTART_POLICY = {
   initialMs: 30_000,

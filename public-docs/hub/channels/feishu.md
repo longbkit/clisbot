@@ -37,7 +37,7 @@ The secret file is JSON:
 Add `verificationToken` and `encryptKey` when you intend to use the webhook transport.
 
 ```sh
-paseo channels add feishu --account main --secret-file ./feishu-app.json
+clisbot channels add feishu --account main --secret-file ./feishu-app.json
 ```
 
 Hub exchanges the pair for a tenant access token before storing it, so a wrong secret fails at setup rather than at the first message.

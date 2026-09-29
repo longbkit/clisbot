@@ -16,7 +16,7 @@
 // matches upstream, whose ingress wrapper passes non-`event_callback` payloads
 // straight through to the listener's own `ack()`.
 
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { inferSlackChannelType } from "../../transport/socket-event-filter.js";
 import { resolveSlackChatType } from "../../transport/socket-event-filter.js";
 

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { ChatPayload } from "@getpaseo/protocol/chats/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { useChatRecord } from "./use-chat-record";
 function fixture() {
   let resolve!: (value: { chats: ChatPayload[] }) => void;

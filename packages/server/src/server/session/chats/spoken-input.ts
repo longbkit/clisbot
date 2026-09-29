@@ -1,4 +1,4 @@
-import { CHAT_ID_LABEL } from "@getpaseo/protocol/bots/labels";
+import { CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { AgentStorage } from "../../agent/agent-storage.js";
 import type { ChatSession } from "./chat-session.js";
 

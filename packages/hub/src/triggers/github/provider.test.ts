@@ -23,7 +23,7 @@ describe("GitHub Phase 1 trigger provider", () => {
         external(
           workflow.id,
           revision.id,
-          createEvent({ body: "@paseo repo=hub agent=opus investigate" }),
+          createEvent({ body: "@clisbot repo=hub agent=opus investigate" }),
         ),
       )
     )[0];
@@ -31,7 +31,7 @@ describe("GitHub Phase 1 trigger provider", () => {
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     assert.deepEqual(match.invocation, {
       status: "accepted",
-      prompt: "@paseo repo=hub agent=opus investigate",
+      prompt: "@clisbot repo=hub agent=opus investigate",
       inputs: { repo: "hub", agent: "opus" },
     });
   });
@@ -46,7 +46,7 @@ describe("GitHub Phase 1 trigger provider", () => {
         external(
           workflow.id,
           revision.id,
-          createEvent({ body: "please @paseo repo=hub agent=opus investigate" }),
+          createEvent({ body: "please @clisbot repo=hub agent=opus investigate" }),
         ),
       )
     )[0];
@@ -54,7 +54,7 @@ describe("GitHub Phase 1 trigger provider", () => {
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     assert.deepEqual(match.invocation, {
       status: "accepted",
-      prompt: "please @paseo repo=hub agent=opus investigate",
+      prompt: "please @clisbot repo=hub agent=opus investigate",
       inputs: { repo: "hub", agent: "opus" },
     });
   });
@@ -62,7 +62,7 @@ describe("GitHub Phase 1 trigger provider", () => {
   it("preserves the complete comment when the marker is last", async () => {
     const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const provider = createProvider(configurationForWorkflow, new TestReactions());
-    const prompt = "Do the whole thing first @paseo";
+    const prompt = "Do the whole thing first @clisbot";
 
     const match = (
       await provider.match(external(workflow.id, revision.id, createEvent({ body: prompt })))
@@ -108,7 +108,7 @@ describe("GitHub Phase 1 trigger provider", () => {
         issue: {
           number: 211,
           title: "smoke",
-          body: "issue body @paseo",
+          body: "issue body @clisbot",
           user: { login: "issue-author" },
         },
         sender: { login: "boudra" },
@@ -444,7 +444,7 @@ function inputConfiguration() {
       {
         ...trigger,
         inputs: {
-          repo: { type: "string", choices: ["paseo", "hub"] },
+          repo: { type: "string", choices: ["clisbot", "hub"] },
           agent: { type: "string", default: "codex", choices: ["codex", "opus"] },
         },
         filters: { ...trigger.filters, inputs: { repo: "hub" } },
@@ -452,7 +452,7 @@ function inputConfiguration() {
           {
             ...trigger.steps[0]!,
             agent: { provider: "codex", mode: "bypassPermissions" },
-            prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+            prompt: [{ text: "Request: ${{ clisbot.prompt }}" }],
           },
         ],
       },
@@ -486,7 +486,7 @@ function githubConfiguration() {
         name: "github-mention",
         on: "github.issue_comment",
         max_runtime: "2h",
-        filters: { repo: "boudra/faro", contains: "@paseo", from_users: ["boudra"] },
+        filters: { repo: "boudra/faro", contains: "@clisbot", from_users: ["boudra"] },
         steps: [
           {
             id: "github-step",
@@ -542,7 +542,7 @@ function createEvent(
       },
       comment: {
         id: 123,
-        body: overrides.body ?? "hello @paseo",
+        body: overrides.body ?? "hello @clisbot",
         html_url: "https://github.com/boudra/faro/issues/211#issuecomment-123",
         user: { login: actor },
         credential: "comment-credential",
@@ -568,7 +568,12 @@ function createItemEvent(
       type === "issues"
         ? {
             action,
-            issue: { number, title: "smoke", body: "issue body @paseo", user: { login: "boudra" } },
+            issue: {
+              number,
+              title: "smoke",
+              body: "issue body @clisbot",
+              user: { login: "boudra" },
+            },
             sender: { login: "boudra" },
           }
         : {
@@ -576,7 +581,7 @@ function createItemEvent(
             pull_request: {
               number,
               title: "smoke",
-              body: "pull request body @paseo",
+              body: "pull request body @clisbot",
               user: { login: "boudra" },
             },
             sender: { login: "boudra" },

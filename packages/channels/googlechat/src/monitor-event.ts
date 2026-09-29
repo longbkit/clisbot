@@ -1,6 +1,6 @@
 // upstream: extensions/googlechat/src/monitor-event.ts@5d8067a4483
 // Googlechat plugin module parses standard and Workspace Add-on webhook envelopes.
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/channel-secret-basic-runtime";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/channel-secret-basic-runtime";
 import type {
   GoogleChatAction,
   GoogleChatActionParameter,

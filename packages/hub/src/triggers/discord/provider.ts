@@ -226,7 +226,7 @@ export function createDiscordTriggerProvider(options: {
     async onAgentExecutionFailed(triggerContext, _outputContext, reason, reactionState) {
       await deleteReactionForPhase(options.bot, triggerContext.target, reactionState);
       await react(options.bot, triggerContext.target, "x");
-      await postThreadNotice(options.bot, triggerContext.target, `Paseo agent failed: ${reason}`);
+      await postThreadNotice(options.bot, triggerContext.target, `Clisbot agent failed: ${reason}`);
       return null;
     },
     async onMachineTerminated(triggerContext, reason, reactionState) {
@@ -236,7 +236,7 @@ export function createDiscordTriggerProvider(options: {
         await postThreadNotice(
           options.bot,
           triggerContext.target,
-          `Paseo machine terminated before the agent could complete: ${reason}`,
+          `Clisbot machine terminated before the agent could complete: ${reason}`,
         );
         return null;
       }

@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
-import { parseFolderPatterns } from "@getpaseo/protocol/project-folders";
+import { parseFolderPatterns } from "@clisbot/protocol/project-folders";
 import type { AccessResource } from "./access-catalog";
 import {
   shareableTerminalProfiles,

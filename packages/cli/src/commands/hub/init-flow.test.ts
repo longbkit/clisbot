@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "vitest";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import type { HubCredentialStore, StoredHubCredential } from "./credentials.js";
 import type { HubDaemonClient, HubStatus } from "./daemon-client.js";
 import type { HubHttpClient } from "./hub-client/index.js";
@@ -40,7 +40,7 @@ describe("Hub login connection asked before browser approval", () => {
         flow: {
           authorize: async () => {
             events.push(`approve after ${prompts.selections.length} question`);
-            return "paseo_cli_prefix_durable-secret";
+            return "clisbot_cli_prefix_durable-secret";
           },
         },
         isInteractive: () => true,
@@ -58,7 +58,7 @@ describe("Hub login connection asked before browser approval", () => {
     ]);
     assert.equal(
       prompts.messages[0],
-      "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  paseo hub disconnect",
+      "Daemon connected. Hub can run agents here.\n\nDisconnect it with:\n  clisbot hub disconnect",
     );
   });
 
@@ -81,7 +81,7 @@ describe("Hub login connection asked before browser approval", () => {
     assert.deepEqual(prompts.selections, []);
     assert.equal(
       prompts.messages[0],
-      "No running daemon found, so only the CLI logs in. Connect later with: paseo hub connect https://hub.test",
+      "No running daemon found, so only the CLI logs in. Connect later with: clisbot hub connect https://hub.test",
     );
   });
 });
@@ -101,7 +101,7 @@ describe("Hub guided setup continuation", () => {
       {
         env: {},
         credentials,
-        flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         isInteractive: () => true,
         continueGuidedSetup: (origin) => continueHubGuidedSetup(origin, environment),
         reporter: { progress() {} },
@@ -109,18 +109,18 @@ describe("Hub guided setup continuation", () => {
     );
 
     assert.deepEqual(prompts.confirmations, [
-      "Connect this daemon to Paseo Hub?\n\nConnecting lets Hub identify this daemon and show whether it is online.\nIt does not allow Hub to create workspaces or run agents.",
+      "Connect this daemon to Clisbot Hub?\n\nConnecting lets Hub identify this daemon and show whether it is online.\nIt does not allow Hub to create workspaces or run agents.",
       "Allow Hub automations to run agents on this daemon?\n\nThis lets workflows triggered from GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents here.\n\nHub is granted: run agents, read and write workspaces, create and remove workspaces, and read this daemon's providers and models.\n\nAgents can access files and run commands allowed by their workspace runtime.",
     ]);
     assert.deepEqual(prompts.selections, []);
     assert.deepEqual(prompts.messages, [
-      "Daemon connected with no permissions.\n\nEnable Hub automations later:\n  paseo hub permissions grant hub.execute",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: paseo hub init",
+      "Daemon connected with no permissions.\n\nEnable Hub automations later:\n  clisbot hub permissions grant hub.execute",
+      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
     ]);
     assert.deepEqual(calls, [{ operation: "token", origin: "https://hub.test" }]);
     assert.equal(daemon.connections, 1);
     assert.deepEqual(daemon.snapshotCwds, []);
-    await assert.rejects(readFile(path.join(cwd, ".paseo", "hub.yml")), { code: "ENOENT" });
+    await assert.rejects(readFile(path.join(cwd, ".clisbot", "hub.yml")), { code: "ENOENT" });
   });
 
   it("prints exact actionable resume commands for login continuation declines", async () => {
@@ -135,8 +135,8 @@ describe("Hub guided setup continuation", () => {
       setupEnvironment(cwd, credentials, daemon, connectDeclined, []),
     );
     assert.deepEqual(connectDeclined.messages, [
-      "Skipped daemon connection. Connect later with: paseo hub connect https://hub.test",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: paseo hub init",
+      "Skipped daemon connection. Connect later with: clisbot hub connect https://hub.test",
+      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
     ]);
   });
 
@@ -156,7 +156,7 @@ describe("Hub guided setup continuation", () => {
     assert.deepEqual(prompts.confirmations, []);
     assert.deepEqual(prompts.messages, [
       "This daemon is already connected to https://hub.test. Permissions: None.",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: paseo hub init",
+      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
     ]);
   });
 
@@ -172,7 +172,7 @@ describe("Hub guided setup continuation", () => {
       {
         env: {},
         credentials,
-        flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         isInteractive: () => true,
         continueGuidedSetup: (origin) =>
           continueHubGuidedSetup(
@@ -192,15 +192,15 @@ describe("Hub guided setup continuation", () => {
     );
 
     assert.deepEqual(prompts.messages, [
-      "Skipped daemon connection. Connect later with: paseo hub connect https://hub.test",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: paseo hub init",
+      "Skipped daemon connection. Connect later with: clisbot hub connect https://hub.test",
+      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
     ]);
   });
 
   it("preserves an existing legacy bundle while adding the organization trigger", async () => {
     const cwd = await temporaryDirectory();
-    await mkdir(path.join(cwd, ".paseo"));
-    await writeFile(path.join(cwd, ".paseo", "hub.yml"), "legacy: bundle\n");
+    await mkdir(path.join(cwd, ".clisbot"));
+    await writeFile(path.join(cwd, ".clisbot", "hub.yml"), "legacy: bundle\n");
     const credentials = new MemoryCredentials();
     credentials.save({ origin: "https://hub.test", credential: "secret" });
     const prompts = new PromptAnswers([], ["codex", "gpt-5", "full-access"], ["U123"]);
@@ -211,9 +211,9 @@ describe("Hub guided setup continuation", () => {
       deploy: false,
     });
 
-    assert.equal(await readFile(path.join(cwd, ".paseo", "hub.yml"), "utf8"), "legacy: bundle\n");
+    assert.equal(await readFile(path.join(cwd, ".clisbot", "hub.yml"), "utf8"), "legacy: bundle\n");
     assert.match(
-      await readFile(path.join(cwd, ".paseo", "triggers", "slack-help.yml"), "utf8"),
+      await readFile(path.join(cwd, ".clisbot", "triggers", "slack-help.yml"), "utf8"),
       /name: slack-help/u,
     );
     assert.deepEqual(prompts.confirmations, []);
@@ -221,7 +221,7 @@ describe("Hub guided setup continuation", () => {
 
   it("asks before replacing only the selected trigger file", async () => {
     const cwd = await temporaryDirectory();
-    const triggerPath = path.join(cwd, ".paseo", "triggers", "slack-help.yml");
+    const triggerPath = path.join(cwd, ".clisbot", "triggers", "slack-help.yml");
     await mkdir(path.dirname(triggerPath), { recursive: true });
     await writeFile(triggerPath, "name: keep-me\n");
     const credentials = new MemoryCredentials();
@@ -235,12 +235,12 @@ describe("Hub guided setup continuation", () => {
         daemonId: "daemon-1",
         deploy: true,
       }),
-      /.paseo\/triggers\/slack-help.yml left unchanged/u,
+      /.clisbot\/triggers\/slack-help.yml left unchanged/u,
     );
 
     assert.equal(await readFile(triggerPath, "utf8"), "name: keep-me\n");
     assert.deepEqual(prompts.confirmations, [
-      "Replace the existing .paseo/triggers/slack-help.yml?",
+      "Replace the existing .clisbot/triggers/slack-help.yml?",
     ]);
     assert.deepEqual(
       calls.map(({ operation }) => operation),
@@ -251,8 +251,8 @@ describe("Hub guided setup continuation", () => {
   it("rejects a symlinked trigger directory without writing outside the project", async () => {
     const cwd = await temporaryDirectory();
     const outside = await temporaryDirectory();
-    await mkdir(path.join(cwd, ".paseo"));
-    await symlink(outside, path.join(cwd, ".paseo", "triggers"));
+    await mkdir(path.join(cwd, ".clisbot"));
+    await symlink(outside, path.join(cwd, ".clisbot", "triggers"));
     const credentials = new MemoryCredentials();
     credentials.save({ origin: "https://hub.test", credential: "secret" });
     const prompts = new PromptAnswers([], ["codex", "gpt-5", "full-access"], ["U123"]);
@@ -298,7 +298,10 @@ describe("Hub guided setup continuation", () => {
       ["Sonnet (suggested)"],
       ["Auto"],
     ]);
-    const trigger = await readFile(path.join(cwd, ".paseo", "triggers", "slack-help.yml"), "utf8");
+    const trigger = await readFile(
+      path.join(cwd, ".clisbot", "triggers", "slack-help.yml"),
+      "utf8",
+    );
     assert.match(trigger, /provider: claude\n    model: sonnet\n    mode: auto/u);
     assert.deepEqual(
       calls.slice(-2).map(({ operation }) => operation),
@@ -332,7 +335,7 @@ describe("Hub guided setup continuation", () => {
     );
 
     assert.equal(daemon.snapshotCwds.length, 0);
-    await assert.rejects(readFile(path.join(cwd, ".paseo", "triggers", "slack-help.yml")), {
+    await assert.rejects(readFile(path.join(cwd, ".clisbot", "triggers", "slack-help.yml")), {
       code: "ENOENT",
     });
   });
@@ -412,7 +415,7 @@ function setupEnvironment(
           daemons: [{ id: "daemon-1", slug: "macbook" }],
           github: [],
           discord: [],
-          slack: [{ slug: "paseo", teamName: "Paseo" }],
+          slack: [{ slug: "clisbot", teamName: "Clisbot" }],
           linear: [],
         }
       );
@@ -444,7 +447,7 @@ function setupEnvironment(
     env: {},
     credentials,
     hub,
-    login: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+    login: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
     daemon: { connect: async () => daemon },
     reporter: { progress() {} },
     cwd: () => cwd,
@@ -602,7 +605,7 @@ function disconnectedStatus(): HubStatus {
 }
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-hub-init-flow-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-hub-init-flow-"));
   directories.push(directory);
   return directory;
 }

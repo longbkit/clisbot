@@ -4,7 +4,7 @@ Small callbacks using the existing SDK:
 
 - Send `Try again.` when the latest output contains `out of credits`.
 - Decline a shell request matching `rm -rf`; approve exactly `git status`; leave other requests alone.
-- Inject `PASEO_HOOK_CREATE_EXAMPLE=created` on creation and `PASEO_HOOK_OPEN_EXAMPLE=opened` on each session opening.
+- Inject `CLISBOT_HOOK_CREATE_EXAMPLE=created` on creation and `CLISBOT_HOOK_OPEN_EXAMPLE=opened` on each session opening.
 - Change requested Codex agents to Claude Haiku before creation.
 - Create a worktree when a directory creation request is titled `Isolated lifecycle example`.
 
@@ -12,14 +12,14 @@ This is a demonstration plugin: installing it enables all these behaviors on its
 alongside `lifecycle-logger` on a test daemon with plugins enabled:
 
 ```bash
-paseo plugin install /absolute/path/to/plugin-examples/lifecycle-actions
-paseo plugin install /absolute/path/to/plugin-examples/lifecycle-logger
-paseo plugin logs lifecycle-logger
+clisbot plugin install /absolute/path/to/plugin-examples/lifecycle-actions
+clisbot plugin install /absolute/path/to/plugin-examples/lifecycle-logger
+clisbot plugin logs lifecycle-logger
 ```
 
-Outside the Paseo repository, `server/inspect.ts` needs `@getpaseo/protocol` installed for its
+Outside the Clisbot repository, `server/inspect.ts` needs `@clisbot/protocol` installed for its
 type imports. Add it to your plugin development dependencies at the same version as
-`@getpaseo/plugin` before installing this example.
+`@clisbot/plugin` before installing this example.
 
 Copy the callbacks you need into your own plugin. The follow-up example sends a new message; it does
 not replay attachments or undo previous tool effects. If the provider keeps returning the matching

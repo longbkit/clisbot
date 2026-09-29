@@ -3,8 +3,8 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { AgentStreamEvent } from "@getpaseo/protocol/agent-types";
-import type { HubExecutionAgentCreateResponse } from "@getpaseo/protocol/messages";
+import type { AgentStreamEvent } from "@clisbot/protocol/agent-types";
+import type { HubExecutionAgentCreateResponse } from "@clisbot/protocol/messages";
 import pino from "pino";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -13,7 +13,7 @@ import { CodexAppServerAgentClient } from "../agent/providers/codex-app-server-a
 import { startHubActionSink, type HubActionSink } from "./test-utils/hub-action-sink.js";
 import { HubRelationshipHarness } from "./test-utils/relationship-harness.js";
 
-const RUN_REAL_HUB_POLICY = process.env.PASEO_REAL_HUB_POLICY === "1";
+const RUN_REAL_HUB_POLICY = process.env.CLISBOT_REAL_HUB_POLICY === "1";
 const REAL_TURN_TIMEOUT_MS = 180_000;
 const HUB_MCP_SERVER = "hub_execution";
 
@@ -193,8 +193,8 @@ describe.skipIf(!RUN_REAL_HUB_POLICY)("Hub provider policy (real providers)", ()
     "codex: resolved workspace-write policy honors one explicit writable root",
     async () => {
       const sink = await startHubActionSink();
-      const allowedRoot = await mkdtemp(path.join(tmpdir(), "paseo-codex-allowed-"));
-      const deniedRoot = await mkdtemp(path.join(tmpdir(), "paseo-codex-denied-"));
+      const allowedRoot = await mkdtemp(path.join(tmpdir(), "clisbot-codex-allowed-"));
+      const deniedRoot = await mkdtemp(path.join(tmpdir(), "clisbot-codex-denied-"));
       const allowedFile = path.join(allowedRoot, "allowed.txt");
       const deniedFile = path.join(deniedRoot, "denied.txt");
       const providerOptions = {
@@ -257,8 +257,8 @@ describe.skipIf(!RUN_REAL_HUB_POLICY)("Hub provider policy (real providers)", ()
     "claude: sandboxed Bash auto-approval remains contained by native filesystem rules",
     async () => {
       const sink = await startHubActionSink();
-      const allowedRoot = await mkdtemp(path.join(tmpdir(), "paseo-claude-allowed-"));
-      const deniedRoot = await mkdtemp(path.join(tmpdir(), "paseo-claude-denied-"));
+      const allowedRoot = await mkdtemp(path.join(tmpdir(), "clisbot-claude-allowed-"));
+      const deniedRoot = await mkdtemp(path.join(tmpdir(), "clisbot-claude-denied-"));
       const allowedFile = path.join(allowedRoot, "allowed.txt");
       const deniedFile = path.join(deniedRoot, "denied.txt");
       const providerOptions = {

@@ -1,4 +1,4 @@
-import { createDeferredCore } from "@getpaseo/channels-core/shared/deferred";
+import { createDeferredCore } from "@clisbot/channels-core/shared/deferred";
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";

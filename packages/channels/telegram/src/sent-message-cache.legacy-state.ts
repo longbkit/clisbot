@@ -5,7 +5,7 @@
 // location, so the scope key is the account owner and the legacy file reader is
 // not carried. Constants, entry-key hashing and the persisted shape are verbatim.
 import { createHash } from "node:crypto";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveTelegramAccountOwnerAgentId } from "./account-owner.js";
 
 export const TTL_MS = 24 * 60 * 60 * 1000;

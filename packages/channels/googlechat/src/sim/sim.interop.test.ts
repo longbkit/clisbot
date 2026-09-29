@@ -17,8 +17,8 @@
 // "where did the public key come from" step is local.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OAuth2Client } from "google-auth-library";
-import { createSimWebhookClient, googleChatSimKey, signWebhookRequest } from "@getpaseo/channels-shared/sim";
-import type { ChannelInboundEvent, HostRuntime, InboundQueueSink } from "@getpaseo/channels-shared";
+import { createSimWebhookClient, googleChatSimKey, signWebhookRequest } from "@clisbot/channels-shared/sim";
+import type { ChannelInboundEvent, HostRuntime, InboundQueueSink } from "@clisbot/channels-shared";
 
 const AUDIENCE = "1234567890";
 const SPACE = "spaces/AAAA";
@@ -78,7 +78,7 @@ async function serve(): Promise<{ url: string; admitted: string[] }> {
     channel: {},
     inboundQueue: queue.sink,
   } as unknown as HostRuntime;
-  const { createInboundEventProcessor } = await import("@getpaseo/channels-shared");
+  const { createInboundEventProcessor } = await import("@clisbot/channels-shared");
   const processor = createInboundEventProcessor({
     hostRuntime: runtime,
     channel: "googlechat",
@@ -158,7 +158,7 @@ describe("the webhook sim's Google Chat token", () => {
   });
 
   it("fails that verification when signed by a different key", async () => {
-    const { createGoogleChatSimKey } = await import("@getpaseo/channels-shared/sim");
+    const { createGoogleChatSimKey } = await import("@clisbot/channels-shared/sim");
     const other = createGoogleChatSimKey("sim-other-key");
     const signed = signWebhookRequest({
       platform: "googlechat",

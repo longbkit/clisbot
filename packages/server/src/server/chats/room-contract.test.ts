@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_ROOM_INSTRUCTIONS } from "@getpaseo/protocol/chats/room";
+import { DEFAULT_ROOM_INSTRUCTIONS } from "@clisbot/protocol/chats/room";
 import {
   isSilentReply,
   renderRoomContract,

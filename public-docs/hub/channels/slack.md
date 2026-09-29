@@ -43,7 +43,7 @@ Add the ones you want in the app's **OAuth & Permissions** page and reinstall. A
 Invite the bot to every channel it should watch:
 
 ```text
-/invite @Paseo
+/invite @Clisbot
 ```
 
 ## Add it to Hub
@@ -51,12 +51,12 @@ Invite the bot to every channel it should watch:
 Slack installs from an existing Connection, so create the Connection first under **Apps → Slack**, then:
 
 ```sh
-paseo channels add slack --account main --connection-id <connection-uuid>
+clisbot channels add slack --account main --connection-id <connection-uuid>
 ```
 
 In the app, open **Channels → Connections → Add Route** and pick the Slack Connection (or **Connect a new one**); that first Route covers the conversations the agent should answer, and the Connection's own **Add Route** adds more. **Channels → Channel Integrations** shows the same capability matrix per account.
 
-`paseo channels ls` shows every account and its transport state; `paseo channels status` adds the pin, integrity, and load-trace columns.
+`clisbot channels ls` shows every account and its transport state; `clisbot channels status` adds the pin, integrity, and load-trace columns.
 
 ## Conversations it handles
 
@@ -99,12 +99,12 @@ The running record with message timestamps is `docs/tests/channels/p0-live-scena
 
 ## Troubleshooting
 
-**The account never leaves `starting` or reports `failed`.** `paseo channels status` prints the detail. A bad or revoked bot token shows as a Slack `invalid_auth`; an app token without `connections:write` fails the Socket Mode open. A loaded host that cannot answer `auth.test` inside the 15 s start budget logs an error naming the budget and retries once before the account fails.
+**The account never leaves `starting` or reports `failed`.** `clisbot channels status` prints the detail. A bad or revoked bot token shows as a Slack `invalid_auth`; an app token without `connections:write` fails the Socket Mode open. A loaded host that cannot answer `auth.test` inside the 15 s start budget logs an error naming the budget and retries once before the account fails.
 
 **An action returns `missing_scope`.** Add the scope from the table above and reinstall the app. The action names the method it called.
 
-**The bot sees nothing in a channel.** It has to be a member. `/invite @Paseo`.
+**The bot sees nothing in a channel.** It has to be a member. `/invite @Clisbot`.
 
 **A message from another bot is ignored.** Bot-authored traffic is admitted only when the message mentions the bot explicitly.
 
-**Replies stop after a Hub restart.** Check `paseo channels status` first; if the account is running, the conversation may be holding an agent session created before the restart. Start a fresh one with `/new`.
+**Replies stop after a Hub restart.** Check `clisbot channels status` first; if the account is running, the conversation may be holding an agent session created before the restart. Start a fresh one with `/new`.

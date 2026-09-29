@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/targets.ts@5d8067a4483
 // Feishu plugin module implements targets behavior.
-import { normalizeLowercaseStringOrEmpty } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeLowercaseStringOrEmpty } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { FeishuIdType } from "./types.js";
 
 const CHAT_ID_PREFIX = "oc_";

@@ -16,10 +16,10 @@ Recorded 2026-09-12 03:32 UTC to `/tmp/env-checks.log`:
 | `which adb`                                                             | not found                                                                                                                    | **native rendering BLOCKED** — no Android device/emulator tooling                               |
 | `which Xvfb`, `which xvfb-run`, `ls /usr/bin \| grep -i xvfb`           | none                                                                                                                         | no headless X display for Electron desktop                                                      |
 | `which asdf`                                                            | not found                                                                                                                    | **relay BLOCKED** — no Elixir toolchain for a local relay                                       |
-| `ls -d /home/node/projects/paseo-relay`                                 | absent; `PASEO_RELAY_CHECKOUT` unset                                                                                         | **relay BLOCKED** — no relay checkout to run `local-elixir-relay.ts` against                    |
+| `ls -d /home/node/projects/clisbot-relay`                               | absent; `CLISBOT_RELAY_CHECKOUT` unset                                                                                       | **relay BLOCKED** — no relay checkout to run `local-elixir-relay.ts` against                    |
 | root `node_modules/.bin/electron` present, `DISPLAY` unset, no Xvfb     | Electron binary exists but no display server                                                                                 | **desktop (Electron) BLOCKED** — cannot launch a desktop window to capture the real shell       |
 | `packages/app/dist` (production web export, built 2026-09-12 03:00 UTC) | fresh — `find dist -newer dist/index.html -name '*.js'` returns only same-build artifacts; 0 src files newer than the export | usable as the **real styled workspace shell** via `E2E_STATIC_APP_DIR` + `startStaticAppServer` |
-| main daemon `~/.paseo` / port 6767                                      | untouched; e2e fixtures spawn isolated daemons on random ports                                                               | isolation boundary respected                                                                    |
+| main daemon `~/.clisbot` / port 6767                                    | untouched; e2e fixtures spawn isolated daemons on random ports                                                               | isolation boundary respected                                                                    |
 
 **Production boundary statement:** the rendered shell in this run is the **production web export**
 (`expo export --platform web` output at `packages/app/dist`, served by the repo's
@@ -31,8 +31,8 @@ BLOCKED with the checks above; nothing in this lane claims those boundaries.
 
 ## Commands run this lane (append per run)
 
-1. `packages/app$ E2E_STATIC_APP_DIR="$PWD/dist" PASEO_AGENT_SESSION_STORAGE=1 node_modules/.bin/playwright test --project=browser e2e/browser/session-profile.ui-contract.spec.ts` → `/tmp/ui-ac2-run1.log` (1 passed, 1.9m)
-2. `packages/app$ E2E_STATIC_APP_DIR="$PWD/dist" PASEO_AGENT_SESSION_STORAGE=1 node_modules/.bin/playwright test --project=browser e2e/browser/sidebar-session-metadata.ui-contract.spec.ts` → `/tmp/ui-sidebar-meta-run1.log` (2 passed, 2 failed — failures were spec bugs, attributed below)
+1. `packages/app$ E2E_STATIC_APP_DIR="$PWD/dist" CLISBOT_AGENT_SESSION_STORAGE=1 node_modules/.bin/playwright test --project=browser e2e/browser/session-profile.ui-contract.spec.ts` → `/tmp/ui-ac2-run1.log` (1 passed, 1.9m)
+2. `packages/app$ E2E_STATIC_APP_DIR="$PWD/dist" CLISBOT_AGENT_SESSION_STORAGE=1 node_modules/.bin/playwright test --project=browser e2e/browser/sidebar-session-metadata.ui-contract.spec.ts` → `/tmp/ui-sidebar-meta-run1.log` (2 passed, 2 failed — failures were spec bugs, attributed below)
 3. `packages/app$ ... playwright test --project=browser e2e/browser/sidebar-session-metadata.ui-contract.spec.ts -g "narrows the list|matches OR-within"` → `/tmp/ui-sidebar-meta-run3.log` (2 passed — W5/W6 after the spec fixes)
 4. `packages/app$ ... playwright test --project=browser e2e/browser/sidebar-session-metadata.ui-contract.spec.ts` → `/tmp/ui-sidebar-meta-run5.log` (**4 passed** — canonical, no concurrent load; the one heavy run)
 
@@ -58,7 +58,7 @@ Both failures in `/tmp/ui-sidebar-meta-run1.log` were **spec bugs, not app defec
   Fixed: the pre-check now runs only on the first open.
 - **W6 (channel-filter):** clicking the bottom-most SubTrigger (`sidebar-display-channel-filter`)
   reported "element is outside of the viewport" for 300s. Root cause: the display menu here is the
-  _tall_ variant (the `PASEO_AGENT_SESSION_STORAGE=1` env turns on the User/Channel rows that the
+  _tall_ variant (the `CLISBOT_AGENT_SESSION_STORAGE=1` env turns on the User/Channel rows that the
   short menus in other specs don't have). Its bottom row is transiently clipped by the
   overflow-hidden content box for the first ~150ms (the 150ms entrance keyframe + the
   `useReleaseFixedMenuHeight` fixed-height snapshot release in
@@ -88,7 +88,7 @@ Both failures in `/tmp/ui-sidebar-meta-run1.log` were **spec bugs, not app defec
   preservation on tab close/restore; native behavior.
 - **Existing evidence:** isolated browser harness, 4 interaction/field tests (unstyled).
 - **This run:** `packages/app/e2e/browser/session-profile.ui-contract.spec.ts` against the
-  production static export with the isolated daemon + `PASEO_AGENT_SESSION_STORAGE=1`
+  production static export with the isolated daemon + `CLISBOT_AGENT_SESSION_STORAGE=1`
   (WS frame injection adds the `sender` SessionActor exactly as a capable daemon would).
   30-turn mock timeline; hover→open read-only profile tab, re-click reopens, no cross-Hub
   confusion (single actor), no-link tolerated (single host), draft + reading-position

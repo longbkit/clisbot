@@ -117,7 +117,7 @@ function buildFakeRegistry(
 // --- pin fixture --------------------------------------------------------------
 
 /** An in-repo (blueprint §6.5) pin document: slack points at the Hub's OWN
- * workspace package (`@getpaseo/channels-shared` — the one with a built
+ * workspace package (`@clisbot/channels-shared` — the one with a built
  * `dist/` in this repo), no tarball supply; the `channel` pin stays the
  * upstream sync reference. Parsed through the real manifest schema so the
  * in-repo entry validation (inRepoPackage ⇔ loadMode) runs. */
@@ -136,7 +136,7 @@ function makeInRepoPins(mainIntegrity: string, channelIntegrity: string): Channe
           },
         },
         loadMode: "in-repo",
-        inRepoPackage: "@getpaseo/channels-shared",
+        inRepoPackage: "@clisbot/channels-shared",
         entry: "./dist/index.js",
         plugin: { specifier: "./dist/plugin.js", exportName: "slackPlugin" },
         notices: "slack",
@@ -584,9 +584,9 @@ describe("ensureChannelInstalled", () => {
     // stay the upstream SYNC REFERENCES, but the loadMode + inRepoPackage point
     // at the Hub's own workspace packages.
     assert.equal(pins.channels["slack"]?.loadMode, "in-repo");
-    assert.equal(pins.channels["slack"]?.inRepoPackage, "@getpaseo/channels-slack");
+    assert.equal(pins.channels["slack"]?.inRepoPackage, "@clisbot/channels-slack");
     assert.equal(pins.channels["telegram"]?.loadMode, "in-repo");
-    assert.equal(pins.channels["telegram"]?.inRepoPackage, "@getpaseo/channels-telegram");
+    assert.equal(pins.channels["telegram"]?.inRepoPackage, "@clisbot/channels-telegram");
     // The entry the loader will import for the in-repo channel.
     assert.equal(pins.channels["slack"]?.entry, "./dist/index.js");
   });

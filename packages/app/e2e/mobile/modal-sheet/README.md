@@ -8,11 +8,11 @@ Set `SHEET_QA_SERVER_ID` to that host's server ID, then run from the repository 
 
 ```sh
 agent-device test packages/app/e2e/mobile/modal-sheet/gestures.android.ad \
-  --env EXAMPLES_URL="paseo://h/${SHEET_QA_SERVER_ID}/plugin/modal-ui-example/surface/main" \
+  --env EXAMPLES_URL="clisbot://h/${SHEET_QA_SERVER_ID}/plugin/modal-ui-example/surface/main" \
   --record-video --artifacts-dir .dev/sheet-qa/plugin
 
 agent-device test packages/app/e2e/mobile/modal-sheet/model.android.ad \
-  --env FORM_URL="paseo://new?serverId=${SHEET_QA_SERVER_ID}" \
+  --env FORM_URL="clisbot://new?serverId=${SHEET_QA_SERVER_ID}" \
   --record-video --artifacts-dir .dev/sheet-qa/model
 ```
 
@@ -77,12 +77,12 @@ Set `MODEL_QA_LAST_MODEL_ID` to its initially offscreen last model; use a short 
 agent-device test packages/app/e2e/mobile/modal-sheet/model-tablet.android.ad \
   packages/app/e2e/mobile/modal-sheet/model-tablet-agent.android.ad \
   --serial "$ANDROID_SERIAL" --metro-port "$MODEL_QA_METRO_PORT" \
-  --env FORM_URL="paseo://new?serverId=${SHEET_QA_SERVER_ID}" \
-  --env AGENT_URL="paseo://h/${SHEET_QA_SERVER_ID}/agent/${MODEL_QA_AGENT_ID}" \
+  --env FORM_URL="clisbot://new?serverId=${SHEET_QA_SERVER_ID}" \
+  --env AGENT_URL="clisbot://h/${SHEET_QA_SERVER_ID}/agent/${MODEL_QA_AGENT_ID}" \
   --env AGENT_TITLE="$MODEL_QA_AGENT_TITLE" \
   --env PROVIDER_ID=codex --env MODEL_ID="$MODEL_QA_MODEL_ID" \
   --env MODEL_LABEL="$MODEL_QA_MODEL_LABEL" --env LAST_MODEL_ID="$MODEL_QA_LAST_MODEL_ID" \
-  --artifacts-dir /tmp/paseo-model-tablet-qa
+  --artifacts-dir /tmp/clisbot-model-tablet-qa
 ```
 
 The existing-agent journey needs the sidebar pinned so its composer stays narrow. Start each run with no modal open;

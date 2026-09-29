@@ -184,7 +184,7 @@ async function execute(
       401,
       "unauthorized",
       "Authentication required",
-      "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+      "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
     );
   }
   if (authorization.status === "forbidden") {
@@ -582,7 +582,7 @@ function problem(
   issues?: readonly { path: readonly (string | number)[]; message: string }[],
 ): Response {
   const body: Problem = ProblemSchema.parse({
-    type: `https://paseo.sh/problems/${code.replaceAll("_", "-")}`,
+    type: `https://clisbot.com/problems/${code.replaceAll("_", "-")}`,
     title,
     status,
     detail,

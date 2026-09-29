@@ -27,7 +27,7 @@
 // FLUSHES the session store before it reports `linked`, so a Hub that restarts
 // one tick later still has the credentials.
 
-import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
+import { formatErrorMessage } from "@clisbot/channels-core/plugin-sdk/error-runtime";
 import { writeQrDataUrlToTempFile } from "../qr-temp-file.js";
 import {
   checkZaloAuthenticated,

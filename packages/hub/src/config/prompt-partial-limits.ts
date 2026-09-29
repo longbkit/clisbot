@@ -3,7 +3,7 @@
  * server boundary schema can share the same numbers as the resolver.
  */
 
-export const PROMPT_PARTIAL_ROOT = ".paseo/workflows";
+export const PROMPT_PARTIAL_ROOT = ".clisbot/workflows";
 export const MAX_PROMPT_PARTIAL_COUNT = 100;
 export const MAX_PROMPT_PARTIAL_PATH_LENGTH = 512;
 export const MAX_PROMPT_PARTIAL_CONTENT_BYTES = 1_000_000;

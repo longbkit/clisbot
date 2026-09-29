@@ -430,7 +430,7 @@ function TriggerCompatibilityAlert({
       <AlertTitle>{workflow ? "Workflow" : "Advanced trigger"}</AlertTitle>
       <AlertDescription>
         {workflow
-          ? "Edit the Workflow YAML here, or use the Steps editor in Paseo Automations."
+          ? "Edit the Workflow YAML here, or use the Steps editor in Clisbot Automations."
           : "This YAML uses features the form cannot represent. Edit it directly; Hub will preserve every advanced field."}
       </AlertDescription>
     </Alert>
@@ -841,7 +841,7 @@ function PromptEditor({ value, onChange }: { value: string; onChange: (value: st
       />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Insert merge tag:</span>
-        {["${{ paseo.prompt }}", "${{ paseo.context }}"].map((mergeTag) => (
+        {["${{ clisbot.prompt }}", "${{ clisbot.context }}"].map((mergeTag) => (
           <Button
             key={mergeTag}
             type="button"
@@ -907,7 +907,7 @@ function defaultForm(snapshot: TriggerSnapshot): TriggerFormValue {
     githubPermissions: "",
     githubDuration: "1h",
     prompt:
-      "Handle this request in the originating conversation.\n\nWhen hub.reply is available, use it for useful progress updates and your final user-facing response. Call hub.finish_execution once the request is complete.\n\nRequest:\n${{ paseo.prompt }}",
+      "Handle this request in the originating conversation.\n\nWhen hub.reply is available, use it for useful progress updates and your final user-facing response. Call hub.finish_execution once the request is complete.\n\nRequest:\n${{ clisbot.prompt }}",
   };
 }
 

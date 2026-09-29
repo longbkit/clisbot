@@ -4,7 +4,7 @@ export const CLIENT_CAPS = {
   helloRejection: "hello_rejection",
   // COMPAT(ownedSubscriptions): added in v0.8.0, remove legacy ownership after 2027-03-09.
   ownedSubscriptions: "owned_subscriptions",
-  // Clients outside the Paseo app version series can explicitly accept provider IDs.
+  // Clients outside the Clisbot app version series can explicitly accept provider IDs.
   // COMPAT(explicitEventSubscriptions): added in v0.8.0, remove legacy broadcasts after 2027-03-08.
   explicitEventSubscriptions: "explicit_event_subscriptions",
   allProviders: "all_providers",

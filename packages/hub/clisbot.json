@@ -1,0 +1,16 @@
+{
+  "worktree": {
+    "setup": ["npm install", "node ./scripts/clisbot-workspace.mjs setup"],
+    "teardown": "node ./scripts/clisbot-workspace.mjs teardown"
+  },
+  "scripts": {
+    "app": {
+      "type": "service",
+      "command": "node ./scripts/clisbot-workspace.mjs dev"
+    },
+    "evidence": {
+      "type": "service",
+      "command": "node ./scripts/clisbot-workspace.mjs evidence"
+    }
+  }
+}

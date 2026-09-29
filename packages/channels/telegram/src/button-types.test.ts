@@ -1,6 +1,6 @@
 // upstream: extensions/telegram/src/button-types.test.ts@5d8067a4483
 // Telegram tests cover button types plugin behavior.
-import { buildApprovalResolutionRef } from "@getpaseo/channels-core/plugin-sdk/approval-reference-runtime";
+import { buildApprovalResolutionRef } from "@clisbot/channels-core/plugin-sdk/approval-reference-runtime";
 import { describe, expect, it } from "vitest";
 import { parseTelegramApprovalCallbackData } from "./approval-callback-data.js";
 import {

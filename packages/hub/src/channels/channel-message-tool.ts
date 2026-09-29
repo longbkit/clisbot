@@ -1,5 +1,5 @@
 // The `message` tool's input schema, generated from the ported OpenClaw
-// message-tool layer (`@getpaseo/channels-core`) instead of hand-written JSON.
+// message-tool layer (`@clisbot/channels-core`) instead of hand-written JSON.
 //
 // Upstream builds one flat schema per turn from the plugin's
 // `describeMessageTool` discovery hook, scoped to the actions and capabilities
@@ -18,17 +18,17 @@ import {
   buildMessageToolSchema,
   buildMessageToolDescription,
   resolveMessageToolActionSchemaActions,
-} from "@getpaseo/channels-core/agents/tools/message-tool-discovery";
+} from "@clisbot/channels-core/agents/tools/message-tool-discovery";
 import {
   buildPreparedMessageToolCatalog,
   type PreparedMessageToolCatalog,
-} from "@getpaseo/channels-core/channels/plugins/message-action-discovery.host-adapter";
+} from "@clisbot/channels-core/channels/plugins/message-action-discovery.host-adapter";
 import type {
   ChannelMessageToolDiscovery,
   ChannelPlugin,
   OpenClawConfig,
-} from "@getpaseo/channels-core/channels/plugins/types.public.host-adapter";
-import type { MediaChannel } from "@getpaseo/channels-shared";
+} from "@clisbot/channels-core/channels/plugins/types.public.host-adapter";
+import type { MediaChannel } from "@clisbot/channels-shared";
 import type { SupportedChannelName } from "./plane/types.js";
 import {
   getChannelDriveConfig,
@@ -176,7 +176,7 @@ const CHANNEL_MESSAGE_TOOL_DISCOVERY: Record<SupportedChannelName, ChannelMessag
  * media params at all. Google Chat's upload is user-OAuth
  * only, Feishu's is omitted from the port, and the Zalo Bot API has no upload
  * endpoint — offering the tool there would advertise a delivery that always
- * fails. The set is pinned to `@getpaseo/channels-shared`'s `MediaChannel`,
+ * fails. The set is pinned to `@clisbot/channels-shared`'s `MediaChannel`,
  * which owns the per-channel size caps.
  */
 export function isMediaChannel(channel: SupportedChannelName): channel is MediaChannel {
@@ -302,7 +302,7 @@ export function isExecutableMessageAction(
 /**
  * Fusion-owned properties merged into the generated schema (D-HUB-MSGTOOL-002).
  *
- * `text` is Paseo's pre-existing alias for the canonical `message` field and
+ * `text` is Clisbot's pre-existing alias for the canonical `message` field and
  * stays until its consumers migrate. `idempotencyKey` and `final` are Hub
  * delivery contracts: upstream derives an idempotency key inside its execution
  * layer and expresses progress/terminal through source-reply policy, neither of

@@ -3,7 +3,7 @@
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString as normalizeText,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export type FeishuGroupSessionScope =
   | "group"

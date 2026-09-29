@@ -4,7 +4,7 @@
 // Discord SDK primitives stubbed at upstream's own runtime object so every layer
 // above them — schema gating, target resolution, param coercion — is real.
 import { describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { discordMessagingActionRuntime } from "./actions/runtime.messaging.runtime.js";
 import { discordMessageActions } from "./channel-actions.js";
 

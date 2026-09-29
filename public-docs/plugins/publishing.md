@@ -1,6 +1,6 @@
 ---
 title: Publish a plugin
-description: Share a Paseo plugin on npm, through a private registry, or from a Git repository.
+description: Share a Clisbot plugin on npm, through a private registry, or from a Git repository.
 nav: Publishing
 order: 45
 category: Plugins
@@ -8,7 +8,7 @@ category: Plugins
 
 # Publish a plugin
 
-Publish your plugin so other people can install and use it in Paseo. Start with a working
+Publish your plugin so other people can install and use it in Clisbot. Start with a working
 [plugin project](/docs/plugins), then choose where to share it:
 
 - [npm](#publish-on-npm): publish a package on the public npm registry.
@@ -24,7 +24,7 @@ and release version.
 From the plugin directory, set your package details and allow publication. Replace `@acme` with your npm scope:
 
 ```bash
-npm pkg set name=@acme/paseo-review version=1.0.0
+npm pkg set name=@acme/clisbot-review version=1.0.0
 npm pkg delete private
 ```
 
@@ -43,10 +43,10 @@ Check the pack output includes any assets you added to the project.
 On a daemon host with npm available:
 
 ```bash
-paseo plugin install npm:@acme/paseo-review@1.0.0
+clisbot plugin install npm:@acme/clisbot-review@1.0.0
 ```
 
-Users can also paste `npm:@acme/paseo-review` into **Settings → Plugins → Plugin source**.
+Users can also paste `npm:@acme/clisbot-review` into **Settings → Plugins → Plugin source**.
 
 :::example[Package configuration]
 
@@ -55,7 +55,7 @@ The scaffold includes this `files` list in `package.json`:
 ```json
 {
   "files": [
-    "paseo-plugin.json",
+    "clisbot-plugin.json",
     "index.client.ts",
     "index.client.tsx",
     "index.server.ts",
@@ -69,7 +69,7 @@ The scaffold includes this `files` list in `package.json`:
 
 - Add any assets stored outside these directories to `files`.
 - Keep the scaffold's SDK and host libraries in `devDependencies`.
-- Add other runtime libraries with `npm install <package>`. Paseo installs their dependencies too.
+- Add other runtime libraries with `npm install <package>`. Clisbot installs their dependencies too.
 - The npm package name identifies the source. The manifest's `id` identifies the installed plugin.
 
 See the [project reference](/docs/plugins/reference#project-files) for entry points and runtime boundaries.
@@ -78,7 +78,7 @@ See the [project reference](/docs/plugins/reference#project-files) for entry poi
 
 ### Plugins with a build step
 
-Paseo compiles TypeScript. An ordinary plugin needs no separate build before publication.
+Clisbot compiles TypeScript. An ordinary plugin needs no separate build before publication.
 If your plugin generates files, include the generated output in the package.
 
 **Installation scripts do not run automatically.** If a dependency needs host-specific setup,
@@ -93,7 +93,7 @@ declare a [preparation command](/docs/plugins/reference#cli-reference).
 - Remove Git-only dependency-install commands from the published manifest; npm installation already
   installs production dependencies.
 
-Paseo skips npm lifecycle scripts during installation, including dependency scripts. For example,
+Clisbot skips npm lifecycle scripts during installation, including dependency scripts. For example,
 a native dependency that needs rebuilding requires an explicit preparation command.
 
 :::
@@ -110,7 +110,7 @@ npm publish --registry=https://npm.pkg.github.com
 [Configure GitHub authentication and package access](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)
 before publishing.
 
-To install the plugin, configure npm **on the daemon host, as the user running Paseo**:
+To install the plugin, configure npm **on the daemon host, as the user running Clisbot**:
 
 1. Add your organization's registry to `~/.npmrc`:
 
@@ -128,10 +128,10 @@ To install the plugin, configure npm **on the daemon host, as the user running P
 3. Install the plugin:
 
    ```bash
-   paseo plugin install npm:@acme/paseo-review
+   clisbot plugin install npm:@acme/clisbot-review
    ```
 
-Paseo uses the host's npm registry settings and credentials for installation and updates.
+Clisbot uses the host's npm registry settings and credentials for installation and updates.
 In the app, enter only the source identifier.
 
 :::
@@ -141,17 +141,17 @@ In the app, enter only the source identifier.
 Push the plugin project to a repository. Users can install it with:
 
 ```bash
-paseo plugin install github:acme/paseo-review
+clisbot plugin install github:acme/clisbot-review
 ```
 
 For another Git host:
 
 ```bash
-paseo plugin install git:https://git.example.com/acme/paseo-review.git
+clisbot plugin install git:https://git.example.com/acme/clisbot-review.git
 ```
 
 If your plugin has runtime npm dependencies, commit `package-lock.json` and add a preparation
-command to `paseo-plugin.json`:
+command to `clisbot-plugin.json`:
 
 ```json
 {
@@ -163,4 +163,4 @@ command to `paseo-plugin.json`:
 - `--omit=dev` excludes development tools.
 - npm must be available on the daemon host.
 
-Plugins that only use Paseo's host libraries need no preparation command.
+Plugins that only use Clisbot's host libraries need no preparation command.

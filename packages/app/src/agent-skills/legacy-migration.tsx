@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { AgentSkillSelection } from "@getpaseo/protocol/messages";
+import type { AgentSkillSelection } from "@clisbot/protocol/messages";
 import { getDesktopDaemonStatus, shouldUseDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
 import {
   deleteLegacySkillSelection,

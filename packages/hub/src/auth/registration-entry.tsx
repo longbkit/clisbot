@@ -264,7 +264,7 @@ function ChoosePasswordForm({
 }
 
 function RegistrationCard({
-  description = "Finish creating your Paseo Hub account.",
+  description = "Finish creating your Clisbot Hub account.",
   children,
 }: {
   description?: string;

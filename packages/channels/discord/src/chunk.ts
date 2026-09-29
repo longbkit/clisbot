@@ -1,12 +1,12 @@
 // upstream: extensions/discord/src/chunk.ts@5d8067a4483
-import { expectDefined } from "@getpaseo/channels-core/plugin-sdk/expect-runtime";
-import { resolveIntegerOption } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
-import { chunkByParagraph, type ChunkMode } from "@getpaseo/channels-core/plugin-sdk/reply-chunking";
+import { expectDefined } from "@clisbot/channels-core/plugin-sdk/expect-runtime";
+import { resolveIntegerOption } from "@clisbot/channels-core/plugin-sdk/number-runtime";
+import { chunkByParagraph, type ChunkMode } from "@clisbot/channels-core/plugin-sdk/reply-chunking";
 import {
   avoidTrailingHighSurrogateBreak,
   chunkTextForOutbound,
   findCodeRegions,
-} from "@getpaseo/channels-core/plugin-sdk/text-chunking";
+} from "@clisbot/channels-core/plugin-sdk/text-chunking";
 
 type ChunkDiscordTextOpts = {
   /** Max characters per Discord message. Default: 2000. */

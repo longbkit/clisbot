@@ -1,9 +1,9 @@
 // upstream: extensions/zalo/src/accounts.ts@5d8067a4483
 // Zalo plugin module implements accounts behavior.
-import { createAccountListHelpers } from "@getpaseo/channels-core/plugin-sdk/account-helpers";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/account-id";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { createAccountListHelpers } from "@clisbot/channels-core/plugin-sdk/account-helpers";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-id";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import type { SecretInputStringResolutionMode } from "./secret-input.js";
 import { resolveZaloToken } from "./token.js";
 import type { ResolvedZaloAccount, ZaloAccountConfig, ZaloConfig } from "./types.js";

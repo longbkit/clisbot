@@ -15,14 +15,14 @@ import type {
   ProjectRegistry,
   WorkspaceRegistry,
 } from "../workspace-registry.js";
-import { getPaseoWorktreesRoot, resolvePaseoWorktreesBaseRoot } from "../../utils/worktree.js";
+import { getClisbotWorktreesRoot, resolveClisbotWorktreesBaseRoot } from "../../utils/worktree.js";
 import { isSameOrDescendantPath } from "../path-utils.js";
 import type { SessionAuthorization } from "../authorization/index.js";
 import {
   requiredPermissionForInbound,
   requiredPermissionForOutbound,
 } from "../authorization/operation-permissions.js";
-import { requiredPrivilegeForOperation } from "@getpaseo/protocol/managed-access-privileges";
+import { requiredPrivilegeForOperation } from "@clisbot/protocol/managed-access-privileges";
 import {
   PROJECT_PRIVILEGES,
   type ProjectAuthorization,
@@ -1049,7 +1049,7 @@ export class ManagedResourceAuthorizer {
     ) {
       return this.allowsCwd(message.repoRoot);
     }
-    if (message.type === "paseo_worktree_list_request") {
+    if (message.type === "clisbot_worktree_list_request") {
       const cwd = message.repoRoot ?? message.cwd;
       return cwd === undefined ? false : this.allowsCwd(cwd);
     }
@@ -1087,12 +1087,12 @@ export class ManagedResourceAuthorizer {
 
   async allowsWorktreeDestination(
     sourceCwd: string,
-    paseoHome: string,
+    clisbotHome: string,
     worktreesRoot?: string,
   ): Promise<boolean> {
     if (!this.isRestricted()) return true;
-    const baseRoot = resolvePaseoWorktreesBaseRoot({ paseoHome, worktreesRoot });
-    const projectRoot = await getPaseoWorktreesRoot(sourceCwd, paseoHome, worktreesRoot);
+    const baseRoot = resolveClisbotWorktreesBaseRoot({ clisbotHome, worktreesRoot });
+    const projectRoot = await getClisbotWorktreesRoot(sourceCwd, clisbotHome, worktreesRoot);
     // The daemon generates a validated single-segment slug below this root.
     // Reject a project-hash directory symlink that would redirect creation elsewhere.
     return isSameOrDescendantExistingPath(baseRoot, projectRoot);

@@ -6,7 +6,7 @@ import {
   type BrowserAutomationCommandName,
   type BrowserAutomationExecuteRequest,
   type BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
 import { browserToolsFailure, type BrowserToolsResponsePayload } from "./errors.js";
 
 export interface BrowserHostClient {

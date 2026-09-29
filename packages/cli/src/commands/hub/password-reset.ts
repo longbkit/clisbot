@@ -18,7 +18,7 @@ export async function resetHubPassword(input: {
   const url = validateRecoveryInput(input);
   let response: Response;
   try {
-    response = await fetch(new URL("/api/auth/paseo/reset-password", url), {
+    response = await fetch(new URL("/api/auth/clisbot/reset-password", url), {
       method: "POST",
       redirect: "error",
       signal: AbortSignal.timeout(15_000),

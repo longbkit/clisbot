@@ -52,12 +52,12 @@ describe("daemon bearer validator", () => {
     expect(extractHttpBearerToken(undefined)).toBeNull();
   });
 
-  test("extracts WebSocket paseo bearer subprotocol tokens", () => {
-    const protocol = extractWsBearerProtocol("chat, paseo.bearer.secret.with.dots");
+  test("extracts WebSocket clisbot bearer subprotocol tokens", () => {
+    const protocol = extractWsBearerProtocol("chat, clisbot.bearer.secret.with.dots");
 
-    expect(protocol).toBe("paseo.bearer.secret.with.dots");
+    expect(protocol).toBe("clisbot.bearer.secret.with.dots");
     expect(extractWsBearerToken(protocol)).toBe("secret.with.dots");
-    expect(extractWsBearerToken("paseo.other.secret")).toBeNull();
+    expect(extractWsBearerToken("clisbot.other.secret")).toBeNull();
   });
 
   test("bypasses bearer auth for preflight, liveness, and capability-token routes", () => {
@@ -139,7 +139,7 @@ describe("hello admission", () => {
     ).toMatchObject({ admission: { principalId: "owner" } });
   });
   test("accepts a password and current local credential, but rejects old and wrong credentials", async () => {
-    const home = await mkdtemp(join(tmpdir(), "paseo-local-auth-"));
+    const home = await mkdtemp(join(tmpdir(), "clisbot-local-auth-"));
     try {
       const first = await writeLocalCredential(home);
       const second = await writeLocalCredential(home);
@@ -192,9 +192,9 @@ describe("hello admission", () => {
   });
 
   test("writes a private rotating credential and reads it only for the matching target", async () => {
-    const home = await mkdtemp(join(tmpdir(), "paseo-local-file-"));
+    const home = await mkdtemp(join(tmpdir(), "clisbot-local-file-"));
     try {
-      await writeFile(join(home, "paseo.pid"), JSON.stringify({ listen: "127.0.0.1:6767" }));
+      await writeFile(join(home, "clisbot.pid"), JSON.stringify({ listen: "127.0.0.1:6767" }));
       const first = await writeLocalCredential(home);
       if (process.platform !== "win32") {
         expect((await stat(join(home, "local-credential"))).mode & 0o777).toBe(0o600);

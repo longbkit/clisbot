@@ -35,9 +35,9 @@ function Header() {
     <div className="flex shrink-0 items-center gap-[14px] px-[18px] pt-[6px] pb-[12px]">
       <Menu size={22} className="shrink-0 text-mock-fg" strokeWidth={1.9} />
       <span className="min-w-0 flex-1">
-        <span className="block text-[18px] font-semibold leading-[21px] text-mock-fg">Paseo</span>
+        <span className="block text-[18px] font-semibold leading-[21px] text-mock-fg">Clisbot</span>
         <span className="mt-[2px] flex items-center gap-[5px] text-[13px] leading-[16px] text-mock-fg-muted">
-          <span className="shrink-0">paseo ·</span>
+          <span className="shrink-0">clisbot ·</span>
           <Server size={12} className="shrink-0" />
           <span className="truncate">Mohameds-MacBook-Pro.l…</span>
         </span>

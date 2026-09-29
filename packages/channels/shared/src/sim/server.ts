@@ -214,7 +214,7 @@ export async function startSimHttpServer(params: {
 }
 
 /** The fault a family router must render, carried alongside the request. */
-const FAULT = Symbol.for("@getpaseo/channels-shared/sim-fault");
+const FAULT = Symbol.for("@clisbot/channels-shared/sim-fault");
 
 function withFault(request: SimRequest, fault: SimFault | undefined): SimRequest {
   if (fault === undefined) return request;

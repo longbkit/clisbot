@@ -465,7 +465,7 @@ it("runs an Automation through the shared dispatcher with current Member access"
       "run:",
       "  target: { daemon: daemon-10000000, cwd: /workspace/app }",
       "  agent: { provider: codex, mode: default }",
-      "  prompt: ${{ paseo.prompt }}",
+      "  prompt: ${{ clisbot.prompt }}",
       "  max_runtime: 1h",
       "  idle_timeout: 5m",
     ].join("\n"),
@@ -622,7 +622,7 @@ it("keeps an Automation a Route uses enabled, but lets its Mode widen", async ()
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".paseo/channels/slack/public.yml",
+        path: ".clisbot/channels/slack/public.yml",
         content: `
 channel: slack
 accountId: public
@@ -711,7 +711,7 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".paseo/hub.yml",
+        path: ".clisbot/hub.yml",
         content: `environments:\n  work:\n    kind: daemon\n    daemon: daemon-10000000\n    cwd: /workspace/app\nagents:\n  coding:\n    provider: codex\n    model: gpt-5.5\n`,
       },
     ],
@@ -1357,7 +1357,7 @@ it("stores provider credentials in the Connection owner and never returns them",
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".paseo/channels/telegram/support.yml",
+        path: ".clisbot/channels/telegram/support.yml",
         content: `channel: telegram\naccountId: support\nenabled: true\nconnectionId: ${connection.id}\ntransport:\n  mode: polling\n`,
       },
     ],
@@ -2046,7 +2046,7 @@ it("probes and stores a Discord bot Connection, keeps it organization scoped, an
       organizationId: ORGANIZATION_ID,
       files: [
         {
-          path: ".paseo/channels/discord/guild-ops.yml",
+          path: ".clisbot/channels/discord/guild-ops.yml",
           content: `channel: discord\naccountId: guild-ops\nenabled: true\nconnectionId: ${connection.id}\ntransport:\n  mode: gateway\n`,
         },
       ],
@@ -2130,7 +2130,7 @@ it("reuses Provider Application capabilities for management reads, saves, and Co
   const overviewResponse = await api.handle(request("/provider-applications", "GET"));
   assert.equal(overviewResponse.status, 200);
   const overview = await overviewResponse.json();
-  assert.equal(overview.applications.github[0].identity.name, "Paseo GitHub");
+  assert.equal(overview.applications.github[0].identity.name, "Clisbot GitHub");
   assert.equal("configuration" in overview.applications.github[0], false);
   assert.equal(overview.setupGuides.length, 5);
   const slackSocketGuide = overview.setupGuides.find(
@@ -2157,7 +2157,7 @@ it("reuses Provider Application capabilities for management reads, saves, and Co
     request("/provider-applications", "POST", {
       provider: "github",
       appId: "42",
-      appSlug: "paseo-github",
+      appSlug: "clisbot-github",
       clientId: "client-id",
       clientSecret: "client-secret",
       privateKey: "private-key",
@@ -2192,7 +2192,7 @@ it("reuses Provider Application capabilities for management reads, saves, and Co
   const connections = await api.handle(request("/connections", "GET"));
   assert.equal(connections.status, 200);
   assert.deepEqual((await connections.json()).providerApplications, [
-    { provider: "github", id: "42", name: "Paseo GitHub" },
+    { provider: "github", id: "42", name: "Clisbot GitHub" },
   ]);
 });
 
@@ -2607,13 +2607,13 @@ function providerApplicationsFixture(calls: {
     status: "verified" as const,
     identifiers: {
       appId: "42",
-      appSlug: "paseo-github",
+      appSlug: "clisbot-github",
       clientId: "client-id",
     },
     identity: {
       provider: "github" as const,
       id: "42",
-      name: "Paseo GitHub",
+      name: "Clisbot GitHub",
       ownerLogin: "acme",
     },
     configurationVersion: 1,
@@ -2629,7 +2629,7 @@ function providerApplicationsFixture(calls: {
       },
       applications: { github: [github], slack: [], discord: [], linear: [] },
     }),
-    connectionCatalog: async () => [{ provider: "github", id: "42", name: "Paseo GitHub" }],
+    connectionCatalog: async () => [{ provider: "github", id: "42", name: "Clisbot GitHub" }],
     verifyAndSave: async (_request, provider, input) => {
       assert.equal(provider, input.provider);
       calls.saved.push(input);
@@ -2639,7 +2639,7 @@ function providerApplicationsFixture(calls: {
         identity: {
           provider: "github",
           id: "42",
-          name: "Paseo GitHub",
+          name: "Clisbot GitHub",
           ownerLogin: "acme",
         },
         configurationVersion: 2,

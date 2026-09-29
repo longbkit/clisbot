@@ -2,7 +2,7 @@
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 export function normalizeGoogleChatUserId(raw?: string | null): string {
   const trimmed = normalizeOptionalString(raw) ?? "";

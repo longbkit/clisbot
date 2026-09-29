@@ -35,7 +35,7 @@ import {
   readSlashCommand,
   type ChannelInboundEvent,
   type ChannelInboundKind,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import { formatZalouserMessageSidFull } from "../message-sid.js";
 import type { ZaloInboundMessage } from "../types.js";
 

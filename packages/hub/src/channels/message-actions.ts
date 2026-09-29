@@ -1,5 +1,5 @@
 // The Hub's edge of the ported OpenClaw message-action layer
-// (`@getpaseo/channels-core`, slice 11 of
+// (`@clisbot/channels-core`, slice 11 of
 // docs/audits/2026-09-07-openclaw-channel-port-goal.md).
 //
 // Two responsibilities, both Fusion-owned:
@@ -28,7 +28,7 @@ import {
   runWithChannelMessageToolPlugins,
   type PreparedMessageToolCatalog,
   buildPreparedMessageToolCatalog,
-} from "@getpaseo/channels-core/channels/plugins/message-action-discovery.host-adapter";
+} from "@clisbot/channels-core/channels/plugins/message-action-discovery.host-adapter";
 import type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
@@ -36,26 +36,26 @@ import type {
   ChannelPlugin as CoreChannelPlugin,
   ChannelThreadingToolContext,
   OpenClawConfig,
-} from "@getpaseo/channels-core/channels/plugins/types.public.host-adapter";
-import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { CHANNEL_MESSAGE_ACTION_NAMES } from "@getpaseo/channels-core/channels/plugins/message-action-names";
-import { MESSAGE_ACTION_TARGET_MODE } from "@getpaseo/channels-core/infra/outbound/message-action-spec";
-import { redactSensitiveText } from "@getpaseo/channels-core/logging/redact";
+} from "@clisbot/channels-core/channels/plugins/types.public.host-adapter";
+import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { CHANNEL_MESSAGE_ACTION_NAMES } from "@clisbot/channels-core/channels/plugins/message-action-names";
+import { MESSAGE_ACTION_TARGET_MODE } from "@clisbot/channels-core/infra/outbound/message-action-spec";
+import { redactSensitiveText } from "@clisbot/channels-core/logging/redact";
 import {
   getToolResult,
   runMessageAction,
-} from "@getpaseo/channels-core/infra/outbound/message-action-runner";
+} from "@clisbot/channels-core/infra/outbound/message-action-runner";
 import {
   resolveMessageActionMessageId,
   resolveMessageActionOutcome,
   type MessageActionResult,
-} from "@getpaseo/channels-core/infra/outbound/message-action-contracts";
+} from "@clisbot/channels-core/infra/outbound/message-action-contracts";
 import {
   runWithCoreOutboundSender,
   type CoreOutboundSender,
   type MessageSendParams,
   type MessageSendResult,
-} from "@getpaseo/channels-core/infra/outbound/message.host-adapter";
+} from "@clisbot/channels-core/infra/outbound/message.host-adapter";
 import {
   runWithChannelMediaStager,
   type ChannelMediaSource,

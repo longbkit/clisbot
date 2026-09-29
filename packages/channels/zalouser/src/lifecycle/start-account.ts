@@ -18,7 +18,7 @@
 // supervisor has no other place to learn the QR session is gone, and a
 // silently-idle account is exactly the failure mode the operator would not see.
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type { HostRuntime, StartAccountContext } from "@clisbot/channels-shared";
 import { resolveZalouserDriveAccount } from "../fusion/account-config.js";
 import { createZalouserAdmission } from "../fusion/admission.js";
 import { startZalouserListenerSession } from "../fusion/listener-session.js";

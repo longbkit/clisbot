@@ -1,7 +1,7 @@
 // upstream: extensions/zalouser/src/probe.test.ts@5d8067a4483
 // D-ZU-023: one ported expectation moves with the core probe boundary.
 // Zalouser tests cover probe plugin behavior.
-import { MAX_TIMER_TIMEOUT_MS } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { MAX_TIMER_TIMEOUT_MS } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { probeZalouser } from "./probe.js";
 import { getZaloUserInfo } from "./zalo-js.js";
@@ -64,7 +64,7 @@ describe("probeZalouser", () => {
     await expect(pending).resolves.toEqual({
       ok: false,
       // D-ZU-023: the timeout MESSAGE is the core probe boundary's, not
-      // upstream's bare "timeout" (`@getpaseo/channels-core`
+      // upstream's bare "timeout" (`@clisbot/channels-core`
       // `plugin-sdk/text-utility-runtime` carries `runChannelProbe` with its own
       // rejection text). The invariant the case exists for — the probe fails
       // instead of hanging, and reports an elapsed time — is unchanged.

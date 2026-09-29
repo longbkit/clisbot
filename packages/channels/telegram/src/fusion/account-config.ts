@@ -12,9 +12,9 @@ import type {
   OpenClawConfig,
   TelegramAccountConfig,
   TelegramActionConfig,
-} from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/routing";
+} from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/routing";
 import { inspectTelegramAccount } from "../account-inspect.js";
 
 const DEFAULT_ACCOUNT_ID = "default";

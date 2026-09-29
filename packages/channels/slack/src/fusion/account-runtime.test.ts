@@ -7,7 +7,7 @@
 // lines were logged under B's account. These cases pin the per-account keying
 // and the dispose that releases only one account.
 import { describe, expect, it } from "vitest";
-import type { HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostKeyedStore, HostRuntime } from "@clisbot/channels-shared";
 import {
   disposeSlackAccountRuntime,
   getSlackHostRuntime,

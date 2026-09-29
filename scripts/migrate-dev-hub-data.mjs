@@ -11,7 +11,7 @@ const HUB_DIRECTORY_NAME = "hub";
 // Hub-owned entries in a shared Clisbot home. Keep this allowlist explicit: a
 // migration must never guess that an unfamiliar user/daemon file belongs to Hub.
 export const LEGACY_HUB_ENTRIES = Object.freeze([
-  ".paseo-hub.lock",
+  ".clisbot-hub.lock",
   "PG_VERSION",
   "backup_label",
   "backup_label.old",
@@ -59,7 +59,7 @@ function processIsRunning(pid) {
 }
 
 async function assertHubStopped(home, isRunning) {
-  const lockPath = join(home, ".paseo-hub.lock");
+  const lockPath = join(home, ".clisbot-hub.lock");
   if (!existsSync(lockPath)) return;
   let owner;
   try {

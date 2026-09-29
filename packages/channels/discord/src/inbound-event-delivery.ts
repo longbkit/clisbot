@@ -1,11 +1,11 @@
 // upstream: extensions/discord/src/inbound-event-delivery.ts@5d8067a4483
 // Discord plugin module implements inbound event delivery behavior.
-import { createInboundEventDeliveryCorrelation } from "@getpaseo/channels-core/plugin-sdk/inbound-event-delivery";
-import type { ReplyPayload } from "@getpaseo/channels-core/plugin-sdk/reply-payload";
+import { createInboundEventDeliveryCorrelation } from "@clisbot/channels-core/plugin-sdk/inbound-event-delivery";
+import type { ReplyPayload } from "@clisbot/channels-core/plugin-sdk/reply-payload";
 import {
   asOptionalRecord,
   normalizeOptionalString,
-} from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const DISCORD_INBOUND_EVENT_DELIVERY_KEY = "__openclawInboundEventDelivery";
 

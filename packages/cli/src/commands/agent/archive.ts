@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { Command } from "commander";
 import { connectToDaemon, resolveAgentId } from "../../utils/client.js";
 import type {
@@ -49,7 +49,7 @@ export async function runArchiveCommand(
     const error: CommandError = {
       code: "MISSING_AGENT_ID",
       message: "Agent ID is required",
-      details: "Usage: paseo agent archive <id-or-name>",
+      details: "Usage: clisbot agent archive <id-or-name>",
     };
     throw error;
   }
@@ -66,7 +66,7 @@ export async function runArchiveCommand(
       const error: CommandError = {
         code: "AGENT_NOT_FOUND",
         message: `Agent not found: ${agentIdArg}`,
-        details: 'Use "paseo ls" to list available agents',
+        details: 'Use "clisbot ls" to list available agents',
       };
       throw error;
     }
@@ -91,7 +91,7 @@ export async function runArchiveCommand(
         code: "AGENT_RUNNING",
         message: `Agent ${agentId.slice(0, 7)} is currently running`,
         details:
-          "Use --force to archive a running agent (it will interrupt the active run), or stop it first with: paseo agent stop. Use paseo agent delete to hard-delete it.",
+          "Use --force to archive a running agent (it will interrupt the active run), or stop it first with: clisbot agent stop. Use clisbot agent delete to hard-delete it.",
       };
       throw error;
     }

@@ -12,7 +12,7 @@
 // A WS event is admitted through the same path a webhook event is: the
 // dispatcher handler awaits durable admission before it returns, so the SDK's
 // ack follows admission, never precedes it.
-import type { HostChildLogger } from "@getpaseo/channels-shared";
+import type { HostChildLogger } from "@clisbot/channels-shared";
 import { createEventDispatcher } from "../client.js";
 import { monitorWebSocket } from "../monitor.transport.js";
 import type { ResolvedFeishuAccount } from "../types.js";

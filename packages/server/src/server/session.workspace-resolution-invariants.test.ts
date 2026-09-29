@@ -14,7 +14,7 @@ import { expect, test, vi } from "vitest";
 
 import { Session, type SessionOptions } from "./session.js";
 import { OWNER_PERMISSIONS } from "./authorization/index.js";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { createNoopWorkspaceGitService } from "./test-utils/workspace-git-service-stub.js";
 import { asInternals, createStub } from "./test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "./test-utils/session-stubs.js";
@@ -64,7 +64,7 @@ function createHarness(input: {
           currentBranch: null,
           remoteUrl: null,
           worktreeRoot: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         };
       }
@@ -74,7 +74,7 @@ function createHarness(input: {
         currentBranch: "main",
         remoteUrl: null,
         worktreeRoot: root,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       };
     },
@@ -101,7 +101,7 @@ function createHarness(input: {
     logger: createStub<SessionOptions["logger"]>(logger),
     downloadTokenStore: createStub<SessionOptions["downloadTokenStore"]>({}),
     pushNotifications: createStub<SessionOptions["pushNotifications"]>({}),
-    paseoHome: mkdtempSync(path.join(tmpdir(), "paseo-invariant-test-")),
+    clisbotHome: mkdtempSync(path.join(tmpdir(), "clisbot-invariant-test-")),
     agentManager: createStub<SessionOptions["agentManager"]>({
       subscribe: () => () => {},
       listAgents: () => [],

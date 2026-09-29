@@ -4,9 +4,9 @@ import {
   jsonResult,
   readStringArrayParam,
   readStringParam,
-} from "@getpaseo/channels-core/plugin-sdk/channel-actions";
-import type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import { extractToolSend } from "@getpaseo/channels-core/plugin-sdk/tool-send";
+} from "@clisbot/channels-core/plugin-sdk/channel-actions";
+import type { ChannelMessageActionAdapter } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import { extractToolSend } from "@clisbot/channels-core/plugin-sdk/tool-send";
 import { resolveGoogleChatAccount } from "./accounts.js";
 import { sendGoogleChatMessage } from "./api.js";
 import { describeGoogleChatMessageTool } from "./message-tool-api.js";

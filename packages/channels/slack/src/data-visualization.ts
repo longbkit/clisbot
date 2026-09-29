@@ -5,8 +5,8 @@ import {
   normalizeMessagePresentation,
   renderMessagePresentationChartFallbackText,
   type MessagePresentationChartBlock,
-} from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
-import { asOptionalRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
+import { asOptionalRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { escapeSlackMrkdwn } from "./monitor/mrkdwn.js";
 import { renderSlackMessagePresentationChartFallbackText } from "./presentation-fallback.js";
 

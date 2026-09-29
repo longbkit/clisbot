@@ -8,9 +8,9 @@
 // The vertical is imported from its build output (`npm run build --workspace=…`).
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import zalouserEntry from "@getpaseo/channels-zalouser/dist/entry.js";
-import { zalouserPlugin } from "@getpaseo/channels-zalouser/dist/plugin.js";
-import type { HostRuntime, KeyedStoreEntry } from "@getpaseo/channels-shared";
+import zalouserEntry from "@clisbot/channels-zalouser/dist/entry.js";
+import { zalouserPlugin } from "@clisbot/channels-zalouser/dist/plugin.js";
+import type { HostRuntime, KeyedStoreEntry } from "@clisbot/channels-shared";
 import { buildAccountCarriers } from "./account-carriers.js";
 import {
   channelUsesQrLogin,

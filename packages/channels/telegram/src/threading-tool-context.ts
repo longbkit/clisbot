@@ -3,9 +3,9 @@
 import type {
   ChannelThreadingContext,
   ChannelThreadingToolContext,
-} from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { parseTelegramTarget } from "./targets.js";
 
 function resolveTelegramToolContextThreadId(context: ChannelThreadingContext): string | undefined {

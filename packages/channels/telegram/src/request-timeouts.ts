@@ -3,7 +3,7 @@
 import {
   finiteSecondsToTimerSafeMilliseconds,
   MAX_TIMER_TIMEOUT_MS,
-} from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+} from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 export const TELEGRAM_GET_UPDATES_REQUEST_TIMEOUT_MS = 45_000;
 const TELEGRAM_DEFAULT_REQUEST_TIMEOUT_MS = 60_000;

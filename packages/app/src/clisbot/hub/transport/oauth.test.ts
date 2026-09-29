@@ -3,7 +3,7 @@ import {
   authorizationCodeFromCallback,
   HUB_ACCESS_SCOPE,
   oauthAuthorizeUrl,
-  PASEO_CLIENT_ID,
+  CLISBOT_CLIENT_ID,
   tokenRequestBody,
 } from "./oauth";
 
@@ -12,7 +12,7 @@ describe("Hub OAuth client contract", () => {
     const url = new URL(
       oauthAuthorizeUrl({
         origin: "https://hub.example.com",
-        redirectUri: "paseo://hub-auth/callback",
+        redirectUri: "clisbot://hub-auth/callback",
         state: "state-value",
         challenge: "challenge-value",
       }),
@@ -22,8 +22,8 @@ describe("Hub OAuth client contract", () => {
     expect(url.pathname).toBe("/api/auth/oauth2/authorize");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       response_type: "code",
-      client_id: PASEO_CLIENT_ID,
-      redirect_uri: "paseo://hub-auth/callback",
+      client_id: CLISBOT_CLIENT_ID,
+      redirect_uri: "clisbot://hub-auth/callback",
       scope: `${HUB_ACCESS_SCOPE} offline_access`,
       state: "state-value",
       code_challenge: "challenge-value",
@@ -35,7 +35,7 @@ describe("Hub OAuth client contract", () => {
     const url = new URL(
       oauthAuthorizeUrl({
         origin: "https://hub.example.com",
-        redirectUri: "paseo://hub-auth/callback",
+        redirectUri: "clisbot://hub-auth/callback",
         state: "state-value",
         challenge: "challenge-value",
         invitationId: "invitation-one",
@@ -44,13 +44,13 @@ describe("Hub OAuth client contract", () => {
 
     expect(url.pathname).toBe("/");
     expect(url.searchParams.get("invitation")).toBe("invitation-one");
-    expect(url.searchParams.get("client_id")).toBe(PASEO_CLIENT_ID);
+    expect(url.searchParams.get("client_id")).toBe(CLISBOT_CLIENT_ID);
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
   it("validates state and issuer before accepting an authorization code", () => {
     const valid =
-      "paseo://hub-auth/callback?code=one-time-code&state=expected&iss=https%3A%2F%2Fhub.example.com";
+      "clisbot://hub-auth/callback?code=one-time-code&state=expected&iss=https%3A%2F%2Fhub.example.com";
     expect(
       authorizationCodeFromCallback({
         callbackUrl: valid,
@@ -77,15 +77,15 @@ describe("Hub OAuth client contract", () => {
   it("keeps authorization-code and rotating-refresh requests distinct", () => {
     const authorization = tokenRequestBody({
       origin: "https://hub.example.com",
-      redirectUri: "paseo://hub-auth/callback",
+      redirectUri: "clisbot://hub-auth/callback",
       code: "code",
       verifier: "verifier",
     });
     expect(Object.fromEntries(authorization)).toEqual({
       grant_type: "authorization_code",
-      client_id: PASEO_CLIENT_ID,
+      client_id: CLISBOT_CLIENT_ID,
       resource: "https://hub.example.com",
-      redirect_uri: "paseo://hub-auth/callback",
+      redirect_uri: "clisbot://hub-auth/callback",
       code: "code",
       code_verifier: "verifier",
     });
@@ -96,7 +96,7 @@ describe("Hub OAuth client contract", () => {
     });
     expect(Object.fromEntries(refresh)).toEqual({
       grant_type: "refresh_token",
-      client_id: PASEO_CLIENT_ID,
+      client_id: CLISBOT_CLIENT_ID,
       resource: "https://hub.example.com",
       refresh_token: "refresh-token",
     });

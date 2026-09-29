@@ -16,7 +16,7 @@ export class DaemonHandoffSurface {
 
   /** The exact command the operator is told to paste, as it is rendered. */
   command(): Locator {
-    return this.page.getByText(/^paseo hub login/u);
+    return this.page.getByText(/^clisbot hub login/u);
   }
 
   async expectCommand(expected: string): Promise<void> {

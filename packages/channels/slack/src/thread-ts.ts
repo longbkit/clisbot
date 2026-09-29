@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/thread-ts.ts@5d8067a4483
 // Slack plugin module implements thread ts behavior.
-import type { ReplyToMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import type { ReplyToMode } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 
 const SLACK_THREAD_TS_PATTERN = /^\d+\.\d+$/;
 

@@ -1,7 +1,7 @@
 import type { Dirent, Stats } from "node:fs";
 import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { scorePathMatch, type MatchScore } from "@getpaseo/protocol/search/text-match";
+import { scorePathMatch, type MatchScore } from "@clisbot/protocol/search/text-match";
 import { isPathInsideRoot } from "./path.js";
 import { runGitCommand } from "./run-git-command.js";
 
@@ -108,7 +108,7 @@ export const WORKSPACE_SEARCH_HIDDEN_DIRECTORIES = [
   ".codex",
   ".github",
   ".opencode",
-  ".paseo",
+  ".clisbot",
   ".vscode",
 ] as const;
 const IGNORED_DIRECTORY_NAMES = new Set([

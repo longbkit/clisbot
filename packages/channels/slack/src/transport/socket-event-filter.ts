@@ -8,7 +8,7 @@
 // Split out of socket-mode.ts so the socket loop stays small and these facts
 // are unit-testable without a live socket. No OpenClaw imports.
 
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { decodeSlackEntities } from "../fusion/slack-entities.js";
 
 /** The identity facts L4 probes from `auth.test` (client/web-api.ts): the
@@ -262,8 +262,8 @@ export interface SlackSlashCommandBody {
  * the shared parser (hub `commands.ts`) already understands, so a team that
  * registered a native command gets the SAME commands with zero extra wiring.
  * The registered command is a single alias whose FIRST WORD picks the
- * sub-command (`/paseo approve`, `/paseo status`); the body's `text` is the
- * remainder. A bare `/paseo` (empty text) becomes `help`.
+ * sub-command (`/clisbot approve`, `/clisbot status`); the body's `text` is the
+ * remainder. A bare `/clisbot` (empty text) becomes `help`.
  *
  * Returns undefined when the body is not a command we can mint (no channel,
  * no user, or a command name the vertical was not told to accept — the
@@ -290,7 +290,7 @@ export function buildSlackSlashCommandEvent(
   const args = (body.text ?? "").trim();
   const text = args === "" ? "help" : args;
   // The registered alias is one command whose FIRST WORD picks the sub-command,
-  // so the verb the Hub acts on is that word, not `/paseo`.
+  // so the verb the Hub acts on is that word, not `/clisbot`.
   const [verb = "help", ...rest] = text.split(/\s+/u);
   const nowMs = Date.now();
   return {

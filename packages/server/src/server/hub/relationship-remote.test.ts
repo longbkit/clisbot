@@ -22,12 +22,12 @@ import {
 
 const openServers: ReturnType<typeof createServer>[] = [];
 const openUpgradeHubs: UpgradeRejectingHub[] = [];
-const openPaseoHomes: string[] = [];
+const openClisbotHomes: string[] = [];
 
 afterEach(async () => {
   for (const hub of openUpgradeHubs.splice(0)) hub.destroyConnections();
   await Promise.all(openServers.splice(0).map((server) => closeServer(server)));
-  await Promise.all(openPaseoHomes.splice(0).map((home) => rm(home, { recursive: true })));
+  await Promise.all(openClisbotHomes.splice(0).map((home) => rm(home, { recursive: true })));
 });
 
 test.each([401, 403, 404])(
@@ -115,7 +115,7 @@ test("Project replacement uses the enrolled daemon credential and one complete s
     projects: [
       {
         projectId: "project-1",
-        name: "Paseo",
+        name: "Clisbot",
         agentConfigurationCatalog: {
           providers: [
             {
@@ -143,7 +143,7 @@ test("Project replacement uses the enrolled daemon credential and one complete s
       projects: [
         {
           projectId: "project-1",
-          name: "Paseo",
+          name: "Clisbot",
           agentConfigurationCatalog: {
             providers: [
               {
@@ -222,10 +222,10 @@ test("Connection Offer publication reads the current managed access mode", async
   });
   const address = server.address() as AddressInfo;
   const hubOrigin = `http://127.0.0.1:${address.port}`;
-  const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-hub-offer-"));
-  openPaseoHomes.push(paseoHome);
+  const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-hub-offer-"));
+  openClisbotHomes.push(clisbotHome);
   await writeFile(
-    path.join(paseoHome, "hub-relationship.json"),
+    path.join(clisbotHome, "hub-relationship.json"),
     JSON.stringify({
       version: 2,
       state: "active",
@@ -243,7 +243,7 @@ test("Connection Offer publication reads the current managed access mode", async
   );
   let managedAccessMode: "off" | "external" = "off";
   const controller = new HubRelationshipController({
-    paseoHome,
+    clisbotHome,
     hostname: "test-daemon.local",
     serverId: "server-1",
     daemonPublicKey: "daemon-public-key",
@@ -275,11 +275,11 @@ test.each([
     const server = createServer();
     const webSockets = new WebSocketServer({ noServer: true });
     if (acknowledge) {
-      webSockets.on("headers", (headers) => headers.push("x-paseo-session-protocol: 1"));
+      webSockets.on("headers", (headers) => headers.push("x-clisbot-session-protocol: 1"));
     }
     let offeredProtocol: string | string[] | undefined;
     server.on("upgrade", (request, socket, head) => {
-      offeredProtocol = request.headers["x-paseo-session-protocol"];
+      offeredProtocol = request.headers["x-clisbot-session-protocol"];
       webSockets.handleUpgrade(request, socket, head, () => undefined);
     });
     openServers.push(server);
@@ -405,7 +405,7 @@ test.each([408, 429])("transient enrollment status %s remains retryable", async 
 });
 
 test("a copied daemon identity is rejected with Hub's reset instructions", async () => {
-  const message = 'Host "studio" already uses this identity. Run: paseo daemon reset-identity';
+  const message = 'Host "studio" already uses this identity. Run: clisbot daemon reset-identity';
   const hubOrigin = await startHubReturning(409, { error: "daemon_server_id_conflict", message });
   const remote = new DirectHubRelationshipRemote();
 
@@ -887,10 +887,10 @@ async function connectController(
   hub: UpgradeRejectingHub,
   clock: ManualRelationshipClock,
 ): Promise<HubRelationshipController> {
-  const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-hub-socket-"));
-  openPaseoHomes.push(paseoHome);
+  const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-hub-socket-"));
+  openClisbotHomes.push(clisbotHome);
   const controller = new HubRelationshipController({
-    paseoHome,
+    clisbotHome,
     hostname: "test-daemon.local",
     serverId: "server-1",
     daemonPublicKey: "daemon-public-key",

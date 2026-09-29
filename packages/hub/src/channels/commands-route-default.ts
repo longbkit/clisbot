@@ -3,7 +3,7 @@
 // caller. Routes match by conversation and message text in order, so only the
 // Hub knows which one served this message, and that Route is the one changed.
 
-import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
+import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import type { ChannelConversationKey } from "../db/channel-access.js";
 import type { ChannelStore } from "../db/channels.js";
 import { routePosition } from "./bindings/index.js";

@@ -1,8 +1,8 @@
 // upstream: extensions/slack/src/monitor/types.ts@5d8067a4483
 // Slack type declarations define plugin contracts.
-import type { ChannelRuntimeSurface } from "@getpaseo/channels-core/plugin-sdk/channel-contract";
-import type { OpenClawConfig, SlackSlashCommandConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import type { RuntimeEnv } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import type { ChannelRuntimeSurface } from "@clisbot/channels-core/plugin-sdk/channel-contract";
+import type { OpenClawConfig, SlackSlashCommandConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import type { RuntimeEnv } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import type { SlackAppContext } from "../agent-context.js";
 import type { SlackMessageEvent } from "../types.js";
 

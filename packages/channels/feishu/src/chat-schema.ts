@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/chat-schema.ts@5d8067a4483
 // Feishu helper module supports chat schema behavior.
-import { optionalPositiveIntegerSchema } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { optionalPositiveIntegerSchema } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import { Type, type Static } from "typebox";
 
 const CHAT_ACTION_VALUES = ["members", "info", "member_info"] as const;

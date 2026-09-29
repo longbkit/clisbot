@@ -10,7 +10,7 @@ import { z } from "zod";
 import { apiKeyScopesSchema, type ApiKeyScope } from "./api-key-contract.js";
 import { withApiKeySerialization } from "../db/api-key-serialization.js";
 
-const API_KEY_PREFIX = "paseo_pk_";
+const API_KEY_PREFIX = "clisbot_pk_";
 const API_KEY_PREFIX_LENGTH = 12;
 const API_KEY_SECRET_BYTES = 32;
 const apiKeyNameSchema = z.string().trim().min(1).max(100);

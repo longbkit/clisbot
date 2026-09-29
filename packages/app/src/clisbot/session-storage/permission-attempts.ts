@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
-import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionResponse } from "@clisbot/protocol/agent-types";
 
 interface Storage {
   getItem(key: string): Promise<string | null>;
@@ -10,7 +10,7 @@ interface Attempt {
   key: string;
   id: string;
 }
-const STORAGE_KEY = "paseo:permission-response-attempts:v1";
+const STORAGE_KEY = "clisbot:permission-response-attempts:v1";
 const MAX_ATTEMPTS = 128;
 const MAX_BYTES = 64 * 1024;
 function stableValue(value: unknown): unknown {

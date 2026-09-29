@@ -141,8 +141,8 @@ export async function runSettingsMemoryRegression(page) {
     await rotateSettings(page);
   }
   const detachedAfterStress = await collectDetachedSettingsPanes(session);
-  if (process.env.PASEO_DESKTOP_SETTINGS_HEAP_SNAPSHOT) {
-    await captureHeapSnapshot(session, process.env.PASEO_DESKTOP_SETTINGS_HEAP_SNAPSHOT);
+  if (process.env.CLISBOT_DESKTOP_SETTINGS_HEAP_SNAPSHOT) {
+    await captureHeapSnapshot(session, process.env.CLISBOT_DESKTOP_SETTINGS_HEAP_SNAPSHOT);
   }
 
   assert(

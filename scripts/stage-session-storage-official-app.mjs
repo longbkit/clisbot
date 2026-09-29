@@ -43,7 +43,7 @@ for (const name of ["app", "expo-two-way-audio"]) {
   for (const entry of await readdir(join(checkout, "packages", name, "node_modules"), {
     withFileTypes: true,
   })) {
-    if (entry.name.startsWith(".") || entry.name === "@getpaseo") continue;
+    if (entry.name.startsWith(".") || entry.name === "@clisbot") continue;
     await symlink(
       await realpath(join(checkout, "packages", name, "node_modules", entry.name)),
       join(localModules, entry.name),
@@ -54,11 +54,11 @@ for (const name of ["app", "expo-two-way-audio"]) {
 // This private workspace has no published artifact. Compile its exact pinned source separately;
 // never point this import to a working Fusion source/build directory.
 const audio = join(source, "packages/expo-two-way-audio");
-const appScope = join(app, "node_modules/@getpaseo");
+const appScope = join(app, "node_modules/@clisbot");
 await mkdir(appScope);
 await symlink(audio, join(appScope, "expo-two-way-audio"), "dir");
 for (const name of ["client", "highlight", "plugin", "protocol", "relay"])
-  await symlink(join(stage, "node_modules/@getpaseo", name), join(appScope, name), "dir");
+  await symlink(join(stage, "node_modules/@clisbot", name), join(appScope, name), "dir");
 const sourceManifest = {
   gitHead: heads[0],
   version: manifest.version,
@@ -68,7 +68,7 @@ const sourceManifest = {
   appDirectory: app,
   privateAudioSourceDirectory: audio,
   privateAudioBuildRequired: true,
-  publishedPackageDirectory: join(stage, "node_modules/@getpaseo"),
+  publishedPackageDirectory: join(stage, "node_modules/@clisbot"),
   note: "Unmodified tracked official app and private audio source; published official client/protocol/relay; shared installed third-party dependencies. Build and browser assertions remain separate.",
 };
 await writeFile(

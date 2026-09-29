@@ -19,7 +19,7 @@ const daemon = {
 };
 
 describe("Hub-managed Host admission", () => {
-  it("keeps older Hub projections on ordinary Paseo trust", () => {
+  it("keeps older Hub projections on ordinary Clisbot trust", () => {
     const parsed = HubDaemonSchema.parse(daemon);
 
     expect(parsed.managedAccessMode).toBe("off");

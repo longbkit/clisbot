@@ -1,5 +1,5 @@
 // upstream: extensions/slack/src/monitor/block-text.ts@5d8067a4483
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { renderSlackBlockFallbackText } from "../blocks-fallback.js";
 
 type SlackBlocksText = {

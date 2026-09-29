@@ -1,6 +1,6 @@
 // Fusion drive-surface bridge onto the ported OpenClaw Discord send path.
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and upstream's
 // `send.ts` entry points. Every wire decision — chunking, markdown rendering,
 // mention rewriting, thread/reply params, retries, receipts, media routing —
@@ -8,9 +8,9 @@
 // `outbound.ts`.
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { HostRuntime, SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
+import { evaluateOutboundMedia, mediaFileName } from "@clisbot/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import type { RequestClient } from "./internal/rest.js";
 import { installDiscordRuntime } from "./fusion/runtime.js";
 import { withDiscordAccount } from "./runtime.js";

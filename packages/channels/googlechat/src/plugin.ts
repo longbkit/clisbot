@@ -6,7 +6,7 @@
 // REST primitives by their upstream names so the message-action runner can
 // dispatch without re-deriving a send path.
 
-import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { googlechatChannelActions } from "./channel-actions.js";
 import { disposeGoogleChatRuntime } from "./fusion/runtime.js";
 import { startGoogleChatAccount } from "./lifecycle/start-account.js";

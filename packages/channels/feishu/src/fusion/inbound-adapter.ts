@@ -7,12 +7,12 @@
 // runtime, the streaming card and the typing indicator. Fusion's Hub owns every
 // one of those, so this module does only the part the Hub cannot: turn the
 // native event into the channel-agnostic `ChannelInboundEvent` the shared L3
-// monitor admits (`@getpaseo/channels-shared`).
+// monitor admits (`@clisbot/channels-shared`).
 //
 // The content, mention and chat-type decisions are the ported source's
 // (`bot-content.ts`, `mention.ts`, `chat-type.ts`, `card-interaction.ts`); this
 // file only chooses which of them applies to which event and fills the envelope.
-import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { checkBotMentioned, normalizeMentions, parseMessageContent } from "../bot-content.js";
 import { decodeFeishuCardAction } from "../card-interaction.js";
 import { normalizeFeishuChatType } from "../chat-type.js";

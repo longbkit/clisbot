@@ -27,7 +27,7 @@
  * (`/new <prompt>`, `/fork`, `/stop`, …) acts on the root binding it creates,
  * so it keeps that binding's lane.
  */
-import { inboundLaneKey } from "@getpaseo/channels-shared";
+import { inboundLaneKey } from "@clisbot/channels-shared";
 import { deriveBindingKey, rootMessagesOpenThreads } from "../bindings/stored-route.js";
 import type { ChannelCommandName } from "../commands.js";
 import type { CompiledChannelAccount } from "../config/compile.js";

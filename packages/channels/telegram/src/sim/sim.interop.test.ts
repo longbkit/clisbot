@@ -6,7 +6,7 @@
 // vertical actually uses — not against a description of the Bot API.
 import { Api, Bot, GrammyError, HttpError } from "grammy";
 import { afterEach, describe, expect, it } from "vitest";
-import { startTelegramSim, type SimTelegram } from "@getpaseo/channels-shared/sim";
+import { startTelegramSim, type SimTelegram } from "@clisbot/channels-shared/sim";
 
 let sim: SimTelegram | undefined;
 

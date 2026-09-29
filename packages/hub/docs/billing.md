@@ -48,7 +48,7 @@ never the entitlement template.
 
 The Stripe catalog carries a `free` product. It is not a tier Hub sells: it is where the
 entitlement floor is authored, so provisioning and cancellation have a real template to stamp
-instead of a constant in the code. Hosted Hub sells exactly one plan today — Paseo Hub, per user,
+instead of a constant in the code. Hosted Hub sells exactly one plan today — Clisbot Hub, per user,
 per month.
 
 `BillingRuntime.publicCatalog` is the boundary that keeps those two apart. It withholds the free
@@ -173,12 +173,12 @@ known secret, the same pattern `e2e/helpers/hub.ts` already uses for GitHub and 
 in `e2e/billing-boundary.spec.ts`, `e2e/billing-catalog.spec.ts`, `e2e/billing-subscription.spec.ts`
 (the money test), and `e2e/billing-downgrade.spec.ts`.
 
-Running the E2E suite locally requires `PASEO_E2E_WORKTREE` pointed at a checkout of
-`getpaseo/paseo` — the harness npm-packs the server packages from it. Without it, entitlements'
+Running the E2E suite locally requires `CLISBOT_E2E_WORKTREE` pointed at a checkout of
+`longbkit/clisbot` — the harness npm-packs the server packages from it. Without it, entitlements'
 metered-usage E2E fails with a worktree-mismatch error that reads like a code regression but is
 an environment gap.
 
 ## Explicitly out of scope
 
 Proration UI, invoices, tax, dunning, coupons, multi-currency, a second payment provider, and a
-Hub-hosted marketing pricing page — paseo.sh fetches `/api/billing/plans` and renders its own.
+Hub-hosted marketing pricing page — clisbot.com fetches `/api/billing/plans` and renders its own.

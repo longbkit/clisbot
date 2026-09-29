@@ -51,17 +51,17 @@ describe("production Hub cold start", () => {
     previousEnvironment = new Map(
       [
         "DATABASE_URL",
-        "PASEO_HUB_AUTH_SECRET",
-        "PASEO_HUB_APP_URL",
-        "PASEO_REGISTRATION_MODE",
-        "PASEO_ORGANIZATION_CREATION",
-        "PASEO_BOOTSTRAP_ORGANIZATION",
-        "PASEO_BOOTSTRAP_OWNER_EMAIL",
-        "PASEO_BOOTSTRAP_OWNER_PASSWORD",
-        "PASEO_HUB_CREDENTIAL_MASTER_KEY",
+        "CLISBOT_HUB_AUTH_SECRET",
+        "CLISBOT_HUB_APP_URL",
+        "CLISBOT_REGISTRATION_MODE",
+        "CLISBOT_ORGANIZATION_CREATION",
+        "CLISBOT_BOOTSTRAP_ORGANIZATION",
+        "CLISBOT_BOOTSTRAP_OWNER_EMAIL",
+        "CLISBOT_BOOTSTRAP_OWNER_PASSWORD",
+        "CLISBOT_HUB_CREDENTIAL_MASTER_KEY",
       ].map((name) => [name, process.env[name]]),
     );
-    process.env["PASEO_HUB_CREDENTIAL_MASTER_KEY"] = Buffer.alloc(32, 7).toString("base64");
+    process.env["CLISBOT_HUB_CREDENTIAL_MASTER_KEY"] = Buffer.alloc(32, 7).toString("base64");
   });
 
   afterEach(async () => {
@@ -88,12 +88,12 @@ describe("production Hub cold start", () => {
     await client.close();
 
     process.env["DATABASE_URL"] = databaseUrl;
-    delete process.env["PASEO_HUB_AUTH_SECRET"];
-    delete process.env["PASEO_HUB_APP_URL"];
-    process.env["PASEO_REGISTRATION_MODE"] = "disabled";
-    delete process.env["PASEO_BOOTSTRAP_ORGANIZATION"];
-    delete process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"];
-    delete process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"];
+    delete process.env["CLISBOT_HUB_AUTH_SECRET"];
+    delete process.env["CLISBOT_HUB_APP_URL"];
+    process.env["CLISBOT_REGISTRATION_MODE"] = "disabled";
+    delete process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"];
+    delete process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"];
+    delete process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"];
 
     const runtime = await startProductionRuntime();
     const verification = await createPostgresQueryRuntime(databaseUrl);
@@ -122,13 +122,13 @@ describe("production Hub cold start", () => {
       "production_blank_app_url",
     );
     process.env["DATABASE_URL"] = databaseUrl;
-    process.env["PASEO_HUB_AUTH_SECRET"] = "production-blank-url-secret-at-least-32-characters";
-    process.env["PASEO_HUB_APP_URL"] = "";
-    process.env["PASEO_REGISTRATION_MODE"] = "disabled";
-    process.env["PASEO_ORGANIZATION_CREATION"] = "disabled";
-    delete process.env["PASEO_BOOTSTRAP_ORGANIZATION"];
-    delete process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"];
-    delete process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"];
+    process.env["CLISBOT_HUB_AUTH_SECRET"] = "production-blank-url-secret-at-least-32-characters";
+    process.env["CLISBOT_HUB_APP_URL"] = "";
+    process.env["CLISBOT_REGISTRATION_MODE"] = "disabled";
+    process.env["CLISBOT_ORGANIZATION_CREATION"] = "disabled";
+    delete process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"];
+    delete process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"];
+    delete process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"];
 
     const runtime = await startProductionRuntime();
 
@@ -143,23 +143,23 @@ describe("production Hub cold start", () => {
     const previous = new Map(
       [
         "DATABASE_URL",
-        "PASEO_HUB_AUTH_SECRET",
-        "PASEO_HUB_APP_URL",
-        "PASEO_REGISTRATION_MODE",
-        "PASEO_ORGANIZATION_CREATION",
-        "PASEO_BOOTSTRAP_ORGANIZATION",
-        "PASEO_BOOTSTRAP_OWNER_EMAIL",
-        "PASEO_BOOTSTRAP_OWNER_PASSWORD",
+        "CLISBOT_HUB_AUTH_SECRET",
+        "CLISBOT_HUB_APP_URL",
+        "CLISBOT_REGISTRATION_MODE",
+        "CLISBOT_ORGANIZATION_CREATION",
+        "CLISBOT_BOOTSTRAP_ORGANIZATION",
+        "CLISBOT_BOOTSTRAP_OWNER_EMAIL",
+        "CLISBOT_BOOTSTRAP_OWNER_PASSWORD",
       ].map((name) => [name, process.env[name]]),
     );
     process.env["DATABASE_URL"] = databaseUrl;
-    process.env["PASEO_HUB_AUTH_SECRET"] = "production-bootstrap-secret-at-least-32-characters";
-    process.env["PASEO_HUB_APP_URL"] = "http://localhost:3000";
-    process.env["PASEO_REGISTRATION_MODE"] = "invite_only";
-    process.env["PASEO_ORGANIZATION_CREATION"] = "disabled";
-    process.env["PASEO_BOOTSTRAP_ORGANIZATION"] = "Production Customer";
-    process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"] = "production-owner@example.test";
-    process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"] = "production-temporary-password";
+    process.env["CLISBOT_HUB_AUTH_SECRET"] = "production-bootstrap-secret-at-least-32-characters";
+    process.env["CLISBOT_HUB_APP_URL"] = "http://localhost:3000";
+    process.env["CLISBOT_REGISTRATION_MODE"] = "invite_only";
+    process.env["CLISBOT_ORGANIZATION_CREATION"] = "disabled";
+    process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"] = "Production Customer";
+    process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"] = "production-owner@example.test";
+    process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"] = "production-temporary-password";
     try {
       const runtime = await startProductionRuntime();
       assert.ok(runtime);
@@ -190,24 +190,24 @@ describe("production Hub cold start", () => {
     const previous = new Map(
       [
         "DATABASE_URL",
-        "PASEO_HUB_AUTH_SECRET",
-        "PASEO_HUB_APP_URL",
-        "PASEO_REGISTRATION_MODE",
-        "PASEO_ORGANIZATION_CREATION",
-        "PASEO_BOOTSTRAP_ORGANIZATION",
-        "PASEO_BOOTSTRAP_OWNER_EMAIL",
-        "PASEO_BOOTSTRAP_OWNER_PASSWORD",
+        "CLISBOT_HUB_AUTH_SECRET",
+        "CLISBOT_HUB_APP_URL",
+        "CLISBOT_REGISTRATION_MODE",
+        "CLISBOT_ORGANIZATION_CREATION",
+        "CLISBOT_BOOTSTRAP_ORGANIZATION",
+        "CLISBOT_BOOTSTRAP_OWNER_EMAIL",
+        "CLISBOT_BOOTSTRAP_OWNER_PASSWORD",
       ].map((name) => [name, process.env[name]]),
     );
     const secret = "production-public-api-secret-at-least-32-characters";
     process.env["DATABASE_URL"] = databaseUrl;
-    process.env["PASEO_HUB_AUTH_SECRET"] = secret;
-    process.env["PASEO_HUB_APP_URL"] = "http://localhost:3000";
-    process.env["PASEO_REGISTRATION_MODE"] = "invite_only";
-    process.env["PASEO_ORGANIZATION_CREATION"] = "disabled";
-    process.env["PASEO_BOOTSTRAP_ORGANIZATION"] = "API Customer";
-    process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"] = "api-owner@example.test";
-    process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"] = "production-temporary-password";
+    process.env["CLISBOT_HUB_AUTH_SECRET"] = secret;
+    process.env["CLISBOT_HUB_APP_URL"] = "http://localhost:3000";
+    process.env["CLISBOT_REGISTRATION_MODE"] = "invite_only";
+    process.env["CLISBOT_ORGANIZATION_CREATION"] = "disabled";
+    process.env["CLISBOT_BOOTSTRAP_ORGANIZATION"] = "API Customer";
+    process.env["CLISBOT_BOOTSTRAP_OWNER_EMAIL"] = "api-owner@example.test";
+    process.env["CLISBOT_BOOTSTRAP_OWNER_PASSWORD"] = "production-temporary-password";
     let keyAuthority: ReturnType<typeof createAuthServer> | undefined;
     let keyAuthorityDatabase: Awaited<ReturnType<typeof createDatabase>> | undefined;
     let keyAuthorityEntitlements: ComposedEntitlements | undefined;
@@ -255,7 +255,7 @@ describe("production Hub cold start", () => {
           },
           body: JSON.stringify({
             projectSlug: "not-present",
-            files: [{ path: ".paseo/hub.yml", content: "environments: {}\nagents: {}" }],
+            files: [{ path: ".clisbot/hub.yml", content: "environments: {}\nagents: {}" }],
           }),
         }),
       );

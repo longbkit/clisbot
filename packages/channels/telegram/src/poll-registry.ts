@@ -5,13 +5,13 @@
 // updates do not carry the originating chat/thread. Persist the authoritative route
 // returned by sendPoll so a later vote can enter the normal inbound turn pipeline.
 import type { Chat } from "grammy/types";
-import { parseStrictInteger, parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { parseStrictInteger, parseStrictPositiveInteger } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 import type {
   PluginStateKeyedStore,
   PluginStateSyncKeyedStore,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { normalizeAccountId } from "@getpaseo/channels-core/plugin-sdk/routing";
-import { isRecord } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+} from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/routing";
+import { isRecord } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { getTelegramRuntime } from "./runtime.js";
 
 const TELEGRAM_POLL_REGISTRY_NAMESPACE = "telegram.poll-registry";

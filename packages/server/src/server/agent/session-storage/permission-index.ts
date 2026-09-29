@@ -1,4 +1,4 @@
-import type { AgentPermissionResponseRecord } from "@getpaseo/protocol/session-authorship";
+import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import type { JournalEntry } from "./paged-journal.js";
 import { AMBIGUOUS_ID, type SessionEventStream } from "./session-event-log.js";
 

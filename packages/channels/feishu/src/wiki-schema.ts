@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/wiki-schema.ts@5d8067a4483
 // Feishu helper module supports wiki schema behavior.
-import { optionalPositiveIntegerSchema } from "@getpaseo/channels-core/plugin-sdk/channel-actions";
+import { optionalPositiveIntegerSchema } from "@clisbot/channels-core/plugin-sdk/channel-actions";
 import { Type, type Static } from "typebox";
 
 const WIKI_SPACE_ID_DESCRIPTION =

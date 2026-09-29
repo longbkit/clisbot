@@ -1,4 +1,4 @@
-import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
 import { describeScheduleCwd } from "@/schedules/schedule-project-targets";
 
 // Derived from existing fields only — no new protocol state. "active"/"paused"

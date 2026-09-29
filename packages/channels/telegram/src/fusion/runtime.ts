@@ -3,7 +3,7 @@
 // Upstream opens SQLite-backed keyed stores from the OpenClaw state directory
 // (`openclaw/plugin-sdk/plugin-state-runtime`). The Hub owns channel state in
 // Fusion and exposes one async keyed-store root per account
-// (`HostRuntime.state.openKeyedStore`, `@getpaseo/channels-shared`). This module
+// (`HostRuntime.state.openKeyedStore`, `@clisbot/channels-shared`). This module
 // installs a `TelegramRuntime` over it so every ported store keeps its upstream
 // interface and call flow.
 //
@@ -14,18 +14,18 @@
 // store does not survive a process restart yet; the caches that use it
 // (sent-message dedupe, sticker cache, the poll-registry fast path) are all
 // TTL'd rebuildable caches.
-import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import type { HostChildLogger, HostKeyedStore, HostRuntime } from "@clisbot/channels-shared";
 import {
   clearChannelSubsystemLogSink,
   installChannelSubsystemLogSink,
-} from "@getpaseo/channels-shared";
+} from "@clisbot/channels-shared";
 import type {
   OpenKeyedStoreOptions,
   PluginStateEntry,
   PluginStateKeyedStore,
   PluginStateSyncKeyedStore,
-} from "@getpaseo/channels-core/plugin-sdk/plugin-state-runtime";
-import { setVerbose } from "@getpaseo/channels-core/globals";
+} from "@clisbot/channels-core/plugin-sdk/plugin-state-runtime";
+import { setVerbose } from "@clisbot/channels-core/globals";
 import { currentTelegramAccountId, setTelegramRuntime } from "../runtime.js";
 import type { TelegramRuntime } from "../runtime.types.js";
 

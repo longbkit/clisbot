@@ -1,15 +1,15 @@
 // Fusion drive-surface bridge onto the ported Zalo send path (D-ZL-016).
 //
-// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// `plugin.outbound.*` is the Hub's contract (`@clisbot/channels-shared`), so
 // this file is the only place that translates between it and upstream's
 // `send.ts`. Every wire decision — the target-prefix stripping, the 2000-char
 // UTF-16-safe truncation, the receipt shape, the photo-vs-text branch — lives in
 // the ported source, not here. Mirrors the Discord and Google Chat verticals'
 // `outbound.ts`.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
-import { createChannelPartialDeliveryError } from "@getpaseo/channels-core/plugin-sdk/channel-inbound";
-import { chunkTextForOutbound } from "@getpaseo/channels-core/plugin-sdk/text-chunking";
-import type { SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
+import { createChannelPartialDeliveryError } from "@clisbot/channels-core/plugin-sdk/channel-inbound";
+import { chunkTextForOutbound } from "@clisbot/channels-core/plugin-sdk/text-chunking";
+import type { SendMediaFn, SendTextFn } from "@clisbot/channels-shared";
 import { mergeAccountCarrier } from "./fusion/account-config.js";
 import { sendMessageZalo } from "./send.js";
 

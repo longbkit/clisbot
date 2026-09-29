@@ -1,7 +1,7 @@
-// Minimal wire types for the Hub's trusted-client transport to a Paseo daemon.
+// Minimal wire types for the Hub's trusted-client transport to a Clisbot daemon.
 // The Hub owns its own copy of the protocol shapes it drives (plan §4-S3: P0 uses
 // the existing trusted-client RPCs only — no new wire, and the Hub package keeps
-// zero @getpaseo imports). Only the fields the channel control plane reads are
+// zero @clisbot imports). Only the fields the channel control plane reads are
 // declared here; unknown fields are passed through untouched.
 
 export interface AgentSnapshot {

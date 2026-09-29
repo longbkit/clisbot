@@ -7,7 +7,7 @@ import { readPluginProviderIcon } from "./provider-icon.js";
 const directories: string[] = [];
 
 async function writeIcon(contents: string): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-icon-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-icon-"));
   directories.push(directory);
   await writeFile(path.join(directory, "icon.svg"), contents);
   return directory;
@@ -54,7 +54,7 @@ describe("readPluginProviderIcon", () => {
 
   test("rejects a symlink that escapes the plugin directory", async () => {
     const directory = await writeIcon("<svg />");
-    const externalDirectory = await mkdtemp(path.join(tmpdir(), "paseo-external-icon-"));
+    const externalDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-external-icon-"));
     directories.push(externalDirectory);
     const externalIcon = path.join(externalDirectory, "external.svg");
     await writeFile(externalIcon, "<svg />");

@@ -5,9 +5,9 @@ import type {
   BrowserAutomationCommandName,
   BrowserAutomationExecuteRequest,
   BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
+import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import type pino from "pino";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -213,7 +213,7 @@ describe("WebSocketServer browser tools wiring", () => {
     const harness = await startBrowserToolsDaemonHarness(resolver);
     await expect(
       harness.connectBrowserHostClient({
-        resolveAccessTicket: async () => "paseo_dat_browser_host",
+        resolveAccessTicket: async () => "clisbot_dat_browser_host",
       }),
     ).rejects.toThrow("Project-scoped clients cannot host daemon browser automation");
 
@@ -341,7 +341,7 @@ function createVoiceAssistantWebSocketServer(params: {
     createStub<AgentManager>(agentManager),
     createStub<AgentStorage>({ list: async () => [] }),
     createStub<DownloadTokenStore>({}),
-    "/tmp/paseo-browser-tools-websocket-test",
+    "/tmp/clisbot-browser-tools-websocket-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
     null,
     {

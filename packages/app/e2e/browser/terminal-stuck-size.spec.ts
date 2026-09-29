@@ -49,8 +49,8 @@ interface RenderedTerminalSize {
 
 async function readRenderedTerminalSize(page: Page): Promise<RenderedTerminalSize | null> {
   return await page.evaluate(() => {
-    const terminal = (window as Window & { __paseoTerminal?: { rows: number; cols: number } })
-      .__paseoTerminal;
+    const terminal = (window as Window & { __clisbotTerminal?: { rows: number; cols: number } })
+      .__clisbotTerminal;
     return terminal ? { rows: terminal.rows, cols: terminal.cols } : null;
   });
 }
@@ -172,7 +172,7 @@ test.describe("terminal PTY size claim under lost window focus", () => {
     // ...and comes back.
     await setWindowFocused(page, true);
 
-    // __paseoTerminal points at the most recently mounted xterm — the new terminal.
+    // __clisbotTerminal points at the most recently mounted xterm — the new terminal.
     const rendered = requireTerminalSize(await readRenderedTerminalSize(page));
     // Sanity: the pane really rendered at a desktop size, not the PTY default.
     expect(rendered.cols).toBeGreaterThan(80);

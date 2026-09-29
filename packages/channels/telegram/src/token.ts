@@ -11,7 +11,7 @@
 // fallback rule. This module keeps upstream's `resolveTelegramToken` signature
 // and result shape and answers from that inspection, so every ported caller is
 // unchanged. `credentialDiagnostics` has no Fusion producer and is not carried.
-import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { inspectTelegramAccount } from "./account-inspect.js";
 
 type TelegramTokenSource = "env" | "tokenFile" | "config" | "none";

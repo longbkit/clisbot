@@ -8,7 +8,7 @@ import { createTestLogger } from "../../../test-utils/test-logger.js";
 import type {
   AgentPermissionResponseRecord,
   SessionActor,
-} from "@getpaseo/protocol/session-authorship";
+} from "@clisbot/protocol/session-authorship";
 
 const directories: string[] = [];
 const timestamp = "2026-09-11T00:00:00.000Z";

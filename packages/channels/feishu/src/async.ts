@@ -1,6 +1,6 @@
 // upstream: extensions/feishu/src/async.ts@5d8067a4483
 // Feishu plugin module implements async behavior.
-import { resolveTimerTimeoutMs } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
+import { resolveTimerTimeoutMs } from "@clisbot/channels-core/plugin-sdk/number-runtime";
 
 const RACE_TIMEOUT = Symbol("race-timeout");
 const RACE_ABORT = Symbol("race-abort");

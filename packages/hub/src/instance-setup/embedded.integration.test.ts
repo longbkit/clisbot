@@ -35,7 +35,7 @@ const ONE_CLAIMED_INSTANCE = {
   bootstrapRows: 1,
   completedSetups: 1,
   operatorName: "embedded.operator",
-  organizationName: "Paseo Hub",
+  organizationName: "Clisbot Hub",
   mustChangePassword: false,
   completionMatchesOwner: true,
 };

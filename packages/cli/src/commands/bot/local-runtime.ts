@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { homeRequiresTickets, loadConfig } from "@getpaseo/server";
-import { readDaemonInstance, daemonLogPath } from "@getpaseo/server/daemon-control";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { homeRequiresTickets, loadConfig } from "@clisbot/server";
+import { readDaemonInstance, daemonLogPath } from "@clisbot/server/daemon-control";
 import { resolveTcpHostFromListen } from "../daemon/local-daemon.js";
 import { resolveLocalHubState } from "../hub/local-hub.js";
 import { selectLocalPort } from "../hub/local-port.js";
@@ -13,10 +13,10 @@ export async function assertLocalOnboardingAccess(
   home: string,
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
-  const config = loadConfig(home, { env: { PASEO_HOME: home } });
+  const config = loadConfig(home, { env: { CLISBOT_HOME: home } });
   if (config.managedAccessMode !== "external" || !homeRequiresTickets(home)) return;
   const state = await readDaemonInstance(home);
-  const listen = state?.listen ?? env.PASEO_LISTEN ?? config.listen;
+  const listen = state?.listen ?? env.CLISBOT_LISTEN ?? config.listen;
   if (resolveTcpHostFromListen(listen) === null) return;
   throw new HubCommandError(
     "ONBOARDING_MANAGED_HOME",
@@ -31,10 +31,10 @@ export async function onboardingDaemonListen(
   home: string,
   env: NodeJS.ProcessEnv,
 ): Promise<string> {
-  const listen = env.PASEO_LISTEN ?? loadConfig(home, { env: { PASEO_HOME: home } }).listen;
+  const listen = env.CLISBOT_LISTEN ?? loadConfig(home, { env: { CLISBOT_HOME: home } }).listen;
   const loopback = /^(?:127\.0\.0\.1|localhost):(\d+)$/.exec(listen);
   if (!loopback) return listen;
-  const port = await selectLocalPort(Number(loopback[1]), !env.PASEO_LISTEN);
+  const port = await selectLocalPort(Number(loopback[1]), !env.CLISBOT_LISTEN);
   return `127.0.0.1:${port}`;
 }
 

@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@getpaseo/protocol/bots/labels";
+import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 import type { CreateAgentCommandInput } from "../agent/create-agent/create.js";

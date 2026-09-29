@@ -4,7 +4,7 @@
 // `node --import tsx scripts/channel-differential-fixtures.mjs generate --pkg telegram`
 // only after you have decided the new behaviour is correct.
 import { describe, expect, it } from "vitest";
-import { readDifferentialCorpus, replayDifferentialCorpus } from "@getpaseo/channels-shared";
+import { readDifferentialCorpus, replayDifferentialCorpus } from "@clisbot/channels-shared";
 import { telegramDifferentialCases } from "./__fixtures__/upstream-differential.cases.js";
 
 const corpus = readDifferentialCorpus(

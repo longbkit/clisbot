@@ -1,7 +1,7 @@
 // upstream: extensions/slack/src/monitor/event-scope.ts@5d8067a4483
 // Slack plugin module validates non-serializable per-event Enterprise Grid scope.
 import type { WebClient, WebClientOptions } from "@slack/web-api";
-import { normalizeOptionalString } from "@getpaseo/channels-core/plugin-sdk/string-coerce-runtime";
+import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { getSlackListenerWriteClient } from "../client.js";
 import type { SlackInstallationIdentity } from "./enterprise-install.js";
 

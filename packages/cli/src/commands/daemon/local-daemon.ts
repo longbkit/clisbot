@@ -2,14 +2,14 @@ import { Command, Option } from "commander";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { startDaemonInstance, resolvePaseoHome } from "@getpaseo/server/daemon-control";
+import { startDaemonInstance, resolveClisbotHome } from "@clisbot/server/daemon-control";
 const require = createRequire(import.meta.url);
 function resolveServerRunnerFromDir(currentDir: string): string | null {
   const packageJsonPath = path.join(currentDir, "package.json");
   if (!existsSync(packageJsonPath)) return null;
   try {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as { name?: string };
-    if (packageJson.name !== "@getpaseo/server") return null;
+    if (packageJson.name !== "@clisbot/server") return null;
     const distRunner = path.join(currentDir, "dist", "scripts", "supervisor-entrypoint.js");
     if (existsSync(distRunner)) {
       return distRunner;
@@ -21,7 +21,7 @@ function resolveServerRunnerFromDir(currentDir: string): string | null {
 }
 
 function resolveDaemonRunnerEntry(): string {
-  const serverExportPath = require.resolve("@getpaseo/server");
+  const serverExportPath = require.resolve("@clisbot/server");
   let currentDir = path.dirname(serverExportPath);
 
   while (true) {
@@ -37,7 +37,7 @@ function resolveDaemonRunnerEntry(): string {
     currentDir = parentDir;
   }
 
-  throw new Error("Unable to resolve @getpaseo/server package root for daemon runner");
+  throw new Error("Unable to resolve @clisbot/server package root for daemon runner");
 }
 
 export async function launchLocalDaemon(options: {
@@ -53,10 +53,10 @@ export async function launchLocalDaemon(options: {
   try {
     const entry = resolveDaemonRunnerEntry();
     return await startDaemonInstance({
-      home: resolvePaseoHome({ PASEO_HOME: options.home }),
+      home: resolveClisbotHome({ CLISBOT_HOME: options.home }),
       command: process.execPath,
       args: [...(entry.endsWith(".ts") ? ["--import", "tsx"] : []), entry],
-      env: options.listen ? { ...process.env, PASEO_LISTEN: options.listen } : process.env,
+      env: options.listen ? { ...process.env, CLISBOT_LISTEN: options.listen } : process.env,
       mode: options.foreground || options.listen ? "deployment" : "managed",
       foreground: options.foreground,
       timeoutMs: options.timeoutMs,
@@ -124,7 +124,7 @@ export function rejectRemovedLaunchFlags(command: Command): Command {
       if (command.getOptionValueSource(name) !== "cli") continue;
       throw {
         code: "REMOVED_LAUNCH_OPTION",
-        message: `${flag.split(" ")[0]} was removed. ${configPath ? `Use paseo daemon config set ${configPath} <value> --home <path>, then start or restart.` : "Use paseo daemon run --home <path> for foreground deployment."} Deployment environment overrides belong to paseo daemon run.`,
+        message: `${flag.split(" ")[0]} was removed. ${configPath ? `Use clisbot daemon config set ${configPath} <value> --home <path>, then start or restart.` : "Use clisbot daemon run --home <path> for foreground deployment."} Deployment environment overrides belong to clisbot daemon run.`,
       };
     }
   });
