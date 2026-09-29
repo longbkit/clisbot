@@ -1,5 +1,6 @@
 import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
+import { isSilentReply } from "@getpaseo/protocol/chats/room";
 import type { ChatMessage } from "../data/contracts";
 
 /**
@@ -108,13 +109,28 @@ function unreferencedItems(
   });
 }
 
+/**
+ * A group bot's live row shows only its running turn: a spoken reply becomes a transcript line
+ * and a silent one (`PASS`) becomes nothing, so an ended turn leaves no tail behind
+ * (plans/group-discussion.md, "Silence is a valid turn").
+ */
+function groupTurnItems(head: ChatLiveHead): readonly StreamItem[] {
+  if (!head.turnActive) return [];
+  const lastPrompt = head.items.findLastIndex((item) => item.kind === "user_message");
+  return head.items
+    .slice(lastPrompt + 1)
+    .filter((item) => !(item.kind === "assistant_message" && isSilentReply(item.text)));
+}
+
 function liveRow(
   transcript: readonly ChatMessage[],
   botId: string,
   head: ChatLiveHead,
   previous: ChatRenderRow | undefined,
+  group: boolean,
 ): ChatRenderRow | null {
-  const items = unreferencedItems(head.items, linesFromAgent(transcript, botId, head.agentId));
+  const tail = group ? groupTurnItems(head) : head.items;
+  const items = unreferencedItems(tail, linesFromAgent(transcript, botId, head.agentId));
   const permissions = [...head.permissions];
   if (!head.turnActive && items.length === 0 && permissions.length === 0) return null;
   return {
@@ -137,11 +153,12 @@ function liveRow(
 export function buildChatRenderModel(
   transcript: readonly ChatMessage[],
   liveHeadsByBot: ReadonlyMap<string, ChatLiveHead>,
+  options: { group?: boolean } = {},
 ): ChatRenderModel {
   const rows: ChatRenderRow[] = [];
   for (const line of transcript) rows.push(transcriptRow(line, rows[rows.length - 1]));
   for (const [botId, head] of liveHeadsByBot) {
-    const row = liveRow(transcript, botId, head, rows[rows.length - 1]);
+    const row = liveRow(transcript, botId, head, rows[rows.length - 1], options.group === true);
     if (row) rows.push(row);
   }
   return { rows };

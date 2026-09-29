@@ -50,7 +50,10 @@ export function ChatScreen({
   headerRight,
   hideHeader = false,
 }: ChatScreenProps) {
-  const model = useMemo(() => buildChatRenderModel(transcript, liveHeads), [liveHeads, transcript]);
+  const model = useMemo(
+    () => buildChatRenderModel(transcript, liveHeads, { group }),
+    [group, liveHeads, transcript],
+  );
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
   const members = useMemo(() => mentionMembersOf(bots), [bots]);
   const placeholder =

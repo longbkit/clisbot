@@ -3,10 +3,13 @@
 // fixed because the engine reads its output: `PASS` is silence and `@slug` decides who
 // wakes. Room instructions are the part the chat owner may change. Pure.
 import { createHash } from "node:crypto";
-import { DEFAULT_ROOM_INSTRUCTIONS } from "@getpaseo/protocol/chats/room";
+import {
+  DEFAULT_ROOM_INSTRUCTIONS,
+  isSilentReply,
+  PASS_REPLY,
+} from "@getpaseo/protocol/chats/room";
 
-/** The reply that means "nothing to add"; the engine appends no line for it. */
-export const PASS_REPLY = "PASS";
+export { isSilentReply, PASS_REPLY };
 
 export interface RoomMember {
   slug: string;
@@ -63,11 +66,6 @@ export function renderTurnCue(round: number, maxRounds: number): string {
   if (round >= maxRounds)
     return `[Your turn — last round] The discussion is wrapping up: reply only if it is essential, otherwise reply ${PASS_REPLY}.`;
   return `[Your turn — round ${round} of at most ${maxRounds}] Reply if you have something worth adding, otherwise reply ${PASS_REPLY}.`;
-}
-
-/** A turn that chose silence: no text, or exactly `PASS`. */
-export function isSilentReply(text: string | null): boolean {
-  return text === null || text.trim() === "" || text.trim() === PASS_REPLY;
 }
 
 const HOW_THIS_ROOM_WORKS = [

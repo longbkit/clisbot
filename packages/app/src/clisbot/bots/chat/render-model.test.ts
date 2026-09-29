@@ -172,3 +172,46 @@ describe("buildChatRenderModel", () => {
     expect(rows[2]).toMatchObject({ botId: "b", opensGroup: true, items: [] });
   });
 });
+
+describe("group live rows", () => {
+  const pass = (id: string, at: number): StreamItem => ({
+    kind: "assistant_message",
+    id,
+    text: "PASS",
+    timestamp: new Date(at),
+  });
+
+  it("an ended silent turn leaves nothing below the transcript", () => {
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([["b", head("agent-b", [userItem("p1", 2), tool("t1", 3), pass("x1", 4)])]]),
+      { group: true },
+    ).rows;
+    expect(rows.map((row) => row.kind)).toEqual(["user"]);
+  });
+
+  it("a running turn shows only its own work, never PASS or an earlier silent turn", () => {
+    const items = [
+      userItem("p1", 2),
+      pass("x1", 3),
+      userItem("p2", 4),
+      tool("t2", 5),
+      pass("x2", 6),
+    ];
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([["b", head("agent-b", items, { turnActive: true })]]),
+      { group: true },
+    ).rows;
+    const live = rows.find((row) => row.kind === "live");
+    expect(live?.kind === "live" && live.items.map((item) => item.id)).toEqual(["t2"]);
+  });
+
+  it("a direct chat keeps the unreferenced tail as before", () => {
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([["a", head("agent-a", [assistant("late", 2)])]]),
+    ).rows;
+    expect(rows.map((row) => row.kind)).toEqual(["user", "live"]);
+  });
+});

@@ -9,3 +9,12 @@ export const DEFAULT_ROOM_INSTRUCTIONS = [
 
 /** Rounds a group discussion may run when the chat sets no `rounds.max`; a guard rail. */
 export const DEFAULT_CHAT_ROUNDS_MAX = 5;
+
+/** The reply a group bot gives when it has nothing to add; it is silence, never a transcript line. */
+export const PASS_REPLY = "PASS";
+
+/** A group turn that chose silence: no text, or exactly `PASS`. */
+export function isSilentReply(text: string | null | undefined): boolean {
+  const trimmed = text?.trim() ?? "";
+  return trimmed === "" || trimmed === PASS_REPLY;
+}
