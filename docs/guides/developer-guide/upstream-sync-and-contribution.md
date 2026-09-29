@@ -137,12 +137,12 @@ git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
 git rev-parse 'refs/upstream-releases/vX.Y.Z^{}' # verify the raw upstream commit
 git worktree add -b sync/rebranded-vX.Y.Z <rebrand-worktree> refs/upstream-releases/vX.Y.Z
 node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --apply \
-  --expo-owner <company-expo-owner> --expo-project-id <clisbot-project-uuid>
+  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 # In <rebrand-worktree>, install dependencies, then run npm run format and
 # npm run lint. The broad rename changes wrapping in many docs/source files.
 git -C <rebrand-worktree> add -A
 node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --check \
-  --expo-owner <company-expo-owner> --expo-project-id <clisbot-project-uuid>
+  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 git -C <rebrand-worktree> diff --cached --check
 git -C <rebrand-worktree> commit -m "Rebrand upstream vX.Y.Z for Clisbot sync"
 
@@ -174,11 +174,11 @@ upstream playbook as historical/provenance records. During the isolated test
 phase, add `--keep-upstream-endpoints` to both rename commands: live
 `app.paseo.sh`, `relay.paseo.sh`, and `hub.paseo.sh` remain reachable, while
 site/documentation links to `paseo.sh` become `clisbot.com`. Do not use that
-flag for the official cutover. Until the company supplies Expo owner and
-project ID, the test app config reads `CLISBOT_EXPO_OWNER` and
-`CLISBOT_EXPO_PROJECT_ID` from the environment; local Expo config works, but
-EAS publishing needs those values. The temporary service endpoints and app
-artwork still need review before the cutover.
+flag for the official cutover. The test branches now use Expo owner
+`lbk-company` and project ID `9314cc2c-4abe-4637-b1cf-647fbbfbd807`.
+Confirm project access and mobile signing before running EAS builds. The
+temporary service endpoints and app artwork still need review before the
+cutover.
 
 ### Current promotion procedure before the cutover
 

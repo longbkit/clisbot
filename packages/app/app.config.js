@@ -216,9 +216,9 @@ export default {
       ...(clisbotHubOrigin === undefined ? {} : { clisbotHub: { origin: clisbotHubOrigin } }),
       router: {},
       eas: {
-        projectId: process.env.CLISBOT_EXPO_PROJECT_ID,
+        projectId: "9314cc2c-4abe-4637-b1cf-647fbbfbd807",
       },
     },
-    owner: process.env.CLISBOT_EXPO_OWNER,
+    owner: "lbk-company",
   },
 };
