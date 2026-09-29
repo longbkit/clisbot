@@ -12,9 +12,9 @@ interface ScrollableList {
  * from reaching that handler, leaving the browser's zoom in place. Plain wheel scrolling is
  * untouched.
  */
-export function usePinchZoomPassthrough(list: RefObject<ScrollableList | null>): void {
+export function usePinchZoomPassthrough(list: RefObject<ScrollableList | null> | undefined): void {
   useEffect(() => {
-    const node = list.current?.getScrollableNode?.();
+    const node = list?.current?.getScrollableNode?.();
     if (!(node instanceof HTMLElement)) return;
     const letPinchThrough = (event: WheelEvent) => {
       if (event.ctrlKey) event.stopImmediatePropagation();

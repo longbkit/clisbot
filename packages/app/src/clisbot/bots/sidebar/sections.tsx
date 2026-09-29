@@ -13,6 +13,7 @@ import { BotCreateForm } from "../create/bot-create-sheet";
 import { GroupChatForm } from "../create/group-chat-form";
 import { BotsSection } from "./bots-section";
 import { ChatsSection } from "./chats-section";
+import { filterByHost, useSidebarDisplayStore } from "./display/preferences";
 
 const BOT_CREATE_SNAP_POINTS = ["95%"];
 const BOT_CREATE_CONTENT_STYLE = { padding: 0 };
@@ -41,6 +42,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
   const current = parseChatRouteFromPathname(usePathname());
   const projectedBots = projectBotSidebar(botRows, chatRows, hosts.length > 1);
   const selectedBotKey = selectedDirectBotKey(chatRows, current);
+  const hostFilters = useSidebarDisplayStore((state) => state.hostFilters);
   return (
     <View>
       {error || menuState.error || bots.error || chats.error ? (
@@ -49,9 +51,10 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         </Text>
       ) : null}
       <ChatsSection
-        chats={projectGroupSidebar(chatRows, hosts.length > 1).filter(
-          (chat) => !pinned("chat", chat.serverId, chat.chatId),
-        )}
+        chats={filterByHost(
+          projectGroupSidebar(chatRows, hosts.length > 1),
+          hostFilters.chats,
+        ).filter((chat) => !pinned("chat", chat.serverId, chat.chatId))}
         onOpenChatMenu={onChatMenu}
         onBeforeNavigate={onBeforeNavigate}
         onCreateChat={openGroup}
@@ -63,7 +66,9 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         loading={directoryStatus.loading}
         loadError={directoryStatus.error}
         onRetry={bots.refetch}
-        bots={projectedBots.filter((bot) => !pinned("bot", bot.serverId, bot.botId))}
+        bots={filterByHost(projectedBots, hostFilters.bots).filter(
+          (bot) => !pinned("bot", bot.serverId, bot.botId),
+        )}
         selectedBotKey={selectedBotKey}
         onPressBot={onPressBot}
         onOpenBotMenu={onBotMenu}

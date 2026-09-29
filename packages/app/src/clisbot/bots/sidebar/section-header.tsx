@@ -108,7 +108,6 @@ export function BotsSectionHeader({
           );
         }}
       </Pressable>
-      {actions}
       {onCreate ? (
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
@@ -130,6 +129,7 @@ export function BotsSectionHeader({
           </TooltipContent>
         </Tooltip>
       ) : null}
+      {actions}
     </View>
   );
 }
@@ -162,7 +162,9 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
   },
   iconSlot: { width: 16, height: 20, alignItems: "center", justifyContent: "center" },
-  actionHidden: { opacity: 0 },
+  // Collapsed rather than transparent, so the actions after it keep the right edge; still
+  // reachable by keyboard, and focusing it shows it.
+  actionHidden: { width: 0, minWidth: 0, opacity: 0, overflow: "hidden" },
   button: {
     width: 32,
     height: 32,

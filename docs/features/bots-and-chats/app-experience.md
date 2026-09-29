@@ -21,6 +21,14 @@ turn rules, grants and execution remain unchanged.
   collapsed, and remembers subsequent changes. No separate visibility toggle remains.
 - Preserve existing workspace/session rows, project filters, display preferences and shallow
   indentation. Creation actions remain discoverable on section headings. Avoid unread-count badges.
+- A section heading keeps its display menu at the right edge; the create action appears to its
+  left on hover and takes no space otherwise. Bots and Group chats each have a display menu like
+  Projects (`clisbot/bots/sidebar/display/`): **Show** toggles what the row's second line says,
+  and **Host** narrows the section when there are several Hosts. A bot row shows Host, provider,
+  permission mode and thinking by default (model and Role are off); a group row shows Host and
+  its bot count (member names are off). A value the bot leaves unset shows as the default it runs
+  with, named from the Host's provider snapshot. The choices are a device preference, stored apart
+  from the upstream sidebar settings.
 - Footer retains Add project, Hosts, Import session, Help and Settings. Account is no longer there;
   there is no additional theme shortcut.
 

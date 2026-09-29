@@ -9,6 +9,11 @@ const env = vi.hoisted(() => ({
   push: vi.fn(),
   compact: false,
 }));
+vi.mock("./display/use-row-detail", () => ({
+  useBotRowDetail: (bot: { hostName?: string }) => bot.hostName ?? null,
+  useChatRowDetail: (row: { hostName?: string }) => row.hostName ?? null,
+}));
+vi.mock("./display/section-display-menu", () => ({ SectionDisplayMenu: () => null }));
 vi.mock("expo-router", () => ({
   usePathname: () => env.pathname,
   useRouter: () => ({ push: env.push }),
@@ -135,7 +140,7 @@ describe("ChatsSection", () => {
 
   it("fills only the row whose route is current and shows the time and host", () => {
     render(
-      <ChatsSection onCreateChat={vi.fn()} chats={[chat(1, { hostLabel: "Host A" }), chat(2)]} />,
+      <ChatsSection onCreateChat={vi.fn()} chats={[chat(1, { hostName: "Host A" }), chat(2)]} />,
     );
     expect(screen.getByRole("button", { name: "Chat 2" }).getAttribute("aria-selected")).toBe(
       "true",

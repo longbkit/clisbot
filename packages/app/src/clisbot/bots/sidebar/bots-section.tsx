@@ -18,6 +18,9 @@ import { BotFace } from "../chat/bot-face";
 import { botsCopy } from "../copy";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { BotsSidebarRow } from "./row";
+import type { BotLaunch } from "./display/row-detail";
+import { useBotRowDetail } from "./display/use-row-detail";
+import { SectionDisplayMenu } from "./display/section-display-menu";
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
 
 export interface BotsSidebarBot {
@@ -31,6 +34,7 @@ export interface BotsSidebarBot {
   hostLabel?: string | null;
   hostName?: string;
   description?: string | null;
+  launch?: BotLaunch;
   /** The current user’s direct-chat session is running. */
   active?: boolean;
   updatedAt?: string;
@@ -82,6 +86,7 @@ export const BotsSection = memo(function BotsSection({
         createLabel={botsCopy.form.create}
         onCreate={onCreateBot}
         disabled={!canCreateBot}
+        actions={botsDisplayMenu}
       />
       {!collapsed ? (
         <>
@@ -140,6 +145,7 @@ const BotRow = memo(function BotRow({
     [bot.updatedAt],
   );
   const timeAgo = useCompactTimeAgo(updatedAt);
+  const detail = useBotRowDetail(bot);
   const handlePress = useCallback(() => onPress(bot), [bot, onPress]);
   const handleOpenMenu = useCallback(
     (anchor: Rect) => onOpenMenu?.(bot, anchor),
@@ -153,7 +159,7 @@ const BotRow = memo(function BotRow({
     <BotsSidebarRow
       leading={face}
       title={bot.name}
-      subtitle={bot.hostLabel}
+      subtitle={detail}
       active={bot.active ?? active}
       trailing={bot.updatedAt ? timeAgo : null}
       selected={selected}
@@ -164,6 +170,8 @@ const BotRow = memo(function BotRow({
     />
   );
 });
+
+const botsDisplayMenu = <SectionDisplayMenu section="bots" />;
 
 const directoryStyles = StyleSheet.create((theme) => ({
   directory: { minHeight: 280, maxHeight: 520, flexShrink: 1, gap: 8 },

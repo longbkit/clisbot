@@ -33,6 +33,7 @@ export function projectBotSidebar(
       hostLabel: multipleHosts ? bot.serverName : null,
       hostName: bot.serverName,
       description: bot.description,
+      launch: bot.launchDefaults,
       canConfigure: bot.canConfigure === true,
       isOwner: bot.isOwner,
       updatedAt: direct?.updatedAt,
@@ -68,6 +69,10 @@ export function projectGroupSidebar(
       title: chat.title,
       updatedAt: chat.updatedAt,
       hostLabel: multipleHosts ? chat.serverName : null,
+      hostName: chat.serverName,
+      memberNames: chat.participants.flatMap((participant) =>
+        participant.displayName ? [participant.displayName] : [],
+      ),
     }));
 }
 

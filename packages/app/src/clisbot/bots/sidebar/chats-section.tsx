@@ -11,6 +11,8 @@ import { botsCopy } from "../copy";
 import { buildHostChatRoute, parseChatRouteFromPathname } from "../routes";
 import { BotsSidebarRow } from "./row";
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
+import { useChatRowDetail } from "./display/use-row-detail";
+import { SectionDisplayMenu } from "./display/section-display-menu";
 
 /** Recent chats before "Show more" (plans/app.md §1). */
 export const RECENT_CHATS_LIMIT = 5;
@@ -24,6 +26,9 @@ export interface ChatsSidebarChat {
   title: string;
   updatedAt: string;
   hostLabel?: string | null;
+  hostName?: string;
+  /** Participants' display names, in Members order. */
+  memberNames?: readonly string[];
   /** A participating bot is mid-turn. */
   active?: boolean;
   agentIds?: readonly string[];
@@ -71,6 +76,7 @@ export const ChatsSection = memo(function ChatsSection({
         createLabel={botsCopy.createGroupChat}
         onCreate={onCreateChat}
         disabled={!canCreateChat}
+        actions={chatsDisplayMenu}
       />
       {!collapsed ? (
         <>
@@ -116,6 +122,11 @@ const ChatRow = memo(function ChatRow({
   );
   const updatedAt = useMemo(() => new Date(chat.updatedAt), [chat.updatedAt]);
   const timeAgo = useCompactTimeAgo(updatedAt);
+  const detailInput = useMemo(
+    () => ({ hostName: chat.hostName, memberNames: chat.memberNames ?? [] }),
+    [chat.hostName, chat.memberNames],
+  );
+  const detail = useChatRowDetail(detailInput);
   const handlePress = useCallback(() => onPress(chat), [chat, onPress]);
   const handleOpenMenu = useCallback(
     (anchor: Rect) => onOpenMenu?.(chat, anchor),
@@ -125,7 +136,7 @@ const ChatRow = memo(function ChatRow({
     <BotsSidebarRow
       leading={chatLeading}
       title={chat.title}
-      subtitle={chat.hostLabel}
+      subtitle={detail}
       trailing={timeAgo}
       active={chat.active ?? active}
       selected={selected}
@@ -136,6 +147,8 @@ const ChatRow = memo(function ChatRow({
     />
   );
 });
+
+const chatsDisplayMenu = <SectionDisplayMenu section="chats" />;
 
 // A neutral leading mark keeps chat titles on the same rail as bot faces. Plain object, not a
 // Unistyles style, so building the element at module scope materialises nothing theme-bound.

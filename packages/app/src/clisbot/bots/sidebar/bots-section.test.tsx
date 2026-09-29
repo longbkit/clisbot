@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BotsSection, type BotsSidebarBot } from "./bots-section";
 
 const env = vi.hoisted(() => ({ compact: false }));
+vi.mock("./display/use-row-detail", () => ({
+  useBotRowDetail: (row: { hostName?: string }) => row.hostName ?? null,
+  useChatRowDetail: (row: { hostName?: string }) => row.hostName ?? null,
+}));
+vi.mock("./display/section-display-menu", () => ({ SectionDisplayMenu: () => null }));
 vi.mock("react-native", () => ({
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
@@ -98,7 +103,7 @@ describe("BotsSection", () => {
   it("renders a row per bot, the selected fill, and the active dot", () => {
     render(
       <BotsSection
-        bots={[bot("a", { active: true }), bot("b", { hostLabel: "Host A" })]}
+        bots={[bot("a", { active: true }), bot("b", { hostName: "Host A" })]}
         selectedBotKey="host-a:b"
         onPressBot={vi.fn()}
         onCreateBot={vi.fn()}
