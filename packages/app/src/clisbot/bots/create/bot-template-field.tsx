@@ -1,9 +1,17 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Text, View, Pressable } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/form-field";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
-import { botFormStyles } from "./bot-form-styles";
+
+const TEMPLATES = {
+  personal: { title: "Personal", description: "Works for one person" },
+  team: { title: "Team", description: "Shared team context" },
+} as const;
+
+type TemplateKind = keyof typeof TEMPLATES;
+
+/** Two choices on one row. The template is fixed once the bot exists. */
 export function BotTemplateField({
   state,
   model,
@@ -13,19 +21,17 @@ export function BotTemplateField({
   model: BotFormModel;
   editing: boolean;
 }) {
-  const [preview, setPreview] = useState(false);
-  const toggle = useCallback(() => setPreview((value) => !value), []);
   return (
-    <View style={styles.stack}>
-      <View style={styles.header}>
-        <Text style={botFormStyles.text}>Bot template</Text>
-        <Button variant="ghost" size="sm" onPress={toggle}>
-          {preview ? "Hide preview" : "Preview templates"}
-        </Button>
-      </View>
-      {(["personal", "team"] as const)
-        .filter((kind) => !editing || kind === state.kind)
-        .map((kind) => (
+    <Field
+      label="Template"
+      hint={
+        editing
+          ? "Set when the bot was created."
+          : "Seeds the bot's instructions and workspace files. Sharing is set in Project Access."
+      }
+    >
+      <View accessibilityRole="radiogroup" style={styles.row}>
+        {(Object.keys(TEMPLATES) as TemplateKind[]).map((kind) => (
           <TemplateOption
             key={kind}
             kind={kind}
@@ -34,22 +40,18 @@ export function BotTemplateField({
             onSelect={model.setKind}
           />
         ))}
-      {preview ? (
-        <Text style={botFormStyles.hint}>
-          Template sets up the bot’s instructions and workspace files. Team context does not grant
-          access automatically; sharing is managed through Project Access.
-        </Text>
-      ) : null}
-    </View>
+      </View>
+    </Field>
   );
 }
+
 function TemplateOption({
   kind,
   selected,
   disabled,
   onSelect,
 }: {
-  kind: "personal" | "team";
+  kind: TemplateKind;
   selected: boolean;
   disabled: boolean;
   onSelect: BotFormModel["setKind"];
@@ -59,41 +61,35 @@ function TemplateOption({
   return (
     <Pressable
       accessibilityRole="radio"
+      accessibilityLabel={`${TEMPLATES[kind].title} assistant`}
       aria-checked={selected}
       accessibilityState={accessibilityState}
       disabled={disabled}
       onPress={select}
-      style={[styles.option, selected && styles.selected]}
+      style={[styles.option, selected && styles.selected, disabled && !selected && styles.faded]}
     >
       <View style={[styles.radio, selected && styles.radioSelected]}>
         {selected ? <View style={styles.dot} /> : null}
       </View>
       <View style={styles.content}>
-        <Text style={botFormStyles.summary}>
-          {kind === "personal" ? "Personal assistant" : "Team assistant"}
-        </Text>
-        <Text style={botFormStyles.hint}>
-          {kind === "personal"
-            ? "Works on behalf of one person."
-            : "Works with shared team context."}
+        <Text style={styles.title}>{TEMPLATES[kind].title}</Text>
+        <Text style={styles.description} numberOfLines={1}>
+          {TEMPLATES[kind].description}
         </Text>
       </View>
     </Pressable>
   );
 }
+
 const styles = StyleSheet.create((theme) => ({
-  stack: { gap: theme.spacing[2] },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+  row: { flexDirection: "row", gap: theme.spacing[2] },
   option: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[3],
-    padding: theme.spacing[3],
-    minHeight: 64,
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -102,11 +98,14 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.foreground,
     backgroundColor: theme.colors.surface2,
   },
-  content: { flex: 1, gap: theme.spacing[1] },
+  faded: { opacity: 0.5 },
+  content: { flex: 1, minWidth: 0 },
+  title: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
+  description: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.colors.foregroundMuted,
     alignItems: "center",

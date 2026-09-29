@@ -1,6 +1,4 @@
-import { Text } from "react-native";
-import { FormTextInput } from "@/components/ui/form-field";
-import { botFormStyles as styles } from "./bot-form-styles";
+import { Field, FormTextInput } from "@/components/ui/form-field";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 
 /** Longest description the form accepts; the room contract repeats it for every group member. */
@@ -20,8 +18,14 @@ export function BotDescriptionField({
   size: "sm" | "md";
 }) {
   return (
-    <>
-      <Text style={styles.text}>Role · optional</Text>
+    <Field
+      label="Role"
+      hint={
+        state.description.trim()
+          ? "Other bots in a group read this to decide when to tag this bot."
+          : "Optional. Add one so other bots in a group know when to tag this bot; without it they only know its name."
+      }
+    >
       <FormTextInput
         accessibilityLabel="Bot role"
         size={size}
@@ -30,11 +34,6 @@ export function BotDescriptionField({
         maxLength={BOT_DESCRIPTION_MAX_CHARS}
         placeholder="For example, Owns product scope and priorities"
       />
-      <Text style={styles.hint}>
-        {state.description.trim()
-          ? "Other bots in a group read this to decide when to tag this bot."
-          : "Add a role so other bots in a group know when to tag this bot. Without one they only know its name."}
-      </Text>
-    </>
+    </Field>
   );
 }

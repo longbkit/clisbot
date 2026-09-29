@@ -1,95 +1,93 @@
-import { useCallback, useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { Button } from "@/components/ui/button";
-import { SelectField } from "@/components/ui/select-field";
+import { Field } from "@/components/ui/form-field";
+import { SelectField, SelectFieldTrigger } from "@/components/ui/select-field";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
+import { getProviderIcon } from "@/components/provider-icons";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 import type { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
-import { botFormStyles as styles } from "./bot-form-styles";
+
 interface Props {
   state: BotFormState;
   model: BotFormModel;
   size: "sm" | "md";
   providerSnapshot: ReturnType<typeof useBotProviderSnapshot>;
   hosts: { serverId: string; label: string }[];
-  expanded?: boolean;
-  onCustomize?: () => void;
 }
-export function BotConfiguration({
-  state,
-  model,
-  size,
-  providerSnapshot,
-  hosts,
-  expanded = false,
-  onCustomize,
-}: Props) {
-  const modelLabel =
-    state.selectedModelDisplay?.label ??
-    (providerSnapshot.isLoading ? "Loading models…" : "Provider default model");
-  const unresolvedSummary = providerSnapshot.isLoading
-    ? "Checking available models…"
-    : "Choose a model to continue";
-  const summary = state.selectedProvider
-    ? `${
-        state.modelSelectorProviders.find((provider) => provider.id === state.selectedProvider)
-          ?.label ?? state.selectedProvider
-      } · ${modelLabel}`
-    : unresolvedSummary;
+
+/** How the bot runs: Host (only when there is a choice), Model, then Permissions and Thinking. */
+export function BotConfiguration({ state, model, size, providerSnapshot, hosts }: Props) {
+  const hostOptions = useMemo(
+    () => hosts.map((host) => ({ id: host.serverId, value: host.serverId, label: host.label })),
+    [hosts],
+  );
   return (
     <>
-      {!expanded ? (
-        <View style={styles.configuration}>
-          <View style={styles.configurationHeader}>
-            <Text style={styles.text}>AI configuration</Text>
-            <Button variant="ghost" size={size} onPress={onCustomize}>
-              {state.selectedProvider ? "Customize" : "Choose setup"}
-            </Button>
-          </View>
-          <Text style={styles.summary}>{state.selectedHostDisplay?.label ?? "Choose a Host"}</Text>
-          <Text style={styles.summary}>{summary}</Text>
-          <Text style={styles.hint}>
-            {[state.selectedModeDisplay.label, state.selectedThinkingDisplay?.label]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-        </View>
+      {state.showHostField ? (
+        <SelectField
+          label="Host"
+          value={state.selectedServerId}
+          selectedDisplay={state.selectedHostDisplay}
+          options={hostOptions}
+          onChange={model.setHost}
+          placeholder="Choose a Host"
+          emptyText="No eligible Hosts connected"
+          size={size}
+        />
       ) : null}
-      {expanded ? (
-        <>
-          {state.showHostField ? (
-            <SelectField
-              label="Host"
-              value={state.selectedServerId}
-              selectedDisplay={state.selectedHostDisplay}
-              options={hosts.map((host) => ({
-                id: host.serverId,
-                value: host.serverId,
-                label: host.label,
-              }))}
-              onChange={model.setHost}
-              placeholder="Choose a Host"
-              emptyText="No eligible Hosts connected"
-              size={size}
-            />
-          ) : null}
-          <BotProfiles model={model} serverId={state.selectedServerId} size={size} />
-          <BotLaunchFields state={state} model={model} providerSnapshot={providerSnapshot} />
-        </>
-      ) : null}
+      <BotProfiles model={model} serverId={state.selectedServerId} size={size} />
+      <BotModelField state={state} model={model} size={size} providerSnapshot={providerSnapshot} />
+      <BotRunOptions state={state} model={model} size={size} />
     </>
   );
 }
-function BotLaunchFields({
-  state,
-  model,
-  providerSnapshot,
-}: Pick<Props, "state" | "model" | "providerSnapshot">) {
+
+/** Provider and model in one picker; the trigger names both, with the provider's icon. */
+function BotModelField({ state, model, size, providerSnapshot }: Omit<Props, "hosts">) {
+  const providerLabel =
+    state.modelSelectorProviders.find((provider) => provider.id === state.selectedProvider)
+      ?.label ?? state.selectedProvider;
+  const leading = useMemo(
+    () =>
+      state.selectedProvider ? (
+        <ProviderIcon provider={state.selectedProvider} serverId={state.selectedServerId} />
+      ) : null,
+    [state.selectedProvider, state.selectedServerId],
+  );
+  const renderTrigger = useCallback(
+    (input: {
+      selectedModelLabel: string;
+      disabled: boolean;
+      isOpen: boolean;
+      hovered: boolean;
+      pressed: boolean;
+    }): ReactNode => {
+      const modelLabel = state.selectedModelDisplay?.label ?? input.selectedModelLabel;
+      const label = providerLabel ? `${providerLabel} · ${modelLabel}` : undefined;
+      return (
+        <SelectFieldTrigger
+          label={label}
+          isPlaceholder={!providerLabel}
+          placeholder={providerSnapshot.isLoading ? "Checking available models…" : "Choose a model"}
+          leading={leading}
+          loading={providerSnapshot.isLoading && !providerLabel}
+          disabled={input.disabled}
+          active={input.hovered || input.pressed || input.isOpen}
+          size={size}
+          testID="bot-model-trigger"
+        />
+      );
+    },
+    [leading, providerLabel, providerSnapshot.isLoading, size, state.selectedModelDisplay],
+  );
   return (
-    <>
-      <Text style={styles.text}>Provider / model</Text>
+    <Field
+      label="Model"
+      hint={state.showHostField ? undefined : hostHint(state.selectedHostDisplay?.label)}
+    >
       <CombinedModelSelector
         providers={state.modelSelectorProviders}
         selectedProvider={state.selectedProvider ?? ""}
@@ -100,40 +98,73 @@ function BotLaunchFields({
         onRetryProvider={providerSnapshot.onRetryProvider}
         isRetryingProvider={providerSnapshot.isRefreshing}
         serverId={state.selectedServerId}
+        renderTrigger={renderTrigger}
+        triggerFill
       />
-      {state.modeOptions.length ? (
-        <SelectField
-          label="Permission mode"
-          value={state.selectedMode}
-          selectedDisplay={state.selectedModeDisplay}
-          options={state.modeOptions.map((option) => ({
-            id: option.id,
-            value: option.id,
-            label: option.label,
-          }))}
-          onChange={model.setMode}
-          placeholder="Choose permissions"
-          emptyText="No permission modes available"
-        />
-      ) : null}
-      {state.availableThinkingOptions.length ? (
-        <SelectField
-          label="Thinking"
-          value={state.selectedThinkingOptionId}
-          selectedDisplay={state.selectedThinkingDisplay}
-          options={state.availableThinkingOptions.map((option) => ({
-            id: option.id,
-            value: option.id,
-            label: option.label ?? option.id,
-          }))}
-          onChange={model.setThinkingOption}
-          placeholder="Choose thinking level"
-          emptyText="No thinking options available"
-        />
-      ) : null}
-    </>
+    </Field>
   );
 }
+
+function hostHint(host: string | undefined): string | undefined {
+  return host ? `Runs on ${host}.` : undefined;
+}
+
+/** Permissions and Thinking side by side: both are short choices the model decides. */
+function BotRunOptions({ state, model, size }: Pick<Props, "state" | "model" | "size">) {
+  const modeOptions = useMemo(
+    () =>
+      state.modeOptions.map((option) => ({ id: option.id, value: option.id, label: option.label })),
+    [state.modeOptions],
+  );
+  const thinkingOptions = useMemo(
+    () =>
+      state.availableThinkingOptions.map((option) => ({
+        id: option.id,
+        value: option.id,
+        label: option.label ?? option.id,
+      })),
+    [state.availableThinkingOptions],
+  );
+  if (!modeOptions.length && !thinkingOptions.length) return null;
+  return (
+    <View style={styles.pair}>
+      {modeOptions.length ? (
+        <View style={styles.half}>
+          <SelectField
+            label="Permissions"
+            value={state.selectedMode}
+            selectedDisplay={state.selectedModeDisplay}
+            options={modeOptions}
+            onChange={model.setMode}
+            placeholder="Choose permissions"
+            emptyText="No permission modes available"
+            size={size}
+          />
+        </View>
+      ) : null}
+      {thinkingOptions.length ? (
+        <View style={styles.half}>
+          <SelectField
+            label="Thinking"
+            value={state.selectedThinkingOptionId}
+            selectedDisplay={state.selectedThinkingDisplay}
+            options={thinkingOptions}
+            onChange={model.setThinkingOption}
+            placeholder="Choose thinking level"
+            emptyText="No thinking options available"
+            size={size}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ProviderIcon({ provider, serverId }: { provider: string; serverId: string | null }) {
+  const Icon = getProviderIcon(provider, serverId);
+  return <Icon size={16} color={styles.icon.color} />;
+}
+
 function useBotProfiles(serverId: string | null) {
   const [profiles, setProfiles] = useState<AgentProfile[]>([]);
   useEffect(() => {
@@ -154,6 +185,7 @@ function useBotProfiles(serverId: string | null) {
   }, [serverId]);
   return profiles;
 }
+
 function BotProfiles({
   model,
   serverId,
@@ -177,7 +209,7 @@ function BotProfiles({
   return (
     <SelectField
       label="Apply agent profile"
-      hint="Fill in saved model, permissions and thinking settings. Your Bot template stays unchanged."
+      hint="Fill in saved model, permissions and thinking settings. The template stays unchanged."
       value={null}
       selectedDisplay={null}
       options={profiles.map((profile) => ({
@@ -193,3 +225,9 @@ function BotProfiles({
     />
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  pair: { flexDirection: "row", gap: theme.spacing[3] },
+  half: { flex: 1, minWidth: 0 },
+  icon: { color: theme.colors.foregroundMuted },
+}));

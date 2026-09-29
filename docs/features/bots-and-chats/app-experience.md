@@ -40,15 +40,18 @@ destination does not introduce a third execution engine or silently convert one 
 
 ## Creation and configuration
 
-New bot foregrounds Name and **Bot template**, then a concise summary of Host and AI configuration.
-The current template catalog is Personal assistant and Team assistant (`kind` remains the stored
-wire field). A template seeds instruction and workspace files, not just memory. It does not grant
-Project Access. Bot settings must not imply that changing a select silently reseeds existing files.
+New bot and Bot settings are one form of labeled fields under the sheet title, no intro heading:
+who the bot is (**Name**, **Role**, **Template**), then how it runs (Host only when there is a
+choice, **Model**, then **Permissions** and **Thinking** on one row). Template is Personal or Team
+side by side on one row (`kind` remains the stored wire field); it is fixed once the bot exists. A
+template seeds instruction and workspace files, not just memory. It does not grant Project Access.
 
-Customize exposes the existing provider/model, permissions and thinking controls. **Apply agent
-profile** is a one-time action copying a saved launch bundle into those controls. There is no selected
-or default profile binding; see [the glossary](../../glossary.md). Reuse existing preference resolution
-and validate the selected Host/provider. Do not introduce a hidden Full access default.
+AI settings are shown as fields, not a summary card behind Customize: an unlabeled "Grok · Grok 4.6
+/ Default mode · High" block did not say which value was which. The Model trigger names provider and
+model with the provider's icon, and its hint names the Host when there is no Host field. **Apply
+agent profile** is a one-time action copying a saved launch bundle into those controls. There is no
+selected or default profile binding; see [the glossary](../../glossary.md). Reuse existing
+preference resolution and validate the selected Host/provider. Do not introduce a hidden Full access default.
 
 New group is Host (only when there is a choice), **Members**, **Group name** and **Who replies?**,
 as flat fields under the sheet title; a section label weaker than the field labels reads as noise.
