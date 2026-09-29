@@ -64,9 +64,8 @@ not silently move the product baseline.
    commit. Make a disposable sync branch from that **raw** commit.
 2. Run the version-controlled, deterministic rename transformation from the
    Fusion worktree against the upstream snapshot, including paths and product
-   documentation. Verify it is
-   idempotent, review every remaining Paseo-name match, then commit the
-   transformed snapshot on the sync branch.
+   documentation. Verify it is idempotent, review every remaining Paseo-name
+   match, then commit the transformed snapshot on the sync branch.
 3. Merge the transformed branch into Clisbot `main` in a clean worktree.
    Resolve overlaps by retaining upstream functional changes with Clisbot
    names. Git may report the same renamed line again: its merge base is the
@@ -77,6 +76,41 @@ not silently move the product baseline.
 5. Delete the disposable sync branch name and create the verified sync tag.
    The merge commit keeps the transformed snapshot and raw upstream history;
    no old `sync/rebranded-*` branch names need to remain.
+
+Git command skeleton for one release, run from a clean checkout after the
+cutover. `<main-worktree>` is the worktree with `main` checked out; the two
+other paths are new disposable worktrees. The rename command and old-name scan
+are still to be implemented, so this is not yet a runnable release recipe.
+
+```bash
+git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
+git rev-parse 'refs/upstream-releases/vX.Y.Z^{}' # verify the raw upstream commit
+git worktree add -b sync/rebranded-vX.Y.Z <rebrand-worktree> refs/upstream-releases/vX.Y.Z
+# Run the version-controlled rename against <rebrand-worktree>; scan paths and contents.
+git -C <rebrand-worktree> add -A
+git -C <rebrand-worktree> diff --cached --check
+git -C <rebrand-worktree> commit -m "Rebrand upstream vX.Y.Z for Clisbot sync"
+
+git worktree add -b sync/promotion-vX.Y.Z <promotion-worktree> main
+git -C <promotion-worktree> merge --no-ff --no-commit sync/rebranded-vX.Y.Z
+# Resolve conflicts; rerun the rename and old-name scan; run the release gates.
+git -C <promotion-worktree> add -A
+git -C <promotion-worktree> diff --cached --check
+git -C <promotion-worktree> commit -m "Sync rebranded upstream vX.Y.Z"
+
+git -C <main-worktree> merge --ff-only sync/promotion-vX.Y.Z
+git -C <main-worktree> tag clisbot/sync-verified-YYYY-MM-DD-vX.Y.Z
+git -C <main-worktree> worktree remove <promotion-worktree>
+git -C <main-worktree> worktree remove <rebrand-worktree>
+git -C <main-worktree> branch -d sync/promotion-vX.Y.Z
+git -C <main-worktree> branch -d sync/rebranded-vX.Y.Z
+```
+
+Stop if the final fast-forward fails because `main` moved during validation;
+reconcile that movement before tagging or deleting the worktrees. Review the
+staged merge diff before committing, especially lockfile changes. The current
+procedure below lists the dependency and typecheck gates; add the focused and
+live checks required by the release being promoted.
 
 Use the same transform and checks for disposable `upstream/main` rehearsals.
 No legacy `paseo://` handler or `PASEO_*` environment alias is part of the
