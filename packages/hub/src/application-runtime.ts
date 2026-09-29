@@ -198,14 +198,20 @@ async function createOwnedApplicationRuntime(
   // last so `CompositionResources` (reverse order) stops the channel plane —
   // the top-most consumer — before the core hub and the outer composition close.
   ownership.own(() => application.hub.stop());
+  // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
+  // channel account, isolated per account; the supervisor is null whenever the
+  // kill-switch is off. It runs in the background: an account waits for its Host's
+  // connection, and a Host connects through this runtime's daemon socket, so
+  // awaiting it here held every request until the Host wait timed out.
+  let channelStartup: Promise<void> = Promise.resolve();
   ownership.own(async () => {
+    await channelStartup;
     await channelSupervisor?.stopAll();
   });
   await application.hub.start(registrations.flatMap((registration) => registration.sources));
-  // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
-  // channel account. Isolated per account (failures never abort the boot);
-  // the supervisor is null whenever the kill-switch is off.
-  await channelSupervisor?.startAll();
+  channelStartup = (channelSupervisor?.startAll() ?? Promise.resolve()).catch((error: unknown) => {
+    logger.error({ err: error }, "channel plane start failed");
+  });
 
   const resources = options.database === null ? null : new OrganizationResources(options.database);
   const accessLeaseRevocation =

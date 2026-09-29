@@ -11,6 +11,8 @@ import { createApplicationRuntime } from "./application-runtime.js";
 
 const supervisorModule = vi.hoisted(() => ({
   stopAllCalls: [] as string[],
+  events: [] as string[],
+  releaseStart: null as null | (() => void),
 }));
 
 // Composition loads the channel supervisor through a literal dynamic import of
@@ -20,8 +22,16 @@ const supervisorModule = vi.hoisted(() => ({
 vi.mock("./channels/supervisor/index.js", () => ({
   createChannelSupervisor: (options: { dataDir: string }) => {
     const fake: ChannelSupervisor = {
-      startAll: async () => undefined,
+      startAll: () =>
+        new Promise<void>((resolve) => {
+          supervisorModule.events.push("start begun");
+          supervisorModule.releaseStart = () => {
+            supervisorModule.events.push("start finished");
+            resolve();
+          };
+        }),
       stopAll: async () => {
+        supervisorModule.events.push("stopAll");
         supervisorModule.stopAllCalls.push(options.dataDir);
       },
       startAccount: async () => ({
@@ -52,6 +62,8 @@ vi.mock("./channels/supervisor/index.js", () => ({
 describe("channel plane disposal chain", () => {
   beforeEach(() => {
     supervisorModule.stopAllCalls.length = 0;
+    supervisorModule.events.length = 0;
+    supervisorModule.releaseStart = null;
   });
 
   it("stops the channel plane when the application runtime stops", async () => {
@@ -74,7 +86,15 @@ describe("channel plane disposal chain", () => {
         close: () => Promise.resolve(),
       });
 
-      await runtime.stop();
+      // The runtime is ready while channel accounts are still starting: a Host connects
+      // through this runtime, so the start must not hold it.
+      assert.deepEqual(supervisorModule.events, ["start begun"]);
+      const stopping = runtime.stop();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.deepEqual(supervisorModule.events, ["start begun"]);
+      supervisorModule.releaseStart?.();
+      await stopping;
+      assert.deepEqual(supervisorModule.events, ["start begun", "start finished", "stopAll"]);
       assert.deepEqual(supervisorModule.stopAllCalls, ["channel-plane-disposal-test"]);
     } finally {
       delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
