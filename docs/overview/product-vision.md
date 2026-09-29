@@ -8,11 +8,11 @@ Repository wiring:
 
 - `origin` → `git@github.com:longbkit/clisbot.git` (the Clisbot home repository).
 - `upstream` → `git@github.com:getpaseo/paseo.git` (the Paseo foundation this branch tracks).
-- `clisbot-paseoclaw-fusion` publishes to and Git-tracks its branch on `origin`; `upstream/main` remains the comparison and rehearsal source, while release tags are the product baselines.
+- `clisbot-paseoclaw-fusion` currently publishes to and Git-tracks its branch on `origin`; the decided product branch after cutover is `main`. `upstream/main` remains the comparison and rehearsal source, while release tags are the product baselines.
 
-In the near term, the project must continuously prove that new changes from Paseo's `main` branch remain mergeable, without shipping an unreviewed moving target. Release-tag promotion and `main` rehearsal are separate gates: rehearsal detects conflicts and contract drift without changing the product baseline; promotion merges a named release only after dependency, typecheck, focused test, and channel E2E evidence pass. Early development must therefore preserve Paseo compatibility and keep Clisbot-specific changes as isolated as practical. New capabilities should be protected by feature toggles when appropriate, with clear integration boundaries that minimize upstream merge conflicts.
+In the near term, the project must continuously prove that new changes from Paseo's `main` branch remain mergeable, without shipping an unreviewed moving target. Release-tag promotion and `main` rehearsal are separate gates: rehearsal detects conflicts and contract drift without changing the product baseline; promotion merges a named release only after dependency, typecheck, focused test, and channel E2E evidence pass. Early development must therefore keep upstream functional changes reviewable and Clisbot-specific changes as isolated as practical. New capabilities should be protected by feature toggles when appropriate, with clear integration boundaries that minimize upstream merge conflicts.
 
-The initial product should remain compatible with the Paseo environment model. It should expose a daemon host that can be added to and used by compatible Paseo clients and workflows (desktop app, mobile app, web, CLI).
+The decided target is a fully branded Clisbot `main`: each new upstream snapshot is renamed before merging, including product-facing names, `CLISBOT_*` environment variables, and `clisbot://` links. There are no `PASEO_*` aliases or `paseo://` legacy handlers. The [rebrand and sync decision](../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md) records the Git tradeoff; the source migration and branch cutover remain to be implemented. Compatibility of host and client wire contracts is a separate question from naming and needs explicit validation.
 
 ### Relationship to Clisbot T3Claw Fusion
 
@@ -69,7 +69,7 @@ This new generation of Clisbot is motivated by limitations in the previous archi
 
 ### Upstream-Friendly Evolution
 
-Keep the Paseo foundation recognizable and mergeable for as long as this remains valuable. Prefer feature toggles, adapters, plugins, and isolated modules over invasive cross-cutting changes. Clisbot-specific behavior should be disabled cleanly so that the base Paseo experience remains available during the early stages. Where possible, reuse Paseo's own extension points (plugins, `paseo.json` workspace configuration, MCP tooling) instead of adding parallel systems.
+Keep the Paseo foundation traceable through Git ancestry and a repeatable rename transformation while the Clisbot source and product use Clisbot names. Prefer feature toggles, adapters, plugins, and isolated modules for functional differences. Where possible, reuse upstream extension points rather than adding parallel systems. The [upstream sync playbook](../guides/developer-guide/upstream-sync-and-contribution.md) owns the merge procedure.
 
 ### Paseo-Compatible Hosts
 

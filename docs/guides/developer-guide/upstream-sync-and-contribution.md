@@ -5,6 +5,13 @@ Read this before syncing upstream or opening an upstream PR. The channel
 verticals track a second upstream — OpenClaw — on its own mechanism; that one
 is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
 
+**Rebrand decision, 2026-09-29:** the target product branch is a fully branded
+Clisbot `main`. Each upstream snapshot will be renamed before it is merged;
+see the [decision and Git evidence](../../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md).
+The branch cutover and rename script are not implemented yet. The existing
+commands below describe the current `clisbot-paseoclaw-fusion` branch until
+that migration is complete.
+
 ## The three repos, each with one job
 
 - **`getpaseo/paseo` (upstream)** — read-only for us. Source of all Paseo code.
@@ -19,9 +26,10 @@ is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
   The fork's `main` is a lazy mirror: update it when cutting a contribution
   branch. It is not a sync relay.
 
-- **`clisbot-paseoclaw-fusion` (this repo)** — the single product line. One
-  long-lived branch. Don't grow a second product line in the fork clone;
-  upstream-facing work happens in the fork, everything else lands here.
+- **`clisbot-paseoclaw-fusion` (this repo today; `main` after cutover)** — the
+  single product line. One long-lived branch. Don't grow a second product line
+  in the fork clone; upstream-facing work happens in the fork, everything else
+  lands here.
 
 ## Sync policy: release baselines plus main rehearsals
 
@@ -50,7 +58,32 @@ Rehearse when `main` moves materially in app/server/protocol or at least once
 per active development week. A rehearsal failure becomes tracked work; it does
 not silently move the product baseline.
 
-### Promotion procedure
+### Target promotion procedure after the rebrand cutover
+
+1. Fetch a named upstream release into `refs/upstream-releases/` and verify its
+   commit. Make a disposable sync branch from that **raw** commit.
+2. Run the version-controlled, deterministic rename transformation from the
+   Fusion worktree against the upstream snapshot, including paths and product
+   documentation. Verify it is
+   idempotent, review every remaining Paseo-name match, then commit the
+   transformed snapshot on the sync branch.
+3. Merge the transformed branch into Clisbot `main` in a clean worktree.
+   Resolve overlaps by retaining upstream functional changes with Clisbot
+   names. Git may report the same renamed line again: its merge base is the
+   previous raw upstream commit, not the previous transformed snapshot.
+4. Rerun the transformation and old-name scan on the merged tree. Reconcile
+   dependency manifests and lockfile; run the build, typecheck, focused tests,
+   and required live/release gates. Commit the merge only after review.
+5. Delete the disposable sync branch name and create the verified sync tag.
+   The merge commit keeps the transformed snapshot and raw upstream history;
+   no old `sync/rebranded-*` branch names need to remain.
+
+Use the same transform and checks for disposable `upstream/main` rehearsals.
+No legacy `paseo://` handler or `PASEO_*` environment alias is part of the
+target Clisbot product. The executable command and scan allowlist will be
+added here when the transformation is implemented.
+
+### Current promotion procedure before the cutover
 
 ```bash
 git worktree add --detach <clean-sync-worktree> clisbot-paseoclaw-fusion

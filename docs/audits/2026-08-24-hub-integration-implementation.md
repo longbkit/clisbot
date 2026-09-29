@@ -1,5 +1,12 @@
 # Hub integration: build, publish, onboarding, and source changes
 
+> Rebrand decision, 2026-09-29: the source-keeps-Paseo-names, publish-time-only
+> rename, and `CLISBOT_*` to `PASEO_*` alias strategy below are superseded by
+> [the full-source rebrand and upstream sync decision](2026-09-29-clisbot-rebrand-upstream-sync-decision.md).
+> This document remains a historical implementation proposal; follow the
+> [upstream sync playbook](../guides/developer-guide/upstream-sync-and-contribution.md)
+> for current and target procedures.
+
 > Onboarding status (2026-09-06): the Hub Project/scaffold/deploy and manual route proposal below is superseded by [API-first assistant onboarding](2026-09-06-api-first-onboarding.md). Project now means the daemon filesystem root; this document retains the historical proposal.
 
 > Credential-model update, 2026-09-01: Hub now persists encrypted canonical Connections; active
