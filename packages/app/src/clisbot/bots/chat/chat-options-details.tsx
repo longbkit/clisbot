@@ -54,7 +54,13 @@ export function ChatOptionsDetailsSheet({
           ) : null}
           {detail === "participants" && group ? (
             <>
-              <SettingsSection title="Name and replies" flush>
+              <ChatParticipantSettings
+                chat={chat}
+                bots={bots}
+                busy={busy}
+                toggle={toggleParticipant}
+              />
+              <SettingsSection title="Details" flush>
                 <GroupChatSettings
                   key={chat.id}
                   serverId={serverId}
@@ -62,13 +68,6 @@ export function ChatOptionsDetailsSheet({
                   onSaved={onClose}
                 />
               </SettingsSection>
-              <Text style={styles.text}>Participant changes apply immediately.</Text>
-              <ChatParticipantSettings
-                chat={chat}
-                bots={bots}
-                busy={busy}
-                toggle={toggleParticipant}
-              />
             </>
           ) : null}
           {error ? (

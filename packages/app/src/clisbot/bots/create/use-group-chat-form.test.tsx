@@ -6,6 +6,20 @@ import type { AggregatedBot } from "../data/use-bots";
 import { useGroupChatForm } from "./use-group-chat-form";
 import { GroupChatForm } from "./group-chat-form";
 const state = vi.hoisted(() => ({ create: vi.fn() }));
+function PickerRow(props: {
+  id: string;
+  name: string;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const { id, onToggle } = props;
+  const press = useCallback(() => onToggle(id), [id, onToggle]);
+  return (
+    <button type="button" aria-checked={props.checked} onClick={press}>
+      {props.name}
+    </button>
+  );
+}
 vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
     getClient: () => ({ createChat: state.create }),
@@ -16,14 +30,54 @@ vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("react-native", () => ({
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+  View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("../chat/bot-member-picker", () => ({
+  BotMemberPicker: ({
+    bots,
+    selected,
+    onToggle,
+  }: {
+    bots: { id: string; name: string }[];
+    selected: ReadonlySet<string>;
+    onToggle: (id: string) => void;
+  }) => (
+    <div>
+      {bots.map((bot) => (
+        <PickerRow
+          key={bot.id}
+          id={bot.id}
+          name={bot.name}
+          checked={selected.has(bot.id)}
+          onToggle={onToggle}
+        />
+      ))}
+    </div>
+  ),
 }));
 vi.mock("./form-layout", () => ({
   BotFormLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("@/components/ui/form-field", () => ({ FormTextInput: () => null }));
+vi.mock("@/components/ui/form-field", () => ({
+  FormTextInput: () => null,
+  Field: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
 vi.mock("@/components/settings", () => ({
-  SettingsCard: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SettingsSwitch: () => null,
+  SettingsSection: ({
+    title,
+    trailing,
+    children,
+  }: {
+    title: string;
+    trailing?: ReactNode;
+    children: ReactNode;
+  }) => (
+    <section aria-label={title}>
+      {trailing}
+      {children}
+    </section>
+  ),
 }));
 vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/select-field", () => ({
@@ -91,4 +145,14 @@ test("keeps the Host selector available when only an unselected Host remains", (
   // Losing the selected Host also leaves the remaining Host selectable.
   rerender(<GroupChatForm hosts={[HOSTS[0]!]} bots={BOTS} onCreated={onCreated} />);
   expect(screen.getByText("Host")).toBeTruthy();
+});
+
+test("members are picked from the list and the count follows", () => {
+  render(<GroupChatForm hosts={HOSTS} bots={BOTS} onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByText("Host"));
+  const first = BOTS.find((bot) => bot.serverId === HOSTS[0]!.serverId)!;
+  expect(screen.getByText("0 selected")).toBeTruthy();
+  fireEvent.click(screen.getByText(first.name));
+  expect(screen.getByText("1 selected")).toBeTruthy();
+  expect(screen.getByText(first.name).getAttribute("aria-checked")).toBe("true");
 });

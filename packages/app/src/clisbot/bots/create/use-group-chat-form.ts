@@ -20,8 +20,11 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const hostBots = bots.filter((bot) => bot.serverId === draft.serverId);
-  const visible = hostBots.filter((bot) =>
-    bot.name.toLocaleLowerCase().includes(draft.search.trim().toLocaleLowerCase()),
+  const query = draft.search.trim().toLocaleLowerCase();
+  const visible = hostBots.filter(
+    (bot) =>
+      bot.name.toLocaleLowerCase().includes(query) ||
+      (bot.description ?? "").toLocaleLowerCase().includes(query),
   );
   const selectHost = useCallback(
     (id: string) => setDraft((value) => selectGroupHost(value, id)),

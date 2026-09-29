@@ -1,9 +1,16 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Text } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
 import { FormTextInput } from "@/components/ui/form-field";
-import { SettingsCard, SettingsRow, SettingsSection, SettingsSwitch } from "@/components/settings";
+import { SettingsSection } from "@/components/settings";
 import type { BotPayload } from "../data/contracts";
+import { BotMemberPicker, type PickerBot } from "./bot-member-picker";
 
+/**
+ * A group's members, with the same picker as New group chat: members first, then the Host's
+ * other bots; checking or unchecking one applies at once. The last member cannot be removed.
+ */
 export function ChatParticipantSettings({
   chat,
   bots,
@@ -16,93 +23,51 @@ export function ChatParticipantSettings({
   toggle: (id: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
-  const roleOf = (botId: string) => bots.find((bot) => bot.id === botId)?.description;
-  const selected = new Set(chat.participants.map((p) => p.botId));
-  const available = bots.filter(
-    (bot) => !selected.has(bot.id) && bot.name.toLowerCase().includes(search.toLowerCase()),
+  const selected = useMemo(() => new Set(chat.participants.map((p) => p.botId)), [chat]);
+  const rows = useMemo(() => memberRows(chat, bots, search), [chat, bots, search]);
+  const count = useMemo(
+    () => <Text style={styles.hint}>{`${selected.size} in this chat`}</Text>,
+    [selected.size],
   );
+  const onToggle = useCallback((id: string) => void toggle(id), [toggle]);
+  const isLocked = useCallback((id: string) => selected.size === 1 && selected.has(id), [selected]);
   return (
-    <>
-      <SettingsSection title={`Participants · ${chat.participants.length}`}>
-        <SettingsCard>
-          {chat.participants.map((p) => (
-            <Participant
-              key={p.botId}
-              id={p.botId}
-              name={p.displayName}
-              role={roleOf(p.botId)}
-              selected
-              busy={busy || selected.size === 1}
-              toggle={toggle}
-            />
-          ))}
-        </SettingsCard>
-      </SettingsSection>
-      <SettingsSection title="Add bots">
-        <FormTextInput
-          accessibilityLabel="Search bots to add"
-          placeholder="Search bots…"
-          initialValue={search}
-          onChangeText={setSearch}
-        />
-        <SettingsCard>
-          {available.slice(0, 8).map((bot) => (
-            <Participant
-              key={bot.id}
-              id={bot.id}
-              name={bot.name}
-              role={bot.description}
-              selected={false}
-              busy={busy}
-              toggle={toggle}
-            />
-          ))}
-          {!available.length ? (
-            <SettingsRow
-              label="No bots to add"
-              hint="All matching bots are already in this chat."
-            />
-          ) : null}
-          {available.length > 8 ? <SettingsRow label="Search to find more bots" /> : null}
-        </SettingsCard>
-      </SettingsSection>
-    </>
+    <SettingsSection
+      title="Members"
+      info="Changes apply immediately. Bots read each other's roles to decide who should answer."
+      trailing={count}
+    >
+      <FormTextInput
+        accessibilityLabel="Search bots"
+        placeholder="Search by name or role"
+        initialValue={search}
+        onChangeText={setSearch}
+      />
+      <BotMemberPicker
+        bots={rows}
+        selected={selected}
+        onToggle={onToggle}
+        disabled={busy}
+        isLocked={isLocked}
+      />
+    </SettingsSection>
   );
-}
-/** Other bots read the role to decide when to tag this one, so a missing role is called out. */
-function roleHint(role: string | null | undefined, selected: boolean): string {
-  const place = selected ? "In this chat" : "Add to this chat";
-  const text = role?.trim();
-  return text
-    ? `${place} · ${text}`
-    : `${place} · No role yet: other bots only know its name. Add one in Bot settings.`;
 }
 
-function Participant({
-  id,
-  name,
-  role,
-  selected,
-  busy,
-  toggle,
-}: {
-  id: string;
-  name: string;
-  role?: string | null;
-  selected: boolean;
-  busy: boolean;
-  toggle: (id: string) => Promise<void>;
-}) {
-  const change = useCallback(() => {
-    void toggle(id);
-  }, [id, toggle]);
-  return (
-    <SettingsSwitch
-      label={name}
-      hint={roleHint(role, selected)}
-      value={selected}
-      disabled={busy}
-      onValueChange={change}
-    />
+/** Members first, in Members order, then the other bots; both filtered by name or role. */
+function memberRows(chat: ChatPayload, bots: readonly BotPayload[], search: string): PickerBot[] {
+  const query = search.trim().toLowerCase();
+  const matches = (bot: PickerBot) =>
+    bot.name.toLowerCase().includes(query) || (bot.description ?? "").toLowerCase().includes(query);
+  const byId = new Map(bots.map((bot) => [bot.id, bot]));
+  const members = chat.participants.map(
+    (p): PickerBot => byId.get(p.botId) ?? { id: p.botId, name: p.displayName },
   );
+  const memberIds = new Set(members.map((bot) => bot.id));
+  const others = bots.filter((bot) => !memberIds.has(bot.id));
+  return [...members, ...others].filter(matches);
 }
+
+const styles = StyleSheet.create((theme) => ({
+  hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+}));

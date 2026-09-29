@@ -1,174 +1,158 @@
 import { useMemo } from "react";
-import { BotFormLayout } from "./form-layout";
-import { useCallback } from "react";
-import { SettingsCard, SettingsSwitch } from "@/components/settings";
-import { FormTextInput } from "@/components/ui/form-field";
-import { SelectField } from "@/components/ui/select-field";
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { SettingsSection } from "@/components/settings";
+import { Field, FormTextInput } from "@/components/ui/form-field";
+import { SelectField } from "@/components/ui/select-field";
 import { Button } from "@/components/ui/button";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { BotMemberPicker } from "../chat/bot-member-picker";
+import { BotFormLayout } from "./form-layout";
 import { useGroupChatForm, type GroupChatFormProps } from "./use-group-chat-form";
+
 const ALL_REPLY = { label: "Everyone, one at a time, unless you @mention a bot" };
 const MENTION_REPLY = { label: "Only bots you @mention" };
+const REPLY_OPTIONS = [
+  { id: "all", value: "all", ...ALL_REPLY },
+  { id: "mentioned", value: "mentioned", ...MENTION_REPLY },
+];
+/** A group is two or more bots; one bot is a direct chat. */
+const MIN_MEMBERS = 2;
+
+type Form = ReturnType<typeof useGroupChatForm>;
+
+/** New group chat: pick the members first, then name the room and say who replies. */
 export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
-  const {
-    draft,
-    hostBots,
-    visible,
-    error,
-    busy,
-    selectHost,
-    selectBot,
-    setTitle,
-    setSearch,
-    setReply,
-    submit,
-  } = useGroupChatForm({ bots, hosts, onCreated });
-  const compact = useIsCompactFormFactor();
-  const size = compact ? "md" : "sm";
+  const form = useGroupChatForm({ bots, hosts, onCreated });
+  const size = useIsCompactFormFactor() ? "md" : "sm";
+  const chosen = form.draft.botIds.filter((id) => form.hostBots.some((bot) => bot.id === id));
+  const canCreate =
+    hosts.some((host) => host.serverId === form.draft.serverId) &&
+    chosen.length >= MIN_MEMBERS &&
+    !form.busy;
   const footer = useMemo(
     () => (
-      <Button
-        size={size}
-        disabled={
-          !hosts.some((host) => host.serverId === draft.serverId) ||
-          draft.botIds.filter((id) => hostBots.some((bot) => bot.id === id)).length < 2 ||
-          busy
-        }
-        onPress={submit}
-      >
-        {busy ? "Creating…" : "Create group chat"}
+      <Button size={size} disabled={!canCreate} onPress={form.submit}>
+        {form.busy ? "Creating…" : createLabel(chosen.length)}
       </Button>
     ),
-    [size, hosts, draft.serverId, draft.botIds, hostBots, busy, submit],
+    [size, canCreate, form.submit, form.busy, chosen.length],
   );
   return (
     <BotFormLayout footer={footer}>
-      <GroupBotPicker
-        hosts={hosts}
-        draft={draft}
-        visible={visible}
-        size={size}
-        selectHost={selectHost}
-        selectBot={selectBot}
-        setSearch={setSearch}
-      />
-      <Text style={styles.label}>Group name · optional</Text>
-      <FormTextInput
-        size={size}
-        accessibilityLabel="Chat name"
-        initialValue={draft.title}
-        onChangeText={setTitle}
-        placeholder="For example, Product launch"
-      />
-      <SelectField
-        label="Who replies?"
-        value={draft.requireMention ? "mentioned" : "all"}
-        selectedDisplay={draft.requireMention ? MENTION_REPLY : ALL_REPLY}
-        options={[
-          {
-            id: "all",
-            value: "all",
-            label: "Everyone, one at a time, unless you @mention a bot",
-          },
-          {
-            id: "mentioned",
-            value: "mentioned",
-            label: "Only bots you @mention",
-          },
-        ]}
-        onChange={setReply}
-        placeholder="Choose who replies"
-        emptyText="No reply options"
-        size={size}
-      />
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.label}>
-          {error}
+      <HostField hosts={hosts} form={form} size={size} />
+      <MembersSection form={form} chosenCount={chosen.length} size={size} />
+      <SettingsSection title="Details" flush>
+        <View style={styles.fields}>
+          <Field
+            label="Group name"
+            hint="Optional. Without one, the group shows its members' names."
+          >
+            <FormTextInput
+              size={size}
+              accessibilityLabel="Group name"
+              initialValue={form.draft.title}
+              onChangeText={form.setTitle}
+              placeholder="For example, Product launch"
+            />
+          </Field>
+          <SelectField
+            label="Who replies?"
+            value={form.draft.requireMention ? "mentioned" : "all"}
+            selectedDisplay={form.draft.requireMention ? MENTION_REPLY : ALL_REPLY}
+            options={REPLY_OPTIONS}
+            onChange={form.setReply}
+            placeholder="Choose who replies"
+            emptyText="No reply options"
+            size={size}
+          />
+        </View>
+      </SettingsSection>
+      {form.error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {form.error}
         </Text>
       ) : null}
     </BotFormLayout>
   );
 }
-function GroupBotPicker({
+
+function createLabel(count: number): string {
+  if (count < MIN_MEMBERS) return `Choose at least ${MIN_MEMBERS} bots`;
+  return `Create group with ${count} bots`;
+}
+
+/** Only when there is a Host to choose: every bot in a group runs on the same Host. */
+function HostField({
   hosts,
-  draft,
-  visible,
+  form,
   size,
-  selectHost,
-  selectBot,
-  setSearch,
-}: Pick<
-  ReturnType<typeof useGroupChatForm>,
-  "draft" | "visible" | "selectHost" | "selectBot" | "setSearch"
-> & { hosts: GroupChatFormProps["hosts"]; size: "sm" | "md" }) {
+}: {
+  hosts: GroupChatFormProps["hosts"];
+  form: Form;
+  size: "sm" | "md";
+}) {
+  const options = useMemo(
+    () => hosts.map((host) => ({ id: host.serverId, value: host.serverId, label: host.label })),
+    [hosts],
+  );
+  const selected = hosts.find((host) => host.serverId === form.draft.serverId) ?? null;
+  if (hosts.length === 1 && hosts[0]?.serverId === form.draft.serverId) return null;
   return (
-    <>
-      {hosts.length !== 1 || hosts[0]?.serverId !== draft.serverId ? (
-        <SelectField
-          label="Host"
-          value={draft.serverId}
-          selectedDisplay={hosts.find((host) => host.serverId === draft.serverId) ?? null}
-          options={hosts.map((host) => ({
-            id: host.serverId,
-            value: host.serverId,
-            label: host.label,
-          }))}
-          onChange={selectHost}
-          placeholder="Choose a Host"
-          emptyText="No eligible Hosts connected"
-          size={size}
-        />
-      ) : null}
-      {hosts.length > 1 && draft.botIds.length > 0 ? (
-        <Text style={styles.hint}>Changing Host clears the selected bots.</Text>
-      ) : null}
-      <Text style={styles.label}>
-        Choose bots
-        {draft.botIds.length ? ` · ${draft.botIds.length} selected` : ""}
-      </Text>
-      <FormTextInput
-        key={draft.serverId}
-        size={size}
-        accessibilityLabel="Search bots"
-        initialValue={draft.search}
-        onChangeText={setSearch}
-        placeholder="Search bots…"
-      />
-      <SettingsCard>
-        {visible.map((bot) => (
-          <GroupParticipant
-            key={bot.id}
-            id={bot.id}
-            name={bot.name}
-            selected={draft.botIds.includes(bot.id)}
-            select={selectBot}
-          />
-        ))}
-      </SettingsCard>
-      {draft.serverId && visible.length === 0 ? (
-        <Text style={styles.hint}>No bots match your search.</Text>
-      ) : null}
-    </>
+    <SelectField
+      label="Host"
+      value={form.draft.serverId}
+      selectedDisplay={selected}
+      options={options}
+      onChange={form.selectHost}
+      placeholder="Choose a Host"
+      emptyText="No eligible Hosts connected"
+      hint={form.draft.botIds.length > 0 ? "Changing Host clears the selected bots." : undefined}
+      size={size}
+    />
   );
 }
-function GroupParticipant({
-  id,
-  name,
-  selected,
-  select,
+
+function MembersSection({
+  form,
+  chosenCount,
+  size,
 }: {
-  id: string;
-  name: string;
-  selected: boolean;
-  select: (id: string) => void;
+  form: Form;
+  chosenCount: number;
+  size: "sm" | "md";
 }) {
-  const toggle = useCallback(() => select(id), [id, select]);
-  return <SettingsSwitch label={name} value={selected} onValueChange={toggle} />;
+  const selected = useMemo(() => new Set(form.draft.botIds), [form.draft.botIds]);
+  const count = useMemo(
+    () => <Text style={styles.hint}>{`${chosenCount} selected`}</Text>,
+    [chosenCount],
+  );
+  return (
+    <SettingsSection
+      title="Members"
+      info="Bots read each other's roles to decide who should answer, so pick bots with distinct roles."
+      trailing={count}
+    >
+      <FormTextInput
+        key={form.draft.serverId}
+        size={size}
+        accessibilityLabel="Search bots"
+        initialValue={form.draft.search}
+        onChangeText={form.setSearch}
+        placeholder="Search by name or role"
+      />
+      {form.visible.length > 0 ? (
+        <BotMemberPicker bots={form.visible} selected={selected} onToggle={form.selectBot} />
+      ) : null}
+      {form.visible.length === 0 && form.draft.serverId ? (
+        <Text style={styles.hint}>No bots match your search.</Text>
+      ) : null}
+    </SettingsSection>
+  );
 }
+
 const styles = StyleSheet.create((theme) => ({
-  form: { padding: theme.spacing[4], gap: theme.spacing[3] },
-  label: { color: theme.colors.foreground },
+  fields: { gap: theme.spacing[3] },
   hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  error: { color: theme.colors.foreground },
 }));
