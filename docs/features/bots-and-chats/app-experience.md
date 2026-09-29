@@ -9,7 +9,12 @@ turn rules, grants and execution remain unchanged.
 
 - Account access sits with the organization context at the top, on desktop and mobile.
 - Primary navigation is New workspace, Search, History, Automations. Search extends the existing
-  Command Center; it is not a second search system.
+  Command Center; it is not a second search system. Bots and group chats register as contribution
+  sections (`clisbot/bots/search/`): **Bots** match name, Role or `@slug` and open the bot's
+  chat; **Group chats** match the title or a member's name. New bot and New group chat join
+  Actions and ask the sidebar to open its sheet. All show only for a query, and rank above
+  Workspaces, so a bot's own workspace no longer stands in for the bot. Message text is not
+  searched yet; that needs a daemon search.
 - Pinned appears before Group chats, Bots, Projects and Bot projects. Pins can identify a bot,
   chat, project, workspace or session; a pinned flat conversation is not repeated in its collection.
 - Section collapse state is a view preference. Bot projects is always available, initially

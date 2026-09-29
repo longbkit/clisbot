@@ -1,12 +1,13 @@
 import type { PinChat } from "./pin-identity";
 import type { Rect } from "@/components/ui/menu/menu-anchor";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins, type ResourcePin } from "./pins";
 import { chatResourceActions, type ChatResourceActionId } from "../chat/chat-resource-actions";
 import { useArchiveChat } from "../chat/use-archive-chat";
 import { buildGroupSettingsRoute } from "../chat/chat-panel-param";
+import { useCreationRequest } from "./creation-request";
 export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonly PinChat[]) {
   const router = useRouter();
   const { pins, toggle: togglePin, isPinned } = useResourcePins(chats);
@@ -69,6 +70,7 @@ export function useCreationActions(
   const closeCreate = useCallback(() => setCreateName(null), []);
   const closeGroup = useCallback(() => setGroupOpen(false), []);
   const openGroup = useCallback(() => setGroupOpen(true), []);
+  useCreationRequestHandler(openCreate, openGroup);
   const onBotCreated = useCallback(
     (serverId: string, botId: string) => {
       setCreateName(null);
@@ -100,4 +102,16 @@ export function useCreationActions(
     onGroupCreated,
     onPressBot,
   };
+}
+
+/** Opens the sheet the Command Center asked for, then clears the request. */
+function useCreationRequestHandler(openCreate: () => void, openGroup: () => void) {
+  const request = useCreationRequest((state) => state.request);
+  const take = useCreationRequest((state) => state.take);
+  useEffect(() => {
+    if (request === null) return;
+    take();
+    if (request === "bot") openCreate();
+    else openGroup();
+  }, [request, take, openCreate, openGroup]);
 }

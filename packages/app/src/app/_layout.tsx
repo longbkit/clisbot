@@ -134,6 +134,7 @@ import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
 import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
 import { HubHostSynchronization } from "@/clisbot/hub/host-synchronization";
+import { BotsCommandCenterActions } from "@/clisbot/bots/search/command-center-registration";
 import {
   ensureOsNotificationPermission,
   WEB_NOTIFICATION_CLICK_EVENT,
@@ -605,6 +606,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
         <CommandCenterRootActions />
         <CommandCenterWorkspaceActions />
         <PluginCommandCenterActions />
+        <BotsCommandCenterActions />
         <WorkspacePinShortcutHandler />
         <WorkspaceRenameHost />
         <CommandCenter />
