@@ -1,9 +1,16 @@
 import { displayMentions, type MentionMember } from "./member-mentions";
 import { useChatMessageImages } from "./use-chat-message-images";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
-import { AssistantMessage, Notification, UserMessage } from "@/components/message";
+import {
+  AssistantMessage,
+  AssistantTurnFooter,
+  Notification,
+  UserMessage,
+} from "@/components/message";
 import { botsCopy } from "../copy";
 import { BotFace } from "./bot-face";
 import type { ChatRenderRow } from "./render-model";
@@ -95,9 +102,38 @@ export const ChatBotRow = memo(function ChatBotRow({
         workspaceRoot={bot.cwd}
         underSenderName={row.opensGroup}
       />
+      <BotLineFooter line={row.line} text={message} />
     </ActorResponseRow>
   );
 });
+
+/**
+ * Copy and time under a bot line, as under an agent turn: "Worked for …" when the line carries
+ * its turn's start (hover shows the clock time), the clock time otherwise.
+ */
+function BotLineFooter({
+  line,
+  text,
+}: {
+  line: Extract<ChatRenderRow, { kind: "bot" }>["line"];
+  text: string;
+}) {
+  const getContent = useCallback(() => text, [text]);
+  const completedAt = useMemo(() => new Date(line.at), [line.at]);
+  const startedAt = line.reply?.startedAt ? Date.parse(line.reply.startedAt) : Number.NaN;
+  const durationMs = Number.isFinite(startedAt)
+    ? Math.max(0, completedAt.getTime() - startedAt)
+    : null;
+  return (
+    <View style={styles.footer}>
+      <AssistantTurnFooter
+        getContent={getContent}
+        completedAt={completedAt}
+        durationMs={durationMs}
+      />
+    </View>
+  );
+}
 
 export const ChatSystemRow = memo(function ChatSystemRow({
   row,
@@ -106,3 +142,7 @@ export const ChatSystemRow = memo(function ChatSystemRow({
 }) {
   return <Notification level="info" message={row.line.text} />;
 });
+
+const styles = StyleSheet.create((theme) => ({
+  footer: { marginTop: theme.spacing[2], alignSelf: "flex-start" },
+}));

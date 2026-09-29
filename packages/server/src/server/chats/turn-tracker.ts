@@ -29,6 +29,8 @@ export interface TurnOutcome {
   lastRow: TimelineReference | null;
   /** `null` for a turn nobody in the chat asked for (started from the cowork view). */
   expectation: TurnExpectation | null;
+  /** When `turn_started` arrived; absent for a turn recovered after a restart. */
+  startedAt?: string;
 }
 
 export interface TurnTrackerHost {
@@ -44,6 +46,7 @@ export interface TurnTrackerHost {
 interface OpenTurn {
   expectation: TurnExpectation | null;
   items: AnsweredItem[];
+  startedAt: string;
 }
 
 interface WatchedAgent {
@@ -168,7 +171,11 @@ export class TurnTracker {
 
   private openTurn(watched: WatchedAgent, turnId: string | undefined): void {
     const id = turnId ?? `unnamed-${++watched.unnamedTurns}`;
-    watched.turns.set(id, { expectation: watched.pending.shift() ?? null, items: [] });
+    watched.turns.set(id, {
+      expectation: watched.pending.shift() ?? null,
+      items: [],
+      startedAt: new Date().toISOString(),
+    });
     watched.openTurnId = id;
   }
 
@@ -209,6 +216,7 @@ export class TurnTracker {
       text: answer?.text ?? null,
       lastRow: answer?.lastRow ?? null,
       expectation: turn.expectation,
+      startedAt: turn.startedAt,
     };
     const handled =
       error === null ? this.host.onTurnCompleted(outcome) : this.host.onTurnFailed(outcome, error);

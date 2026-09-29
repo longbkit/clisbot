@@ -77,6 +77,8 @@ export const ChatMessageReplySchema = z.object({
   turnId: z.string().optional(),
   epoch: z.string().optional(),
   seq: z.number().int().optional(),
+  /** When the turn that produced this line started; with `at`, how long the bot worked. */
+  startedAt: z.string().optional(),
 });
 export type ChatMessageReply = z.infer<typeof ChatMessageReplySchema>;
 

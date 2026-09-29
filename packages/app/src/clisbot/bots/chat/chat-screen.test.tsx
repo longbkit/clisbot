@@ -109,6 +109,15 @@ vi.mock("@/components/message", () => ({
       </p>
     );
   },
+  AssistantTurnFooter: ({
+    getContent,
+    durationMs,
+  }: {
+    getContent: () => string;
+    durationMs?: number | null;
+  }) => (
+    <span data-kind="footer" data-copy={getContent()} data-duration={String(durationMs ?? "")} />
+  ),
   ToolCall: ({ toolName, status }: { toolName: string; status: string }) => {
     useToolCallSheet();
     return (
@@ -247,6 +256,31 @@ describe("ChatScreen", () => {
     expect(screen.getByText("search").getAttribute("data-status")).toBe("running");
     expect(screen.getByText("Here is what I found").getAttribute("data-phase")).toBe("complete");
     expect(screen.getByText("Thanks").getAttribute("data-first")).toBe("true");
+    // Every bot line gets copy and time, as an agent turn does; user lines keep their own.
+    const footers = document.querySelectorAll('[data-kind="footer"]');
+    expect([...footers].map((footer) => footer.getAttribute("data-copy"))).toEqual([
+      "Drafting now",
+      "And one more thing",
+      "Here is what I found",
+    ]);
+  });
+
+  it("says how long a bot worked when its line carries the turn's start", () => {
+    const reply = line({ kind: "bot", botId: "research" }, "Done");
+    const started = new Date(Date.parse(reply.at) - 42_000).toISOString();
+    render(
+      <ChatScreen
+        serverId="host-a"
+        chatId="chat-3"
+        title="Research"
+        bots={[BOTS[0]!]}
+        transcript={[{ ...reply, reply: { agentId: "agent-r", startedAt: started } }]}
+        liveHeads={new Map()}
+        onSubmitMessage={vi.fn(async () => {})}
+      />,
+    );
+    const footer = document.querySelector('[data-kind="footer"]');
+    expect(footer?.getAttribute("data-duration")).toBe("42000");
   });
 
   it("names the bot in a direct chat and hands the text to the submit handler", () => {

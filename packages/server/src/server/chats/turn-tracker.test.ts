@@ -84,6 +84,8 @@ describe("TurnTracker", () => {
         text: "Hello",
         lastRow: { epoch: "epoch-1", seq: 3 },
         expectation: { messageIds: ["m1"], hop: 0, disposition: "turn_started" },
+        // When turn_started arrived, so the chat can say how long the bot worked.
+        startedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       },
     ]);
   });

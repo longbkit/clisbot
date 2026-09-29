@@ -45,7 +45,12 @@ export function botReplyLine(outcome: TurnOutcome, text: string, at: string): Tr
     at,
     sender: { kind: "bot", botId: outcome.botId },
     text,
-    reply: { agentId: outcome.agentId, turnId: outcome.turnId, ...outcome.lastRow },
+    reply: {
+      agentId: outcome.agentId,
+      turnId: outcome.turnId,
+      ...outcome.lastRow,
+      ...(outcome.startedAt ? { startedAt: outcome.startedAt } : {}),
+    },
     ...(outcome.expectation ? { inReplyTo: outcome.expectation.messageIds.at(-1)! } : {}),
     hop: (outcome.expectation?.hop ?? 0) + 1,
   };

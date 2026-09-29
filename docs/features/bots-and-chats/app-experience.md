@@ -95,6 +95,10 @@ retain other draft fields. Create failures retain input and do not show success 
 Chat owns its conversation layout; a real bot Workspace owns each file/resource operation. Never use
 a synthetic chat layout identifier as the workspace identity sent to the daemon.
 
+- A bot line ends with the agent turn's footer: copy, then "Worked for …" (hover or tap shows the
+  clock time). The daemon records when the turn started in `reply.startedAt`; a line without it,
+  from an older daemon or recovered after a restart, shows the clock time only. Fork is not offered
+  on a chat line yet.
 - Messages is the fixed conversation tab. Keep the current ChatScreen/ChatComposer, tool sheets,
   approvals and dictation. The composer is outside the scrolling message list. Attachments use the
   existing upload/image pipeline and canonical chat submission. The selected bot's current session
