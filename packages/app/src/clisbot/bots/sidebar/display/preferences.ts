@@ -121,10 +121,15 @@ function pick<K extends string>(
 
 export const useSidebarDisplayStore = createSidebarDisplayStore();
 
-/** Rows on the Hosts a section's filter keeps; an empty filter keeps every Host. */
+/**
+ * Rows on the Hosts a section's filter keeps. An empty filter keeps every Host, and so does a
+ * filter whose Hosts are all gone, so a removed Host cannot leave a section empty for good.
+ */
 export function filterByHost<T extends { serverId: string }>(
   rows: readonly T[],
   hostFilter: readonly string[],
+  knownHosts: readonly string[],
 ): readonly T[] {
-  return hostFilter.length === 0 ? rows : rows.filter((row) => hostFilter.includes(row.serverId));
+  const active = hostFilter.filter((serverId) => knownHosts.includes(serverId));
+  return active.length === 0 ? rows : rows.filter((row) => active.includes(row.serverId));
 }

@@ -43,6 +43,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
   const projectedBots = projectBotSidebar(botRows, chatRows, hosts.length > 1);
   const selectedBotKey = selectedDirectBotKey(chatRows, current);
   const hostFilters = useSidebarDisplayStore((state) => state.hostFilters);
+  const hostIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   return (
     <View>
       {error || menuState.error || bots.error || chats.error ? (
@@ -54,6 +55,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         chats={filterByHost(
           projectGroupSidebar(chatRows, hosts.length > 1),
           hostFilters.chats,
+          hostIds,
         ).filter((chat) => !pinned("chat", chat.serverId, chat.chatId))}
         onOpenChatMenu={onChatMenu}
         onBeforeNavigate={onBeforeNavigate}
@@ -66,7 +68,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         loading={directoryStatus.loading}
         loadError={directoryStatus.error}
         onRetry={bots.refetch}
-        bots={filterByHost(projectedBots, hostFilters.bots).filter(
+        bots={filterByHost(projectedBots, hostFilters.bots, hostIds).filter(
           (bot) => !pinned("bot", bot.serverId, bot.botId),
         )}
         selectedBotKey={selectedBotKey}

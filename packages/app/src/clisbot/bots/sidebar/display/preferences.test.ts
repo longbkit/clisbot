@@ -38,9 +38,11 @@ describe("sidebar display preferences", () => {
     expect(store.getState().hostFilters.chats).toEqual([]);
   });
 
-  it("an empty Host filter keeps every row", () => {
+  it("an empty Host filter, or one naming only Hosts that are gone, keeps every row", () => {
     const rows = [{ serverId: "h1" }, { serverId: "h2" }];
-    expect(filterByHost(rows, [])).toBe(rows);
-    expect(filterByHost(rows, ["h2"])).toEqual([{ serverId: "h2" }]);
+    const known = ["h1", "h2"];
+    expect(filterByHost(rows, [], known)).toBe(rows);
+    expect(filterByHost(rows, ["h2"], known)).toEqual([{ serverId: "h2" }]);
+    expect(filterByHost(rows, ["gone"], known)).toBe(rows);
   });
 });

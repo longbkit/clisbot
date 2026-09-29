@@ -5,7 +5,7 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { buildHostBotRoute } from "../routes";
 import { useResourcePins } from "../sidebar/pins";
 import type { BotPayload } from "../data/contracts";
-import { refreshBotsAndChats } from "../data/runtime";
+import { refreshBotsAndChatsNow } from "../data/runtime";
 import { chatResourceActions, type ChatResourceActionId } from "./chat-resource-actions";
 import { useArchiveChat } from "./use-archive-chat";
 
@@ -48,7 +48,8 @@ export function useChatMembership(serverId: string, chat: ChatPayload) {
           ? await host.removeChatParticipant({ chatId: chat.id, botId })
           : await host.addChatParticipant({ chatId: chat.id, botId });
         if (r.error) throw new Error(r.error);
-        refreshBotsAndChats();
+        // Stay busy until the chat refetches, so the next change reads who is in it now.
+        await refreshBotsAndChatsNow();
       }),
     [chat, run],
   );

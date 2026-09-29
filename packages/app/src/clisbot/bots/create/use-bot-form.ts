@@ -48,7 +48,7 @@ export function useBotForm({ name, defaultServerId, bot, hosts, onCreated }: Bot
       const result = bot ? await client.updateBot(update) : await client.createBot(request);
       if (result.error || !result.bot) throw new Error(result.error ?? "Bot could not be created");
       refreshBotsAndChats();
-      if (!bot) void rememberSelection(state, updatePreferences);
+      if (!bot && model.isProviderChosen()) void rememberSelection(state, updatePreferences);
       if (isCurrent()) onCreated(serverId, result.bot.id);
     } catch (error) {
       if (isCurrent()) model.setSubmitError(String(error));

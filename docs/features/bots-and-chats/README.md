@@ -228,12 +228,15 @@ A new bot's launch defaults come from the Agent profile or controls chosen at cr
 hidden default provider.
 
 Revised 2026-09-29: the New bot form now starts filled so Name and Enter create a bot. Provider,
-model, mode and thinking come from the choices this device last saved (a created bot saves its
-choices, as New agent does); when nothing is saved or the saved provider is not on the Host, the
-Host's first ready provider with its default model stands in. The default is not hidden: the AI
-configuration card always shows Host, Model, Permissions and Thinking as labeled rows. The earlier
-rule left Model empty and Create disabled on a fresh device, one extra pick per bot. The CLI
-(`hub init`) still asks or fails instead of assuming a provider.
+model, mode and thinking come from the choices this device last saved, the same preferences New
+agent reads and writes. When nothing is saved, or the saved provider is not ready or loading on the
+Host, the first provider the Host's snapshot reports ready stands in, with its default model.
+Creating a bot saves its choices only when the provider was chosen (by the user, or the saved
+one); a stand-in is never saved, so it cannot become New agent's default. Changing the Host drops
+choices made for the old one. The default is not hidden: the AI configuration card always shows
+Host, Model, Permissions and Thinking as labeled rows. The earlier rule left Model empty and Create
+disabled on a fresh device, one extra pick per bot. The CLI (`hub init`) still asks or fails
+instead of assuming a provider.
 
 ### D12. Host choice is explicit
 
@@ -241,8 +244,8 @@ A bot is created on the Host selected in the sidebar. With several Hosts the cre
 Host picker; nothing guesses.
 
 Revised 2026-09-29: when no Host is selected in the sidebar, the form starts on the Host of the
-most recent chat, else the only Host. The Host row is always shown and can be changed before
-creating, so the guess is visible, not silent.
+most recent chat, else the only Host. The Host row is always shown, and with several Hosts it can
+be changed before creating, so the guess is visible, not silent.
 
 ### D13. Sharing is a Project grant
 

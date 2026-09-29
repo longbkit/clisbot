@@ -45,7 +45,10 @@ export function BotsCommandCenterActions() {
   const chats = useChatsQuery({ hosts, runtime: botsRuntime });
   const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : EMPTY;
   const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : EMPTY;
-  const canCreate = useBotCreationHosts().length > 0;
+  const creationHosts = useBotCreationHosts();
+  const sidebarCanCreate = useCreationRequest((state) => state.handlers > 0);
+  const canCreateBot = sidebarCanCreate && creationHosts.length > 0;
+  const canCreateGroup = sidebarCanCreate && botRows.length > 0;
   const { openBot, navigate, error } = useBotSidebarActions(
     chatRows,
     undefined,
@@ -63,7 +66,8 @@ export function BotsCommandCenterActions() {
         bots: botRows,
         chats: chatRows,
         multipleHosts: hosts.length > 1,
-        canCreate,
+        canCreateBot,
+        canCreateGroup,
         labels: { actions: t("shell.commandCenter.actions") },
         icons: ICONS,
         openBot: (serverId, botId) => void openBot(serverId, botId),
@@ -71,7 +75,7 @@ export function BotsCommandCenterActions() {
         createBot: () => ask("bot"),
         createGroup: () => ask("group"),
       }),
-    [botRows, chatRows, hosts.length, canCreate, t, openBot, navigate, ask],
+    [botRows, chatRows, hosts.length, canCreateBot, canCreateGroup, t, openBot, navigate, ask],
   );
   useCommandCenterActions({ sourceId: "clisbot-bots", enabled: hosts.length > 0, actions });
   return null;

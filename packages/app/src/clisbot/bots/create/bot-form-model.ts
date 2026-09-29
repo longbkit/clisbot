@@ -126,6 +126,11 @@ export interface BotFormModel {
   setThinkingOption: (thinkingOptionId: string) => void;
   setFeature: (featureId: string, value: unknown) => void;
   setSubmitError: (value: string | null) => void;
+  /**
+   * The provider is one someone chose: the user here, or the saved preferences. False for the
+   * Host's first ready provider standing in, which must not become the next form's default.
+   */
+  isProviderChosen: () => boolean;
 }
 
 function launchOf(state: BotFormState): BotLaunchDefaults {
@@ -218,6 +223,8 @@ function resolved(session: BotFormSession, next: BotFormState): BotFormState {
 
 function clearProviderSelection(session: BotFormSession, next: BotFormState): BotFormState {
   session.entries = [];
+  // The choices were for the old Host; the new one starts from preferences and its own providers.
+  session.userModified = { ...INITIAL_USER_MODIFIED };
   return {
     ...next,
     selectedProvider: null,
@@ -238,9 +245,13 @@ function defaultModeOf(entry: ProviderSnapshotEntry | null): string {
 
 function lifecycleMethods(
   session: BotFormSession,
-): Pick<BotFormModel, "getState" | "subscribe" | "close"> {
+): Pick<BotFormModel, "getState" | "subscribe" | "close" | "isProviderChosen"> {
   return {
     getState: () => session.state,
+    isProviderChosen: () =>
+      session.userModified.provider ||
+      (session.state.selectedProvider !== null &&
+        session.state.selectedProvider === session.preferences?.provider),
     subscribe(listener) {
       if (session.closed) return () => {};
       session.listeners.add(listener);

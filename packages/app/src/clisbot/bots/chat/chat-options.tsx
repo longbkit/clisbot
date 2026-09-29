@@ -80,7 +80,7 @@ export function ChatOptions({
         chat={chat}
         bots={bots}
         group={group}
-        busy={busy}
+        offline={!membership.connected}
         toggleParticipant={membership.toggleParticipant}
         onClose={close}
       />

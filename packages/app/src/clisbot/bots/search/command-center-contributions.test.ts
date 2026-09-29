@@ -47,7 +47,8 @@ function source(overrides: Partial<BotSearchSource> = {}): BotSearchSource {
       chat("g1", "Launch room", ["legal", "cfo"], "2026-09-29T02:00:00Z"),
     ],
     multipleHosts: false,
-    canCreate: true,
+    canCreateBot: true,
+    canCreateGroup: true,
     labels: { actions: "Actions" },
     icons: {},
     openBot: vi.fn(),
@@ -98,9 +99,12 @@ describe("buildBotSearchContributions", () => {
     expect(input.openChat).toHaveBeenCalledWith("h1", "g1");
   });
 
-  it("names the Host only with several, and offers creation only when allowed", () => {
-    const rows = buildBotSearchContributions(source({ multipleHosts: true, canCreate: false }));
+  it("names the Host only with several, and offers each creation only when it can happen", () => {
+    const rows = buildBotSearchContributions(source({ multipleHosts: true, canCreateBot: false }));
     expect(rows.map((row) => row.id)).not.toContain("new-bot");
+    expect(rows.map((row) => row.id)).toContain("new-group-chat");
+    const noGroup = buildBotSearchContributions(source({ canCreateGroup: false }));
+    expect(noGroup.map((row) => row.id)).not.toContain("new-group-chat");
     expect(rows[0]!.presentation.kind === "action" && rows[0]!.presentation.subtitle).toBe(
       "Studio · Owns contracts",
     );

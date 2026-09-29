@@ -125,6 +125,27 @@ describe("openBotForm", () => {
     expect(model.getState().selectedProvider).toBe("other");
   });
 
+  it("starts over on a new Host: a choice made for the old one does not block the stand-in", () => {
+    const model = openBotForm(createSnapshot({ hosts: HOSTS, defaults: { serverId: "host-a" } }));
+    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    model.setProvider("mock");
+    expect(model.isProviderChosen()).toBe(true);
+    model.setHost("host-b");
+    model.applyProviderSnapshot("host-b", { entries: ENTRIES });
+    expect(model.getState().selectedProvider).toBe("mock");
+    expect(model.isProviderChosen()).toBe(false);
+  });
+
+  it("counts a saved provider as chosen, and the stand-in as not", () => {
+    const saved = openBotForm(createSnapshot({ defaults: { preferences: { provider: "mock" } } }));
+    saved.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    expect(saved.isProviderChosen()).toBe(true);
+    const standIn = openBotForm(createSnapshot());
+    standIn.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    expect(standIn.getState().selectedProvider).toBe("mock");
+    expect(standIn.isProviderChosen()).toBe(false);
+  });
+
   it("does not replace a provider the user chose", () => {
     const model = openBotForm(createSnapshot());
     model.setProvider("grok");

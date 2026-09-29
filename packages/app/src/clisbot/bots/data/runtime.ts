@@ -40,8 +40,14 @@ export const botsRuntime: BotsRuntime = {
   },
 };
 export function refreshBotsAndChats() {
-  void queryClient.invalidateQueries({ queryKey: ["bots"] });
-  void queryClient.invalidateQueries({ queryKey: ["chats"] });
+  void refreshBotsAndChatsNow();
+}
+/** Resolves once the active bot and chat queries have refetched. */
+export async function refreshBotsAndChatsNow(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["bots"] }),
+    queryClient.invalidateQueries({ queryKey: ["chats"] }),
+  ]);
 }
 export function useBotCatalog() {
   const featureHosts = useBotsFeatureHosts();

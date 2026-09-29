@@ -11,8 +11,10 @@ export interface BotSearchSource {
   chats: readonly HostTagged<ChatPayload>[];
   /** Name the Host on each row only when there is more than one. */
   multipleHosts: boolean;
-  /** Offer New bot and New group chat; false when no Host lets this identity create bots. */
-  canCreate: boolean;
+  /** Offer New bot: a Host lets this identity create bots and the sidebar can open the sheet. */
+  canCreateBot: boolean;
+  /** Offer New group chat: there is a bot to add and the sidebar can open the sheet. */
+  canCreateGroup: boolean;
   labels: { actions: string };
   icons: { bot?: CommandCenterIcon; group?: CommandCenterIcon; create?: CommandCenterIcon };
   openBot(serverId: string, botId: string): void;
@@ -25,7 +27,7 @@ export function buildBotSearchContributions(source: BotSearchSource): CommandCen
   return [
     ...source.bots.map((bot, index) => botContribution(source, bot, index)),
     ...groupChats(source.chats).map((chat, index) => groupContribution(source, chat, index)),
-    ...(source.canCreate ? creationContributions(source) : []),
+    ...creationContributions(source),
   ];
 }
 
@@ -94,8 +96,12 @@ function creationContributions(source: BotSearchSource): CommandCenterContributi
       },
     }) satisfies CommandCenterContribution;
   return [
-    action("new-bot", "New bot", 20, source.createBot, ["bot", "assistant"]),
-    action("new-group-chat", "New group chat", 21, source.createGroup, ["group", "chat", "room"]),
+    ...(source.canCreateBot
+      ? [action("new-bot", "New bot", 20, source.createBot, ["bot", "assistant"])]
+      : []),
+    ...(source.canCreateGroup
+      ? [action("new-group-chat", "New group chat", 21, source.createGroup, ["group", "room"])]
+      : []),
   ];
 }
 

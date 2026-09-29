@@ -86,6 +86,11 @@ export const ChatBotRow = memo(function ChatBotRow({
     () => displayMentions(row.line.text, members, { markdown: true }),
     [members, row.line.text],
   );
+  // Copy keeps the bot's own markdown but not the bold the app puts around mentions.
+  const copyText = useMemo(
+    () => displayMentions(row.line.text, members, { markdown: false }),
+    [members, row.line.text],
+  );
   const face = useMemo(
     () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
     [bot.avatar, bot.botId, bot.name],
@@ -102,7 +107,7 @@ export const ChatBotRow = memo(function ChatBotRow({
         workspaceRoot={bot.cwd}
         underSenderName={row.opensGroup}
       />
-      <BotLineFooter line={row.line} text={message} />
+      <BotLineFooter line={row.line} text={copyText} />
     </ActorResponseRow>
   );
 });

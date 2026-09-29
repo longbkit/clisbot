@@ -20,7 +20,7 @@ export function ChatOptionsDetailsSheet({
   chat,
   bots,
   group,
-  busy,
+  offline,
   toggleParticipant,
   onClose,
 }: {
@@ -31,7 +31,8 @@ export function ChatOptionsDetailsSheet({
   chat: ChatPayload;
   bots: BotPayload[];
   group: boolean;
-  busy: boolean;
+  /** The Host is disconnected: membership cannot change. */
+  offline: boolean;
   toggleParticipant: (botId: string) => Promise<void>;
   onClose: () => void;
 }) {
@@ -56,7 +57,7 @@ export function ChatOptionsDetailsSheet({
               <ChatParticipantSettings
                 chat={chat}
                 bots={bots}
-                busy={busy}
+                disabled={offline}
                 toggle={toggleParticipant}
               />
               <GroupChatSettings key={chat.id} serverId={serverId} chat={chat} onSaved={onClose} />

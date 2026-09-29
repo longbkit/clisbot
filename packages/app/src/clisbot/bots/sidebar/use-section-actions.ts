@@ -108,6 +108,8 @@ export function useCreationActions(
 function useCreationRequestHandler(openCreate: () => void, openGroup: () => void) {
   const request = useCreationRequest((state) => state.request);
   const take = useCreationRequest((state) => state.take);
+  const register = useCreationRequest((state) => state.register);
+  useEffect(register, [register]);
   useEffect(() => {
     if (request === null) return;
     take();
