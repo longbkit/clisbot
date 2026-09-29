@@ -66,6 +66,10 @@ export const ChatComposer = memo(function ChatComposer({
         }
         serverId={serverId}
         isPaneFocused={active}
+        // Opening a bot DM or a group lands in the message field, as an agent session does;
+        // the Composer only honors it at the desktop breakpoint, so phones keep the keyboard down.
+        autoFocus
+        autoFocusKey={chatId}
         placeholder={placeholder}
         onSubmitMessage={onSubmitMessage}
         isSubmitLoading={disabled}
