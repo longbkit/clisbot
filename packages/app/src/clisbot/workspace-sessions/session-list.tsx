@@ -1,15 +1,21 @@
 import { SessionPinButton } from "@/clisbot/bots/sidebar/session-pin";
-import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SessionMetadataLine } from "@/clisbot/session-storage/workspace-metadata-row";
 import { getProviderIcon } from "@/components/provider-icons";
 import { isWeb } from "@/constants/platform";
-import {
-  WorkspaceTabIcon,
-  type WorkspaceTabPresentation,
-} from "@/screens/workspace/workspace-tab-presentation";
+import type { WorkspaceTabPresentation } from "@/screens/workspace/workspace-tab-presentation";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { type Agent, useSessionStore } from "@/stores/session-store";
@@ -30,6 +36,12 @@ import { SessionTitleTooltip } from "./session-title-tooltip";
  * - `visible`: showing in another pane of a split. Full-strength title, no fill.
  */
 type SessionLineState = "selected" | "visible" | "idle";
+
+// The presentation module also imports the panel registry and terminal renderer. Load it only
+// when a session icon is actually rendered, after the app's navigator polyfill has run.
+const WorkspaceTabIcon = lazy(async () => ({
+  default: (await import("@/screens/workspace/workspace-tab-presentation")).WorkspaceTabIcon,
+}));
 
 interface WorkspaceSessionListProps {
   serverId: string;
@@ -242,7 +254,14 @@ function SessionMark({
   );
   return (
     <View style={styles.markSlot}>
-      <WorkspaceTabIcon presentation={presentation} active={active} size={12} backdrop={backdrop} />
+      <Suspense fallback={null}>
+        <WorkspaceTabIcon
+          presentation={presentation}
+          active={active}
+          size={12}
+          backdrop={backdrop}
+        />
+      </Suspense>
     </View>
   );
 }
