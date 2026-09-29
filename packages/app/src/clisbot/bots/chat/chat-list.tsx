@@ -1,6 +1,7 @@
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useChatKeyboardDismiss } from "./use-chat-keyboard-dismiss";
 import { useChatScrollPosition } from "./use-chat-scroll-position";
+import { usePinchZoomPassthrough } from "./use-pinch-zoom-passthrough";
 import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
 import { FlatList, View, type ListRenderItemInfo } from "react-native";
@@ -50,6 +51,7 @@ export const ChatList = memo(function ChatList({
 }: ChatListProps) {
   const scrollPosition = useChatScrollPosition<ChatRenderRow>(scrollKey);
   const keyboardDismiss = useChatKeyboardDismiss();
+  usePinchZoomPassthrough(scrollPosition.ref);
   const onScroll = useStableEvent((event: Parameters<typeof scrollPosition.onScroll>[0]) => {
     scrollPosition.onScroll(event);
     keyboardDismiss.onScroll(event);
