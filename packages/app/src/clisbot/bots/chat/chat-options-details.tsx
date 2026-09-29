@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatPayload } from "@getpaseo/protocol/chats/types";
-import { SettingsSection } from "@/components/settings";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import type { BotPayload } from "../data/contracts";
 import { ChatParticipantSettings } from "./chat-participant-settings";
@@ -60,14 +59,7 @@ export function ChatOptionsDetailsSheet({
                 busy={busy}
                 toggle={toggleParticipant}
               />
-              <SettingsSection title="Details" flush>
-                <GroupChatSettings
-                  key={chat.id}
-                  serverId={serverId}
-                  chat={chat}
-                  onSaved={onClose}
-                />
-              </SettingsSection>
+              <GroupChatSettings key={chat.id} serverId={serverId} chat={chat} onSaved={onClose} />
             </>
           ) : null}
           {error ? (

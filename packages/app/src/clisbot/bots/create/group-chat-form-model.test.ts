@@ -9,7 +9,6 @@ const draft: GroupChatDraft = {
   serverId: "host-a",
   botIds: ["a", "b"],
   title: " Launch ",
-  search: "ct",
   requireMention: false,
 };
 describe("group creation", () => {
@@ -27,13 +26,13 @@ describe("group creation", () => {
       ...draft,
       serverId: "host-b",
       botIds: [],
-      search: "",
     });
   });
-  it("rejects stale or cross-Host bot selection", () => {
-    expect(() => groupChatRequest(draft, ["a"])).toThrow("Choose at least two bots");
+  it("accepts one bot and rejects a selection with no bot left on the Host", () => {
+    expect(groupChatRequest(draft, ["a"]).botIds).toEqual(["a"]);
+    expect(() => groupChatRequest(draft, ["c"])).toThrow("Choose at least one bot");
   });
-  it("keeps a selected bot while search is changed and toggles without duplicates", () => {
+  it("toggles without duplicates", () => {
     expect(toggleGroupBot(draft, "a").botIds).toEqual(["b"]);
     expect(toggleGroupBot(draft, "c").botIds).toEqual(["a", "b", "c"]);
   });

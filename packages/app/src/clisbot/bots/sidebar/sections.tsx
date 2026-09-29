@@ -49,16 +49,13 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         </Text>
       ) : null}
       <ChatsSection
-        botCount={botRows.length}
         chats={projectGroupSidebar(chatRows, hosts.length > 1).filter(
           (chat) => !pinned("chat", chat.serverId, chat.chatId),
         )}
         onOpenChatMenu={onChatMenu}
         onBeforeNavigate={onBeforeNavigate}
         onCreateChat={openGroup}
-        canCreateChat={hosts.some(
-          (host) => botRows.filter((bot) => bot.serverId === host.serverId).length >= 2,
-        )}
+        canCreateChat={hosts.some((host) => botRows.some((bot) => bot.serverId === host.serverId))}
       />
       <BotsSection
         directoryBots={projectedBots}

@@ -50,13 +50,18 @@ profile** is a one-time action copying a saved launch bundle into those controls
 or default profile binding; see [the glossary](../../glossary.md). Reuse existing preference resolution
 and validate the selected Host/provider. Do not introduce a hidden Full access default.
 
-New group foregrounds choosing at least two bots on the same Host, an optional name, and **Who
-replies?**, in that order: a **Members** section, then **Details**. Members are chosen from one
-picker (`clisbot/bots/chat/bot-member-picker.tsx`) shared with Group settings: each row shows the
-bot's face, name and Role with a checkbox, and the whole row toggles. Switches are for settings
-that turn on and off; picking who belongs to a group is a multi-select list. The create button
-names the count, and says how many more bots are needed until there are two. The default is every bot, one at a time, when no one is mentioned; an explicit mention
-addresses only the mentioned bots ([group discussion](plans/group-discussion.md)). Mention-only is the alternative. Hide numeric hop and input-length limits from
+New group is Host (only when there is a choice), **Members**, **Group name** and **Who replies?**,
+as flat fields under the sheet title; a section label weaker than the field labels reads as noise.
+Members is one field shared with Group settings (`clisbot/bots/chat/bot-members-field.tsx`): the
+bots already added, each with face, name, Role and a remove button, above a search that adds more.
+Opening New group opens that search with the cursor in it, because picking bots is the first thing
+to do; typing filters by name or Role and Enter adds. Picking members is a list with a search, not
+switches or checkboxes: switches are for settings that turn on and off.
+
+One bot is enough for a group. A one-bot group is a separate thread with the same bot, so a user
+can keep topics apart without creating another bot; the last member cannot be removed. The default
+is every bot, one at a time, when no one is mentioned; an explicit mention addresses only the
+mentioned bots ([group discussion](plans/group-discussion.md)). Mention-only is the alternative. Hide numeric hop and input-length limits from
 ordinary creation without changing server defaults. Host changes reset incompatible bot selections;
 retain other draft fields. Create failures retain input and do not show success prematurely.
 

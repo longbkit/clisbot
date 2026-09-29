@@ -20,22 +20,14 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const hostBots = bots.filter((bot) => bot.serverId === draft.serverId);
-  const query = draft.search.trim().toLocaleLowerCase();
-  const visible = hostBots.filter(
-    (bot) =>
-      bot.name.toLocaleLowerCase().includes(query) ||
-      (bot.description ?? "").toLocaleLowerCase().includes(query),
-  );
+  const members = draft.botIds.flatMap((id) => hostBots.find((bot) => bot.id === id) ?? []);
+  const available = hostBots.filter((bot) => !draft.botIds.includes(bot.id));
   const selectHost = useCallback(
     (id: string) => setDraft((value) => selectGroupHost(value, id)),
     [],
   );
   const selectBot = useCallback((id: string) => setDraft((value) => toggleGroupBot(value, id)), []);
   const setTitle = useCallback((title: string) => setDraft((value) => ({ ...value, title })), []);
-  const setSearch = useCallback(
-    (search: string) => setDraft((value) => ({ ...value, search })),
-    [],
-  );
   const setReply = useCallback(
     (reply: string) =>
       setDraft((value) => ({
@@ -73,14 +65,13 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
   }, [bots, draft, hosts, onCreated, isCurrent]);
   return {
     draft,
-    hostBots,
-    visible,
+    members,
+    available,
     error,
     busy,
     selectHost,
     selectBot,
     setTitle,
-    setSearch,
     setReply,
     submit,
   };

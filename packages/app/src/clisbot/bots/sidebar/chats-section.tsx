@@ -36,7 +36,6 @@ interface ChatsSectionProps {
   onBeforeNavigate?: () => void;
   onCreateChat: () => void;
   canCreateChat?: boolean;
-  botCount?: number;
   onOpenChatMenu?: (chat: ChatsSidebarChat, anchor: Rect) => void;
 }
 
@@ -46,7 +45,6 @@ export const ChatsSection = memo(function ChatsSection({
   onBeforeNavigate,
   onCreateChat,
   canCreateChat = true,
-  botCount,
   onOpenChatMenu,
 }: ChatsSectionProps) {
   const router = useRouter();
@@ -76,11 +74,7 @@ export const ChatsSection = memo(function ChatsSection({
       />
       {!collapsed ? (
         <>
-          {!canCreateChat ? (
-            <Text style={hintStyles.hint}>
-              {botCount === 1 ? "Add another bot to create a group chat." : botsCopy.createBotFirst}
-            </Text>
-          ) : null}
+          {!canCreateChat ? <Text style={hintStyles.hint}>{botsCopy.createBotFirst}</Text> : null}
           {visible.map((chat) => (
             <ChatRow
               key={chat.key}

@@ -33,51 +33,31 @@ vi.mock("react-native", () => ({
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
-vi.mock("../chat/bot-member-picker", () => ({
-  BotMemberPicker: ({
-    bots,
-    selected,
-    onToggle,
+vi.mock("../chat/bot-members-field", () => ({
+  BotMembersField: ({
+    members,
+    available,
+    onAdd,
   }: {
-    bots: { id: string; name: string }[];
-    selected: ReadonlySet<string>;
-    onToggle: (id: string) => void;
+    members: { id: string; name: string }[];
+    available: { id: string; name: string }[];
+    onAdd: (id: string) => void;
   }) => (
     <div>
-      {bots.map((bot) => (
-        <PickerRow
-          key={bot.id}
-          id={bot.id}
-          name={bot.name}
-          checked={selected.has(bot.id)}
-          onToggle={onToggle}
-        />
+      <span>{`${members.length} added`}</span>
+      {available.map((bot) => (
+        <PickerRow key={bot.id} id={bot.id} name={bot.name} checked={false} onToggle={onAdd} />
       ))}
     </div>
   ),
 }));
+
 vi.mock("./form-layout", () => ({
   BotFormLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/ui/form-field", () => ({
   FormTextInput: () => null,
   Field: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
-vi.mock("@/components/settings", () => ({
-  SettingsSection: ({
-    title,
-    trailing,
-    children,
-  }: {
-    title: string;
-    trailing?: ReactNode;
-    children: ReactNode;
-  }) => (
-    <section aria-label={title}>
-      {trailing}
-      {children}
-    </section>
-  ),
 }));
 vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/select-field", () => ({
@@ -147,12 +127,13 @@ test("keeps the Host selector available when only an unselected Host remains", (
   expect(screen.getByText("Host")).toBeTruthy();
 });
 
-test("members are picked from the list and the count follows", () => {
+test("bots are added from the search and leave it once added", () => {
   render(<GroupChatForm hosts={HOSTS} bots={BOTS} onCreated={vi.fn()} />);
   fireEvent.click(screen.getByText("Host"));
   const first = BOTS.find((bot) => bot.serverId === HOSTS[0]!.serverId)!;
-  expect(screen.getByText("0 selected")).toBeTruthy();
+  expect(screen.getByText("0 added")).toBeTruthy();
   fireEvent.click(screen.getByText(first.name));
-  expect(screen.getByText("1 selected")).toBeTruthy();
-  expect(screen.getByText(first.name).getAttribute("aria-checked")).toBe("true");
+  // One bot is enough for a group; the added bot leaves the search list.
+  expect(screen.getByText("1 added")).toBeTruthy();
+  expect(screen.queryByText(first.name)).toBeNull();
 });
