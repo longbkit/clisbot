@@ -58,6 +58,32 @@ Rehearse when `main` moves materially in app/server/protocol or at least once
 per active development week. A rehearsal failure becomes tracked work; it does
 not silently move the product baseline.
 
+### One-time cutover: make Fusion the Clisbot `main`
+
+This step comes **after** the current Fusion branch has been fully rebranded,
+the repeatable rename script and old-name scan exist, and the release gates
+pass. It comes **before** the first transformed-upstream promotion into `main`.
+Do not push the current partially branded Fusion tip as the final product.
+
+The old GitHub `main` was backed up on 2026-09-29 as
+`origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
+Before cutover, verify that this backup still points to the old `origin/main`
+commit. The current `main` and Fusion branch have no common ancestor, so a
+normal fast-forward push cannot make Fusion the new `main`. Use a lease tied to
+the verified old-main commit; if `main` moved, stop and review the new tip.
+
+```bash
+git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
+# After full rebrand and validation, record the exact approved Fusion commit.
+git rev-parse clisbot-paseoclaw-fusion
+git push --force-with-lease=refs/heads/main:<verified-old-main-sha> origin <verified-fusion-sha>:refs/heads/main
+git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
+```
+
+The final check must show `main` at the approved Fusion SHA and the backup at
+its original SHA. Only then does the promotion procedure below apply to the
+official Clisbot `main`.
+
 ### Target promotion procedure after the rebrand cutover
 
 1. Fetch a named upstream release into `refs/upstream-releases/` and verify its

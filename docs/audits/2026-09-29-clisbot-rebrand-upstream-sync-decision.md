@@ -6,6 +6,12 @@ still to be implemented. Until then, the existing sync commands in the
 [upstream sync playbook](../guides/developer-guide/upstream-sync-and-contribution.md)
 describe the current branch.
 
+The old `origin/main` was backed up on GitHub as
+`clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
+The [one-time cutover](../guides/developer-guide/upstream-sync-and-contribution.md#one-time-cutover-make-fusion-the-clisbot-main)
+that pushes the verified, fully rebranded Fusion tip to `origin/main` is a
+separate step before the recurring upstream-sync flow below.
+
 ## Decision
 
 For each Paseo release promotion, start a disposable branch at the raw upstream
