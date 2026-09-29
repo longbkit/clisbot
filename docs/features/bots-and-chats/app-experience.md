@@ -41,14 +41,18 @@ destination does not introduce a third execution engine or silently convert one 
 ## Creation and configuration
 
 New bot and Bot settings are one form of labeled fields under the sheet title, no intro heading:
-who the bot is (**Name**, **Role**, **Template**), then how it runs (Host only when there is a
-choice, **Model**, then **Permissions** and **Thinking** on one row). Template is Personal or Team
-side by side on one row (`kind` remains the stored wire field); it is fixed once the bot exists. A
-template seeds instruction and workspace files, not just memory. It does not grant Project Access.
+who the bot is (**Name**, **Role**, **Template**), then **AI configuration**. Template is Personal
+or Team side by side on one row (`kind` remains the stored wire field); it is fixed once the bot
+exists. A template seeds instruction and workspace files, not just memory. It does not grant
+Project Access.
 
-AI settings are shown as fields, not a summary card behind Customize: an unlabeled "Grok · Grok 4.6
-/ Default mode · High" block did not say which value was which. The Model trigger names provider and
-model with the provider's icon, and its hint names the Host when there is no Host field. **Apply
+AI configuration stays one group, a card of labeled rows: Host, Model, Permissions, Thinking
+(`clisbot/bots/create/bot-setup-rows.tsx`). Every row is always shown, so the user sees the Host
+and permission mode the bot will run with even when there is one choice; a row with options has a
+chevron and opens its own picker, a row without shows the value it will use. The Model row names
+provider and model with the provider's icon. An unlabeled summary ("Grok · Grok 4.6 / Default mode
+· High") behind a Customize button did not say which value was which or that it could be changed,
+and splitting the settings into separate fields lost the grouping and hid rows with one choice. **Apply
 agent profile** is a one-time action copying a saved launch bundle into those controls. There is no
 selected or default profile binding; see [the glossary](../../glossary.md). Reuse existing
 preference resolution and validate the selected Host/provider. Do not introduce a hidden Full access default.

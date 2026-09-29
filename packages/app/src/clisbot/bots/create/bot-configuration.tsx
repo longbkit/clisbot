@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Field } from "@/components/ui/form-field";
-import { SelectField, SelectFieldTrigger } from "@/components/ui/select-field";
+import { SelectField } from "@/components/ui/select-field";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { getProviderIcon } from "@/components/provider-icons";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 import type { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
+import { SetupCard, SetupRowView, SetupSelectRow } from "./bot-setup-rows";
 
 interface Props {
   state: BotFormState;
@@ -18,35 +19,54 @@ interface Props {
   hosts: { serverId: string; label: string }[];
 }
 
-/** How the bot runs: Host (only when there is a choice), Model, then Permissions and Thinking. */
+/**
+ * How the bot runs, as one card of labeled rows: Host, Model, Permissions, Thinking. Every row is
+ * always shown; a row with nothing to choose shows the value the bot will use.
+ */
 export function BotConfiguration({ state, model, size, providerSnapshot, hosts }: Props) {
-  const hostOptions = useMemo(
-    () => hosts.map((host) => ({ id: host.serverId, value: host.serverId, label: host.label })),
-    [hosts],
-  );
   return (
     <>
-      {state.showHostField ? (
-        <SelectField
-          label="Host"
-          value={state.selectedServerId}
-          selectedDisplay={state.selectedHostDisplay}
-          options={hostOptions}
-          onChange={model.setHost}
-          placeholder="Choose a Host"
-          emptyText="No eligible Hosts connected"
-          size={size}
-        />
-      ) : null}
+      <Field label="AI configuration">
+        <SetupCard>
+          <HostRow state={state} model={model} hosts={hosts} />
+          <ModelRow state={state} model={model} providerSnapshot={providerSnapshot} />
+          <PermissionsRow state={state} model={model} />
+          <ThinkingRow state={state} model={model} />
+        </SetupCard>
+      </Field>
       <BotProfiles model={model} serverId={state.selectedServerId} size={size} />
-      <BotModelField state={state} model={model} size={size} providerSnapshot={providerSnapshot} />
-      <BotRunOptions state={state} model={model} size={size} />
     </>
   );
 }
 
-/** Provider and model in one picker; the trigger names both, with the provider's icon. */
-function BotModelField({ state, model, size, providerSnapshot }: Omit<Props, "hosts">) {
+function HostRow({ state, model, hosts }: Pick<Props, "state" | "model" | "hosts">) {
+  const options = useMemo(
+    () => hosts.map((host) => ({ id: host.serverId, label: host.label })),
+    [hosts],
+  );
+  const choose = useCallback(
+    (id: string) => {
+      const host = hosts.find((entry) => entry.serverId === id);
+      model.setHost(id, host ? { label: host.label } : null);
+    },
+    [hosts, model],
+  );
+  return (
+    <SetupSelectRow
+      label="Host"
+      value={state.selectedHostDisplay?.label ?? "Choose a Host"}
+      placeholder={!state.selectedHostDisplay}
+      options={options}
+      selectedId={state.selectedServerId}
+      onChange={choose}
+      emptyText="No eligible Hosts connected"
+      testID="bot-host-row"
+    />
+  );
+}
+
+/** Provider and model in one picker: the row names both, with the provider's icon. */
+function ModelRow({ state, model, providerSnapshot }: Omit<Props, "hosts" | "size">) {
   const providerLabel =
     state.modelSelectorProviders.find((provider) => provider.id === state.selectedProvider)
       ?.label ?? state.selectedProvider;
@@ -58,105 +78,82 @@ function BotModelField({ state, model, size, providerSnapshot }: Omit<Props, "ho
     [state.selectedProvider, state.selectedServerId],
   );
   const renderTrigger = useCallback(
-    (input: {
-      selectedModelLabel: string;
-      disabled: boolean;
-      isOpen: boolean;
-      hovered: boolean;
-      pressed: boolean;
-    }): ReactNode => {
+    (
+      input: { selectedModelLabel: string; isOpen: boolean } & PressableStateCallbackType & {
+          hovered: boolean;
+        },
+    ) => {
       const modelLabel = state.selectedModelDisplay?.label ?? input.selectedModelLabel;
-      const label = providerLabel ? `${providerLabel} · ${modelLabel}` : undefined;
+      const empty = providerSnapshot.isLoading ? "Checking available models…" : "Choose a model";
       return (
-        <SelectFieldTrigger
-          label={label}
-          isPlaceholder={!providerLabel}
-          placeholder={providerSnapshot.isLoading ? "Checking available models…" : "Choose a model"}
+        <SetupRowView
+          label="Model"
+          value={providerLabel ? `${providerLabel} · ${modelLabel}` : empty}
+          placeholder={!providerLabel}
           leading={leading}
-          loading={providerSnapshot.isLoading && !providerLabel}
-          disabled={input.disabled}
-          active={input.hovered || input.pressed || input.isOpen}
-          size={size}
+          interactive
+          highlighted={input.hovered || input.pressed || input.isOpen}
           testID="bot-model-trigger"
         />
       );
     },
-    [leading, providerLabel, providerSnapshot.isLoading, size, state.selectedModelDisplay],
+    [leading, providerLabel, providerSnapshot.isLoading, state.selectedModelDisplay],
   );
   return (
-    <Field
-      label="Model"
-      hint={state.showHostField ? undefined : hostHint(state.selectedHostDisplay?.label)}
-    >
-      <CombinedModelSelector
-        providers={state.modelSelectorProviders}
-        selectedProvider={state.selectedProvider ?? ""}
-        selectedModel={state.selectedModel}
-        onSelect={model.setModel}
-        isLoading={providerSnapshot.isLoading}
-        onOpen={providerSnapshot.onOpen}
-        onRetryProvider={providerSnapshot.onRetryProvider}
-        isRetryingProvider={providerSnapshot.isRefreshing}
-        serverId={state.selectedServerId}
-        renderTrigger={renderTrigger}
-        triggerFill
-      />
-    </Field>
+    <CombinedModelSelector
+      providers={state.modelSelectorProviders}
+      selectedProvider={state.selectedProvider ?? ""}
+      selectedModel={state.selectedModel}
+      onSelect={model.setModel}
+      isLoading={providerSnapshot.isLoading}
+      onOpen={providerSnapshot.onOpen}
+      onRetryProvider={providerSnapshot.onRetryProvider}
+      isRetryingProvider={providerSnapshot.isRefreshing}
+      serverId={state.selectedServerId}
+      renderTrigger={renderTrigger}
+      triggerFill
+    />
   );
 }
 
-function hostHint(host: string | undefined): string | undefined {
-  return host ? `Runs on ${host}.` : undefined;
-}
-
-/** Permissions and Thinking side by side: both are short choices the model decides. */
-function BotRunOptions({ state, model, size }: Pick<Props, "state" | "model" | "size">) {
-  const modeOptions = useMemo(
-    () =>
-      state.modeOptions.map((option) => ({ id: option.id, value: option.id, label: option.label })),
+function PermissionsRow({ state, model }: Pick<Props, "state" | "model">) {
+  const options = useMemo(
+    () => state.modeOptions.map((option) => ({ id: option.id, label: option.label })),
     [state.modeOptions],
   );
-  const thinkingOptions = useMemo(
+  return (
+    <SetupSelectRow
+      label="Permissions"
+      value={state.selectedModeDisplay.label}
+      options={options}
+      selectedId={state.selectedMode}
+      onChange={model.setMode}
+      emptyText="No permission modes available"
+      testID="bot-permissions-row"
+    />
+  );
+}
+
+function ThinkingRow({ state, model }: Pick<Props, "state" | "model">) {
+  const options = useMemo(
     () =>
       state.availableThinkingOptions.map((option) => ({
         id: option.id,
-        value: option.id,
         label: option.label ?? option.id,
       })),
     [state.availableThinkingOptions],
   );
-  if (!modeOptions.length && !thinkingOptions.length) return null;
   return (
-    <View style={styles.pair}>
-      {modeOptions.length ? (
-        <View style={styles.half}>
-          <SelectField
-            label="Permissions"
-            value={state.selectedMode}
-            selectedDisplay={state.selectedModeDisplay}
-            options={modeOptions}
-            onChange={model.setMode}
-            placeholder="Choose permissions"
-            emptyText="No permission modes available"
-            size={size}
-          />
-        </View>
-      ) : null}
-      {thinkingOptions.length ? (
-        <View style={styles.half}>
-          <SelectField
-            label="Thinking"
-            value={state.selectedThinkingOptionId}
-            selectedDisplay={state.selectedThinkingDisplay}
-            options={thinkingOptions}
-            onChange={model.setThinkingOption}
-            placeholder="Choose thinking level"
-            emptyText="No thinking options available"
-            size={size}
-          />
-        </View>
-      ) : null}
-    </View>
+    <SetupSelectRow
+      label="Thinking"
+      value={state.selectedThinkingDisplay?.label ?? "Model default"}
+      options={options}
+      selectedId={state.selectedThinkingOptionId}
+      onChange={model.setThinkingOption}
+      emptyText="No thinking options available"
+      last
+      testID="bot-thinking-row"
+    />
   );
 }
 
@@ -227,7 +224,5 @@ function BotProfiles({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  pair: { flexDirection: "row", gap: theme.spacing[3] },
-  half: { flex: 1, minWidth: 0 },
   icon: { color: theme.colors.foregroundMuted },
 }));
