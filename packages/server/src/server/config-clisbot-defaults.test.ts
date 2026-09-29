@@ -35,19 +35,19 @@ describe("Clisbot daemon defaults", () => {
     );
   });
 
-  test("bots are off until the environment or config turns them on; the environment wins", async () => {
+  test("bots run unless the environment or config turns them off; the environment wins", async () => {
     const unset = await createPaseoHome({ version: 1 });
     expect(loadConfig(unset, { env: {} }).bots).toEqual({
-      enabled: false,
+      enabled: true,
       root: path.join(unset, "workspaces"),
     });
-    expect(loadConfig(unset, { env: { PASEO_BOTS_ENABLED: "1" } }).bots?.enabled).toBe(true);
+    expect(loadConfig(unset, { env: { PASEO_BOTS_ENABLED: "0" } }).bots?.enabled).toBe(false);
 
-    const on = await createPaseoHome({ version: 1, daemon: { bots: { enabled: true } } });
-    expect(loadConfig(on, { env: {} }).bots?.enabled).toBe(true);
-    const offByEnv = loadConfig(on, { env: { PASEO_BOTS_ENABLED: "0" } });
-    expect(offByEnv.bots?.enabled).toBe(false);
-    expect(offByEnv.configReload?.overrideControlledPaths).toContain("daemon.bots.enabled");
+    const off = await createPaseoHome({ version: 1, daemon: { bots: { enabled: false } } });
+    expect(loadConfig(off, { env: {} }).bots?.enabled).toBe(false);
+    const onByEnv = loadConfig(off, { env: { PASEO_BOTS_ENABLED: "1" } });
+    expect(onByEnv.bots?.enabled).toBe(true);
+    expect(onByEnv.configReload?.overrideControlledPaths).toContain("daemon.bots.enabled");
   });
 
   test("the bots root resolves like the worktrees root", async () => {

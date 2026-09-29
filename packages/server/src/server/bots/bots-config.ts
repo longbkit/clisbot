@@ -41,7 +41,10 @@ export function resolveBotsConfig(input: {
   paseoHome: string;
 }): BotsConfig {
   return {
-    enabled: parseBooleanEnv(input.env[BOTS_ENABLED_ENV]) ?? input.persisted?.enabled ?? false,
+    // COMPAT(clisbot-bots-default): upstream Paseo has no Bots. The Clisbot fusion runs them
+    // unless `daemon.bots.enabled: false` or `PASEO_BOTS_ENABLED=0` says otherwise; off stays
+    // byte-for-byte upstream (README D10).
+    enabled: parseBooleanEnv(input.env[BOTS_ENABLED_ENV]) ?? input.persisted?.enabled ?? true,
     root: resolveBotsRoot(input.paseoHome, input.persisted?.root),
   };
 }

@@ -189,7 +189,10 @@ current values with an update hint. Direct and archived chats cannot use this op
 ### D10. Feature flag
 
 `daemon.bots.enabled` in persisted config, `PASEO_BOTS_ENABLED` override, `server_info.features.bots`
-with a `COMPAT` tag; the app gates on `useHostFeature`. Off: no RPC registered, no storage touched,
+with a `COMPAT` tag; the app gates on `useHostFeature`. **On by default** since 2026-09-29
+(`COMPAT(clisbot-bots-default)` in `packages/server/src/server/bots/bots-config.ts`): a fusion daemon
+runs Bots & Chats unless `daemon.bots.enabled: false` or `PASEO_BOTS_ENABLED=0`; the environment
+wins, then the file, then the default. Off: no RPC registered, no storage touched,
 no sidebar entry; the daemon behaves byte-for-byte as upstream. The app is behavior-equivalent: its
 two route files and three sidebar insertion points exist in the bundle and return nothing while the
 Host reports no `bots` feature. That is the one recorded exception to byte-equivalence.
