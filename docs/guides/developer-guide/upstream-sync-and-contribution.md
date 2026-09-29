@@ -58,12 +58,34 @@ Rehearse when `main` moves materially in app/server/protocol or at least once
 per active development week. A rehearsal failure becomes tracked work; it does
 not silently move the product baseline.
 
+### Prepare Fusion before the one-time cutover
+
+1. Implement the repeatable rename transformation and apply it to the current
+   `clisbot-paseoclaw-fusion` branch. Commit the completed Clisbot rebrand there;
+   check paths, source, generated output, and product documentation for old
+   names. This first step removes the branch's current mixed naming.
+2. Pick the upstream release tag to become the initial official baseline.
+   Fetch its raw commit, create a disposable branch from it, run the same
+   transformation over the upstream snapshot, and commit that result.
+3. Merge the transformed upstream branch into the fully rebranded Fusion
+   branch. Resolve source conflicts by keeping the upstream functional changes
+   with Clisbot names. Rerun the rename and old-name scan, reconcile the
+   lockfile, and pass the build, typecheck, focused tests, and release gates.
+4. Put the verified merge result at the tip of `clisbot-paseoclaw-fusion` and
+   record its exact SHA. Delete the disposable sync branch name after the merge.
+   This verified Fusion SHA is what the cutover pushes to `origin/main`.
+
+For step 3, use the transformed-upstream Git sequence below with
+`clisbot-paseoclaw-fusion` in place of `main`, and with its clean worktree in
+place of `<main-worktree>`. The recurring procedure below targets `main` only
+after the cutover.
+
 ### One-time cutover: make Fusion the Clisbot `main`
 
-This step comes **after** the current Fusion branch has been fully rebranded,
-the repeatable rename script and old-name scan exist, and the release gates
-pass. It comes **before** the first transformed-upstream promotion into `main`.
-Do not push the current partially branded Fusion tip as the final product.
+This step comes **after** the rebranded Fusion branch has merged the selected
+transformed upstream baseline and passed its gates. It comes **before** later
+upstream promotions directly into `main`. Do not push the current partially
+branded Fusion tip as the final product.
 
 The old GitHub `main` was backed up on 2026-09-29 as
 `origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
@@ -84,7 +106,7 @@ The final check must show `main` at the approved Fusion SHA and the backup at
 its original SHA. Only then does the promotion procedure below apply to the
 official Clisbot `main`.
 
-### Target promotion procedure after the rebrand cutover
+### Recurring promotion procedure after the rebrand cutover
 
 1. Fetch a named upstream release into `refs/upstream-releases/` and verify its
    commit. Make a disposable sync branch from that **raw** commit.

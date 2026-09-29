@@ -10,14 +10,18 @@ The old `origin/main` was backed up on GitHub as
 `clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
 The [one-time cutover](../guides/developer-guide/upstream-sync-and-contribution.md#one-time-cutover-make-fusion-the-clisbot-main)
 that pushes the verified, fully rebranded Fusion tip to `origin/main` is a
-separate step before the recurring upstream-sync flow below.
+separate step after the initial transformed-upstream merge into Fusion and
+before recurring upstream-sync merges into `main`.
 
 ## Decision
 
-For each Paseo release promotion, start a disposable branch at the raw upstream
-release commit, apply the same versioned Clisbot rename transformation to its
-whole snapshot, then merge that transformed branch into the Clisbot `main`.
-Delete the branch name after the merge; the merge commit retains the transformed
+First finish the current Fusion branch's Clisbot rebrand. For each Paseo release
+promotion, start a disposable branch at the raw upstream release commit and
+apply the same versioned Clisbot rename transformation to its whole snapshot.
+Merge the initial transformed release into `clisbot-paseoclaw-fusion`, verify
+that result, then cut over GitHub `main` to that exact Fusion commit. Later
+promotions merge transformed releases into Clisbot `main`. Delete each
+disposable branch name after its merge; the merge commit retains the transformed
 commit and raw upstream commit in its ancestry. Rehearsals against upstream
 `main` use the same transformation in a disposable worktree.
 
