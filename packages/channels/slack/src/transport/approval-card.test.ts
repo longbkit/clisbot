@@ -16,13 +16,13 @@ function realClickBody(overrides: Record<string, unknown> = {}): Record<string, 
     container: {
       type: "message_attachment",
       message_ts: "1788024705.123456",
-      channel_id: "C07U0LDK6ER",
+      channel_id: "C0000000001",
       is_ephemeral: false,
       is_app_unfurl: false,
     },
     trigger_id: "T01",
     team: { id: "T6YPB58N6", domain: "vexere" },
-    channel: { id: "C07U0LDK6ER", name: "long-luong-workspace" },
+    channel: { id: "C0000000001", name: "long-luong-workspace" },
     message: {
       bot_id: "B0ABC",
       type: "message",
@@ -53,7 +53,7 @@ describe("slack approval-card: parseApprovalCardClick (the real wire shape)", ()
     assert.ok(click);
     assert.equal(click.senderId, "U0A1B2C3D4");
     assert.equal(click.cardValue, "allow:permission-exec-1cf40d5d-0000-0000-0000-000000000000");
-    assert.equal(click.rootChannelId, "C07U0LDK6ER");
+    assert.equal(click.rootChannelId, "C0000000001");
     assert.equal(click.threadTs, "1788024627.188659");
     assert.equal(click.messageTs, "1788024705.123456");
   });
@@ -71,7 +71,7 @@ describe("slack approval-card: parseApprovalCardClick (the real wire shape)", ()
     delete body["channel"];
     const click = parseApprovalCardClick(body);
     assert.ok(click);
-    assert.equal(click.rootChannelId, "C07U0LDK6ER");
+    assert.equal(click.rootChannelId, "C0000000001");
   });
 
   it("returns null for a non-block_actions payload", () => {
@@ -103,6 +103,6 @@ describe("slack approval-card: approvalRootKind", () => {
   it("maps the id prefixes to the plane's root kinds", () => {
     assert.equal(approvalRootKind("D01ABC"), "dm");
     assert.equal(approvalRootKind("G01ABC"), "group");
-    assert.equal(approvalRootKind("C07U0LDK6ER"), "channel");
+    assert.equal(approvalRootKind("C0000000001"), "channel");
   });
 });

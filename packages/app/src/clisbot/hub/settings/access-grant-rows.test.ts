@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { AccessAssignment, AccessResource, HubMember, HubTeam } from "./access-catalog";
 import { effectiveGrantRows, grantRows, groupGrantRows } from "./access-grant-rows";
 
-const host = { kind: "daemon", id: "host", name: "LongPro2Max", parent: null } as AccessResource;
+const host = {
+  kind: "daemon",
+  id: "host",
+  name: "Example Workstation",
+  parent: null,
+} as AccessResource;
 const project = {
   kind: "project",
   id: "brain",
@@ -10,7 +15,7 @@ const project = {
   parent: { kind: "daemon", id: "host" },
 } as AccessResource;
 const members = [
-  { id: "m-ai", userId: "u-ai", name: "Ai Tran" },
+  { id: "m-ai", userId: "u-ai", name: "Alice Example" },
   { id: "m-bao", userId: "u-bao", name: "Bao" },
 ] as HubMember[];
 const teams = [{ id: "t-qc", name: "QC", userIds: ["u-ai"] }] as HubTeam[];
@@ -56,7 +61,7 @@ describe("grantRows", () => {
   it("gives each grant one fact per field: the thing, its kind and parent, level, modifiers, author", () => {
     expect(rows[0]).toMatchObject({
       subject: { kind: "team", name: "QC" },
-      resource: { name: "brain", context: "Project · LongPro2Max" },
+      resource: { name: "brain", context: "Project · Example Workstation" },
       level: "Office worker",
       details: [],
       grantedBy: "Bao",
@@ -71,19 +76,19 @@ describe("groupGrantRows", () => {
     const groups = groupGrantRows(rows, "subject", directory);
     expect(groups.map(({ title, subtitle }) => [title, subtitle])).toEqual([
       ["QC", "Team · 1 Member"],
-      ["Ai Tran", "Member"],
+      ["Alice Example", "Member"],
     ]);
     const ai = groups[1]!.rows;
     // A Team row keeps the Team's grant, so it can be opened and edited on the Team.
     expect(ai.map((row) => [row.resource.name, row.via, row.viaKey, row.assignment?.id])).toEqual([
-      ["LongPro2Max", null, null, "ai-host"],
+      ["Example Workstation", null, null, "ai-host"],
       ["brain", "Team QC", "team:t-qc", "team-project"],
     ]);
   });
 
   it("groups by resource, Hosts before Projects", () => {
     const groups = groupGrantRows(rows, "resource", directory);
-    expect(groups.map(({ title }) => title)).toEqual(["LongPro2Max", "brain"]);
+    expect(groups.map(({ title }) => title)).toEqual(["Example Workstation", "brain"]);
   });
 
   it("lists a Host grant that carries Project use under each Project, from the Host", () => {
@@ -110,11 +115,11 @@ describe("groupGrantRows", () => {
       ({ key }) => key === "project:brain",
     );
     expect(brain.map(({ title, subtitle }) => [title, subtitle])).toEqual([
-      ["brain", "Project · LongPro2Max"],
+      ["brain", "Project · Example Workstation"],
     ]);
     expect(
       brain[0]!.rows.map((row) => [row.subject.name, row.via, row.viaKey, row.assignment?.id]),
-    ).toEqual([["Bao", "Host LongPro2Max", "daemon:host", "bao-host"]]);
+    ).toEqual([["Bao", "Host Example Workstation", "daemon:host", "bao-host"]]);
   });
 
   it("keeps Guest apart and drops Team grants from a Member who left the Team", () => {
@@ -153,7 +158,7 @@ describe("Team-only access", () => {
       locked: () => false,
     });
     const groups = groupGrantRows(teamOnly, "subject", directory);
-    expect(groups.map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
+    expect(groups.map(({ title }) => title)).toEqual(["QC", "Alice Example"]);
     expect(groups[1]!.rows[0]).toMatchObject({ via: "Team QC", viaKey: "team:t-qc" });
     expect(groups[1]!.rows[0]!.assignment?.subjectKind).toBe("team");
   });

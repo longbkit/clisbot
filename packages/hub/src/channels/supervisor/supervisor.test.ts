@@ -372,13 +372,13 @@ describe("flatInboundNormalizer", () => {
         Body: "hi",
         ChatType: "channel",
         ChatId: "C0APP",
-        SenderId: "U018WR2K090",
-        SenderName: "Minh Dương",
-        SenderUsername: "minh.duong",
+        SenderId: "U0000000001",
+        SenderName: "An Nguyễn",
+        SenderUsername: "an.example",
       },
     });
-    assert.equal(message?.senderName, "Minh Dương");
-    assert.equal(message?.senderUsername, "minh.duong");
+    assert.equal(message?.senderName, "An Nguyễn");
+    assert.equal(message?.senderUsername, "an.example");
   });
 
   it("maps MessageSid to the marker's externalMessageId", () => {

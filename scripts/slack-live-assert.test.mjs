@@ -11,11 +11,11 @@ const HEADER = "MsgID,UserID,UserName,Text,Time,FileCount\n";
 describe("parseSlackCsv", () => {
   it("keeps a multi-line message in one row", () => {
     const rows = parseSlackCsv(
-      `${HEADER}1788793662.128819,U08N4UZM8CF,vai,"# Tiêu đề\n\n**Đậm** and a table:\n\n| A | B |\n| 1 | 2 |",2026-09-07T14:47:42Z,0\n`,
+      `${HEADER}1788793662.128819,U0000000002,example-bot,"# Tiêu đề\n\n**Đậm** and a table:\n\n| A | B |\n| 1 | 2 |",2026-09-07T14:47:42Z,0\n`,
     );
     assert.equal(rows.length, 1);
     assert.equal(rows[0].MsgID, "1788793662.128819");
-    assert.equal(rows[0].UserID, "U08N4UZM8CF");
+    assert.equal(rows[0].UserID, "U0000000002");
     assert.match(rows[0].Text, /^# Tiêu đề\n/u);
     assert.ok(rows[0].Text.includes("| A | B |"));
   });
@@ -25,19 +25,19 @@ describe("parseSlackCsv", () => {
     // by the bot's reply. Every row must keep its own author.
     const rows = parseSlackCsv(
       `${HEADER}` +
-        `1788793586.717609,U8ZTVGJJF,long.luong,"<@U08N4UZM8CF> render this:\n\n# heading\n\n| A |\n| 1 |",2026-09-07T14:46:26Z,0\n` +
-        `1788793662.128819,U08N4UZM8CF,vai,"PONG-W5SL3\nrendered",2026-09-07T14:47:42Z,0\n`,
+        `1788793586.717609,U0000000003,example.user,"<@U0000000002> render this:\n\n# heading\n\n| A |\n| 1 |",2026-09-07T14:46:26Z,0\n` +
+        `1788793662.128819,U0000000002,example-bot,"PONG-W5SL3\nrendered",2026-09-07T14:47:42Z,0\n`,
     );
     assert.deepEqual(
       rows.map((row) => row.UserID),
-      ["U8ZTVGJJF", "U08N4UZM8CF"],
+      ["U0000000003", "U0000000002"],
     );
     assert.equal(rows.filter((row) => row.UserID === undefined || row.UserID === "").length, 0);
   });
 
   it("handles quoted commas and doubled quotes", () => {
     const rows = parseSlackCsv(
-      `${HEADER}1.1,U1,vai,"a, b and ""quoted"" text",2026-09-07T14:47:42Z,0\n`,
+      `${HEADER}1.1,U1,example-bot,"a, b and ""quoted"" text",2026-09-07T14:47:42Z,0\n`,
     );
     assert.equal(rows[0].Text, 'a, b and "quoted" text');
   });

@@ -8,8 +8,8 @@ function message(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     channel: "slack",
     accountId: "work",
-    senderIdentity: "slack:U018WR2K090",
-    senderName: "Minh Dương",
+    senderIdentity: "slack:U0000000001",
+    senderName: "An Nguyễn",
     text: "Create a CS card",
     mentionedBot: true,
     externalMessageId: "1712000000.000100",
@@ -24,7 +24,7 @@ describe("renderConversationPrompt", () => {
   it("renders an inbound channel message as a sender line", () => {
     assert.equal(
       renderConversationPrompt({ context: [], messages: [message()] }),
-      "Minh Dương (slack:U018WR2K090): Create a CS card",
+      "An Nguyễn (slack:U0000000001): Create a CS card",
     );
   });
 });

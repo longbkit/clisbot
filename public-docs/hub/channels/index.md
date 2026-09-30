@@ -177,7 +177,7 @@ session on the route uses the new default, and no account restarts.
 Every message reaches the agent with its sender, on every route:
 
 ```
-Minh Dương (slack:U018WR2K090, @minh.duong): Create a CS card for QR tickets
+An Nguyễn (slack:U0000000001, @an.example): Create a CS card for QR tickets
 ```
 
 Messages in the same conversation that did not wake the agent (no mention, or

@@ -122,7 +122,7 @@ function linked(team: string) {
     memberId: "member-alex",
     identityRealm: `slack:${team}`,
     connectionId: team === "T1" ? "a1" : "b1",
-    externalSubjectId: "U8ZTVGJJF",
+    externalSubjectId: "U0000000003",
     displayName: null,
     verificationMethod: "channel_challenge",
     verifiedAt: "2026-09-17T00:00:00Z",

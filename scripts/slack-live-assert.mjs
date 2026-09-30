@@ -272,7 +272,7 @@ if (!IS_ENTRYPOINT) {
   let markerTs;
   try {
     // conversations-add-message prints plain text, not CSV:
-    // "Successfully posted message to channel C07U0LDK6ER (ts=1787878626.847089)"
+    // "Successfully posted message to channel C0000000001 (ts=1787878626.847089)"
     const out = execFileSync("slack-cli", ["conversations-add-message", ...argv], {
       encoding: "utf8",
       timeout: 60_000,

@@ -69,7 +69,7 @@ it("lists the Member's own linked chat accounts on Account without opening Manag
   await page.viewport(1000, 700);
   boundary.connections = [bot("a1", "dai-clisbot"), bot("a2", "oai-clisbot")];
   boundary.identities = [
-    identity("i1", "member-alex", "U8ZTVGJJF"),
+    identity("i1", "member-alex", "U0000000003"),
     identity("i2", "member-sam", "USAM"),
   ];
   render(
@@ -77,7 +77,7 @@ it("lists the Member's own linked chat accounts on Account without opening Manag
       <ChannelIdentitiesSection pending={false} onManage={vi.fn()} />
     </QueryClientProvider>,
   );
-  expect(await screen.findByText("Account U8ZTVGJJF")).toBeTruthy();
+  expect(await screen.findByText("Account U0000000003")).toBeTruthy();
   // One row for the workspace, naming every bot that recognizes the identity, never the realm id.
   expect(screen.getByText("Slack · VeXeRe · works with dai-clisbot, oai-clisbot")).toBeTruthy();
   // An administrator's read includes other Members; Account shows only your own.

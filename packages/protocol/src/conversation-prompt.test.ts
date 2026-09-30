@@ -9,8 +9,8 @@ import {
 
 function line(overrides: Partial<ConversationLine> = {}): ConversationLine {
   return {
-    senderIdentity: "slack:U018WR2K090",
-    senderName: "Minh Dương",
+    senderIdentity: "slack:U0000000001",
+    senderName: "An Nguyễn",
     text: "Create a CS card",
     ...overrides,
   };
@@ -19,11 +19,11 @@ function line(overrides: Partial<ConversationLine> = {}): ConversationLine {
 describe("renderConversationPrompt", () => {
   test("names the sender of every line, and the identity alone when no name is known", () => {
     expect(renderConversationPrompt({ context: [], messages: [line()] })).toBe(
-      "Minh Dương (slack:U018WR2K090): Create a CS card",
+      "An Nguyễn (slack:U0000000001): Create a CS card",
     );
     const { senderName: _unnamed, ...anonymous } = line({ text: "hi" });
     expect(renderConversationPrompt({ context: [], messages: [anonymous] })).toBe(
-      "slack:U018WR2K090: hi",
+      "slack:U0000000001: hi",
     );
   });
 
@@ -40,7 +40,7 @@ describe("renderConversationPrompt", () => {
         CONTEXT_HEADER,
         "Lan Nguyễn (slack:U02ABC): code is HH-HT",
         MESSAGE_HEADER,
-        "Minh Dương (slack:U018WR2K090): create the card",
+        "An Nguyễn (slack:U0000000001): create the card",
       ].join("\n"),
     );
   });
@@ -49,11 +49,11 @@ describe("renderConversationPrompt", () => {
     expect(
       renderConversationPrompt({
         context: [],
-        messages: [line({ senderUsername: "minh.duong", text: "hi" })],
+        messages: [line({ senderUsername: "an.example", text: "hi" })],
       }),
-    ).toBe("Minh Dương (slack:U018WR2K090, @minh.duong): hi");
-    const { senderName: _unnamed, ...anonymous } = line({ senderUsername: "minh.duong" });
-    expect(senderLabel(anonymous)).toBe("slack:U018WR2K090");
+    ).toBe("An Nguyễn (slack:U0000000001, @an.example): hi");
+    const { senderName: _unnamed, ...anonymous } = line({ senderUsername: "an.example" });
+    expect(senderLabel(anonymous)).toBe("slack:U0000000001");
   });
 
   test("renders the daemon chat senders: a user with an actor, a bot, and the system", () => {

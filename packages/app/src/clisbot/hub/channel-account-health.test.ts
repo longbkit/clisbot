@@ -7,7 +7,7 @@ import {
 import { CHANNEL_CATALOG_FIXTURE as catalog } from "./channel-catalog.fixture";
 
 const connections = [
-  { id: "conn-1", provider: "telegram", name: "support", externalName: "@longluong3bot" },
+  { id: "conn-1", provider: "telegram", name: "support", externalName: "@example01_bot" },
 ];
 
 const accounts = [
@@ -47,7 +47,7 @@ describe("account health join", () => {
       enabled: true,
       transport: "started",
       transportLabel: "Running",
-      identity: "@longluong3bot",
+      identity: "@example01_bot",
       connectionName: "support",
       ingressSummary: "2 pending · 1 dead-lettered",
       oldestPending: "2m",

@@ -28,7 +28,7 @@ export interface ConversationPrompt<T extends ConversationLine = ConversationLin
 }
 
 /**
- * `Name (slack:U018WR2K090, @minh.duong)`: the name, then the identity and the
+ * `Name (slack:U0000000001, @an.example)`: the name, then the identity and the
  * handle when known; with no name, the identity alone. People the text
  * mentions are named by the vertical, which asks the platform.
  */

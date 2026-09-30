@@ -12,7 +12,7 @@ import {
 } from "./inbound-adapter.js";
 
 const BOT_ID = 991_001;
-const PARAMS = { accountId: "acct", botId: BOT_ID, botUsername: "longluong3bot" };
+const PARAMS = { accountId: "acct", botId: BOT_ID, botUsername: "example01_bot" };
 
 function message(overrides: Record<string, unknown> = {}): Message {
   return {
@@ -33,7 +33,7 @@ describe("mention facts", () => {
   it("counts an @username mention of the bot", () => {
     const facts = resolveTelegramMentionFacts(
       message({
-        text: "@longluong3bot ping",
+        text: "@example01_bot ping",
         entities: [{ type: "mention", offset: 0, length: 14 }],
       }),
       PARAMS,
@@ -87,7 +87,7 @@ describe("mention facts", () => {
 
   it("treats /cmd@our_bot as ours, and a bare /cmd only in a DM", () => {
     const addressed = message({
-      text: "/status@longluong3bot",
+      text: "/status@example01_bot",
       entities: [{ type: "bot_command", offset: 0, length: 21 }],
     });
     expect(resolveTelegramMentionFacts(addressed, PARAMS).wasMentioned).toBe(true);
@@ -112,12 +112,12 @@ describe("sender name", () => {
     const named = (from: Record<string, unknown>) =>
       buildTelegramMessageEvent([message({ from: { id: 42, is_bot: false, ...from } })], 7, PARAMS)
         ?.event;
-    expect(named({ first_name: "Minh", last_name: "Dương", username: "minh" })).toMatchObject({
-      senderName: "Minh Dương",
-      senderUsername: "minh",
+    expect(named({ first_name: "An", last_name: "Nguyễn", username: "an_example" })).toMatchObject({
+      senderName: "An Nguyễn",
+      senderUsername: "an_example",
     });
-    expect(named({ first_name: "Minh" })?.senderName).toBe("Minh");
-    expect(named({ first_name: " ", username: "minh" })?.senderName).toBe("minh");
+    expect(named({ first_name: "An" })?.senderName).toBe("An");
+    expect(named({ first_name: " ", username: "an_example" })?.senderName).toBe("an_example");
   });
 });
 
@@ -441,7 +441,7 @@ describe("inbound kinds", () => {
 
   it("strips the @bot suffix off the command verb", () => {
     const build = buildTelegramInboundEvent(
-      update({ message: message({ text: "/stop@longluong3bot" }) }),
+      update({ message: message({ text: "/stop@example01_bot" }) }),
       PARAMS,
     );
     expect(build?.event.kind).toBe("command");

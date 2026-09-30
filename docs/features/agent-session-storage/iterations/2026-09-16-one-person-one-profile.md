@@ -1,11 +1,13 @@
 # Iteration 2026-09-16 — one person, one profile
 
+> Privacy note (2026-10-01): personal names, handles and service IDs below are anonymized examples. Historical observations are preserved. For live runs, resolve actual IDs and bot usernames from the configured test environment.
+
 Long-term rules this changes live in [design.md](../design.md#identity-rules); this file records
 why the decision was taken and what it supersedes.
 
 ## Context
 
-A Slack message opened a profile that read `slack:U8ZTVGJJF` and nothing else recognisable. The
+A Slack message opened a profile that read `slack:U0000000003` and nothing else recognisable. The
 same human speaking through Slack, Telegram and the app produced three profile tabs, three
 monogram colours, and — on their own messages from a channel — a layout that treated them as
 somebody else.

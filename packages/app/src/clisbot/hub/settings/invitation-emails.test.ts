@@ -4,21 +4,23 @@ import { parseInvitationEmails } from "./invitation-emails";
 describe("parseInvitationEmails", () => {
   it("splits on commas, semicolons, spaces, and new lines, lower-cased and de-duplicated", () => {
     expect(
-      parseInvitationEmails("A@vexere.com, b@vexere.com;c@vexere.com\n a@vexere.com  d@gmail.com"),
+      parseInvitationEmails(
+        "A@example.test, b@example.test;c@example.test\n a@example.test  d@example.org",
+      ),
     ).toEqual({
-      emails: ["a@vexere.com", "b@vexere.com", "c@vexere.com", "d@gmail.com"],
+      emails: ["a@example.test", "b@example.test", "c@example.test", "d@example.org"],
       invalid: [],
     });
   });
   it("reads the Name <address> form mail clients copy", () => {
-    expect(parseInvitationEmails("Ai Tran <ai.tran@vexere.com>, Nghia <nghia@vexere.com>")).toEqual(
-      { emails: ["ai.tran@vexere.com", "nghia@vexere.com"], invalid: [] },
-    );
+    expect(
+      parseInvitationEmails("Alice Example <alice@example.test>, Bob Example <bob@example.test>"),
+    ).toEqual({ emails: ["alice@example.test", "bob@example.test"], invalid: [] });
   });
   it("reports malformed addresses", () => {
-    expect(parseInvitationEmails("ok@vexere.com bad@vexere, @x.com")).toEqual({
-      emails: ["ok@vexere.com"],
-      invalid: ["bad@vexere", "@x.com"],
+    expect(parseInvitationEmails("ok@example.test bad@example, @x.com")).toEqual({
+      emails: ["ok@example.test"],
+      invalid: ["bad@example", "@x.com"],
     });
   });
 });

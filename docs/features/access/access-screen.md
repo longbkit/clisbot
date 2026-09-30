@@ -42,14 +42,14 @@ resource, then read only its grants.
 Access ⓘ
 View access by  [ People and Teams | Resources ]
 
-[ Search people and Teams ]            Ai Tran                [Grant access…]
-(All 178) (Teams 12) (Members         ai@vexere.com
+[ Search people and Teams ]            Alice Example                [Grant access…]
+(All 178) (Teams 12) (Members         alice@example.test
  165) (Guest 1) (With access 38) (No access 140)
 ┌──────────────────────────────┐       Resource          Level      Details        Granted by
-│ QC            Team · 9       │       LongPro2Max       Developer  Can share      Hoa    Edit …
-│ Ai Tran       ai@…   3 grants│ ◀     Host · vexere.com
+│ QC            Team · 9       │       Example Workstation       Developer  Can share      Hoa    Edit …
+│ Alice Example       ai@…   3 grants│ ◀     Host · example.test
 │ Bao           bao@…  1 grant │       brain             Office     via Team QC    Hoa
-│ …                            │       Project · LongPro2Max
+│ …                            │       Project · Example Workstation
 │ Show 50 more of 312          │
 └──────────────────────────────┘
 ```

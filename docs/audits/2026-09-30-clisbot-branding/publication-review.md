@@ -1,8 +1,9 @@
 # Publication identity and inherited marketing review
 
 2026-09-30 — follow-up to the [baseline inventory](inventory.md).
-Scope: Fusion rebrand test branch. The real transformed-upstream branch and
-`main` have not received these changes.
+Original scope: Fusion rebrand test branch. That reviewed branch was promoted
+to `main` on 2026-10-01; historical verification sections below describe their
+own checkpoints.
 
 ## Decisions and changes
 
@@ -161,3 +162,32 @@ sends `projectSlug`, but the unchanged strict `DispatchManualRunRequestSchema`
 does not accept that field. The fixture and schema have no diff from HEAD.
 This separate test-contract mismatch remains open; the four production
 cold-start tests in that file passed independently. No full test suite was run.
+
+## 2026-10-01 — personal identifiers in examples
+
+Anonymized personal names, employee emails, Slack user/bot/channel IDs, personal
+Telegram bot usernames, a workstation name and a private tailnet hostname in
+UI examples, public/internal docs, comments and test fixtures. Synthetic IDs
+remain distinct, Vietnamese names retain Unicode coverage, and Telegram bot
+fixtures retain their original username length so entity offsets stay valid.
+The security-reporting contact is now `clisbot@gmail.com`.
+
+Historical live-test notes explicitly identify anonymized examples. Live-run
+instructions resolve the actual bot identity from the configured environment;
+they must not use the synthetic IDs as real destinations. No credentials,
+user data, deployed services or saved connections were changed.
+
+Deliberately retained: public author/company biography, copyright and upstream
+attribution, repository and Expo ownership metadata, approved temporary
+upstream service endpoints, and low-impact local paths in historical audits.
+This is a scoped cleanup of current files, not a Git-history rewrite or a
+claim that every identity in all historical artifacts has been removed.
+
+For future syncs, review newly introduced examples and copied live-test output
+for personal identifiers. Use synthetic fixtures or environment references;
+do not apply a global replacement to copyright, credits or public ownership.
+
+Verification: 193 tests passed across 21 affected test files, including two
+browser suites. An exact-token scan of tracked text found no remaining values
+from the scoped identifier list. That list and raw scan results stay in ignored
+local scratch storage.

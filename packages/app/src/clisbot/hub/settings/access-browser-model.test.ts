@@ -9,7 +9,12 @@ import {
 } from "./access-browser-model";
 import { grantRows } from "./access-grant-rows";
 
-const host = { kind: "daemon", id: "host", name: "LongPro2Max", parent: null } as AccessResource;
+const host = {
+  kind: "daemon",
+  id: "host",
+  name: "Example Workstation",
+  parent: null,
+} as AccessResource;
 const project = {
   kind: "project",
   id: "brain",
@@ -17,7 +22,7 @@ const project = {
   parent: { kind: "daemon", id: "host" },
 } as AccessResource;
 const members = [
-  { id: "m-ai", userId: "u-ai", name: "Ai Tran", email: "ai@example.test" },
+  { id: "m-ai", userId: "u-ai", name: "Alice Example", email: "ai@example.test" },
   { id: "m-bao", userId: "u-bao", name: "Bao", email: "bao@example.test" },
 ] as HubMember[];
 const teams = [{ id: "t-qc", name: "QC", userIds: ["u-ai"] }] as HubTeam[];
@@ -52,7 +57,7 @@ describe("accessEntries", () => {
       entries.map(({ title, subtitle, rows: grants }) => [title, subtitle, grants.length]),
     ).toEqual([
       ["QC", "Team · 1 Member", 1],
-      ["Ai Tran", "ai@example.test", 1],
+      ["Alice Example", "ai@example.test", 1],
       ["Bao", "bao@example.test", 0],
       ["Guest", "Channel senders without a linked Member", 0],
     ]);
@@ -62,7 +67,7 @@ describe("accessEntries", () => {
   it("counts a Project reached only through its Host as having access", () => {
     const entries = accessEntries(rows, "resource", directory);
     const brain = entries.find(({ key }) => key === "project:brain")!;
-    expect(brain.rows.map((row) => row.via)).toEqual(["Host LongPro2Max"]);
+    expect(brain.rows.map((row) => row.via)).toEqual(["Host Example Workstation"]);
     expect(brain.target).toEqual({ subject: null, resource: "project\0brain" });
   });
 });
@@ -74,7 +79,7 @@ describe("a Member's Teams", () => {
       teams: [...teams, { id: "t-empty", name: "Design", userIds: ["u-ai"] }] as HubTeam[],
     };
     const entries = accessEntries(rows, "subject", withEmptyTeam);
-    const ai = entries.find(({ title }) => title === "Ai Tran")!;
+    const ai = entries.find(({ title }) => title === "Alice Example")!;
     expect(memberTeamEntries(ai, entries).map((team) => [team.title, entryStatus(team)])).toEqual([
       ["QC", "1 grant"],
       ["Design", "No access"],
@@ -97,7 +102,10 @@ describe("filters", () => {
       ["No access", 2],
     ]);
     expect(filterEntries(entries, "all", "")).toHaveLength(4);
-    expect(filterEntries(entries, "with", "").map(({ title }) => title)).toEqual(["QC", "Ai Tran"]);
+    expect(filterEntries(entries, "with", "").map(({ title }) => title)).toEqual([
+      "QC",
+      "Alice Example",
+    ]);
   });
 
   it("counts an Owner or Admin as having access through their role, not as No access", () => {
@@ -115,13 +123,13 @@ describe("filters", () => {
     const byTitle = new Map(all.map((entry) => [entry.title, entryStatus(entry)]));
     expect(byTitle.get("Owen")).toBe("Owner, full access");
     expect(byTitle.get("Ada")).toBe("Admin role");
-    expect(byTitle.get("Ai Tran")).toBe("1 grant");
+    expect(byTitle.get("Alice Example")).toBe("1 grant");
     expect(byTitle.get("Bao")).toBe("No access");
   });
 
   it("filters by kind and searches name or email", () => {
     expect(filterEntries(entries, "member", "").map(({ title }) => title)).toEqual([
-      "Ai Tran",
+      "Alice Example",
       "Bao",
     ]);
     expect(filterEntries(entries, "none", "bao@").map(({ title }) => title)).toEqual(["Bao"]);

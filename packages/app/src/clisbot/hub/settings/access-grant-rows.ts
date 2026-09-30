@@ -32,7 +32,7 @@ export interface GrantRow {
   details: string[];
   /** Who made the grant; null where that is not known (a Member's own view). */
   grantedBy: string | null;
-  /** What this grant reaches the group through ("Team QC", "Host LongPro2Max");
+  /** What this grant reaches the group through ("Team QC", "Host Example Workstation");
    * such a row is edited where it is granted. */
   via: string | null;
   /** The Access entry the row comes through (`team:<id>`, `daemon:<id>`), to open it. */
@@ -47,7 +47,7 @@ export interface GrantRow {
 export interface GrantGroup {
   key: string;
   title: string;
-  /** What the group is: "Team · 3 Members", "Member", "Project · LongPro2Max". */
+  /** What the group is: "Team · 3 Members", "Member", "Project · Example Workstation". */
   subtitle: string;
   rows: GrantRow[];
 }

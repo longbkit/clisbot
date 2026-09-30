@@ -4,7 +4,7 @@ import type { ChannelInboundEvent } from "@clisbot/channels-shared";
 import { SlackSenderDirectory, slackPersonName, type SlackUsersClient } from "./sender-directory.js";
 
 const PEOPLE: Record<string, unknown> = {
-  U018WR2K090: { user: { name: "minh.duong", real_name: "Minh", profile: { real_name: "Minh Dương" } } },
+  U0000000001: { user: { name: "an.example", real_name: "An", profile: { real_name: "An Nguyễn" } } },
   U02ABC: { user: { name: "lan", profile: { display_name: "Lan Nguyễn" } } },
 };
 
@@ -28,7 +28,7 @@ const event = (body: string): ChannelInboundEvent => ({
   externalMessageId: "1.2",
   externalConversationId: "C0ROOM",
   chatType: "channel",
-  senderId: "U018WR2K090",
+  senderId: "U0000000001",
   body,
   wasMentioned: true,
   timestampMs: 0,
@@ -36,7 +36,7 @@ const event = (body: string): ChannelInboundEvent => ({
 
 describe("slackPersonName", () => {
   it("prefers the profile's real name, then display name, and keeps the handle", () => {
-    assert.deepEqual(slackPersonName(PEOPLE["U018WR2K090"]), { name: "Minh Dương", handle: "minh.duong" });
+    assert.deepEqual(slackPersonName(PEOPLE["U0000000001"]), { name: "An Nguyễn", handle: "an.example" });
     assert.deepEqual(slackPersonName(PEOPLE["U02ABC"]), { name: "Lan Nguyễn", handle: "lan" });
     assert.deepEqual(slackPersonName({ user: {} }), {});
   });
@@ -47,11 +47,11 @@ describe("SlackSenderDirectory", () => {
     const { client, calls } = directoryClient();
     const directory = new SlackSenderDirectory();
     const named = await directory.name(client, event("ask <@U02ABC> and <@U0NOBODY>"));
-    assert.equal(named.senderName, "Minh Dương");
-    assert.equal(named.senderUsername, "minh.duong");
+    assert.equal(named.senderName, "An Nguyễn");
+    assert.equal(named.senderUsername, "an.example");
     assert.equal(named.body, "ask @Lan Nguyễn and <@U0NOBODY>");
     await directory.name(client, event("again <@U02ABC>"));
-    assert.deepEqual(calls.toSorted(), ["U018WR2K090", "U02ABC", "U0NOBODY"], "cache hits");
+    assert.deepEqual(calls.toSorted(), ["U0000000001", "U02ABC", "U0NOBODY"], "cache hits");
   });
 
   it("falls back to the id when Slack fails, and retries only after a while", async () => {
@@ -60,10 +60,10 @@ describe("SlackSenderDirectory", () => {
     const directory = new SlackSenderDirectory({ now: () => now, failureTtlMs: 1_000 });
     const named = await directory.name(client, event("hi"));
     assert.equal(named.senderName, undefined);
-    await directory.lookup(client, "U018WR2K090");
+    await directory.lookup(client, "U0000000001");
     assert.equal(calls.length, 1);
     now = 2_000;
-    await directory.lookup(client, "U018WR2K090");
+    await directory.lookup(client, "U0000000001");
     assert.equal(calls.length, 2);
   });
 
@@ -73,7 +73,7 @@ describe("SlackSenderDirectory", () => {
     const directory = new SlackSenderDirectory({
       logger: { warn: (message: string) => warnings.push(message) } as never,
     });
-    await directory.lookup(client, "U018WR2K090");
+    await directory.lookup(client, "U0000000001");
     await directory.lookup(client, "U02ABC");
     assert.equal(calls.length, 1);
     assert.equal(warnings.length, 1);
@@ -82,6 +82,6 @@ describe("SlackSenderDirectory", () => {
   it("gives up on a slow lookup instead of holding admission", async () => {
     const client: SlackUsersClient = { users: { info: () => new Promise(() => undefined) } };
     const directory = new SlackSenderDirectory({ timeoutMs: 10 });
-    assert.deepEqual(await directory.lookup(client, "U018WR2K090"), {});
+    assert.deepEqual(await directory.lookup(client, "U0000000001"), {});
   });
 });

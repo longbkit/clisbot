@@ -56,7 +56,7 @@ async function serve(options: {
   const started = startTelegramWebhookSession({
     accountId: "acct",
     botId: BOT_ID,
-    botUsername: "longluong3bot",
+    botUsername: "example01_bot",
     api,
     abortSignal: abort.signal,
     admit:

@@ -92,7 +92,7 @@ function harness(options: {
     botToken: TOKEN,
     api,
     botId: BOT_ID,
-    botUsername: "longluong3bot",
+    botUsername: "example01_bot",
     abortSignal: abort.signal,
     admit:
       options.admit ??

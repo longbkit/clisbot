@@ -6,7 +6,7 @@ import {
 } from "./channel-host-connection";
 
 const DAEMONS = [
-  { id: "daemon-1", slug: "longpro2max", presence: "connected" },
+  { id: "daemon-1", slug: "example-workstation", presence: "connected" },
   { id: "daemon-2", slug: "build-box", presence: "offline" },
 ];
 
@@ -23,7 +23,7 @@ describe("routeHostConnection", () => {
     expect(
       routeHostConnection({ route: { environment: "repo" }, resource: RESOURCE, daemons: DAEMONS }),
     ).toEqual({
-      label: "longpro2max",
+      label: "example-workstation",
       connected: true,
     });
     expect(

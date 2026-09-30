@@ -109,7 +109,7 @@ export function RouteConversationSection({
     <RouteFormSection title="Conversation context" info={CONVERSATION_CONTEXT_INFO}>
       <View>
         <Text style={settingsStyles.rowHint}>Each message reaches the Agent with its sender:</Text>
-        <Text style={styles.example}>Minh Dương (slack:U018WR2K090, @minh.duong): …</Text>
+        <Text style={styles.example}>An Nguyễn (slack:U0000000001, @an.example): …</Text>
       </View>
       {showUnmentioned ? (
         <View>

@@ -5,9 +5,9 @@ describe("resolveAllowedHosts", () => {
   it("allows the hostname from the configured public Hub URL", () => {
     expect(
       resolveAllowedHosts({
-        CLISBOT_HUB_APP_URL: "https://sandbox.taile33b14.ts.net:8444",
+        CLISBOT_HUB_APP_URL: "https://sandbox.tail-example.ts.net:8444",
       }),
-    ).toEqual(["sandbox.taile33b14.ts.net"]);
+    ).toEqual(["sandbox.tail-example.ts.net"]);
   });
 
   it("does not broaden the allowlist without a valid configured URL", () => {

@@ -27,7 +27,7 @@ const ngocLong: SessionActor = {
 /** The same person as `longbkit`, recorded as they arrived through Slack. */
 const longbkitOnSlack: SessionActor = {
   kind: "user",
-  id: "slack:U8ZTVGJJF",
+  id: "slack:U0000000003",
   displayName: "longbkit",
   organizationId: "org",
   connectionId: "connection",

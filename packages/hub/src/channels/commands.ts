@@ -17,10 +17,10 @@
 //     gets the same commands with zero conflict.
 //   * Telegram: bots have no slash-command API for group control — commands
 //     are plain text. A leading @bot mention (glued, spaced, or doubled) is
-//     stripped before matching, so `@longluong3bot /status`,
-//     `@longluong3bot/status`, `@bot@bot /stop`, and bare `/status` all
+//     stripped before matching, so `@example01_bot /status`,
+//     `@example01_bot/status`, `@bot@bot /stop`, and bare `/status` all
 //     work. The Bot API's autocomplete form — a verb glued to the bot
-//     username (`/approve@longluong3bot`, `/status@longluong3bot`) — is
+//     username (`/approve@example01_bot`, `/status@example01_bot`) — is
 //     normalized the same way: the `@…` rides the VERB, never the answer.
 //
 // The commands are IN-CONVERSATION controls (they act on the bound agent
@@ -324,7 +324,7 @@ const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "link
  *     is never swallowed, and only a LEADING mention before a KNOWN verb is
  *     stripped — "hello @someone" and prose stay untouched.
  *   * The Telegram autocomplete suffix — a `@username` glued directly to the
- *     verb (`/approve@longluong3bot`). Stripping it keeps the rest of the
+ *     verb (`/approve@example01_bot`). Stripping it keeps the rest of the
  *     line (the id, the answer) exactly where the parser expects it.
  *
  * The prefix itself (`/`, `\`, or none) is left for the verb regexes to

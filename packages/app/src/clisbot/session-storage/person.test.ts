@@ -14,7 +14,7 @@ const roster: RosterMember[] = [
 ];
 const onSlack: SessionActor = {
   kind: "user",
-  id: "slack:U8ZTVGJJF",
+  id: "slack:U0000000003",
   displayName: "Long L.",
   organizationId: "org",
   connectionId: "connection",

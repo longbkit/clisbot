@@ -70,18 +70,18 @@ describe("parseApprovalCommand", () => {
   });
 
   it("tolerates a leading Telegram @bot mention (glued, spaced, punctuated)", () => {
-    assert.deepEqual(parseApprovalCommand("@longluong3bot /approve"), {
+    assert.deepEqual(parseApprovalCommand("@example01_bot /approve"), {
       decision: "allow",
     });
-    assert.deepEqual(parseApprovalCommand("@longluong3bot /approve req-1"), {
-      decision: "allow",
-      requestId: "req-1",
-    });
-    assert.deepEqual(parseApprovalCommand("@longluong3bot/approve req-1"), {
+    assert.deepEqual(parseApprovalCommand("@example01_bot /approve req-1"), {
       decision: "allow",
       requestId: "req-1",
     });
-    assert.deepEqual(parseApprovalCommand("/approve@longluong3bot req-1"), {
+    assert.deepEqual(parseApprovalCommand("@example01_bot/approve req-1"), {
+      decision: "allow",
+      requestId: "req-1",
+    });
+    assert.deepEqual(parseApprovalCommand("/approve@example01_bot req-1"), {
       decision: "allow",
       requestId: "req-1",
     });
@@ -90,20 +90,22 @@ describe("parseApprovalCommand", () => {
       decision: "allow",
       requestId: "req-1",
     });
-    assert.deepEqual(parseApprovalCommand("\\approve@longluong3bot"), { decision: "allow" });
-    assert.deepEqual(parseApprovalCommand("@bot /approve@longluong3bot req-1"), {
+    assert.deepEqual(parseApprovalCommand("\\approve@example01_bot"), {
+      decision: "allow",
+    });
+    assert.deepEqual(parseApprovalCommand("@bot /approve@example01_bot req-1"), {
       decision: "allow",
       requestId: "req-1",
     });
   });
 
   it("accepts a leading Slack <@U…> mention addressing the bot", () => {
-    assert.deepEqual(parseApprovalCommand("<@U8ZTVGJJF> /approve"), { decision: "allow" });
-    assert.deepEqual(parseApprovalCommand("<@U8ZTVGJJF> deny req-1"), {
+    assert.deepEqual(parseApprovalCommand("<@U0000000003> /approve"), { decision: "allow" });
+    assert.deepEqual(parseApprovalCommand("<@U0000000003> deny req-1"), {
       decision: "deny",
       requestId: "req-1",
     });
-    assert.deepEqual(parseChannelTextCommand("<@U8ZTVGJJF> /status"), { name: "status" });
+    assert.deepEqual(parseChannelTextCommand("<@U0000000003> /status"), { name: "status" });
   });
 
   it("accepts every approval address form used by Slack and Telegram", () => {
@@ -134,7 +136,7 @@ describe("parseApprovalCommand", () => {
     assert.equal(parseApprovalCommand("please approve"), null);
     assert.equal(parseApprovalCommand("approve !bad-id!"), null);
     assert.equal(parseApprovalCommand("maybe req-1"), null);
-    assert.equal(parseApprovalCommand("hello @longluong3bot"), null);
+    assert.equal(parseApprovalCommand("hello @example01_bot"), null);
     assert.equal(parseApprovalCommand(""), null);
     assert.equal(parseApprovalCommand("deny me an extension"), null);
   });
@@ -145,8 +147,8 @@ describe("parseChannelIdentityLinkCode", () => {
     for (const text of [
       "/link ABCDE-23456",
       "\\link ABCDE-23456",
-      "@longluong3bot /link ABCDE-23456",
-      "/link@longluong3bot ABCDE-23456",
+      "@example01_bot /link ABCDE-23456",
+      "/link@example01_bot ABCDE-23456",
       "<@U0BOT> /link ABCDE-23456",
       "/clisbot link ABCDE-23456",
     ]) {
@@ -177,9 +179,9 @@ describe("parseChannelTextCommand", () => {
   });
 
   it("tolerates a leading @bot mention, glued or spaced", () => {
-    assert.deepEqual(parseChannelTextCommand("@longluong3bot /status"), { name: "status" });
-    assert.deepEqual(parseChannelTextCommand("@longluong3bot/status"), { name: "status" });
-    assert.deepEqual(parseChannelTextCommand("/stop@longluong3bot"), { name: "stop" });
+    assert.deepEqual(parseChannelTextCommand("@example01_bot /status"), { name: "status" });
+    assert.deepEqual(parseChannelTextCommand("@example01_bot/status"), { name: "status" });
+    assert.deepEqual(parseChannelTextCommand("/stop@example01_bot"), { name: "stop" });
     assert.deepEqual(parseChannelTextCommand("@bot @bot /help"), { name: "help" });
   });
 
@@ -192,7 +194,7 @@ describe("parseChannelTextCommand", () => {
   it("rejects unknown verbs and ordinary prose", () => {
     expect(parseChannelTextCommand("/frobnicate")).toBeNull();
     expect(parseChannelTextCommand("the status of my order")).toBeNull();
-    expect(parseChannelTextCommand("hello @longluong3bot")).toBeNull();
+    expect(parseChannelTextCommand("hello @example01_bot")).toBeNull();
     expect(parseChannelTextCommand("")).toBeNull();
   });
 
@@ -201,7 +203,7 @@ describe("parseChannelTextCommand", () => {
       name: "model",
       value: "gpt-5.6-luna",
     });
-    assert.deepEqual(parseChannelTextCommand("@longluong3bot /agent reviewer"), {
+    assert.deepEqual(parseChannelTextCommand("@example01_bot /agent reviewer"), {
       name: "agent",
       value: "reviewer",
     });

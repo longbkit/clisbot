@@ -15,7 +15,7 @@ import { hasProviderObservedTelegramThreadBinding } from "./message-thread-obser
 import { installMemoryTelegramRuntime } from "./test-support.js";
 
 const BOT_TOKEN = "123456789:TEST-TOKEN";
-const PARAMS = { accountId: "acct", botId: 123_456_789, botUsername: "longluong3bot" };
+const PARAMS = { accountId: "acct", botId: 123_456_789, botUsername: "example01_bot" };
 const dirs: string[] = [];
 
 afterAll(async () => {

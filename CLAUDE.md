@@ -256,7 +256,7 @@ same external conversation, followed by an API/CLI read-back matching the sent
 message id or timestamp.
 
 - **Telegram:** `TELEGRAM_DEV_BOT_TOKEN` is the bot under test
-  (`@longluong3bot`). `TELEGRAM_MASTER_BOT_TOKEN` is only the test driver that
+  (username from `TELEGRAM_DEV_BOT_USERNAME`, verified with `getMe`). `TELEGRAM_MASTER_BOT_TOKEN` is only the test driver that
   plays the external sender; never configure the channel host with the master
   token and never report the master bot as the bot under test. Send the marker
   from the master bot into the test group, addressing the bot under
