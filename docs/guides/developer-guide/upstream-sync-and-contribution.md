@@ -8,9 +8,10 @@ is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
 **Rebrand decision, 2026-09-29:** the target product branch is a fully branded
 Clisbot `main`. Each upstream snapshot will be renamed before it is merged;
 see the [decision and Git evidence](../../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md).
-The branch cutover and rename script are not implemented yet. The existing
-commands below describe the current `clisbot-paseoclaw-fusion` branch until
-that migration is complete.
+The branch cutover is not implemented yet. The rename script and transformed
+snapshots are being tested on isolated branches; the existing commands below
+describe the current `clisbot-paseoclaw-fusion` branch until that migration is
+complete.
 
 ## The three repos, each with one job
 
@@ -124,6 +125,28 @@ official Clisbot `main`.
 5. Delete the disposable sync branch name and create the verified sync tag.
    The merge commit keeps the transformed snapshot and raw upstream history;
    no old `sync/rebranded-*` branch names need to remain.
+
+### Current rename rules and remaining-name review
+
+The test branch's [rename script](../../../scripts/rebrand-clisbot.mjs) applies
+the following rules to Git-tracked paths and UTF-8 text. These are string and
+path rules, not a semantic determination that every retained old name is valid.
+
+| Input                                                                                                                            | Current rule                                                                                                                                                                                | Review when syncing                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LICENSE`; `docs/audits/**`; `docs/lessons/**`; `docs/overview/product-vision.md`; this playbook; the rename script and its test | Preserve the entire path and contents.                                                                                                                                                      | Historical and legal provenance can retain Paseo, but protection does not make every statement in these files current.                                |
+| `getpaseo/paseo-relay`                                                                                                           | Preserve this exact external repository identity.                                                                                                                                           | Confirm each reference still points to the upstream relay, rather than presenting it as a Clisbot-owned service.                                      |
+| `getpaseo/paseo`, `@getpaseo/*`, other `getpaseo` text                                                                           | Rewrite the first to `longbkit/clisbot` and the package scope to `@clisbot/*`. The general lowercase replacement leaves `getpaseo` intact because it skips `paseo` immediately after `get`. | This broad exception can retain unrelated GitHub identities and examples; review each remaining match.                                                |
+| `app.paseo.sh`, `relay.paseo.sh`, `hub.paseo.sh` with `--keep-upstream-endpoints`                                                | Preserve the live upstream service hosts, including escaped host patterns. Plain site and documentation links to `paseo.sh` become `clisbot.com`.                                           | Use this flag only on the isolated test branches. Without it, the hosts are transformed for Clisbot; confirm replacement services before cutover.     |
+| `PASEO`, `Paseo`, `paseo` elsewhere                                                                                              | Replace with `CLISBOT`, `Clisbot`, `clisbot` in text and paths; file-specific fixes remove collapsed aliases and set publishing/Expo ownership.                                             | The rule is case-sensitive and does not cover every mixed-case spelling or contextual claim. Review product copy and configuration after replacement. |
+
+Files with binary or invalid UTF-8 contents are skipped. `--check` verifies
+that another run would make no further changes; it does **not** validate the
+names left behind. After each transformed-upstream commit and after each merge,
+scan both tracked contents and paths case-insensitively for `paseo`, then
+classify every remaining match as provenance, an intentional test endpoint, or
+work still required before release. Do not treat the table as a blanket
+allowlist for new upstream text.
 
 Git command skeleton for one release, run from a clean checkout after the
 cutover. `<main-worktree>` is the worktree with `main` checked out; the two
