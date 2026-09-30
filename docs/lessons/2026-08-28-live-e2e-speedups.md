@@ -34,6 +34,9 @@ matching top-level only looks like a hang.
 
 ## Keep the revision write-script template durable
 
+**2026-10-01 update:** the machine-specific root scripts were archived out of Git.
+The workflow below remains useful; see [channel operations](../guides/developer-guide/channels-operations.md#writing-a-config-revision) for the historical source and current placement rules.
+
 Wave 1's `.hub-revision-writeN.mjs` scripts were deleted after the campaign;
 wave 2 spent an hour reconstructing the store/PGlite shape. The surviving
 shape (wave 2's `.hub-revision-write.mjs`, repo root, kept as template):

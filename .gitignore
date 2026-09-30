@@ -101,3 +101,12 @@ app.json
 .writer-progress/
 # Heap snapshots dumped by --heapsnapshot-near-heap-limit; keep them for debugging.
 *.heapsnapshot
+
+# Legacy root session artifacts; new scratch work belongs in .debug/scratch/<task>/
+/.probe-*.mjs
+/.hub-*.mjs
+/.reviewer-*.txt
+/.inspect-bindings.mjs
+/.resolve-stuck-perm.mjs
+/.set-dev-grok.mjs
+/cli-client-id

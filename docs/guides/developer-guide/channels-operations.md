@@ -71,7 +71,7 @@ The channel plane admits against a daemon in managed-access `external` mode by m
 
 ### Writing a config revision
 
-Live channel configuration lives in the Hub DB's active revision, not on disk. `.hub-revision-write.mjs` is the durable template and `.hub-revision-write12.mjs` is the current-generation copy of it, re-targeted at the organization-scoped store. Keep both; the template is what the next scenario is derived from.
+Live channel configuration lives in the Hub DB's active revision, not on disk. The old `.hub-revision-write.mjs` and `.hub-revision-write12.mjs` were machine-specific live-test scripts, removed from the tracked tree on 2026-10-01. Their [historical source](https://github.com/longbkit/clisbot/tree/c02242b142d4b7ad1af91f5a18c0cbd1196b3c8d) remains available for reference; review it against current APIs before reuse. Put scenario-specific copies under `.debug/scratch/<task>/`. A maintained replacement belongs under `scripts/` with explicit configuration instead of machine-specific defaults.
 
 The invariant is **STOP < WRITE < START** — the writer opens the PGlite data directory directly, so the Hub must be down or the data-dir lock is held.
 

@@ -40,3 +40,12 @@ packages/desktop/release
 plan.*.log
 *.log
 CLAUDE.local.md
+
+# Legacy root session artifacts; new scratch work belongs in .debug/scratch/<task>/
+/.probe-*.mjs
+/.hub-*.mjs
+/.reviewer-*.txt
+/.inspect-bindings.mjs
+/.resolve-stuck-perm.mjs
+/.set-dev-grok.mjs
+/cli-client-id

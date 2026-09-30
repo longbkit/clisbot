@@ -149,6 +149,8 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 
 ## Critical rules
 
+- **Keep session artifacts out of the repo root.** Put temporary probes, experiments, and review output in `.debug/scratch/<task>/` (ignored by Git and Docker). Maintained, reusable tools belong in a named subfolder under `scripts/`; durable audit findings belong in a topic folder under `docs/audits/`. Before committing, inspect staged paths for local runtime state and scratch output.
+
 - **NEVER restart the main Clisbot daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.
 - **NEVER add auth checks to tests** — agent providers handle their own auth.
@@ -303,8 +305,8 @@ message id or timestamp.
   Built-in providers are pre-enabled by default and probe to `unavailable`
   (not an error) when their binary/auth is missing; **enabling a non-built-in
   provider (e.g. a custom ACP one) is a per-daemon config write (app toggle /
-  `set_daemon_config`), not a script** — `.set-dev-grok.mjs` is a dev-daemon
-  test fixture, not onboarding; the enablement/onboarding model is
+  `set_daemon_config`), not a script** — the historical `.set-dev-grok.mjs` was a dev-daemon
+  test fixture, archived out of the tracked tree on 2026-10-01, not onboarding; the enablement/onboarding model is
   [§4.6 note 15](docs/audits/2026-08-24-hub-integration-implementation.md#46-notices).
 - Keep channel E2E on the fixed isolated dev home from `.env`
   (`CLISBOT_HOME` = `~/.clisbot-dev`) and reuse it across runs so offsets,
