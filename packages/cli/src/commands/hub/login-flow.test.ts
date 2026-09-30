@@ -38,7 +38,7 @@ describe("Hub CLI login browser flow", () => {
     assert.equal(credential, "clisbot_cli_prefix_durable-secret-value");
     assert.deepEqual(journey.waits, [5_000, 5_000, 10_000]);
     assert.deepEqual(journey.opened, ["https://hub.test/cli-login?code=ABCD-EFGH"]);
-    assert.deepEqual(journey.instructions, ["https://hub.test/cli-login ABCD-EFGH"]);
+    assert.deepEqual(journey.instructions, ["https://hub.test/cli-login?code=ABCD-EFGH ABCD-EFGH"]);
   });
 
   it("does not open a browser in noninteractive mode", async () => {
@@ -57,7 +57,7 @@ describe("Hub CLI login browser flow", () => {
     await journey.authorize();
 
     assert.deepEqual(journey.opened, []);
-    assert.equal(journey.instructions.length, 1);
+    assert.deepEqual(journey.instructions, ["https://hub.test/cli-login?code=ABCD-EFGH ABCD-EFGH"]);
   });
 });
 

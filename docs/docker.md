@@ -59,6 +59,7 @@ public URL settings.
 ```sh
 docker run -d --name clisbot --stop-timeout 40 \
   -e CLISBOT_RUN_MODE=all \
+  -e CLISBOT_RELAY_ENABLED=true \
   -e CLISBOT_HUB_CREDENTIAL_MASTER_KEY \
   -e CLISBOT_PASSWORD=change-me \
   -p 6868:6868 \
@@ -71,6 +72,8 @@ Open `http://localhost:6868` for the app and Hub management. In `all` mode, the
 entrypoint sets `CLISBOT_HUB_PROXY_URL=http://127.0.0.1:6870` and defaults
 `CLISBOT_HUB_APP_URL` to `http://localhost:6868`. The daemon forwards Hub API and
 Hub WebSocket requests to the backend; browser cookies stay on the app's origin.
+The example enables relay because the current Hub connection-offer publisher requires it, even when a direct endpoint is also configured. A fresh daemon otherwise defaults to relay off; enrollment can succeed while app connection details stay unavailable.
+
 The page enables Hub features at runtime. Daemon API and `/ws` authentication
 remain separate from Hub account authentication.
 
@@ -341,3 +344,13 @@ The published image is multi-arch for `linux/amd64` and `linux/arm64`.
   uid/gid `1000:1000`, or run the container as the host uid/gid.
 - **Logs**: inspect `docker logs clisbot` or
   `/home/clisbot/.clisbot/daemon.log` inside the container.
+
+### Add the Docker Host to Hub
+
+After signing into the shared web UI, run `connect` inside the daemon container:
+
+```sh
+docker compose exec -T --user clisbot clisbot clisbot hub connect http://localhost:6868
+```
+
+Open the printed approval URL in your browser and approve the Host. Keep the command running; no `hub login` or second terminal confirmation is needed. The URL must be reachable from both the container and browser. For a custom test port, use that same reachable port and configure the shared UI's public URL accordingly; `localhost` inside the container is not the Docker host. The command creates only the Host relationship, not durable CLI administration access. See [Host onboarding](guides/user-guide/hosts/connect-and-manage.md).

@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
@@ -1623,9 +1624,9 @@ class PgDatabase implements Database {
         const inserted = await client.query<CliAuthorizationRow>(
           `insert into cli_authorizations
            (id, device_verifier, user_code_verifier, fingerprint_verifier,
-            status, poll_interval_seconds, next_poll_at, expires_at)
+            status, poll_interval_seconds, next_poll_at, expires_at, enrollment)
          values ($1, $2, $3, $4, 'pending', $5, now(),
-                 now() + ($6 * interval '1 second'))
+                 now() + ($6 * interval '1 second'), $7)
          returning *`,
           [
             input.id,
@@ -1634,6 +1635,7 @@ class PgDatabase implements Database {
             input.fingerprintVerifier,
             input.pollIntervalSeconds,
             input.lifetimeSeconds,
+            input.enrollment ?? null,
           ],
         );
         return toCliAuthorization(inserted.rows[0]!);
@@ -1682,6 +1684,9 @@ class PgDatabase implements Database {
         if (authorization.rows[0] === undefined) {
           return client.rollback("unavailable" as const);
         }
+        if ((input.purpose === "host_enrollment") !== Boolean(authorization.rows[0].enrollment)) {
+          return client.rollback("forbidden" as const);
+        }
         const authority = await client.query(
           `select 1
          from session
@@ -1720,6 +1725,7 @@ class PgDatabase implements Database {
   async pollCliAuthorization(input: {
     deviceVerifier: string;
     credential: { id: string; prefix: string; verifier: string };
+    enrollmentToken?: { verifier: string };
   }): Promise<CliAuthorizationPollResult> {
     try {
       return await this.pool.transaction(async (client) => {
@@ -1772,6 +1778,31 @@ class PgDatabase implements Database {
           [authorization.id],
         );
         if (authorization.status === "approved") {
+          if (Boolean(authorization.enrollment) !== Boolean(input.enrollmentToken)) {
+            return client.rollback({ status: "denied" as const, intervalSeconds: 5 });
+          }
+          if (authorization.enrollment && input.enrollmentToken) {
+            await client.query(
+              `insert into daemon_enrollment_tokens
+                (id, verifier, organization_id, expires_at, enrollment)
+               values ($1, $2, $3, $4, $5)`,
+              [
+                authorization.id,
+                input.enrollmentToken.verifier,
+                authorization.approved_organization_id,
+                authorization.expires_at,
+                authorization.enrollment,
+              ],
+            );
+            await client.query(`update cli_authorizations set status = 'disclosed' where id = $1`, [
+              authorization.id,
+            ]);
+            return {
+              status: "enrollment_authorized",
+              intervalSeconds: authorization.poll_interval_seconds,
+              organizationId: authorization.approved_organization_id!,
+            };
+          }
           await client.query(
             `insert into organization_cli_credentials
              (id, organization_id, prefix, verifier, created_by_user_id)
@@ -1815,7 +1846,12 @@ class PgDatabase implements Database {
         if (
           existing.rows[0] &&
           existing.rows[0].id === input.daemonId &&
-          existing.rows[0].enrollment_verifier === input.tokenVerifier
+          existing.rows[0].enrollment_verifier === input.tokenVerifier &&
+          existing.rows[0].server_id === input.serverId &&
+          existing.rows[0].daemon_public_key === input.daemonPublicKey &&
+          existing.rows[0].credential_verifier === input.credentialVerifier &&
+          existing.rows[0].status === "active" &&
+          [...existing.rows[0].scopes].sort().join(" ") === [...input.permissions].sort().join(" ")
         ) {
           return toDaemon(existing.rows[0]);
         }
@@ -1829,8 +1865,18 @@ class PgDatabase implements Database {
          set consumed_at = $2
          where verifier = $1 and organization_id is not null and consumed_at is null
            and expires_at > $2
+           and (enrollment is null or (
+             enrollment->>'serverId' = $3 and enrollment->>'daemonPublicKey' = $4
+             and enrollment->'permissions' @> $5::jsonb
+             and enrollment->'permissions' <@ $5::jsonb))
          returning id, organization_id, issued_by_api_key_id, issued_by_cli_credential_id`,
-          [input.tokenVerifier, input.now],
+          [
+            input.tokenVerifier,
+            input.now,
+            input.serverId,
+            input.daemonPublicKey,
+            JSON.stringify(input.permissions),
+          ],
         );
         const consumedToken = token.rows[0];
         if (consumedToken?.organization_id === null || consumedToken === undefined)
@@ -4949,6 +4995,7 @@ interface DaemonRow extends QueryRow {
 }
 
 interface CliAuthorizationRow extends QueryRow {
+  enrollment: HubEnrollmentRequest | null;
   id: string;
   device_verifier: string;
   user_code_verifier: string;
@@ -4996,6 +5043,7 @@ function semanticDaemonPermissions(stored: readonly string[]): string[] {
 
 function toCliAuthorization(row: CliAuthorizationRow): CliAuthorizationRecord {
   return {
+    enrollment: row.enrollment,
     id: row.id,
     status: row.status,
     pollIntervalSeconds: row.poll_interval_seconds,

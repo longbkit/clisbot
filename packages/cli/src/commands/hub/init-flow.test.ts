@@ -22,7 +22,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
 });
 
-describe("Hub login connection asked before browser approval", () => {
+describe("Legacy Hub login connection (onboarding disabled)", () => {
   it("asks once before approval, then connects with the chosen permissions without asking again", async () => {
     const cwd = await temporaryDirectory();
     const credentials = new MemoryCredentials();
@@ -35,7 +35,7 @@ describe("Hub login connection asked before browser approval", () => {
       "https://hub.test",
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         flow: {
           authorize: async () => {
@@ -99,7 +99,7 @@ describe("Hub guided setup continuation", () => {
       "https://hub.test",
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         isInteractive: () => true,
@@ -115,7 +115,7 @@ describe("Hub guided setup continuation", () => {
     assert.deepEqual(prompts.selections, []);
     assert.deepEqual(prompts.messages, [
       "Daemon connected with no permissions.\n\nEnable Hub automations later:\n  clisbot hub permissions grant hub.execute",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
+      "Configure triggers in Hub: https://hub.test/triggers\nOr scaffold triggers as code: clisbot hub init",
     ]);
     assert.deepEqual(calls, [{ operation: "token", origin: "https://hub.test" }]);
     assert.equal(daemon.connections, 1);
@@ -136,7 +136,7 @@ describe("Hub guided setup continuation", () => {
     );
     assert.deepEqual(connectDeclined.messages, [
       "Skipped daemon connection. Connect later with: clisbot hub connect https://hub.test",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
+      "Configure triggers in Hub: https://hub.test/triggers\nOr scaffold triggers as code: clisbot hub init",
     ]);
   });
 
@@ -156,7 +156,7 @@ describe("Hub guided setup continuation", () => {
     assert.deepEqual(prompts.confirmations, []);
     assert.deepEqual(prompts.messages, [
       "This daemon is already connected to https://hub.test. Permissions: None.",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
+      "Configure triggers in Hub: https://hub.test/triggers\nOr scaffold triggers as code: clisbot hub init",
     ]);
   });
 
@@ -170,7 +170,7 @@ describe("Hub guided setup continuation", () => {
       "https://hub.test",
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         isInteractive: () => true,
@@ -193,7 +193,7 @@ describe("Hub guided setup continuation", () => {
 
     assert.deepEqual(prompts.messages, [
       "Skipped daemon connection. Connect later with: clisbot hub connect https://hub.test",
-      "Configure resources directly in Hub: https://hub.test. For a local assistant workspace and channel setup, run: clisbot hub init",
+      "Configure triggers in Hub: https://hub.test/triggers\nOr scaffold triggers as code: clisbot hub init",
     ]);
   });
 
@@ -444,7 +444,7 @@ function setupEnvironment(
     },
   } as HubHttpClient;
   return {
-    env: {},
+    env: { CLISBOT_ONBOARDING_ENABLED: "0" },
     credentials,
     hub,
     login: { authorize: async () => "clisbot_cli_prefix_durable-secret" },

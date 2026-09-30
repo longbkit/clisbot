@@ -1,3 +1,4 @@
+import { HubEnrollmentRequestSchema } from "@clisbot/protocol/messages";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -9,11 +10,13 @@ const userCodeSchema = z.object({ userCode: z.string().min(1) });
 const decisionSchema = userCodeSchema.extend({
   decision: z.enum(["approve", "deny"]),
   organizationId: z.string().min(1),
+  purpose: z.enum(["cli_login", "host_enrollment"]).optional(),
 });
 const authorizationSchema = z.object({
   expiresAt: z.string().datetime(),
   organization: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
   canManage: z.boolean(),
+  enrollment: HubEnrollmentRequestSchema.nullable().optional(),
 });
 
 export type CliAuthorizationRequest = z.infer<typeof authorizationSchema>;

@@ -24,12 +24,45 @@ const hub = vi.hoisted(() => ({
 const navigation = vi.hoisted(() => ({
   params: {} as { channelConnectionId?: string },
   setParams: vi.fn(),
+  push: vi.fn(),
 }));
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ setParams: navigation.setParams }),
+  useRouter: () => ({ setParams: navigation.setParams, push: navigation.push }),
   useLocalSearchParams: () => navigation.params,
 }));
 vi.mock("../account-provider", () => ({ useHubAccount: () => hub }));
+const inventory = vi.hoisted(() => ({
+  status: "ready" as "ready" | "loading" | "error",
+  hosts: [] as { serverId: string }[],
+  daemons: { data: { daemons: [] as { id: string }[] } },
+  error: null as string | null,
+  retry: vi.fn(),
+}));
+vi.mock("../host-inventory", () => ({ useHostInventory: () => inventory }));
+vi.mock("@/components/add-host-modal", () => ({
+  AddHostModal: ({
+    visible,
+    onClose,
+    onSaved,
+  }: {
+    visible: boolean;
+    onClose(): void;
+    onSaved(input: { serverId: string }): void;
+  }) => {
+    const save = React.useCallback(() => onSaved({ serverId: "direct-host" }), [onSaved]);
+    return visible ? (
+      <section aria-label="Direct connection form">
+        <button type="button" onClick={onClose}>
+          Cancel direct connection
+        </button>
+        <button type="button" onClick={save}>
+          Save direct connection
+        </button>
+      </section>
+    ) : null;
+  },
+}));
+
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.
@@ -156,6 +189,10 @@ beforeEach(() => {
   });
   hub.state = { status: "signedOut", registration: "open" };
   hub.signedIn = null;
+  inventory.status = "ready";
+  inventory.hosts = [];
+  inventory.daemons.data = { daemons: [] };
+  inventory.error = null;
 });
 afterEach(cleanup);
 function enter(label: string, value: string) {
@@ -383,4 +420,78 @@ describe("Account entry lifecycle and recovery", () => {
       expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
     },
   );
+});
+
+describe("first Host after signing in", () => {
+  function signedIn(canManage = true) {
+    hub.state = {
+      status: "active",
+      account,
+      organization: { id: "org", name: "Organization" },
+      membership: { id: "membership", role: canManage ? "owner" : "member" },
+      capabilities: { manageResources: canManage },
+    };
+    hub.signedIn = hub.state;
+  }
+
+  it("shows both choices after sign-in and opens the existing managed Host guide", () => {
+    const ui = render(view());
+    expect(screen.queryByText("Add your first Host")).toBeNull();
+    signedIn();
+    ui.rerender(view());
+    expect(screen.getByText("Add your first Host")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connect directly" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add via Hub" }));
+    expect(navigation.push).toHaveBeenCalledWith("/settings/hub/hosts");
+  });
+
+  it("opens the direct form, supports cancel, and enters the saved Host", () => {
+    signedIn();
+    render(view());
+    fireEvent.click(screen.getByRole("button", { name: "Connect directly" }));
+    expect(screen.getByRole("region", { name: "Direct connection form" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel direct connection" }));
+    expect(screen.queryByRole("region", { name: "Direct connection form" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Connect directly" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save direct connection" }));
+    expect(navigation.push).toHaveBeenCalledWith("/h/direct-host");
+  });
+
+  it("does not treat loading or an inventory error as having no Hosts", () => {
+    signedIn();
+    inventory.status = "loading";
+    const ui = render(view());
+    expect(screen.getByText("Checking your Hosts…")).toBeTruthy();
+    expect(screen.queryByText("Add your first Host")).toBeNull();
+    inventory.status = "error";
+    inventory.error = "offline";
+    ui.rerender(view());
+    expect(screen.getByRole("alert").textContent).toContain("Could not load your Hosts");
+    expect(screen.queryByText("Add your first Host")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(inventory.retry).toHaveBeenCalledOnce();
+    inventory.status = "ready";
+    inventory.error = null;
+    ui.rerender(view());
+    expect(screen.getByText("Add your first Host")).toBeTruthy();
+  });
+
+  it.each(["direct", "managed"])("does not offer first setup when a %s Host exists", (kind) => {
+    signedIn();
+    const ui = render(view());
+    if (kind === "direct") inventory.hosts = [{ serverId: "offline-host" }];
+    else inventory.daemons.data = { daemons: [{ id: "registered-without-an-offer" }] };
+    ui.rerender(view());
+    expect(screen.queryByText("Add your first Host")).toBeNull();
+  });
+
+  it("offers Members direct access and shared Host guidance without enrollment authority", () => {
+    signedIn(false);
+    render(view());
+    expect(screen.queryByRole("button", { name: "Add via Hub" })).toBeNull();
+    expect(screen.getByText(/Ask an owner or admin to add one/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connect directly" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "View shared Hosts" }));
+    expect(navigation.push).toHaveBeenCalledWith("/settings/hub/hosts");
+  });
 });

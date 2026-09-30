@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Text } from "react-native";
@@ -14,6 +15,7 @@ const CLI_CREDENTIAL_IMPACTS = [
 ] as const;
 
 export interface CliAuthorizationSubject {
+  enrollment?: HubEnrollmentRequest | null;
   organization: { name: string; slug: string };
   account: { email: string; roleLabel: string } | null;
   hubOrigin: string | null;
@@ -30,7 +32,11 @@ export function CliAuthorizationSummary(subject: CliAuthorizationSubject) {
   return (
     <View style={styles.stack}>
       <View style={[settingsStyles.card, styles.card]}>
-        <Text style={styles.eyebrow}>CLI login for organization</Text>
+        <Text style={styles.eyebrow}>
+          {subject.enrollment
+            ? "Connect Host to organization"
+            : "Advanced CLI access for organization"}
+        </Text>
         <OrganizationTitle name={subject.organization.name} />
         <DetailRow label="Organization ID" value={subject.organization.slug} />
         {subject.account ? (
@@ -42,11 +48,26 @@ export function CliAuthorizationSummary(subject: CliAuthorizationSubject) {
         {subject.hubOrigin ? <DetailRow label="Hub" value={subject.hubOrigin} /> : null}
         <DetailRow label="Code" value={subject.code} hint="Must match the code in your terminal" />
         <DetailRow label="Request expires" value={formatExpiry(subject.expiresAt)} />
+        {subject.enrollment ? (
+          <>
+            <DetailRow label="Host" value={subject.enrollment.hostname} />
+            <DetailRow label="Host ID" value={subject.enrollment.serverId} />
+            <DetailRow label="Host public key" value={subject.enrollment.daemonPublicKey} />
+          </>
+        ) : null}
       </View>
       <Alert
         variant="warning"
-        title={`This CLI will act for ${subject.organization.name}`}
-        description={`${CLI_CREDENTIAL_IMPACTS.map((impact) => `• ${impact}`).join("\n")}\n\nThe credential stays valid until an owner or admin revokes it in Hub → Configuration → API keys.`}
+        title={
+          subject.enrollment
+            ? `Allow ${subject.organization.name} to use this Host`
+            : `This CLI will act for ${subject.organization.name}`
+        }
+        description={
+          subject.enrollment
+            ? `Hub permissions on this Host: ${subject.enrollment.permissions.length ? subject.enrollment.permissions.join(", ") : "None"}.\n\nApproval allows one enrollment of this Host before the request expires. The Host then keeps its own connection credential. No CLI administration credential is created. Disconnect the Host to remove its local connection, or revoke it in Hub.`
+            : `${CLI_CREDENTIAL_IMPACTS.map((impact) => `• ${impact}`).join("\n")}\n\nThe credential has no automatic expiry. An owner or admin must revoke it in Hub → Configuration → API keys. CLI logout only removes its local copy. Use hub connect for Host onboarding.`
+        }
       />
     </View>
   );

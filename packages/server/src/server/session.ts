@@ -1,3 +1,4 @@
+import { browseProjectDirectories } from "./managed-access/browse-project-directories.js";
 import { routeChatSpokenInput } from "./session/chats/spoken-input.js";
 import { isBotChatEvent } from "./session/chats/chat-events.js";
 import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
@@ -5479,6 +5480,27 @@ export class Session {
     const { query, limit, requestId, cwd, includeFiles, includeDirectories, matchMode } = msg;
 
     try {
+      if (msg.browsePath !== undefined) {
+        if (cwd !== undefined) throw new Error("Project browsing cannot use a workspace scope");
+        const result = await browseProjectDirectories({
+          browsePath: msg.browsePath,
+          home: process.env.HOME ?? homedir(),
+          query,
+          limit,
+          filter: (entries) => this.resourceAuthorizer.filterProjectFolderSearch(entries),
+          canSelect: (target) => this.resourceAuthorizer.mayCreateProjectAt(target),
+        });
+        this.emit({
+          type: "directory_suggestions_response",
+          payload: {
+            ...result,
+            directories: result.entries.map((entry) => entry.path),
+            error: null,
+            requestId,
+          },
+        });
+        return;
+      }
       const workspaceCwd = cwd?.trim();
       const searchesWorkspace = Boolean(workspaceCwd);
       const entries = await searchDirectoryEntries({

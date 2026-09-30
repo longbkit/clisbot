@@ -8,7 +8,11 @@ import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import type { Result } from "../contract/respond.js";
-import { decideCliAuthorization, inspectCliAuthorization } from "./functions.js";
+import {
+  decideCliAuthorization,
+  inspectCliAuthorization,
+  type CliAuthorizationRequest,
+} from "./functions.js";
 
 export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity) {
   const [code, setCode] = useState(() =>
@@ -40,6 +44,7 @@ export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity
           userCode: code,
           decision,
           organizationId: snapshot.data.data.organization.id,
+          purpose: snapshot.data.data.enrollment ? "host_enrollment" : "cli_login",
         },
       });
     },
@@ -65,10 +70,12 @@ export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity
     return (
       <Centered>
         <AuthCard
-          title={`CLI login ${decide.data.data.decision}`}
+          title={`${authorizationAction(snapshot.data)} ${decide.data.data.decision}`}
           description="You can close this window and return to the terminal."
         >
-          <p role="status">The terminal has received the decision.</p>
+          <p role="status">
+            The decision is recorded. Keep the terminal command running to complete the request.
+          </p>
         </AuthCard>
       </Centered>
     );
@@ -84,19 +91,21 @@ export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity
     <Centered>
       <AuthCard
         titleId="approval-heading"
-        title="Approve CLI login"
-        description="Grant this terminal durable access to one organization."
+        title={request.enrollment ? "Connect Host" : "Advanced CLI access"}
+        description={
+          request.enrollment
+            ? "Approve one Host enrollment in this organization."
+            : "Grant this terminal durable access to one organization."
+        }
       >
         <div className="grid gap-1 rounded-md border px-3 py-2.5 text-sm">
           <span className="text-muted-foreground">Organization receiving access</span>
           <span className="text-foreground">{request.organization.name}</span>
+          <span>Code: {code} — must match your terminal</span>
         </div>
         {request.canManage ? (
           <form className="grid gap-6" onSubmit={submitDecision} aria-label="Approve CLI login">
-            <p className="text-muted-foreground text-sm">
-              The credential can list projects, validate and install configuration, enroll daemons,
-              and dispatch manual runs for this organization until revoked.
-            </p>
+            <AuthorizationDetails request={request} />
             {message === undefined ? null : (
               <Alert variant="destructive">
                 <AlertDescription>{message}</AlertDescription>
@@ -113,7 +122,7 @@ export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity
                 Deny
               </Button>
               <Button type="submit" name="decision" value="approve" disabled={decide.isPending}>
-                Approve CLI login
+                {request.enrollment ? "Approve Host connection" : "Approve CLI access"}
               </Button>
             </div>
           </form>
@@ -148,7 +157,10 @@ function CodeEntry({ onCode }: { onCode: (code: string) => void }) {
   );
   return (
     <Centered>
-      <AuthCard title="Log in the Clisbot CLI" description="Enter the code shown in your terminal.">
+      <AuthCard
+        title="Approve a terminal request"
+        description="Enter the code shown in your terminal."
+      >
         <form className="grid gap-6" onSubmit={submit}>
           <Field>
             <FieldLabel htmlFor="cli-login-code">Verification code</FieldLabel>
@@ -173,4 +185,35 @@ function Loading() {
 
 function Centered({ children }: { children: ReactNode }) {
   return <div className="mx-auto w-full max-w-lg py-8">{children}</div>;
+}
+
+function AuthorizationDetails({ request }: { request: CliAuthorizationRequest }) {
+  return (
+    <p className="text-muted-foreground text-sm">
+      {request.enrollment ? (
+        <>
+          Host: {request.enrollment.hostname}
+          <br />
+          Host ID: {request.enrollment.serverId}
+          <br />
+          Public key: {request.enrollment.daemonPublicKey}
+          <br />
+          Hub permissions on this Host: {request.enrollment.permissions.join(", ") || "None"}.<br />
+          One enrollment only, before {request.expiresAt}. The Host keeps its own connection
+          credential. No CLI administration credential is created.
+        </>
+      ) : (
+        <>
+          This credential can list Projects, validate and install configuration, enroll Hosts, and
+          dispatch manual runs for this organization. It has no automatic expiry; revoke it in Hub
+          to end access. CLI logout only deletes the local copy. Use hub connect for Host
+          onboarding.
+        </>
+      )}
+    </p>
+  );
+}
+
+function authorizationAction(result: Result<CliAuthorizationRequest> | undefined) {
+  return result?.status === "ok" && result.data.enrollment ? "Host connection" : "CLI login";
 }

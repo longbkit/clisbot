@@ -22,7 +22,7 @@ registry.registerPath({
   method: "post",
   path: "/api/v1/cli-authorizations",
   operationId: "startCliAuthorization",
-  summary: "Start CLI login",
+  summary: "Start Host enrollment or advanced CLI login",
   description: "Starts an anonymous, expiring browser authorization for the Clisbot CLI.",
   tags: ["CLI login"],
   request: {
@@ -33,7 +33,7 @@ registry.registerPath({
   },
   responses: {
     201: {
-      description: "The CLI login request was created.",
+      description: "The authorization request was created.",
       content: { "application/json": { schema: CliAuthorizationSchema } },
     },
     429: { description: "Too many active authorization requests." },
@@ -45,9 +45,9 @@ registry.registerPath({
   method: "post",
   path: "/api/v1/cli-authorizations/poll",
   operationId: "pollCliAuthorization",
-  summary: "Poll CLI login",
+  summary: "Poll terminal authorization",
   description:
-    "Polls an anonymous CLI login request. An approved credential is disclosed exactly once.",
+    "Polls an anonymous request. Host enrollment requires purpose host_enrollment and returns a bound one-time token; CLI login returns a durable organization credential. Each result is disclosed exactly once.",
   tags: ["CLI login"],
   request: {
     body: {

@@ -2276,12 +2276,14 @@ export class VoiceAssistantWebSocketServer {
         workspaceMarkUnread: true,
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: true,
+        hubEnrollmentIdentity: true,
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.
         projectGithubClone: true,
         // COMPAT(workspaceGithubRepositorySearch): added in v0.1.108, remove gate after 2027-01-15.
         workspaceGithubRepositorySearch: true,
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: true,
+        projectDirectoryBrowse: true,
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
         commitsList: true,
         // COMPAT(commitBaseClassification): added in v0.2.0, remove gate after 2027-01-23.

@@ -89,8 +89,8 @@ function hostOnboardingStatus(
 }
 
 /** `cliCommand` is `clisbot` for users; the dev runner substitutes this checkout's CLI and home. */
-export function buildHubLoginCommand(hubOrigin: string, cliCommand = "clisbot"): string {
-  return `${cliCommand} hub login ${hubOrigin}`;
+export function buildHubConnectCommand(hubOrigin: string, cliCommand = "clisbot"): string {
+  return `${cliCommand} hub connect ${hubOrigin}`;
 }
 
 /** One vocabulary for a Hub Host's state, shared by Settings → Account and the Welcome card. */

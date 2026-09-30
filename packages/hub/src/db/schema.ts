@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { sql } from "drizzle-orm";
 import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
@@ -559,6 +560,7 @@ export const machines = pgTable(
 );
 
 export const daemonEnrollmentTokens = pgTable("daemon_enrollment_tokens", {
+  enrollment: jsonb().$type<HubEnrollmentRequest>(),
   id: uuid().primaryKey(),
   verifier: text().notNull().unique(),
   organizationId: text("organization_id"),
@@ -859,6 +861,7 @@ export const daemonAccessLeases = pgTable(
 export const cliAuthorizations = pgTable(
   "cli_authorizations",
   {
+    enrollment: jsonb().$type<HubEnrollmentRequest>(),
     id: uuid().primaryKey(),
     deviceVerifier: text("device_verifier").notNull().unique(),
     userCodeVerifier: text("user_code_verifier").notNull().unique(),

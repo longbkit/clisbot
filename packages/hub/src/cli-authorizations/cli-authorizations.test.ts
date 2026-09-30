@@ -1,5 +1,6 @@
+import { createHash, randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import { z } from "zod";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
 import { createMemoryDatabase } from "../db/memory.js";
@@ -165,3 +166,94 @@ function post(path: string, body: unknown): Request {
 }
 
 const json = (response: Response): Promise<unknown> => response.json();
+
+describe("Host approval authority boundary", () => {
+  const enrollment = {
+    serverId: "host",
+    daemonPublicKey: "key",
+    hostname: "laptop",
+    permissions: ["daemon.read"],
+  };
+  it("rejects new Host requests when onboarding is disabled, while explicit CLI login remains available", async () => {
+    vi.stubEnv("CLISBOT_ONBOARDING_ENABLED", "0");
+    try {
+      const auth = new CliAuthorizations(createMemoryDatabase(), browserAccess());
+      assert.equal((await auth.start(post("/start", { enrollment }))).status, 403);
+      assert.equal((await auth.start(post("/start", {}))).status, 201);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it("memory storage enforces the same Host binding and single-use contract", async () => {
+    const database = createMemoryDatabase();
+    const auth = new CliAuthorizations(database, browserAccess());
+    const started = startSchema.parse(
+      await (await auth.start(post("/start", { enrollment }))).json(),
+    );
+    assert.equal(
+      (
+        await auth.decide(
+          post("/decide", {
+            userCode: started.userCode,
+            organizationId: "org-acme",
+            decision: "approve",
+          }),
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await auth.decide(
+          post("/decide", {
+            userCode: started.userCode,
+            organizationId: "org-acme",
+            decision: "approve",
+            purpose: "host_enrollment",
+          }),
+        )
+      ).status,
+      200,
+    );
+    const result = z
+      .object({
+        status: z.literal("enrollment_authorized"),
+        token: z.string(),
+        credential: z.undefined().optional(),
+      })
+      .parse(
+        await (
+          await auth.poll(
+            post("/poll", { deviceCode: started.deviceCode, purpose: "host_enrollment" }),
+          )
+        ).json(),
+      );
+    const input = {
+      daemonId: randomUUID(),
+      idempotencyKey: randomUUID(),
+      tokenVerifier: createHash("sha256").update(result.token).digest("base64url"),
+      serverId: "host",
+      daemonPublicKey: "key",
+      permissions: ["daemon.read"],
+      credentialVerifier: "daemon-secret",
+      now: new Date(),
+    };
+    assert.equal(await database.enrollDaemon({ ...input, serverId: "other-host" }), undefined);
+    assert.equal(
+      await database.enrollDaemon({ ...input, permissions: ["daemon.manage"] }),
+      undefined,
+    );
+    const enrolled = await database.enrollDaemon(input);
+    assert.ok(enrolled);
+    assert.deepEqual(await database.enrollDaemon(input), enrolled);
+    assert.equal(await database.enrollDaemon({ ...input, credentialVerifier: "other" }), undefined);
+    assert.equal(
+      await database.enrollDaemon({
+        ...input,
+        daemonId: randomUUID(),
+        idempotencyKey: randomUUID(),
+      }),
+      undefined,
+    );
+  });
+});

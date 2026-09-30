@@ -190,3 +190,7 @@ Update and restart every daemon before the Hub. A daemon that predates `terminal
    - **Every agent, by its own Project**, under Managed Access `external`: an answer for an id outside it is "not found". Small (one module, about 15 lines in `clisbot-tools.ts`), but it also limits an Administrator's agents, because an agent does not record who started it.
    - **Only agents a restricted session started**: needs the agent record to keep the starting session's authority, the same gap as open decision 2's "Whose grant".
    - **Leave unscoped**: no upstream diff; the cross-Project reach stays.
+
+### Duyệt thư mục khi Add Project
+
+`server_info.features.projectDirectoryBrowse` bật bộ duyệt thư mục Host trên web/mobile/desktop. Client gửi `directory_suggestions_request` với `browsePath` tùy chọn (không có `cwd`); daemon yêu cầu `workspace.manage`, chuẩn hóa realpath, kiểm tra quyền duyệt thư mục hiện tại rồi lọc từng thư mục con bằng cùng `filterProjectFolderSearch` trước khi giới hạn kết quả. `directory` tùy chọn trong response chứa đường dẫn hiện tại, cha được phép duyệt, `canSelect` và trạng thái giới hạn 100 kết quả. Chọn thư mục vẫn đi qua Add Project và kiểm tra quyền tạo hiện hành. Request tìm kiếm cũ không thay đổi; app chỉ dùng chế độ mới khi Host quảng bá capability, Host cũ hiện hướng dẫn cập nhật.

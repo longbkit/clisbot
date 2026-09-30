@@ -123,16 +123,19 @@ describe("Hub commands", () => {
       },
     );
 
-    assert.deepEqual(events, [
-      "progress:Logging in to https://hub.paseo.sh",
-      "authorize:https://hub.paseo.sh",
-      "progress:Logged in",
-      "progress:Hub https://hub.paseo.sh did not report which organization this credential belongs to.",
-    ]);
+    assert.deepEqual(
+      events.filter((event) => !event.startsWith("progress:Advanced CLI access:")),
+      [
+        "progress:Logging in to https://hub.paseo.sh",
+        "authorize:https://hub.paseo.sh",
+        "progress:Logged in",
+        "progress:Hub https://hub.paseo.sh did not report which organization this credential belongs to.",
+      ],
+    );
     assert.equal(result.data.origin, "https://hub.paseo.sh");
   });
 
-  it("interactive login continues through the injected daemon and Hub guidance coordinator", async () => {
+  it("interactive login creates only explicit CLI access and does not enroll a Host", async () => {
     const credentials = new MemoryCredentials();
     const events: string[] = [];
 
@@ -158,14 +161,15 @@ describe("Hub commands", () => {
       },
     );
 
-    assert.deepEqual(events, [
-      "progress:Logging in to https://hub.test",
-      "login",
-      "progress:Logged in",
-      "progress:Hub https://hub.test did not report which organization this credential belongs to.",
-      "connect:https://hub.test",
-      "show-guidance",
-    ]);
+    assert.deepEqual(
+      events.filter((event) => !event.startsWith("progress:Advanced CLI access:")),
+      [
+        "progress:Logging in to https://hub.test",
+        "login",
+        "progress:Logged in",
+        "progress:Hub https://hub.test did not report which organization this credential belongs to.",
+      ],
+    );
   });
 
   it("JSON and noninteractive login remain login-only", async () => {
@@ -201,7 +205,7 @@ describe("Hub commands", () => {
       "https://hub.test",
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         hub: {
           describeCredential: unknownIdentity,
@@ -240,7 +244,7 @@ describe("Hub commands", () => {
       "https://hub.test",
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         hub: {
           describeCredential: async () => {
@@ -263,15 +267,18 @@ describe("Hub commands", () => {
       },
     );
 
-    assert.deepEqual(events, [
-      "Connecting this daemon to https://hub.test",
-      "describe",
-      "Hub: https://hub.test",
-      "Account: ada@acme.test",
-      "Organization: Acme (acme)",
-      "Role: owner",
-      "enroll",
-    ]);
+    assert.deepEqual(
+      events.filter((event) => !event.startsWith("progress:Advanced CLI access:")),
+      [
+        "Connecting this daemon to https://hub.test",
+        "describe",
+        "Hub: https://hub.test",
+        "Account: ada@acme.test",
+        "Organization: Acme (acme)",
+        "Role: owner",
+        "enroll",
+      ],
+    );
     const [row] = JSON.parse(render(result, { format: "json" })) as Array<Record<string, unknown>>;
     assert.ok(row !== undefined);
     assert.equal(row["organization"], "Acme");
@@ -288,7 +295,7 @@ describe("Hub commands", () => {
       "https://hub.test",
       { permissions: ["hub.execute"] },
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         hub: {
           issueEnrollmentToken: async () => "one-time-token",
@@ -313,7 +320,7 @@ describe("Hub commands", () => {
         "https://hub.test",
         {},
         {
-          env: {},
+          env: { CLISBOT_ONBOARDING_ENABLED: "0" },
           credentials,
           hub: {
             issueEnrollmentToken: async () => "one-time-token",
@@ -375,10 +382,10 @@ describe("Hub commands", () => {
       },
     );
 
-    assert.deepEqual(events, [
-      "progress:Listing projects from https://hub.test",
-      "request:https://hub.test",
-    ]);
+    assert.deepEqual(
+      events.filter((event) => !event.startsWith("progress:Advanced CLI access:")),
+      ["progress:Listing projects from https://hub.test", "request:https://hub.test"],
+    );
     assert.deepEqual(JSON.parse(render(result, { format: "json" })), {
       origin: "https://hub.test",
       projects: [],
@@ -395,7 +402,7 @@ describe("Hub commands", () => {
       undefined,
       {},
       {
-        env: {},
+        env: { CLISBOT_ONBOARDING_ENABLED: "0" },
         credentials,
         hub: {
           describeCredential: unknownIdentity,
@@ -423,7 +430,7 @@ describe("Hub commands", () => {
         undefined,
         {},
         {
-          env: {},
+          env: { CLISBOT_ONBOARDING_ENABLED: "0" },
           credentials,
           hub: {
             describeCredential: unknownIdentity,

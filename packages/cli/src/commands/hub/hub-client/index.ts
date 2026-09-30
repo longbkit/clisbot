@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import type { HubBundleFile } from "../deploy-bundle.js";
 import { HubCommandError } from "../error.js";
 import {
@@ -46,15 +47,18 @@ interface HubConfigurationInput {
 }
 
 export class HubHttpClient {
-  startCliAuthorization(origin: string): Promise<CliAuthorization> {
+  startCliAuthorization(
+    origin: string,
+    enrollment?: HubEnrollmentRequest,
+  ): Promise<CliAuthorization> {
     return requestHub({
       origin,
       path: "/api/v1/cli-authorizations",
       method: "POST",
-      body: {},
+      body: enrollment ? { enrollment } : {},
       successStatus: 201,
       schema: authorizationSchema,
-      failureMessage: "Hub CLI login could not be started",
+      failureMessage: "Hub authorization could not be started",
     });
   }
 
@@ -62,17 +66,18 @@ export class HubHttpClient {
     origin: string,
     deviceCode: string,
     timeoutMilliseconds: number,
+    purpose?: "host_enrollment",
   ): Promise<CliAuthorizationPoll> {
     try {
       return await requestHub({
         origin,
         path: "/api/v1/cli-authorizations/poll",
         method: "POST",
-        body: { deviceCode },
+        body: { deviceCode, ...(purpose ? { purpose } : {}) },
         successStatus: 200,
         schema: authorizationPollSchema,
         timeoutMilliseconds,
-        failureMessage: "Hub CLI login polling failed",
+        failureMessage: "Hub authorization polling failed",
       });
     } catch (error) {
       if (error instanceof HubCommandError && error.code === "HUB_NETWORK_ERROR") {

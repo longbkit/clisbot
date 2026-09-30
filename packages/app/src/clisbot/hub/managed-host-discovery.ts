@@ -14,11 +14,14 @@ export function findNewlyEnrolledHost<T extends HostReference>(input: {
   hosts: readonly T[];
   daemons: readonly DaemonReference[];
   baseline: readonly DaemonReference[];
+  expectedServerId?: string;
 }): T | undefined {
   // A previously registered daemon with no offer can finish enrollment too.
   // Never infer enrollment from an unchanged existing offer or an unrelated heartbeat.
   for (const daemon of input.daemons) {
     if (daemon.connectionOffer === null) continue;
+    if (input.expectedServerId && daemon.connectionOffer.serverId !== input.expectedServerId)
+      continue;
     const previous = input.baseline.find((candidate) => candidate.id === daemon.id);
     if (previous?.connectionOffer) continue;
     const host = input.hosts.find(

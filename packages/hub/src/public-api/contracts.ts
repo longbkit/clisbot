@@ -1,3 +1,4 @@
+import { HubEnrollmentRequestSchema } from "@clisbot/protocol/messages";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import {
@@ -42,7 +43,7 @@ export const InstalledTriggerSchema = z
   .openapi("InstalledTrigger");
 
 export const StartCliAuthorizationRequestSchema = z
-  .object({})
+  .object({ enrollment: HubEnrollmentRequestSchema.optional() })
   .strict()
   .openapi("StartCliAuthorizationRequest");
 
@@ -59,12 +60,23 @@ export const CliAuthorizationSchema = z
   .openapi("CliAuthorization");
 
 export const PollCliAuthorizationRequestSchema = z
-  .object({ deviceCode: z.string().min(32).max(200) })
+  .object({
+    deviceCode: z.string().min(32).max(200),
+    purpose: z.enum(["cli_login", "host_enrollment"]).optional(),
+  })
   .strict()
   .openapi("PollCliAuthorizationRequest");
 
 export const CliAuthorizationPollSchema = z
   .discriminatedUnion("status", [
+    z
+      .object({
+        status: z.literal("enrollment_authorized"),
+        interval: z.number().int().positive(),
+        token: z.string().min(32),
+        organizationId: z.string().min(1),
+      })
+      .strict(),
     z
       .object({
         status: z.literal("authorized"),

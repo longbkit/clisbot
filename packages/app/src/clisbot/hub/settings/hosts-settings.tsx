@@ -16,7 +16,7 @@ import { useHubAccount } from "../account-provider";
 import { useHostInventory } from "../host-inventory";
 import { SavedHostRow } from "./saved-host-row";
 import { CopyableCommand } from "../copyable-command";
-import { buildHubLoginCommand, projectHubHostOnboarding } from "../host-onboarding";
+import { buildHubConnectCommand, projectHubHostOnboarding } from "../host-onboarding";
 import { HubHostOnboardingRow } from "../host-onboarding-row";
 
 /** Set only by `npm run dev:clisbot`: this checkout's CLI against the dev home. An `EXPO_PUBLIC_`
@@ -43,7 +43,7 @@ export function HostsSettings() {
   );
   const savedHosts = hosts.filter((host) => !items.some((item) => item.serverId === host.serverId));
   const hasHosts = items.length > 0 || savedHosts.length > 0;
-  const command = buildHubLoginCommand(hub.origin ?? "", DEV_CLI_COMMAND);
+  const command = buildHubConnectCommand(hub.origin ?? "", DEV_CLI_COMMAND);
   const retry = useCallback(() => void daemons.refetch(), [daemons]);
   const refreshAction = useMemo(
     () => (
@@ -76,7 +76,7 @@ export function HostsSettings() {
       <Alert
         variant="info"
         title="No Hosts yet"
-        description="Add one with the command under Add a Host."
+        description="Follow the steps under Add a Host to connect a computer."
       />
     );
   } else if (hasHosts) {
@@ -145,7 +145,9 @@ function AddHostSection({ command }: { command: string }) {
       info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People & access › Access."
       trailing={accessLink}
     >
+      <Text style={settingsStyles.rowHint}>Run on the computer you want to connect:</Text>
       <CopyableCommand command={command} />
+      <Text style={settingsStyles.rowHint}>Open the terminal link and approve.</Text>
     </SettingsSection>
   );
 }

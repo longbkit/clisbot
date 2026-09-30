@@ -7,21 +7,20 @@
 Trên máy chạy daemon, dùng lệnh ở mục **Add a Host** trong **Settings → Hosts**, hoặc:
 
 ```sh
-clisbot hub login https://hub.example.com
-clisbot hub connect
-clisbot hub status
+clisbot hub connect https://hub.example.com
 ```
 
-Thay URL bằng Hub của bạn. Khi chạy trong terminal, `login` hỏi **một câu** trước khi mở link duyệt:
+Daemon phải đang chạy. Terminal in URL đã chứa sẵn mã duyệt; mở URL trên thiết bị đã đăng nhập Hub (không cần nhập mã riêng), kiểm tra **Host**, **tổ chức**, **mã** và **quyền Hub trên Host**, rồi chấp thuận. Owner/Admin của tổ chức thực hiện bước duyệt này. Lệnh tự đăng ký Host và trả trạng thái hiện tại; nếu còn `connecting`, daemon tiếp tục kết nối ở nền và trang duyệt theo dõi đến khi Host xuất hiện; không có bước `login` trước hoặc câu hỏi xác nhận thứ hai.
 
-- **Connect and let Hub run agents here:** kết nối daemon. Automations và Channels của tổ chức được tạo workspace, chạy agent trên máy này. Ngắt bằng `clisbot hub disconnect`.
-- **Don't connect now:** chỉ CLI đăng nhập; kết nối sau bằng `clisbot hub connect`.
+Mã duyệt hết hạn sau 10 phút. Token đăng ký chỉ dùng được cho danh tính Host và bộ quyền đã duyệt, dùng một lần và hết hạn cùng yêu cầu. Daemon tự giữ credential kết nối riêng; **không tạo hay lưu credential quản trị CLI**. Mặc định cấp `hub.execute`, `daemon.read`, `workspace.read`, `workspace.write`, `workspace.manage`; dùng `--permission <permission...>` nếu muốn chỉ định bộ quyền khác. Đây là quyền của Hub trên Host; quyền người dùng vào Host/Project vẫn cấu hình trong Access.
 
-Không có lựa chọn "chỉ kết nối": Channels dùng kết nối Hub như client tin cậy, nên daemon đã kết nối thì Hub chạy agent được qua Channels dù chưa cấp `hub.execute`.
+Luồng giống nhau với terminal thường, `--json` và Docker `exec -T`: vẫn cần duyệt trên web, rồi CLI tự tiếp tục. Giữ lệnh chạy trong lúc duyệt, rồi để lệnh kết thúc. Theo dõi kết quả ở Hub → Hosts. Chạy lại `connect` với cùng Hub không đăng ký thêm Host; nhưng sau enrollment, `connect`/`hub status` cần kết nối daemon đã có quyền (IPC local hoặc vé Managed Access). Với Hub khác, phải `disconnect` rõ ràng trước. Nếu mất kết quả duyệt trước khi token tới daemon, bắt đầu lại `connect` để xin mã mới.
 
-Sau đó terminal in link và mở trình duyệt. Duyệt trên web xong, daemon tự kết nối theo lựa chọn trên, không hỏi thêm. Daemon chưa chạy hoặc đang nối Hub khác thì chỉ CLI đăng nhập.
+Để cài không có người duyệt, truyền API key có scope `daemons:enroll` bằng `CLISBOT_HUB_API_KEY` (hoặc `--api-key`). `connect` không tự dùng credential từ một lần `login` cũ.
 
 Host đã lưu sẵn trong app (ví dụ kết nối trực tiếp `localhost`) được gắn vào Hub luôn, giữ tên và kết nối cũ. Đăng xuất Hub chỉ gỡ phần Hub, Host đã lưu vẫn còn.
+
+Hiện tại, daemon chỉ công bố thông tin kết nối cho Hub khi relay được bật. Daemon mới mặc định tắt relay; nếu Host đã đăng ký nhưng thiếu thông tin kết nối, bật relay trong cấu hình daemon (Docker: `CLISBOT_RELAY_ENABLED=true`, rồi tạo lại container giữ nguyên volume). Đây là cấu hình đường kết nối, không cần đăng nhập CLI thêm.
 
 Trong **Connections** của Host, kết nối Hub cấp (thường là Relay) ghi **Provided by Hub** và không có nút Remove, vì Hub sẽ thêm lại. Kết nối bạn tự lưu vẫn xoá được.
 
@@ -33,13 +32,28 @@ Khi mở workspace, Host đã biết là offline được báo ngay. Host manage
 
 Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `CLISBOT_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
 
-Hub báo **Host "…" already uses this daemon's identity** khi `CLISBOT_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `clisbot daemon stop`, `clisbot daemon reset-identity`, `clisbot daemon start` rồi `clisbot hub login` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
+Hub báo **Host "…" already uses this daemon's identity** khi `CLISBOT_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `clisbot daemon stop`, `clisbot daemon reset-identity`, `clisbot daemon start` rồi `clisbot hub connect <URL-Hub>` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
 
 Host báo **Offline** ở **Settings → Hosts**: bấm **Reconnect**. Vẫn offline thì kiểm tra Clisbot đang chạy trên máy đó rồi mở **Connections**.
 
-Khi chạy không tương tác hoặc `--json`, `login` chỉ đăng nhập CLI: chạy `connect` rồi kiểm tra `status`.
+## Sau khi kết nối
 
-Đăng nhập CLI và enrollment là hai thứ riêng: daemon giữ credential máy để duy trì quan hệ với Hub. Mỗi daemon có một quan hệ Hub tại một thời điểm.
+Trang duyệt luôn có **Home** và **Settings**, kể cả khi đang đợi Host kết nối. Khi Host xuất hiện, chọn bước tiếp theo:
+
+- **Create a Bot**: mở form tạo Bot trên Host vừa kết nối; Bot tự có workspace riêng, không cần thêm Project trước.
+- **Add a Project**: chọn thư mục tài liệu hoặc code trên Host. Có **Browse folders on Host** để duyệt từng cấp; xem [hướng dẫn Project](../work/projects-and-workspaces.md#tạo-project).
+- **Add another Host**: chọn managed qua Hub hoặc direct.
+- **Continue to Home**: vào app, có thể thiết lập sau.
+
+Các thao tác tạo chỉ xuất hiện khi Host online, hỗ trợ tính năng và bạn có quyền tương ứng. Đóng form hoặc bỏ qua Add Project không làm mất Host đã kết nối. Đổi kích thước cửa sổ hoặc chuyển giữa layout desktop/mobile giữ kết quả duyệt trong phiên hiện tại và thư mục đang chọn.
+
+## `login`: chỉ dùng khi cần quyền CLI nâng cao
+
+**Không dùng `hub login` để thêm Host.** Chỉ dùng khi chủ động muốn cấp quyền quản trị API cho CLI, ví dụ export cấu hình hoặc sử dụng các API quản trị được hỗ trợ. Đọc [phạm vi và vòng đời credential](../../../hub.md#advanced-cli-login) trước khi chạy.
+
+Hiện `login` cấp cả năm scope `projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`; không phải quyền chỉ đăng ký một Host. Credential không có hạn tự hết và vẫn hợp lệ cho tới khi thu hồi trên Hub. `hub logout` chỉ xóa bản lưu local, **không thu hồi credential trên Hub**. Token của các lần login trước không tự mất hiệu lực sau khi cập nhật bản mới; nếu không còn cần, Owner/Admin thu hồi tại Hub → Configuration → API keys.
+
+Mỗi daemon có một quan hệ Hub tại một thời điểm, độc lập với credential CLI.
 
 ## Đổi tên Host
 

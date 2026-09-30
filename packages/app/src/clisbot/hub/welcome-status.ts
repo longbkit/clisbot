@@ -111,7 +111,7 @@ function noHostView(canAddHost: boolean): HubWelcomeStatusView {
     tone: "warning",
     badge: "No Host",
     message: canAddHost
-      ? "No Host shared with you yet. Run `clisbot hub login` on the computer you want to use, or connect one of your own below."
+      ? "No Host shared with you yet. Run `clisbot hub connect` on the computer you want to use, or connect one of your own below."
       : "No Host shared with you yet. Ask an organization owner or admin for access, or connect one of your own below.",
     actions: ["refreshHosts", "account"],
     primaryAction: null,

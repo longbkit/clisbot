@@ -14,6 +14,14 @@ export const authorizationSchema = z
   .strict();
 
 export const authorizationPollSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("enrollment_authorized"),
+      interval: z.number().int().min(1),
+      token: z.string().min(32),
+      organizationId: z.string().min(1),
+    })
+    .strict(),
   z.object({ status: z.literal("pending"), interval: z.number().int().min(1) }).strict(),
   z.object({ status: z.literal("slow_down"), interval: z.number().int().min(1) }).strict(),
   z

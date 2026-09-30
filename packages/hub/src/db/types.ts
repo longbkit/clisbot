@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 // COMPAT(clisbot-channels): fork-owned channel control plane status enums (schema.ts).
 import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
@@ -224,6 +225,7 @@ export interface EnrollmentTokenRecord {
 }
 
 export interface CliAuthorizationRecord {
+  enrollment?: HubEnrollmentRequest | null;
   id: string;
   status: "pending" | "approved" | "denied" | "expired" | "disclosed";
   pollIntervalSeconds: number;
@@ -234,6 +236,7 @@ export interface CliAuthorizationRecord {
 }
 
 export interface StartCliAuthorizationInput {
+  enrollment?: HubEnrollmentRequest | null;
   id: string;
   deviceVerifier: string;
   userCodeVerifier: string;
@@ -246,7 +249,11 @@ export interface StartCliAuthorizationInput {
 
 export type CliAuthorizationPollResult =
   | { status: "pending" | "slow_down"; intervalSeconds: number }
-  | { status: "authorized"; intervalSeconds: number; organizationId: string }
+  | {
+      status: "authorized" | "enrollment_authorized";
+      intervalSeconds: number;
+      organizationId: string;
+    }
   | { status: "denied" | "expired" | "disclosed"; intervalSeconds: number };
 
 export interface DeviceDecisionAccess {
@@ -258,6 +265,7 @@ export interface DeviceDecisionAccess {
 
 export type CliAuthorizationDecisionInput = {
   userCodeVerifier: string;
+  purpose?: "cli_login" | "host_enrollment";
   access: DeviceDecisionAccess;
 } & { decision: "approve" | "deny" };
 
@@ -1345,6 +1353,7 @@ export interface Database {
   pollCliAuthorization(input: {
     deviceVerifier: string;
     credential: { id: string; prefix: string; verifier: string };
+    enrollmentToken?: { verifier: string };
   }): Promise<CliAuthorizationPollResult>;
   enrollDaemon(input: EnrollDaemonInput): Promise<DaemonEnrollmentResult>;
   findDaemonBySlugForOrganization(

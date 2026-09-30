@@ -1,3 +1,4 @@
+import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import type { CommandOptions } from "../../output/index.js";
 import type { DaemonTarget } from "../../utils/daemon-target.js";
 import type { Command } from "commander";
@@ -53,12 +54,18 @@ export async function runHubLogin(
     env: dependencies.env,
     credentials: dependencies.credentials,
   });
-  const guided = !options.json && dependencies.isInteractive?.() === true;
+  const guided =
+    !isOnboardingEnabled(dependencies.env) &&
+    !options.json &&
+    dependencies.isInteractive?.() === true;
   const continueSetup =
     guided && dependencies.planGuidedSetup !== undefined
       ? await dependencies.planGuidedSetup(origin, options.daemonTarget)
       : undefined;
   reportHubProgress(dependencies.reporter, options, `Logging in to ${origin}`);
+  dependencies.reporter.progress(
+    "Advanced CLI access: this creates a durable organization credential for reading Projects, validating/installing configuration, dispatching runs and enrolling Hosts. It remains valid until revoked on the Hub; logout only removes the local copy. To add a Host, use clisbot hub connect instead.",
+  );
   const credential = await dependencies.flow.authorize(origin);
   dependencies.credentials.save({ origin, credential });
   reportHubProgress(dependencies.reporter, options, "Logged in");
@@ -66,6 +73,7 @@ export async function runHubLogin(
   reportCredentialIdentity(dependencies.reporter, options, origin, identity);
   if (continueSetup) await continueSetup();
   else if (
+    !isOnboardingEnabled(dependencies.env) &&
     !options.json &&
     dependencies.isInteractive?.() &&
     dependencies.continueGuidedSetup !== undefined
@@ -84,7 +92,9 @@ export function addHubLoginCommand(parent: Command, dependencies: HubLoginDepend
     addHubResolutionHelp(
       parent
         .command("login")
-        .description("Log in to a Clisbot Hub for CLI access")
+        .description(
+          "Advanced: grant durable organization API access to this CLI (not Host onboarding)",
+        )
         .argument("[origin]", "Clisbot Hub origin"),
     ),
   ).action(

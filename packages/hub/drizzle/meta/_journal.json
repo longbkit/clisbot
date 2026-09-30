@@ -603,6 +603,13 @@
       "when": 1790358141115,
       "tag": "0085_terminal_profile_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1790771881741,
+      "tag": "0086_host_enrollment_authorization",
+      "breakpoints": true
     }
   ]
 }

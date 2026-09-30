@@ -3,6 +3,7 @@ export interface AddProjectHost {
   label: string;
   canAddProject: boolean;
   canBrowse: boolean;
+  canBrowseDirectories?: boolean;
   canCloneGithubRepositories: boolean;
   canSearchGithubRepositories: boolean;
   canCreateDirectory: boolean;

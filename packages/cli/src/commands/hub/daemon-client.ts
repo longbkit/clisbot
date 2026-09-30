@@ -3,6 +3,7 @@ import { connectToDaemon } from "../../utils/client.js";
 import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 
 export interface HubStatus {
+  enrollmentIdentity?: { serverId: string; daemonPublicKey: string; hostname: string };
   state: string;
   daemonId: string | null;
   hubOrigin: string | null;
@@ -16,6 +17,7 @@ export interface HubProvidersSnapshotOptions {
 }
 
 export interface HubDaemonClient {
+  getLastServerInfoMessage?(): { features?: { hubEnrollmentIdentity?: boolean } } | null;
   connectHub(
     url: string,
     token: string,

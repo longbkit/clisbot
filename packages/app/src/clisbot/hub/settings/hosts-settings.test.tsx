@@ -445,13 +445,14 @@ describe("Host onboarding query recovery", () => {
     await screen.findByText("No Hosts yet");
     fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
     await screen.findByText("Clipboard unavailable");
-    expect(screen.getByText("clisbot hub login https://hub.example.test").textContent).toBe(
-      "clisbot hub login https://hub.example.test",
+    expect(screen.getByText("clisbot hub connect https://hub.example.test").textContent).toBe(
+      "clisbot hub connect https://hub.example.test",
     );
     fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
     await screen.findByRole("button", { name: "Copied" });
     await waitFor(() => expect(screen.queryByText("Clipboard unavailable")).toBeNull());
     expect(adapters.copy).toHaveBeenCalledTimes(2);
+    expect(adapters.copy).toHaveBeenLastCalledWith("clisbot hub connect https://hub.example.test");
   });
 });
 
@@ -551,7 +552,7 @@ describe("Host administration", () => {
     adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
     renderSection();
     await screen.findByText("Add a Host");
-    expect(screen.getByText("clisbot hub login https://hub.example.test")).toBeTruthy();
+    expect(screen.getByText("clisbot hub connect https://hub.example.test")).toBeTruthy();
   });
 });
 

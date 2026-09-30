@@ -1,14 +1,20 @@
+import { mutedIconColorMapping } from "@/components/ui/icon-color";
+import { HubEnrollmentRequestSchema } from "@clisbot/protocol/messages";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { Home, Settings } from "lucide-react-native";
+import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
+import { iconButtonChromeGlyphSize } from "@/components/ui/icon-button-chrome";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useFetchQuery } from "@/data/query";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useOpenAddProject } from "@/hooks/use-open-add-project";
+import { buildOpenProjectRoute, buildSettingsRoute } from "@/utils/host-routes";
+import { ConnectedHostActions } from "./connected-host-actions";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
@@ -21,10 +27,19 @@ import {
   type DaemonReference,
 } from "./managed-host-discovery";
 import { HubSettingsContent } from "./settings";
-import { openCliLoginForm, type CliLoginFormState } from "./cli-login-form";
+import {
+  createCliLoginCompletionCache,
+  openCliLoginForm,
+  type CliLoginFormState,
+} from "./cli-login-form";
 import { buildHubSettingsRoute } from "./navigation";
 import { CliAuthorizationSummary, type CliAuthorizationSubject } from "./cli-authorization-summary";
 import { roleLabel } from "./organization-identity";
+
+const completedForms = createCliLoginCompletionCache();
+const NO_SHORTCUTS: [] = [];
+const ThemedHome = withUnistyles(Home);
+const ThemedSettings = withUnistyles(Settings);
 
 const CliAuthorizationSchema = z.object({
   expiresAt: z.string().datetime(),
@@ -34,6 +49,7 @@ const CliAuthorizationSchema = z.object({
     slug: z.string(),
   }),
   canManage: z.boolean(),
+  enrollment: HubEnrollmentRequestSchema.nullable().optional(),
 });
 
 const CliAuthorizationDecisionSchema = z.object({
@@ -42,12 +58,40 @@ const CliAuthorizationDecisionSchema = z.object({
 
 export function HubCliLoginScreen() {
   const hub = useHubAccount();
+  const router = useRouter();
+  const home = useCallback(() => router.push(buildOpenProjectRoute()), [router]);
+  const settings = useCallback(() => router.push(buildSettingsRoute()), [router]);
   const params = useLocalSearchParams<{ code?: string | string[] }>();
   const routeCode = (Array.isArray(params.code) ? params.code[0] : params.code)?.trim() ?? "";
   const account = hub.signedIn;
   if (!hub.enabled) return null;
   return (
     <View style={styles.scroll}>
+      <View style={styles.navigation}>
+        <HeaderToggleButton
+          onPress={home}
+          tooltipLabel="Home"
+          tooltipKeys={NO_SHORTCUTS}
+          tooltipSide="bottom"
+          accessibilityRole="button"
+          accessibilityLabel="Home"
+        >
+          <ThemedHome size={iconButtonChromeGlyphSize("large")} uniProps={mutedIconColorMapping} />
+        </HeaderToggleButton>
+        <HeaderToggleButton
+          onPress={settings}
+          tooltipLabel="Settings"
+          tooltipKeys={NO_SHORTCUTS}
+          tooltipSide="bottom"
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
+          <ThemedSettings
+            size={iconButtonChromeGlyphSize("large")}
+            uniProps={mutedIconColorMapping}
+          />
+        </HeaderToggleButton>
+      </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.panel}>
           {hub.loading || account === null ? (
@@ -72,14 +116,19 @@ export function HubCliLoginScreen() {
 function CliLoginForm({ code }: { code: string }) {
   const hub = useHubAccount();
   const router = useRouter();
-  const openAddProject = useOpenAddProject();
   const hosts = useHosts();
   const organizationId = hub.signedIn?.organization.id ?? null;
   const accountId = hub.signedIn?.account.id ?? null;
   const approver = useApprover(hub);
+  const receiptScope = JSON.stringify([hub.origin, accountId, organizationId, code]);
   const [model] = useState(() =>
     openCliLoginForm({
       code,
+      completed: code ? completedForms.read(receiptScope) : undefined,
+      onCompleted: (completed) => {
+        if (code && completed.submittedCode === code.trim())
+          completedForms.save(receiptScope, completed);
+      },
       readDaemons: () =>
         hub
           .api()
@@ -96,25 +145,34 @@ function CliLoginForm({ code }: { code: string }) {
     return model.close;
   }, [model]);
   useEffect(() => {
-    if (decision !== "approved" || state.discoveryExpired) return;
+    if (decision !== "approved" || !state.enrollment || state.discoveryExpired) return;
     const timer = setTimeout(
       model.expireDiscovery,
       Math.max(0, state.discoveryDeadline - Date.now()),
     );
     return () => clearTimeout(timer);
-  }, [decision, model, state.discoveryDeadline, state.discoveryExpired]);
+  }, [decision, model, state.enrollment, state.discoveryDeadline, state.discoveryExpired]);
   const findDiscoveredHost = useCallback(
     (daemons: readonly DaemonReference[]) => {
       if (state.baseline === null) return undefined;
-      return findNewlyEnrolledHost({ hosts, daemons, baseline: state.baseline });
+      return findNewlyEnrolledHost({
+        hosts,
+        daemons,
+        baseline: state.baseline,
+        expectedServerId: state.enrollment?.serverId,
+      });
     },
-    [hosts, state.baseline],
+    [hosts, state.baseline, state.enrollment],
   );
   const daemonCatalog = useFetchQuery({
     queryKey: hubResourceQueryKey({ origin: hub.origin, organizationId, accountId }, "daemons"),
     queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
     dataShape: "value",
-    enabled: organizationId !== null && decision === "approved" && !state.discoveryExpired,
+    enabled:
+      organizationId !== null &&
+      decision === "approved" &&
+      state.enrollment !== null &&
+      !state.discoveryExpired,
     retry: false,
     refetchInterval: (query) =>
       hubHostDiscoveryRefetchInterval({
@@ -153,51 +211,36 @@ function CliLoginForm({ code }: { code: string }) {
     staleTimeMs: 0,
   });
   const approve = useCallback(() => {
-    if (authorization.data?.canManage && authorization.data.organization.id === organizationId) {
-      void model.decide("approve", authorization.data.organization.id);
-    }
+    recordAuthorizationDecision(authorization.data, organizationId, model, "approve");
   }, [authorization.data, model, organizationId]);
   const deny = useCallback(() => {
-    if (authorization.data?.canManage && authorization.data.organization.id === organizationId) {
-      void model.decide("deny", authorization.data.organization.id);
-    }
+    recordAuthorizationDecision(authorization.data, organizationId, model, "deny");
   }, [authorization.data, model, organizationId]);
   const retryInspection = useCallback(() => void authorization.refetch(), [authorization]);
   const retryDiscovery = useCallback(() => {
     model.retryDiscovery();
     void daemonCatalog.refetch();
   }, [daemonCatalog, model]);
-  const openHosts = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
-  const addProject = useCallback(() => {
-    if (discoveredHost) openAddProject(discoveredHost.serverId);
-  }, [discoveredHost, openAddProject]);
+  const openHosts = useCallback(() => router.push(buildHubSettingsRoute("hosts")), [router]);
 
-  if (decision === "denied") {
+  if (decision !== null) {
     return (
-      <SettingsSection title="CLI login">
-        <Alert
-          variant="warning"
-          title="CLI login denied"
-          description="You can close this window and return to the terminal."
-        />
-      </SettingsSection>
-    );
-  }
-  if (decision === "approved") {
-    return (
-      <CliHostDiscovery
+      <CliAuthorizationResult
+        decision={decision}
+        enrollment={state.enrollment !== null}
         host={discoveredHost}
         connected={discoveredHostIsConnected}
         failed={state.discoveryExpired || daemonCatalog.isError}
         retry={retryDiscovery}
         openHosts={openHosts}
-        addProject={addProject}
       />
     );
   }
   if (submittedCode.length === 0) return <CliCodeEntry model={model} state={state} />;
   return (
-    <SettingsSection title="Approve CLI login">
+    <SettingsSection
+      title={authorization.data?.enrollment ? "Connect Host" : "Advanced CLI access"}
+    >
       <CliAuthorizationReview
         authorization={authorization}
         account={approver}
@@ -218,7 +261,7 @@ type CliLoginFormModel = ReturnType<typeof openCliLoginForm>;
 function CliCodeEntry({ model, state }: { model: CliLoginFormModel; state: CliLoginFormState }) {
   const compact = useIsCompactFormFactor();
   return (
-    <SettingsSection title="Log in the Clisbot CLI">
+    <SettingsSection title="Approve a terminal request">
       <Field label="Verification code" hint="Only approve a code you requested yourself.">
         <FormTextInput
           initialValue={state.enteredCode}
@@ -242,14 +285,12 @@ function CliHostDiscovery({
   failed,
   retry,
   openHosts,
-  addProject,
 }: {
-  host: { label: string } | undefined;
+  host: { serverId: string; label: string } | undefined;
   connected: boolean;
   failed: boolean;
   retry(): void;
   openHosts(): void;
-  addProject(): void;
 }) {
   if (host !== undefined) {
     return (
@@ -259,17 +300,16 @@ function CliHostDiscovery({
           title={`${host.label} was added to Clisbot`}
           description={
             connected
-              ? "The Host is online and ready for Projects and Agents."
+              ? "The Host is online. Choose what to do next, or continue to the app."
               : "The Host was added and Clisbot is connecting to it."
           }
         />
-        {connected ? (
-          <Button onPress={addProject}>Add a project</Button>
-        ) : (
+        <ConnectedHostActions serverId={host.serverId} connected={connected} />
+        {!connected ? (
           <Button variant="outline" onPress={openHosts}>
             Open Hosts
           </Button>
-        )}
+        ) : null}
       </SettingsSection>
     );
   }
@@ -277,11 +317,11 @@ function CliHostDiscovery({
     <SettingsSection title="Connect host">
       <Alert
         variant={failed ? "warning" : "success"}
-        title={failed ? "CLI approved; host not detected" : "CLI login approved"}
+        title={failed ? "Connection approved; Host not detected" : "Host connection approved"}
         description={
           failed
-            ? "Confirm enrollment in the terminal, then retry. If this host is already enrolled, open Hosts to continue."
-            : "Return to the terminal and confirm Connect this daemon to Clisbot Hub. Clisbot will add the host automatically."
+            ? "Open Hosts to check the connection. If it is missing, check the daemon logs, then retry discovery."
+            : "Clisbot is connecting the approved Host automatically. Let the terminal command finish; this page follows the connection."
         }
       >
         {failed ? (
@@ -326,13 +366,13 @@ function CliAuthorizationReview({
   openAccount(): void;
 }) {
   if (authorization.isPending)
-    return <Text style={settingsStyles.rowHint}>Checking the login request...</Text>;
+    return <Text style={settingsStyles.rowHint}>Checking the request...</Text>;
   if (authorization.error) {
     return (
       <Alert
         variant="error"
-        title="CLI login unavailable"
-        description="Check the code and Hub connection, or start Hub login again from the terminal if the request expired."
+        title="Request unavailable"
+        description="Check the code and Hub connection, or run the terminal command again from the terminal if the request expired."
       >
         <Button size="sm" variant="outline" onPress={retry}>
           Retry
@@ -352,6 +392,7 @@ function CliAuthorizationReview({
         hubOrigin={hubOrigin}
         code={state.submittedCode}
         expiresAt={authorization.data.expiresAt}
+        enrollment={authorization.data.enrollment}
       />
       {authorization.data.canManage ? (
         <>
@@ -378,7 +419,7 @@ function CliAuthorizationReview({
         <Alert
           variant="info"
           title="Owner or admin approval required"
-          description="An organization owner or admin must approve this CLI login. Sign in with an account that can manage this organization."
+          description="An organization owner or admin must approve this request. Sign in with an account that can manage this organization."
         >
           <Button size="sm" variant="outline" onPress={openAccount}>
             Open account
@@ -404,6 +445,12 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     backgroundColor: theme.colors.surface0,
   },
+  navigation: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    padding: theme.spacing[3],
+    gap: theme.spacing[1],
+  },
   content: {
     flexGrow: 1,
     alignItems: "center",
@@ -422,3 +469,44 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
 }));
+
+function recordAuthorizationDecision(
+  authorization: z.infer<typeof CliAuthorizationSchema> | undefined,
+  organizationId: string | null,
+  model: CliLoginFormModel,
+  decision: "approve" | "deny",
+) {
+  if (!authorization?.canManage || authorization.organization.id !== organizationId) return;
+  void model.decide(decision, organizationId, authorization.enrollment ?? null);
+}
+
+function CliAuthorizationResult({
+  decision,
+  enrollment,
+  ...discovery
+}: Parameters<typeof CliHostDiscovery>[0] & {
+  decision: "approved" | "denied";
+  enrollment: boolean;
+}) {
+  if (decision === "denied")
+    return (
+      <SettingsSection title="Request denied">
+        <Alert
+          variant="warning"
+          title="Request denied"
+          description="You can close this window and return to the terminal."
+        />
+      </SettingsSection>
+    );
+  if (!enrollment)
+    return (
+      <SettingsSection title="Advanced CLI access">
+        <Alert
+          variant="success"
+          title="CLI login approved"
+          description="Return to the terminal. This grants organization API access; it does not add a Host. Use hub connect to add a Host."
+        />
+      </SettingsSection>
+    );
+  return <CliHostDiscovery {...discovery} />;
+}

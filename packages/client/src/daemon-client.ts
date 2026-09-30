@@ -4987,6 +4987,7 @@ export class DaemonClient {
   async getDirectorySuggestions(
     options: {
       query: string;
+      browsePath?: string;
       limit?: number;
       cwd?: string;
       includeFiles?: boolean;
@@ -5000,6 +5001,7 @@ export class DaemonClient {
       message: {
         type: "directory_suggestions_request",
         query: options.query,
+        browsePath: options.browsePath,
         cwd: options.cwd,
         includeFiles: options.includeFiles,
         includeDirectories: options.includeDirectories,

@@ -21,7 +21,7 @@ These are the canonical reference endpoints for the hosted Clisbot Hub. A self-h
 
 ## Authentication
 
-Run `clisbot hub login [origin]` for interactive CLI access. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`.
+**Host onboarding uses `clisbot hub connect <origin>` and does not require CLI login.** Use `clisbot hub login [origin]` only for deliberate CLI API administration after understanding its authority. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`.
 
 For automation, create an organization API key from the Hub dashboard under **API keys**. Both credential types are bearer tokens:
 
@@ -48,7 +48,7 @@ Each key has one or more selectable scopes:
 API keys do not grant dashboard access. They cannot manage connections,
 projects, or organization members.
 
-CLI credentials have the current CLI operation scopes and remain revocable independently of daemon relationships. `clisbot hub logout` deletes the active local CLI credential; it does not revoke or disconnect the daemon identity.
+CLI credentials grant all five scopes listed above (`projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`) and have no automatic expiry. They remain revocable independently of daemon relationships. `clisbot hub logout` deletes the active local CLI credential; it does not revoke the credential on the server or disconnect the daemon identity. Revoke CLI credentials in Hub → Configuration → API keys. For automation, prefer a key containing only the needed scopes.
 
 API failures use RFC 9457 problem details. Missing, invalid, or revoked credentials return `401` with `application/problem+json`:
 
@@ -267,7 +267,7 @@ No request body is required. On success, Hub returns `201`:
 
 The token expires after 10 minutes and is consumed when the daemon enrolls.
 
-`clisbot hub connect [origin]` performs this request with `--api-key`, `CLISBOT_HUB_API_KEY`, or the matching stored login, then passes the one-time token to the daemon's enrollment operation. The daemon generates and keeps its own relationship credential.
+`clisbot hub connect [origin]` uses this endpoint only with an explicit `--api-key` or `CLISBOT_HUB_API_KEY`. By default it starts a browser approval through `/api/v1/cli-authorizations` with an `enrollment` object (server ID, public key, hostname and permissions); poll and browser decision use `purpose: "host_enrollment"`. Successful polling returns `status: "enrollment_authorized"` and `token`, never `credential`. That token is single-use, bound to the approved identity and permissions, and expires with the 10-minute request. An empty start body retains the advanced CLI-login contract. Both flows pass only an enrollment token to the daemon when enrolling. The daemon generates and keeps its own relationship credential.
 
 ```bash
 curl --fail-with-body -sS -X POST \

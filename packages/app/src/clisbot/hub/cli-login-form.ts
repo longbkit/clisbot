@@ -1,6 +1,8 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { HUB_HOST_DISCOVERY_WINDOW_MS, type DaemonReference } from "./managed-host-discovery";
 
 export interface CliLoginFormState {
+  enrollment: HubEnrollmentRequest | null;
   enteredCode: string;
   submittedCode: string;
   decision: "approved" | "denied" | null;
@@ -14,18 +16,22 @@ export interface CliLoginFormState {
 /** One authorization attempt; closing it prevents late responses updating another account/code. */
 export function openCliLoginForm(input: {
   code: string;
+  completed?: CliLoginFormState;
+  onCompleted?: (state: CliLoginFormState) => void;
   readDaemons(): Promise<readonly DaemonReference[]>;
   decide(input: {
     userCode: string;
     decision: "approve" | "deny";
     organizationId: string;
+    purpose: "cli_login" | "host_enrollment";
   }): Promise<{ status: "approved" | "denied" }>;
   now?: () => number;
 }) {
   const now = input.now ?? Date.now;
   let closed = false;
   let lifetime = 0;
-  let state: CliLoginFormState = {
+  let state: CliLoginFormState = input.completed ?? {
+    enrollment: null,
     enteredCode: input.code,
     submittedCode: input.code.trim(),
     decision: null,
@@ -39,6 +45,7 @@ export function openCliLoginForm(input: {
   const publish = (patch: Partial<CliLoginFormState>) => {
     if (closed) return;
     state = { ...state, ...patch };
+    if (state.decision !== null) input.onCompleted?.(state);
     listeners.forEach((listener) => listener());
   };
   return {
@@ -66,7 +73,11 @@ export function openCliLoginForm(input: {
     editCode() {
       if (!state.pending) publish({ submittedCode: "", error: null });
     },
-    async decide(decision: "approve" | "deny", organizationId: string) {
+    async decide(
+      decision: "approve" | "deny",
+      organizationId: string,
+      enrollment: HubEnrollmentRequest | null = null,
+    ) {
       if (closed || state.pending || state.decision !== null || !state.submittedCode) return;
       const userCode = state.submittedCode;
       const attemptLifetime = lifetime;
@@ -74,19 +85,21 @@ export function openCliLoginForm(input: {
       try {
         // Capture a fresh, successful catalog before granting access. Cached/failed
         // catalogs cannot distinguish an existing Host from a new enrollment.
-        const baseline = decision === "approve" ? await input.readDaemons() : null;
+        const baseline = decision === "approve" && enrollment ? await input.readDaemons() : null;
         if (closed || lifetime !== attemptLifetime) return;
         const result = await input.decide({
           userCode,
           decision,
           organizationId,
+          purpose: enrollment ? "host_enrollment" : "cli_login",
         });
         if (closed || lifetime !== attemptLifetime) return;
         publish({
           decision: result.status,
+          enrollment,
           baseline,
           discoveryDeadline:
-            result.status === "approved" ? now() + HUB_HOST_DISCOVERY_WINDOW_MS : 0,
+            result.status === "approved" && enrollment ? now() + HUB_HOST_DISCOVERY_WINDOW_MS : 0,
           discoveryExpired: false,
         });
       } catch (cause) {
@@ -109,6 +122,25 @@ export function openCliLoginForm(input: {
         discoveryExpired: false,
         discoveryDeadline: now() + HUB_HOST_DISCOVERY_WINDOW_MS,
       });
+    },
+  };
+}
+
+/** In-memory UI receipts only: no credential and no repeated approval after a layout remount. */
+export function createCliLoginCompletionCache(now: () => number = Date.now) {
+  const receipts = new Map<string, { expiresAt: number; state: CliLoginFormState }>();
+  return {
+    read(scope: string): CliLoginFormState | undefined {
+      const receipt = receipts.get(scope);
+      if (receipt && receipt.expiresAt > now()) return receipt.state;
+      receipts.delete(scope);
+      return undefined;
+    },
+    save(scope: string, state: CliLoginFormState) {
+      if (state.decision === null) return;
+      for (const [key, receipt] of receipts) if (receipt.expiresAt <= now()) receipts.delete(key);
+      if (receipts.size >= 100) receipts.delete(receipts.keys().next().value!);
+      receipts.set(scope, { expiresAt: now() + 10 * 60_000, state: { ...state, pending: false } });
     },
   };
 }

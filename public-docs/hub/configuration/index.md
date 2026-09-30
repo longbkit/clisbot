@@ -18,7 +18,7 @@ Each organization trigger is one self-contained YAML file. Keep triggers in your
 
 ## Generated starter trigger
 
-Run `clisbot hub init` from the repository the agent should work in. Setup selects an app connection and an available agent runtime, asks which user may trigger it, validates the result, and writes one file. It then asks whether to deploy. Interactive `clisbot hub login` connects the daemon and points to this command; it does not write trigger files.
+Run `clisbot hub init` from the repository the agent should work in. Setup selects an app connection and an available agent runtime, asks which user may trigger it, validates the result, and writes one file. It then asks whether to deploy. Host onboarding uses `clisbot hub connect <url>`. `hub login` is only for deliberate CLI API administration, not Host enrollment; read its [scope and lifetime](/docs/hub/api#authentication) before using it.
 
 For a Slack connection named `my-team`, the generated document looks like this:
 
@@ -86,6 +86,8 @@ Use a positive duration in `ms`, `s`, `m`, or `h`, up to `24h`. Omitting the fie
 Run from the repository root:
 
 ```sh
+# Legacy deployment requires explicit API authority; prefer a scoped API key.
+# Advanced CLI login grants broad, durable rights: read API authentication first.
 clisbot hub login https://hub.example.com
 clisbot hub deploy --dry-run
 clisbot hub deploy

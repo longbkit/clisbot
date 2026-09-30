@@ -329,9 +329,9 @@ Local-only `start`, `daemon run`, `config`, `onboard`, and `set-password` reject
 ## Hub
 
 ```bash
-clisbot hub login [url]          # Approve and store organization-scoped CLI access
+clisbot hub login [url]          # Advanced: grant durable organization API access
 clisbot hub init                 # Create and optionally deploy a starter trigger here
-clisbot hub connect [url]        # Enroll this daemon using CLI access
+clisbot hub connect [url]        # Add this Host with one browser approval (no login)
 clisbot hub projects             # List legacy projects in the authenticated organization
 clisbot hub status               # Show the current Hub relationship
 clisbot hub disconnect           # End it
@@ -345,7 +345,9 @@ Run deploy from the repository root. By default it reads every direct `.clisbot/
 
 Pass `-p, --project <slug>` for an existing legacy bundle: `.clisbot/hub.yml`, direct `.clisbot/workflows/*.yml` files, and referenced workflow partials. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
 
-`login` opens the Hub approval page and stores a durable organization-scoped CLI credential under `CLISBOT_HOME`. In an interactive terminal it offers to connect this daemon, then separately asks whether to allow Hub automations to run agents. Connection defaults to yes; execution permission defaults to no. It then links to Hub's **Triggers** page and prints `clisbot hub init` for setup as code. `--json` and non-TTY login remain login-only and never prompt. The stored login is separate from the daemon relationship created by `connect`.
+`connect <url>` is the Host onboarding command. Approve the Host, organization and requested permissions in the browser; the command enrolls it and waits for the connection, including in non-TTY/JSON mode. It creates no CLI credential. Use a scoped API key explicitly for unattended enrollment.
+
+`login` is an advanced administration command. It creates a durable credential with all five Public API scopes and no automatic expiry; it does not enroll a Host. Read [API authentication](/docs/hub/api#authentication) before using it. `logout` only deletes the local copy; server revocation is separate. The legacy guided-login/scaffold flow is available only with `CLISBOT_ONBOARDING_ENABLED=0`.
 
 `init` requires a TTY. It signs in and connects the daemon as needed, then lists the organization's app connections that can back a starter trigger. One usable connection is selected automatically; with several, you choose a **Trigger connection**. If none is ready, setup sends you to **Hub → Apps** and stops before selecting an agent or writing files.
 

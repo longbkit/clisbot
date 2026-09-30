@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHubLoginCommand, projectHubHostOnboarding } from "./host-onboarding";
+import { buildHubConnectCommand, projectHubHostOnboarding } from "./host-onboarding";
 
 describe("Hub Host onboarding projection", () => {
   it.each([
@@ -181,19 +181,19 @@ describe("Hub Host onboarding projection", () => {
   });
 
   it("builds the same cross-platform enrollment command", () => {
-    expect(buildHubLoginCommand("https://hub.example.com")).toBe(
-      "clisbot hub login https://hub.example.com",
+    expect(buildHubConnectCommand("https://hub.example.com")).toBe(
+      "clisbot hub connect https://hub.example.com",
     );
   });
 
   it("uses the development CLI invocation when the dev runner provides one", () => {
     expect(
-      buildHubLoginCommand(
+      buildHubConnectCommand(
         "https://hub.example.com",
         "CLISBOT_HOME=/home/op/.clisbot-dev-01 npm run cli --",
       ),
     ).toBe(
-      "CLISBOT_HOME=/home/op/.clisbot-dev-01 npm run cli -- hub login https://hub.example.com",
+      "CLISBOT_HOME=/home/op/.clisbot-dev-01 npm run cli -- hub connect https://hub.example.com",
     );
   });
 });

@@ -7,8 +7,11 @@
 ## Tạo Project
 
 1. Kết nối đúng Host.
-2. Chọn **Add Project**, chọn thư mục có sẵn hoặc luồng tạo/clone phù hợp.
-3. Kiểm tra đường dẫn và hoàn tất.
+2. Chọn **Add Project → Browse folders on Host**. Bắt đầu ở home của người chạy daemon; mở từng thư mục, dùng **Up one level** để lên cấp trên, hoặc nhập đường dẫn tuyệt đối rồi **Go**. Đây là thư mục trên Host, kể cả khi mở app từ điện thoại hay trình duyệt trên máy khác.
+3. Chọn thư mục chứa tài liệu hoặc code của công việc đó, rồi **Add this folder as a Project**. Có thể lọc theo tên; danh sách tối đa 100 thư mục mỗi lần, chỉ hiện các thư mục được quyền duyệt.
+4. Chưa có thư mục: quay lại **New directory**, duyệt để chọn thư mục cha rồi đặt tên. Luồng clone GitHub cũng có bộ duyệt chọn thư mục cha.
+
+Host cũ chưa hỗ trợ Browse sẽ yêu cầu cập nhật; **Search for directory**, nhập đường dẫn và bộ chọn Finder trên desktop vẫn hoạt động như trước. Có thể **Close** bất kỳ lúc nào để về app; thêm Project không phải bước bắt buộc sau khi kết nối Host. Muốn tạo Bot, dùng **Create a Bot** ở trang kết nối hoặc **New bot** trong sidebar; Bot tự tạo workspace riêng.
 
 Cần một trong các quyền: Organization Owner, **Administrator** trên Host, hoặc **Full access**. Full access trên Host tạo được Project ở bất kỳ thư mục nào; Full access trên một Project chỉ tạo được Project bên trong thư mục của Project đó. Developer không tạo được Project. App kiểm tra quyền ngay khi mở Add Project; daemon vẫn là nơi quyết định cuối cùng. Với Full access trên Host, Project vừa tạo dùng được sau khi kết nối lại Host. Với Full access trên một Project, Project con vừa tạo cần được cấp quyền riêng mới dùng được, kể cả với người tạo. Xem [hệ quả khi cấp](../access/permissions.md#4-hệ-quả-cần-biết-trước-khi-cấp).
 

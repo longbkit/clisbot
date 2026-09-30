@@ -89,6 +89,11 @@ describe("Hub relationship", () => {
         .digest("base64url"),
     );
     expect(enrollment.hostname).toBe(hostname());
+    expect((await relationship.status()).enrollmentIdentity).toEqual({
+      serverId: enrollment.serverId,
+      daemonPublicKey: enrollment.daemonPublicKey,
+      hostname: enrollment.hostname,
+    });
     relationship.completeEnrollment();
     await connecting.result;
     await relationship.socketDialed();

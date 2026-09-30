@@ -1,3 +1,4 @@
+import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { ChannelConfigurationConflictError, OrganizationTriggerConflictError } from "./errors.js";
 import type { AgentExecutionStatus, MachineStatus } from "./schema.js";
@@ -194,7 +195,11 @@ class MemoryDatabase implements Database {
   private readonly workflowWakeups = new Map<string, WorkflowWakeupRecord>();
   private readonly attachments = new Map<string, AttachmentRecord>();
   private readonly attachmentIdsBySource = new Map<string, string>();
-  private readonly enrollmentTokens = new Map<string, EnrollmentTokenRecord>();
+  private readonly daemonEnrollments = new Map<string, EnrollDaemonInput>();
+  private readonly enrollmentTokens = new Map<
+    string,
+    EnrollmentTokenRecord & { enrollment?: HubEnrollmentRequest }
+  >();
   private readonly cliAuthorizations = new Map<string, MemoryCliAuthorization>();
   private readonly daemons = new Map<string, DaemonRecord>();
   private readonly organizationEntitlements = new Map<string, OrganizationEntitlementsRecord>();
@@ -1600,6 +1605,7 @@ class MemoryDatabase implements Database {
       return undefined;
     }
     const authorization: MemoryCliAuthorization = {
+      enrollment: input.enrollment ?? null,
       id: input.id,
       deviceVerifier: input.deviceVerifier,
       userCodeVerifier: input.userCodeVerifier,
@@ -1642,6 +1648,8 @@ class MemoryDatabase implements Database {
     if (authorization === undefined || authorization.status !== "pending") {
       return "unavailable";
     }
+    if ((input.purpose === "host_enrollment") !== Boolean(authorization.enrollment))
+      return "forbidden";
     const status = input.decision === "approve" ? "approved" : "denied";
     authorization.status = status;
     if (input.decision === "approve") {
@@ -1653,6 +1661,7 @@ class MemoryDatabase implements Database {
   async pollCliAuthorization(input: {
     deviceVerifier: string;
     credential: { id: string; prefix: string; verifier: string };
+    enrollmentToken?: { verifier: string };
   }): Promise<CliAuthorizationPollResult> {
     const now = this.options.now?.() ?? new Date();
     const authorization = this.cliAuthorizations.get(input.deviceVerifier);
@@ -1683,6 +1692,25 @@ class MemoryDatabase implements Database {
     }
     authorization.nextPollAt = new Date(now.getTime() + authorization.pollIntervalSeconds * 1_000);
     if (authorization.status === "approved") {
+      if (Boolean(authorization.enrollment) !== Boolean(input.enrollmentToken)) {
+        return { status: "denied", intervalSeconds: 5 };
+      }
+      if (authorization.enrollment && input.enrollmentToken) {
+        this.enrollmentTokens.set(input.enrollmentToken.verifier, {
+          id: authorization.id,
+          verifier: input.enrollmentToken.verifier,
+          organizationId: authorization.approvedOrganizationId!,
+          enrollment: authorization.enrollment,
+          expiresAt: authorization.expiresAt,
+          consumedAt: null,
+        });
+        authorization.status = "disclosed";
+        return {
+          status: "enrollment_authorized",
+          intervalSeconds: authorization.pollIntervalSeconds,
+          organizationId: authorization.approvedOrganizationId!,
+        };
+      }
       authorization.credential = input.credential;
       authorization.status = "disclosed";
       return {
@@ -1698,9 +1726,22 @@ class MemoryDatabase implements Database {
   }
   async enrollDaemon(input: EnrollDaemonInput) {
     const replay = Array.from(this.daemons.values()).find((daemon) => daemon.id === input.daemonId);
-    if (replay) return replay;
+    if (replay) {
+      const original = this.daemonEnrollments.get(replay.id);
+      return original && replay.status === "active" && matchesEnrollmentReplay(original, input)
+        ? replay
+        : undefined;
+    }
     const token = this.enrollmentTokens.get(input.tokenVerifier);
     if (!token || token.consumedAt || token.expiresAt <= input.now) return undefined;
+    if (
+      token.enrollment &&
+      (token.enrollment.serverId !== input.serverId ||
+        token.enrollment.daemonPublicKey !== input.daemonPublicKey ||
+        [...token.enrollment.permissions].sort().join(" ") !==
+          [...input.permissions].sort().join(" "))
+    )
+      return undefined;
     const sameServer = Array.from(this.daemons.values()).find(
       (daemon) =>
         daemon.status === "active" &&
@@ -1722,6 +1763,7 @@ class MemoryDatabase implements Database {
         daemon.slug === slug && this.machines.get(daemon.machineId)?.orgId === token.organizationId,
     );
     if (slugTaken) return { status: "slug_conflict" as const, slug };
+    this.daemonEnrollments.set(input.daemonId, input);
     this.enrollmentTokens.set(input.tokenVerifier, {
       ...token,
       consumedAt: input.now,
@@ -3650,4 +3692,15 @@ function workflowReuseBindingKey(input: {
   stepId: string;
 }): string {
   return JSON.stringify([input.organizationId, input.bindingKey, input.workflowName, input.stepId]);
+}
+
+function matchesEnrollmentReplay(original: EnrollDaemonInput, input: EnrollDaemonInput): boolean {
+  return (
+    original.idempotencyKey === input.idempotencyKey &&
+    original.tokenVerifier === input.tokenVerifier &&
+    original.serverId === input.serverId &&
+    original.daemonPublicKey === input.daemonPublicKey &&
+    original.credentialVerifier === input.credentialVerifier &&
+    [...original.permissions].sort().join(" ") === [...input.permissions].sort().join(" ")
+  );
 }

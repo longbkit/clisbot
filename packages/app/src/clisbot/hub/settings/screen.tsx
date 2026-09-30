@@ -29,6 +29,7 @@ import { capitalizeLabel as channelLabel } from "./labels";
 import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
 import { BackLink } from "./back-link";
+import { FirstHostSetup } from "./first-host-setup";
 
 export function HubSettingsContent({
   section,
@@ -415,6 +416,7 @@ function ActiveHubAccount({
     );
   return (
     <View>
+      <FirstHostSetup />
       <ProfileSettings
         hub={hub}
         account={state.account}

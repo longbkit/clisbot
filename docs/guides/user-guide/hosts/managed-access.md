@@ -38,7 +38,9 @@ Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối n
 
 ## CLI trên Host ở chế độ external
 
-CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `clisbot hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên CLI không có nhiều quyền hơn người đó.
+CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `clisbot hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên riêng vé kết nối Host không có nhiều quyền hơn người đó. **Credential `hub login` còn có các quyền Public API quản trị riêng, không giới hạn ở việc xin vé**; đọc [phạm vi và vòng đời](../../../hub.md#advanced-cli-login) trước khi dùng.
+
+**Đây là truy cập CLI vào một Host đã quản lý, không phải onboarding. Thêm Host mới chỉ dùng `hub connect <URL-Hub>`.** Nếu đang vận hành trên chính máy daemon, ưu tiên socket/pipe local khi phù hợp để không cần cấp credential quản trị CLI.
 
 - Chưa đăng nhập Hub đó thì CLI báo: chạy `clisbot hub login` rồi thử lại.
 - `clisbot hub connect` chạy trước khi daemon thuộc Hub, lúc daemon chưa đòi vé. Daemon trả kết quả enroll xong mới đóng phiên đó.

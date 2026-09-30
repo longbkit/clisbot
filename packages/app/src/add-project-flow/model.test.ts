@@ -27,6 +27,7 @@ const HOST: AddProjectHost = {
   label: "Local",
   canAddProject: true,
   canBrowse: true,
+  canBrowseDirectories: true,
   canCloneGithubRepositories: true,
   canSearchGithubRepositories: true,
   canCreateDirectory: true,
@@ -118,16 +119,35 @@ describe("Add Project options", () => {
     expect(addProjectMethodEmptyText(outdatedHost)).toBe("Update the host to use Add Project.");
   });
 
+  it("offers Host browsing without desktop Finder", () => {
+    const methods = buildAddProjectMethods({
+      ...HOST,
+      canBrowse: false,
+      canBrowseDirectories: true,
+    });
+    expect(methods.find((method) => method.id === "browse-host")).toMatchObject({
+      disabled: false,
+    });
+    expect(methods.some((method) => method.id === "browse")).toBe(false);
+  });
+
   it("keeps host-upgrade methods discoverable while hiding local-only Browse", () => {
     expect(
       buildAddProjectMethods({
         ...HOST,
         canBrowse: false,
+        canBrowseDirectories: false,
         canCloneGithubRepositories: false,
         canSearchGithubRepositories: false,
         canCreateDirectory: false,
       }),
     ).toEqual([
+      {
+        id: "browse-host",
+        label: "Browse folders on Host",
+        description: "Update this Host to browse folders",
+        disabled: true,
+      },
       {
         id: "directory-search",
         label: "Search for directory",

@@ -1025,6 +1025,7 @@ export class ManagedResourceAuthorizer {
 
   /** The Host folder policy, the creating Host grants' rules, and no nesting, for a path that may not exist yet. */
   async mayCreateProjectAt(target: string): Promise<boolean> {
+    if (!this.isRestricted()) return true;
     const canonical = await canonicalPathForAuthorization(target);
     return canonical !== null && mayCreateProjectAt(canonical, await this.projectCreationScope());
   }

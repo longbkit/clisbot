@@ -4,9 +4,23 @@ User/channel metadata and session persistence: [agent session storage](features/
 
 Clisbot Hub is an explicit opt-in connection from one Clisbot daemon to one Hub. Running a daemon does
 not register it with a Hub. The relationship begins only when a user runs
-`clisbot hub connect [url]` from the daemon machine with an explicit API key or matching stored CLI login. Clisbot assistant onboarding also explicitly enrolls the local daemon when channel credentials are supplied, using the authenticated local operator API and a short-lived enrollment token.
+`clisbot hub connect [url]` from the daemon machine and approves that Host in the browser. Clisbot assistant onboarding can also explicitly enroll the local daemon through the authenticated local operator API when channel credentials are supplied.
 
-The human CLI login and daemon relationship are separate identities. `clisbot hub login [url]` stores a durable organization-scoped CLI credential keyed by normalized Hub origin under `CLISBOT_HOME`. Interactive login optionally connects the local daemon, then points to the Hub UI for trigger configuration; it does not scaffold or deploy configuration. With Clisbot onboarding enabled (the default), `clisbot hub init` creates a seeded daemon Project/Workspace and configures supplied channels through resource APIs. It does not create a Hub Project or scaffold a deployment bundle. See [API-first onboarding](audits/2026-09-06-api-first-onboarding.md) and the [quickstart](../public-docs/hub/quickstart.md). The inherited scaffold/deploy commands are available only with `CLISBOT_ONBOARDING_ENABLED=0`. `clisbot hub export [directory]` writes the active organization's current triggers as one self-contained YAML file per trigger, using the active login unless another Hub or API key is selected. Origin resolution uses explicit command input, `CLISBOT_HUB_URL`, active login, then `https://hub.paseo.sh`. Connect uses exact-origin authority to request a one-time enrollment token, then passes only that token to the daemon. The daemon generates and persists its own relationship credential.
+## Host onboarding
+
+With `CLISBOT_ONBOARDING_ENABLED` enabled (the default), onboarding uses **one command: `clisbot hub connect <Hub URL>`**. It reads the daemon's public identity, starts a browser approval request, and shows the Host, organization and Hub-on-Host permissions before consent. Owner/Admin approval issues a single-use enrollment token bound to the server ID, daemon public key and exact permission set. The request and token expire 10 minutes after the request starts. Approval and token disclosure are persisted transactionally; issuing a Host token never inserts an organization CLI credential. The daemon exchanges the token and keeps its own relationship credential.
+
+The CLI returns the enrollment response, which may still say `connecting`; the daemon finishes the connection in the background and the browser follows its progress. Enrollment activates Managed Access and closes the ticketless CLI session, so onboarding does not poll through that session or obtain a broader credential. Non-TTY and JSON modes use the same browser approval flow; instructions go to stderr. Both the printed link and automatically opened URL include the approval code, so the user does not need to copy it separately. An already enrolled Host on the same Hub is reused without changing permissions. A different Hub requires an explicit disconnect. Lost or expired approval results require a new request; follow connection progress in Hub → Hosts. `hub status` and rerunning `connect` on an enrolled Host require an already authorized daemon connection (local IPC or a managed access ticket). No stored CLI credential is consulted. An explicit `--api-key` or `CLISBOT_HUB_API_KEY` selects unattended enrollment instead; use an API key restricted to `daemons:enroll`.
+
+The existing Hub relationship status RPC adds optional `enrollmentIdentity` data (public only), gated once by `server_info.features.hubEnrollmentIdentity`. Older daemons remain readable; browser enrollment requires the field and fails with an update instruction rather than creating a broad CLI login. Browser decisions include their purpose so an older approval page cannot approve a Host request as a CLI login. The rollout toggle belongs to CLI and Hub: disabling `CLISBOT_ONBOARDING_ENABLED` restores the legacy credential-based CLI connect/login flow and rejects new browser Host-enrollment requests on Hub. Existing authorized requests keep their original scope and expiry.
+
+## Advanced CLI login
+
+`clisbot hub login [url]` is for deliberate CLI API administration, **not Host onboarding**. It stores a durable bearer credential keyed by normalized Hub origin under `CLISBOT_HOME`. The browser approval grants all five Public API scopes: `projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`. The credential can read Projects/configuration, validate and install configuration, dispatch runs and enroll Hosts across its organization. It also supports the CLI access-ticket endpoint, which checks current membership and Host access. It is not a general browser session for every Management API endpoint.
+
+The credential has **no automatic expiry**. Restrict use of `login` to operators who understand this scope and protect the local credential file. Prefer a scoped API key for automation. `hub logout` deletes the local copy; it does not server-revoke the credential. Revoke unwanted CLI credentials in Hub → Configuration → API keys, including credentials created by older onboarding versions. Updating or reconnecting a Host does not revoke them automatically.
+
+`login` does not enroll a daemon in the default flow. `clisbot hub init` creates a seeded daemon Project/Workspace and configures supplied channels through resource APIs; it does not create a Hub Project or scaffold a deployment bundle. See [API-first onboarding](audits/2026-09-06-api-first-onboarding.md) and the [quickstart](../public-docs/hub/quickstart.md). Inherited scaffold/deploy commands are available only with `CLISBOT_ONBOARDING_ENABLED=0`. `hub export [directory]` uses explicit API authority or a stored CLI login to write current triggers as YAML. Origin resolution uses explicit command input, `CLISBOT_HUB_URL`, active login origin, then `https://hub.paseo.sh`.
 
 ## Connection and authority
 
@@ -20,10 +34,11 @@ relationship is independent of its current transport, so a future transport can 
 WebSocket without pairing again. The current foundation supports one Hub relationship per daemon.
 
 Normal authenticated daemon sessions may manage the daemon's Hub relationship and permissions.
-Hub connections have no daemon permissions by default. Connecting gives Hub machine identity and
-presence but no execution authority. The `hub.execute` permission lets workflows triggered from
+The relationship protocol grants no implicit daemon permissions. The browser-approved `hub connect`
+flow explicitly requests the five permissions listed above; the user sees them before approval.
+An enrollment with an empty permission set gives Hub machine identity and presence only. The `hub.execute` permission lets workflows triggered from
 GitHub, Slack, Discord, Linear, and other integrations create workspaces and run agents. Grant it
-during interactive login or later with `clisbot hub permissions grant hub.execute`. Relationships
+during `hub connect` approval or later with `clisbot hub permissions grant hub.execute`. Relationships
 created before this split migrate their legacy execution scope to `hub.execute`. Hub sessions cannot
 manage their own relationship or permissions.
 

@@ -129,6 +129,7 @@ export type HubConnectionState =
   | "revoked";
 
 export interface HubRelationshipStatus {
+  enrollmentIdentity?: { serverId: string; daemonPublicKey: string; hostname: string };
   state: HubConnectionState;
   daemonId: string | null;
   hubOrigin: string | null;
@@ -300,6 +301,11 @@ export class HubRelationshipController implements HubRelationshipManagement {
 
   status(): HubRelationshipStatus {
     return {
+      enrollmentIdentity: {
+        serverId: this.options.serverId,
+        daemonPublicKey: this.options.daemonPublicKey,
+        hostname: this.options.hostname,
+      },
       state: this.state,
       daemonId: this.record?.relationship.daemonId ?? null,
       hubOrigin: this.record?.relationship.hubOrigin ?? null,

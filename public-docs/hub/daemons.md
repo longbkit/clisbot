@@ -12,23 +12,17 @@ A daemon is one of your machines running the Clisbot daemon. Enroll it once with
 
 ## Connect
 
-Log in from the machine first:
+Run this on the machine with the daemon already running:
 
 ```sh
-clisbot hub login https://hub.example.com
+clisbot hub connect https://hub.example.com
 ```
 
-The CLI prints a URL and a verification code and opens your browser. The approved login is stored under `CLISBOT_HOME`.
+Open the printed URL (the code is filled in automatically) and approve the **Host, organization and Hub permissions** as an organization owner/admin. The CLI then enrolls the Host and returns its current status. If it says `connecting`, the daemon finishes in the background and this page follows its progress. There is no preliminary `login` or second terminal confirmation. Non-TTY/Docker `exec -T` and `--json` follow the same flow; keep the command running while approving in a browser.
 
-In an interactive terminal, login offers to connect this daemon and separately asks whether to allow Hub automations to run agents. Connection defaults to yes; execution permission defaults to no. It then links to **Triggers** and prints `clisbot hub init` for creating a starter trigger as code. `--json` or non-TTY login only logs in. [Quickstart](/docs/hub/quickstart) walks through connection and initialization.
+The single-use token is bound to this Host's identity and approved permission set, and expires with the request after 10 minutes. The daemon retains its own relationship credential. This flow **does not create a CLI administration credential** or use a previously stored CLI login. Default Hub-on-Host permissions are `hub.execute`, `daemon.read`, `workspace.read`, `workspace.write`, `workspace.manage`; override with `--permission <permission...>`. Human Host/Project access is managed separately.
 
-Enroll the daemon on its own when you declined, or when the machine is already logged in:
-
-```sh
-clisbot hub connect
-```
-
-`connect` uses the active login to request a single-use enrollment token. The daemon exchanges it for its own relationship credential; your CLI login is never stored as daemon authority.
+Follow a slow connection in Hub → Hosts. After enrollment, `hub status` and rerunning `connect` require an authorized daemon connection (local IPC or a managed access ticket). If the approval result was lost before enrollment, start a new request. See [Quickstart](/docs/hub/quickstart) for the rest of setup.
 
 A daemon's identity (its server ID and key) lives in its `CLISBOT_HOME`. Copying that directory to another computer, cloning a VM, or baking it into a container image copies the identity too. Hub refuses to enroll a second daemon with a server ID another Host in the organization already uses, and names that Host. On the copied computer, reset the identity and connect again:
 
@@ -36,7 +30,7 @@ A daemon's identity (its server ID and key) lives in its `CLISBOT_HOME`. Copying
 clisbot daemon stop
 clisbot daemon reset-identity
 clisbot daemon start
-clisbot hub login https://hub.example.com
+clisbot hub connect https://hub.example.com
 ```
 
 `reset-identity` removes `server-id`, `daemon-keypair.json`, and `hub-relationship.json` from `CLISBOT_HOME`. It refuses while the daemon runs or while `CLISBOT_SERVER_ID` is set, since that variable would restore the same ID. Hub also accepts connection details from a daemon only for the identity it enrolled with.
@@ -61,13 +55,13 @@ chooses **New workspace**, and selects **New worktree** for Git isolation. This 
 creating new Projects or managing other Projects. Update the daemon before granting the new
 privilege; older daemons reject unknown Project privileges.
 
-For unattended setup, pass an organization API key without storing it:
+For unattended setup, inject an organization API key restricted to `daemons:enroll` without storing it:
 
 ```sh
 CLISBOT_HUB_URL=https://hub.example.com CLISBOT_HUB_API_KEY=clisbot_pk_... clisbot hub connect
 ```
 
-Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over the environment and an exact-origin stored login.
+Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over `CLISBOT_HUB_API_KEY`. Stored CLI credentials are not used for connection.
 
 Check and undo:
 
@@ -77,7 +71,7 @@ clisbot hub disconnect
 clisbot hub disconnect --force   # drop local authority when Hub is unreachable
 ```
 
-One daemon has one Hub relationship. Connecting a daemon that already has one is refused.
+One daemon has one Hub relationship. Repeating `connect` for the same Hub reuses it without changing permissions; connecting to a different Hub requires an explicit disconnect first.
 
 `clisbot hub logout` removes the active CLI login. The daemon's relationship is a separate identity and stays connected.
 
@@ -135,3 +129,7 @@ If Hub loses the create response, or the daemon restarts mid-execution, Hub rese
 An event that arrives while a daemon is offline fails dispatch with `daemon_not_connected`. Nothing is queued for later. The event is in the project's Activity, and the trigger has to fire again.
 
 Revoking from **Daemons → Revoke daemon** ends the relationship from Hub's side. The daemon keeps running your local agents.
+
+## Advanced CLI login
+
+Use `hub login` only when intentionally granting durable CLI administration access, such as configuration export or supported API operations. It grants all five Public API scopes, has no automatic expiry, and does not add a Host. Read [API authentication](/docs/hub/api#authentication) before using it. `hub logout` only removes the local credential; revoke it in Hub → Configuration → API keys to end its server-side authority. Credentials from older onboarding versions remain valid until revoked.

@@ -1,3 +1,5 @@
+import { HubEnrollmentRequestSchema } from "@clisbot/protocol/messages";
+import { apiFirstOnboardingEnabled } from "../organizations/onboarding.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -11,13 +13,19 @@ const LIFETIME_SECONDS = 10 * 60;
 const INITIAL_POLL_INTERVAL_SECONDS = 5;
 const PER_FINGERPRINT_LIMIT = 5;
 const GLOBAL_LIMIT = 1_000;
-const emptyBody = z.object({}).strict();
-const pollBody = z.object({ deviceCode: z.string().min(32).max(200) }).strict();
+const startBody = z.object({ enrollment: HubEnrollmentRequestSchema.optional() }).strict();
+const pollBody = z
+  .object({
+    deviceCode: z.string().min(32).max(200),
+    purpose: z.enum(["cli_login", "host_enrollment"]).optional(),
+  })
+  .strict();
 const codeBody = z.object({ userCode: z.string().min(1).max(40) }).strict();
 const decisionBody = codeBody
   .extend({
     decision: z.enum(["approve", "deny"]),
     organizationId: z.string().min(1),
+    purpose: z.enum(["cli_login", "host_enrollment"]).optional(),
   })
   .strict();
 
@@ -29,13 +37,17 @@ export class CliAuthorizations {
   ) {}
 
   async start(request: Request): Promise<Response> {
-    const input = emptyBody.safeParse(
+    const input = startBody.safeParse(
       await this.parsedJson(request, "cli_authorization.start.parse"),
     );
     if (!input.success) return invalidRequest();
+    if (input.data.enrollment && !apiFirstOnboardingEnabled()) {
+      return Response.json({ error: "host_onboarding_disabled" }, { status: 403 });
+    }
     const deviceCode = randomBytes(32).toString("base64url");
     const userCode = formatUserCode(base32(randomBytes(8)));
     const authorization = await this.database.startCliAuthorization({
+      enrollment: input.data.enrollment ?? null,
       id: randomUUID(),
       deviceVerifier: verifier(deviceCode),
       userCodeVerifier: verifier(normalizeUserCode(userCode)),
@@ -78,13 +90,20 @@ export class CliAuthorizations {
     );
     if (!input.success) return invalidRequest();
     const credential = deriveCredential(input.data.deviceCode);
+    const token = `clisbot_enroll_${verifier(`host-enrollment:${input.data.deviceCode}`)}`;
     const outcome = await this.database.pollCliAuthorization({
       deviceVerifier: verifier(input.data.deviceCode),
       credential: { id: randomUUID(), ...cliCredentialParts(credential) },
+      ...(input.data.purpose === "host_enrollment"
+        ? { enrollmentToken: { verifier: verifier(token) } }
+        : {}),
     });
     return Response.json({
       status: outcome.status,
       interval: outcome.intervalSeconds,
+      ...(outcome.status === "enrollment_authorized"
+        ? { token, organizationId: outcome.organizationId }
+        : {}),
       ...(outcome.status === "authorized"
         ? { credential, organizationId: outcome.organizationId }
         : {}),
@@ -106,6 +125,7 @@ export class CliAuthorizations {
       expiresAt: authorization.expiresAt.toISOString(),
       organization: access.organization,
       canManage: access.capabilities.manageResources,
+      enrollment: authorization.enrollment ?? null,
     });
   }
 
@@ -125,6 +145,7 @@ export class CliAuthorizations {
     const outcome = await this.database.decideCliAuthorization({
       userCodeVerifier: verifier(normalizeUserCode(input.data.userCode)),
       decision: input.data.decision,
+      purpose: input.data.purpose ?? "cli_login",
       access: {
         sessionId: access.session.id,
         userId: access.account.id,

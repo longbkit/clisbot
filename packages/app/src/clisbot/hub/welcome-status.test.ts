@@ -126,7 +126,7 @@ describe("Welcome Hub card", () => {
       view: {
         badge: "No Host",
         message:
-          "No Host shared with you yet. Run `clisbot hub login` on the computer you want to use, or connect one of your own below.",
+          "No Host shared with you yet. Run `clisbot hub connect` on the computer you want to use, or connect one of your own below.",
         primaryAction: null,
       },
     });

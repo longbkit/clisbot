@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { openCliLoginForm } from "./cli-login-form";
+import { createCliLoginCompletionCache, openCliLoginForm } from "./cli-login-form";
 import { HUB_HOST_DISCOVERY_WINDOW_MS, findNewlyEnrolledHost } from "./managed-host-discovery";
 
 const daemon = (id: string, serverId: string | null) => ({
   id,
   connectionOffer: serverId === null ? null : { serverId },
 });
+
+const enrollment = {
+  serverId: "target",
+  daemonPublicKey: "key",
+  hostname: "laptop",
+  permissions: [],
+};
 
 describe("CLI login authorization", () => {
   it("captures a successful fresh baseline before approving and prevents duplicate decisions", async () => {
@@ -21,8 +28,8 @@ describe("CLI login authorization", () => {
       decide,
       now: () => 100,
     });
-    const pending = form.decide("approve", "org-one");
-    await form.decide("approve", "org-one");
+    const pending = form.decide("approve", "org-one", enrollment);
+    await form.decide("approve", "org-one", enrollment);
     expect(decide).not.toHaveBeenCalled();
     expect(form.getState().pending).toBe(true);
     finishBaseline(baseline);
@@ -31,6 +38,7 @@ describe("CLI login authorization", () => {
       userCode: "CODE",
       decision: "approve",
       organizationId: "org-one",
+      purpose: "host_enrollment",
     });
     expect(form.getState()).toMatchObject({
       baseline,
@@ -47,7 +55,7 @@ describe("CLI login authorization", () => {
       .mockResolvedValueOnce([]);
     const decide = vi.fn(async () => ({ status: "approved" as const }));
     const form = openCliLoginForm({ code: "CODE", readDaemons, decide });
-    await form.decide("approve", "org");
+    await form.decide("approve", "org", enrollment);
     expect(decide).not.toHaveBeenCalled();
     expect(form.getState()).toMatchObject({
       decision: null,
@@ -55,7 +63,7 @@ describe("CLI login authorization", () => {
       baseline: null,
       error: "Hosts unavailable",
     });
-    await form.decide("approve", "org");
+    await form.decide("approve", "org", enrollment);
     expect(form.getState()).toMatchObject({
       decision: "approved",
       error: null,
@@ -73,7 +81,7 @@ describe("CLI login authorization", () => {
         }),
       decide,
     });
-    const pending = form.decide("approve", "old-org");
+    const pending = form.decide("approve", "old-org", enrollment);
     form.close();
     form.mount();
     finishBaseline([]);
@@ -86,8 +94,8 @@ describe("CLI login authorization", () => {
     const readDaemons = vi.fn();
     const decide = vi.fn(async () => ({ status: "denied" as const }));
     const form = openCliLoginForm({ code: "CODE", readDaemons, decide });
-    await form.decide("deny", "org");
-    await form.decide("approve", "org");
+    await form.decide("deny", "org", enrollment);
+    await form.decide("approve", "org", enrollment);
     expect(readDaemons).not.toHaveBeenCalled();
     expect(decide).toHaveBeenCalledTimes(1);
     expect(form.getState().decision).toBe("denied");
@@ -103,7 +111,7 @@ describe("CLI login authorization", () => {
       decide,
       now: () => now,
     });
-    await form.decide("approve", "org");
+    await form.decide("approve", "org", enrollment);
     form.expireDiscovery();
     expect(form.getState().discoveryExpired).toBe(false);
     now += HUB_HOST_DISCOVERY_WINDOW_MS;
@@ -162,4 +170,60 @@ describe("CLI enrollment discovery", () => {
       }),
     ).toBeUndefined();
   });
+});
+
+it("CLI login does not query or wait for a Host", async () => {
+  const readDaemons = vi.fn();
+  const decide = vi.fn(async () => ({ status: "approved" as const }));
+  const form = openCliLoginForm({ code: "CLI", readDaemons, decide });
+  await form.decide("approve", "org");
+  expect(readDaemons).not.toHaveBeenCalled();
+  expect(decide).toHaveBeenCalledWith({
+    userCode: "CLI",
+    decision: "approve",
+    organizationId: "org",
+    purpose: "cli_login",
+  });
+  expect(form.getState()).toMatchObject({
+    decision: "approved",
+    enrollment: null,
+    discoveryDeadline: 0,
+  });
+});
+it("discovery ignores another Host enrolling during the same approval", () => {
+  expect(
+    findNewlyEnrolledHost({
+      baseline: [],
+      daemons: [daemon("new", "other")],
+      hosts: [{ serverId: "other" }],
+      expectedServerId: "target",
+    }),
+  ).toBeUndefined();
+});
+
+it("restores completed approval after a layout remount without replaying it or crossing accounts", async () => {
+  let now = 0;
+  const cache = createCliLoginCompletionCache(() => now);
+  const decide = vi.fn(async () => ({ status: "approved" as const }));
+  const input = {
+    code: "resize-code",
+    readDaemons: async () => [],
+    decide,
+    onCompleted: (state: ReturnType<ReturnType<typeof openCliLoginForm>["getState"]>) =>
+      cache.save("origin/account/org/resize-code", state),
+  };
+  const form = openCliLoginForm(input);
+  await form.decide("approve", "org", enrollment);
+  expect(cache.read("origin/account/org/resize-code")?.decision).toBe("approved");
+  form.close();
+  const restored = openCliLoginForm({
+    ...input,
+    completed: cache.read("origin/account/org/resize-code"),
+  });
+  expect(restored.getState()).toMatchObject({ decision: "approved", enrollment, pending: false });
+  await restored.decide("approve", "org", enrollment);
+  expect(decide).toHaveBeenCalledTimes(1);
+  expect(cache.read("origin/another-account/org/resize-code")).toBeUndefined();
+  now = 600_001;
+  expect(cache.read("origin/account/org/resize-code")).toBeUndefined();
 });

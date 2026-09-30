@@ -2439,6 +2439,8 @@ export const GitHubSearchRequestSchema = z.object({
 export const DirectorySuggestionsRequestSchema = z.object({
   type: z.literal("directory_suggestions_request"),
   query: z.string(),
+  // Clisbot: shallow browsing for Add Project; gated by projectDirectoryBrowse.
+  browsePath: z.string().optional(),
   cwd: z.string().optional(),
   includeFiles: z.boolean().optional(),
   includeDirectories: z.boolean().optional(),
@@ -3732,12 +3734,14 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceMarkUnread: z.boolean().optional(),
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: z.boolean().optional(),
+        hubEnrollmentIdentity: z.boolean().optional(),
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.
         projectGithubClone: z.boolean().optional(),
         // COMPAT(workspaceGithubRepositorySearch): added in v0.1.108, remove gate after 2027-01-15.
         workspaceGithubRepositorySearch: z.boolean().optional(),
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: z.boolean().optional(),
+        projectDirectoryBrowse: z.boolean().optional(),
         // COMPAT(projectList): added in v0.2.4, drop the gate when floor >= v0.2.4.
         projectList: z.boolean().optional(),
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
@@ -5120,7 +5124,24 @@ export const DaemonGetStatusResponseSchema = z.object({
     .passthrough(),
 });
 
+// COMPAT(hubEnrollmentIdentity): optional for older daemons; connect requires its presence.
+export const HubEnrollmentIdentitySchema = z
+  .object({
+    serverId: z.string().min(1).max(200),
+    daemonPublicKey: z.string().min(1).max(200),
+    hostname: z.string().min(1).max(255),
+  })
+  .strict();
+export const HubEnrollmentRequestSchema = HubEnrollmentIdentitySchema.extend({
+  permissions: z
+    .array(DaemonPermissionSchema)
+    .max(32)
+    .refine((values) => new Set(values).size === values.length, "Duplicate permissions"),
+}).strict();
+export type HubEnrollmentRequest = z.infer<typeof HubEnrollmentRequestSchema>;
+
 export const HubRelationshipStatusSchema = z.object({
+  enrollmentIdentity: HubEnrollmentIdentitySchema.optional(),
   state: z.enum([
     "not_connected",
     "connecting",
@@ -6034,6 +6055,14 @@ export const DirectorySuggestionsResponseSchema = z.object({
   type: z.literal("directory_suggestions_response"),
   payload: z.object({
     directories: z.array(z.string()),
+    directory: z
+      .object({
+        path: z.string(),
+        parentPath: z.string().nullable(),
+        truncated: z.boolean(),
+        canSelect: z.boolean(),
+      })
+      .optional(),
     entries: z
       .array(
         z.object({
