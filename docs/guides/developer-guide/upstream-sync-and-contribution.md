@@ -169,6 +169,14 @@ below apply to official Clisbot `main`.
 
 ### Current rename rules and remaining-name review
 
+**Track renamed files explicitly:** on 2026-10-01, an audit recovered 16 source
+files omitted during rebrand staging: 15 Hub example/fixture files under
+`.clisbot/` and one Plugin API integration test hidden by a machine-wide
+`plugins/` ignore. The rename script now fails after applying a rename if Git
+ignores any destination. Add narrow repository exceptions or force-add only
+the listed source paths, then stage and check again. Never force-add the whole
+checkout; local runtime homes and credentials must stay ignored.
+
 The test branch's [rename script](../../../scripts/rebrand-clisbot.mjs) applies
 the following rules to Git-tracked paths and UTF-8 text. These are string and
 path rules, not a semantic determination that every retained old name is valid.
@@ -273,7 +281,9 @@ node scripts/branding/apply.mjs --root <rebrand-worktree> --apply
 node scripts/branding/apply.mjs --root <rebrand-worktree> --check
 # In <rebrand-worktree>, install dependencies, then run npm run format and
 # npm run lint. The broad rename changes wrapping in many docs/source files.
-git -C <rebrand-worktree> add -A
+# Disable machine-wide ignore rules when staging the transformed snapshot.
+# Repository .gitignore rules still apply.
+git -c core.excludesFile=/dev/null -C <rebrand-worktree> add -A
 node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --check \
   --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 git -C <rebrand-worktree> diff --cached --check

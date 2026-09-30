@@ -249,6 +249,28 @@ if (options.mode === "apply") {
       removeEmptyParents(dirname(source));
     }
   }
+  const renamedTargets = planned
+    .filter((item) => item.path !== item.target)
+    .map((item) => item.target);
+  if (renamedTargets.length) {
+    let ignored = "";
+    try {
+      ignored = execFileSync("git", ["check-ignore", "--no-index", "--stdin"], {
+        cwd: root,
+        input: renamedTargets.join("\n") + "\n",
+        encoding: "utf8",
+      }).trim();
+    } catch (error) {
+      if (error.status !== 1) throw error;
+    }
+    if (ignored) {
+      throw new Error(
+        `Rename applied, but Git ignores these renamed source files:\n${ignored}\n` +
+          "Add scoped .gitignore exceptions or stage these exact paths with git add -f before committing. " +
+          "Do not force-add the entire checkout.",
+      );
+    }
+  }
 }
 
 const report = {

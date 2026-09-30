@@ -453,6 +453,28 @@ test("stops on unfamiliar testimonial markup before applying any rename", () => 
   assert.match(readFileSync(join(root, "packages/example.ts"), "utf8"), /Paseo/);
 });
 
+test("reports renamed source hidden by repository or global ignore rules", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-ignored-"));
+  git(root, "init", "-q");
+  put(root, ".gitignore", ".paseo/\n");
+  const globalIgnore = join(tmpdir(), `clisbot-global-ignore-${process.pid}`);
+  writeFileSync(globalIgnore, "plugins/\n");
+  git(root, "config", "core.excludesFile", globalIgnore);
+  put(root, "fixtures/.paseo/hub.yml", "name: Paseo\n");
+  put(root, "packages/plugins/paseo.test.ts", "// Paseo\n");
+  git(root, "add", "-f", ".gitignore", "fixtures/.paseo/hub.yml", "packages/plugins/paseo.test.ts");
+  assert.throws(
+    () => execFileSync("node", [script, "--root", root, "--apply"], { stdio: "pipe" }),
+    (error) => {
+      const message = String(error.stderr);
+      assert.match(message, /Git ignores these renamed source files/);
+      assert.match(message, /fixtures\/\.clisbot\/hub\.yml/);
+      assert.match(message, /packages\/plugins\/clisbot\.test\.ts/);
+      return true;
+    },
+  );
+});
+
 function git(root, ...args) {
   execFileSync("git", args, { cwd: root });
 }

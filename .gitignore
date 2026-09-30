@@ -110,3 +110,13 @@ app.json
 /.resolve-stuck-perm.mjs
 /.set-dev-grok.mjs
 /cli-client-id
+
+# Product source must remain trackable even with a global plugins/ ignore.
+!/packages/server/src/server/plugins/
+!/packages/server/src/server/plugins/**
+
+# Versioned Hub examples and fixtures are not local runtime homes.
+!/packages/hub/examples/single-repo-team-bot/.clisbot/
+!/packages/hub/examples/single-repo-team-bot/.clisbot/**
+!/packages/hub/src/config/fixtures/current-project/.clisbot/
+!/packages/hub/src/config/fixtures/current-project/.clisbot/**

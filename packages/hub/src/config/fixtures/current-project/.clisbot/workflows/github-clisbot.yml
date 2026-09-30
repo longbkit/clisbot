@@ -1,0 +1,16 @@
+name: github-clisbot
+on: github.issue_comment
+max_runtime: 2h
+filters:
+  repo: longbkit/clisbot
+  from_users: [maintainer]
+steps:
+  - id: work
+    environment: clisbot
+    max_runtime: 1h
+    idle_timeout: 10m
+    agent: codex
+    github:
+      connection: getpaseo
+    prompt:
+      - text: ${{ clisbot.prompt }}

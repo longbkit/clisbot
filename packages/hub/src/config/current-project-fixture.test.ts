@@ -10,8 +10,8 @@ describe("current project configuration proof", () => {
       bundle.configuration.triggers.map(({ name, sourceFile }) => ({ name, sourceFile })),
       [
         { name: "discord-request", sourceFile: ".clisbot/workflows/discord.yml" },
-        { name: "github-hub", sourceFile: ".clisbot/workflows/github-hub.yml" },
         { name: "github-clisbot", sourceFile: ".clisbot/workflows/github-clisbot.yml" },
+        { name: "github-hub", sourceFile: ".clisbot/workflows/github-hub.yml" },
         { name: "slack-request", sourceFile: ".clisbot/workflows/slack.yml" },
       ],
     );
