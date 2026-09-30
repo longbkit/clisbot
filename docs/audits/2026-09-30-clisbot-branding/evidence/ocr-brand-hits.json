@@ -1,0 +1,97 @@
+{
+  "method": "Apple Vision accurate text recognition; case-insensitive paseo|boudra|moboudra|getpaseo filter; not exhaustive visual detection",
+  "images_scanned": 44,
+  "files_with_hits": {
+    "fastlane/metadata/android/en-US/images/phoneScreenshots/1.png": [
+      "• getpaseo/paseo",
+      "boudra/konbert",
+      "boudra/moboudra.com",
+      "boudra/faro"
+    ],
+    "fastlane/metadata/android/en-US/images/phoneScreenshots/2.png": [
+      "= fix-138-number-k... getpaseo/pa..."
+    ],
+    "packages/website/public/hero-mockup.png": [
+      "getpaseo/paseo",
+      "s boudra/shareavideo",
+      "Ppaseo-cloud",
+      "fix-138-number-keys getpaseo/paseo",
+      "fix-138-number-k... getpaseo/pa..."
+    ],
+    "packages/website/public/homepage-hero.png": [
+      "paseo • mac-dev",
+      "paseo • dev",
+      "paseo • dev",
+      "paseo • dev",
+      "paseo • dev",
+      "Paseo hub dashboard MVP",
+      "getpaseo/paseo-cloud • mac-dev",
+      "paseo • dev",
+      "paseo-cloud-mvp-daemon-...",
+      "paseo • mac-dev",
+      "Paseo hub dashboard MVP getpaseo/paseo-cloud",
+      "@ Called Paseo 1 time"
+    ],
+    "packages/website/public/iphone-mockup-left.png": [
+      "= main getpaseo/paseo",
+      "~/dev/paseo main*",
+      "> npm ls @getpaseo/cli",
+      "paseo@0.1.34/Users/moboudra/dev/paseo",
+      "@getpaseo/cli@0.1.34 -./packages/cli",
+      "@getpaseo/desktop@0.1.34 → ./packages/desktop",
+      "@getpaseo/cli@0.1.34 deduped - ./packages/cl",
+      "r/dev/paseo main*",
+      "r/dev/paseo main*",
+      "~/dev/paseo main*",
+      "paseo.json"
+    ],
+    "packages/website/public/mobile-mockup.png": [
+      "&› getpaseo/paseo",
+      "[k boudra/konbert",
+      "boudra/moboudra.com",
+      "boudra/faro",
+      "getpaseo/pa...",
+      "~/.paseo/worktrees/1luy0po7/puzzled-pug fix-138-num",
+      "~.paseo/worktrees/1luy0po7/puzzled-pugfix-138-num",
+      "paseo.json",
+      "~/•paseo/worktrees/1luy0po7/puzzled-pug fix-138-num"
+    ],
+    "packages/website/public/og-image.png": [
+      "O getpaseo/paseo",
+      "boudra/moboudra.com",
+      "• boudra/faro",
+      "Paseo",
+      "dev getpaseo/paseo"
+    ],
+    "packages/website/public/phone-1-320.webp": [
+      "getpaseo/paseo",
+      "boudra/konbert",
+      "boudra/moboudra.com",
+      "boudra/faro"
+    ],
+    "packages/website/public/phone-1-480.webp": [
+      "getpaseo/paseo",
+      "boudra/konbert",
+      "&boudra/moboudra.com",
+      "boudra/faro"
+    ],
+    "packages/website/public/phone-1.png": [
+      "• getpaseo/paseo",
+      "boudra/konbert",
+      "boudra/moboudra.com",
+      "boudra/faro"
+    ],
+    "packages/website/public/phone-2-320.webp": ["fix-138-number-k... getpaseo/pa..."],
+    "packages/website/public/phone-2-480.webp": ["= fix-138-number-k... getpaseo/pa.../"],
+    "packages/website/public/phone-2.png": ["= fix-138-number-k... getpaseo/pa..."],
+    "plugin-examples/modal-ui/screenshots/android-copy-paste.png": [
+      "Paseo clipboard example",
+      "Copied from Paseo",
+      "Input: Copied from Paseo"
+    ],
+    "plugin-examples/modal-ui/screenshots/android-wide-custom-inset.png": [
+      "Paseo clipboard example"
+    ],
+    "plugin-examples/modal-ui/screenshots/web-custom-inset.png": ["Paseo clipboard example"]
+  }
+}

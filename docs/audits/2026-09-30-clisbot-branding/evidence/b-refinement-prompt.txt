@@ -1,0 +1,27 @@
+Create ONE new landscape identity comparison sheet refining ONLY concept B / Roundtable from the provided reference. The reference is context for the product name, quiet typography and warm golden palette; do not repeat its A or C columns. The user wants B to signal an AI APPLICATION while staying exceptionally clean and simple. Keep the IDEA of several specialist bots collaborating, but redesign the silhouette to avoid a three-blade circular symbol, Google Chrome, Ubuntu, radiation signs, or a generic swirl.
+
+Output a fully OPAQUE flat graphic-design sheet on solid warm white #FAF9F5, all pixels alpha 255. NO transparency, glow, shadows, texture, hazy overlay, gradients, metallic or 3D effects. Dark navy #172033 text, deep warm amber #AD7718 as the main mark on ivory, soft gold #E2BE65 accents. Keep the SAME colors and typography across all three options so the comparison is about silhouette. Polished and restrained editorial design. Three equal columns with thin straight dividers, generous whitespace and precise aligned baselines. Strong ink-on-paper readability. Image should be landscape 3:2.
+
+Exact heading: "clisbot / B, refined"
+Exact subheading: "Specialist bots. One shared workspace."
+Column labels exactly "B1 / SHARED CHAT", "B2 / AGENT WORKSPACE", "B3 / BOT COLLECTIVE".
+Every wordmark exactly "clisbot", lowercase, medium-bold geometric-humanist sans.
+
+Important drawing rules: each logo should be one memorable compact symbol, not a flowchart or a UI screenshot. No letters 'AI', no neural-network branches, no terminal prompt, no big sparkle or star pasted on a generic logo. Maximum three substantial geometric elements and one tiny cue per design. Meaning should come from negative space and the arrangement, not ornamental marks. Avoid both circular threefold symmetry and the standard two-eyed single robot face. The concepts must look materially different from one another, and from the prior A/C.
+
+B1 SHARED CHAT: design a compact asymmetric assembly of two thick interlocking rounded conversation tiles. Their shared negative space contains one small vertical rounded cursor/caret, suggesting an AI generating a reply in a shared conversation. The offset tiles read as two distinct participants, each with one short abstract conversation-tail cut, not many overlapping bubbles. Crisp, generous negative space. The tiny cursor is secondary, the two-dialogue silhouette remains clear without it. This is the simplest, most conversational option. One flat amber mark, never a clockwise circle.
+
+B2 AGENT WORKSPACE: the most abstract and polished option. Design a nearly square glyph built from THREE independent bold rounded L-shaped modules with different orientations, arranged on an orthogonal grid to define ONE clean shared rectangular center. Asymmetric balance, not circular, not a four-pane Windows logo. One module's inner edge has a short stepped cursor-like notch, hinting at an intelligent workspace. The three modules should feel like separate specialists contributing to one app. Rounded external silhouette with crisp interior cuts. The design must stay readable at favicon size, no enclosing extra box, no browser toolbar details, no tiny dots. One flat amber mark.
+
+B3 BOT COLLECTIVE: a compact friendly but professional group glyph. Two offset rounded corner conversation tiles plus a central taller rounded arch form an asymmetric cluster; ONLY the central arch has a pair of small vertical eye cutouts to subtly reveal an agent, while the flanking tiles imply other participants. Keep only three outer masses, no heads-on-sticks or antennae, no gaming-controller shape, no childlike cartoon, no smile. Distinctive silhouette at tiny sizes, looks like bots sharing a place rather than one mascot. One flat amber mark, no radial layout.
+
+Column anatomy, identical for all:
+- small label, large standalone mark with 180px-equivalent room
+- lowercase clisbot wordmark under the mark
+- one medium app icon tile using ivory mark on warm amber background (do not use yellow on black)
+- two genuinely small visual sample icons labelled "32 px" and "16 px" to judge silhouette (rough comparative previews, not giant versions)
+- a monochrome strip: dark mark on white and white mark on dark navy, faithfully same geometry
+- one compact descriptor respectively "AI in the conversation.", "A home for your agents.", "Many bots. One team."
+
+Footer text "Concept exploration / Not production artwork".
+Avoid extra paragraphs, fake statistics, illustrations, glossy app store renders or any unrequested brand. All headings must be readable. Every sample within each column must use the SAME logo geometry as its large mark. Produce a thoughtful identity sketch sheet, with the craft and clarity of a professional vector designer.

@@ -1,0 +1,231 @@
+{
+  "README.ja.md": [
+    [
+      2,
+      "<img src=\"packages/website/public/logo.svg\" width=\"64\" height=\"64\" alt=\"Clisbot logo\">"
+    ],
+    [
+      31,
+      "<img src=\"https://clisbot.com/hero-mockup.png\" alt=\"Clisbot アプリのスクリーンショット\" width=\"100%\">"
+    ],
+    [
+      35,
+      "<img src=\"https://clisbot.com/mobile-mockup.png\" alt=\"Clisbot モバイルアプリ\" width=\"100%\">"
+    ]
+  ],
+  "README.ko.md": [
+    [
+      2,
+      "<img src=\"packages/website/public/logo.svg\" width=\"64\" height=\"64\" alt=\"Clisbot 로고\">"
+    ],
+    [
+      31,
+      "<img src=\"https://clisbot.com/hero-mockup.png\" alt=\"Clisbot app screenshot\" width=\"100%\">"
+    ],
+    [
+      35,
+      "<img src=\"https://clisbot.com/mobile-mockup.png\" alt=\"Clisbot mobile app\" width=\"100%\">"
+    ]
+  ],
+  "README.md": [
+    [
+      2,
+      "<img src=\"packages/website/public/logo.svg\" width=\"64\" height=\"64\" alt=\"Clisbot logo\">"
+    ],
+    [
+      31,
+      "<img src=\"https://clisbot.com/hero-mockup.png\" alt=\"Clisbot app screenshot\" width=\"100%\">"
+    ],
+    [
+      35,
+      "<img src=\"https://clisbot.com/mobile-mockup.png\" alt=\"Clisbot mobile app\" width=\"100%\">"
+    ]
+  ],
+  "README.zh-CN.md": [
+    [
+      2,
+      "<img src=\"packages/website/public/logo.svg\" width=\"64\" height=\"64\" alt=\"Clisbot logo\">"
+    ],
+    [
+      31,
+      "<img src=\"https://clisbot.com/hero-mockup.png\" alt=\"Clisbot app screenshot\" width=\"100%\">"
+    ],
+    [
+      35,
+      "<img src=\"https://clisbot.com/mobile-mockup.png\" alt=\"Clisbot mobile app\" width=\"100%\">"
+    ]
+  ],
+  "packages/app/app.config.js": [
+    [70, "icon: \"./assets/images/notification-icon.png\","],
+    [127, "icon: \"./assets/images/icon.png\","],
+    [146, "foregroundImage: \"./assets/images/android-icon-foreground.png\","],
+    [176, "image: \"./assets/images/splash-icon.png\","]
+  ],
+  "packages/app/e2e/mobile/clipboard-image.mjs": [
+    [16, "const png = await readFile(new URL(\"../../assets/images/icon.png\", import.meta.url));"]
+  ],
+  "packages/app/public/index.html": [
+    [16, "<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\" />"]
+  ],
+  "packages/app/public/manifest.json": [
+    [15, "\"src\": \"/pwa-icon-192.png\","],
+    [21, "\"src\": \"/pwa-icon-512.png\","]
+  ],
+  "packages/app/src/attachments/file-types.test.ts": [
+    [14, "expect(getMimeTypeFromPath(\"/tmp/logo.svg\")).toBe(\"application/octet-stream\");"],
+    [15, "expect(isRasterImagePath(\"/tmp/logo.svg\")).toBe(false);"],
+    [
+      17,
+      "expect(isRasterImageFile(new File([\"<svg />\"], \"logo.svg\", { type: \"image/svg+xml\" }))).toBe("
+    ]
+  ],
+  "packages/app/src/components/icons/clisbot-logo.tsx": [
+    [4, "interface ClisbotLogoProps {"],
+    [9, "export function ClisbotLogo({ size = 64, color }: ClisbotLogoProps) {"]
+  ],
+  "packages/app/src/components/welcome-screen.tsx": [
+    [28, "import { ClisbotLogo } from \"@/components/icons/clisbot-logo\";"],
+    [317, "<ClisbotLogo size={96} />"]
+  ],
+  "packages/app/src/hooks/use-favicon-status.ts": [
+    [15, "none: require(\"../../assets/images/favicon-dark.png\"),"],
+    [16, "running: require(\"../../assets/images/favicon-dark-running.png\"),"],
+    [17, "attention: require(\"../../assets/images/favicon-dark-attention.png\"),"],
+    [20, "none: require(\"../../assets/images/favicon-light.png\"),"],
+    [21, "running: require(\"../../assets/images/favicon-light-running.png\"),"],
+    [22, "attention: require(\"../../assets/images/favicon-light-attention.png\"),"]
+  ],
+  "packages/app/src/screens/open-project-screen.tsx": [
+    [8, "import { ClisbotLogo } from \"@/components/icons/clisbot-logo\";"],
+    [73, "<ClisbotLogo size={52} />"]
+  ],
+  "packages/app/src/screens/startup-splash-screen.tsx": [
+    [18, "import { ClisbotLogo } from \"@/components/icons/clisbot-logo\";"],
+    [153, "<ClisbotLogo size={LOGO_SIZE} color=\"#000000\" />"],
+    [163, "<ClisbotLogo size={LOGO_SIZE} color={color} />"],
+    [403, "<ClisbotLogo size={64} />"]
+  ],
+  "packages/app/src/utils/image-attachments-from-files.test.ts": [
+    [99, "const svgFile = new File([\"<svg />\"], \"logo.svg\", {"]
+  ],
+  "packages/app/src/utils/os-notifications.test.ts": [
+    [55, "uri: \"http://localhost:8081/packages/app/assets/images/notification-icon.png\","]
+  ],
+  "packages/app/src/utils/os-notifications.ts": [
+    [112, "const asset = Asset.fromModule(require(\"../../assets/images/notification-icon.png\"));"]
+  ],
+  "packages/app/src/utils/tool-call-icon.ts": [
+    [14, "import { ClisbotLogo } from \"@/components/icons/clisbot-logo\";"],
+    [29, "clisbot: ClisbotLogo,"]
+  ],
+  "packages/desktop/electron-builder.yml": [
+    [42, "icon: assets/icon.icns"],
+    [84, "icon: assets/icon.ico"]
+  ],
+  "packages/desktop/src/features/notifications.ts": [
+    [34, "path.resolve(__dirname, \"../assets/icon.png\"),"]
+  ],
+  "packages/desktop/src/main.ts": [
+    [599, "path.resolve(__dirname, \"../assets/icon-dev.png\"),"],
+    [600, "path.resolve(__dirname, \"../assets/icon.ico\"),"],
+    [601, "path.resolve(__dirname, \"../assets/icon.png\"),"],
+    [605, "path.resolve(__dirname, \"../assets/icon-dev.png\"),"],
+    [606, "path.resolve(__dirname, \"../assets/icon.png\"),"]
+  ],
+  "packages/hub/README.md": [
+    [
+      2,
+      "<img src=\"https://clisbot.com/logo.svg\" width=\"64\" height=\"64\" alt=\"Clisbot logo\">"
+    ]
+  ],
+  "packages/hub/src/auth/account-states.tsx": [
+    [2, "import { AuthCard, AuthLayout, ProductMark } from \"../components/app/auth-layout.js\";"],
+    [34, "<ProductMark />"]
+  ],
+  "packages/hub/src/auth/dashboard-shell.tsx": [
+    [37, "import { ClisbotGlyph } from \"../components/app/auth-layout.js\";"],
+    [636, "<ClisbotGlyph />"]
+  ],
+  "packages/hub/src/components/app/auth-layout.tsx": [
+    [32, "<ProductMark />"],
+    [80, "export function ProductMark({ className }: { className?: string }) {"],
+    [84, "<ClisbotGlyph />"],
+    [91, "export function ClisbotGlyph() {"]
+  ],
+  "packages/server/src/utils/project-icon.test.ts": [
+    [44, "expect(ICON_PATTERNS).toContain(\"logo.svg\");"],
+    [176, "it(\"finds apple-touch-icon.png\", async () => {"],
+    [177, "writeFileSync(join(tempDir, \"apple-touch-icon.png\"), \"apple icon\");"],
+    [180, "expect(result).toBe(join(tempDir, \"apple-touch-icon.png\"));"],
+    [185, "writeFileSync(join(tempDir, \"apple-touch-icon.png\"), \"apple icon\");"],
+    [188, "expect(result).toBe(join(tempDir, \"apple-touch-icon.png\"));"],
+    [252, "writeFileSync(join(tempDir, \"packages\", \"ui\", \"logo.svg\"), \"icon\");"],
+    [255, "expect(result).toBe(join(tempDir, \"packages\", \"ui\", \"logo.svg\"));"]
+  ],
+  "packages/server/src/utils/project-icon.ts": [
+    [23, "\"apple-touch-icon.png\","],
+    [29, "\"logo.svg\","]
+  ],
+  "packages/website/src/components/mockup/geometry.ts": [
+    [7, "* The numbers come from measuring public/homepage-hero.png (a 2x capture of a"]
+  ],
+  "packages/website/src/components/mockup/icons.tsx": [
+    [3, "/** The Clisbot brand swirl — public/logo.svg, drawn as a small sidebar avatar mark. */"],
+    [
+      4,
+      "export function ClisbotMark({ size = 13, className }: { size?: number; className?: string }) {"
+    ]
+  ],
+  "packages/website/src/components/mockup/mobile/atoms.tsx": [
+    [
+      10,
+      "export function ClisbotMark({ size = 20, className }: { size?: number; className?: string }) {"
+    ],
+    [50, "export function ClisbotTile() {"],
+    [53, "<ClisbotMark size={14} />"]
+  ],
+  "packages/website/src/components/mockup/mobile/sidebar.tsx": [
+    [24, "import { LetterTile, ClisbotTile } from \"./atoms\";"],
+    [65, "* an optional running dot. Uses ClisbotTile so pinned and workspace icons match. */"],
+    [69, "{white ? <span className=\"size-[18px] rounded-[5px] bg-mock-fg\" /> : <ClisbotTile />}"]
+  ],
+  "packages/website/src/components/mockup/sidebar.tsx": [
+    [22, "import { ClisbotMark } from \"./icons\";"],
+    [172, "<ClisbotMark size={14} />"]
+  ],
+  "packages/website/src/components/site-header.tsx": [
+    [10, "<img src=\"/logo.svg\" alt=\"Clisbot\" className=\"w-6 h-6\" />"]
+  ],
+  "packages/website/src/content/alternatives/claude-desktop.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/codex-app.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/conductor.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/happy-coder.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/openchamber.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/opencode-desktop.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/content/alternatives/superset.md": [
+    [14, "![Clisbot desktop and mobile app](/hero-mockup.png)"]
+  ],
+  "packages/website/src/routes/__root.tsx": [
+    [65, "{ property: \"og:image\", content: \"https://clisbot.com/og-image.png\" },"],
+    [67, "{ name: \"twitter:image\", content: \"https://clisbot.com/og-image.png\" },"]
+  ],
+  "packages/website/src/routes/docs.tsx": [
+    [31, "<img src=\"/logo.svg\" alt=\"Clisbot\" className=\"w-6 h-6\" />"],
+    [55, "<img src=\"/logo.svg\" alt=\"Clisbot\" className=\"w-6 h-6\" />"]
+  ],
+  "packages/website/src/routes/hub.tsx": [
+    [334, "<img src=\"/logo.svg\" alt=\"\" className=\"h-4 w-4\" />"]
+  ]
+}

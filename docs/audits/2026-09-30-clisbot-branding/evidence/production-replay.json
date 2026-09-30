@@ -1,0 +1,63 @@
+{
+  "scope": "Only the tracked branding consumers/assets, copied into disposable repositories; no Git merge or live branch mutation.",
+  "fixtures": [
+    {
+      "label": "fusion",
+      "ref": "17566cab8",
+      "commit": "17566cab8e7adb9564f913237cf40d0a21882beb",
+      "copiedProductFiles": 63,
+      "textRenameChangedFiles": 0,
+      "visualChangedFiles": 66,
+      "visualByFolder": {
+        "packages/website/public": 18,
+        "packages/app/assets/images": 22,
+        "packages/desktop/assets": 8,
+        "fastlane/metadata/android/en-US/images": 1,
+        "packages/app/public": 3,
+        "fastlane/metadata/android/en-US/images/phoneScreenshots": 3,
+        "packages/app/src/components/icons": 1,
+        "packages/app/src/screens": 1,
+        "packages/website/src/components/mockup": 2,
+        "packages/website/src/components/mockup/mobile": 2,
+        "packages/hub/src/components/app": 1,
+        "packages/hub/src/routes": 1,
+        "packages/app": 1,
+        "packages/app/src/utils": 1,
+        "packages/website/src/routes": 1
+      },
+      "secondApplyChangedFiles": 0,
+      "protectedSourcesAndFontLicensePreserved": true,
+      "installedAssetsByteIdenticalToKit": true,
+      "fastlaneSymlinksReplacedWithoutOverwritingWebsiteImages": true,
+      "unknownGeometryRejectedBeforeWrites": true
+    },
+    {
+      "label": "upstream",
+      "ref": "refs/upstream-releases/v0.10.1",
+      "commit": "c5236c00d8575cdc4423407dd4cb9f111135564e",
+      "copiedProductFiles": 61,
+      "textRenameChangedFiles": 10,
+      "visualChangedFiles": 64,
+      "visualByFolder": {
+        "packages/website/public": 18,
+        "packages/app/assets/images": 22,
+        "packages/desktop/assets": 8,
+        "fastlane/metadata/android/en-US/images": 1,
+        "packages/app/public": 3,
+        "fastlane/metadata/android/en-US/images/phoneScreenshots": 3,
+        "packages/app/src/components/icons": 1,
+        "packages/app/src/screens": 1,
+        "packages/website/src/components/mockup": 2,
+        "packages/website/src/components/mockup/mobile": 2,
+        "packages/app": 1,
+        "packages/app/src/utils": 1,
+        "packages/website/src/routes": 1
+      },
+      "secondApplyChangedFiles": 0,
+      "protectedSourcesAndFontLicensePreserved": true,
+      "installedAssetsByteIdenticalToKit": true,
+      "fastlaneSymlinksReplacedWithoutOverwritingWebsiteImages": true,
+      "unknownGeometryRejectedBeforeWrites": true
+    }
+  ]
+}

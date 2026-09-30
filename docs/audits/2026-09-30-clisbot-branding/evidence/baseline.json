@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-30",
+  "fusion_branch": "rebrand/clisbot-fusion-test",
+  "fusion_commit": "17566cab8",
+  "transformed_upstream_branch": "rebrand/upstream-v0.10.1-test",
+  "transformed_upstream_commit": "5b760da4e",
+  "raw_upstream_ref": "refs/upstream-releases/v0.10.1",
+  "raw_upstream_commit": "2abbca32bc6154066c98d63db37fb25c8ae7db9b",
+  "tracked_media_files": 147,
+  "product_logo_assets": 34,
+  "inline_logo_source_files_fusion": 6,
+  "inline_logo_source_files_upstream": 4,
+  "note": "Counts exclude this audit folder, added after the baseline commits; code line references are snapshot locations."
+}

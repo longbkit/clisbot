@@ -1,0 +1,698 @@
+{
+  "version": 1,
+  "direction": "B1-A Flow / Ocean 02",
+  "artifacts": [
+    {
+      "file": "logos/mark-ocean.svg",
+      "bytes": 725,
+      "sha256": "978f7e83083496f2bf5b037613abe9eee7dde243829d33cd30c1050cd5081c20"
+    },
+    {
+      "file": "logos/mark-ocean.png",
+      "bytes": 67647,
+      "sha256": "88a5b08eb39df8311d12c6990fbe96c205b8db94b18c7bd3a9df1a87781baf12"
+    },
+    {
+      "file": "logos/lockup-ocean.svg",
+      "bytes": 8019,
+      "sha256": "18de1794c112f9dad5df578cb6b442b9c62671e9e88f20f1b315a6ab6d907078"
+    },
+    {
+      "file": "logos/lockup-ocean.png",
+      "bytes": 22399,
+      "sha256": "3c5d61968a4a75feae96d72db3f5d86a2dbb22095120c5800cc64ec3c6615143"
+    },
+    {
+      "file": "logos/mark-seafoam.svg",
+      "bytes": 725,
+      "sha256": "c58ecb6736e78027e2dcbad28cdaeb805883435ca4782678cbf0834cafa8dcb6"
+    },
+    {
+      "file": "logos/mark-seafoam.png",
+      "bytes": 68327,
+      "sha256": "35a7caab267bb56756603f07b754bc3c5c9b0655e241af9b692a293f9e21fbe3"
+    },
+    {
+      "file": "logos/lockup-seafoam.svg",
+      "bytes": 8019,
+      "sha256": "0e0c220dc9e4932e54d7f20eee9251b5eca29b86aaecd36865493a624a2dc411"
+    },
+    {
+      "file": "logos/lockup-seafoam.png",
+      "bytes": 22361,
+      "sha256": "0caeeb7699c84946e051234b2513febd34c6d6a063cdf8d18af6459e590b5b25"
+    },
+    {
+      "file": "logos/mark-black.svg",
+      "bytes": 725,
+      "sha256": "639ed95c617e65b9101b39f6bd0323b31bb17da3621a0b3f331364ccef78f041"
+    },
+    {
+      "file": "logos/mark-black.png",
+      "bytes": 60885,
+      "sha256": "1f9dc782d3b25534f4d1edbfb748099b29d5f4d560b7d9986d96df15d0e0a7d3"
+    },
+    {
+      "file": "logos/lockup-black.svg",
+      "bytes": 8019,
+      "sha256": "4e387f232c843a502f103ff6c514a17dba7423b316c28972497488e8971c93b2"
+    },
+    {
+      "file": "logos/lockup-black.png",
+      "bytes": 17720,
+      "sha256": "48eda4d4003e8be522c40af71677e668efa295acdeed5f84074336d8b9e73c63"
+    },
+    {
+      "file": "logos/mark-white.svg",
+      "bytes": 725,
+      "sha256": "aa6b5dcb128de78668c46c31aadb878445af51bbfadd73f2c08667ac678fa987"
+    },
+    {
+      "file": "logos/mark-white.png",
+      "bytes": 37330,
+      "sha256": "c26824ef462e4584bb917fa04963d5f3709f3709c9dbacba1104093042604133"
+    },
+    {
+      "file": "logos/lockup-white.svg",
+      "bytes": 8019,
+      "sha256": "70943dc29d67e005b9998d8d242a2edd159f368590f630b3e40b644e4206fc2d"
+    },
+    {
+      "file": "logos/lockup-white.png",
+      "bytes": 17734,
+      "sha256": "6aa92bc42bc723d27836f3e415a665fadd5698e6b51227ec97b3e1b05c8d6ac0"
+    },
+    {
+      "file": "logos/mark-current-color.svg",
+      "bytes": 710,
+      "sha256": "d5d3b71473069c51bd5730420858771afddfd76ae65a6244727bf01b9b5fd7fd"
+    },
+    {
+      "file": "logos/wordmark.svg",
+      "bytes": 7228,
+      "sha256": "a7b219f640e504f5f4df3d89f733ccb528d1eb0bedce2322db11aa9ccdddfdf1"
+    },
+    {
+      "file": "icons/ocean-16.png",
+      "bytes": 398,
+      "sha256": "f1c97de04573384dd42bfee95befd31c2e128d8ca7b6b4920a03b3916aa04919"
+    },
+    {
+      "file": "icons/light-16.png",
+      "bytes": 404,
+      "sha256": "c29e123d3f6e473c148db104a79c80c091be5b7ed8eaba058a2770b96c905b25"
+    },
+    {
+      "file": "icons/ocean-24.png",
+      "bytes": 519,
+      "sha256": "22e7aab609c4c0cccac96dace6fcf223b08fb986d1339c1744b162e523c5f754"
+    },
+    {
+      "file": "icons/light-24.png",
+      "bytes": 533,
+      "sha256": "fde4c45f29549513c43de4a1f1393aa9969a1cbd91f0b586cdab81face3f4fef"
+    },
+    {
+      "file": "icons/ocean-32.png",
+      "bytes": 668,
+      "sha256": "a9d3dcfd83c47c239200f94efb52748292a04548350bd86d65469a1b33c0547d"
+    },
+    {
+      "file": "icons/light-32.png",
+      "bytes": 695,
+      "sha256": "bb03d4958f12c48ba8c12f980a453a898726a8338b48cafa98bb2bdf1ef9e552"
+    },
+    {
+      "file": "icons/ocean-48.png",
+      "bytes": 946,
+      "sha256": "6002d91ee56afaf717d16349e0c6a53ab6b6c84683317f0f65f9bdc0b79d1717"
+    },
+    {
+      "file": "icons/light-48.png",
+      "bytes": 939,
+      "sha256": "4d98e530ec495077c417e0acbf85f1ec1d83a531fb0ec63cab5ec6c5647580b7"
+    },
+    {
+      "file": "icons/ocean-64.png",
+      "bytes": 1183,
+      "sha256": "ba513cffc124e43779c00ddb0d8d235a6977656857835bf70ba6df951f17e9fd"
+    },
+    {
+      "file": "icons/light-64.png",
+      "bytes": 1148,
+      "sha256": "b29e28a03a96267a366c2d9af6d46f3362c938af751335812793b063088fbb8a"
+    },
+    {
+      "file": "icons/ocean-128.png",
+      "bytes": 2441,
+      "sha256": "1c590d0daac5fb10c654b1e8a5af259978bd37149671332e9c7d2efb3d8ceaff"
+    },
+    {
+      "file": "icons/light-128.png",
+      "bytes": 2419,
+      "sha256": "a18fc89b2689578c751d6342168c605a7dfb83c928a27363bc4e47d67b18ac64"
+    },
+    {
+      "file": "icons/ocean-180.png",
+      "bytes": 3657,
+      "sha256": "d5b41353ee1a306eab640c1155b2db07c6b0c9bedcaa17f5993d66127a495903"
+    },
+    {
+      "file": "icons/light-180.png",
+      "bytes": 3638,
+      "sha256": "8d9a46ead76e18d5229f78f6d7b405cbd85806b3424e91c7f6fd6ab6bcb7b17c"
+    },
+    {
+      "file": "icons/ocean-192.png",
+      "bytes": 3936,
+      "sha256": "1b902d6289f284405af91abb55dcfdabd8b8e903e72af8b0d04d0215e77657a3"
+    },
+    {
+      "file": "icons/light-192.png",
+      "bytes": 3922,
+      "sha256": "4eaa864621f26aabba1f4e2d714026a3318218951bd4939dc99b558d46680390"
+    },
+    {
+      "file": "icons/ocean-256.png",
+      "bytes": 5598,
+      "sha256": "e0bc51e904c5adbbfc1b16b9a20421b9cf1d955b9f05fc7df5ebe20b4d2039e8"
+    },
+    {
+      "file": "icons/light-256.png",
+      "bytes": 5599,
+      "sha256": "4b10d425246a3255f9432da6cc0cd3fbbc1aa208ca3f482b9fb9d8f930c96e7f"
+    },
+    {
+      "file": "icons/ocean-512.png",
+      "bytes": 14925,
+      "sha256": "32c232c44df3da3ccc8f66aeedf616ad6f8757b175f576118e980f7fb743f4c7"
+    },
+    {
+      "file": "icons/light-512.png",
+      "bytes": 14849,
+      "sha256": "5f40e6403b5e287e61f03a49a97f0e380195003d8d4b1f584c080e9b034c1d3c"
+    },
+    {
+      "file": "icons/ocean-1024.png",
+      "bytes": 42027,
+      "sha256": "5fdccd12abe89bf38f8a3f5bf49ed8db3b20bcb2e1a24adaf2588a46a468806e"
+    },
+    {
+      "file": "icons/light-1024.png",
+      "bytes": 41927,
+      "sha256": "92bc7accd68d6d3e38a2ad7e8120ee5c1fb7d943ab6a386cd02590096940c50c"
+    },
+    {
+      "file": "icons/app-ocean.svg",
+      "bytes": 829,
+      "sha256": "ac7a4361ed08ffd592b7438ca26091938f85540dcfb30ff9151cbe24ae9bf2c5"
+    },
+    {
+      "file": "icons/app-light.svg",
+      "bytes": 829,
+      "sha256": "ad374447433d2f99f95e13650dec85b664b5b72e3a5c04122f25c65726974198"
+    },
+    {
+      "file": "icons/app-store-1024.png",
+      "bytes": 34890,
+      "sha256": "4a00b10b026798085f58becfbaacb6d461d9625ecd9390a5225b49e430a31384"
+    },
+    {
+      "file": "icons/play-store-512.png",
+      "bytes": 11576,
+      "sha256": "d2faeacfd93a6e4d0af3ce337107b4dbb91ff5d76c8cb9f2a8f379ecbb98c685"
+    },
+    {
+      "file": "icons/desktop-dev-1024.png",
+      "bytes": 42923,
+      "sha256": "9adf43c162beec00265c2cd1804dd80b621646a74c6ad88632c4f92862ab2db4"
+    },
+    {
+      "file": "icons/apple-touch-icon.png",
+      "bytes": 2405,
+      "sha256": "753a8cf41063a591320aa242a2f4c4287539548acb44fbbbec51e9677fe5bfe0"
+    },
+    {
+      "file": "icons/pwa-icon-192.png",
+      "bytes": 2591,
+      "sha256": "bca01b45f8b7d26867d5aad596df76babb29410cb53174c1a810cb61235a1b9b"
+    },
+    {
+      "file": "icons/pwa-icon-512.png",
+      "bytes": 10918,
+      "sha256": "90ad2755a8e74bbbc661457b81a4df8b96a1f3bccda740fb33dc54fd8978d0b4"
+    },
+    {
+      "file": "android/adaptive-foreground.svg",
+      "bytes": 765,
+      "sha256": "a904dbef65e9559adf60e0ce4a7484204c34068628a3b94c18aba126a79712c9"
+    },
+    {
+      "file": "android/adaptive-foreground.png",
+      "bytes": 14659,
+      "sha256": "9b5df14866d8e495bbbab155fadaabd03389ef258e362813ffd43a1c0e821c7d"
+    },
+    {
+      "file": "android/adaptive-monochrome.png",
+      "bytes": 10550,
+      "sha256": "662d222d0d634424253e9a7d1ea45fca2efdd92dd8dbf7be74e974537bb0776f"
+    },
+    {
+      "file": "android/adaptive-background.svg",
+      "bytes": 147,
+      "sha256": "2dc1555c28f4ef5c95f0c5e90ceaa4cacd1452bc32b62ca8df99124057913a19"
+    },
+    {
+      "file": "notifications/notification-24.png",
+      "bytes": 336,
+      "sha256": "fe6e4567354b69a4fd18a8ae984296b9d0ea30b21b7d53c92edccf0cb3f852dc"
+    },
+    {
+      "file": "notifications/notification-48.png",
+      "bytes": 528,
+      "sha256": "b20ac5c1f3dc55d26ca90107e8f23713ea3c7d1a607a262b9eb7c1260d982fe5"
+    },
+    {
+      "file": "notifications/notification-72.png",
+      "bytes": 736,
+      "sha256": "05f0d4f2bd9800b9bb146d4099fec27723bd076d09c12ef958b6a1948eb0c373"
+    },
+    {
+      "file": "notifications/notification-96.png",
+      "bytes": 926,
+      "sha256": "f7ea6f35bd90b35277128946ad3bdb5fee8547fd4a616372026269d17b2d4f7a"
+    },
+    {
+      "file": "notifications/browser-notification-192.png",
+      "bytes": 3936,
+      "sha256": "1b902d6289f284405af91abb55dcfdabd8b8e903e72af8b0d04d0215e77657a3"
+    },
+    {
+      "file": "splash/splash-icon.png",
+      "bytes": 2738,
+      "sha256": "d826b39287b46acd775f55d8141e99c097abadc39e086dff291fc63006a4efc8"
+    },
+    {
+      "file": "splash/mark-light.svg",
+      "bytes": 760,
+      "sha256": "9b80fb251296aae430f055d2277090f56addb9b470099042cd2a744ec4a653c4"
+    },
+    {
+      "file": "splash/splash-icon-dark.png",
+      "bytes": 2754,
+      "sha256": "3baaa83f8a1b007f6512aa6b54ae05821a6b8726a0022b43da7ede65ab96e14f"
+    },
+    {
+      "file": "splash/mark-dark.svg",
+      "bytes": 760,
+      "sha256": "f286d8cd717e16c03845d6a769f56e3152d971890d917d2c4c5aa955d3fa33c8"
+    },
+    {
+      "file": "favicons/favicon-dark.svg",
+      "bytes": 741,
+      "sha256": "e831cbeab7423641ecdfc107dd6a30d001e9f5c461ee3d558983dc66c9e5db8f"
+    },
+    {
+      "file": "favicons/favicon-dark.png",
+      "bytes": 986,
+      "sha256": "4baebe2eeb16db6e303fc4cf87c54dca14dd58e9ecc2dbff33ad883f64835469"
+    },
+    {
+      "file": "favicons/favicon-dark-running.svg",
+      "bytes": 847,
+      "sha256": "ce81b0bd157922d4a3785200565ec88f2e281aba6c17ca4fc85a4f7a74e5a01a"
+    },
+    {
+      "file": "favicons/favicon-dark-running.png",
+      "bytes": 1201,
+      "sha256": "c8e25d89359cce88826207a3a42d01c31b6cd7b17a228bf389d0d1cd2a8831f2"
+    },
+    {
+      "file": "favicons/favicon-dark-attention.svg",
+      "bytes": 847,
+      "sha256": "f2e5bbbf1daeb17011c011a56db377f5a691281f8c90ac3e51a7475d8a993287"
+    },
+    {
+      "file": "favicons/favicon-dark-attention.png",
+      "bytes": 1198,
+      "sha256": "1a05728e48c9accad72e7f3cb49fb8bd4f7226035d96f21f21ac2d0ca67c2f99"
+    },
+    {
+      "file": "favicons/favicon-light.svg",
+      "bytes": 741,
+      "sha256": "23f6bade5b284a9edced2948167f78e2ea1befb5334ac96b1eb9875b62c06abb"
+    },
+    {
+      "file": "favicons/favicon-light.png",
+      "bytes": 980,
+      "sha256": "48a4092a97da09cd68bc901d45e87703ac2bc0cdf6b4a238156bdf9a7cc4b0ac"
+    },
+    {
+      "file": "favicons/favicon-light-running.svg",
+      "bytes": 847,
+      "sha256": "a874eda7930acbfdca155d7d520d2c9b8643ef0e59a6d41f5d167606dfbf7607"
+    },
+    {
+      "file": "favicons/favicon-light-running.png",
+      "bytes": 1187,
+      "sha256": "5b5ac101a0d5ede6396b3bb5221650d5fb59f1045d72983131ccbe3798ce58d9"
+    },
+    {
+      "file": "favicons/favicon-light-attention.svg",
+      "bytes": 847,
+      "sha256": "4561d73b667d5e7a3c9172db4bb73c4cdbc15193af0d7ade02a11b6838760fc1"
+    },
+    {
+      "file": "favicons/favicon-light-attention.png",
+      "bytes": 1207,
+      "sha256": "05a5016637bd3b8f0109b4845d90c842654368e1b89aff02e3a51eb86abe847f"
+    },
+    {
+      "file": "favicons/favicon.svg",
+      "bytes": 741,
+      "sha256": "e831cbeab7423641ecdfc107dd6a30d001e9f5c461ee3d558983dc66c9e5db8f"
+    },
+    {
+      "file": "desktop/icon.ico",
+      "bytes": 12504,
+      "sha256": "fe8e4794b6724cfcfaa65e072fe0c5675f95dd225074193fef65ab0926cc48d9"
+    },
+    {
+      "file": "desktop/icon.icns",
+      "bytes": 67304,
+      "sha256": "64c942cbb27cb09195b7b4c9a1e7595a2028dd1b0970d04ccc994148ab5df427"
+    },
+    {
+      "file": "social/og-image.svg",
+      "bytes": 66709,
+      "sha256": "0fad64db358205a11518a4d1d440685f2726b59dbc9caa6ddf2583c4ecfda602"
+    },
+    {
+      "file": "social/og-image.png",
+      "bytes": 48744,
+      "sha256": "f523124dfba146da543d7a5d06fcb205220decf49a9fa6707bdcae87449d95f7"
+    },
+    {
+      "file": "marketing/hero-mockup.png",
+      "bytes": 311047,
+      "sha256": "8a406beb7c4961299fe898a0fece6432a95dcf3b93a03f6d8598195ea853fa03"
+    },
+    {
+      "file": "marketing/homepage-hero.png",
+      "bytes": 382127,
+      "sha256": "76f0d4d078acb5dcc62b3df11d636bce7166584682f28e021664555f74c789da"
+    },
+    {
+      "file": "marketing/mobile-mockup.png",
+      "bytes": 402771,
+      "sha256": "2f719aaa17d76b3028a4a8690cf34b5dc91cb80b67be9d3c1ba8d6518be819f6"
+    },
+    {
+      "file": "marketing/iphone-mockup-left.png",
+      "bytes": 446953,
+      "sha256": "36e5143dbf81b41113a65d4e125640cf4fdb4859b98be69d530c0e5c27fc5a09"
+    },
+    {
+      "file": "marketing/phone-1.png",
+      "bytes": 307416,
+      "sha256": "6be7e81ffc15ef6cbc7ab4d012a8d97267dc3b49d93a7c99b05b9d3017fd05b0"
+    },
+    {
+      "file": "marketing/phone-1-320.webp",
+      "bytes": 19602,
+      "sha256": "6b8b0d47798e3a22e889200a63542c5a553de3969a25a030fb2291fe31fee9e6"
+    },
+    {
+      "file": "marketing/phone-1-480.webp",
+      "bytes": 35146,
+      "sha256": "f807bf96ec998d9201f3d17399bd465a7d2f126b95d483b37f4a77fb6c8b8b96"
+    },
+    {
+      "file": "marketing/android-screen-1.png",
+      "bytes": 173495,
+      "sha256": "5cd198b250d15d34b321bc731dfb835b4c0db6af75efa552cf7a836aa8d14be5"
+    },
+    {
+      "file": "marketing/phone-2.png",
+      "bytes": 372943,
+      "sha256": "5ebc0d9b8661443aa8afcad59c24da98f7320dcada969fb7ce333f8d75869dc7"
+    },
+    {
+      "file": "marketing/phone-2-320.webp",
+      "bytes": 30436,
+      "sha256": "3a0ed2563218af6d65ebbd74b737d4a7ec39d953d0e126cebce4cfd30de503a8"
+    },
+    {
+      "file": "marketing/phone-2-480.webp",
+      "bytes": 49448,
+      "sha256": "79bb732c85141e4b496030cc0b87e7cdd20de919f3384d0a239c751b7bbe327f"
+    },
+    {
+      "file": "marketing/android-screen-2.png",
+      "bytes": 214059,
+      "sha256": "f5391a87689e07bc6cd55130d3cfad1a6ab936e29548a281abc6b90f2e05fb5c"
+    },
+    {
+      "file": "marketing/phone-3.png",
+      "bytes": 331092,
+      "sha256": "71bbbf0beae3df79904914886fa8cb6a7f85933da81a22f40a38bb605787e866"
+    },
+    {
+      "file": "marketing/phone-3-320.webp",
+      "bytes": 24358,
+      "sha256": "7d28405ed701a12133d14e6fa610c1fb3a1f9039c19872e1df520ad9ce7b0819"
+    },
+    {
+      "file": "marketing/phone-3-480.webp",
+      "bytes": 42216,
+      "sha256": "7a36a772778d1849cba109632bfb52950a3770b5dd1afb9a88481bdabd4ef2ae"
+    },
+    {
+      "file": "marketing/android-screen-3.png",
+      "bytes": 184927,
+      "sha256": "eecdcbf9b627a26d29dc4326c11c1e63f9ea727eea7a649f6ee231834c4f7677"
+    }
+  ],
+  "installs": [
+    {
+      "artifact": "logos/mark-ocean.svg",
+      "target": "packages/website/public/logo.svg"
+    },
+    {
+      "artifact": "logos/mark-ocean.svg",
+      "target": "packages/app/assets/images/butterfly-green.svg"
+    },
+    {
+      "artifact": "logos/mark-white.svg",
+      "target": "packages/app/assets/images/butterfly-white.svg"
+    },
+    {
+      "artifact": "icons/ocean-32.png",
+      "target": "packages/desktop/assets/32x32.png"
+    },
+    {
+      "artifact": "icons/ocean-64.png",
+      "target": "packages/desktop/assets/64x64.png"
+    },
+    {
+      "artifact": "icons/ocean-128.png",
+      "target": "packages/desktop/assets/128x128.png"
+    },
+    {
+      "artifact": "icons/ocean-256.png",
+      "target": "packages/desktop/assets/128x128@2x.png"
+    },
+    {
+      "artifact": "icons/ocean-512.png",
+      "target": "packages/desktop/assets/icon.png"
+    },
+    {
+      "artifact": "icons/app-store-1024.png",
+      "target": "packages/app/assets/images/icon.png"
+    },
+    {
+      "artifact": "icons/play-store-512.png",
+      "target": "fastlane/metadata/android/en-US/images/icon.png"
+    },
+    {
+      "artifact": "icons/desktop-dev-1024.png",
+      "target": "packages/desktop/assets/icon-dev.png"
+    },
+    {
+      "artifact": "icons/apple-touch-icon.png",
+      "target": "packages/app/public/apple-touch-icon.png"
+    },
+    {
+      "artifact": "icons/apple-touch-icon.png",
+      "target": "packages/website/public/apple-touch-icon.png"
+    },
+    {
+      "artifact": "icons/pwa-icon-192.png",
+      "target": "packages/app/public/pwa-icon-192.png"
+    },
+    {
+      "artifact": "icons/pwa-icon-512.png",
+      "target": "packages/app/public/pwa-icon-512.png"
+    },
+    {
+      "artifact": "android/adaptive-foreground.png",
+      "target": "packages/app/assets/images/android-icon-foreground.png"
+    },
+    {
+      "artifact": "android/adaptive-monochrome.png",
+      "target": "packages/app/assets/images/android-icon-monochrome.png"
+    },
+    {
+      "artifact": "notifications/notification-96.png",
+      "target": "packages/app/assets/images/notification-icon.png"
+    },
+    {
+      "artifact": "notifications/browser-notification-192.png",
+      "target": "packages/app/assets/images/browser-notification-icon.png"
+    },
+    {
+      "artifact": "splash/splash-icon.png",
+      "target": "packages/app/assets/images/splash-icon.png"
+    },
+    {
+      "artifact": "splash/splash-icon-dark.png",
+      "target": "packages/app/assets/images/splash-icon-dark.png"
+    },
+    {
+      "artifact": "favicons/favicon-dark.svg",
+      "target": "packages/app/assets/images/favicon-dark.svg"
+    },
+    {
+      "artifact": "favicons/favicon-dark.png",
+      "target": "packages/app/assets/images/favicon-dark.png"
+    },
+    {
+      "artifact": "favicons/favicon-dark.png",
+      "target": "packages/app/assets/images/favicon.png"
+    },
+    {
+      "artifact": "favicons/favicon-dark-running.svg",
+      "target": "packages/app/assets/images/favicon-dark-running.svg"
+    },
+    {
+      "artifact": "favicons/favicon-dark-running.png",
+      "target": "packages/app/assets/images/favicon-dark-running.png"
+    },
+    {
+      "artifact": "favicons/favicon-dark-attention.svg",
+      "target": "packages/app/assets/images/favicon-dark-attention.svg"
+    },
+    {
+      "artifact": "favicons/favicon-dark-attention.png",
+      "target": "packages/app/assets/images/favicon-dark-attention.png"
+    },
+    {
+      "artifact": "favicons/favicon-light.svg",
+      "target": "packages/app/assets/images/favicon-light.svg"
+    },
+    {
+      "artifact": "favicons/favicon-light.png",
+      "target": "packages/app/assets/images/favicon-light.png"
+    },
+    {
+      "artifact": "favicons/favicon-light-running.svg",
+      "target": "packages/app/assets/images/favicon-light-running.svg"
+    },
+    {
+      "artifact": "favicons/favicon-light-running.png",
+      "target": "packages/app/assets/images/favicon-light-running.png"
+    },
+    {
+      "artifact": "favicons/favicon-light-attention.svg",
+      "target": "packages/app/assets/images/favicon-light-attention.svg"
+    },
+    {
+      "artifact": "favicons/favicon-light-attention.png",
+      "target": "packages/app/assets/images/favicon-light-attention.png"
+    },
+    {
+      "artifact": "favicons/favicon.svg",
+      "target": "packages/website/public/favicon.svg"
+    },
+    {
+      "artifact": "desktop/icon.ico",
+      "target": "packages/desktop/assets/icon.ico"
+    },
+    {
+      "artifact": "desktop/icon.ico",
+      "target": "packages/website/public/favicon.ico"
+    },
+    {
+      "artifact": "desktop/icon.icns",
+      "target": "packages/desktop/assets/icon.icns"
+    },
+    {
+      "artifact": "social/og-image.png",
+      "target": "packages/website/public/og-image.png"
+    },
+    {
+      "artifact": "marketing/hero-mockup.png",
+      "target": "packages/website/public/hero-mockup.png"
+    },
+    {
+      "artifact": "marketing/homepage-hero.png",
+      "target": "packages/website/public/homepage-hero.png"
+    },
+    {
+      "artifact": "marketing/mobile-mockup.png",
+      "target": "packages/website/public/mobile-mockup.png"
+    },
+    {
+      "artifact": "marketing/iphone-mockup-left.png",
+      "target": "packages/website/public/iphone-mockup-left.png"
+    },
+    {
+      "artifact": "marketing/phone-1.png",
+      "target": "packages/website/public/phone-1.png"
+    },
+    {
+      "artifact": "marketing/phone-1-320.webp",
+      "target": "packages/website/public/phone-1-320.webp"
+    },
+    {
+      "artifact": "marketing/phone-1-480.webp",
+      "target": "packages/website/public/phone-1-480.webp"
+    },
+    {
+      "artifact": "marketing/android-screen-1.png",
+      "target": "fastlane/metadata/android/en-US/images/phoneScreenshots/1.png"
+    },
+    {
+      "artifact": "marketing/phone-2.png",
+      "target": "packages/website/public/phone-2.png"
+    },
+    {
+      "artifact": "marketing/phone-2-320.webp",
+      "target": "packages/website/public/phone-2-320.webp"
+    },
+    {
+      "artifact": "marketing/phone-2-480.webp",
+      "target": "packages/website/public/phone-2-480.webp"
+    },
+    {
+      "artifact": "marketing/android-screen-2.png",
+      "target": "fastlane/metadata/android/en-US/images/phoneScreenshots/2.png"
+    },
+    {
+      "artifact": "marketing/phone-3.png",
+      "target": "packages/website/public/phone-3.png"
+    },
+    {
+      "artifact": "marketing/phone-3-320.webp",
+      "target": "packages/website/public/phone-3-320.webp"
+    },
+    {
+      "artifact": "marketing/phone-3-480.webp",
+      "target": "packages/website/public/phone-3-480.webp"
+    },
+    {
+      "artifact": "marketing/android-screen-3.png",
+      "target": "fastlane/metadata/android/en-US/images/phoneScreenshots/3.png"
+    }
+  ]
+}

@@ -168,7 +168,7 @@ function NavItem({
 function AvatarIcon({ avatar }: { avatar: Avatar }) {
   if (avatar.kind === "clisbot") {
     return (
-      <span className="flex size-[16px] items-center justify-center rounded-[5px] bg-black text-white">
+      <span className="flex size-[16px] items-center justify-center rounded-[5px] bg-[#153B43] text-[#A1DFD4]">
         <ClisbotMark size={14} />
       </span>
     );

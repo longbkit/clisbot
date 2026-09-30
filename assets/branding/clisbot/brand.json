@@ -1,0 +1,26 @@
+{
+  "name": "Clisbot",
+  "direction": "B1-A Flow primary (open curved gap)",
+  "palette": "Ocean 02",
+  "approved": "2026-09-30",
+  "colors": {
+    "ocean": "#153B43",
+    "seafoam": "#A1DFD4",
+    "paper": "#F6F4EF",
+    "ink": "#202827",
+    "ivory": "#F4F0E7",
+    "running": "#3B82F6",
+    "attention": "#22C55E"
+  },
+  "masters": {
+    "mark": "source/mark.svg",
+    "small": "source/mark-small.svg",
+    "wordmark": "source/wordmark.svg"
+  },
+  "font": {
+    "family": "Manrope",
+    "weight": 700,
+    "license": "SIL Open Font License 1.1",
+    "source": "https://github.com/google/fonts/tree/main/ofl/manrope"
+  }
+}

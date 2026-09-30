@@ -1,0 +1,55 @@
+@import "../../../packages/website/src/styles.css";
+@source "../../../packages/website/src/components/mockup";
+@font-face {
+  font-family: Manrope;
+  src: url("/fonts/Manrope-Variable.ttf") format("truetype");
+  font-weight: 200 800;
+  font-display: block;
+}
+html,
+body {
+  margin: 0;
+  font-family: Manrope, sans-serif;
+}
+body {
+  background: #153b43;
+}
+#capture {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #153b43;
+}
+.desktop-window {
+  width: 1440px;
+  height: 826px;
+  flex: none;
+  transform-origin: center;
+  overflow: hidden;
+  border-radius: 20px;
+}
+.phone {
+  width: 402px;
+  height: 874px;
+  flex: none;
+  transform-origin: center;
+}
+.mobile-row {
+  display: flex;
+  gap: 72px;
+  width: 1350px;
+  height: 874px;
+  flex: none;
+}
+.android-screen {
+  height: 874px;
+  display: flex;
+  flex-direction: column;
+  color: #fafafa;
+  background: #181b1a;
+  overflow: hidden;
+  padding: 24px 0;
+  box-sizing: border-box;
+}

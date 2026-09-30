@@ -39,7 +39,7 @@ function Header() {
         <span className="mt-[2px] flex items-center gap-[5px] text-[13px] leading-[16px] text-mock-fg-muted">
           <span className="shrink-0">clisbot ·</span>
           <Server size={12} className="shrink-0" />
-          <span className="truncate">Mohameds-MacBook-Pro.l…</span>
+          <span className="truncate">Work-Mac.local</span>
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-[17px] text-mock-fg-muted">

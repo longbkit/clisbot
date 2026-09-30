@@ -1,0 +1,1122 @@
+[
+  {
+    "path": "fastlane/metadata/android/en-US/images/icon.png",
+    "bytes": 19787,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "512x512"
+  },
+  {
+    "path": "fastlane/metadata/android/en-US/images/phoneScreenshots/1.png",
+    "bytes": 250462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "fastlane/metadata/android/en-US/images/phoneScreenshots/2.png",
+    "bytes": 319749,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "fastlane/metadata/android/en-US/images/phoneScreenshots/3.png",
+    "bytes": 430733,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "packages/app/assets/icons/claude.svg",
+    "bytes": 1701,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/icons/codex.svg",
+    "bytes": 1707,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/android-icon-foreground.png",
+    "bytes": 18551,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/app/assets/images/butterfly-green.svg",
+    "bytes": 3296,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/butterfly-white.svg",
+    "bytes": 3294,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/antigravity.png",
+    "bytes": 3064,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/cursor.png",
+    "bytes": 2478,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/file-explorer.png",
+    "bytes": 2638,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/finder.png",
+    "bytes": 3893,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/vscode.png",
+    "bytes": 2804,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/webstorm.png",
+    "bytes": 4677,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/editor-apps/zed.png",
+    "bytes": 4789,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark-attention.png",
+    "bytes": 2169,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark-attention.svg",
+    "bytes": 3462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark-running.png",
+    "bytes": 2151,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark-running.svg",
+    "bytes": 3462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark.png",
+    "bytes": 1733,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-dark.svg",
+    "bytes": 3411,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light-attention.png",
+    "bytes": 2169,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light-attention.svg",
+    "bytes": 3462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light-running.png",
+    "bytes": 2151,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light-running.svg",
+    "bytes": 3462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light.png",
+    "bytes": 1733,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/favicon-light.svg",
+    "bytes": 3411,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/assets/images/favicon.png",
+    "bytes": 1733,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/app/assets/images/icon.png",
+    "bytes": 63241,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/app/assets/images/notification-icon.png",
+    "bytes": 2339,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "96x96"
+  },
+  {
+    "path": "packages/app/assets/images/splash-icon.png",
+    "bytes": 8115,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "200x200"
+  },
+  {
+    "path": "packages/app/e2e/mobile/diff-tree/evidence/after.png",
+    "bytes": 123022,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "packages/app/e2e/mobile/diff-tree/evidence/before.png",
+    "bytes": 123355,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "packages/app/e2e/mobile/diff-tree/evidence/dark.png",
+    "bytes": 119439,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "packages/app/e2e/mobile/diff-tree/evidence/light.png",
+    "bytes": 118643,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "packages/app/e2e/mobile/modal-sheet/evidence/android-after.mp4",
+    "bytes": 1046634,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/e2e/mobile/modal-sheet/evidence/android-before.mp4",
+    "bytes": 409125,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/e2e/mobile/modal-sheet/evidence/browser.webm",
+    "bytes": 828763,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/e2e/support/fixtures/recording.webm",
+    "bytes": 31811,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/public/apple-touch-icon.png",
+    "bytes": 8394,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "180x180"
+  },
+  {
+    "path": "packages/app/public/pwa-icon-192.png",
+    "bytes": 9214,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "192x192"
+  },
+  {
+    "path": "packages/app/public/pwa-icon-512.png",
+    "bytes": 33314,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "512x512"
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/agoragentic-acp.svg",
+    "bytes": 416,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/amp-acp.svg",
+    "bytes": 650,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/auggie.svg",
+    "bytes": 2063,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/autohand.svg",
+    "bytes": 8967,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/claude-acp.svg",
+    "bytes": 3953,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/cline.svg",
+    "bytes": 878,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/codebuddy-code.svg",
+    "bytes": 1518,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/codewhale.svg",
+    "bytes": 397,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/codex-acp.svg",
+    "bytes": 1377,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/cortex-code.svg",
+    "bytes": 2730,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/corust-agent.svg",
+    "bytes": 2302,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/crow-cli.svg",
+    "bytes": 2179,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/cursor.svg",
+    "bytes": 573,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/deepagents.svg",
+    "bytes": 973,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/dimcode.svg",
+    "bytes": 822,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/dirac.svg",
+    "bytes": 538,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/factory-droid.svg",
+    "bytes": 3280,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/fast-agent.svg",
+    "bytes": 13581,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/gemini.svg",
+    "bytes": 410,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/github-copilot-cli.svg",
+    "bytes": 2805,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/gjc.svg",
+    "bytes": 1216,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/glm-acp-agent.svg",
+    "bytes": 302,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/goose.svg",
+    "bytes": 4864,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/junie.svg",
+    "bytes": 361,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/kilo.svg",
+    "bytes": 808,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/kimi.svg",
+    "bytes": 646,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/minion-code.svg",
+    "bytes": 1694,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/mistral-vibe.svg",
+    "bytes": 919,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/nova.svg",
+    "bytes": 782,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/opencode.svg",
+    "bytes": 221,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/pi-acp.svg",
+    "bytes": 307,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/poolside.svg",
+    "bytes": 2440,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/qoder.svg",
+    "bytes": 334,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/qwen-code.svg",
+    "bytes": 946,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/sigit.svg",
+    "bytes": 5407,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/stakpak.svg",
+    "bytes": 179,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/app/src/assets/acp-provider-icons/vtcode.svg",
+    "bytes": 399,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/desktop/assets/128x128.png",
+    "bytes": 7046,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "128x128"
+  },
+  {
+    "path": "packages/desktop/assets/128x128@2x.png",
+    "bytes": 14779,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "256x256"
+  },
+  {
+    "path": "packages/desktop/assets/32x32.png",
+    "bytes": 1629,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "32x32"
+  },
+  {
+    "path": "packages/desktop/assets/64x64.png",
+    "bytes": 3381,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/android-studio.png",
+    "bytes": 3957,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/antigravity.png",
+    "bytes": 3064,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/cursor.png",
+    "bytes": 2478,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/finder.png",
+    "bytes": 3893,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/vscode.png",
+    "bytes": 2804,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/webstorm.png",
+    "bytes": 4677,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/editor-targets/zed.png",
+    "bytes": 4789,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "64x64"
+  },
+  {
+    "path": "packages/desktop/assets/icon-dev.png",
+    "bytes": 883275,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1254x1254"
+  },
+  {
+    "path": "packages/desktop/assets/icon.icns",
+    "bytes": 172864,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/desktop/assets/icon.ico",
+    "bytes": 27641,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "256x256"
+  },
+  {
+    "path": "packages/desktop/assets/icon.png",
+    "bytes": 32164,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "512x512"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/basic-usage/assets/adaptive-icon.png",
+    "bytes": 17547,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/basic-usage/assets/favicon.png",
+    "bytes": 1466,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/basic-usage/assets/icon.png",
+    "bytes": 22380,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/basic-usage/assets/splash.png",
+    "bytes": 47346,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1284x2778"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/flow-api/assets/adaptive-icon.png",
+    "bytes": 17547,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/flow-api/assets/favicon.png",
+    "bytes": 1466,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/flow-api/assets/icon.png",
+    "bytes": 22380,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1024x1024"
+  },
+  {
+    "path": "packages/expo-two-way-audio/examples/flow-api/assets/splash.png",
+    "bytes": 47346,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1284x2778"
+  },
+  {
+    "path": "packages/website/public/9viSwGkz_400x400.jpg",
+    "bytes": 45537,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "400x400"
+  },
+  {
+    "path": "packages/website/public/blank-page.svg",
+    "bytes": 1120,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/website/public/favicon.ico",
+    "bytes": 15086,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "48x48"
+  },
+  {
+    "path": "packages/website/public/favicon.svg",
+    "bytes": 3411,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/website/public/hero-bg.jpg",
+    "bytes": 6817815,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "5504x3072"
+  },
+  {
+    "path": "packages/website/public/hero-mockup.png",
+    "bytes": 883230,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "2048x1233"
+  },
+  {
+    "path": "packages/website/public/homepage-hero.png",
+    "bytes": 1325588,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "2400x1442"
+  },
+  {
+    "path": "packages/website/public/iphone-mockup-left.png",
+    "bytes": 1229684,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1857x3096"
+  },
+  {
+    "path": "packages/website/public/logo.svg",
+    "bytes": 3292,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "packages/website/public/mobile-mockup.png",
+    "bytes": 605749,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "2048x1239"
+  },
+  {
+    "path": "packages/website/public/og-image.png",
+    "bytes": 176454,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1200x630"
+  },
+  {
+    "path": "packages/website/public/phone-1-320.webp",
+    "bytes": 13310,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "320x696"
+  },
+  {
+    "path": "packages/website/public/phone-1-480.webp",
+    "bytes": 23054,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "480x1044"
+  },
+  {
+    "path": "packages/website/public/phone-1.png",
+    "bytes": 250462,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "packages/website/public/phone-2-320.webp",
+    "bytes": 22992,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "320x696"
+  },
+  {
+    "path": "packages/website/public/phone-2-480.webp",
+    "bytes": 39108,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "480x1044"
+  },
+  {
+    "path": "packages/website/public/phone-2.png",
+    "bytes": 319749,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "packages/website/public/phone-3-320.webp",
+    "bytes": 29192,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "320x696"
+  },
+  {
+    "path": "packages/website/public/phone-3-480.webp",
+    "bytes": 53422,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "480x1044"
+  },
+  {
+    "path": "packages/website/public/phone-3.png",
+    "bytes": 430733,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1206x2622"
+  },
+  {
+    "path": "packages/website/public/social-proof/aadtyn.jpg",
+    "bytes": 2795,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/amankumarjagdev.jpg",
+    "bytes": 2439,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/arnoldgamboa.jpg",
+    "bytes": 3329,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/bevstratov.jpg",
+    "bytes": 2083,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/ceeebeeebeee.jpg",
+    "bytes": 2795,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/dongnaebi.jpg",
+    "bytes": 3507,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/erikksherman.jpg",
+    "bytes": 2973,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/jasontorres.jpg",
+    "bytes": 3863,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "packages/website/public/social-proof/tietougongshiba.jpg",
+    "bytes": 2795,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "73x73"
+  },
+  {
+    "path": "plugin-examples/buttons/screenshots/actions.png",
+    "bytes": 65357,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1440x900"
+  },
+  {
+    "path": "plugin-examples/buttons/screenshots/compact.png",
+    "bytes": 23747,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "390x844"
+  },
+  {
+    "path": "plugin-examples/buttons/screenshots/menu.png",
+    "bytes": 73382,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1440x900"
+  },
+  {
+    "path": "plugin-examples/buttons/screenshots/popover.png",
+    "bytes": 73508,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1440x900"
+  },
+  {
+    "path": "plugin-examples/modal-ui/screenshots/android-copy-paste.png",
+    "bytes": 79035,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "plugin-examples/modal-ui/screenshots/android-wide-custom-inset.png",
+    "bytes": 70900,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1200x1600"
+  },
+  {
+    "path": "plugin-examples/modal-ui/screenshots/web-custom-inset.png",
+    "bytes": 53973,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1200x900"
+  },
+  {
+    "path": "plugin-examples/provider-acp-transformer/icon.svg",
+    "bytes": 237,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "plugin-examples/provider-direct/icon.svg",
+    "bytes": 227,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true
+  },
+  {
+    "path": "plugin-examples/settings/screenshots/android.png",
+    "bytes": 75487,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1080x1920"
+  },
+  {
+    "path": "plugin-examples/settings/screenshots/electron.png",
+    "bytes": 47456,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "1200x720"
+  },
+  {
+    "path": "plugin-examples/settings/screenshots/web-compact.png",
+    "bytes": 20680,
+    "identical_to_upstream_tag": true,
+    "identical_between_test_branches": true,
+    "present_in_other_branch": true,
+    "dimensions": "390x844"
+  },
+  {
+    "path": "work/hub-member-onboarding-mobile.png",
+    "bytes": 34334,
+    "identical_to_upstream_tag": false,
+    "identical_between_test_branches": false,
+    "present_in_other_branch": false,
+    "dimensions": "390x760"
+  },
+  {
+    "path": "work/hub-member-onboarding.png",
+    "bytes": 58630,
+    "identical_to_upstream_tag": false,
+    "identical_between_test_branches": false,
+    "present_in_other_branch": false,
+    "dimensions": "1100x820"
+  },
+  {
+    "path": "work/hub-owner-onboarding.png",
+    "bytes": 54281,
+    "identical_to_upstream_tag": false,
+    "identical_between_test_branches": false,
+    "present_in_other_branch": false,
+    "dimensions": "1100x820"
+  }
+]

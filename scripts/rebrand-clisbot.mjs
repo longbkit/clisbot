@@ -270,6 +270,8 @@ function isProtectedPath(path) {
   return (
     path === "scripts/rebrand-clisbot.mjs" ||
     path === "scripts/rebrand-clisbot.test.mjs" ||
+    path.startsWith("scripts/branding/") ||
+    path.startsWith("assets/branding/") ||
     path.startsWith("scripts/rebrand-templates/") ||
     path === "LICENSE" ||
     path.startsWith("docs/audits/") ||

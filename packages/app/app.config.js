@@ -68,7 +68,7 @@ const buildProfile = isFdroidBuild
           "expo-notifications",
           {
             icon: "./assets/images/notification-icon.png",
-            color: "#20744A",
+            color: "#153B43",
           },
         ],
       ],
@@ -142,8 +142,9 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        backgroundColor: "#000000",
+        backgroundColor: "#153B43",
         foregroundImage: "./assets/images/android-icon-foreground.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -176,9 +177,10 @@ export default {
           image: "./assets/images/splash-icon.png",
           imageWidth: 200,
           resizeMode: "contain",
-          backgroundColor: "#ffffff",
+          backgroundColor: "#F6F4EF",
           dark: {
-            backgroundColor: "#000000",
+            image: "./assets/images/splash-icon-dark.png",
+            backgroundColor: "#153B43",
           },
         },
       ],

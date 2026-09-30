@@ -1,0 +1,21 @@
+Use case: logo-brand, precise color comparison edit.
+Input: the approved Clisbot B1-A / Flow PRIMARY design reference. Make ONE clean two-column comparison sheet for the same exact logo in two Ocean palettes. This is a COLOR-ONLY experiment. Preserve the reference PRIMARY logo geometry: one workspace window upper-left, one chat lower-right, a clearly open curved S-shaped negative-space gap separating the two. The gap must remain open. Do not join the shapes into a solid mass. Preserve titlebar slot, relative sizes, curves, short chat tail, optical alignment and padding. Both columns MUST use identical geometry and identical scale.
+
+Canvas: landscape 1536x1024, fully OPAQUE flat warm-white #F6F4EF from edge to edge. No transparency. Sharp vector-like edges, flat solid fills, no gradient, gloss, texture, glow, fog, shadow, vignette or 3D effects.
+Taste: restrained polished identity presentation, generous whitespace, elegant dark ink sans typography, minimal labels. No new branding concept. All typography legible. Do not add recommendation badges.
+Top small header: "B1-A / Flow" and subtitle "Ocean palette comparison".
+LEFT column heading: "01 / Current"
+RIGHT column heading: "02 / Refined"
+Each column: one large square app-icon tile with smoothly rounded corners, about 340px wide. Within the tile the SAME Flow glyph occupies about 62% of its width, centered with equal safe margins. At lower right within the column but OUTSIDE the tile place one small identical app-icon sample about 54px, aligned the same way in both columns.
+Below each large tile, two clean color swatches with the exact labels and hex codes. Below those show a modest horizontal "clisbot" wordmark lockup on the same light page, using that column's dark petrol color for both the mark and text. Same text size, weight and spacing across columns; semibold wordmark not extra-bold. Thin quiet vertical divider between columns.
+
+EXACT LEFT PALETTE:
+App tile background #173C40 (R23 G60 B64), glyph #A8DDCD (R168 G221 B205).
+Labels: "Background  #173C40" and "Mark  #A8DDCD".
+
+EXACT RIGHT PALETTE:
+App tile background #153B43 (R21 G59 B67), glyph #A1DFD4 (R161 G223 B212).
+Labels: "Background  #153B43" and "Mark  #A1DFD4".
+
+This difference is intentionally SUBTLE: right background a little bluer; right mark a little more aqua and saturated than the greener/milkier left mint. Do not exaggerate the change into bright blue, cyan, neon turquoise, or different brightness levels. Do not recolor the page itself. Aim to match the specified sRGB values in the flat fills.
+Small footer: "Same shape. Two palettes." Keep the overall sheet beautiful and balanced, so the viewer can judge this controlled color refinement. Only two columns and two palettes; no Ink or Iris.

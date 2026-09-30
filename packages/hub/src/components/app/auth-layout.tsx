@@ -90,13 +90,10 @@ export function ProductMark({ className }: { className?: string }) {
 
 export function ClisbotGlyph() {
   return (
-    <svg viewBox="0 0 16 16" className="size-4" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 700 700" className="size-4" fill="currentColor" aria-hidden="true">
       <path
-        d="M4 12.5V4.5a1 1 0 0 1 1-1h3.5a3 3 0 0 1 0 6H4"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fillRule="evenodd"
+        d="M159.6 140H442.4C470.4 140 490 161 490 189V280H383.6C341.6 280 315 310.8 315 350V380.8C315 414.4 301 429.8 271.6 429.8H161C124.6 429.8 98 403.2 98 368.2V203C98 166.6 124.6 140 159.6 140ZM173.6 183.4C159.684 183.4 148.4 194.684 148.4 208.6C148.4 222.516 159.684 233.8 173.6 233.8H389.2C403.116 233.8 414.4 222.516 414.4 208.6C414.4 194.684 403.116 183.4 389.2 183.4H173.6Z M406 329H548.8C579.6 329 602 352.8 602 383.6V452.2C602 484.4 582.4 508.2 551.6 508.2V544.6C551.6 554.4 546 558.6 537.6 551.6L488.6 511H385C354.2 511 330.4 497 322 476C345.8 466.2 361.2 449.4 361.2 424.2V380.8C361.2 350 378 329 406 329Z"
       />
     </svg>
   );

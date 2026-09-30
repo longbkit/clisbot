@@ -109,7 +109,7 @@ function getWebNotificationIconUrl(): string | undefined {
   }
 
   try {
-    const asset = Asset.fromModule(require("../../assets/images/notification-icon.png"));
+    const asset = Asset.fromModule(require("../../assets/images/browser-notification-icon.png"));
     notificationIconUrl = asset.uri ?? null;
   } catch {
     notificationIconUrl = null;
