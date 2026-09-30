@@ -10,7 +10,11 @@
   runtime changes are part of the cutover.
 - Old `main` and its GitHub backup `clisbot-v1-tmux-acp-deprecated` were both
   checked at `21baca297f5995fb1dd3d0dc354d64a252dba9e9` before promotion.
-  Use a force-with-lease bound to that old-main SHA, as described in the playbook.
+  GitHub rejected force-with-lease because `main` forbids non-fast-forward updates.
+  The cutover instead merges old `main` into the accepted Fusion tip using the
+  `ours` strategy, preserving both histories and Fusion's code. Only this
+  documentation changes in that merge; a normal push advances `main` without
+  changing its protection rules. This strategy is not used for upstream syncs.
 - The user accepted the candidate after the remaining regression checks and
   temporary upstream service endpoints had been disclosed. These remain
   follow-up work; unrun checks are not recorded as passing. The known cleanup

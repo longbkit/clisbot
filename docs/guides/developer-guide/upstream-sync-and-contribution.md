@@ -122,21 +122,31 @@ tag from this acceptance alone.
 The old GitHub `main` was backed up on 2026-09-29 as
 `origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
 Before cutover, verify that this backup still points to the old `origin/main`
-commit. The current `main` and Fusion branch have no common ancestor, so a
-normal fast-forward push cannot make Fusion the new `main`. Use a lease tied to
-the verified old-main commit; if `main` moved, stop and review the new tip.
+commit. The old `main` and Fusion branch have no common ancestor. GitHub rejected
+the initial force-with-lease attempt because `main` forbids non-fast-forward
+updates. Preserve the old history with a one-time `ours` merge whose first
+parent is the accepted Fusion tip and second parent is old `main`. This keeps
+the Fusion files and allows a normal fast-forward push without changing branch
+protection. This strategy is only for replacing the retired product; never use
+it for recurring upstream merges. If remote `main` moved, stop and review it.
 
 ```bash
 git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
 # After full rebrand and validation, record the exact approved Fusion commit.
-git rev-parse rebrand/clisbot-fusion-test
-git push --force-with-lease=refs/heads/main:<verified-old-main-sha> origin <verified-fusion-sha>:refs/heads/main
+git switch -c sync/fusion-main-cutover <verified-fusion-sha>
+git merge --no-ff --no-commit --strategy=ours --allow-unrelated-histories <verified-old-main-sha>
+# Record acceptance/cutover docs, then commit. Only docs may differ from Fusion.
+git commit -m "Merge accepted Fusion into main while preserving retired history"
+git diff --exit-code <verified-fusion-sha> HEAD -- . ':!docs'
+git merge-base --is-ancestor <verified-old-main-sha> HEAD
+git push origin HEAD:refs/heads/main
 git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
 ```
 
-The final check must show `main` at the approved Fusion SHA and the backup at
-its original SHA. Only then does the promotion procedure below apply to the
-official Clisbot `main`.
+The final check must show `main` at the cutover merge SHA and the backup at its
+original SHA. The cutover tree must match the accepted Fusion code, with only
+the acceptance documentation added. Only then does the promotion procedure
+below apply to official Clisbot `main`.
 
 ### Recurring promotion procedure after the rebrand cutover
 
