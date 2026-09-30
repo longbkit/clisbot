@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { StoredAgentRecord } from "./agent-storage.js";

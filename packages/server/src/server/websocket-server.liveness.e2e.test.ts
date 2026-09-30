@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { WebSocket, type RawData } from "ws";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/index.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/index.js";
 import { WSOutboundMessageSchema, type WSOutboundMessage } from "./messages.js";
 
 const LARGE_REQUEST_BYTES = 512 * 1024;
@@ -16,12 +16,12 @@ class ResumedPhysicalSocketSession {
   private replacement: WebSocket | null = null;
 
   private constructor(
-    private readonly daemon: TestPaseoDaemon,
+    private readonly daemon: TestClisbotDaemon,
     private readonly original: WebSocket,
   ) {}
 
   static async launch(): Promise<ResumedPhysicalSocketSession> {
-    const daemon = await createTestPaseoDaemon();
+    const daemon = await createTestClisbotDaemon();
     const original = await connectSocket(daemon.port, "stale-physical-socket");
     return new ResumedPhysicalSocketSession(daemon, original);
   }

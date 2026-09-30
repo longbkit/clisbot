@@ -6,9 +6,9 @@ import type { AddressInfo } from "node:net";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { runLocalPaseo } from "./helpers/local-cli.js";
+import { runLocalClisbot } from "./helpers/local-cli.js";
 
-const cwd = await mkdtemp(path.join(tmpdir(), "paseo-hub-installed-"));
+const cwd = await mkdtemp(path.join(tmpdir(), "clisbot-hub-installed-"));
 const requests: Array<{ url: string | undefined; body: unknown }> = [];
 const server = createServer((request, response) => {
   let body = "";
@@ -36,21 +36,21 @@ const server = createServer((request, response) => {
 });
 
 try {
-  const workflows = path.join(cwd, ".paseo", "workflows");
+  const workflows = path.join(cwd, ".clisbot", "workflows");
   await mkdir(path.join(workflows, "partials"), { recursive: true });
   const files = [
     {
-      path: ".paseo/hub.yml",
+      path: ".clisbot/hub.yml",
       content:
         "environments:\n  studio:\n    kind: daemon\n    daemon: local\n    cwd: /workspace\nagents:\n  codex-safe:\n    provider: codex\n    options:\n      sandbox_workspace_write:\n        writable_roots: [/var/cache/npm]\n        network_access: false\n",
     },
     {
-      path: ".paseo/workflows/run.yml",
+      path: ".clisbot/workflows/run.yml",
       content:
-        "name: run\non: manual.run\nmax_runtime: 1h\ninputs:\n  repo:\n    type: string\n    choices: [studio]\n  agent:\n    type: string\n    choices: [codex-safe]\nsteps:\n  - id: work\n    environment: ${{ paseo.inputs.repo }}\n    max_runtime: 30m\n    idle_timeout: 5m\n    agent: ${{ paseo.inputs.agent }}\n    prompt:\n      - include: partials/instructions.md\n      - text: ${{ paseo.prompt }}\n",
+        "name: run\non: manual.run\nmax_runtime: 1h\ninputs:\n  repo:\n    type: string\n    choices: [studio]\n  agent:\n    type: string\n    choices: [codex-safe]\nsteps:\n  - id: work\n    environment: ${{ clisbot.inputs.repo }}\n    max_runtime: 30m\n    idle_timeout: 5m\n    agent: ${{ clisbot.inputs.agent }}\n    prompt:\n      - include: partials/instructions.md\n      - text: ${{ clisbot.prompt }}\n",
     },
     {
-      path: ".paseo/workflows/partials/instructions.md",
+      path: ".clisbot/workflows/partials/instructions.md",
       content: "Keep structured provider options unchanged.\n",
     },
   ];
@@ -59,7 +59,7 @@ try {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address() as AddressInfo;
   const origin = `http://127.0.0.1:${address.port}`;
-  const validate = await runLocalPaseo(
+  const validate = await runLocalClisbot(
     [
       "hub",
       "deploy",
@@ -83,7 +83,7 @@ try {
     origin,
   });
 
-  const install = await runLocalPaseo(
+  const install = await runLocalClisbot(
     ["hub", "deploy", "-p", "studio", "--hub", origin, "--api-key", "test-secret", "--json"],
     {},
     cwd,

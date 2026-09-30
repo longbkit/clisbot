@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { DaemonClient, FetchAgentsEntry } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient, FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { deriveWorkspaceAgentVisibility } from "@/workspace-tabs/agent-visibility";
 import { buildAgentDirectoryState } from "@/utils/agent-directory-sync";
@@ -49,7 +49,7 @@ function legacyAgent(input: {
         currentBranch: "main",
         remoteUrl: "git@example.com:repo/app.git",
         worktreeRoot: input.cwd,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: "/repo",
       },
     },

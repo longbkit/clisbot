@@ -89,7 +89,7 @@ describe("curateAgentActivity", () => {
         name: "terminal",
         detail: {
           type: "plain_text",
-          label: `skills/paseo-chat/bin/chat.sh post --room storage-revamp --body $'first line
+          label: `skills/clisbot-chat/bin/chat.sh post --room storage-revamp --body $'first line
 
 second line'`,
           icon: "square_terminal",
@@ -100,7 +100,7 @@ second line'`,
     const result = curateAgentActivity(timeline);
 
     expect(result).toContain(
-      "[Terminal] skills/paseo-chat/bin/chat.sh post --room storage-revamp --body $'first line second line'",
+      "[Terminal] skills/clisbot-chat/bin/chat.sh post --room storage-revamp --body $'first line second line'",
     );
     expect(result).not.toContain("[Interacted with terminal]");
   });
@@ -141,14 +141,16 @@ second line'`,
     const timeline: AgentTimelineItem[] = [
       toolCallItem({
         callId: "mcp-1",
-        name: "paseo__create_agent",
+        name: "clisbot__create_agent",
         input: { cwd: "/tmp/repo", initialPrompt: "do the thing" },
       }),
     ];
 
     const result = curateAgentActivity(timeline);
 
-    expect(result).toBe('[paseo__create_agent] {"cwd":"/tmp/repo","initialPrompt":"do the thing"}');
+    expect(result).toBe(
+      '[clisbot__create_agent] {"cwd":"/tmp/repo","initialPrompt":"do the thing"}',
+    );
   });
 
   it("collapses repeated tool updates by callId", () => {
@@ -291,7 +293,7 @@ second line'`,
           4,
           toolCallItem({
             callId: "external-1",
-            name: "paseo__create_agent",
+            name: "clisbot__create_agent",
             input: { initialPrompt: "do not include raw external tool input" },
           }),
         ),
@@ -321,7 +323,7 @@ second line'`,
     expect(result.attachment.text).toContain("Source directory: /repo");
     expect(result.attachment.text).toContain("[User] Ship the thing");
     expect(result.attachment.text).toContain("[Read] src/index.ts");
-    expect(result.attachment.text).toContain("[paseo__create_agent]");
+    expect(result.attachment.text).toContain("[clisbot__create_agent]");
     expect(result.attachment.text).toContain("[Assistant] Done.");
     expect(result.attachment.text).not.toContain("private chain of thought");
     expect(result.attachment.text).not.toContain("do not include raw external tool input");

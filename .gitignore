@@ -65,7 +65,7 @@ CLAUDE.local.md
 .debug.conversations/
 .debug/
 .dev/
-.paseo/
+.clisbot/
 .wrangler/
 **/.wrangler/
 **/.tanstack/
@@ -76,7 +76,7 @@ PLAN.md
 valknut-report.html/
 valknut-report.json/
 **/.playwright-mcp/
-**/.paseo-provider-history/
+**/.clisbot-provider-history/
 .claude/settings.local.json
 **/.claude/settings.local.json
 .claude/scheduled_tasks.lock

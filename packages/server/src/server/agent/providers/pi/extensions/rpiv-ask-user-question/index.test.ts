@@ -145,7 +145,7 @@ test("the Pi agent releases a deferred captured dialog when the form is answered
   const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
   const session = await client.createSession({
     provider: "pi",
-    cwd: "/tmp/paseo-pi-question-test",
+    cwd: "/tmp/clisbot-pi-question-test",
   });
   const runtime = pi.latestSession();
   runtime.emit(start);

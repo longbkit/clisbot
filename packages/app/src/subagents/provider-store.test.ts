@@ -1,4 +1,4 @@
-import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   observeProviderSubagentTimeline,

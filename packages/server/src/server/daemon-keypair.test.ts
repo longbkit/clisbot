@@ -10,7 +10,7 @@ const MODE_MASK = 0o777;
 const PERMISSIVE_FILE_MODE = 0o644;
 
 function createTempHome(): string {
-  return mkdtempSync(path.join(tmpdir(), "paseo-keypair-"));
+  return mkdtempSync(path.join(tmpdir(), "clisbot-keypair-"));
 }
 
 function modeOf(filePath: string): number {

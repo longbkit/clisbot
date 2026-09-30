@@ -1,7 +1,7 @@
 import { SessionChildren } from "./children.js";
 import { SessionTurns } from "./turns.js";
 import { V2Timeline } from "./timeline.js";
-import { waitForLocationReady, awaitPaseoPlugin } from "./readiness.js";
+import { waitForLocationReady, awaitClisbotPlugin } from "./readiness.js";
 
 import type { SessionInfo, SessionMessageInfo } from "@opencode/client";
 
@@ -64,7 +64,7 @@ export class OpenCodeV2Session implements AgentSession {
     private readonly config: AgentSessionConfig,
     private readonly logger: Logger,
     private readonly persist: boolean,
-    private readonly requiresPaseoPlugin: boolean,
+    private readonly requiresClisbotPlugin: boolean,
     private readonly unbind?: () => void,
     bindChild?: (id: string) => void,
     private readonly acquire?: () => Promise<V2Connection>,
@@ -147,8 +147,8 @@ export class OpenCodeV2Session implements AgentSession {
   private async configureConnection() {
     const location = { directory: this.config.cwd };
     await waitForLocationReady({ client: this.client, location, signal: this.abort.signal });
-    if (this.requiresPaseoPlugin)
-      await awaitPaseoPlugin({ client: this.client, location, signal: this.abort.signal });
+    if (this.requiresClisbotPlugin)
+      await awaitClisbotPlugin({ client: this.client, location, signal: this.abort.signal });
     for (const [server, config] of Object.entries(this.config.mcpServers ?? {})) {
       await this.client.mcp.add({
         server,
@@ -178,7 +178,7 @@ export class OpenCodeV2Session implements AgentSession {
     if (system)
       await this.client.session.instructions.entry.put({
         sessionID: this.id,
-        key: "paseo",
+        key: "clisbot",
         value: system,
       });
   }

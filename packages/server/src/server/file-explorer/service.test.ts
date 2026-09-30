@@ -35,7 +35,7 @@ async function createTempDir(prefix: string): Promise<string> {
 
 describe("file explorer service", () => {
   it("atomically writes an existing text file at the expected revision", async () => {
-    const root = await createTempDir("paseo-file-write-");
+    const root = await createTempDir("clisbot-file-write-");
     try {
       const filePath = path.join(root, "notes.txt");
       await writeFile(filePath, "before", "utf8");
@@ -61,7 +61,7 @@ describe("file explorer service", () => {
   it.skipIf(process.platform === "win32")(
     "preserves the original file permissions across atomic replacement",
     async () => {
-      const root = await createTempDir("paseo-file-mode-");
+      const root = await createTempDir("clisbot-file-mode-");
       try {
         const filePath = path.join(root, "script.sh");
         await writeFile(filePath, "before", "utf8");
@@ -87,7 +87,7 @@ describe("file explorer service", () => {
   );
 
   it("preserves a newer disk revision instead of overwriting it", async () => {
-    const root = await createTempDir("paseo-file-conflict-");
+    const root = await createTempDir("clisbot-file-conflict-");
     try {
       const filePath = path.join(root, "notes.txt");
       await writeFile(filePath, "newer on disk", "utf8");
@@ -109,7 +109,7 @@ describe("file explorer service", () => {
   });
 
   it("prefers the high-precision revision token over the display timestamp", async () => {
-    const root = await createTempDir("paseo-file-revision-");
+    const root = await createTempDir("clisbot-file-revision-");
     try {
       const filePath = path.join(root, "notes.txt");
       await writeFile(filePath, "on disk", "utf8");
@@ -133,7 +133,7 @@ describe("file explorer service", () => {
   });
 
   it("never creates a missing file through the write API", async () => {
-    const root = await createTempDir("paseo-file-missing-");
+    const root = await createTempDir("clisbot-file-missing-");
     try {
       const result = await writeExplorerFile({
         root,
@@ -149,7 +149,7 @@ describe("file explorer service", () => {
   });
 
   it("reads .ex files as text", async () => {
-    const root = await createTempDir("paseo-file-explorer-");
+    const root = await createTempDir("clisbot-file-explorer-");
 
     try {
       const filePath = path.join(root, "sample.ex");
@@ -171,7 +171,7 @@ describe("file explorer service", () => {
   });
 
   it("reads unknown extension text files as text", async () => {
-    const root = await createTempDir("paseo-file-explorer-");
+    const root = await createTempDir("clisbot-file-explorer-");
 
     try {
       const filePath = path.join(root, "notes.customext");
@@ -193,7 +193,7 @@ describe("file explorer service", () => {
   });
 
   it("classifies files with null bytes as binary", async () => {
-    const root = await createTempDir("paseo-file-explorer-");
+    const root = await createTempDir("clisbot-file-explorer-");
 
     try {
       const filePath = path.join(root, "blob.weird");
@@ -214,7 +214,7 @@ describe("file explorer service", () => {
   });
 
   it("fails a stream when the file grows after its revision is advertised", async () => {
-    const root = await createTempDir("paseo-file-stream-growth-");
+    const root = await createTempDir("clisbot-file-stream-growth-");
 
     try {
       const filePath = path.join(root, "growing.log");
@@ -234,7 +234,7 @@ describe("file explorer service", () => {
   });
 
   it("fails a stream when the file shrinks below its advertised size", async () => {
-    const root = await createTempDir("paseo-file-stream-truncate-");
+    const root = await createTempDir("clisbot-file-stream-truncate-");
 
     try {
       const filePath = path.join(root, "shrinking.log");
@@ -254,7 +254,7 @@ describe("file explorer service", () => {
   });
 
   it("fails a stream when the file is overwritten in place", async () => {
-    const root = await createTempDir("paseo-file-stream-overwrite-");
+    const root = await createTempDir("clisbot-file-stream-overwrite-");
 
     try {
       const filePath = path.join(root, "changing.log");
@@ -279,7 +279,7 @@ describe("file explorer service", () => {
   });
 
   it("classifies sampled text when UTF-8 crosses the sample boundary", async () => {
-    const root = await createTempDir("paseo-file-stream-utf8-");
+    const root = await createTempDir("clisbot-file-stream-utf8-");
 
     try {
       const content = Buffer.concat([Buffer.alloc(8191, 0x61), Buffer.from("€"), Buffer.from("z")]);
@@ -300,7 +300,7 @@ describe("file explorer service", () => {
   });
 
   it("rejects incomplete UTF-8 when the whole file was sampled", async () => {
-    const root = await createTempDir("paseo-file-stream-invalid-utf8-");
+    const root = await createTempDir("clisbot-file-stream-invalid-utf8-");
 
     try {
       await writeFile(path.join(root, "invalid.txt"), Buffer.from([0x61, 0xe2, 0x82]));
@@ -317,7 +317,7 @@ describe("file explorer service", () => {
   });
 
   it("detects binary bytes beyond the initial classification block", async () => {
-    const root = await createTempDir("paseo-file-stream-late-binary-");
+    const root = await createTempDir("clisbot-file-stream-late-binary-");
 
     try {
       const content = Buffer.concat([Buffer.alloc(8192, 0x61), Buffer.from([0xff])]);
@@ -335,7 +335,7 @@ describe("file explorer service", () => {
   });
 
   it("expands a ~ prefix in relative paths against the user home directory", async () => {
-    const root = await createHomeTempDir(".paseo-file-explorer-home-");
+    const root = await createHomeTempDir(".clisbot-file-explorer-home-");
 
     try {
       const filePath = path.join(root, "sample.txt");
@@ -355,7 +355,7 @@ describe("file explorer service", () => {
   });
 
   it("allows home to be the scoped root for tilde file previews", async () => {
-    const root = await createHomeTempDir(".paseo-file-explorer-home-root-");
+    const root = await createHomeTempDir(".clisbot-file-explorer-home-root-");
 
     try {
       const filePath = path.join(root, "sample.txt");
@@ -376,7 +376,7 @@ describe("file explorer service", () => {
   });
 
   it("rejects ~-prefixed paths that resolve outside the workspace", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "paseo-file-explorer-outside-home-"));
+    const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-file-explorer-outside-home-"));
 
     try {
       await expect(
@@ -391,7 +391,7 @@ describe("file explorer service", () => {
   });
 
   it("creates files and directories, refusing duplicates and separator names", async () => {
-    const root = await createTempDir("paseo-entry-create-");
+    const root = await createTempDir("clisbot-entry-create-");
     try {
       const file = await createExplorerEntry({
         root,
@@ -438,7 +438,7 @@ describe("file explorer service", () => {
   });
 
   it("duplicates files and folders with collision-free sibling names", async () => {
-    const root = await createTempDir("paseo-entry-duplicate-");
+    const root = await createTempDir("clisbot-entry-duplicate-");
     try {
       await writeFile(path.join(root, "notes.txt"), "original", "utf8");
       const firstFileCopy = await duplicateExplorerEntry({
@@ -473,7 +473,7 @@ describe("file explorer service", () => {
   });
 
   it("renames tracked entries with Git and untracked entries on the filesystem", async () => {
-    const root = await createTempDir("paseo-entry-rename-");
+    const root = await createTempDir("clisbot-entry-rename-");
     try {
       await runGitCommand(["init"], { cwd: root });
       await writeFile(path.join(root, "tracked.txt"), "tracked", "utf8");
@@ -481,7 +481,15 @@ describe("file explorer service", () => {
       await writeFile(path.join(root, "tracked-folder", "inside.txt"), "tracked", "utf8");
       await runGitCommand(["add", "."], { cwd: root });
       await runGitCommand(
-        ["-c", "user.name=Paseo Test", "-c", "user.email=test@paseo.local", "commit", "-m", "base"],
+        [
+          "-c",
+          "user.name=Clisbot Test",
+          "-c",
+          "user.email=test@clisbot.local",
+          "commit",
+          "-m",
+          "base",
+        ],
         { cwd: root },
       );
 
@@ -518,14 +526,22 @@ describe("file explorer service", () => {
   });
 
   it("supports case-only renames for tracked and untracked files", async () => {
-    const root = await createTempDir("paseo-entry-case-rename-");
+    const root = await createTempDir("clisbot-entry-case-rename-");
     try {
       await runGitCommand(["init"], { cwd: root });
       await writeFile(path.join(root, "Tracked.txt"), "tracked", "utf8");
       await writeFile(path.join(root, "Loose.txt"), "untracked", "utf8");
       await runGitCommand(["add", "Tracked.txt"], { cwd: root });
       await runGitCommand(
-        ["-c", "user.name=Paseo Test", "-c", "user.email=test@paseo.local", "commit", "-m", "base"],
+        [
+          "-c",
+          "user.name=Clisbot Test",
+          "-c",
+          "user.email=test@clisbot.local",
+          "commit",
+          "-m",
+          "base",
+        ],
         { cwd: root },
       );
 
@@ -544,7 +560,7 @@ describe("file explorer service", () => {
   });
 
   it("refuses invalid renames, existing targets, and the workspace root", async () => {
-    const root = await createTempDir("paseo-entry-rename-errors-");
+    const root = await createTempDir("clisbot-entry-rename-errors-");
     try {
       await writeFile(path.join(root, "source.txt"), "source", "utf8");
       await writeFile(path.join(root, "existing.txt"), "existing", "utf8");
@@ -568,7 +584,7 @@ describe("file explorer service", () => {
   });
 
   it("deletes files and directories but never the workspace root or outside paths", async () => {
-    const root = await createTempDir("paseo-entry-delete-");
+    const root = await createTempDir("clisbot-entry-delete-");
     try {
       await writeFile(path.join(root, "doomed.txt"), "bye", "utf8");
       const removedFile = await deleteExplorerEntry({ root, relativePath: "doomed.txt" });

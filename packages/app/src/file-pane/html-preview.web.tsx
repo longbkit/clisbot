@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { withPreviewCsp } from "./html-preview-csp";
 
 // `allow-scripts` alone: the file gets an opaque origin, so a plan page can run
-// its own scripts (Excalidraw, charts) but cannot reach the Paseo app's DOM,
+// its own scripts (Excalidraw, charts) but cannot reach the Clisbot app's DOM,
 // cookies, or storage, and cannot navigate the top window. Agent-written HTML is
 // not trusted markup. No popup tokens — a preview is a viewer, not a browser, and
 // escaping the sandbox to open one buys nothing for reading a local plan. The same

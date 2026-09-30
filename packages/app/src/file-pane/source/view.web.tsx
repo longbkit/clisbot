@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FileFind, FileFindModel } from "../find/index.web";
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { getLanguageForFile } from "@getpaseo/highlight";
+import { getLanguageForFile } from "@clisbot/highlight";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";
 import { editorTheme } from "../editor/extensions.web";

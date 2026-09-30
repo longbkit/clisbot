@@ -108,11 +108,11 @@ export default defineConfig({
     ],
     alias: [
       {
-        find: /^@getpaseo\/relay\/e2ee$/,
+        find: /^@clisbot\/relay\/e2ee$/,
         replacement: path.resolve(__dirname, "../relay/src/e2ee.ts"),
       },
       {
-        find: /^@getpaseo\/relay$/,
+        find: /^@clisbot\/relay$/,
         replacement: path.resolve(__dirname, "../relay/src/index.ts"),
       },
       { find: "@", replacement: path.resolve(__dirname, "src") },

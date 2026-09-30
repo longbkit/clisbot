@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { stopDaemonInstance, type DaemonInstance } from "@getpaseo/server/daemon-control";
+import { stopDaemonInstance, type DaemonInstance } from "@clisbot/server/daemon-control";
 import { connectToDaemon } from "../../utils/client.js";
 import { withOutput, type CommandOptions } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";

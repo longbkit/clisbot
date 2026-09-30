@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useReducer, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { ScheduleCadence } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleCadence } from "@clisbot/protocol/schedule/types";
 import type { FieldControlSize } from "@/components/ui/control-geometry";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";

@@ -1,4 +1,4 @@
-import type { PluginBeforeRequests, PluginLifecycleEvents } from "@getpaseo/plugin/server";
+import type { PluginBeforeRequests, PluginLifecycleEvents } from "@clisbot/plugin/server";
 import { validateBeforeRequest, validateBeforeResult } from "./lifecycle/index.js";
 import { fork } from "node:child_process";
 import { stat } from "node:fs/promises";
@@ -14,12 +14,12 @@ import {
   type ProviderConnection,
   type ProviderEvent,
   type ProviderInput,
-} from "@getpaseo/plugin/server/provider";
-import type { PluginLogEntry } from "@getpaseo/protocol/messages";
+} from "@clisbot/plugin/server/provider";
+import type { PluginLogEntry } from "@clisbot/protocol/messages";
 import { compilePlugin } from "./compiler.js";
 import { readPluginManifest } from "./manifest.js";
-import type { PluginRequirements } from "@getpaseo/protocol/messages";
-import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
+import type { PluginRequirements } from "@clisbot/protocol/messages";
+import { assertPluginCompatibility } from "@clisbot/protocol/plugin-requirements";
 import type {
   PluginProcessMessage,
   PluginProcessRequest,
@@ -85,7 +85,7 @@ interface PluginFrameInput {
   session: PluginSessionBinding;
   pluginId: string;
   child: PluginChild;
-  sessionHost: PluginPaseoSessionHost;
+  sessionHost: PluginClisbotSessionHost;
   frame: string | Uint8Array;
   isBinary: boolean;
 }
@@ -115,7 +115,7 @@ interface PluginRuntimeDependencies {
   settingsDirectory?: string;
   onSettingsChanged?: (pluginId: string, settingsId: string) => void;
   spawnChild?: () => PluginChild;
-  sessionHost?: PluginPaseoSessionHost;
+  sessionHost?: PluginClisbotSessionHost;
 }
 
 interface PluginLogTail {
@@ -191,7 +191,7 @@ class PluginOutputCapture {
   }
 }
 
-export interface PluginPaseoSessionHost {
+export interface PluginClisbotSessionHost {
   attachPluginSocket(
     pluginId: string,
     socket: PluginSessionSocket,
@@ -276,7 +276,7 @@ async function resolveEntryPaths(directory: string): Promise<{
   const legacyEntry = await findEntry(directory, ["index.ts", "index.tsx"]);
   if (legacyEntry) {
     throw new Error(
-      "This plugin was made for an older version of Paseo and cannot run on Paseo v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://paseo.sh/docs/plugins/migration",
+      "This plugin was made for an older version of Clisbot and cannot run on Clisbot v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://clisbot.com/docs/plugins/migration",
     );
   }
   throw new Error(
@@ -289,7 +289,7 @@ export class PluginRuntime {
   private readonly logTails = new Map<string, PluginLogTail>();
   private readonly logger: pino.Logger;
   private readonly spawnChild: () => PluginChild;
-  private sessionHost: PluginPaseoSessionHost | null;
+  private sessionHost: PluginClisbotSessionHost | null;
   private readonly listeners = new Set<(pluginId: string, error?: string) => void>();
 
   constructor(
@@ -302,7 +302,7 @@ export class PluginRuntime {
     this.sessionHost = dependencies.sessionHost ?? null;
   }
 
-  bindPaseoSessionHost(sessionHost: PluginPaseoSessionHost): void {
+  bindClisbotSessionHost(sessionHost: PluginClisbotSessionHost): void {
     if (this.plugins.size > 0)
       throw new Error("Cannot replace the plugin session host while running");
     this.sessionHost = sessionHost;
@@ -319,9 +319,13 @@ export class PluginRuntime {
     canPublish: () => boolean = () => true,
   ): Promise<void> {
     if (this.plugins.has(pluginId)) throw new Error(`Plugin is already running: ${pluginId}`);
-    this.appendLog(pluginId, "stdout", "[paseo] Loading plugin");
+    this.appendLog(pluginId, "stdout", "[clisbot] Loading plugin");
     const loaded = await this.loadDirectoryPlugin(pluginId, configuredPath).catch((error) => {
-      this.appendLog(pluginId, "stderr", `[paseo] Plugin failed to load: ${describeError(error)}`);
+      this.appendLog(
+        pluginId,
+        "stderr",
+        `[clisbot] Plugin failed to load: ${describeError(error)}`,
+      );
       throw error;
     });
     if (!canPublish()) {
@@ -329,7 +333,7 @@ export class PluginRuntime {
       throw new Error(`Plugin start cancelled: ${pluginId}`);
     }
     this.plugins.set(pluginId, loaded);
-    this.appendLog(pluginId, "stdout", "[paseo] Plugin ready");
+    this.appendLog(pluginId, "stdout", "[clisbot] Plugin ready");
   }
 
   async validatePlugin(configuredPath: string): Promise<void> {
@@ -576,7 +580,7 @@ export class PluginRuntime {
       };
     }
     const sessionHost = this.sessionHost;
-    if (!sessionHost) throw new Error("Plugin Paseo session host is not attached");
+    if (!sessionHost) throw new Error("Plugin Clisbot session host is not attached");
     const child = this.spawnChild();
     const outputCapture = new PluginOutputCapture(child, (stream, message) => {
       this.appendLog(pluginId, stream, message);
@@ -620,7 +624,7 @@ export class PluginRuntime {
               return;
             }
             const message = parsed.data;
-            if (message.type === "paseo_frame") {
+            if (message.type === "clisbot_frame") {
               this.routePluginFrame({
                 session,
                 pluginId,
@@ -629,7 +633,7 @@ export class PluginRuntime {
                 frame: message.data,
                 isBinary: message.isBinary,
               });
-            } else if (message.type === "paseo_close") {
+            } else if (message.type === "clisbot_close") {
               session.socket.peerClosed();
             } else if (message.type === "ready") {
               if (settled) return;
@@ -725,10 +729,10 @@ export class PluginRuntime {
         session.plugin.sessionClosed = attachment.closed;
       }
       replacement.receive(frame, isBinary);
-      this.appendLog(pluginId, "stdout", "[paseo] Re-attached plugin session");
+      this.appendLog(pluginId, "stdout", "[clisbot] Re-attached plugin session");
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.appendLog(pluginId, "stderr", `[paseo] Failed to re-attach plugin session: ${reason}`);
+      this.appendLog(pluginId, "stderr", `[clisbot] Failed to re-attach plugin session: ${reason}`);
       this.logger.warn({ pluginId, err: error }, "Failed to re-attach a plugin session");
       this.notify(pluginId, `Plugin session could not be re-attached: ${pluginId}`);
     }
@@ -1032,7 +1036,7 @@ export class PluginRuntime {
     const connectionId = readConnectionId(rawMessage);
     const state = connectionId ? loaded.providerConnections.get(connectionId) : undefined;
     if (!connectionId || !state) {
-      this.appendLog(loaded.id, "stderr", `[paseo] ${error.message}`);
+      this.appendLog(loaded.id, "stderr", `[clisbot] ${error.message}`);
       terminatePluginChild(loaded.child!);
       return;
     }
@@ -1076,7 +1080,7 @@ export class PluginRuntime {
   }
 
   private async stopPlugin(loaded: LoadedPlugin): Promise<void> {
-    this.appendLog(loaded.id, "stdout", "[paseo] Stopping plugin");
+    this.appendLog(loaded.id, "stdout", "[clisbot] Stopping plugin");
     for (const [connectionId, state] of loaded.providerConnections) {
       if (state.connected) continue;
       this.abandonProviderConnect(
@@ -1088,13 +1092,13 @@ export class PluginRuntime {
     }
     const { child, sessionSocket, sessionClosed } = loaded;
     if (!child || !sessionSocket || !sessionClosed) {
-      this.appendLog(loaded.id, "stdout", "[paseo] Plugin stopped");
+      this.appendLog(loaded.id, "stdout", "[clisbot] Plugin stopped");
       return;
     }
     if (child.killed) {
       sessionSocket.peerClosed();
       await sessionClosed;
-      this.appendLog(loaded.id, "stdout", "[paseo] Plugin stopped");
+      this.appendLog(loaded.id, "stdout", "[clisbot] Plugin stopped");
       return;
     }
     const closed = new Promise<void>((resolve) =>
@@ -1116,7 +1120,7 @@ export class PluginRuntime {
     });
     sessionSocket.peerClosed();
     await sessionClosed;
-    this.appendLog(loaded.id, "stdout", "[paseo] Plugin stopped");
+    this.appendLog(loaded.id, "stdout", "[clisbot] Plugin stopped");
   }
 
   private rejectPending(loaded: LoadedPlugin, message: string): void {

@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["sh.clisbot.diffprototype.ClisbotDiffPrototypeModule"]
+  }
+}

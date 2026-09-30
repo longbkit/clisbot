@@ -18,10 +18,10 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: node scripts/npm-retry.mjs ci --workspace=@getpaseo/relay --include-workspace-root
+        run: node scripts/npm-retry.mjs ci --workspace=@clisbot/relay --include-workspace-root
 
       - name: Typecheck
-        run: npm run typecheck --workspace=@getpaseo/relay
+        run: npm run typecheck --workspace=@clisbot/relay
 
       - name: Deploy worker
         run: cd packages/relay && npx wrangler deploy

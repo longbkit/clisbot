@@ -8,9 +8,9 @@ const TerminalSchema = z.object({
   name: z.string(),
 });
 
-export type PaseoTerminal = z.infer<typeof TerminalSchema>;
+export type ClisbotTerminal = z.infer<typeof TerminalSchema>;
 
-export interface PaseoTerminalCreateOptions {
+export interface ClisbotTerminalCreateOptions {
   workspaceId: string;
   /** Process working directory; defaults to the workspace directory. */
   cwd?: string;
@@ -21,7 +21,7 @@ export interface PaseoTerminalCreateOptions {
   requestId?: string;
 }
 
-export interface PaseoTerminalListOptions {
+export interface ClisbotTerminalListOptions {
   /** Ownership filter. When supplied, cwd does not restrict the results. */
   workspaceId?: string;
   /** Workspace root directory filter for unscoped listings. */
@@ -29,41 +29,43 @@ export interface PaseoTerminalListOptions {
   requestId?: string;
 }
 
-export interface PaseoTerminalListResult {
-  entries: PaseoTerminal[];
+export interface ClisbotTerminalListResult {
+  entries: ClisbotTerminal[];
   requestId: string;
 }
 
-export interface PaseoTerminalCaptureOptions {
+export interface ClisbotTerminalCaptureOptions {
   start?: number;
   end?: number;
   stripAnsi?: boolean;
   requestId?: string;
 }
 
-export type PaseoTerminalCaptureResult = Awaited<ReturnType<DaemonClient["captureTerminal"]>>;
+export type ClisbotTerminalCaptureResult = Awaited<ReturnType<DaemonClient["captureTerminal"]>>;
 
-export interface PaseoTerminalHandle {
+export interface ClisbotTerminalHandle {
   readonly id: string;
-  current(): PaseoTerminal | null;
-  refresh(options?: { requestId?: string }): Promise<PaseoTerminal | null>;
+  current(): ClisbotTerminal | null;
+  refresh(options?: { requestId?: string }): Promise<ClisbotTerminal | null>;
   /** Sends literal input and returns its UTF-16 length. Does not await command execution. */
   write(data: string): number;
   /** Expands CLI key tokens; other strings are literal. Returns the input's UTF-16 length. */
   sendKeys(keys: readonly string[]): number;
-  capture(options?: PaseoTerminalCaptureOptions): Promise<PaseoTerminalCaptureResult>;
+  capture(options?: ClisbotTerminalCaptureOptions): Promise<ClisbotTerminalCaptureResult>;
   kill(requestId?: string): Promise<void>;
 }
 
-export interface PaseoTerminalActions {
-  create(options: PaseoTerminalCreateOptions): Promise<PaseoTerminalHandle>;
-  list(options?: PaseoTerminalListOptions): Promise<PaseoTerminalListResult>;
-  ref(terminal: string | PaseoTerminal): PaseoTerminalHandle;
+export interface ClisbotTerminalActions {
+  create(options: ClisbotTerminalCreateOptions): Promise<ClisbotTerminalHandle>;
+  list(options?: ClisbotTerminalListOptions): Promise<ClisbotTerminalListResult>;
+  ref(terminal: string | ClisbotTerminal): ClisbotTerminalHandle;
 }
 
-export interface PaseoWorkspaceTerminalActions {
-  create(options?: Omit<PaseoTerminalCreateOptions, "workspaceId">): Promise<PaseoTerminalHandle>;
-  list(options?: { requestId?: string }): Promise<PaseoTerminalListResult>;
+export interface ClisbotWorkspaceTerminalActions {
+  create(
+    options?: Omit<ClisbotTerminalCreateOptions, "workspaceId">,
+  ): Promise<ClisbotTerminalHandle>;
+  list(options?: { requestId?: string }): Promise<ClisbotTerminalListResult>;
 }
 
 type TerminalClient = Pick<
@@ -81,7 +83,7 @@ type TerminalClient = Pick<
 export function createTerminalActions(
   daemonClient: TerminalClient,
   resolveWorkspaceDirectory: (workspaceId: string) => Promise<string>,
-): PaseoTerminalActions {
+): ClisbotTerminalActions {
   function client(): TerminalClient {
     daemonClient.ensureConnected();
     // COMPAT(workspaceTerminals): added in v0.7.3, remove gate after 2027-09-05.
@@ -91,7 +93,9 @@ export function createTerminalActions(
     return daemonClient;
   }
 
-  const list = async (options: PaseoTerminalListOptions = {}): Promise<PaseoTerminalListResult> => {
+  const list = async (
+    options: ClisbotTerminalListOptions = {},
+  ): Promise<ClisbotTerminalListResult> => {
     const result = await client().listTerminals(options.cwd, options.requestId, {
       workspaceId: options.workspaceId,
     });
@@ -101,7 +105,7 @@ export function createTerminalActions(
     };
   };
 
-  const ref = (terminal: string | PaseoTerminal): PaseoTerminalHandle => {
+  const ref = (terminal: string | ClisbotTerminal): ClisbotTerminalHandle => {
     const id = typeof terminal === "string" ? terminal : terminal.id;
     let current = typeof terminal === "string" ? null : terminal;
     const write = (data: string): number => {

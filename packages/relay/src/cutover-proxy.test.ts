@@ -71,7 +71,7 @@ describe("cutover proxy", () => {
       new Request("https://relay.paseo.sh/ws?serverId=srv_prod&role=server&v=2", {
         headers: { "x-relay-probe": "production" },
       }),
-      { PASEO_RELAY_UPSTREAM: originUrl } as RelayEnv,
+      { CLISBOT_RELAY_UPSTREAM: originUrl } as RelayEnv,
     );
 
     expect(origin.received()).toEqual([

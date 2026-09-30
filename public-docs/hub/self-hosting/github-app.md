@@ -16,16 +16,16 @@ Open **Apps → GitHub**. Hub gives you the current callback URLs, required repo
 
 Repository access and installation work without a GitHub webhook. GitHub event triggers and configuration sync do not: GitHub must be able to deliver events to a public HTTPS URL.
 
-On a local HTTP Hub, the Apps guide lets you configure repository access and explains that event setup is unavailable. Reopen Hub at its public address after setting `PASEO_HUB_APP_URL` to add the webhook secret and events.
+On a local HTTP Hub, the Apps guide lets you configure repository access and explains that event setup is unavailable. Reopen Hub at its public address after setting `CLISBOT_HUB_APP_URL` to add the webhook secret and events.
 
 GitHub uses these Hub URLs:
 
-| Setting      | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Homepage URL | `<PASEO_HUB_APP_URL>`                                  |
-| Callback URL | `<PASEO_HUB_APP_URL>/api/integrations/github/callback` |
-| Setup URL    | `<PASEO_HUB_APP_URL>/api/integrations/github/setup`    |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/webhook`                          |
+| Setting      | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Homepage URL | `<CLISBOT_HUB_APP_URL>`                                  |
+| Callback URL | `<CLISBOT_HUB_APP_URL>/api/integrations/github/callback` |
+| Setup URL    | `<CLISBOT_HUB_APP_URL>/api/integrations/github/setup`    |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/webhook`                          |
 
 Keep GitHub's SSL verification enabled.
 
@@ -44,7 +44,7 @@ The connection appears with a slug derived from the account. An installation on 
 ## What the connection provides
 
 - **Events:** issues, comments, reviews, and pushes from repositories the installation can see. See [GitHub triggers](/docs/hub/triggers/github).
-- **Configuration sync:** a repository can hold the canonical `.paseo` bundle. See [Configuration](/docs/hub/configuration).
+- **Configuration sync:** a repository can hold the canonical `.clisbot` bundle. See [Configuration](/docs/hub/configuration).
 - **Execution credentials:** Hub mints scoped GitHub App tokens for workflow steps that explicitly request GitHub authority.
 
 An authenticated `gh` CLI on the daemon does not configure Hub's GitHub integration. It can still serve agents outside Hub's scoped GitHub authority, subject to the daemon and provider's own environment and permission policy.

@@ -26,7 +26,7 @@ export interface HubInitScaffold {
 }
 
 export function hubLoginResumeCommand(step: "connect" | "init", origin: string): string {
-  return step === "connect" ? `paseo hub connect ${origin}` : "paseo hub init";
+  return step === "connect" ? `clisbot hub connect ${origin}` : "clisbot hub init";
 }
 
 export function resolveHubInitConnection(
@@ -51,7 +51,7 @@ export function resolveHubInitConnection(
 export function createHubInitScaffold(input: HubInitScaffoldInput): HubInitScaffold {
   const provider = providerScaffold(input.provider, input.providerFilters);
   return {
-    triggerPath: `.paseo/triggers/${input.provider}-help.yml`,
+    triggerPath: `.clisbot/triggers/${input.provider}-help.yml`,
     trigger: YAML.stringify(
       triggerDocument({
         ...provider,
@@ -87,8 +87,8 @@ function providerScaffold(
       name: "github-help",
       event: "github.issue_comment",
       connection,
-      filters: { repo, contains: "@paseo", from_users: [user] },
-      testAction: `Comment \`@paseo have a look\` on ${repo}.`,
+      filters: { repo, contains: "@clisbot", from_users: [user] },
+      testAction: `Comment \`@clisbot have a look\` on ${repo}.`,
     };
   }
 
@@ -100,7 +100,7 @@ function providerScaffold(
       connection,
       filters: { from_users: [user] },
       reply: "slack.reply",
-      testAction: "Mention `@Paseo have a look` in Slack.",
+      testAction: "Mention `@Clisbot have a look` in Slack.",
     };
   }
 
@@ -110,7 +110,7 @@ function providerScaffold(
     connection,
     filters: { from_users: [user] },
     reply: "discord.reply",
-    testAction: "Mention `@Paseo have a look` in Discord.",
+    testAction: "Mention `@Clisbot have a look` in Discord.",
   };
 }
 
@@ -135,7 +135,7 @@ function triggerDocument(input: {
       continuation: { mode: "conversation" },
       max_runtime: "90m",
       idle_timeout: "10m",
-      prompt: `${replyInstruction}complete this request and call hub.finish_execution when done.\n\n<user-prompt>\n\${{ paseo.prompt }}\n</user-prompt>\n`,
+      prompt: `${replyInstruction}complete this request and call hub.finish_execution when done.\n\n<user-prompt>\n\${{ clisbot.prompt }}\n</user-prompt>\n`,
       ...(input.reply === undefined
         ? {}
         : { outputs: { [input.reply]: { max: 1, required: true } } }),

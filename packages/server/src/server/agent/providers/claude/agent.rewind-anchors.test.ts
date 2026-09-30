@@ -21,7 +21,7 @@ function initMessage(): Record<string, unknown> {
   };
 }
 
-/** Claude Code echoes the user message back under the uuid Paseo minted for it. */
+/** Claude Code echoes the user message back under the uuid Clisbot minted for it. */
 function userEcho(uuid: string): Record<string, unknown> {
   return {
     type: "user",
@@ -92,7 +92,7 @@ function failedResult(): Record<string, unknown> {
 
 interface Conversation {
   queryFactory: ReturnType<typeof vi.fn>;
-  /** The uuid Paseo minted for each prompt, in the order the turns ran. */
+  /** The uuid Clisbot minted for each prompt, in the order the turns ran. */
   userMessageIds: string[];
 }
 

@@ -1,11 +1,11 @@
 npmRebuild: false
-appId: sh.paseo.desktop
-productName: Paseo
-executableName: Paseo
+appId: sh.clisbot.desktop
+productName: Clisbot
+executableName: Clisbot
 protocols:
-  - name: Paseo agent link
+  - name: Clisbot agent link
     schemes:
-      - paseo
+      - clisbot
 afterPack: ./scripts/after-pack.js
 afterSign: ./scripts/after-sign.js
 directories:
@@ -13,19 +13,19 @@ directories:
 files:
   - dist/**/*
   - "!**/*.map"
-  - "!node_modules/@getpaseo/*/src/**"
-  - "!node_modules/@getpaseo/**/*.test.*"
-  - "!node_modules/@getpaseo/**/*.spec.*"
-  - "!node_modules/@getpaseo/server/dist/server/web-ui/**"
+  - "!node_modules/@clisbot/*/src/**"
+  - "!node_modules/@clisbot/**/*.test.*"
+  - "!node_modules/@clisbot/**/*.spec.*"
+  - "!node_modules/@clisbot/server/dist/server/web-ui/**"
   # Workspace packages are symlinked, so anything a dev generates inside them
   # lands in the asar. CI never has these; a local .debug run adds gigabytes.
-  - "!node_modules/@getpaseo/*/.debug/**"
-  - "!node_modules/@getpaseo/*/.tasks/**"
-  - "!node_modules/@getpaseo/*/conversations/**"
-  - "!node_modules/@getpaseo/*/test-results/**"
+  - "!node_modules/@clisbot/*/.debug/**"
+  - "!node_modules/@clisbot/*/.tasks/**"
+  - "!node_modules/@clisbot/*/conversations/**"
+  - "!node_modules/@clisbot/*/test-results/**"
 asarUnpack:
   - dist/daemon/node-entrypoint-runner.js
-  - node_modules/@getpaseo/server/dist/server/terminal/shell-integration/**/*
+  - node_modules/@clisbot/server/dist/server/terminal/shell-integration/**/*
 extraResources:
   - from: ../app/dist
     to: app-dist
@@ -33,10 +33,10 @@ extraResources:
     to: editor-target-icons
 publish:
   provider: github
-  owner: getpaseo
-  repo: paseo
+  owner: longbkit
+  repo: clisbot
 mac:
-  artifactName: "Paseo-${version}-${arch}.${ext}"
+  artifactName: "Clisbot-${version}-${arch}.${ext}"
   minimumSystemVersion: "13.0.0"
   category: public.app-category.developer-tools
   icon: assets/icon.icns
@@ -45,8 +45,8 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   extraResources:
-    - from: bin/paseo
-      to: bin/paseo
+    - from: bin/clisbot
+      to: bin/clisbot
     - from: assets/icon.png
       to: icon.png
   target:
@@ -55,12 +55,12 @@ mac:
 linux:
   category: Development
   icon: assets
-  artifactName: "Paseo-${version}-${arch}.${ext}"
+  artifactName: "Clisbot-${version}-${arch}.${ext}"
   maintainer: "Mohamed Boudra <hello@moboudra.com>"
-  vendor: "Paseo"
+  vendor: "Clisbot"
   extraResources:
-    - from: bin/paseo
-      to: bin/paseo
+    - from: bin/clisbot
+      to: bin/clisbot
   target:
     - AppImage
     - deb
@@ -72,19 +72,19 @@ rpm:
   afterInstall: scripts/linux-sandbox/after-install.tpl
 appImage:
   # A nonempty argument list replaces builder's hardcoded --no-sandbox default.
-  executableArgs: ["--class=Paseo"]
+  executableArgs: ["--class=Clisbot"]
   # Keep the AppImage filename stable across versions (no ${version}) so
   # electron-updater overwrites the file in place instead of renaming it to a new
   # versioned path. A rename orphans the old binary, breaks desktop shortcuts, and
-  # dangles the ~/.local/bin/paseo CLI symlink, which points at $APPIMAGE. The
+  # dangles the ~/.local/bin/clisbot CLI symlink, which points at $APPIMAGE. The
   # version stays discoverable via the release tag and the in-app version.
-  artifactName: "Paseo-${arch}.${ext}"
+  artifactName: "Clisbot-${arch}.${ext}"
 win:
-  artifactName: "Paseo-Setup-${version}-${arch}.${ext}"
+  artifactName: "Clisbot-Setup-${version}-${arch}.${ext}"
   icon: assets/icon.ico
   extraResources:
-    - from: bin/paseo.cmd
-      to: bin/paseo.cmd
+    - from: bin/clisbot.cmd
+      to: bin/clisbot.cmd
   target:
     - target: nsis
       arch:

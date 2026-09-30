@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/highlight",
+  "name": "@clisbot/highlight",
   "version": "0.10.2",
   "files": [
     "dist",

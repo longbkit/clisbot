@@ -3,7 +3,7 @@ import type {
   AgentSnapshotPayload,
   CreationSnapshot,
   WorkspaceDescriptorPayload,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { CreationClient, type CreationResult } from "./index.js";
 
 const workspace: WorkspaceDescriptorPayload = {

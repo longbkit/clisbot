@@ -18,14 +18,14 @@ import {
   takeCommandCenterFocusRestoreElement,
 } from "../../utils/command-center-focus-restore";
 
-const RESIDENT_HOST_ID = "paseo-browser-resident-webviews";
+const RESIDENT_HOST_ID = "clisbot-browser-resident-webviews";
 const attachedBrowsers: Array<{
   browserId: string;
   workspaceId: string;
   webContentsId: number;
 }> = [];
 const profileHost: BrowserWebviewProfileHost = {
-  profilePartition: "persist:paseo-browser",
+  profilePartition: "persist:clisbot-browser",
   registerAttachedBrowser: async (input) => {
     attachedBrowsers.push(input);
   },
@@ -213,8 +213,8 @@ describe("resident browser webviews", () => {
 
     expect(webview).not.toBeNull();
     expect(webview?.isConnected).toBe(true);
-    expect(webview?.getAttribute("data-paseo-browser-id")).toBe("browser-agent");
-    expect(webview?.getAttribute("partition")).toBe("persist:paseo-browser");
+    expect(webview?.getAttribute("data-clisbot-browser-id")).toBe("browser-agent");
+    expect(webview?.getAttribute("partition")).toBe("persist:clisbot-browser");
     expect((webview as HTMLUnknownElement & { src?: string })?.src).toContain(
       "https://example.com",
     );
@@ -242,8 +242,8 @@ describe("resident browser webviews", () => {
     firstWebview.dispatchEvent(new Event("did-attach"));
     secondWebview.dispatchEvent(new Event("did-attach"));
 
-    expect(firstWebview.getAttribute("partition")).toBe("persist:paseo-browser");
-    expect(secondWebview.getAttribute("partition")).toBe("persist:paseo-browser");
+    expect(firstWebview.getAttribute("partition")).toBe("persist:clisbot-browser");
+    expect(secondWebview.getAttribute("partition")).toBe("persist:clisbot-browser");
     expect(attachedBrowsers).toEqual([
       { browserId: "browser-first", workspaceId: "workspace-a", webContentsId: 101 },
       { browserId: "browser-second", workspaceId: "workspace-b", webContentsId: 202 },

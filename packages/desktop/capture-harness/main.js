@@ -7,7 +7,7 @@ const { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, session } = requ
 const { adaptWebContents } = require("../dist/features/browser-automation/ipc.js");
 
 const ROOT = __dirname;
-const OUT_DIR = process.env.PASEO_CAPTURE_HARNESS_OUT_DIR || path.join(ROOT, "out");
+const OUT_DIR = process.env.CLISBOT_CAPTURE_HARNESS_OUT_DIR || path.join(ROOT, "out");
 const PRODUCTION_BROWSER_KEYBOARD_DIR = path.join(
   ROOT,
   "..",
@@ -28,7 +28,7 @@ const PRODUCTION_BROWSER_WEBVIEW_REGISTRY_PATH = path.join(
   "browser-webviews",
   "registry.js",
 );
-const BROWSER_SHORTCUT_INPUT_CHANNEL = "paseo:browser-shortcut-input";
+const BROWSER_SHORTCUT_INPUT_CHANNEL = "clisbot:browser-shortcut-input";
 const VIEWPORT_WIDTH = 1280;
 const VIEWPORT_HEIGHT = 800;
 const FULL_PAGE_HEIGHT = 1600;
@@ -37,19 +37,19 @@ const BROWSER_PROFILE_TIMEOUT_MS = 15000;
 const CAPTURE_RETRY_INTERVAL_MS = 200;
 const REPEAT_COUNT = 5;
 const FRESH_REPEAT_COUNT = 3;
-const SOAK_MS = Number(process.env.PASEO_CAPTURE_HARNESS_SOAK_MS || 75000);
-const HARNESS_GROUP = process.env.PASEO_CAPTURE_HARNESS_GROUP || "permanent-parking";
-const BROWSER_PROFILE_PHASE = process.env.PASEO_CAPTURE_HARNESS_PHASE || "";
+const SOAK_MS = Number(process.env.CLISBOT_CAPTURE_HARNESS_SOAK_MS || 75000);
+const HARNESS_GROUP = process.env.CLISBOT_CAPTURE_HARNESS_GROUP || "permanent-parking";
+const BROWSER_PROFILE_PHASE = process.env.CLISBOT_CAPTURE_HARNESS_PHASE || "";
 const BROWSER_PROFILE_ORIGIN_FILE = path.join(OUT_DIR, "browser-profile-origin.txt");
 const BROWSER_PROFILE_VALUE_FILE = path.join(OUT_DIR, "browser-profile-value.txt");
 const PERMANENT_STATE_FILTER = new Set(
-  (process.env.PASEO_CAPTURE_HARNESS_STATES || "P1")
+  (process.env.CLISBOT_CAPTURE_HARNESS_STATES || "P1")
     .split(",")
     .map((state) => state.trim())
     .filter(Boolean),
 );
 const PERMANENT_VARIANT_FILTER = new Set(
-  (process.env.PASEO_CAPTURE_HARNESS_VARIANTS || "default")
+  (process.env.CLISBOT_CAPTURE_HARNESS_VARIANTS || "default")
     .split(",")
     .map((variant) => variant.trim())
     .filter(Boolean),
@@ -1378,7 +1378,7 @@ const AUTOMATION_SNAPSHOT_PROBE = String.raw`(() => {
           : { ok: false, reason: 'stale_ref' };
       }
     };
-    Object.defineProperty(window, '__PASEO_BROWSER_AUTOMATION__', { configurable: true, value: api });
+    Object.defineProperty(window, '__CLISBOT_BROWSER_AUTOMATION__', { configurable: true, value: api });
     return api;
   }
   function roleFor(element) {
@@ -1448,7 +1448,7 @@ async function automationRefPoint(guest, ref, fingerprint) {
         return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
       };
       while (performance.now() <= deadline) {
-        const resolved = window.__PASEO_BROWSER_AUTOMATION__.resolve(ref, fingerprint);
+        const resolved = window.__CLISBOT_BROWSER_AUTOMATION__.resolve(ref, fingerprint);
         if (!resolved.ok || !resolved.element?.isConnected) return { ok: false, reason: 'stale_ref' };
         const element = resolved.element;
         const rect = element.getBoundingClientRect();
@@ -1617,7 +1617,7 @@ async function automationEvaluate(guest, functionSource, refEntry) {
       const args = [];
       ${
         refEntry
-          ? `const resolved = window.__PASEO_BROWSER_AUTOMATION__.resolve(${JSON.stringify(refEntry.ref)}, ${JSON.stringify(refEntry.fingerprint)});
+          ? `const resolved = window.__CLISBOT_BROWSER_AUTOMATION__.resolve(${JSON.stringify(refEntry.ref)}, ${JSON.stringify(refEntry.fingerprint)});
       if (!resolved.ok) return { ok: false, reason: "stale_ref" };
       args.push(resolved.element);`
           : ""
@@ -1636,7 +1636,7 @@ const AUTOMATION_DIALOG_POLICY = {
 };
 
 const AUTOMATION_PROMPT_SHIM_INSTALL = String.raw`(() => {
-  const stateKey = "__PASEO_BROWSER_AUTOMATION_DIALOG_STATE__";
+  const stateKey = "__CLISBOT_BROWSER_AUTOMATION_DIALOG_STATE__";
   const state = window[stateKey] || { prompts: [], installed: false };
   window[stateKey] = state;
   if (state.installed) return true;
@@ -1655,7 +1655,7 @@ const AUTOMATION_PROMPT_SHIM_INSTALL = String.raw`(() => {
 })()`;
 
 const AUTOMATION_PROMPT_SHIM_DRAIN = String.raw`(() => {
-  const state = window.__PASEO_BROWSER_AUTOMATION_DIALOG_STATE__;
+  const state = window.__CLISBOT_BROWSER_AUTOMATION_DIALOG_STATE__;
   if (!state || !Array.isArray(state.prompts)) return [];
   return state.prompts.splice(0);
 })()`;
@@ -2100,8 +2100,8 @@ async function verifyBrowserKeyboardIsolation({ guest, win, browserId, usesMeta,
 async function runAutomationGroup() {
   const results = [];
   const { BrowserKeyboard } = require(PRODUCTION_BROWSER_KEYBOARD_PATH);
-  const { PaseoBrowserWebviewRegistry } = require(PRODUCTION_BROWSER_WEBVIEW_REGISTRY_PATH);
-  const browserRegistry = new PaseoBrowserWebviewRegistry();
+  const { ClisbotBrowserWebviewRegistry } = require(PRODUCTION_BROWSER_WEBVIEW_REGISTRY_PATH);
+  const browserRegistry = new ClisbotBrowserWebviewRegistry();
   const browserKeyboard = new BrowserKeyboard(browserRegistry);
   browserKeyboard.registerIpc();
   const browserKeyboardSentinels = installBrowserKeyboardSentinels();
@@ -2204,7 +2204,7 @@ async function runAutomationGroup() {
     }
     await guest.executeJavaScript("window.pushFixtureState()", true);
     const pushStateResult = await guest.executeJavaScript(
-      `window.__PASEO_BROWSER_AUTOMATION__.resolve(${JSON.stringify(saveRef.ref)}, ${JSON.stringify(saveRef.fingerprint)}).ok`,
+      `window.__CLISBOT_BROWSER_AUTOMATION__.resolve(${JSON.stringify(saveRef.ref)}, ${JSON.stringify(saveRef.fingerprint)}).ok`,
       true,
     );
     if (pushStateResult !== true) {
@@ -2395,7 +2395,7 @@ async function runAutomationGroup() {
 
     await guest.executeJavaScript("window.sameUrlRerender()", true);
     const rerenderResult = await guest.executeJavaScript(
-      `window.__PASEO_BROWSER_AUTOMATION__.resolve(${JSON.stringify(saveRef.ref)}, ${JSON.stringify(saveRef.fingerprint)}).reason`,
+      `window.__CLISBOT_BROWSER_AUTOMATION__.resolve(${JSON.stringify(saveRef.ref)}, ${JSON.stringify(saveRef.fingerprint)}).reason`,
       true,
     );
     if (rerenderResult !== "stale_ref") {
@@ -2413,8 +2413,8 @@ async function runAutomationGroup() {
       guest.debugger.attach("1.3");
     }
     const evaluated = await guest.debugger.sendCommand("Runtime.evaluate", {
-      expression: `(() => window.__PASEO_BROWSER_AUTOMATION__.resolve(${JSON.stringify(uploadRef.ref)}, ${JSON.stringify(uploadRef.fingerprint)}).element)()`,
-      objectGroup: "paseo-browser-automation",
+      expression: `(() => window.__CLISBOT_BROWSER_AUTOMATION__.resolve(${JSON.stringify(uploadRef.ref)}, ${JSON.stringify(uploadRef.fingerprint)}).element)()`,
+      objectGroup: "clisbot-browser-automation",
       returnByValue: false,
     });
     const described = await guest.debugger.sendCommand("DOM.describeNode", {
@@ -2514,7 +2514,7 @@ async function createBrowserProfileHarnessWindow(partition, sourceUrl) {
 async function readBrowserProfileFixture(guest) {
   return await guest.executeJavaScript(`({
     cookie: document.cookie,
-    localStorage: localStorage.getItem("paseo-browser-profile")
+    localStorage: localStorage.getItem("clisbot-browser-profile")
   })`);
 }
 
@@ -2522,7 +2522,7 @@ function assertBrowserProfileFixture(state, expectedValue, label) {
   if (state.localStorage !== expectedValue) {
     fail(`${label} localStorage mismatch ${JSON.stringify(state)}`);
   }
-  if (!state.cookie.split("; ").includes(`paseo-browser-profile=${expectedValue}`)) {
+  if (!state.cookie.split("; ").includes(`clisbot-browser-profile=${expectedValue}`)) {
     fail(`${label} cookie mismatch ${JSON.stringify(state)}`);
   }
 }
@@ -2574,8 +2574,8 @@ async function prepareBrowserProfileValue(firstGuest, profileSession) {
   const profileValue = `profile-${Date.now()}-${process.pid}`;
   await firstGuest.executeJavaScript(`(() => {
     const value = ${JSON.stringify(profileValue)};
-    localStorage.setItem("paseo-browser-profile", value);
-    document.cookie = "paseo-browser-profile=" + value + "; Max-Age=86400; SameSite=Lax";
+    localStorage.setItem("clisbot-browser-profile", value);
+    document.cookie = "clisbot-browser-profile=" + value + "; Max-Age=86400; SameSite=Lax";
   })()`);
   if (BROWSER_PROFILE_PHASE === "write") {
     await fsp.writeFile(BROWSER_PROFILE_VALUE_FILE, `${profileValue}\n`);
@@ -2588,7 +2588,7 @@ async function runBrowserProfileGroup() {
   if (!["write", "read"].includes(BROWSER_PROFILE_PHASE)) {
     fail(`unknown browser profile phase ${BROWSER_PROFILE_PHASE}`);
   }
-  const partition = "persist:paseo-browser-profile-harness-restart";
+  const partition = "persist:clisbot-browser-profile-harness-restart";
   const profileSession = session.fromPartition(partition);
   const fixture = await startBrowserProfileServer();
   const windows = [];

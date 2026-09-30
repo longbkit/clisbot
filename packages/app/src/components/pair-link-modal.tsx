@@ -7,7 +7,7 @@ import { Link } from "lucide-react-native";
 import type { HostProfile } from "@/types/host-connection";
 import { useHosts, useHostMutations } from "@/runtime/host-runtime";
 import { parseRelayConnectionUri } from "@/utils/daemon-endpoints";
-import { parseConnectionOfferFromUrl } from "@getpaseo/protocol/connection-offer";
+import { parseConnectionOfferFromUrl } from "@clisbot/protocol/connection-offer";
 import { AdaptiveModalSheet, AdaptiveTextInput, type SheetHeader } from "./adaptive-modal-sheet";
 import { getConnectionAuthFailureReason } from "@/utils/test-daemon-connection";
 import { PairingTargetTracker } from "./pair-link-credentials";

@@ -10,14 +10,14 @@ function parseHostnameFromHostHeader(hostHeader: string): string | null {
   const trimmed = hostHeader.trim();
   if (!trimmed) return null;
 
-  // IPv6 in brackets: [::1]:6767
+  // IPv6 in brackets: [::1]:6868
   if (trimmed.startsWith("[")) {
     const end = trimmed.indexOf("]");
     if (end === -1) return null;
     return normalizeHostname(trimmed.slice(1, end));
   }
 
-  // IPv4/hostname with optional port: localhost:6767
+  // IPv4/hostname with optional port: localhost:6868
   const colonIndex = trimmed.indexOf(":");
   if (colonIndex === -1) {
     return normalizeHostname(trimmed);

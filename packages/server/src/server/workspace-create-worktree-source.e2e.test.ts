@@ -5,7 +5,7 @@ import path from "node:path";
 import { expect, onTestFinished, test } from "vitest";
 
 import { DaemonClient } from "./test-utils/index.js";
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 // The reshaped workspace.create.request forwards its worktree `source`
 // (action/refName/branchName/githubPrNumber/worktreeSlug) into createWorktreeCore.
@@ -18,11 +18,11 @@ function createGitRepoWithBranch(): { repoDir: string; tempRoot: string } {
   const tempRoot = mkdtempSync(path.join(tmpdir(), "workspace-create-worktree-source-"));
   const repoDir = path.join(tempRoot, "repo");
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "initial"], {
     cwd: repoDir,
     stdio: "pipe",
@@ -33,7 +33,7 @@ function createGitRepoWithBranch(): { repoDir: string; tempRoot: string } {
 }
 
 test("workspace.create worktree source forwards action=checkout + refName into the real worktree", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -65,7 +65,7 @@ test("workspace.create worktree source forwards action=checkout + refName into t
 }, 180000);
 
 test("workspace.create keeps a branch-off name separate from its worktree slug", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -96,8 +96,8 @@ test("workspace.create keeps a branch-off name separate from its worktree slug",
   }
 }, 180000);
 
-test("workspace.create accepts a Git-valid branch-off name outside Paseo slug syntax", async () => {
-  const daemon = await createTestPaseoDaemon();
+test("workspace.create accepts a Git-valid branch-off name outside Clisbot slug syntax", async () => {
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -131,7 +131,7 @@ test("workspace.create accepts a Git-valid branch-off name outside Paseo slug sy
 }, 180000);
 
 test("workspace.create always creates a new worktree when the slug is already occupied", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -173,7 +173,7 @@ test("workspace.create always creates a new worktree when the slug is already oc
 }, 180000);
 
 test("workspace.create suffixes past an occupied detached worktree", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -218,7 +218,7 @@ test("workspace.create suffixes past an occupied detached worktree", async () =>
 }, 180000);
 
 test("workspace.create suffixes an occupied checkout branch", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -292,7 +292,7 @@ test("restore preserves upstream comparison and update but rejects a missing loc
 }, 180000);
 
 async function createRestorableWorkspace(baseRef: string) {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   onTestFinished(async () => {
@@ -372,7 +372,7 @@ async function expectRestoredComparison(
   ]);
   expect((await client.getCommitFileDiff(cwd, head, "feature.txt")).file?.path).toBe("feature.txt");
   const records = JSON.parse(
-    readFileSync(path.join(daemon.paseoHome, "projects/workspaces.json"), "utf8"),
+    readFileSync(path.join(daemon.clisbotHome, "projects/workspaces.json"), "utf8"),
   );
   expect(
     records.find((record: { workspaceId: string }) => record.workspaceId === workspace.id)

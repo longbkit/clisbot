@@ -412,12 +412,12 @@ export class FakePiSession implements PiRuntimeSession {
       type: "extension_ui_request",
       id: `submitted-user-${entry.id}`,
       method: "notify",
-      message: `PASEO_SUBMITTED_USER_ENTRY ${JSON.stringify({ entry })}`,
+      message: `CLISBOT_SUBMITTED_USER_ENTRY ${JSON.stringify({ entry })}`,
     });
   }
 
   private handleTreeNavigationCommand(message: string): void {
-    const prefix = "/paseo_tree ";
+    const prefix = "/clisbot_tree ";
     if (!message.startsWith(prefix)) {
       return;
     }
@@ -433,7 +433,7 @@ export class FakePiSession implements PiRuntimeSession {
   }
 
   private handleEntryCaptureCommand(message: string): void {
-    const prefix = "/paseo_capture_entries ";
+    const prefix = "/clisbot_capture_entries ";
     if (!message.startsWith(prefix)) {
       return;
     }
@@ -454,7 +454,7 @@ export class FakePiSession implements PiRuntimeSession {
       type: "extension_ui_request",
       id: `capture-${requestId ?? reason}`,
       method: "notify",
-      message: `PASEO_ENTRY_CAPTURE ${JSON.stringify({
+      message: `CLISBOT_ENTRY_CAPTURE ${JSON.stringify({
         reason,
         requestId,
         treeEntries: this.treeUserEntries,
@@ -471,7 +471,7 @@ export class FakePiSession implements PiRuntimeSession {
       type: "extension_ui_request",
       id: `command-${requestId}`,
       method: "notify",
-      message: `PASEO_COMMAND_RESULT ${JSON.stringify({ requestId, ...result })}`,
+      message: `CLISBOT_COMMAND_RESULT ${JSON.stringify({ requestId, ...result })}`,
     });
   }
 }

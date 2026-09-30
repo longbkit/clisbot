@@ -54,14 +54,14 @@ describe("Hub commands", () => {
       {
         env: {},
         credentials,
-        flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         reporter: quietReporter,
       },
     );
 
     assert.deepEqual(credentials.active(), {
       origin: "https://hub.test",
-      credential: "paseo_cli_prefix_durable-secret",
+      credential: "clisbot_cli_prefix_durable-secret",
     });
     assert.deepEqual(result.data, { origin: "https://hub.test", status: "logged_in" });
     assert.equal(JSON.stringify(result).includes("durable-secret"), false);
@@ -80,7 +80,7 @@ describe("Hub commands", () => {
         flow: {
           authorize: async (origin) => {
             events.push(`authorize:${origin}`);
-            return "paseo_cli_prefix_durable-secret";
+            return "clisbot_cli_prefix_durable-secret";
           },
         },
         reporter: { progress: (message) => events.push(`progress:${message}`) },
@@ -108,7 +108,7 @@ describe("Hub commands", () => {
         flow: {
           authorize: async () => {
             events.push("login");
-            return "paseo_cli_prefix_durable-secret";
+            return "clisbot_cli_prefix_durable-secret";
           },
         },
         isInteractive: () => true,
@@ -139,7 +139,7 @@ describe("Hub commands", () => {
       await runHubLogin(undefined, options, {
         env: {},
         credentials,
-        flow: { authorize: async () => "paseo_cli_prefix_durable-secret" },
+        flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
         isInteractive: () => interactive,
         continueGuidedSetup: async () => {
           continuationCount += 1;
@@ -338,7 +338,7 @@ describe("Hub commands", () => {
       {
         code: "HUB_API_KEY_REQUIRED",
         message:
-          "No stored Hub login matches https://hub.paseo.sh. Run `paseo hub login https://hub.paseo.sh`, pass --api-key <secret>, or set PASEO_HUB_API_KEY.",
+          "No stored Hub login matches https://hub.paseo.sh. Run `clisbot hub login https://hub.paseo.sh`, pass --api-key <secret>, or set CLISBOT_HUB_API_KEY.",
       },
     );
 
@@ -356,7 +356,7 @@ describe("Hub commands", () => {
     const result = await runHubProjects(
       { hub: "https://explicit.test", apiKey: "explicit-secret", json: true },
       {
-        env: { PASEO_HUB_URL: "https://env.test", PASEO_HUB_API_KEY: "env-secret" },
+        env: { CLISBOT_HUB_URL: "https://env.test", CLISBOT_HUB_API_KEY: "env-secret" },
         credentials,
         hub: {
           listProjects: async (origin, credential) => {
@@ -364,8 +364,8 @@ describe("Hub commands", () => {
             return [
               {
                 id: "a50e05af-4f20-4c8f-8dcc-58e5ea360663",
-                slug: "paseo",
-                name: "Paseo",
+                slug: "clisbot",
+                name: "Clisbot",
               },
             ];
           },
@@ -382,8 +382,8 @@ describe("Hub commands", () => {
       projects: [
         {
           id: "a50e05af-4f20-4c8f-8dcc-58e5ea360663",
-          slug: "paseo",
-          name: "Paseo",
+          slug: "clisbot",
+          name: "Clisbot",
         },
       ],
     });

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { DefaultNpmGlobalPaseoCli } from "./npm-global-cli.js";
+import { DefaultNpmGlobalClisbotCli } from "./npm-global-cli.js";
 
 interface CommandCall {
   command: string;
@@ -11,14 +11,14 @@ interface CommandCall {
 
 const globalRoot = path.join(path.sep, "global", "lib");
 const globalNodeModules = path.join(globalRoot, "node_modules");
-const cliPackagePath = path.join(globalNodeModules, "@getpaseo", "cli");
+const cliPackagePath = path.join(globalNodeModules, "@clisbot", "cli");
 
-function npmGlobalPaseoCliJson(version: string, options?: { linked?: boolean }): string {
+function npmGlobalClisbotCliJson(version: string, options?: { linked?: boolean }): string {
   return JSON.stringify({
     name: "lib",
     path: globalRoot,
     dependencies: {
-      "@getpaseo/cli": {
+      "@clisbot/cli": {
         version,
         path: cliPackagePath,
         link: options?.linked === true,
@@ -27,17 +27,17 @@ function npmGlobalPaseoCliJson(version: string, options?: { linked?: boolean }):
   });
 }
 
-describe("DefaultNpmGlobalPaseoCli", () => {
+describe("DefaultNpmGlobalClisbotCli", () => {
   test("inspects the npm global cli install with npm -g ls", async () => {
     const calls: CommandCall[] = [];
-    const cli = new DefaultNpmGlobalPaseoCli(async (command, args, options) => {
+    const cli = new DefaultNpmGlobalClisbotCli(async (command, args, options) => {
       calls.push({
         command,
         args,
         timeout: options?.timeout,
         maxBuffer: options?.maxBuffer,
       });
-      return { exitCode: 0, stdout: npmGlobalPaseoCliJson("0.1.15"), stderr: "" };
+      return { exitCode: 0, stdout: npmGlobalClisbotCliJson("0.1.15"), stderr: "" };
     });
 
     await expect(cli.inspect()).resolves.toEqual({
@@ -49,7 +49,7 @@ describe("DefaultNpmGlobalPaseoCli", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["-g", "ls", "@getpaseo/cli", "--json", "--depth=0", "--long"],
+        args: ["-g", "ls", "@clisbot/cli", "--json", "--depth=0", "--long"],
         timeout: 10_000,
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -58,7 +58,7 @@ describe("DefaultNpmGlobalPaseoCli", () => {
 
   test("runs the global install command for the latest cli", async () => {
     const calls: CommandCall[] = [];
-    const cli = new DefaultNpmGlobalPaseoCli(async (command, args, options) => {
+    const cli = new DefaultNpmGlobalClisbotCli(async (command, args, options) => {
       calls.push({
         command,
         args,
@@ -76,7 +76,7 @@ describe("DefaultNpmGlobalPaseoCli", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["install", "-g", "@getpaseo/cli@latest"],
+        args: ["install", "-g", "@clisbot/cli@latest"],
         timeout: 300_000,
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -84,7 +84,7 @@ describe("DefaultNpmGlobalPaseoCli", () => {
   });
 
   test("reports missing npm when npm exits without JSON", async () => {
-    const cli = new DefaultNpmGlobalPaseoCli(async () => ({
+    const cli = new DefaultNpmGlobalClisbotCli(async () => ({
       exitCode: 127,
       stdout: "",
       stderr: "npm: command not found",
@@ -94,14 +94,14 @@ describe("DefaultNpmGlobalPaseoCli", () => {
   });
 
   test("reports missing global cli when npm output has no cli dependency", async () => {
-    const cli = new DefaultNpmGlobalPaseoCli(async () => ({
+    const cli = new DefaultNpmGlobalClisbotCli(async () => ({
       exitCode: 1,
       stdout: JSON.stringify({ name: "lib", path: globalRoot, dependencies: {} }),
       stderr: "missing",
     }));
 
     await expect(cli.inspect()).rejects.toThrow(
-      "@getpaseo/cli is not installed with npm -g on this host",
+      "@clisbot/cli is not installed with npm -g on this host",
     );
   });
 });

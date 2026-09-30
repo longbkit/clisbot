@@ -8,7 +8,7 @@ const OFFER = {
   relay: { endpoint: "relay.paseo.sh:443" },
 };
 
-const DIRECT_ENDPOINT = "localhost:6767";
+const DIRECT_ENDPOINT = "localhost:6868";
 const PING_COUNT = 20;
 const WARMUP_COUNT = 3;
 
@@ -92,7 +92,7 @@ async function main() {
     url: buildDaemonWebSocketUrl(DIRECT_ENDPOINT),
   });
 
-  await measurePings("Direct (localhost:6767)", directClient, PING_COUNT, WARMUP_COUNT);
+  await measurePings("Direct (localhost:6868)", directClient, PING_COUNT, WARMUP_COUNT);
 
   // Measure relay connection
   console.log("\nConnecting via relay...");

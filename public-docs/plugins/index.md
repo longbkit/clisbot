@@ -1,6 +1,6 @@
 ---
 title: Plugin quickstart
-description: Build, install, share, and update a trusted Paseo plugin.
+description: Build, install, share, and update a trusted Clisbot plugin.
 nav: Quickstart
 order: 44
 category: Plugins
@@ -8,7 +8,7 @@ category: Plugins
 
 # Plugin quickstart
 
-A plugin is a TypeScript project installed into one Paseo daemon. It can add
+A plugin is a TypeScript project installed into one Clisbot daemon. It can add
 [surfaces and sidebar items](/docs/plugins/reference#surfaces-and-sidebar-items),
 [workspace panels](/docs/plugins/reference#workspace-panels),
 [Command Center items](/docs/plugins/reference#command-center-items),
@@ -19,7 +19,7 @@ A plugin is a TypeScript project installed into one Paseo daemon. It can add
 [attachment sources](/docs/plugins/reference#add-a-composer-attachment-source), and
 [daemon-side RPCs](/docs/plugins/reference#add-plugin-specific-backend-behavior). It can also
 [connect a coding agent as a provider](/docs/plugins/providers). Client
-contributions run on every Paseo client connected to that daemon, including mobile.
+contributions run on every Clisbot client connected to that daemon, including mobile.
 
 This guide scaffolds a plugin, runs it, and adds a workspace panel to it.
 
@@ -28,13 +28,13 @@ This guide scaffolds a plugin, runs it, and adds a workspace panel to it.
 Use an absolute path on the daemon machine:
 
 ```bash
-paseo plugin init /absolute/path/to/workspace-plugin
+clisbot plugin init /absolute/path/to/workspace-plugin
 cd /absolute/path/to/workspace-plugin
 npm install
 ```
 
 `init` writes a strict TypeScript project and does not run the package manager. `npm install` adds
-development dependencies for typechecking and tests only; Paseo supplies the plugin SDK, React,
+development dependencies for typechecking and tests only; Clisbot supplies the plugin SDK, React,
 React Native, TanStack Query, and Zod at runtime.
 
 The scaffold is a working plugin: a sidebar surface with a button that asks the daemon for a
@@ -42,8 +42,8 @@ greeting through an RPC.
 
 ```text
 workspace-plugin/
-  paseo-plugin.json      # plugin ID and supported Paseo versions
-  index.client.tsx       # runs in the Paseo app
+  clisbot-plugin.json      # plugin ID and supported Clisbot versions
+  index.client.tsx       # runs in the Clisbot app
   index.server.ts        # runs in a daemon subprocess
   client/greeting.tsx    # the surface component
   client/web.ts          # the only file allowed to touch browser APIs
@@ -57,7 +57,7 @@ Each entry default-exports one function that registers contributions and returns
 function. `index.client.tsx` registers the surface and the sidebar item that opens it:
 
 ```tsx
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { GreetingSurface } from "./client/greeting";
 
 export default function contribute(client: PluginClientContext) {
@@ -75,7 +75,7 @@ export default function contribute(client: PluginClientContext) {
 `index.server.ts` registers the handler for the contract in `shared/greeting.ts`:
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createGreeting } from "./server/greeting";
 import { greetingRpc } from "./shared/greeting";
 
@@ -99,27 +99,27 @@ API behind `Platform.OS` with a native fallback. See
 ## Install and try it
 
 Plugins are trusted, unsandboxed code: server code and preparation commands run with the daemon
-user's access on the daemon machine, and client code runs inside the Paseo app. Installing a plugin
+user's access on the daemon machine, and client code runs inside the Clisbot app. Installing a plugin
 means you trust that codebase, its dependencies, and its future updates.
 
 Turn on **Enable plugins** under **Settings → Plugins** on the daemon you are installing into. It is
 the global switch for every plugin on that daemon. It is also the root `pluginsEnabled` field in the
-daemon's `config.json`; after editing the file, apply it with `paseo reload --json`. An automated
+daemon's `config.json`; after editing the file, apply it with `clisbot reload --json`. An automated
 tool must read the current value and get your explicit permission before turning it on.
 
 Then typecheck and install:
 
 ```bash
 npm run typecheck
-paseo plugin install /absolute/path/to/workspace-plugin
-paseo plugin ls
+clisbot plugin install /absolute/path/to/workspace-plugin
+clisbot plugin ls
 ```
 
 Or install the directory from the app:
 
 1. Open **Settings → Plugins** on the target host.
 2. Paste `/absolute/path/to/workspace-plugin` into **Plugin source**.
-3. Select **Install plugin**. The app uses the plugin ID from `paseo-plugin.json`.
+3. Select **Install plugin**. The app uses the plugin ID from `clisbot-plugin.json`.
 
 The source field also accepts Git repositories, npm packages, and plugin subdirectories. See
 [Plugin sources](/docs/plugins/reference#plugin-sources) for the accepted syntax and resolution
@@ -129,12 +129,12 @@ management actions remain available.
 Each installed plugin row shows its status and description. Use its switch to enable or disable it,
 and open its three-dot menu for settings, logs, reload, and removal.
 
-`paseo plugin ls` should report the plugin as `running`. Open Paseo, choose **Greeting** in the
+`clisbot plugin ls` should report the plugin as `running`. Open Clisbot, choose **Greeting** in the
 sidebar, and press **Create greeting**. The message comes back from the daemon subprocess through
 the RPC.
 
 If the sidebar item is missing, check that **Enable plugins** is on, the plugin is `running`, and
-the client is viewing the host you installed into. `paseo plugin logs workspace-plugin` shows the
+the client is viewing the host you installed into. `clisbot plugin logs workspace-plugin` shows the
 daemon-side output, including load errors.
 
 ## Add a workspace panel
@@ -142,7 +142,7 @@ daemon-side output, including load errors.
 A workspace panel opens as a tab next to agents, terminals, and files. Create `client/overview.tsx`:
 
 ```tsx
-import { type PluginWorkspacePanelProps, useWorkspace } from "@getpaseo/plugin/client";
+import { type PluginWorkspacePanelProps, useWorkspace } from "@clisbot/plugin/client";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 
@@ -178,7 +178,7 @@ export function WorkspaceOverview({ theme, layout, workspaceId }: PluginWorkspac
 
 `useWorkspace` reads the fields the panel renders from the app's cached state, without an RPC and
 without re-rendering when unrelated fields change. Every `Text` takes its color from
-`theme.colors`, and `layout.compact` drives spacing, so the panel works in every Paseo theme and on
+`theme.colors`, and `layout.compact` drives spacing, so the panel works in every Clisbot theme and on
 phones. See [Theme and layout](/docs/plugins/reference#theme-and-layout) for the token list.
 
 Register the panel and a Command Center item that opens it by adding to `index.client.tsx`:
@@ -214,11 +214,11 @@ Source changes take effect only when you reload the plugin:
 
 ```bash
 npm run typecheck
-paseo plugin reload workspace-plugin
+clisbot plugin reload workspace-plugin
 ```
 
 A reload stops the old plugin, runs its cleanup, compiles the current source, and starts it again.
-A failed reload stays failed and reports its error in `paseo plugin ls`; fix the source and reload
+A failed reload stays failed and reports its error in `clisbot plugin ls`; fix the source and reload
 again.
 
 Open a workspace, press **⌘K** on macOS or **Ctrl+K** on Windows and Linux, and choose **Open
@@ -229,7 +229,7 @@ workspace overview**. The panel opens as a workspace tab.
 Install a trusted npm plugin using npm on the daemon host:
 
 ```bash
-paseo plugin install npm:@acme/paseo-review@1.2.0
+clisbot plugin install npm:@acme/clisbot-review@1.2.0
 ```
 
 Or paste the same identifier into **Settings → Plugins → Plugin source** and select **Install
@@ -243,19 +243,19 @@ See [plugin sources](/docs/plugins/reference#plugin-sources) for identifier synt
 Plugins published in a Git repository install by shorthand or URL:
 
 ```bash
-paseo plugin add owner/repository
-paseo plugin add https://gitlab.com/group/repository.git
-paseo plugin add owner/monorepo:plugins/workspace
-paseo plugin add owner/repository --ref main
+clisbot plugin add owner/repository
+clisbot plugin add https://gitlab.com/group/repository.git
+clisbot plugin add owner/monorepo:plugins/workspace
+clisbot plugin add owner/repository --ref main
 ```
 
 Append `:relative/path` when the plugin lives below the repository root. `--ref` selects the initial
 Git content once; omitting it installs the default HEAD. See the [source reference](/docs/plugins/reference#plugin-sources) for exact syntax.
 
 ```bash
-paseo plugin ls
-paseo plugin update workspace-plugin
-paseo plugin update --all
+clisbot plugin ls
+clisbot plugin update workspace-plugin
+clisbot plugin update --all
 ```
 
 `ls` reports source identity and the current installed revision without contacting the remote.
@@ -277,11 +277,11 @@ Read the recent output by opening the plugin's three-dot menu under **Settings �
 selecting **Logs**, or use the CLI:
 
 ```bash
-paseo plugin logs workspace-plugin
-paseo plugin logs workspace-plugin --json
+clisbot plugin logs workspace-plugin
+clisbot plugin logs workspace-plugin --json
 ```
 
-The tail includes `[paseo]` loading, ready, stopping, and stopped entries, plus compilation and load
+The tail includes `[clisbot]` loading, ready, stopping, and stopped entries, plus compilation and load
 failures, and it survives reloads and crashes. Client-side output stays in the app. See
 [Debug backend output](/docs/plugins/reference#debug-backend-output) for retention and what not to
 log.
@@ -295,5 +295,5 @@ log.
   modules, hosts, and the CLI.
 - [Migrate a plugin to runtime entries](/docs/plugins/migration): move a plugin written against the
   single `index.ts` entry, step by step.
-- [TypeScript SDK](/docs/sdk): the workspace, agent, provider, and config API available as `paseo`
+- [TypeScript SDK](/docs/sdk): the workspace, agent, provider, and config API available as `clisbot`
   in client and server code.

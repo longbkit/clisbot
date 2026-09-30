@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "playwright/test";
 
 const desktopName =
-  "Paseo desktop app with coding agents, a conversation, and a code diff open side by side";
+  "Clisbot desktop app with coding agents, a conversation, and a code diff open side by side";
 
 async function openHomepage(page: Page) {
   await page.setViewportSize({ width: 1512, height: 930 });
@@ -10,7 +10,7 @@ async function openHomepage(page: Page) {
 }
 
 async function viewPhones(page: Page) {
-  await page.getByRole("img", { name: "Paseo agent chat", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("img", { name: "Clisbot agent chat", exact: true }).scrollIntoViewIfNeeded();
 }
 
 async function expectScreenContentInsidePhone(page: Page, name: string, time: string) {
@@ -46,9 +46,9 @@ async function resizeToPhone(page: Page) {
 test("the three phone mockups show their screen content", async ({ page }) => {
   await openHomepage(page);
   await viewPhones(page);
-  await expectScreenContentInsidePhone(page, "Paseo workspace drawer", "18:54");
-  await expectScreenContentInsidePhone(page, "Paseo agent chat", "18:53");
-  await expectScreenContentInsidePhone(page, "Paseo diff view", "18:55");
+  await expectScreenContentInsidePhone(page, "Clisbot workspace drawer", "18:54");
+  await expectScreenContentInsidePhone(page, "Clisbot agent chat", "18:53");
+  await expectScreenContentInsidePhone(page, "Clisbot diff view", "18:55");
 });
 
 test("desktop mockup corners shrink in proportion on a phone", async ({ page }) => {

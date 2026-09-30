@@ -106,11 +106,11 @@ export function parseHostPort(input: string): HostPortParts {
     throw new Error("Host is required");
   }
 
-  // IPv6: [::1]:6767
+  // IPv6: [::1]:6868
   if (trimmed.startsWith("[")) {
     const match = trimmed.match(/^\[([^\]]+)\]:(\d{1,5})$/);
     if (!match) {
-      throw new Error("Invalid host:port (expected [::1]:6767)");
+      throw new Error("Invalid host:port (expected [::1]:6868)");
     }
     const host = match[1].trim();
     if (!host) throw new Error("Host is required");
@@ -120,7 +120,7 @@ export function parseHostPort(input: string): HostPortParts {
 
   const match = trimmed.match(/^(.+):(\d{1,5})$/);
   if (!match) {
-    throw new Error("Invalid host:port (expected localhost:6767)");
+    throw new Error("Invalid host:port (expected localhost:6868)");
   }
   const host = match[1].trim();
   if (!host) throw new Error("Host is required");

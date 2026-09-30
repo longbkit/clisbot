@@ -25,7 +25,7 @@ interface ProviderLaunchCase {
   launchMode?: "spawnProcess" | "piRuntime";
 }
 
-const JSON_ARG = '{"mcpServers":{"paseo":{"type":"http","url":"http://127.0.0.1:6767/mcp"}}}';
+const JSON_ARG = '{"mcpServers":{"clisbot":{"type":"http","url":"http://127.0.0.1:6868/mcp"}}}';
 const tempDirs: string[] = [];
 
 function makeFixture(
@@ -33,10 +33,10 @@ function makeFixture(
   expectedArgs: string[],
   launchMode: "spawnProcess" | "piRuntime" = "spawnProcess",
 ) {
-  const root = mkdtempSync(path.join(tmpdir(), `paseo ${binaryName} launch `));
+  const root = mkdtempSync(path.join(tmpdir(), `clisbot ${binaryName} launch `));
   tempDirs.push(root);
 
-  const fakeDaemonNode = path.join(root, "Fake Paseo.exe");
+  const fakeDaemonNode = path.join(root, "Fake Clisbot.exe");
   copyFileSync(process.execPath, fakeDaemonNode);
 
   const assertScript = path.join(root, "assert-argv.js");

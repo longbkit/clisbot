@@ -1,5 +1,5 @@
 import { compare } from "bcryptjs";
-import type { WSHelloMessage } from "@getpaseo/protocol/messages";
+import type { WSHelloMessage } from "@clisbot/protocol/messages";
 import { OWNER_PERMISSIONS } from "./authorization/index.js";
 import { matchesLocalCredential } from "./local-credential.js";
 import type { SessionAdmission } from "./websocket-server.js";

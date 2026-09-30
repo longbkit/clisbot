@@ -43,7 +43,7 @@ export async function installCli(): Promise<InstallStatus> {
       "@echo off",
       `set "BUNDLED_CLI=${shimPath}"`,
       `if not exist "%BUNDLED_CLI%" (`,
-      `  echo Paseo CLI not found at %BUNDLED_CLI% — is Paseo installed? 1>&2`,
+      `  echo Clisbot CLI not found at %BUNDLED_CLI% — is Clisbot installed? 1>&2`,
       `  exit /b 1`,
       `)`,
       `call "%BUNDLED_CLI%" %*`,

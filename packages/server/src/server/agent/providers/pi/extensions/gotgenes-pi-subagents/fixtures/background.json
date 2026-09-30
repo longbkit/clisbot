@@ -48,7 +48,7 @@
       "message": {
         "role": "custom",
         "customType": "subagent-notification",
-        "content": "<task-notification>\n<task-id>b913f6d2-2b1e-4be</task-id>\n<tool-use-id>call_403820</tool-use-id>\n<output-file>/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl</output-file>\n<status>Done</status>\n<summary>Subagent \"list files\" completed</summary>\n<result>The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.</result>\n<usage><total_tokens>8843</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>3714</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl\nCall get_subagent_result(\"b913f6d2-2b1e-4be\") to collect the full result.",
+        "content": "<task-notification>\n<task-id>b913f6d2-2b1e-4be</task-id>\n<tool-use-id>call_403820</tool-use-id>\n<output-file>/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl</output-file>\n<status>Done</status>\n<summary>Subagent \"list files\" completed</summary>\n<result>The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.</result>\n<usage><total_tokens>8843</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>3714</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl\nCall get_subagent_result(\"b913f6d2-2b1e-4be\") to collect the full result.",
         "display": true,
         "details": {
           "id": "b913f6d2-2b1e-4be",
@@ -58,8 +58,8 @@
           "turnCount": 3,
           "totalTokens": 8843,
           "durationMs": 3714,
-          "outputFile": "/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl",
-          "resultPreview": "The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty."
+          "outputFile": "/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl",
+          "resultPreview": "The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty."
         },
         "timestamp": 1790197700057
       }
@@ -80,7 +80,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Agent: b913f6d2-2b1e-4be\nType: Agent | Status: completed | Tool uses: 1 | 8.8k token | Context: 1% | Duration: 3.7s\nDescription: list files\n\nThe workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.\n\nFull transcript available at: /tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
+            "text": "Agent: b913f6d2-2b1e-4be\nType: Agent | Status: completed | Tool uses: 1 | 8.8k token | Context: 1% | Duration: 3.7s\nDescription: list files\n\nThe workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.\n\nFull transcript available at: /tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
           }
         ],
         "details": {
@@ -93,9 +93,9 @@
           "contextPercent": 0.6055831909179688,
           "compactionCount": 0,
           "duration": "3.7s",
-          "preview": "The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.",
+          "preview": "The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.",
           "verbose": false,
-          "transcriptPath": "/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
+          "transcriptPath": "/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
         }
       },
       "isError": false
@@ -167,7 +167,7 @@
     {
       "role": "custom",
       "customType": "subagent-notification",
-      "content": "<task-notification>\n<task-id>b913f6d2-2b1e-4be</task-id>\n<tool-use-id>call_403820</tool-use-id>\n<output-file>/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl</output-file>\n<status>Done</status>\n<summary>Subagent \"list files\" completed</summary>\n<result>The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.</result>\n<usage><total_tokens>8843</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>3714</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl\nCall get_subagent_result(\"b913f6d2-2b1e-4be\") to collect the full result.",
+      "content": "<task-notification>\n<task-id>b913f6d2-2b1e-4be</task-id>\n<tool-use-id>call_403820</tool-use-id>\n<output-file>/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl</output-file>\n<status>Done</status>\n<summary>Subagent \"list files\" completed</summary>\n<result>The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.</result>\n<usage><total_tokens>8843</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>3714</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl\nCall get_subagent_result(\"b913f6d2-2b1e-4be\") to collect the full result.",
       "display": true,
       "details": {
         "id": "b913f6d2-2b1e-4be",
@@ -177,8 +177,8 @@
         "turnCount": 3,
         "totalTokens": 8843,
         "durationMs": 3714,
-        "outputFile": "/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl",
-        "resultPreview": "The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty."
+        "outputFile": "/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl",
+        "resultPreview": "The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty."
       },
       "timestamp": 1790197700057
     },
@@ -224,7 +224,7 @@
       "content": [
         {
           "type": "text",
-          "text": "Agent: b913f6d2-2b1e-4be\nType: Agent | Status: completed | Tool uses: 1 | 8.8k token | Context: 1% | Duration: 3.7s\nDescription: list files\n\nThe workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.\n\nFull transcript available at: /tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
+          "text": "Agent: b913f6d2-2b1e-4be\nType: Agent | Status: completed | Tool uses: 1 | 8.8k token | Context: 1% | Duration: 3.7s\nDescription: list files\n\nThe workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.\n\nFull transcript available at: /tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
         }
       ],
       "details": {
@@ -237,9 +237,9 @@
         "contextPercent": 0.6055831909179688,
         "compactionCount": 0,
         "duration": "3.7s",
-        "preview": "The workspace `/tmp/paseo-pi-extension-phase3/workspace` is currently empty.",
+        "preview": "The workspace `/tmp/clisbot-pi-extension-phase3/workspace` is currently empty.",
         "verbose": false,
-        "transcriptPath": "/tmp/paseo-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
+        "transcriptPath": "/tmp/clisbot-pi-extension-phase3/sessions-gotgenes/2026-09-23T21-08-13-733Z_01a0d018-fd25-783b-b9e9-27f4bd6c8851/tasks/2026-09-23T21-08-17-217Z_01a0d019-0ac1-72e0-a277-0fea25d9da6c.jsonl"
       },
       "isError": false,
       "timestamp": 1790197701316

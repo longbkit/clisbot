@@ -6,4 +6,4 @@ Added
 - Added automatic Pull request tab opening once per workspace when a PR is detected
 - Added expandable plan cards, with rejected plans collapsed by default
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

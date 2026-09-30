@@ -20,7 +20,7 @@ function candidate(input: {
     },
     project: {
       projectKey: "key",
-      projectName: input.projectName ?? "getpaseo/paseo",
+      projectName: input.projectName ?? "longbkit/clisbot",
       workspaceName: input.workspaceName ?? null,
       checkout: {
         cwd: "/tmp/repo",
@@ -28,7 +28,7 @@ function candidate(input: {
         currentBranch: branch,
         remoteUrl: null,
         worktreeRoot: "/tmp/repo",
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     },
@@ -71,9 +71,9 @@ describe("matchesAgentHistoryQuery", () => {
   });
 
   it("matches the project name", () => {
-    expect(matchesAgentHistoryQuery("paseo", candidate({ projectName: "getpaseo/paseo" }))).toBe(
-      true,
-    );
+    expect(
+      matchesAgentHistoryQuery("clisbot", candidate({ projectName: "longbkit/clisbot" })),
+    ).toBe(true);
   });
 
   it("requires every token to match somewhere", () => {

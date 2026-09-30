@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ArrowUpRight, Blocks, Check, Settings2 } from "lucide-react-native";
-import type { AgentSkillOperation, AgentSkillsStatus } from "@getpaseo/protocol/messages";
+import type { AgentSkillOperation, AgentSkillsStatus } from "@clisbot/protocol/messages";
 import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -24,7 +24,7 @@ const ThemedBlocks = withUnistyles(Blocks);
 const ThemedCheck = withUnistyles(Check);
 const ThemedSettings = withUnistyles(Settings2);
 const ThemedArrowUpRight = withUnistyles(ArrowUpRight);
-const SKILLS_DOCS_URL = "https://paseo.sh/docs/skills";
+const SKILLS_DOCS_URL = "https://clisbot.com/docs/skills";
 const foregroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const mutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 

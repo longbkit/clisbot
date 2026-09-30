@@ -30,15 +30,15 @@ console.log("=== Send Command Tests ===\n");
 
 // Allocate an unused endpoint for connection-error and argument-validation checks.
 const port = await getAvailablePort();
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-test-home-"));
-const promptFilePath = join(paseoHome, "send-prompt.txt");
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-test-home-"));
+const promptFilePath = join(clisbotHome, "send-prompt.txt");
 await writeFile(promptFilePath, "prompt from file");
 
 try {
   // Test 1: send --help shows options
   {
     console.log("Test 1: send --help shows options");
-    const result = await $`npx paseo send --help`.nothrow();
+    const result = await $`npx clisbot send --help`.nothrow();
     assert.strictEqual(result.exitCode, 0, "send --help should exit 0");
     assert(result.stdout.includes("--prompt"), "help should mention --prompt option");
     assert(result.stdout.includes("--prompt-file"), "help should mention --prompt-file option");
@@ -59,7 +59,7 @@ try {
   {
     console.log("Test 2: send requires id argument");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send`.nothrow();
     assert.notStrictEqual(result.exitCode, 0, "should fail without id");
     const output = result.stdout + result.stderr;
     // Commander should complain about missing argument
@@ -75,7 +75,7 @@ try {
   {
     console.log("Test 3: send requires prompt argument");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send abc123`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send abc123`.nothrow();
     assert.notStrictEqual(result.exitCode, 0, "should fail without prompt");
     const output = result.stdout + result.stderr;
     // Commander should complain about missing argument
@@ -91,7 +91,7 @@ try {
   {
     console.log("Test 4: send handles daemon not running");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send abc123 "test prompt"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send abc123 "test prompt"`.nothrow();
     // Should fail because daemon not running
     assert.notStrictEqual(result.exitCode, 0, "should fail when daemon not running");
     const output = result.stdout + result.stderr;
@@ -107,7 +107,7 @@ try {
   {
     console.log("Test 5: send --no-wait flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send --no-wait abc123 "test prompt"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send --no-wait abc123 "test prompt"`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --no-wait flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -118,7 +118,7 @@ try {
   {
     console.log("Test 5b: send --prompt flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send --prompt "test prompt" abc123`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send --prompt "test prompt" abc123`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --prompt flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -129,7 +129,7 @@ try {
   {
     console.log("Test 5c: send --prompt-file flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send --prompt-file ${promptFilePath} abc123`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send --prompt-file ${promptFilePath} abc123`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --prompt-file flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -140,7 +140,7 @@ try {
   {
     console.log("Test 6: send --host flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo send --host localhost:${port} abc123 "test prompt"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot send --host localhost:${port} abc123 "test prompt"`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --host flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -151,7 +151,7 @@ try {
   {
     console.log("Test 7: -q (quiet) flag is accepted with send");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} -q send --no-wait abc123 "test prompt"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} -q send --no-wait abc123 "test prompt"`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept -q flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -162,7 +162,7 @@ try {
   {
     console.log("Test 8: Combined flags work together");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} -q send --no-wait abc123 "Run the linter"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} -q send --no-wait abc123 "Run the linter"`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept all combined flags");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -173,7 +173,7 @@ try {
   {
     console.log("Test 8b: conflicting prompt sources are rejected");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} send abc123 "positional prompt" --prompt "flag prompt"`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} send abc123 "positional prompt" --prompt "flag prompt"`.nothrow();
     assert.notStrictEqual(result.exitCode, 0, "should fail for conflicting prompt sources");
     const output = result.stdout + result.stderr;
     assert(
@@ -183,19 +183,19 @@ try {
     console.log("✓ conflicting prompt sources are rejected\n");
   }
 
-  // Test 9: paseo --help shows send command
+  // Test 9: clisbot --help shows send command
   {
-    console.log("Test 9: paseo --help shows send command");
-    const result = await $`npx paseo --help`.nothrow();
-    assert.strictEqual(result.exitCode, 0, "paseo --help should exit 0");
+    console.log("Test 9: clisbot --help shows send command");
+    const result = await $`npx clisbot --help`.nothrow();
+    assert.strictEqual(result.exitCode, 0, "clisbot --help should exit 0");
     assert(result.stdout.includes("send"), "help should mention send command");
-    console.log("✓ paseo --help shows send command\n");
+    console.log("✓ clisbot --help shows send command\n");
   }
 
   // Test 10: ID prefix syntax is mentioned in help
   {
     console.log("Test 10: send command description mentions ID");
-    const result = await $`npx paseo send --help`.nothrow();
+    const result = await $`npx clisbot send --help`.nothrow();
     assert.strictEqual(result.exitCode, 0, "send --help should exit 0");
     const hasIdMention =
       result.stdout.toLowerCase().includes("id") || result.stdout.toLowerCase().includes("prefix");
@@ -204,7 +204,7 @@ try {
   }
 } finally {
   // Clean up temp directory
-  await rm(paseoHome, { recursive: true, force: true });
+  await rm(clisbotHome, { recursive: true, force: true });
 }
 
 console.log("=== All send tests passed ===");

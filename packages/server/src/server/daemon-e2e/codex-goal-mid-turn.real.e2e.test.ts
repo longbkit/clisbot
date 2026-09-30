@@ -6,7 +6,7 @@ import pino from "pino";
 
 import { resolveBinaryVersion } from "../agent/providers/diagnostic-utils.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import {
   canRunRealProvider,
   createRealProviderClients,
@@ -108,7 +108,7 @@ describe("daemon E2E (real codex) - /goal command", () => {
   test("/goal <objective> sets the goal and the model can read it back", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["codex"], logger),
       logger,
     });
@@ -162,7 +162,7 @@ describe("daemon E2E (real codex) - /goal command", () => {
   test("/goal pause mid-turn does not cancel the running turn", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["codex"], logger),
       logger,
     });
@@ -239,7 +239,7 @@ describe("daemon E2E (real codex) - /goal command", () => {
   test("/goal clear removes the goal", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["codex"], logger),
       logger,
     });

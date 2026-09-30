@@ -13,7 +13,7 @@ describe.skipIf(process.platform === "win32")("materializeProviderImage", () => 
     const attachmentDir = path.dirname(materialized.path);
 
     try {
-      expect(path.basename(attachmentDir)).toMatch(/^paseo-attachments-/);
+      expect(path.basename(attachmentDir)).toMatch(/^clisbot-attachments-/);
       expect(existsSync(materialized.path)).toBe(true);
       expect(statSync(attachmentDir).mode & 0o777).toBe(0o700);
       expect(statSync(materialized.path).mode & 0o777).toBe(0o600);

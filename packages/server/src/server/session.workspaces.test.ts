@@ -18,13 +18,13 @@ import { setImmediate as waitForImmediate } from "node:timers/promises";
 import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { Session } from "./session.js";
 import type { SessionOptions } from "./session.js";
 import { OWNER_PERMISSIONS } from "./authorization/index.js";
 import type { AgentUpdatesService } from "./session/agent-updates/agent-updates-service.js";
-import type { AgentSnapshotPayload, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import { createTerminalManager } from "../terminal/terminal-manager.js";
 import { AgentManager, type AgentManagerEvent, type ManagedAgent } from "./agent/agent-manager.js";
@@ -43,9 +43,9 @@ import type {
 import { createWorktree } from "../utils/worktree.js";
 import { createRealpathAwarePathMatcher } from "../utils/path.js";
 import {
-  readPaseoWorktreeMetadata,
-  writePaseoWorktreeFirstAgentBranchAutoNameMetadata,
-  writePaseoWorktreeMetadata,
+  readClisbotWorktreeMetadata,
+  writeClisbotWorktreeFirstAgentBranchAutoNameMetadata,
+  writeClisbotWorktreeMetadata,
 } from "../utils/worktree-metadata.js";
 import type { WorkspaceGitRuntimeSnapshot } from "./workspace-git-service.js";
 import type { GeneratedWorkspaceName } from "./worktree-branch-name-generator.js";
@@ -158,7 +158,7 @@ interface SessionTestAccess {
   }>;
   handleArchiveAgentRequest(agentId: string, requestId: string): Promise<unknown>;
   handleMessage(message: unknown, source?: object): Promise<unknown>;
-  handleCreatePaseoWorktreeRequest(params: unknown): Promise<unknown>;
+  handleCreateClisbotWorktreeRequest(params: unknown): Promise<unknown>;
   listAgentPayloads(...args: unknown[]): Promise<unknown[]>;
   listFetchWorkspacesEntries(params: unknown): Promise<ListFetchResult>;
   listFetchAgentsEntries(params: unknown): Promise<ListFetchResult>;
@@ -177,7 +177,7 @@ interface SessionTestAccess {
   updateClientCapabilities(capabilities: Record<string, unknown> | null, source?: object): void;
   emit(message: unknown): void;
   onMessage(message: unknown): void;
-  paseoHome: string;
+  clisbotHome: string;
   terminalManager: {
     killTerminal(id: string): unknown;
     clearTerminalAttention?(id: string): Promise<boolean>;
@@ -410,7 +410,7 @@ function createWorkspaceRuntimeSnapshot(
       mainRepoRoot: null,
       currentBranch: "main",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 0, behind: 0 },
@@ -564,7 +564,7 @@ function createSessionForWorkspaceTests(
     projectRegistry?: SessionOptions["projectRegistry"];
     workspaceRegistry?: SessionOptions["workspaceRegistry"];
     github?: ForgeService;
-    paseoHome?: string;
+    clisbotHome?: string;
     worktreesRoot?: string;
     renameCurrentBranch?: (
       cwd: string,
@@ -655,7 +655,7 @@ function createSessionForWorkspaceTests(
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: options.paseoHome ?? "/tmp/paseo-test",
+      clisbotHome: options.clisbotHome ?? "/tmp/clisbot-test",
       worktreesRoot: options.worktreesRoot,
       agentManager,
       agentStorage: asAgentStorage({
@@ -941,7 +941,7 @@ test("client heartbeat clears attention for the focused terminal", async () => {
 });
 
 test("create_agent_request keeps requested child cwd when grouped under an existing parent workspace", async () => {
-  const workdir = mkdtempSync(path.join(tmpdir(), "paseo-create-agent-cwd-"));
+  const workdir = mkdtempSync(path.join(tmpdir(), "clisbot-create-agent-cwd-"));
   try {
     const parent = path.join(workdir, "parent");
     const child = path.join(parent, "child");
@@ -977,7 +977,7 @@ test("create_agent_request keeps requested child cwd when grouped under an exist
         currentBranch: "main",
         remoteUrl: null,
         worktreeRoot: parent,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       }),
     });
@@ -1017,7 +1017,7 @@ test("create_agent_request keeps requested child cwd when grouped under an exist
         logger: asSessionLogger(logger),
         downloadTokenStore: asDownloadTokenStore(),
         pushNotifications: asPushNotifications(),
-        paseoHome: path.join(workdir, "paseo-home"),
+        clisbotHome: path.join(workdir, "clisbot-home"),
         agentManager,
         agentStorage,
         projectRegistry,
@@ -1087,17 +1087,17 @@ test("create_agent_request keeps requested child cwd when grouped under an exist
 });
 
 test("create_agent_request launches from an exact subdirectory in a created worktree", async () => {
-  const workdir = mkdtempSync(path.join(tmpdir(), "paseo-create-agent-worktree-cwd-"));
+  const workdir = mkdtempSync(path.join(tmpdir(), "clisbot-create-agent-worktree-cwd-"));
   try {
     const parent = path.join(workdir, "parent");
     const child = path.join(parent, "packages", "app");
     mkdirSync(child, { recursive: true });
     execFileSync("git", ["init", "-b", "main"], { cwd: parent, stdio: "pipe" });
-    execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+    execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
       cwd: parent,
       stdio: "pipe",
     });
-    execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: parent, stdio: "pipe" });
+    execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: parent, stdio: "pipe" });
     writeFileSync(path.join(child, "README.md"), "app\n");
     execFileSync("git", ["add", "."], { cwd: parent, stdio: "pipe" });
     execFileSync("git", ["commit", "-m", "initial"], { cwd: parent, stdio: "pipe" });
@@ -1132,7 +1132,7 @@ test("create_agent_request launches from an exact subdirectory in a created work
         currentBranch: "main",
         remoteUrl: null,
         worktreeRoot: parent,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       }),
       resolveRepoRoot: async () => parent,
@@ -1171,7 +1171,7 @@ test("create_agent_request launches from an exact subdirectory in a created work
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: path.join(workdir, "paseo-home"),
+      clisbotHome: path.join(workdir, "clisbot-home"),
       agentManager,
       agentStorage,
       projectRegistry,
@@ -1246,7 +1246,7 @@ test("create_agent_request launches from an exact subdirectory in a created work
 
 test("create_agent_request does not title an existing workspace from the agent prompt", async () => {
   vi.useFakeTimers();
-  const workdir = mkdtempSync(path.join(tmpdir(), "paseo-create-agent-existing-title-"));
+  const workdir = mkdtempSync(path.join(tmpdir(), "clisbot-create-agent-existing-title-"));
   try {
     const cwd = path.join(workdir, "repo");
     mkdirSync(cwd, { recursive: true });
@@ -1310,7 +1310,7 @@ test("create_agent_request does not title an existing workspace from the agent p
         logger: asSessionLogger(logger),
         downloadTokenStore: asDownloadTokenStore(),
         pushNotifications: asPushNotifications(),
-        paseoHome: path.join(workdir, "paseo-home"),
+        clisbotHome: path.join(workdir, "clisbot-home"),
         agentManager,
         agentStorage,
         projectRegistry,
@@ -1580,7 +1580,7 @@ test("archive emits an authoritative agent_update upsert for subscribed clients"
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       agentManager: asAgentManager({
         subscribe: () => () => {},
         listAgents: () => [],
@@ -1824,7 +1824,7 @@ test("workspace mark unread selects the newest finished workspace root", async (
         cwd: REPO_CWD,
         workspaceId: workspace.workspaceId,
         updatedAt: "2026-03-30T17:00:00.000Z",
-        labels: { "paseo.parent-agent-id": "root-agent" },
+        labels: { "clisbot.parent-agent-id": "root-agent" },
       }),
     ],
   ]);
@@ -2064,7 +2064,7 @@ test("close_items_request archives agents and kills terminals in one batch", asy
       logger: asSessionLogger(sessionLogger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       agentManager: asAgentManager({
         subscribe: () => () => {},
         listAgents: () => [],
@@ -2234,7 +2234,7 @@ test("close_items_request archives stored agents that are not currently loaded",
       logger: asSessionLogger(sessionLogger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       agentManager: asAgentManager({
         subscribe: () => () => {},
         listAgents: () => [],
@@ -2395,7 +2395,7 @@ test("close_items_request continues after an archive failure", async () => {
       logger: asSessionLogger(sessionLogger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       agentManager: asAgentManager({
         subscribe: () => () => {},
         listAgents: () => [],
@@ -2558,7 +2558,7 @@ test("workspace placements preserve checkout facts independently from the projec
     cwd: "/tmp/manual-worktree",
     kind: "worktree",
     displayName: "manual",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: "/tmp/main-repo",
     createdAt: "2026-03-01T12:00:00.000Z",
     updatedAt: "2026-03-01T12:00:00.000Z",
@@ -2572,13 +2572,13 @@ test("workspace placements preserve checkout facts independently from the projec
     createdAt: "2026-03-01T12:00:00.000Z",
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
-  const paseoSubdirectory = createPersistedWorkspaceRecord({
-    workspaceId: "ws-paseo-subdirectory",
+  const clisbotSubdirectory = createPersistedWorkspaceRecord({
+    workspaceId: "ws-clisbot-subdirectory",
     projectId: "proj-manual-worktree",
-    cwd: "/tmp/paseo-worktree/packages/app",
+    cwd: "/tmp/clisbot-worktree/packages/app",
     kind: "worktree",
     displayName: "app",
-    isPaseoOwnedWorktree: true,
+    isClisbotOwnedWorktree: true,
     mainRepoRoot: "/tmp/main-repo",
     createdAt: "2026-03-01T12:00:00.000Z",
     updatedAt: "2026-03-01T12:00:00.000Z",
@@ -2592,14 +2592,14 @@ test("workspace placements preserve checkout facts independently from the projec
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
   session.workspaceRegistry.get = async (workspaceId: string) =>
-    [manualWorktree, explicitDirectory, paseoSubdirectory].find(
+    [manualWorktree, explicitDirectory, clisbotSubdirectory].find(
       (workspace) => workspace.workspaceId === workspaceId,
     ) ?? null;
   session.projectRegistry.get = async () => project;
   session.workspaceGitService.peekSnapshot = (cwd: string) =>
-    cwd === paseoSubdirectory.cwd
+    cwd === clisbotSubdirectory.cwd
       ? createWorkspaceRuntimeSnapshot(cwd, {
-          git: { repoRoot: "/tmp/paseo-worktree" },
+          git: { repoRoot: "/tmp/clisbot-worktree" },
         })
       : null;
 
@@ -2609,7 +2609,7 @@ test("workspace placements preserve checkout facts independently from the projec
     expect.objectContaining({
       checkout: expect.objectContaining({
         isGit: true,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: "/tmp/main-repo",
       }),
     }),
@@ -2620,18 +2620,18 @@ test("workspace placements preserve checkout facts independently from the projec
     expect.objectContaining({
       checkout: expect.objectContaining({
         isGit: false,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       }),
     }),
   );
   await expect(
-    session.buildProjectPlacementForWorkspaceId(paseoSubdirectory.workspaceId),
+    session.buildProjectPlacementForWorkspaceId(clisbotSubdirectory.workspaceId),
   ).resolves.toEqual(
     expect.objectContaining({
       checkout: expect.objectContaining({
-        cwd: paseoSubdirectory.cwd,
-        worktreeRoot: "/tmp/paseo-worktree",
+        cwd: clisbotSubdirectory.cwd,
+        worktreeRoot: "/tmp/clisbot-worktree",
       }),
     }),
   );
@@ -3477,7 +3477,7 @@ test("fetch_agent_request still resolves archived historical agents", async () =
       currentBranch: null,
       remoteUrl: null,
       worktreeRoot: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -3533,7 +3533,7 @@ test("git branch workspace uses branch as canonical name", async () => {
       currentBranch: "feature/name-from-server",
       remoteUrl: "https://github.com/acme/repo-branch.git",
       worktreeRoot: cwd,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -3652,7 +3652,7 @@ test("workspace update stream keeps persisted workspace visible after agents sto
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       agentManager: asAgentManager({
         subscribe: () => () => {},
         listAgents: () => [],
@@ -4026,13 +4026,13 @@ test("project.remove.request removes an already-empty project", async () => {
   ]);
 });
 
-test("create paseo worktree response preserves an explicit non-Git project", async () => {
+test("create clisbot worktree response preserves an explicit non-Git project", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const createdAt = "2026-05-12T12:00:00.000Z";
   vi.setSystemTime(new Date(createdAt));
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "session-worktree-test-")));
   const repoDir = path.join(tempDir, "repo");
-  const paseoHome = path.join(tempDir, "paseo-home");
+  const clisbotHome = path.join(tempDir, "clisbot-home");
   mkdirSync(repoDir, { recursive: true });
   execFileSync("git", ["init", "-b", "main"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["config", "user.email", "test@test.com"], {
@@ -4054,7 +4054,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
           repoRoot: repoDir,
           currentBranch: "main",
           remoteUrl: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         },
       });
@@ -4066,7 +4066,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
           repoRoot: cwd,
           currentBranch: "worktree-123",
           remoteUrl: null,
-          isPaseoOwnedWorktree: true,
+          isClisbotOwnedWorktree: true,
           mainRepoRoot: repoDir,
         },
       });
@@ -4077,7 +4077,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
         repoRoot: cwd,
         currentBranch: "main",
         remoteUrl: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     });
@@ -4098,7 +4098,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
     updatedAt: createdAt,
   });
   const projects = new Map([[explicitProject.projectId, explicitProject]]);
-  session.paseoHome = paseoHome;
+  session.clisbotHome = clisbotHome;
   session.workspaceRegistry.get = async (lookupWorkspaceId: string) =>
     workspaces.get(lookupWorkspaceId) ?? null;
   session.workspaceRegistry.list = async () => Array.from(workspaces.values());
@@ -4134,8 +4134,8 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
     if (isSessionOutboundMessage(message)) emitted.push(message);
   };
   try {
-    await session.handleCreatePaseoWorktreeRequest({
-      type: "create_paseo_worktree_request",
+    await session.handleCreateClisbotWorktreeRequest({
+      type: "create_clisbot_worktree_request",
       cwd: repoDir,
       projectId: explicitProject.projectId,
       worktreeSlug: "worktree-123",
@@ -4146,7 +4146,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
     rmSync(tempDir, { recursive: true, force: true });
   }
 
-  const response = findByType(emitted, "create_paseo_worktree_response");
+  const response = findByType(emitted, "create_clisbot_worktree_response");
 
   expect(response?.payload.error).toBeNull();
   expect(response?.payload.workspace).toMatchObject({
@@ -4176,7 +4176,7 @@ test("create paseo worktree response preserves an explicit non-Git project", asy
 test("workspace updates stay scoped to the matching cwd", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const archivedWorkspaceIds: string[] = [];
-  const missingRoot = path.join(tmpdir(), `paseo-scoped-workspace-${Date.now()}`);
+  const missingRoot = path.join(tmpdir(), `clisbot-scoped-workspace-${Date.now()}`);
   rmSync(missingRoot, { recursive: true, force: true });
   const mainCwd = path.join(missingRoot, "main");
   const featureCwd = path.join(missingRoot, "feature");
@@ -4292,7 +4292,7 @@ test("open_project_request registers a workspace before any agent exists", async
       currentBranch: null,
       remoteUrl: null,
       worktreeRoot: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -4347,7 +4347,7 @@ test("import_agent_request registers a workspace for a never-seen cwd", async ()
       currentBranch: null,
       remoteUrl: null,
       worktreeRoot: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -4534,7 +4534,7 @@ test("open_project_response returns immediately even when the GitHub fetch is sl
     currentBranch: "main",
     remoteUrl: "https://github.com/acme/slow.git",
     worktreeRoot: requestedCwd,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: null,
   });
   let resolveSnapshot: (snapshot: WorkspaceGitRuntimeSnapshot) => void = () => {};
@@ -4610,7 +4610,7 @@ test("open_project_request emits a workspace_update with githubRuntime once the 
     currentBranch: "main",
     remoteUrl: "https://github.com/acme/repo.git",
     worktreeRoot: requestedCwd,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: null,
   });
   session.workspaceGitService.peekSnapshot = () => peeked.value;
@@ -4671,7 +4671,7 @@ test("open_project_request does not match a new child directory to an existing p
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
   const home = path.resolve("/home/developer");
-  const worktree = path.join(home, ".paseo", "worktrees", "project-config-lifecycle-textarea");
+  const worktree = path.join(home, ".clisbot", "worktrees", "project-config-lifecycle-textarea");
 
   projects.set(
     home,
@@ -4737,7 +4737,7 @@ test("open_project_request does not unarchive an archived parent workspace for a
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
   const home = path.resolve("/home/developer");
-  const worktree = path.join(home, ".paseo", "worktrees", "project-config-lifecycle-textarea");
+  const worktree = path.join(home, ".clisbot", "worktrees", "project-config-lifecycle-textarea");
   const archivedAt = "2026-04-24T08:00:00.000Z";
 
   projects.set(
@@ -4804,10 +4804,10 @@ test("open_project_request reclassifies an archived directory workspace when git
   const session = createSessionForWorkspaceTests();
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
-  const repoRoot = path.resolve("/home/developer/dev/paseo");
+  const repoRoot = path.resolve("/home/developer/dev/clisbot");
   const cwd = path.join(
     path.resolve("/home/developer"),
-    ".paseo",
+    ".clisbot",
     "worktrees",
     "orchestrate",
     "desktop-daemon-settings",
@@ -4863,9 +4863,9 @@ test("open_project_request reclassifies an archived directory workspace when git
     cwd,
     isGit: true,
     currentBranch: "feature/desktop-daemon-settings",
-    remoteUrl: "git@github.com:getpaseo/paseo.git",
+    remoteUrl: "git@github.com:longbkit/clisbot.git",
     worktreeRoot: cwd,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: repoRoot,
   });
   session.workspaceGitService.getSnapshot = async () =>
@@ -4874,8 +4874,8 @@ test("open_project_request reclassifies an archived directory workspace when git
         isGit: true,
         repoRoot: cwd,
         currentBranch: "feature/desktop-daemon-settings",
-        remoteUrl: "git@github.com:getpaseo/paseo.git",
-        isPaseoOwnedWorktree: false,
+        remoteUrl: "git@github.com:longbkit/clisbot.git",
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: repoRoot,
       },
     });
@@ -4899,10 +4899,10 @@ test("open_project_request reclassifies an active directory workspace when git m
   const session = createSessionForWorkspaceTests();
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
-  const repoRoot = path.resolve("/home/developer/dev/paseo");
+  const repoRoot = path.resolve("/home/developer/dev/clisbot");
   const cwd = path.join(
     path.resolve("/home/developer"),
-    ".paseo",
+    ".clisbot",
     "worktrees",
     "orchestrate",
     "desktop-daemon-settings",
@@ -4925,13 +4925,13 @@ test("open_project_request reclassifies an active directory workspace when git m
       projectId: repoRoot,
       rootPath: repoRoot,
       kind: "git",
-      displayName: "paseo",
+      displayName: "clisbot",
       createdAt: "2026-04-24T09:40:00.000Z",
       updatedAt: "2026-04-24T09:40:00.000Z",
     }),
   );
   const workspaceId = "ws-desktop-daemon-settings-active";
-  const repoWorkspaceId = "ws-paseo-main";
+  const repoWorkspaceId = "ws-clisbot-main";
   workspaces.set(
     workspaceId,
     createPersistedWorkspaceRecord({
@@ -4979,9 +4979,9 @@ test("open_project_request reclassifies an active directory workspace when git m
     cwd: requestedCwd,
     isGit: true,
     currentBranch: requestedCwd === repoRoot ? "main" : "feature/desktop-daemon-settings",
-    remoteUrl: "git@github.com:getpaseo/paseo.git",
+    remoteUrl: "git@github.com:longbkit/clisbot.git",
     worktreeRoot: requestedCwd,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: requestedCwd === repoRoot ? null : repoRoot,
   });
   session.workspaceGitService.getSnapshot = async (requestedCwd: string) =>
@@ -4990,8 +4990,8 @@ test("open_project_request reclassifies an active directory workspace when git m
         isGit: true,
         repoRoot: requestedCwd,
         currentBranch: requestedCwd === repoRoot ? "main" : "feature/desktop-daemon-settings",
-        remoteUrl: "git@github.com:getpaseo/paseo.git",
-        isPaseoOwnedWorktree: false,
+        remoteUrl: "git@github.com:longbkit/clisbot.git",
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: requestedCwd === repoRoot ? null : repoRoot,
       },
     });
@@ -5014,10 +5014,10 @@ test("open_project_request gives a plain git worktree its own exact-root project
   const session = createSessionForWorkspaceTests();
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
-  const repoRoot = path.resolve("/home/developer/dev/paseo");
+  const repoRoot = path.resolve("/home/developer/dev/clisbot");
   const cwd = path.join(
     path.resolve("/home/developer"),
-    ".paseo",
+    ".clisbot",
     "worktrees",
     "orchestrate",
     "desktop-daemon-settings",
@@ -5029,7 +5029,7 @@ test("open_project_request gives a plain git worktree its own exact-root project
       projectId: repoRoot,
       rootPath: repoRoot,
       kind: "git",
-      displayName: "paseo",
+      displayName: "clisbot",
       createdAt: "2026-04-24T09:46:43.146Z",
       updatedAt: "2026-04-24T09:46:43.146Z",
     }),
@@ -5069,9 +5069,9 @@ test("open_project_request gives a plain git worktree its own exact-root project
     cwd: requestedCwd,
     isGit: true,
     currentBranch: requestedCwd === repoRoot ? "main" : "feature/desktop-daemon-settings",
-    remoteUrl: "git@github.com:getpaseo/paseo.git",
+    remoteUrl: "git@github.com:longbkit/clisbot.git",
     worktreeRoot: requestedCwd,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: requestedCwd === repoRoot ? null : repoRoot,
   });
   session.workspaceGitService.getSnapshot = async (requestedCwd: string) =>
@@ -5080,8 +5080,8 @@ test("open_project_request gives a plain git worktree its own exact-root project
         isGit: true,
         repoRoot: requestedCwd,
         currentBranch: requestedCwd === repoRoot ? "main" : "feature/desktop-daemon-settings",
-        remoteUrl: "git@github.com:getpaseo/paseo.git",
-        isPaseoOwnedWorktree: false,
+        remoteUrl: "git@github.com:longbkit/clisbot.git",
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: requestedCwd === repoRoot ? null : repoRoot,
       },
     });
@@ -5309,7 +5309,7 @@ test("refresh_agent_request leaves workspace archival independent when its direc
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
 
-  const cwd = path.resolve("/tmp/paseo-unit2-existing-dir");
+  const cwd = path.resolve("/tmp/clisbot-unit2-existing-dir");
   session.filesystem.isDirectory = async () => true;
   const workspaceId = "ws-repo-archived";
   const agentId = "agent-archived";
@@ -5407,7 +5407,7 @@ test("refresh_agent_request leaves workspace archival independent when its direc
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
 
-  const cwd = path.resolve("/tmp/paseo-missing-workspace-dir");
+  const cwd = path.resolve("/tmp/clisbot-missing-workspace-dir");
   session.filesystem.isDirectory = async () => false;
   const workspaceId = "ws-missing-dir";
   const agentId = "agent-missing-dir";
@@ -5497,7 +5497,7 @@ test("refresh_agent_request does not recreate or unarchive a deleted worktree", 
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
 
-  const cwd = path.resolve("/tmp/paseo-deleted-worktree-dir");
+  const cwd = path.resolve("/tmp/clisbot-deleted-worktree-dir");
   session.filesystem.isDirectory = async () => false;
   const workspaceId = "ws-deleted-worktree";
   const agentId = "agent-deleted-worktree";
@@ -5596,7 +5596,7 @@ test("refresh_agent_request does not inspect an archived worktree branch", async
   const projects = new Map<string, ReturnType<typeof createPersistedProjectRecord>>();
   const workspaces = new Map<string, ReturnType<typeof createPersistedWorkspaceRecord>>();
 
-  const cwd = path.resolve("/tmp/paseo-deleted-worktree-fail");
+  const cwd = path.resolve("/tmp/clisbot-deleted-worktree-fail");
   session.filesystem.isDirectory = async () => false;
   const workspaceId = "ws-deleted-worktree-fail";
   const agentId = "agent-deleted-worktree-fail";
@@ -5677,14 +5677,14 @@ test("refresh_agent_request does not inspect an archived worktree branch", async
 });
 
 function createRecreateWorktreeRepo(): { tempDir: string; repoDir: string } {
-  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-recreate-worktree-")));
+  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-recreate-worktree-")));
   const repoDir = path.join(tempDir, "repo");
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: repoDir, stdio: "pipe" });
   writeFileSync(path.join(repoDir, "README.md"), "main\n");
   execFileSync("git", ["add", "README.md"], { cwd: repoDir, stdio: "pipe" });
@@ -5698,13 +5698,13 @@ test("legacy refresh_agent_request restores a real deleted worktree", async () =
   execFileSync("git", ["branch", branch], { cwd: repoDir, stdio: "pipe" });
 
   const worktreesRoot = path.join(tempDir, "worktrees");
-  const paseoHome = path.join(tempDir, "paseo-home");
+  const clisbotHome = path.join(tempDir, "clisbot-home");
   const created = await createWorktree({
     cwd: repoDir,
     worktreeSlug: "keep",
     source: { kind: "checkout-branch", branchName: branch },
     runSetup: false,
-    paseoHome,
+    clisbotHome,
     worktreesRoot,
   });
   const worktreePath = realpathSync(created.worktreePath);
@@ -5716,7 +5716,7 @@ test("legacy refresh_agent_request restores a real deleted worktree", async () =
   const emitted: SessionOutboundMessage[] = [];
   const session = createSessionForWorkspaceTests({
     appVersion: "0.1.104",
-    paseoHome,
+    clisbotHome,
     worktreesRoot,
     onMessage: (message) => {
       if (isSessionOutboundMessage(message)) emitted.push(message);
@@ -5845,7 +5845,7 @@ test.skip("open_project_request collapses a git subdirectory onto the repo root 
       currentBranch: "main",
       remoteUrl: null,
       worktreeRoot: repoRoot,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -5932,17 +5932,17 @@ test("archive_workspace_request archives a worktree-kind workspace and removes t
   const repoDir = path.join(tempDir, "repo");
   mkdirSync(repoDir, { recursive: true });
   execFileSync("git", ["init", "-b", "main"], { cwd: repoDir, stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "initial"], {
     cwd: repoDir,
     stdio: "pipe",
   });
 
-  const paseoHome = path.join(tempDir, ".paseo");
+  const clisbotHome = path.join(tempDir, ".clisbot");
   const worktree = await createWorktree({
     cwd: repoDir,
     worktreeSlug: "worktree-kind-archive",
@@ -5952,7 +5952,7 @@ test("archive_workspace_request archives a worktree-kind workspace and removes t
       branchName: "worktree-kind-archive",
     },
     runSetup: false,
-    paseoHome,
+    clisbotHome,
   });
 
   const workspaceId = "ws-worktree-kind-archive";
@@ -5986,7 +5986,7 @@ test("archive_workspace_request archives a worktree-kind workspace and removes t
           mainRepoRoot: repoDir,
           currentBranch: "worktree-kind-archive",
           remoteUrl: null,
-          isPaseoOwnedWorktree: true,
+          isClisbotOwnedWorktree: true,
           isDirty: false,
           baseRef: null,
           aheadBehind: null,
@@ -6003,7 +6003,7 @@ test("archive_workspace_request archives a worktree-kind workspace and removes t
       }),
     }),
   });
-  session.paseoHome = paseoHome;
+  session.clisbotHome = clisbotHome;
   session.emit = (message) => {
     if (isSessionOutboundMessage(message)) emitted.push(message);
   };
@@ -6040,7 +6040,7 @@ test.skip("opening a new worktree reconciles older local workspaces into the rem
 
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "session-workspace-reconcile-")));
   const mainWorkspaceId = path.join(tempDir, "inkwell");
-  const worktreeWorkspaceId = path.join(mainWorkspaceId, ".paseo", "worktrees", "feature-a");
+  const worktreeWorkspaceId = path.join(mainWorkspaceId, ".clisbot", "worktrees", "feature-a");
   const localProjectId = mainWorkspaceId;
   const remoteProjectId = "remote:github.com/zimakki/inkwell";
 
@@ -6109,7 +6109,7 @@ test.skip("opening a new worktree reconciles older local workspaces into the rem
       currentBranch: cwd === mainWorkspaceId ? "main" : "feature-a",
       remoteUrl: "https://github.com/zimakki/inkwell.git",
       worktreeRoot: cwd,
-      isPaseoOwnedWorktree: cwd !== mainWorkspaceId,
+      isClisbotOwnedWorktree: cwd !== mainWorkspaceId,
       mainRepoRoot: cwd === mainWorkspaceId ? null : mainWorkspaceId,
     },
   });
@@ -6149,7 +6149,7 @@ test.skip("fetch_workspaces_request reconciles remote URL changes for existing w
 
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "session-workspace-fetch-")));
   const mainWorkspaceId = path.join(tempDir, "inkwell");
-  const worktreeWorkspaceId = path.join(mainWorkspaceId, ".paseo", "worktrees", "feature-a");
+  const worktreeWorkspaceId = path.join(mainWorkspaceId, ".clisbot", "worktrees", "feature-a");
   const oldProjectId = "remote:github.com/old-owner/inkwell";
   const newProjectId = "remote:github.com/new-owner/inkwell";
 
@@ -6215,7 +6215,7 @@ test.skip("fetch_workspaces_request reconciles remote URL changes for existing w
       currentBranch: cwd === mainWorkspaceId ? "main" : "feature-a",
       remoteUrl: "https://github.com/new-owner/inkwell.git",
       worktreeRoot: cwd,
-      isPaseoOwnedWorktree: cwd !== mainWorkspaceId,
+      isClisbotOwnedWorktree: cwd !== mainWorkspaceId,
       mainRepoRoot: cwd === mainWorkspaceId ? null : mainWorkspaceId,
     },
   });
@@ -6316,7 +6316,7 @@ test.skip("reconcile archives stale subdirectory workspace records when collapsi
       currentBranch: "main",
       remoteUrl: "https://github.com/acme/repo.git",
       worktreeRoot: repoRoot,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -7016,7 +7016,7 @@ test("fetch_workspaces_response reads runtime fields from passive workspace git 
       currentBranch: runtimeSnapshot.git.currentBranch,
       remoteUrl: runtimeSnapshot.git.remoteUrl,
       worktreeRoot: cwd,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -7037,7 +7037,7 @@ test("fetch_workspaces_response reads runtime fields from passive workspace git 
       gitRuntime: {
         currentBranch: "runtime-branch",
         remoteUrl: "https://github.com/acme/repo.git",
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         isDirty: true,
         aheadBehind: { ahead: 3, behind: 1 },
         aheadOfOrigin: 3,
@@ -7181,7 +7181,7 @@ test("workspace_update includes updated runtime fields", async () => {
       currentBranch: runtimeSnapshot.git.currentBranch,
       remoteUrl: runtimeSnapshot.git.remoteUrl,
       worktreeRoot: cwd,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
     },
   });
@@ -7896,7 +7896,7 @@ test("project.icon.set.request publishes a custom icon that project.icon.get ser
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "session-project-icon-test-")));
   const session = asTestSession(
     createSessionForWorkspaceTests({
-      paseoHome: path.join(tempDir, "paseo-home"),
+      clisbotHome: path.join(tempDir, "clisbot-home"),
       onMessage: (message) => emitted.push(message),
     }),
   );
@@ -8513,7 +8513,7 @@ test("overlapping workspace rebuilds publish the newest provider subagent status
 
 test("title-only terminal change does not build workspace descriptors or emit workspace_update", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-session-title-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-title-"));
   const workspace = createPersistedWorkspaceRecord({
     workspaceId: "ws-title",
     projectId: "proj-title",
@@ -8557,7 +8557,7 @@ test("title-only terminal change does not build workspace descriptors or emit wo
 
 test("terminal activity contribution change updates the correct workspace", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-session-activity-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-activity-"));
   const workspace = createPersistedWorkspaceRecord({
     workspaceId: "ws-activity",
     projectId: "proj-activity",
@@ -8606,7 +8606,7 @@ test("terminal activity contribution change updates the correct workspace", asyn
 
 test("same-cwd terminal activity updates only the workspace that owns the terminal", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-session-same-cwd-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-same-cwd-"));
   const workspaceA = createPersistedWorkspaceRecord({
     workspaceId: "ws-same-a",
     projectId: "proj-same",
@@ -8667,7 +8667,7 @@ test("same-cwd terminal activity updates only the workspace that owns the termin
 
 test("a worktree terminal updates only the workspace that owns it", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const rootCwd = mkdtempSync(path.join(tmpdir(), "paseo-session-nested-"));
+  const rootCwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-nested-"));
   const worktreeCwd = path.join(rootCwd, "worktree");
   const terminalCwd = path.join(worktreeCwd, "subdir");
   mkdirSync(terminalCwd, { recursive: true });
@@ -8732,7 +8732,7 @@ test("a worktree terminal updates only the workspace that owns it", async () => 
 
 test("removing an idle terminal does not update workspace status", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-session-remove-idle-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-remove-idle-"));
   const workspace = createPersistedWorkspaceRecord({
     workspaceId: "ws-remove-idle",
     projectId: "proj-remove-idle",
@@ -8771,7 +8771,7 @@ test("removing an idle terminal does not update workspace status", async () => {
 
 test("removing a contributing terminal clears workspace status", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-session-remove-contrib-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-session-remove-contrib-"));
   const workspace = createPersistedWorkspaceRecord({
     workspaceId: "ws-remove-contrib",
     projectId: "proj-remove-contrib",
@@ -8832,7 +8832,7 @@ test("removing a contributing terminal clears workspace status", async () => {
 interface WorkspaceCreatePrRepoFixture {
   tempDir: string;
   repoDir: string;
-  paseoHome: string;
+  clisbotHome: string;
   headRef: string;
   prFileName: string;
   prNumber: number;
@@ -8842,17 +8842,17 @@ function createWorkspaceCreatePrRepo(): WorkspaceCreatePrRepoFixture {
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "workspace-create-pr-")));
   const repoDir = path.join(tempDir, "repo");
   const remoteDir = path.join(tempDir, "origin.git");
-  const paseoHome = path.join(tempDir, ".paseo");
+  const clisbotHome = path.join(tempDir, ".clisbot");
   const prNumber = 123;
   const headRef = "feature/review-pr";
   const prFileName = "pr-123.txt";
 
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: repoDir, stdio: "pipe" });
   writeFileSync(path.join(repoDir, "README.md"), "main\n");
   execFileSync("git", ["add", "README.md"], { cwd: repoDir, stdio: "pipe" });
@@ -8881,7 +8881,7 @@ function createWorkspaceCreatePrRepo(): WorkspaceCreatePrRepoFixture {
   execFileSync("git", ["branch", "-D", headRef], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir, stdio: "pipe" });
 
-  return { tempDir, repoDir, paseoHome, headRef, prFileName, prNumber };
+  return { tempDir, repoDir, clisbotHome, headRef, prFileName, prNumber };
 }
 
 function createPrCheckoutGitHubService(params: { headRef: string }): ForgeService {
@@ -8999,7 +8999,7 @@ test("workspace.create worktree source checks out a GitHub PR from githubPrNumbe
     github: createPrCheckoutGitHubService({
       headRef: fixture.headRef,
     }),
-    paseoHome: fixture.paseoHome,
+    clisbotHome: fixture.clisbotHome,
     projectRegistry,
     workspaceRegistry,
     workspaceGitService: createNoopWorkspaceGitService({
@@ -9183,18 +9183,18 @@ test("workspace auto-name uses the backing root for a nested worktree", async ()
   const repoDir = path.join(tempDir, "repo");
   mkdirSync(repoDir);
   execFileSync("git", ["init", repoDir], { stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: repoDir, stdio: "pipe" });
   writeFileSync(path.join(repoDir, "README.md"), "hello\n");
   execFileSync("git", ["add", "README.md"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["commit", "-m", "initial"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["branch", "-M", "placeholder-branch"], { cwd: repoDir, stdio: "pipe" });
-  writePaseoWorktreeMetadata(repoDir, { baseRefName: "main" });
-  writePaseoWorktreeFirstAgentBranchAutoNameMetadata(repoDir, {
+  writeClisbotWorktreeMetadata(repoDir, { baseRefName: "main" });
+  writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(repoDir, {
     placeholderBranchName: "placeholder-branch",
   });
   const workspaceCwd = path.join(repoDir, "packages", "app");
@@ -9209,7 +9209,7 @@ test("workspace auto-name uses the backing root for a nested worktree", async ()
     title: "Fix checkout title",
     branch: "placeholder-branch",
     worktreeRoot: repoDir,
-    isPaseoOwnedWorktree: true,
+    isClisbotOwnedWorktree: true,
     createdAt: "2026-03-01T12:00:00.000Z",
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
@@ -9264,7 +9264,7 @@ test("workspace auto-name uses the backing root for a nested worktree", async ()
         .toString()
         .trim(),
     ).toBe("placeholder-branch");
-    expect(readPaseoWorktreeMetadata(repoDir)).toMatchObject({
+    expect(readClisbotWorktreeMetadata(repoDir)).toMatchObject({
       version: 2,
       firstAgentBranchAutoName: {
         status: "attempted",

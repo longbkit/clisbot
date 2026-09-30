@@ -1,4 +1,4 @@
-import type { AgentFeature, AgentModelDefinition } from "@getpaseo/protocol/agent-types";
+import type { AgentFeature, AgentModelDefinition } from "@clisbot/protocol/agent-types";
 import { i18n } from "@/i18n/i18next";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { FAST_MODE_FEATURE_ID, PLAN_MODE_FEATURE_ID } from "@/agent-controls/policy";

@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandOptions, ListResult, OutputSchema, CommandError } from "../../output/index.js";
 
@@ -87,7 +87,7 @@ export async function runAllowCommand(
       const error: CommandError = {
         code: "AGENT_NOT_FOUND",
         message: `Agent not found: ${agentIdOrPrefix}`,
-        details: 'Use "paseo ls" to list available agents',
+        details: 'Use "clisbot ls" to list available agents',
       };
       throw error;
     }

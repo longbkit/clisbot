@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { openSettings } from "./app";
 import { clickSettingsBackToWorkspace, openSettingsSection } from "./settings";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 /** Persisted nav key -> the testID the app shell renders that item with. */
 const SHELL_ROW_TEST_IDS = {

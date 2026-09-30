@@ -15,10 +15,10 @@ Each live agent in `AgentManager` carries a `lastStatus` of `initializing`, `idl
 ## Runtime residency
 
 An unarchived agent may be `closed` without being deleted or archived. Closing releases its provider
-processes and subscriptions while retaining its Paseo identity, persistence handle, timeline,
+processes and subscriptions while retaining its Clisbot identity, persistence handle, timeline,
 workspace, labels, title, usage, attention, timestamps, and parent relationship. Opening or prompting
 the agent runs through `ensureAgentLoaded()`, which resumes the durable provider session under the
-same Paseo agent ID. Provider history is not appended again when the canonical timeline is already
+same Clisbot agent ID. Provider history is not appended again when the canonical timeline is already
 primed.
 
 Reload releases the old runtime before resuming its durable session: an idle provider process can
@@ -52,7 +52,7 @@ Accepting new work after an ambiguous interruption would create a split-brain se
 
 ## Relationships
 
-Agents can launch other agents via the agent-scoped `create_agent` MCP tool. Agent-scoped creation is always asynchronous and always stamps `paseo.parent-agent-id`, pointing back at the caller. Omit `workspaceId` to use the caller's workspace, or pass an existing workspace ID returned by `create_workspace`. Placement never changes parentage.
+Agents can launch other agents via the agent-scoped `create_agent` MCP tool. Agent-scoped creation is always asynchronous and always stamps `clisbot.parent-agent-id`, pointing back at the caller. Omit `workspaceId` to use the caller's workspace, or pass an existing workspace ID returned by `create_workspace`. Placement never changes parentage.
 
 - **Subagents** — exist as part of the creating agent's work, appear in that agent's subagent track, and are archived with it.
 - **Detached agents** — stand on their own after an explicit detach transition, do not appear in the former parent's subagent track, and are not archived with it.
@@ -63,7 +63,7 @@ Parent archive detaches a subagent instead of archiving it when either condition
 - The child is currently open in an agent tab.
 
 All other children archive with the parent. After the workspace layout hydrates, the client marks
-every managed subagent present in its tabs with `paseo.open-agent-tab.<client-id>=true` through the
+every managed subagent present in its tabs with `clisbot.open-agent-tab.<client-id>=true` through the
 generic agent metadata update. This includes background and restored tabs; navigation does not own
 the marker. Closing a tab sets that client's label to `false`. Any `true` client label keeps the child
 open. Detach clears the parent and every open-tab label. The surviving child therefore becomes a
@@ -80,9 +80,9 @@ A watched child that closes before its finish event also notifies the caller so 
 
 ## Provider-managed child agents
 
-Some providers can create their own child sessions inside one provider runtime. OMP's task tool reports these with `child_session` events; `AgentManager` imports the live provider handle, stamps `paseo.parent-agent-id`, and surfaces the result as a normal subagent in the parent's subagents track.
+Some providers can create their own child sessions inside one provider runtime. OMP's task tool reports these with `child_session` events; `AgentManager` imports the live provider handle, stamps `clisbot.parent-agent-id`, and surfaces the result as a normal subagent in the parent's subagents track.
 
-The provider still owns the underlying runtime. Paseo keeps an agent record so the child can be opened, tracked, archived, and cascaded with the parent, but prompts and history hydration route through the provider adapter for that native child handle.
+The provider still owns the underlying runtime. Clisbot keeps an agent record so the child can be opened, tracked, archived, and cascaded with the parent, but prompts and history hydration route through the provider adapter for that native child handle.
 
 ## Archive
 
@@ -130,7 +130,7 @@ purpose initializes a temporary app-server, reads the persisted thread and child
 releases the process before returning. It never loads, resumes, or unarchives a native thread,
 including legacy records whose native archive failed. The retained history session contains only
 the read results. Interactive resume remains responsible for repairing a provider session archived
-outside Paseo while its Paseo agent is active.
+outside Clisbot while its Clisbot agent is active.
 
 Provider session connection owns every process it spawns until the session is registered with
 `AgentManager`. If initialization, persisted-session resume, or initial history hydration fails,
@@ -177,7 +177,7 @@ The track is a pill at the foot of an agent's pane (`packages/app/src/subagents/
 
 The rows combine two kinds of children:
 
-- **Paseo subagents** are full managed agents. Their membership rule (`packages/app/src/subagents/select.ts`) is:
+- **Clisbot subagents** are full managed agents. Their membership rule (`packages/app/src/subagents/select.ts`) is:
 
 ```
 parentAgentId === thisAgent.id  AND  !archivedAt
@@ -185,29 +185,29 @@ parentAgentId === thisAgent.id  AND  !archivedAt
 
 - **Provider subagents** are child executions owned by Claude, Codex, or OpenCode. They are not inserted into `AgentManager` as managed agents. Providers emit a separate descriptor and timeline stream through `agent.provider_subagents.*`; the client keeps that state outside the normal agent store and merges only the presentation rows into the track. A descriptor's optional `parentSubagentId` identifies its direct provider-subagent parent; an absent value identifies a direct child of the managed agent.
 
-Clicking either kind opens a workspace tab. A Paseo subagent tab is a normal interactive agent pane. A provider subagent tab is a read-only timeline pane with no composer, archive, detach, rewind, or fork actions. It shows its own direct children in a subagents track. Both panes use `AgentStreamView`, so message, reasoning, tool-call, and layout rendering stay identical.
+Clicking either kind opens a workspace tab. A Clisbot subagent tab is a normal interactive agent pane. A provider subagent tab is a read-only timeline pane with no composer, archive, detach, rewind, or fork actions. It shows its own direct children in a subagents track. Both panes use `AgentStreamView`, so message, reasoning, tool-call, and layout rendering stay identical.
 
-Provider timelines use the same structural timeline item format but deliberately have a separate lifecycle and transport. A provider thread/session identifier is not a Paseo agent identifier, and closing its tab is always layout-only.
+Provider timelines use the same structural timeline item format but deliberately have a separate lifecycle and transport. A provider thread/session identifier is not a Clisbot agent identifier, and closing its tab is always layout-only.
 
 Provider descriptors may include one compact subtitle. The provider owns its contents and formatting; clients display and truncate it without interpreting provider-specific model, thinking, or usage fields.
 
 ### Claude provider subagents: the task protocol
 
-Claude Code announces subagent lifecycle on the SDK stream (`task_started` / `task_updated` / `task_notification` / `task_progress`), and Paseo reads those announcements rather than reconstructing them from sidechain frames. The live source (`subagents/live-source.ts`) and the replay source (`subagents/replay-source.ts`) both translate into one observation vocabulary (`subagents/observation.ts`), so a fact is derived once for both paths instead of once per path. Gotchas that are not obvious from the SDK types:
+Claude Code announces subagent lifecycle on the SDK stream (`task_started` / `task_updated` / `task_notification` / `task_progress`), and Clisbot reads those announcements rather than reconstructing them from sidechain frames. The live source (`subagents/live-source.ts`) and the replay source (`subagents/replay-source.ts`) both translate into one observation vocabulary (`subagents/observation.ts`), so a fact is derived once for both paths instead of once per path. Gotchas that are not obvious from the SDK types:
 
 - **Not every announced task belongs in the track.** Task subagents announce as `local_agent` and workflows as `local_workflow`; a backgrounded shell announces as `local_bash` with the same `tool_use_id` shape, and ambient housekeeping sets `skip_transcript`. The Claude provider normalizes a workflow to a generic provider-subagent descriptor titled `Workflow`, using Claude's summary as its description and timeline opener. Shared storage, protocol, and UI do not distinguish it from another provider subagent.
 - **A task that was never declared gets no descriptor, by any route.** Filtered tasks still emit `task_notification`s carrying a `tool_use_id`, and still emit frames carrying `parent_tool_use_id`. Attributing either produces a descriptor with no identity and a defaulted `running` status — a nameless row that never finishes. Status, presentation updates, and sidechain frames all route through the declaration table.
 - **Task ids are session-scoped, not turn-scoped.** Cancelling a turn must not clear the routing table: a backgrounded child settles after the interrupt and needs its descriptor to still exist. Cancellation instead terminalizes the declared children that were running in the foreground, and a later `task_notification` is free to correct that guess. Backgrounded children are identified by `task_updated.patch.is_backgrounded`.
 - **A resumed task can be announced again with a new `tool_use_id`.** The first Task tool id remains the canonical descriptor and later ids are routing aliases for the same session-scoped task. The resumed prompt is added to that child timeline.
-- **Effort is only reachable through hooks.** It appears nowhere on the message stream at any depth, and the level Paseo requests is not necessarily the level that runs — a model that does not support it is silently downgraded. A hook firing inside a subagent reports the active post-downgrade level next to its `agent_id`, which is the same id `task_started` calls `task_id`.
+- **Effort is only reachable through hooks.** It appears nowhere on the message stream at any depth, and the level Clisbot requests is not necessarily the level that runs — a model that does not support it is silently downgraded. A hook firing inside a subagent reports the active post-downgrade level next to its `agent_id`, which is the same id `task_started` calls `task_id`.
 - **Backgrounded subagents emit no frames carrying `parent_tool_use_id` at all.** Everything keyed off that field sees nothing for one; they are visible only because the task protocol announces them.
 - **Nested ownership comes from the launching sidechain, not `spawn_depth` alone.** A sidechain's Agent or Bash tool call records the direct owner of that `tool_use_id`; the following `task_started` inherits it. This routes a grandchild descriptor and child-owned background notifications without relying on labels or flattening them into the managed parent.
 - **On replay, `<session>/subagents/` holds every descendant beside the root.** Resolve the tree one proven generation at a time: the root transcript admits direct children, then each admitted sidechain transcript admits its children by `toolUseId`. `spawnDepth` orders candidates but does not establish ownership. Unresolved sidecars remain excluded as ambient or unrelated work.
 - **Replay `totalTokens` is a context-size reading, not cumulative spend.** Claude Code finalizes a subagent by summing the _last_ assistant message's usage block and shipping that as `usage.total_tokens`. Summing per-entry usage instead multiplies the cached prefix by the turn count and reports a number several times larger than the live path.
 
-Archived Paseo subagents disappear from the track, by design. To remove one from the track without closing its tab, use the **archive button** on the row — it opens a confirm dialog and archives the subagent on confirm. Provider-owned rows have no individual Paseo lifecycle controls.
+Archived Clisbot subagents disappear from the track, by design. To remove one from the track without closing its tab, use the **archive button** on the row — it opens a confirm dialog and archives the subagent on confirm. Provider-owned rows have no individual Clisbot lifecycle controls.
 
-The **Archive finished** row at the foot of the panel covers every finished row. It archives idle or errored managed Paseo subagents one at a time, and hides completed, failed, or canceled provider-owned rows in the current app session. Native sessions and timelines are untouched. Running and initializing children remain in the track. If a hidden provider child starts running again, the app brings it back to the track.
+The **Archive finished** row at the foot of the panel covers every finished row. It archives idle or errored managed Clisbot subagents one at a time, and hides completed, failed, or canceled provider-owned rows in the current app session. Native sessions and timelines are untouched. Running and initializing children remain in the track. If a hidden provider child starts running again, the app brings it back to the track.
 
 To keep the agent alive but remove it from the parent's track, use **detach**. The daemon clears the relationship lifecycle labels, emits the normal agent update, and every client reclassifies the agent from subagent to root/sibling from that updated snapshot.
 
@@ -227,7 +227,7 @@ We considered universal decoupling (no tab close ever archives, archive is alway
 
 ### Subagent accumulation under long-lived parents
 
-A parent that spawns many subagents will see the panel's list grow; the pill only counts them. Managed Paseo subagents can be archived individually or with **Archive finished**. That action hides finished provider-owned rows locally; this presentation state resets when the app restarts.
+A parent that spawns many subagents will see the panel's list grow; the pill only counts them. Managed Clisbot subagents can be archived individually or with **Archive finished**. That action hides finished provider-owned rows locally; this presentation state resets when the app restarts.
 
 ### Cross-client tab dismissal
 
@@ -236,19 +236,19 @@ Closing a subagent's tab on one client doesn't affect other clients' layouts. Th
 ## Storage
 
 ```
-$PASEO_HOME/agents/{cwd-with-dashes}/{agent-id}.json
+$CLISBOT_HOME/agents/{cwd-with-dashes}/{agent-id}.json
 ```
 
 `{cwd-with-dashes}` is derived from the agent's filesystem `cwd`. It is not the workspace id; agent storage stays cwd-keyed while workspace identity is the opaque workspace id.
 
 Each agent is a single JSON file. Fields relevant to this doc:
 
-| Field                                        | Type          | Meaning                                                                            |
-| -------------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
-| `id`                                         | `string`      | Stable identifier                                                                  |
-| `archivedAt`                                 | `string?`     | Soft-delete timestamp (ISO 8601)                                                   |
-| `labels["paseo.parent-agent-id"]`            | `string?`     | Parent agent ID, set automatically for agent-scoped creation and removed by detach |
-| `labels["paseo.open-agent-tab.<client-id>"]` | `string?`     | `"true"` protects an open tab on that client; detach clears every matching label   |
-| `lastStatus`                                 | `AgentStatus` | `initializing` / `idle` / `running` / `error` / `closed`                           |
+| Field                                          | Type          | Meaning                                                                            |
+| ---------------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
+| `id`                                           | `string`      | Stable identifier                                                                  |
+| `archivedAt`                                   | `string?`     | Soft-delete timestamp (ISO 8601)                                                   |
+| `labels["clisbot.parent-agent-id"]`            | `string?`     | Parent agent ID, set automatically for agent-scoped creation and removed by detach |
+| `labels["clisbot.open-agent-tab.<client-id>"]` | `string?`     | `"true"` protects an open tab on that client; detach clears every matching label   |
+| `lastStatus`                                   | `AgentStatus` | `initializing` / `idle` / `running` / `error` / `closed`                           |
 
 See [`docs/data-model.md`](./data-model.md) for the full agent record.

@@ -300,7 +300,7 @@ function buildForwardedHeaders({
   //
   // LIMITATION: none of this is authenticated, and the port in Host is not an
   // observation of the connection — it is whatever the client wrote, since
-  // route lookup normalizes the port away before matching. Paseo also does not
+  // route lookup normalizes the port away before matching. Clisbot also does not
   // check whether an inbound x-forwarded-port arrived from a configured trusted
   // proxy. Services must treat the forwarded authority as client-influenced
   // input, not as a trusted origin. This predates the header handling here:

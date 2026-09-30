@@ -1,0 +1,6 @@
+{
+  "id": "local-example",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

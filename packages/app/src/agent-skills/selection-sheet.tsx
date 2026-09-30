@@ -13,7 +13,7 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import type {
   AgentSkillSelection as SkillSelection,
   AgentSkillsSaveResult as SkillsSaveResult,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 const ThemedCheck = withUnistyles(Check);
 const checkedIconMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });

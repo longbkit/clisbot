@@ -88,7 +88,7 @@ function formatFieldIssues(
 function formatIssuePath(path: z.infer<typeof issuePathSchema> | undefined): string | undefined {
   if (path === undefined || typeof path === "string") return path;
   const [file, ...fieldPath] = path;
-  if (typeof file === "string" && file.startsWith(".paseo/") && fieldPath.length > 0) {
+  if (typeof file === "string" && file.startsWith(".clisbot/") && fieldPath.length > 0) {
     return `${file}: ${formatPathSegments(fieldPath)}`;
   }
   return formatPathSegments(path) || undefined;

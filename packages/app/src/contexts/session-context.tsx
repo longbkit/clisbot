@@ -16,17 +16,17 @@ import { deriveAgentStreamTurnLiveness } from "@/timeline/session-stream-reducer
 import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import { requestTimelineReplacement } from "@/timeline/timeline-replacement";
 import { type ViewedTimelineOwner } from "@/timeline/viewed-timeline-sync";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import { parseServerInfoStatusPayload } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
+import { parseServerInfoStatusPayload } from "@clisbot/protocol/messages";
 import {
   buildAgentAttentionNotificationPayload,
   type AgentAttentionReason,
   type AgentAttentionNotificationPayload,
   type NotificationPermissionRequest,
-} from "@getpaseo/protocol/agent-attention-notification";
+} from "@clisbot/protocol/agent-attention-notification";
 
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentPermissionResponse } from "@clisbot/protocol/agent-types";
 import { getHostRuntimeStore, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useVoiceAudioEngineOptional, useVoiceRuntimeOptional } from "@/contexts/voice-context";
 import type { AudioPlaybackSource } from "@/voice/audio-engine-types";

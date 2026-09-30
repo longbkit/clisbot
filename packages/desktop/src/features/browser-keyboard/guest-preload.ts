@@ -1,9 +1,9 @@
 import { ipcRenderer } from "electron";
 import type { BrowserKeyboardPolicy, BrowserShortcutPrefix } from "./policy.js";
 
-const POLICY_CHANNEL = "paseo:browser-keyboard-policy";
-const POLICY_REQUEST_CHANNEL = "paseo:browser-keyboard-policy-request";
-const SHORTCUT_INPUT_CHANNEL = "paseo:browser-shortcut-input";
+const POLICY_CHANNEL = "clisbot:browser-keyboard-policy";
+const POLICY_REQUEST_CHANNEL = "clisbot:browser-keyboard-policy-request";
+const SHORTCUT_INPUT_CHANNEL = "clisbot:browser-shortcut-input";
 
 let browserId: string | null = null;
 let policy: BrowserShortcutPrefix[] = [];

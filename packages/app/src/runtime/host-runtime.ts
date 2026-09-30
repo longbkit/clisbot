@@ -7,7 +7,7 @@ import {
   type DaemonClientConfig,
   type ConnectionState,
   type FetchAgentsOptions,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 import {
   connectionFromListen,
   createRemoteSshHostConnection,
@@ -28,7 +28,7 @@ import {
   shouldUseTlsForDefaultHostedRelay,
 } from "@/utils/daemon-endpoints";
 import { resolveAppVersion } from "@/utils/app-version";
-import { ConnectionOfferSchema, type ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import { ConnectionOfferSchema, type ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { shouldUseDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
 import { isWeb } from "@/constants/platform";
 import { connectToDaemon, getConnectionAuthFailureReason } from "@/utils/test-daemon-connection";
@@ -46,8 +46,8 @@ import {
 } from "@/desktop/daemon/desktop-daemon-transport";
 import { getDesktopHost } from "@/desktop/host";
 import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-credential";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
+import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
 import {
   useSessionStore,
   type Agent,
@@ -1373,11 +1373,11 @@ export class HostRuntimeController {
   }
 }
 
-const REGISTRY_STORAGE_KEY = "@paseo:daemon-registry";
-const LOCALHOST_FALLBACK_ENDPOINT = "localhost:6767";
+const REGISTRY_STORAGE_KEY = "@clisbot:daemon-registry";
+const LOCALHOST_FALLBACK_ENDPOINT = "localhost:6868";
 const DEFAULT_LOCALHOST_BOOTSTRAP_TIMEOUT_MS = 2500;
-const E2E_STORAGE_KEY = "@paseo:e2e";
-const INITIAL_DAEMON_CONNECTION_HINT_GLOBAL_KEY = "__PASEO_INITIAL_DAEMON_CONNECTION__";
+const E2E_STORAGE_KEY = "@clisbot:e2e";
+const INITIAL_DAEMON_CONNECTION_HINT_GLOBAL_KEY = "__CLISBOT_INITIAL_DAEMON_CONNECTION__";
 
 export interface InitialDaemonConnectionHint {
   listen: string;
@@ -2591,7 +2591,7 @@ export class HostRuntimeStore {
 }
 
 let singletonHostRuntimeStore: HostRuntimeStore | null = null;
-const HOST_RUNTIME_STORE_GLOBAL_KEY = "__paseoHostRuntimeStore";
+const HOST_RUNTIME_STORE_GLOBAL_KEY = "__clisbotHostRuntimeStore";
 
 export function getHostRuntimeStore(): HostRuntimeStore {
   if (singletonHostRuntimeStore) {

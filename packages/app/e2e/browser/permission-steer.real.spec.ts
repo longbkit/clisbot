@@ -81,7 +81,7 @@ interface PlanSteer {
 async function withPlanSteer(context: PlanSteer, journey: () => Promise<void>): Promise<void> {
   const { page, scenario } = context;
   const cwd = realpathSync(
-    mkdtempSync(path.join(tmpdir(), `paseo-permission-steer-${scenario.provider}-`)),
+    mkdtempSync(path.join(tmpdir(), `clisbot-permission-steer-${scenario.provider}-`)),
   );
   let handle: AgentHandle | undefined;
   try {

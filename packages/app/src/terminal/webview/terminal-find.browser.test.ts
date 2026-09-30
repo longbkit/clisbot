@@ -9,8 +9,8 @@ interface Message {
   data?: string;
 }
 interface TerminalFrameWindow extends Window {
-  __PASEO_TERMINAL_WEBVIEW_RECEIVE__(message: unknown): void;
-  __paseoTerminal?: Terminal;
+  __CLISBOT_TERMINAL_WEBVIEW_RECEIVE__(message: unknown): void;
+  __clisbotTerminal?: Terminal;
 }
 let frame: HTMLIFrameElement;
 afterEach(() => frame?.remove());
@@ -30,7 +30,7 @@ test("the generated WebView searches its mounted stream and keeps Find commands 
   win.document.close();
   await expect.poll(() => messages.some((m) => m.type === "bridgeReady")).toBe(true);
   const send = (message: object) =>
-    win.__PASEO_TERMINAL_WEBVIEW_RECEIVE__({ streamKey: "owned", ...message });
+    win.__CLISBOT_TERMINAL_WEBVIEW_RECEIVE__({ streamKey: "owned", ...message });
   send({
     type: "mount",
     initialSnapshot: null,
@@ -45,7 +45,7 @@ test("the generated WebView searches its mounted stream and keeps Find commands 
   send({ type: "writeOutput", text: "first a.b\r\n" + "padding\r\n".repeat(30) + "last A.B" });
   await expect
     .poll(() => {
-      const b = win.__paseoTerminal?.buffer.active;
+      const b = win.__clisbotTerminal?.buffer.active;
       return b
         ? Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(true)).join(
             "\n",
@@ -63,7 +63,7 @@ test("the generated WebView searches its mounted stream and keeps Find commands 
     .poll(() => messages.findLast((m) => m.type === "findResult")?.result)
     .toMatchObject({ resultCount: 2, resultIndex: 0 });
   send({ type: "find", streamKey: "stale", query: "absent" });
-  expect(win.__paseoTerminal!.getSelection()).toBe("a.b");
+  expect(win.__clisbotTerminal!.getSelection()).toBe("a.b");
   send({ type: "clearFind" });
   await expect
     .poll(() => messages.findLast((m) => m.type === "findResult")?.result)

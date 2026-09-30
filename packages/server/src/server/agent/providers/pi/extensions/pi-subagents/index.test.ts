@@ -127,7 +127,7 @@ describe("pi-subagents adapter", () => {
     const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
     const session = await client.createSession({
       provider: "pi",
-      cwd: "/tmp/paseo-pi-child-close",
+      cwd: "/tmp/clisbot-pi-child-close",
     });
     const events: AgentStreamEvent[] = [];
     session.subscribe((event) => events.push(event));

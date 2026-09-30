@@ -1,5 +1,5 @@
-import type { FetchRecentProviderSessionEntry } from "@getpaseo/client/internal/daemon-client";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { FetchRecentProviderSessionEntry } from "@clisbot/client/internal/daemon-client";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import { i18n } from "@/i18n/i18next";
 
 export const PER_PROVIDER_LIMIT = 15;

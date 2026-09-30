@@ -1,6 +1,6 @@
 import { createNameId } from "mnemonic-id";
 import { generateDraftId } from "@/stores/draft-keys";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { create } from "zustand";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 

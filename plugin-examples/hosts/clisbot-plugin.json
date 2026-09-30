@@ -1,0 +1,1 @@
+{ "id": "host-agents", "requirements": { "clisbot": ">=0.8.0" } }

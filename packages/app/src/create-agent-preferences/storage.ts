@@ -6,7 +6,7 @@ import {
   type FormPreferences,
 } from "./preferences";
 
-export const CREATE_AGENT_PREFERENCES_STORAGE_KEY = "@paseo:create-agent-preferences";
+export const CREATE_AGENT_PREFERENCES_STORAGE_KEY = "@clisbot:create-agent-preferences";
 
 export interface CreateAgentPreferenceStorage {
   read(): Promise<unknown>;

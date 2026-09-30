@@ -8,7 +8,7 @@ const OSC11_CAPTURE_SCRIPT = `
 let captured = Buffer.alloc(0);
 
 function finish() {
-  process.stdout.write("PASEO_OSC11_CAPTURE:" + JSON.stringify(captured.toString("latin1")) + "\\n");
+  process.stdout.write("CLISBOT_OSC11_CAPTURE:" + JSON.stringify(captured.toString("latin1")) + "\\n");
   process.exit(0);
 }
 
@@ -47,7 +47,7 @@ test.describe("Terminal protocol queries", () => {
       const terminal = harness.terminalSurface(page);
       await terminal.pressSequentially("node osc11-capture.cjs\n", { delay: 0 });
 
-      await waitForTerminalContent(page, (text) => text.includes("PASEO_OSC11_CAPTURE:"), 10_000);
+      await waitForTerminalContent(page, (text) => text.includes("CLISBOT_OSC11_CAPTURE:"), 10_000);
       await page.waitForTimeout(500);
 
       const text = await getTerminalBufferText(page);

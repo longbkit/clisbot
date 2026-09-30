@@ -351,32 +351,32 @@ describe("parseAssistantFileLink", () => {
 
   it("keeps tilde hrefs as direct home-relative file targets", () => {
     expect(
-      parseAssistantFileLink("~/.paseo/plans/file-preview.md", {
+      parseAssistantFileLink("~/.clisbot/plans/file-preview.md", {
         workspaceRoot: "/Users/test/project",
       }),
     ).toEqual({
-      raw: "~/.paseo/plans/file-preview.md",
-      path: "~/.paseo/plans/file-preview.md",
+      raw: "~/.clisbot/plans/file-preview.md",
+      path: "~/.clisbot/plans/file-preview.md",
       lineStart: undefined,
       lineEnd: undefined,
     });
     expect(
-      parseAssistantFileLink("~/.paseo/plans/file-preview.md:12", {
+      parseAssistantFileLink("~/.clisbot/plans/file-preview.md:12", {
         workspaceRoot: "/Users/test/project",
       }),
     ).toEqual({
-      raw: "~/.paseo/plans/file-preview.md:12",
-      path: "~/.paseo/plans/file-preview.md",
+      raw: "~/.clisbot/plans/file-preview.md:12",
+      path: "~/.clisbot/plans/file-preview.md",
       lineStart: 12,
       lineEnd: undefined,
     });
     expect(
-      parseAssistantFileLink("~\\.paseo\\plans\\file-preview.md", {
+      parseAssistantFileLink("~\\.clisbot\\plans\\file-preview.md", {
         workspaceRoot: "/Users/test/project",
       }),
     ).toEqual({
-      raw: "~\\.paseo\\plans\\file-preview.md",
-      path: "~/.paseo/plans/file-preview.md",
+      raw: "~\\.clisbot\\plans\\file-preview.md",
+      path: "~/.clisbot/plans/file-preview.md",
       lineStart: undefined,
       lineEnd: undefined,
     });
@@ -448,10 +448,10 @@ describe("normalizeInlinePathTarget", () => {
 
   it("keeps tilde paths as home-relative file targets", () => {
     expect(
-      normalizeInlinePathTarget("~/.paseo/plans/file-preview.md", "/Users/test/project"),
+      normalizeInlinePathTarget("~/.clisbot/plans/file-preview.md", "/Users/test/project"),
     ).toEqual({
-      directory: "~/.paseo/plans",
-      file: "~/.paseo/plans/file-preview.md",
+      directory: "~/.clisbot/plans",
+      file: "~/.clisbot/plans/file-preview.md",
     });
   });
 

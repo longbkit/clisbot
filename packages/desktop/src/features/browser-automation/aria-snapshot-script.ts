@@ -1,4 +1,4 @@
-export const ARIA_SNAPSHOT_SCRIPT_MARKER = "__PASEO_ARIA_SNAPSHOT__";
+export const ARIA_SNAPSHOT_SCRIPT_MARKER = "__CLISBOT_ARIA_SNAPSHOT__";
 
 // Adapted from Playwright's injected ARIA snapshot model.
 // Copyright (c) Microsoft Corporation. Licensed under the Apache License, Version 2.0.
@@ -170,7 +170,7 @@ export const ARIA_SNAPSHOT_SCRIPT = String.raw`(() => {
         return { ok: true, element };
       }
     };
-    Object.defineProperty(window, '__PASEO_BROWSER_AUTOMATION__', {
+    Object.defineProperty(window, '__CLISBOT_BROWSER_AUTOMATION__', {
       configurable: true,
       enumerable: false,
       value: runtime

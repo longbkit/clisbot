@@ -1,6 +1,6 @@
-# Adding a Git Forge to Paseo
+# Adding a Git Forge to Clisbot
 
-Paseo's forge layer is a registry/manifest system. A forge is a runtime concern:
+Clisbot's forge layer is a registry/manifest system. A forge is a runtime concern:
 shared protocol messages carry neutral/open facts, the server adapter owns
 behavior, and the app owns bundled presentation/runtime interpretation.
 
@@ -112,7 +112,7 @@ as the lookup itself. Otherwise a commit made on the same branch can inherit the
 previous commit's cached terminal status until the cache expires.
 
 Cloud hosts in the manifest are a bounded public-host list, not a self-host
-allowlist. Self-hosted detection is a trust gate: Paseo only talks to a forge
+allowlist. Self-hosted detection is a trust gate: Clisbot only talks to a forge
 host that is either a known cloud host or one the CLI is already authenticated
 to. Adapter probes must not make anonymous HTTP requests to remote-derived
 hosts, and adapters must not route credentials to an unauthenticated host.

@@ -97,18 +97,18 @@ async function waitForCondition(
 
 function seedFetchFixture(): {
   originRoot: string;
-  paseoHome: string;
+  clisbotHome: string;
   repoRoot: string;
   worktrees: string[];
 } {
-  const fixtureRoot = mkdtempSync(join(tmpdir(), "paseo-noop-fetch-"));
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "clisbot-noop-fetch-"));
   cleanupPaths.push(fixtureRoot);
   const repoRoot = join(fixtureRoot, "repo");
   const originRoot = join(fixtureRoot, "origin.git");
-  const paseoHome = join(fixtureRoot, "paseo-home");
+  const clisbotHome = join(fixtureRoot, "clisbot-home");
   const worktreesRoot = join(fixtureRoot, "worktrees");
   mkdirSync(repoRoot, { recursive: true });
-  mkdirSync(paseoHome, { recursive: true });
+  mkdirSync(clisbotHome, { recursive: true });
   mkdirSync(worktreesRoot, { recursive: true });
 
   git(repoRoot, ["init", "-b", "main"]);
@@ -145,7 +145,7 @@ function seedFetchFixture(): {
     return cwd;
   });
 
-  return { originRoot, paseoHome, repoRoot, worktrees };
+  return { originRoot, clisbotHome, repoRoot, worktrees };
 }
 
 function advanceOriginRef(originRoot: string, ref: string): void {
@@ -180,7 +180,7 @@ async function measureFetchScenario(
 
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ level: "silent" }),
-    paseoHome: fixture.paseoHome,
+    clisbotHome: fixture.clisbotHome,
     deps: {
       runGitFetch: async (cwd, observer) => {
         fetchStarted.resolve();
@@ -270,7 +270,7 @@ async function measureExternalFetchScenario(
   const initialFetchCompleted = createDeferred<void>();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ level: "silent" }),
-    paseoHome: fixture.paseoHome,
+    clisbotHome: fixture.clisbotHome,
     deps: {
       runGitFetch: async (cwd, observer) => {
         const result = await fetchWorkspaceGitRemote(cwd, observer);

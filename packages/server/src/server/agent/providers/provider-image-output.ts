@@ -17,7 +17,7 @@ export interface MaterializedProviderImage {
   path: string;
 }
 
-const PROVIDER_IMAGE_ATTACHMENT_DIR = "paseo-attachments";
+const PROVIDER_IMAGE_ATTACHMENT_DIR = "clisbot-attachments";
 const PROVIDER_IMAGE_ATTACHMENT_DIR_PREFIX = `${PROVIDER_IMAGE_ATTACHMENT_DIR}-`;
 const PRIVATE_ATTACHMENT_DIR_MODE = 0o700;
 const MATERIALIZED_IMAGE_FILE_MODE = 0o600;

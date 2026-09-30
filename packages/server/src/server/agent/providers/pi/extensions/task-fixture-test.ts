@@ -81,7 +81,10 @@ export async function verifyTaskFixture(path: URL, expectedStatuses: string[]): 
 
   const pi = new FakePi();
   const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
-  const session = await client.createSession({ provider: "pi", cwd: "/tmp/paseo-pi-task-fixture" });
+  const session = await client.createSession({
+    provider: "pi",
+    cwd: "/tmp/clisbot-pi-task-fixture",
+  });
   const live: AgentStreamEvent[] = [];
   session.subscribe((event) => live.push(event));
   try {

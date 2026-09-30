@@ -9,10 +9,10 @@ import {
 } from "./agent/provider-launch-config.js";
 import type { AgentProviderRuntimeSettingsMap } from "./agent/provider-launch-config.js";
 import { ensurePrivateFile, writePrivateFileAtomicSync } from "./private-files.js";
-import { AgentProfileSchema, AgentSkillSelectionSchema } from "@getpaseo/protocol/agent-profile";
-import { PluginIdSchema, PluginSourceSchema } from "@getpaseo/protocol/plugin-config";
-import { TerminalProfileSchema } from "@getpaseo/protocol/terminal-profile";
-import { PaseoServicePortAllocationSchema } from "@getpaseo/protocol/paseo-config-schema";
+import { AgentProfileSchema, AgentSkillSelectionSchema } from "@clisbot/protocol/agent-profile";
+import { PluginIdSchema, PluginSourceSchema } from "@clisbot/protocol/plugin-config";
+import { TerminalProfileSchema } from "@clisbot/protocol/terminal-profile";
+import { ClisbotServicePortAllocationSchema } from "@clisbot/protocol/clisbot-config-schema";
 
 export const LogLevelSchema = z.enum(["trace", "debug", "info", "warn", "error", "fatal"]);
 export const LogFormatSchema = z.enum(["pretty", "json"]);
@@ -80,7 +80,7 @@ const ProvidersSchema = z
 const WorktreesConfigSchema = z
   .object({
     root: z.string().min(1).optional(),
-    servicePorts: PaseoServicePortAllocationSchema.optional(),
+    servicePorts: ClisbotServicePortAllocationSchema.optional(),
   })
   .strict();
 
@@ -343,7 +343,7 @@ const CONFIG_FILENAME = "config.json";
 const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
   version: 1,
   daemon: {
-    listen: "127.0.0.1:6767",
+    listen: "127.0.0.1:6868",
     cors: {
       allowedOrigins: ["https://app.paseo.sh"],
     },
@@ -361,8 +361,8 @@ interface LoggerLike {
   info(...args: unknown[]): void;
 }
 
-function getConfigPath(paseoHome: string): string {
-  return path.join(paseoHome, CONFIG_FILENAME);
+function getConfigPath(clisbotHome: string): string {
+  return path.join(clisbotHome, CONFIG_FILENAME);
 }
 
 function getLogger(logger: LoggerLike | undefined): LoggerLike | undefined {
@@ -408,9 +408,9 @@ function stripRemovedConfigFields(parsed: unknown): unknown {
   return root;
 }
 
-export function loadPersistedConfig(paseoHome: string, logger?: LoggerLike): PersistedConfig {
+export function loadPersistedConfig(clisbotHome: string, logger?: LoggerLike): PersistedConfig {
   const log = getLogger(logger);
-  const configPath = getConfigPath(paseoHome);
+  const configPath = getConfigPath(clisbotHome);
 
   if (!existsSync(configPath)) {
     try {
@@ -443,10 +443,10 @@ export function loadPersistedConfig(paseoHome: string, logger?: LoggerLike): Per
 
 /** Observe the file without initializing a home, identity, or default configuration. */
 export function readPersistedConfig(
-  paseoHome: string,
+  clisbotHome: string,
   options: { defaultsIfMissing?: boolean } = {},
 ): PersistedConfig {
-  const configPath = getConfigPath(paseoHome);
+  const configPath = getConfigPath(clisbotHome);
   let raw: string;
   try {
     raw = readFileSync(configPath, "utf8");
@@ -516,7 +516,7 @@ export function getPersistedConfigValue(config: PersistedConfig, field: string):
 }
 
 export function editPersistedConfig(
-  paseoHome: string,
+  clisbotHome: string,
   field: string,
   edit: { value: unknown } | { unset: true },
 ): PersistedConfig {
@@ -524,7 +524,7 @@ export function editPersistedConfig(
   if (field === "daemon.auth" || field.startsWith("daemon.auth.")) {
     throw new Error("Use daemon set-password to change the daemon password.");
   }
-  const config = readPersistedConfig(paseoHome, { defaultsIfMissing: true });
+  const config = readPersistedConfig(clisbotHome, { defaultsIfMissing: true });
   let object = config as Record<string, unknown>;
   for (const part of parts.slice(0, -1)) {
     object[part] ??= {};
@@ -542,17 +542,17 @@ export function editPersistedConfig(
   }
   if ("unset" in edit) delete object[key];
   else object[key] = edit.value;
-  savePersistedConfig(paseoHome, config);
+  savePersistedConfig(clisbotHome, config);
   return config;
 }
 
 export function savePersistedConfig(
-  paseoHome: string,
+  clisbotHome: string,
   config: PersistedConfig,
   logger?: LoggerLike,
 ): void {
   const log = getLogger(logger);
-  const configPath = getConfigPath(paseoHome);
+  const configPath = getConfigPath(clisbotHome);
 
   const result = PersistedConfigSchema.safeParse(config);
   if (!result.success) {

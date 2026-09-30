@@ -10,7 +10,7 @@ category: Schedules
 
 A schedule starts a new agent for you on a cron cadence: at this time, run this prompt, in this repo, with these agent settings.
 
-Paseo also has **heartbeats**. A heartbeat sends a recurring prompt back into one existing agent so it can reassess and continue the same conversation.
+Clisbot also has **heartbeats**. A heartbeat sends a recurring prompt back into one existing agent so it can reassess and continue the same conversation.
 
 Both concepts use the same cron engine, but their product surfaces stay separate:
 
@@ -33,5 +33,5 @@ Both run on a cadence you set. To start an agent from an external event instead 
 
 - **In the app** — open the Schedules view and create one with agent settings, a cron cadence, a repo, and a prompt. This is the main way to create and manage schedules.
 - **[From chat](/docs/schedules-chat)** — ask the agent in a chat and it sets the schedule up for you.
-- **[From the CLI](/docs/schedules-cli)** — `paseo schedule create`, for headless boxes and scripts.
+- **[From the CLI](/docs/schedules-cli)** — `clisbot schedule create`, for headless boxes and scripts.
 - **[Over MCP](/docs/mcp)** — agents create and manage schedules programmatically.

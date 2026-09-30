@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, type StateStorage } from "zustand/middleware";
 import { z } from "zod";
-import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey } from "@clisbot/protocol/workspace-labels";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 
 export type SidebarGroupMode = "project" | "status";

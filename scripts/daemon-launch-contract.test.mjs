@@ -75,8 +75,8 @@ test("every executable daemon entrypoint enters the supervisor", async () => {
 
   assert.match(nixPackage, /dist\/scripts\/supervisor-entrypoint\.js/);
   assertNoDirectWorkerLaunch("Nix package wrapper", nixPackage);
-  assert.match(nixPackage, /--set PASEO_NODE_ENV production/);
+  assert.match(nixPackage, /--set CLISBOT_NODE_ENV production/);
   assert.doesNotMatch(nixPackage, /--set(-default)?\s+NODE_ENV\b/);
   assert.doesNotMatch(nixModule, /\bNODE_ENV\b\s*=/);
-  assert.doesNotMatch(nixModule, /\bPASEO_NODE_ENV\b/);
+  assert.doesNotMatch(nixModule, /\bCLISBOT_NODE_ENV\b/);
 });

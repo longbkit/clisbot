@@ -72,7 +72,7 @@ function createCheckoutFacts(
     remoteUrl: "https://github.com/acme/repo.git",
     absoluteGitDir: join(cwd, ".git"),
     gitCommonDir: join(cwd, ".git"),
-    paseoWorktree: { isPaseoOwnedWorktree: false },
+    clisbotWorktree: { isClisbotOwnedWorktree: false },
     storedBaseRef: null,
     resolvedBaseRef: "main",
     mainRepoRoot: null,
@@ -100,7 +100,7 @@ function createCheckoutStatus(
     behindOfOrigin: 0,
     hasRemote: true,
     remoteUrl: "https://github.com/acme/repo.git",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     ...overrides,
   };
 }
@@ -170,7 +170,7 @@ function createBaseSnapshot(cwd: string): WorkspaceGitRuntimeSnapshot {
       mainRepoRoot: null,
       currentBranch: "main",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 0, behind: 0 },
@@ -325,7 +325,7 @@ interface CreateServiceOptions {
   resolveBranchCheckout?: ReturnType<typeof vi.fn>;
   resolveRepositoryDefaultBranch?: ReturnType<typeof vi.fn>;
   listBranchSuggestions?: ReturnType<typeof vi.fn>;
-  listPaseoWorktrees?: ReturnType<typeof vi.fn>;
+  listClisbotWorktrees?: ReturnType<typeof vi.fn>;
   github?: ForgeService;
   resolveAbsoluteGitDir?: ReturnType<typeof vi.fn>;
   hasOriginRemote?: ReturnType<typeof vi.fn>;
@@ -357,7 +357,7 @@ function buildDefaultServiceDeps() {
     resolveBranchCheckout: vi.fn(async () => ({ kind: "not-found" })),
     resolveRepositoryDefaultBranch: vi.fn(async () => "main"),
     listBranchSuggestions: vi.fn(async () => []),
-    listPaseoWorktrees: vi.fn(async () => []),
+    listClisbotWorktrees: vi.fn(async () => []),
     forgeOverrides: { github: createGitHubServiceStub() },
     resolveAbsoluteGitDir: vi.fn(async () => join(REPO_CWD, ".git")),
     hasOriginRemote: vi.fn(async () => false),
@@ -408,7 +408,7 @@ function buildServiceDeps(options?: CreateServiceOptions) {
 function createService(options?: CreateServiceOptions) {
   return new WorkspaceGitServiceImpl({
     logger: createLogger() as never,
-    paseoHome: "/tmp/paseo-test",
+    clisbotHome: "/tmp/clisbot-test",
     deps: buildServiceDeps(options),
   });
 }
@@ -464,9 +464,9 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
         "-c",
         "commit.gpgsign=false",
         "-c",
-        "user.name=Paseo Test",
+        "user.name=Clisbot Test",
         "-c",
-        "user.email=paseo@example.test",
+        "user.email=clisbot@example.test",
         "commit",
         "-m",
         "initial",
@@ -1140,7 +1140,7 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     const getCheckoutSnapshotFacts = vi.fn(async (cwd: string) =>
       createCheckoutFacts(cwd, {
         currentBranch: "fork-owner/open-button-targets-active-file",
-        branchRemoteName: "paseo-pr-1285",
+        branchRemoteName: "clisbot-pr-1285",
         branchMergeRef: "refs/heads/open-button-targets-active-file",
         pullRequestLookupTarget: {
           headRef: "open-button-targets-active-file",
@@ -1151,7 +1151,7 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     const getCheckoutStatus = vi.fn(async (cwd: string) =>
       createCheckoutStatus(cwd, {
         currentBranch: "fork-owner/open-button-targets-active-file",
-        remoteUrl: "git@github.com:getpaseo/paseo.git",
+        remoteUrl: "git@github.com:longbkit/clisbot.git",
       }),
     );
     const service = createService({
@@ -1739,7 +1739,7 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
 
   test("listStashes cold-loads, warms, forces, and coalesces per cwd", async () => {
     let nowMs = 0;
-    const stashOutput = "stash@{0}\u0000paseo-auto-stash: feature\n";
+    const stashOutput = "stash@{0}\u0000clisbot-auto-stash: feature\n";
     const stashDeferred = createDeferred<{
       stdout: string;
       stderr: string;
@@ -1762,8 +1762,8 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
       now: () => new Date(nowMs),
     });
 
-    const first = service.listStashes(REPO_CWD, { paseoOnly: true });
-    const second = service.listStashes(join(REPO_CWD, "."), { paseoOnly: true });
+    const first = service.listStashes(REPO_CWD, { clisbotOnly: true });
+    const second = service.listStashes(join(REPO_CWD, "."), { clisbotOnly: true });
     await flushPromises();
 
     expect(runGitCommand).toHaveBeenCalledTimes(1);
@@ -1775,15 +1775,15 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
       signal: null,
     });
     await expect(Promise.all([first, second])).resolves.toEqual([
-      [{ index: 0, message: "paseo-auto-stash: feature", branch: "feature", isPaseo: true }],
-      [{ index: 0, message: "paseo-auto-stash: feature", branch: "feature", isPaseo: true }],
+      [{ index: 0, message: "clisbot-auto-stash: feature", branch: "feature", isClisbot: true }],
+      [{ index: 0, message: "clisbot-auto-stash: feature", branch: "feature", isClisbot: true }],
     ]);
 
     nowMs = 1_000;
-    await service.listStashes(REPO_CWD, { paseoOnly: true });
+    await service.listStashes(REPO_CWD, { clisbotOnly: true });
     expect(runGitCommand).toHaveBeenCalledTimes(1);
 
-    await service.listStashes(REPO_CWD, { paseoOnly: true }, { force: true, reason: "test" });
+    await service.listStashes(REPO_CWD, { clisbotOnly: true }, { force: true, reason: "test" });
     expect(runGitCommand).toHaveBeenCalledTimes(2);
 
     service.dispose();
@@ -1793,28 +1793,28 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     let nowMs = 0;
     const worktrees = [
       {
-        path: "/tmp/paseo-home/worktrees/repo/feature",
+        path: "/tmp/clisbot-home/worktrees/repo/feature",
         createdAt: "2026-04-12T00:00:00.000Z",
         branchName: "feature",
       },
     ];
-    const listPaseoWorktrees = vi.fn().mockResolvedValue(worktrees);
+    const listClisbotWorktrees = vi.fn().mockResolvedValue(worktrees);
     const service = createService({
-      listPaseoWorktrees,
+      listClisbotWorktrees,
       now: () => new Date(nowMs),
     });
 
     const first = service.listWorktrees(REPO_CWD);
     const second = service.listWorktrees(join(REPO_CWD, "."));
     await expect(Promise.all([first, second])).resolves.toEqual([worktrees, worktrees]);
-    expect(listPaseoWorktrees).toHaveBeenCalledTimes(1);
+    expect(listClisbotWorktrees).toHaveBeenCalledTimes(1);
 
     nowMs = 1_000;
     await service.listWorktrees(REPO_CWD);
-    expect(listPaseoWorktrees).toHaveBeenCalledTimes(1);
+    expect(listClisbotWorktrees).toHaveBeenCalledTimes(1);
 
     await service.listWorktrees(REPO_CWD, { force: true, reason: "test" });
-    expect(listPaseoWorktrees).toHaveBeenCalledTimes(2);
+    expect(listClisbotWorktrees).toHaveBeenCalledTimes(2);
 
     service.dispose();
   });
@@ -1828,16 +1828,16 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
 
     const worktrees = [
       {
-        path: join(tempDir, "paseo-home", "worktrees", "repo", "feature"),
+        path: join(tempDir, "clisbot-home", "worktrees", "repo", "feature"),
         createdAt: "2026-04-12T00:00:00.000Z",
         branchName: "feature",
       },
     ];
-    const listPaseoWorktrees = vi.fn(async () => worktrees);
+    const listClisbotWorktrees = vi.fn(async () => worktrees);
     const service = createService({
       getCheckoutSnapshotFacts: getCheckoutSnapshotFactsUncached as never,
       getCheckoutStatus: getCheckoutStatusUncached as never,
-      listPaseoWorktrees,
+      listClisbotWorktrees,
     });
 
     try {
@@ -1846,10 +1846,10 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
       ).resolves.toEqual([worktrees, worktrees]);
       await expect(service.listWorktrees(nestedWorkspaceDir)).resolves.toEqual(worktrees);
 
-      expect(listPaseoWorktrees).toHaveBeenCalledTimes(1);
-      expect(listPaseoWorktrees).toHaveBeenCalledWith({
+      expect(listClisbotWorktrees).toHaveBeenCalledTimes(1);
+      expect(listClisbotWorktrees).toHaveBeenCalledWith({
         cwd: realpathSync.native(repoDir).replace(/\\/g, "/"),
-        paseoHome: "/tmp/paseo-test",
+        clisbotHome: "/tmp/clisbot-test",
       });
     } finally {
       service.dispose();
@@ -1923,7 +1923,7 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     let nowMs = 0;
     const getCheckoutStatus = vi.fn(async (cwd: string) =>
       createCheckoutStatus(cwd, {
-        remoteUrl: "https://github.com/getpaseo/paseo.git",
+        remoteUrl: "https://github.com/longbkit/clisbot.git",
       }),
     );
     const service = createService({
@@ -1932,11 +1932,11 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     });
 
     await expect(service.resolveRepoRemoteUrl(REPO_CWD)).resolves.toBe(
-      "https://github.com/getpaseo/paseo.git",
+      "https://github.com/longbkit/clisbot.git",
     );
     nowMs = 1_000;
     await expect(service.resolveRepoRemoteUrl(join(REPO_CWD, "."))).resolves.toBe(
-      "https://github.com/getpaseo/paseo.git",
+      "https://github.com/longbkit/clisbot.git",
     );
 
     expect(getCheckoutStatus).toHaveBeenCalledTimes(1);
@@ -1949,7 +1949,7 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     const getCheckoutStatus = vi.fn(async (cwd: string) =>
       createCheckoutStatus(cwd, {
         currentBranch: "feature/service-metadata",
-        remoteUrl: "https://github.com/getpaseo/paseo.git",
+        remoteUrl: "https://github.com/longbkit/clisbot.git",
         repoRoot: REPO_CWD,
       }),
     );
@@ -1958,7 +1958,7 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
       now: () => new Date(nowMs),
     });
 
-    await expect(service.getProjectSlug(REPO_CWD)).resolves.toBe("paseo");
+    await expect(service.getProjectSlug(REPO_CWD)).resolves.toBe("clisbot");
 
     nowMs = 1_000;
     await service.getProjectSlug(join(REPO_CWD, "."));

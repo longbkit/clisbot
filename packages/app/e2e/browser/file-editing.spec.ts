@@ -13,7 +13,7 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 const RED_PIXEL = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=",
@@ -382,7 +382,7 @@ test.describe("CodeMirror workspace file editing", () => {
 
   test("applies the interface font to portaled tooltips", async ({ page, withWorkspace }) => {
     await page.addInitScript(() => {
-      localStorage.setItem("@paseo:app-settings", JSON.stringify({ uiFontFamily: "monospace" }));
+      localStorage.setItem("@clisbot:app-settings", JSON.stringify({ uiFontFamily: "monospace" }));
     });
     const workspace = await withWorkspace({ prefix: "file-tooltip-font-" });
     const relativePath = "tooltip-font.txt";

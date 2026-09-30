@@ -29,12 +29,12 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: node scripts/npm-retry.mjs ci --workspace=@getpaseo/website --include-workspace-root
+        run: node scripts/npm-retry.mjs ci --workspace=@clisbot/website --include-workspace-root
 
       - name: Typecheck
-        run: npm run typecheck --workspace=@getpaseo/website
+        run: npm run typecheck --workspace=@clisbot/website
 
       - name: Deploy to Cloudflare Workers
-        run: npm run deploy --workspace=@getpaseo/website
+        run: npm run deploy --workspace=@clisbot/website
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

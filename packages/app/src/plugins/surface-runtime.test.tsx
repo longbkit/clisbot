@@ -1,7 +1,7 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PaseoApi } from "@getpaseo/client";
-import { PaseoApiProvider } from "@getpaseo/plugin/client/host";
-import { usePaseo } from "@getpaseo/plugin/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ClisbotApi } from "@clisbot/client";
+import { ClisbotApiProvider } from "@clisbot/plugin/client/host";
+import { useClisbot } from "@clisbot/plugin/client";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -34,23 +34,23 @@ function clientWithWorkspace(id: string) {
   };
 }
 
-function borrowFromAppProvider(paseo: PaseoApi): PaseoApi {
-  let borrowed: PaseoApi | null = null;
+function borrowFromAppProvider(clisbot: ClisbotApi): ClisbotApi {
+  let borrowed: ClisbotApi | null = null;
   function PluginSurface() {
-    borrowed = usePaseo();
+    borrowed = useClisbot();
     return null;
   }
   renderToStaticMarkup(
-    <PaseoApiProvider paseo={paseo}>
+    <ClisbotApiProvider clisbot={clisbot}>
       <PluginSurface />
-    </PaseoApiProvider>,
+    </ClisbotApiProvider>,
   );
-  if (!borrowed) throw new Error("Plugin surface did not receive Paseo API");
+  if (!borrowed) throw new Error("Plugin surface did not receive Clisbot API");
   return borrowed;
 }
 
 describe("plugin surface host runtime", () => {
-  it("creates a PR worktree and agent through usePaseo on the selected app host", async () => {
+  it("creates a PR worktree and agent through useClisbot on the selected app host", async () => {
     const selected = clientWithWorkspace("workspace-a");
     const runtime = createPluginSurfaceRuntime(selected.client, {
       id: "workspace-plugin",
@@ -58,8 +58,8 @@ describe("plugin surface host runtime", () => {
     });
     if (!runtime) throw new Error("Expected selected host runtime");
 
-    const paseo = borrowFromAppProvider(runtime.paseo);
-    const workspace = await paseo.workspaces.create({
+    const clisbot = borrowFromAppProvider(runtime.clisbot);
+    const workspace = await clisbot.workspaces.create({
       source: {
         kind: "worktree",
         cwd: "/tmp/repository",
@@ -92,7 +92,7 @@ describe("plugin surface host runtime", () => {
     if (!first || !second) throw new Error("Expected online host runtimes");
 
     await first.invoke("host", {});
-    await borrowFromAppProvider(second.paseo).workspaces.create({
+    await borrowFromAppProvider(second.clisbot).workspaces.create({
       source: { kind: "directory", path: "/tmp/workspace-b" },
     });
 

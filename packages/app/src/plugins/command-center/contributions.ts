@@ -1,4 +1,4 @@
-import type { PluginClientStateSource } from "@getpaseo/plugin/client/host";
+import type { PluginClientStateSource } from "@clisbot/plugin/client/host";
 import type { CommandCenterContribution } from "@/command-center/contributions";
 import { getCommandCenterIcon } from "@/command-center/icon";
 import { resolvePluginIcon } from "../icons";
@@ -74,7 +74,7 @@ export function buildPluginCommandCenterContributions(
         } catch (error) {
           source.reportError(error);
         } finally {
-          await runtime.paseo.dispose().catch(source.reportError);
+          await runtime.clisbot.dispose().catch(source.reportError);
         }
       };
       contributions.push({

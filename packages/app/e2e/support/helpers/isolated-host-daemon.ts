@@ -9,7 +9,7 @@ import { killProcessTree, spawnTsx } from "./spawn-node";
 export interface IsolatedHostDaemon {
   serverId: string;
   port: number;
-  paseoHome: string;
+  clisbotHome: string;
   getPid(): number | undefined;
   restart(): Promise<void>;
   close(): Promise<void>;
@@ -21,7 +21,7 @@ export interface IsolatedHostDaemonOptions {
     enabled: boolean;
     endpoint?: string;
   };
-  paseoHome?: string;
+  clisbotHome?: string;
   preserveHome?: boolean;
   publishedVersion?: string;
 }
@@ -83,16 +83,17 @@ export async function startIsolatedHostDaemon(
 ): Promise<IsolatedHostDaemon> {
   const primaryPort = Number(process.env.E2E_DAEMON_PORT ?? 0);
   let port = await getAvailablePort();
-  while (port === 6767 || port === 6768 || port === primaryPort) port = await getAvailablePort();
+  while ([6767, 6768, 6868, 6869].includes(port) || port === primaryPort)
+    port = await getAvailablePort();
 
   const metroPort = process.env.E2E_METRO_PORT;
   if (!metroPort) throw new Error("E2E_METRO_PORT is required to start an isolated host daemon");
 
-  const paseoHome =
-    options.paseoHome ?? (await mkdtemp(path.join(tmpdir(), "paseo-e2e-secondary-host-")));
+  const clisbotHome =
+    options.clisbotHome ?? (await mkdtemp(path.join(tmpdir(), "clisbot-e2e-secondary-host-")));
   let publishedPackageRoot: string | null = null;
   if (options.publishedVersion) {
-    publishedPackageRoot = await mkdtemp(path.join(tmpdir(), "paseo-e2e-published-server-"));
+    publishedPackageRoot = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-published-server-"));
     await writeFile(
       path.join(publishedPackageRoot, "package.json"),
       `${JSON.stringify({ private: true })}\n`,
@@ -112,13 +113,13 @@ export async function startIsolatedHostDaemon(
           "--no-audit",
           "--no-fund",
           "--no-package-lock",
-          `@getpaseo/server@${options.publishedVersion}`,
+          `@clisbot/server@${options.publishedVersion}`,
         ],
         { cwd: publishedPackageRoot, stdio: "ignore" },
       );
     } catch (error) {
       if (!options.preserveHome) {
-        await rm(paseoHome, { recursive: true, force: true });
+        await rm(clisbotHome, { recursive: true, force: true });
       }
       await rm(publishedPackageRoot, { recursive: true, force: true });
       throw error;
@@ -129,7 +130,7 @@ export async function startIsolatedHostDaemon(
       options.mutableRelay.endpoint ??
       (process.env.E2E_RELAY_PORT ? `127.0.0.1:${process.env.E2E_RELAY_PORT}` : "127.0.0.1:9");
     await writeFile(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       `${JSON.stringify({
         version: 1,
         daemon: {
@@ -145,7 +146,7 @@ export async function startIsolatedHostDaemon(
     );
   }
   const serverDir = publishedPackageRoot
-    ? path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")
+    ? path.join(publishedPackageRoot, "node_modules", "@clisbot", "server")
     : path.resolve(__dirname, "../../../../server");
   const spawnDaemon = async (): Promise<ChildProcess> => {
     const spawnOptions: SpawnOptions = {
@@ -153,12 +154,12 @@ export async function startIsolatedHostDaemon(
       env: withDisabledE2ESpeechEnv({
         ...process.env,
         ...options.environment,
-        PASEO_HOME: paseoHome,
-        PASEO_SERVER_ID: serverId,
-        PASEO_LISTEN: `127.0.0.1:${port}`,
-        PASEO_CORS_ORIGINS: `http://localhost:${metroPort}`,
-        PASEO_RELAY_ENABLED: options.mutableRelay ? undefined : "0",
-        PASEO_NODE_ENV: "development",
+        CLISBOT_HOME: clisbotHome,
+        CLISBOT_SERVER_ID: serverId,
+        CLISBOT_LISTEN: `127.0.0.1:${port}`,
+        CLISBOT_CORS_ORIGINS: `http://localhost:${metroPort}`,
+        CLISBOT_RELAY_ENABLED: options.mutableRelay ? undefined : "0",
+        CLISBOT_NODE_ENV: "development",
         NODE_ENV: "development",
       }),
       stdio: ["ignore", "ignore", "pipe"],
@@ -191,7 +192,7 @@ export async function startIsolatedHostDaemon(
     child = await spawnDaemon();
   } catch (error) {
     if (!options.preserveHome) {
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
     }
     if (publishedPackageRoot) {
       await rm(publishedPackageRoot, { recursive: true, force: true });
@@ -203,7 +204,7 @@ export async function startIsolatedHostDaemon(
   return {
     serverId,
     port,
-    paseoHome,
+    clisbotHome,
     getPid: () => child.pid,
     restart: async () => {
       if (closed) throw new Error(`Cannot restart closed isolated daemon ${serverId}`);
@@ -215,7 +216,7 @@ export async function startIsolatedHostDaemon(
       closed = true;
       await killProcessTree(child);
       if (!options.preserveHome) {
-        await rm(paseoHome, { recursive: true, force: true });
+        await rm(clisbotHome, { recursive: true, force: true });
       }
       if (publishedPackageRoot) {
         await rm(publishedPackageRoot, { recursive: true, force: true });

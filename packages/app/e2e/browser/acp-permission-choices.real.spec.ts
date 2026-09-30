@@ -48,7 +48,7 @@ test.describe("real ACP permission choices", () => {
     page,
   }, testInfo) => {
     const provider = "kimi" satisfies RewindFlowProvider;
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-acp-question-kimi-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-acp-question-kimi-")));
     let handle: AgentHandle | undefined;
 
     try {

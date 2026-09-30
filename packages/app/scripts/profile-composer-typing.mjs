@@ -2,22 +2,22 @@ import { writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.PASEO_PROFILE_APP_URL ?? "http://localhost:19010";
-const cadenceMs = Number(process.env.PASEO_PROFILE_TYPING_CADENCE_MS ?? 16);
-const scenario = process.env.PASEO_PROFILE_TYPING_SCENARIO ?? "continuous-text";
+const baseUrl = process.env.CLISBOT_PROFILE_APP_URL ?? "http://localhost:19010";
+const cadenceMs = Number(process.env.CLISBOT_PROFILE_TYPING_CADENCE_MS ?? 16);
+const scenario = process.env.CLISBOT_PROFILE_TYPING_SCENARIO ?? "continuous-text";
 if (!["continuous-text", "height-growth"].includes(scenario)) {
   throw new Error(
-    `Unknown PASEO_PROFILE_TYPING_SCENARIO: ${scenario}. Use continuous-text or height-growth.`,
+    `Unknown CLISBOT_PROFILE_TYPING_SCENARIO: ${scenario}. Use continuous-text or height-growth.`,
   );
 }
 const sampleCount = Number(
-  process.env.PASEO_PROFILE_TYPING_KEYS ?? (scenario === "height-growth" ? 24 : 300),
+  process.env.CLISBOT_PROFILE_TYPING_KEYS ?? (scenario === "height-growth" ? 24 : 300),
 );
-const repeatCount = Number(process.env.PASEO_PROFILE_TYPING_REPEATS ?? 3);
-const workspaceDigit = process.env.PASEO_PROFILE_WORKSPACE_DIGIT ?? "1";
-const headless = process.env.PASEO_PROFILE_HEADLESS !== "0";
-const cpuProfilePath = process.env.PASEO_PROFILE_CPU_PATH;
-const tracePath = process.env.PASEO_PROFILE_TRACE_PATH;
+const repeatCount = Number(process.env.CLISBOT_PROFILE_TYPING_REPEATS ?? 3);
+const workspaceDigit = process.env.CLISBOT_PROFILE_WORKSPACE_DIGIT ?? "1";
+const headless = process.env.CLISBOT_PROFILE_HEADLESS !== "0";
+const cpuProfilePath = process.env.CLISBOT_PROFILE_CPU_PATH;
+const tracePath = process.env.CLISBOT_PROFILE_TRACE_PATH;
 const alphabet = "abcdefghijklmnopqrstuvwxyz";
 const measuredInput = Array.from({ length: sampleCount }, (_, index) => {
   if (scenario === "height-growth" && index % 2 === 0) {
@@ -99,7 +99,7 @@ function measuredInputKind(sequence) {
 async function installAppBootstrap(page) {
   await page.addInitScript(() => {
     localStorage.setItem(
-      "@paseo:keyboard-shortcut-overrides",
+      "@clisbot:keyboard-shortcut-overrides",
       JSON.stringify({ "workspace-navigate-index-alt-digit-web": "Cmd+Digit" }),
     );
 
@@ -163,7 +163,7 @@ async function prepareTextareaControl(page) {
 
 async function installTypingProbe(page, target) {
   await page.evaluate((probeTarget) => {
-    globalThis.__PASEO_TYPING_BENCHMARK_CLEANUP__?.();
+    globalThis.__CLISBOT_TYPING_BENCHMARK_CLEANUP__?.();
     const element =
       probeTarget === "composer"
         ? [...document.querySelectorAll("[data-composer-input]")].find(
@@ -243,7 +243,7 @@ async function installTypingProbe(page, target) {
     };
     element.addEventListener("keydown", onKeydown, true);
     element.addEventListener("input", onInput);
-    globalThis.__PASEO_TYPING_BENCHMARK__ = {
+    globalThis.__CLISBOT_TYPING_BENCHMARK__ = {
       get receivedKeys() {
         return sequence;
       },
@@ -259,7 +259,7 @@ async function installTypingProbe(page, target) {
       eventTimings,
       timeOrigin: performance.timeOrigin,
     };
-    globalThis.__PASEO_TYPING_BENCHMARK_CLEANUP__ = () => {
+    globalThis.__CLISBOT_TYPING_BENCHMARK_CLEANUP__ = () => {
       element.removeEventListener("keydown", onKeydown, true);
       element.removeEventListener("input", onInput);
       longTaskObserver.disconnect();
@@ -475,13 +475,13 @@ async function dispatchMeasuredInput(page, inputs) {
 
 async function waitForMeasurement(page, expectedKeys) {
   await page.waitForFunction(
-    (count) => globalThis.__PASEO_TYPING_BENCHMARK__?.receivedKeys === count,
+    (count) => globalThis.__CLISBOT_TYPING_BENCHMARK__?.receivedKeys === count,
     expectedKeys,
     { timeout: 15_000 },
   );
   await page.waitForFunction(
     (count) =>
-      globalThis.__PASEO_TYPING_BENCHMARK__?.paintedAt.filter(Number.isFinite).length === count,
+      globalThis.__CLISBOT_TYPING_BENCHMARK__?.paintedAt.filter(Number.isFinite).length === count,
     expectedKeys,
     { timeout: 15_000 },
   );
@@ -497,14 +497,14 @@ async function measureTarget(page, input, target, originalText) {
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
   await installTypingProbe(page, target);
-  await page.evaluate(() => globalThis.__PASEO_RESET_RENDER_PROFILE__?.());
+  await page.evaluate(() => globalThis.__CLISBOT_RESET_RENDER_PROFILE__?.());
   const { dispatchedAt, scheduledAt } = await dispatchMeasuredInput(page, measuredInput);
   await waitForMeasurement(page, measuredText.length);
 
   const diagnostics = await page.evaluate(() => ({
-    state: globalThis.__PASEO_TYPING_BENCHMARK__,
-    commits: globalThis.__PASEO_RENDER_PROFILE__ ?? [],
-    renderReasons: globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {},
+    state: globalThis.__CLISBOT_TYPING_BENCHMARK__,
+    commits: globalThis.__CLISBOT_RENDER_PROFILE__ ?? [],
+    renderReasons: globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {},
     value: document.activeElement?.value ?? null,
   }));
   if (diagnostics.value !== `${originalText}${measuredText}`) {

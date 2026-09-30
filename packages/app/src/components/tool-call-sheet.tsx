@@ -5,7 +5,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { BottomSheetScrollView, BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import { X } from "lucide-react-native";
-import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
+import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
 import {
   IsolatedBottomSheetModal,
   type ContextBridge,

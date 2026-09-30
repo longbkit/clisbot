@@ -1,7 +1,7 @@
 import type {
   BrowserAutomationErrorCode,
   BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
 
 export type BrowserToolsResponsePayload = BrowserAutomationExecuteResponse["payload"];
 export type BrowserToolsErrorPayload = Extract<BrowserToolsResponsePayload, { ok: false }>["error"];

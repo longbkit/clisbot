@@ -27,8 +27,8 @@ import { resolveAppVersion } from "@/utils/app-version";
 import { openChangelog } from "@/changelog";
 import { openExternalUrl } from "@/utils/open-external-url";
 
-const DISCORD_URL = "https://discord.gg/jz8T2uahpH";
-const GITHUB_ISSUE_URL = "https://github.com/getpaseo/paseo/issues/new";
+const DISCORD_URL = "https://discord.gg/awGmcmFXC";
+const GITHUB_ISSUE_URL = "https://github.com/longbkit/clisbot/issues/new";
 const ThemedActivity = withUnistyles(Activity);
 const ThemedCircleHelp = withUnistyles(CircleHelp);
 const ThemedGift = withUnistyles(Gift);

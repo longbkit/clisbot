@@ -13,7 +13,7 @@ function transcript(messageId: string, blocks: string[]): HTMLElement {
     const row = document.createElement("div");
     row.setAttribute("data-history-row-id", `${messageId}:block:${index}`);
     row.setAttribute("data-message-id", messageId);
-    row.innerHTML = `<div data-message-text="true"><div data-paseo-markdown-tag="p">${text}</div></div>`;
+    row.innerHTML = `<div data-message-text="true"><div data-clisbot-markdown-tag="p">${text}</div></div>`;
     root.append(row);
   }
   document.body.append(root);
@@ -37,12 +37,12 @@ function viewport(root: HTMLElement, capture: Capture) {
   return createFindViewport({
     getBindings: () => bindings,
     getRoot: () => root,
-    highlightName: "paseo-chat-find-test",
+    highlightName: "clisbot-chat-find-test",
   });
 }
 
 afterEach(() => {
-  CSS.highlights.delete("paseo-chat-find-test");
+  CSS.highlights.delete("clisbot-chat-find-test");
   document.body.replaceChildren();
 });
 
@@ -83,7 +83,7 @@ it("keeps the chosen occurrence when an earlier row unmounts mid-scroll", async 
 });
 
 function highlightedRanges(): Range[] {
-  const highlight = CSS.highlights.get("paseo-chat-find-test");
+  const highlight = CSS.highlights.get("clisbot-chat-find-test");
   return highlight ? Array.from(highlight).filter((range) => range instanceof Range) : [];
 }
 

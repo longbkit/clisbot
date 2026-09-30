@@ -3,7 +3,7 @@ import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 
 // Where Settings → Keyboard shortcuts persists a rebound shortcut.
-const OVERRIDE_STORAGE_KEY = "@paseo:keyboard-shortcut-overrides";
+const OVERRIDE_STORAGE_KEY = "@clisbot:keyboard-shortcut-overrides";
 const COMMAND_CENTER_BINDING = "command-center-toggle-ctrl-k-non-mac";
 
 async function rebindCommandCenter(page: Page, combo: string): Promise<void> {

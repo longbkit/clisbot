@@ -15,7 +15,7 @@ function message(messageId: string, ...blocks: string[]) {
   for (const block of blocks) {
     const row = document.createElement("div");
     row.dataset.messageId = messageId;
-    row.innerHTML = `<div data-message-text="true"><div data-paseo-markdown-tag="p">${block}</div></div>`;
+    row.innerHTML = `<div data-message-text="true"><div data-clisbot-markdown-tag="p">${block}</div></div>`;
     root.append(row);
   }
   document.body.append(root);
@@ -26,7 +26,7 @@ it("collects a message's occurrences across its block rows in row order", () => 
   const other = document.createElement("div");
   other.dataset.messageId = "message-2";
   other.innerHTML =
-    '<div data-message-text="true"><div data-paseo-markdown-tag="p">alpha three</div></div>';
+    '<div data-message-text="true"><div data-clisbot-markdown-tag="p">alpha three</div></div>';
   root.append(other);
   expect(findMessageMatches(root, "message-1", "alpha").map((range) => range.toString())).toEqual([
     "alpha",
@@ -42,7 +42,7 @@ it("collects a message's occurrences across its block rows in row order", () => 
 });
 it("finds each actual occurrence across inline formatting with original Unicode offsets", () => {
   const row = content(
-    '<div data-paseo-markdown-tag="p">İ😀hello <strong>world</strong> then <em>hello</em> world</div>',
+    '<div data-clisbot-markdown-tag="p">İ😀hello <strong>world</strong> then <em>hello</em> world</div>',
   );
   const matches = findRenderedMatches(row, "hello world");
   expect(matches.map((range) => range.toString())).toEqual(["hello world", "hello world"]);
@@ -51,14 +51,14 @@ it("finds each actual occurrence across inline formatting with original Unicode 
 });
 it("ignores controls, keeps block boundaries, and preserves literal code punctuation", () => {
   const row = content(
-    '<div data-paseo-markdown-tag="p">first</div><div data-paseo-markdown-tag="p">second</div><div data-paseo-markdown-tag="pre"><span>const a</span><span>.b</span><button>copy a.b</button><span data-paseo-markdown-ignore="true">a.b</span></div>',
+    '<div data-clisbot-markdown-tag="p">first</div><div data-clisbot-markdown-tag="p">second</div><div data-clisbot-markdown-tag="pre"><span>const a</span><span>.b</span><button>copy a.b</button><span data-clisbot-markdown-ignore="true">a.b</span></div>',
   );
   expect(findRenderedMatches(row, "firstsecond")).toEqual([]);
   expect(findRenderedMatches(row, "a.b").map((range) => range.toString())).toEqual(["a.b"]);
 });
 it("matches whitespace across text nodes without inspecting hidden link destinations", () => {
   const row = content(
-    '<div data-paseo-markdown-tag="p"><a href="https://example.com/hidden">hello &amp; world</a>\nline</div>',
+    '<div data-clisbot-markdown-tag="p"><a href="https://example.com/hidden">hello &amp; world</a>\nline</div>',
   );
   expect(findRenderedMatches(row, "hidden")).toEqual([]);
   expect(findRenderedMatches(row, "world line").map((range) => range.toString())).toEqual([

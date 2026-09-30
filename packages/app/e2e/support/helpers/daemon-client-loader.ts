@@ -65,7 +65,7 @@ function loadAppVersion(): string {
   return packageJson.version;
 }
 
-export async function loadProtocolSchemas(): Promise<typeof import("@getpaseo/protocol/messages")> {
+export async function loadProtocolSchemas(): Promise<typeof import("@clisbot/protocol/messages")> {
   const moduleUrl = pathToFileURL(
     path.resolve(__dirname, "../../../../../packages/protocol/dist/messages.js"),
   ).href;

@@ -55,13 +55,13 @@ test("uses xterm's literal matching across wrapped cells and keeps selection whe
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 0, placement: "top" });
   runtime.find.search("[a.b] 界", "previous");
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 1 });
-  const selection = window.__paseoTerminal!.getSelection();
+  const selection = window.__clisbotTerminal!.getSelection();
   runtime.find.clear();
-  expect(window.__paseoTerminal!.getSelection()).toBe(selection);
+  expect(window.__clisbotTerminal!.getSelection()).toBe(selection);
   expect(results.at(-1)).toMatchObject({ resultCount: 0, resultIndex: -1 });
   runtime.find.search("[aXb]");
   expect(results.at(-1)).toMatchObject({ resultCount: 0 });
-  const cols = window.__paseoTerminal!.cols;
+  const cols = window.__clisbotTerminal!.cols;
   await write("\r\n" + "x".repeat(cols - 2) + "wrapped-needle");
   runtime.find.search("wrapped-needle");
   await expect.poll(() => results.at(-1)).toMatchObject({ resultCount: 1, resultIndex: 0 });
@@ -72,7 +72,7 @@ test("reports the addon's highlight limit without disabling navigation beyond th
   await write(("a ".repeat(25) + "\r\n").repeat(801));
   runtime.find.search("a");
   expect(results.at(-1)).toMatchObject({ resultCount: 20000, limited: true, resultIndex: -1 });
-  expect(window.__paseoTerminal!.getSelection()).toBe("a");
+  expect(window.__clisbotTerminal!.getSelection()).toBe("a");
   runtime.find.search("a", "next");
   expect(results.at(-1)).toMatchObject({ resultCount: 20000, limited: true, resultIndex: 0 });
 });
@@ -81,7 +81,7 @@ test("keeps the inspected bottom viewport fixed when output arrives", async () =
   mount();
   await write("padding\r\n".repeat(30) + "inspected needle");
   runtime.find.search("needle");
-  const term = window.__paseoTerminal!;
+  const term = window.__clisbotTerminal!;
   const inspected = term.buffer.active.viewportY;
   await write("\r\nnew output".repeat(30));
   await expect.poll(() => term.buffer.active.viewportY).toBe(inspected);
@@ -91,15 +91,15 @@ test("keeps the inspected bottom viewport fixed when output arrives", async () =
 test("searches the active alternate buffer without moving the restored normal viewport", async () => {
   const results = mount();
   await write("normal needle\r\n" + "padding\r\n".repeat(30));
-  const normalViewport = window.__paseoTerminal!.buffer.active.viewportY;
+  const normalViewport = window.__clisbotTerminal!.buffer.active.viewportY;
   await write("\x1b[?1049hAlt needle\r\nAlt NEEDLE");
   runtime.find.search("needle");
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 1, limited: false });
-  expect(window.__paseoTerminal!.getSelection()).toBe("NEEDLE");
+  expect(window.__clisbotTerminal!.getSelection()).toBe("NEEDLE");
   runtime.find.search("needle", "previous");
-  expect(window.__paseoTerminal!.getSelection()).toBe("needle");
+  expect(window.__clisbotTerminal!.getSelection()).toBe("needle");
   await write("\x1b[?1049l");
-  await expect.poll(() => window.__paseoTerminal!.buffer.active.viewportY).toBe(normalViewport);
+  await expect.poll(() => window.__clisbotTerminal!.buffer.active.viewportY).toBe(normalViewport);
   runtime.find.search("needle");
   await expect.poll(() => results.at(-1)).toMatchObject({ resultCount: 1, resultIndex: 0 });
 });
@@ -108,7 +108,7 @@ test("keeps Find at the top unless its measured frame covers the active match", 
   const results = mount();
   await new Promise((resolve) => setTimeout(resolve, 2600));
   runtime.find.setWidgetSize({ width: 356, height: 58 });
-  const cols = window.__paseoTerminal!.cols;
+  const cols = window.__clisbotTerminal!.cols;
   await write("left-needle\r\n" + " ".repeat(cols - 12) + "right-needle");
   runtime.find.search("left-needle");
   expect(results.at(-1)).toMatchObject({ resultCount: 1, placement: "top" });
@@ -119,7 +119,7 @@ test("keeps Find at the top unless its measured frame covers the active match", 
 test("closing Find cancels pending refreshes without clearing old or new selections", async () => {
   mount();
   await write("first needle\r\n" + "padding\r\n".repeat(30) + "last needle");
-  const term = window.__paseoTerminal!;
+  const term = window.__clisbotTerminal!;
   for (const freshSelection of [false, true]) {
     runtime.find.search("needle");
     await write("\r\nnew output");
@@ -145,7 +145,7 @@ test("preserves inspection through multiple real parser turns of queued output",
   await new Promise((resolve) => setTimeout(resolve, 2600));
   await write("padding\r\n".repeat(30) + "needle\r\nprogress");
   runtime.find.search("needle");
-  const term = window.__paseoTerminal!;
+  const term = window.__clisbotTerminal!;
   const inspected = term.buffer.active.viewportY;
   const samples: { viewport: number; base: number }[] = [];
   const subscription = term.onWriteParsed(() => {

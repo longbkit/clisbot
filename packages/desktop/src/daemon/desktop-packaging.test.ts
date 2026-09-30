@@ -24,24 +24,24 @@ function createFakeMacBundle(options: { includeHelper: boolean }): {
   root: string;
   shimPath: string;
 } {
-  const root = mkdtempSync(join(tmpdir(), "paseo-cli-shim-test-"));
-  const appPath = join(root, "Paseo.app");
+  const root = mkdtempSync(join(tmpdir(), "clisbot-cli-shim-test-"));
+  const appPath = join(root, "Clisbot.app");
   const contentsPath = join(appPath, "Contents");
   const resourcesPath = join(contentsPath, "Resources");
-  const shimPath = join(resourcesPath, "bin", "paseo");
-  const mainPath = join(contentsPath, "MacOS", "Paseo");
+  const shimPath = join(resourcesPath, "bin", "clisbot");
+  const mainPath = join(contentsPath, "MacOS", "Clisbot");
   const helperPath = join(
     contentsPath,
     "Frameworks",
-    "Paseo Helper.app",
+    "Clisbot Helper.app",
     "Contents",
     "MacOS",
-    "Paseo Helper",
+    "Clisbot Helper",
   );
 
   mkdirSync(dirname(shimPath), { recursive: true });
   mkdirSync(dirname(mainPath), { recursive: true });
-  copyFileSync(join(packageRoot, "bin", "paseo"), shimPath);
+  copyFileSync(join(packageRoot, "bin", "clisbot"), shimPath);
   chmodSync(shimPath, 0o755);
 
   writeExecutable(mainPath, "#!/bin/sh\necho main-executable\n");
@@ -52,7 +52,7 @@ function createFakeMacBundle(options: { includeHelper: boolean }): {
       helperPath,
       [
         "#!/bin/sh",
-        'printf "helper env=%s/%s cli=%s\\n" "$ELECTRON_RUN_AS_NODE" "$PASEO_NODE_ENV" "$PASEO_CLI"',
+        'printf "helper env=%s/%s cli=%s\\n" "$ELECTRON_RUN_AS_NODE" "$CLISBOT_NODE_ENV" "$CLISBOT_CLI"',
         'printf "args=%s\\n" "$*"',
         "",
       ].join("\n"),
@@ -83,10 +83,10 @@ describe("desktop packaging", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
 
     expect(config).toContain(
-      "node_modules/@getpaseo/server/dist/server/terminal/shell-integration/**/*",
+      "node_modules/@clisbot/server/dist/server/terminal/shell-integration/**/*",
     );
     expect(config).not.toContain(
-      "node_modules/@getpaseo/server/dist/src/terminal/shell-integration/**/*",
+      "node_modules/@clisbot/server/dist/src/terminal/shell-integration/**/*",
     );
   });
 
@@ -94,15 +94,15 @@ describe("desktop packaging", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
 
     expect(config).toContain("!**/*.map");
-    expect(config).toContain("!node_modules/@getpaseo/*/src/**");
-    expect(config).toContain("!node_modules/@getpaseo/**/*.test.*");
-    expect(config).toContain("!node_modules/@getpaseo/**/*.spec.*");
+    expect(config).toContain("!node_modules/@clisbot/*/src/**");
+    expect(config).toContain("!node_modules/@clisbot/**/*.test.*");
+    expect(config).toContain("!node_modules/@clisbot/**/*.spec.*");
   });
 
   it("excludes the bundled daemon web UI from the packaged app", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
 
-    expect(config).toContain("!node_modules/@getpaseo/server/dist/server/web-ui/**");
+    expect(config).toContain("!node_modules/@clisbot/server/dist/server/web-ui/**");
   });
 
   it("uses the server skill catalog without a duplicate desktop resource", () => {
@@ -119,15 +119,15 @@ describe("desktop packaging", () => {
     expect(runtimeTrace).toContain('"packages/server/dist/server/skills/**"');
   });
 
-  it("registers Paseo agent links with the operating system", () => {
+  it("registers Clisbot agent links with the operating system", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
 
-    expect(config).toContain("name: Paseo agent link");
-    expect(config).toContain("- paseo");
+    expect(config).toContain("name: Clisbot agent link");
+    expect(config).toContain("- clisbot");
   });
 
   // electron-builder packs production dependencies declared in package.json into
-  // app.asar. Runtime code in runtime-paths.ts and bin/paseo dynamically resolves
+  // app.asar. Runtime code in runtime-paths.ts and bin/clisbot dynamically resolves
   // these workspace packages by string, so static analysis (TypeScript, Knip) cannot
   // see the link. If a runtime-required workspace dep is dropped from
   // dependencies, the build still succeeds but ships a broken bundle. This
@@ -138,7 +138,7 @@ describe("desktop packaging", () => {
     };
     const deps = pkg.dependencies ?? {};
 
-    for (const required of ["@getpaseo/cli", "@getpaseo/server"]) {
+    for (const required of ["@clisbot/cli", "@clisbot/server"]) {
       expect(deps[required], `${required} must be declared in dependencies`).toBe("*");
     }
   });
@@ -154,7 +154,7 @@ describe("desktop packaging", () => {
       expect(result.stdout).toContain(`helper env=1/production cli=${bundle.shimPath}`);
       expect(result.stdout).toContain("node-entrypoint-runner.js");
       expect(result.stdout).toContain("node-script");
-      expect(result.stdout).toContain("@getpaseo/cli/dist/index.js");
+      expect(result.stdout).toContain("@clisbot/cli/dist/index.js");
       expect(result.stdout).toContain("--version");
       expect(result.stdout).not.toContain("main-executable");
     } finally {
@@ -170,7 +170,7 @@ describe("desktop packaging", () => {
       const result = spawnSync(bundle.shimPath, ["--version"], { encoding: "utf8" });
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("Bundled Paseo Helper executable not found");
+      expect(result.stderr).toContain("Bundled Clisbot Helper executable not found");
       expect(result.stdout).not.toContain("main-executable");
     } finally {
       rmSync(bundle.root, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 // Browser compatibility tests run a real daemon in a separate Node runtime.
-import { createTestPaseoDaemon } from "./paseo-daemon.js";
+import { createTestClisbotDaemon } from "./clisbot-daemon.js";
 
-const daemon = await createTestPaseoDaemon({
+const daemon = await createTestClisbotDaemon({
   daemonVersion: process.argv[2],
   pluginsEnabled: true,
   mcpEnabled: false,

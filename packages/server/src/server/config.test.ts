@@ -14,62 +14,62 @@ describe("server config", () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  test("records when the daemon is managed by Paseo Desktop", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-desktop-managed-"));
-    roots.push(paseoHome);
+  test("records when the daemon is managed by Clisbot Desktop", async () => {
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-desktop-managed-"));
+    roots.push(clisbotHome);
 
-    const desktopConfig = loadConfig(paseoHome, {
-      env: { PASEO_DESKTOP_MANAGED: "1" },
+    const desktopConfig = loadConfig(clisbotHome, {
+      env: { CLISBOT_DESKTOP_MANAGED: "1" },
     });
-    const standaloneConfig = loadConfig(paseoHome, { env: {} });
+    const standaloneConfig = loadConfig(clisbotHome, { env: {} });
 
     expect(desktopConfig.desktopManaged).toBe(true);
     expect(standaloneConfig.desktopManaged).toBe(false);
   });
 
   test("loads the provider catalog refresh timeout", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-provider-timeout-"));
-    roots.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-provider-timeout-"));
+    roots.push(clisbotHome);
     await writeFile(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       JSON.stringify({ agents: { catalogRefreshTimeoutMs: 180_000 } }),
     );
 
-    const config = loadConfig(paseoHome, { env: {} });
+    const config = loadConfig(clisbotHome, { env: {} });
 
     expect(config.providerCatalogRefreshTimeoutMs).toBe(180_000);
   });
 
   test("resolves reload state from the supplied validated snapshot", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-snapshot-"));
-    roots.push(paseoHome);
-    const snapshot = loadPersistedConfig(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-snapshot-"));
+    roots.push(clisbotHome);
+    const snapshot = loadPersistedConfig(clisbotHome);
     await writeFile(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       JSON.stringify({
         ...snapshot,
         daemon: { ...snapshot.daemon, browserTools: { enabled: true } },
       }),
     );
 
-    expect(resolveConfigFromPersisted(paseoHome, snapshot, { env: {} }).browserToolsEnabled).toBe(
+    expect(resolveConfigFromPersisted(clisbotHome, snapshot, { env: {} }).browserToolsEnabled).toBe(
       false,
     );
-    expect(loadConfig(paseoHome, { env: {} }).browserToolsEnabled).toBe(true);
+    expect(loadConfig(clisbotHome, { env: {} }).browserToolsEnabled).toBe(true);
   });
 
   test("records mutable and startup launch overrides by persisted leaf", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-overrides-"));
-    roots.push(paseoHome);
-    const config = loadConfig(paseoHome, {
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-overrides-"));
+    roots.push(clisbotHome);
+    const config = loadConfig(clisbotHome, {
       env: {
-        PASEO_LISTEN: "127.0.0.1:7000",
-        PASEO_PASSWORD: "secret",
-        PASEO_RELAY_ENDPOINT: "relay.example.test:443",
-        PASEO_TRUSTED_PROXIES: "true",
-        PASEO_WEB_UI_ENABLED: "true",
-        PASEO_LOG_FILE_PATH: "custom.log",
-        PASEO_VOICE_LLM_PROVIDER: "codex",
+        CLISBOT_LISTEN: "127.0.0.1:7000",
+        CLISBOT_PASSWORD: "secret",
+        CLISBOT_RELAY_ENDPOINT: "relay.example.test:443",
+        CLISBOT_TRUSTED_PROXIES: "true",
+        CLISBOT_WEB_UI_ENABLED: "true",
+        CLISBOT_LOG_FILE_PATH: "custom.log",
+        CLISBOT_VOICE_LLM_PROVIDER: "codex",
       },
       cli: { relayUseTls: false },
     });
@@ -123,7 +123,7 @@ describe("server config", () => {
     },
   ])("classifies speech overrides for $name", ({ providers, expected }) => {
     const config = resolveConfigFromPersisted(
-      "/tmp/paseo-speech-override-classification",
+      "/tmp/clisbot-speech-override-classification",
       {
         version: 1,
         features: {
@@ -138,9 +138,9 @@ describe("server config", () => {
       {
         env: {
           OPENAI_API_KEY: "test-api-key",
-          PASEO_DICTATION_LOCAL_STT_MODEL: "parakeet-tdt-0.6b-v2-int8",
-          PASEO_VOICE_LOCAL_STT_MODEL: "parakeet-tdt-0.6b-v2-int8",
-          PASEO_VOICE_LOCAL_TTS_MODEL: "kokoro-en-v0_19",
+          CLISBOT_DICTATION_LOCAL_STT_MODEL: "parakeet-tdt-0.6b-v2-int8",
+          CLISBOT_VOICE_LOCAL_STT_MODEL: "parakeet-tdt-0.6b-v2-int8",
+          CLISBOT_VOICE_LOCAL_TTS_MODEL: "kokoro-en-v0_19",
           STT_CONFIDENCE_THRESHOLD: "0.5",
           STT_MODEL: "whisper-1",
           TTS_MODEL: "tts-1",
@@ -164,7 +164,7 @@ describe("server config", () => {
   });
 
   test("resolves bundled web UI path from globally installed compiled modules", async () => {
-    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-config-compiled-"));
+    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-compiled-"));
     roots.push(packageRoot);
     await mkdir(path.join(packageRoot, "dist", "server", "web-ui"), { recursive: true });
 
@@ -176,7 +176,7 @@ describe("server config", () => {
   });
 
   test("resolves packaged desktop web UI path from resources app-dist", async () => {
-    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-config-packaged-"));
+    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-packaged-"));
     roots.push(packageRoot);
     await mkdir(path.join(packageRoot, "app-dist"), { recursive: true });
 
@@ -187,7 +187,7 @@ describe("server config", () => {
             packageRoot,
             "app.asar",
             "node_modules",
-            "@getpaseo",
+            "@clisbot",
             "server",
             "dist",
             "server",

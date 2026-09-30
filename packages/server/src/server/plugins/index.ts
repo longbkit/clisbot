@@ -2,7 +2,7 @@ import type { PluginLifecycle } from "./lifecycle/index.js";
 import path from "node:path";
 import { stat, rm } from "node:fs/promises";
 import type pino from "pino";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import {
   PluginIdSchema,
   type PluginLogEntry,
@@ -14,10 +14,10 @@ import {
   type PluginUpdateProposal,
   type PluginUpdatePreview,
   type PluginUpdateResult,
-} from "@getpaseo/protocol/messages";
-import { parsePluginSourceReference } from "@getpaseo/protocol/plugin-source-reference";
-import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
-import { BUILTIN_PROVIDER_IDS } from "@getpaseo/protocol/provider-manifest";
+} from "@clisbot/protocol/messages";
+import { parsePluginSourceReference } from "@clisbot/protocol/plugin-source-reference";
+import { assertPluginCompatibility } from "@clisbot/protocol/plugin-requirements";
+import { BUILTIN_PROVIDER_IDS } from "@clisbot/protocol/provider-manifest";
 import type { DaemonConfigStore } from "../daemon-config-store.js";
 import { type ManagedPluginCandidate, ManagedPluginSources } from "./managed-source.js";
 import { readPluginManifest } from "./manifest.js";
@@ -43,7 +43,7 @@ interface PluginRuntimePort {
   stopPluginById(pluginId: string): Promise<boolean>;
   stopAll(): Promise<void>;
   subscribe(listener: (pluginId: string, error?: string) => void): () => void;
-  bindPaseoSessionHost(sessionHost: Parameters<PluginRuntime["bindPaseoSessionHost"]>[0]): void;
+  bindClisbotSessionHost(sessionHost: Parameters<PluginRuntime["bindClisbotSessionHost"]>[0]): void;
 }
 
 interface PluginServiceDependencies {
@@ -119,8 +119,10 @@ export class PluginService {
     return () => this.listeners.delete(listener);
   }
 
-  bindPaseoSessionHost(sessionHost: Parameters<PluginRuntime["bindPaseoSessionHost"]>[0]): void {
-    this.runtime.bindPaseoSessionHost(sessionHost);
+  bindClisbotSessionHost(
+    sessionHost: Parameters<PluginRuntime["bindClisbotSessionHost"]>[0],
+  ): void {
+    this.runtime.bindClisbotSessionHost(sessionHost);
   }
 
   getProviderRegistrations(): readonly ProviderRegistration[] {

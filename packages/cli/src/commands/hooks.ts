@@ -1,10 +1,10 @@
 import { Command } from "commander";
-import { resolveHookActivity, type AgentHookActivityState } from "@getpaseo/server/agent-hooks";
+import { resolveHookActivity, type AgentHookActivityState } from "@clisbot/server/agent-hooks";
 
 interface HookEnvironment {
-  PASEO_TERMINAL_ID?: string;
-  PASEO_ACTIVITY_TOKEN?: string;
-  PASEO_TERMINAL_ACTIVITY_URL?: string;
+  CLISBOT_TERMINAL_ID?: string;
+  CLISBOT_ACTIVITY_TOKEN?: string;
+  CLISBOT_TERMINAL_ACTIVITY_URL?: string;
 }
 
 interface HookInput {
@@ -52,9 +52,9 @@ export async function runHooksCommand(
 }
 
 function resolveTarget(env: HookEnvironment) {
-  const terminalId = env.PASEO_TERMINAL_ID;
-  const token = env.PASEO_ACTIVITY_TOKEN;
-  const url = env.PASEO_TERMINAL_ACTIVITY_URL;
+  const terminalId = env.CLISBOT_TERMINAL_ID;
+  const token = env.CLISBOT_ACTIVITY_TOKEN;
+  const url = env.CLISBOT_TERMINAL_ACTIVITY_URL;
 
   if (!terminalId || !token || !url) return null;
   return { terminalId, token, url };

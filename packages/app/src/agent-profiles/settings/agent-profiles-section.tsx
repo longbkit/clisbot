@@ -3,7 +3,7 @@ import { Alert, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { Button } from "@/components/ui/button";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";

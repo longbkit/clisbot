@@ -14,7 +14,7 @@ import {
  * Claude Code announces subagent lifecycle on the SDK stream. This reads those announcements
  * instead of reconstructing them from sidechain frames.
  *
- * Verified on the wire (Claude Code 2.1.220, Paseo's own query options):
+ * Verified on the wire (Claude Code 2.1.220, Clisbot's own query options):
  *
  *   task_started       task_id, tool_use_id, description, subagent_type, task_type
  *   task_updated       task_id, patch.status, patch.is_backgrounded
@@ -463,7 +463,7 @@ export class ClaudeTaskProtocolSource {
    * Effort as reported by a hook firing inside a subagent.
    *
    * This is the only live source: the message stream carries no effort at any depth, and the
-   * value Paseo requested is not necessarily the one that ran, because a model that does not
+   * value Clisbot requested is not necessarily the one that ran, because a model that does not
    * support the requested level is silently downgraded. Hooks report the post-downgrade level.
    *
    * `agent_id` is the same id `task_started` calls `task_id`, so it routes through the table

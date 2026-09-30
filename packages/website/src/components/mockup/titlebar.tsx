@@ -49,8 +49,8 @@ export function TitleBar({ state }: { state: MockupStateId }) {
       className="flex shrink-0 items-center gap-[10px] border-b border-mock-border px-[16px]"
       style={TITLEBAR_STYLE}
     >
-      <span className="truncate text-[13.5px] font-medium text-mock-fg">Paseo homepage</span>
-      <span className="truncate text-[12.5px] text-mock-fg-muted">paseo</span>
+      <span className="truncate text-[13.5px] font-medium text-mock-fg">Clisbot homepage</span>
+      <span className="truncate text-[12.5px] text-mock-fg-muted">clisbot</span>
       <Ellipsis size={14} className="shrink-0 text-mock-fg-muted" />
 
       <span className="flex-1" />

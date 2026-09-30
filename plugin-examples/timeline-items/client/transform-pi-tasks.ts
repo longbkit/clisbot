@@ -1,4 +1,4 @@
-import type { PluginTimelineTransformerContribution } from "@getpaseo/plugin/client";
+import type { PluginTimelineTransformerContribution } from "@clisbot/plugin/client";
 import { z } from "zod";
 import { piTaskListSchema } from "../shared/pi-tasks";
 

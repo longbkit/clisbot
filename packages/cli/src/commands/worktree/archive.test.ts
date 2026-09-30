@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { runArchiveCommandWithDeps } from "./archive.js";
 
 const daemonTarget = { kind: "endpoint" as const, host: "example.test:12345" };
 
 function createFakeDaemonClient(
   overrides: Partial<
-    Pick<DaemonClient, "getPaseoWorktreeList" | "archivePaseoWorktree" | "close">
+    Pick<DaemonClient, "getClisbotWorktreeList" | "archiveClisbotWorktree" | "close">
   > = {},
 ): DaemonClient {
   return {
-    getPaseoWorktreeList: async () => ({
+    getClisbotWorktreeList: async () => ({
       worktrees: [],
       error: null,
       requestId: "req-list",
     }),
-    archivePaseoWorktree: async () => ({
+    archiveClisbotWorktree: async () => ({
       success: true,
       removedAgents: [],
       error: null,
@@ -32,12 +32,12 @@ function createFakeDaemonClient(
 
 describe("runArchiveCommand", () => {
   it("sends scope worktree when archiving by worktree path", async () => {
-    const worktreePath = "/tmp/paseo-home/worktrees/repo/feature";
+    const worktreePath = "/tmp/clisbot-home/worktrees/repo/feature";
     const archiveCalls: Array<{
-      input: Parameters<DaemonClient["archivePaseoWorktree"]>[0];
+      input: Parameters<DaemonClient["archiveClisbotWorktree"]>[0];
     }> = [];
     const fakeClient = createFakeDaemonClient({
-      getPaseoWorktreeList: async () => ({
+      getClisbotWorktreeList: async () => ({
         worktrees: [
           {
             worktreePath,
@@ -49,7 +49,7 @@ describe("runArchiveCommand", () => {
         error: null,
         requestId: "req-list",
       }),
-      archivePaseoWorktree: async (input) => {
+      archiveClisbotWorktree: async (input) => {
         archiveCalls.push({ input });
         return {
           success: true,
@@ -86,12 +86,12 @@ describe("runArchiveCommand", () => {
   });
 
   it("archives by matching branch name when no directory name matches", async () => {
-    const worktreePath = "/tmp/paseo-home/worktrees/repo/feature-branch";
+    const worktreePath = "/tmp/clisbot-home/worktrees/repo/feature-branch";
     const archiveCalls: Array<{
-      input: Parameters<DaemonClient["archivePaseoWorktree"]>[0];
+      input: Parameters<DaemonClient["archiveClisbotWorktree"]>[0];
     }> = [];
     const fakeClient = createFakeDaemonClient({
-      getPaseoWorktreeList: async () => ({
+      getClisbotWorktreeList: async () => ({
         worktrees: [
           {
             worktreePath,
@@ -103,7 +103,7 @@ describe("runArchiveCommand", () => {
         error: null,
         requestId: "req-list",
       }),
-      archivePaseoWorktree: async (input) => {
+      archiveClisbotWorktree: async (input) => {
         archiveCalls.push({ input });
         return {
           success: true,
@@ -132,7 +132,7 @@ describe("runArchiveCommand", () => {
 
   it("throws a CommandError when the worktree is not found", async () => {
     const fakeClient = createFakeDaemonClient({
-      getPaseoWorktreeList: async () => ({
+      getClisbotWorktreeList: async () => ({
         worktrees: [],
         error: null,
         requestId: "req-list",

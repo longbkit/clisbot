@@ -10,7 +10,7 @@ import type {
   AgentStreamEvent,
 } from "../agent/agent-sdk-types.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import {
   canRunRealProvider,
   createRealProviderClient,
@@ -78,7 +78,7 @@ function collectUserMessageEvents(client: DaemonClient, agentId: string): AgentS
 
 describe.each(CONTRACT_CASES)("daemon E2E (real $provider) - user_message contract", (entry) => {
   let canRun = false;
-  let daemon: TestPaseoDaemon | null = null;
+  let daemon: TestClisbotDaemon | null = null;
   let client: DaemonClient | null = null;
   let cwd: string | null = null;
 
@@ -94,7 +94,7 @@ describe.each(CONTRACT_CASES)("daemon E2E (real $provider) - user_message contra
 
     cwd = tmpCwd(entry.provider);
     const logger = pino({ level: "silent" });
-    daemon = await createTestPaseoDaemon({
+    daemon = await createTestClisbotDaemon({
       agentClients: { [entry.provider]: createRealProviderClient(entry.provider, logger) },
       logger,
     });
@@ -124,7 +124,7 @@ describe.each(CONTRACT_CASES)("daemon E2E (real $provider) - user_message contra
         throw new Error(`${entry.title} user-message contract test was not initialized`);
       }
 
-      const prompt = `PASEO_USER_MESSAGE_CONTRACT_${entry.provider.toUpperCase()}. Reply exactly: OK.`;
+      const prompt = `CLISBOT_USER_MESSAGE_CONTRACT_${entry.provider.toUpperCase()}. Reply exactly: OK.`;
       const agent = await client.createAgent({
         cwd,
         title: `${entry.provider}-user-message-contract`,

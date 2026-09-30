@@ -13,7 +13,7 @@ const SEQUENCE_FINAL_KEY = "j";
 /** Record the sequence in Settings → Keyboard shortcuts, through its storage. */
 async function recordCommandCenterSequence(page: Page): Promise<void> {
   await page.addInitScript((overrides) => {
-    localStorage.setItem("@paseo:keyboard-shortcut-overrides", JSON.stringify(overrides));
+    localStorage.setItem("@clisbot:keyboard-shortcut-overrides", JSON.stringify(overrides));
   }, COMMAND_CENTER_SEQUENCE);
 }
 

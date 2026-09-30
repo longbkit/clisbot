@@ -6,7 +6,7 @@ import type { PermissionResult, SDKMessage, SDKUserMessage } from "@anthropic-ai
 
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
 import * as executableUtils from "../../../../executable-resolution/executable-resolution.js";
-import { buildAgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
+import { buildAgentAttentionNotificationPayload } from "@clisbot/protocol/agent-attention-notification";
 import {
   ClaudeAgentClient,
   convertClaudeHistoryEntry,
@@ -23,7 +23,7 @@ import type {
   AgentTimelineItem,
   AgentStreamEvent,
 } from "../../agent-sdk-types.js";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import { buildAgentPrompt, renderPromptAttachmentAsText } from "../../prompt-attachments.js";
 
 interface TestClaudeSession {
@@ -422,7 +422,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
   const logger = createTestLogger();
 
   test("returns hardcoded claude models", async () => {
-    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-empty-"));
+    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-empty-"));
     try {
       const client = new ClaudeAgentClient({
         logger,
@@ -468,7 +468,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
   });
 
   test("preserves the catalog when Claude Code version detection fails", async () => {
-    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-empty-"));
+    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-empty-"));
     try {
       const client = new ClaudeAgentClient({
         logger,
@@ -491,7 +491,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
   });
 
   test("exposes Ultra Code on xhigh-capable Claude models", async () => {
-    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-empty-"));
+    const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-empty-"));
     try {
       const client = new ClaudeAgentClient({
         logger,
@@ -928,7 +928,7 @@ describe("ClaudeAgentSession features", () => {
 
   const issueAttachment: AgentAttachment = {
     type: "forge_issue",
-    mimeType: "application/paseo-forge-issue",
+    mimeType: "application/clisbot-forge-issue",
     forge: "github",
     number: 12,
     title: "Fake issue for QA",
@@ -1638,7 +1638,7 @@ describe("normalizeClaudeAskUserQuestionUpdatedInput", () => {
 
 describe("ClaudeAgentClient.listImportableSessions", () => {
   test("uses the latest native custom title and leaves fixture mtimes unchanged", async () => {
-    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-import-"));
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-import-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
 
@@ -1672,7 +1672,7 @@ describe("ClaudeAgentClient.listImportableSessions", () => {
       await expect(client.listImportableSessions({ limit: 1 })).resolves.toEqual([
         {
           providerHandleId: "native-title-session",
-          cwd: "/tmp/paseo-claude-native-title",
+          cwd: "/tmp/clisbot-claude-native-title",
           title: "My research session",
           firstPromptPreview: "Review this project",
           lastPromptPreview: "Focus on the import flow",
@@ -1694,7 +1694,7 @@ describe("ClaudeAgentClient.listImportableSessions", () => {
   });
 
   test("scopes candidates to the requested cwd before applying the limit", async () => {
-    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-import-"));
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-import-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
 
@@ -1763,14 +1763,14 @@ describe("ClaudeAgentClient.listImportableSessions", () => {
   });
 
   test("shows Claude slash command prompts without transcript tags", async () => {
-    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-import-"));
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-import-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
 
     try {
       const commandSessionId = "session-command-import";
       const argsSessionId = "session-command-args-import";
-      const cwd = "/tmp/paseo-test-claude-import";
+      const cwd = "/tmp/clisbot-test-claude-import";
       const sanitized = cwd.replace(/[\\/._:]/g, "-");
       const projectDir = path.join(tmpConfigDir, "projects", sanitized);
       await fs.mkdir(projectDir, { recursive: true });
@@ -2303,13 +2303,13 @@ describe("ClaudeAgentSession context window usage", () => {
   });
 
   test("deletes the persisted session jsonl on close when persistSession=false", async () => {
-    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-persist-"));
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-persist-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
 
     try {
       const sessionId = "session-ephemeral";
-      const cwd = "/tmp/paseo-test-claude";
+      const cwd = "/tmp/clisbot-test-claude";
       const sanitized = cwd.replace(/[\\/._:]/g, "-");
       const projectDir = path.join(tmpConfigDir, "projects", sanitized);
       await fs.mkdir(projectDir, { recursive: true });
@@ -2369,13 +2369,13 @@ describe("ClaudeAgentSession context window usage", () => {
   });
 
   test("preserves the persisted session jsonl on close when persistSession is undefined", async () => {
-    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-persist-"));
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-persist-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
 
     try {
       const sessionId = "session-persistent";
-      const cwd = "/tmp/paseo-test-claude";
+      const cwd = "/tmp/clisbot-test-claude";
       const sanitized = cwd.replace(/[\\/._:]/g, "-");
       const projectDir = path.join(tmpConfigDir, "projects", sanitized);
       await fs.mkdir(projectDir, { recursive: true });

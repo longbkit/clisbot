@@ -8,4 +8,4 @@ Improved
 Fixed
 - Fixed large and many-file diffs stalling or crashing while opening and scrolling
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

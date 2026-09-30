@@ -1,4 +1,4 @@
-import type { PluginAgentSnapshot, PluginWorkspaceSnapshot } from "@getpaseo/plugin";
+import type { PluginAgentSnapshot, PluginWorkspaceSnapshot } from "@clisbot/plugin";
 import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 
 const workspaceSnapshots = new WeakMap<WorkspaceDescriptor, PluginWorkspaceSnapshot>();

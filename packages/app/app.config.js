@@ -5,11 +5,11 @@ const withAndroidAsyncStorageSize = require("./plugins/with-android-async-storag
 const withAndroidProfileable = require("./plugins/with-android-profileable");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
-const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
+const withAndroidScroll = require("./modules/clisbot-scroll/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
-const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
-const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
+const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
+const isProfileBuild = process.env.CLISBOT_PROFILE_BUILD === "1";
 
 const buildProfile = isFdroidBuild
   ? {
@@ -45,7 +45,7 @@ const buildProfile = isFdroidBuild
           "expo-notifications",
           {
             icon: "./assets/images/notification-icon.png",
-            color: "#20744A",
+            color: "#153B43",
           },
         ],
       ],
@@ -67,8 +67,8 @@ function resolveSecretFile(params) {
 
 const variants = {
   production: {
-    name: "Paseo",
-    packageId: "sh.paseo",
+    name: "Clisbot",
+    packageId: "com.clisbot.app",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_PROD",
       fallbackRelativePath: "./.secrets/google-services.prod.json",
@@ -79,8 +79,8 @@ const variants = {
     }),
   },
   development: {
-    name: "Paseo Debug",
-    packageId: "sh.paseo.debug",
+    name: "Clisbot Debug",
+    packageId: "com.clisbot.app.dev",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_DEBUG",
       fallbackRelativePath: "./.secrets/google-services.debug.json",
@@ -98,11 +98,11 @@ const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
 export default {
   expo: {
     name: variant.name,
-    slug: "voice-mobile",
+    slug: "clisbot",
     version: nativeReleaseVersion.appVersion,
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "paseo",
+    scheme: "clisbot",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
@@ -119,8 +119,9 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        backgroundColor: "#000000",
+        backgroundColor: "#153B43",
         foregroundImage: "./assets/images/android-icon-foreground.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -151,9 +152,10 @@ export default {
           image: "./assets/images/splash-icon.png",
           imageWidth: 200,
           resizeMode: "contain",
-          backgroundColor: "#ffffff",
+          backgroundColor: "#F6F4EF",
           dark: {
-            backgroundColor: "#000000",
+            image: "./assets/images/splash-icon-dark.png",
+            backgroundColor: "#153B43",
           },
         },
       ],
@@ -190,9 +192,9 @@ export default {
       profileBuild: isProfileBuild,
       router: {},
       eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
+        projectId: "9314cc2c-4abe-4637-b1cf-647fbbfbd807",
       },
     },
-    owner: "getpaseo",
+    owner: "lbk-company",
   },
 };

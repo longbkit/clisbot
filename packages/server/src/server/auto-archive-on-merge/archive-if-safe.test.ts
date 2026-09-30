@@ -17,9 +17,9 @@ import { createWorktree, type WorktreeConfig } from "../../utils/worktree.js";
 import type { ForgeService } from "../../../services/forge-service.js";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 
-const CWD = "/tmp/paseo/worktrees/repo/branch";
-const PASEO_HOME = "/tmp/paseo";
-const WORKTREES_ROOT = "/tmp/paseo/worktrees/repo";
+const CWD = "/tmp/clisbot/worktrees/repo/branch";
+const CLISBOT_HOME = "/tmp/clisbot";
+const WORKTREES_ROOT = "/tmp/clisbot/worktrees/repo";
 
 function createPullRequest(
   overrides?: Partial<NonNullable<WorkspaceGitRuntimeSnapshot["forge"]["pullRequest"]>>,
@@ -47,7 +47,7 @@ function createSnapshot(overrides?: {
       mainRepoRoot: "/tmp/repo",
       currentBranch: "feature",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 0, behind: 0 },
@@ -81,7 +81,7 @@ function createLogger(): Logger {
 function createHarness(overrides?: {
   autoArchivedChangeRequestUrl?: string | null;
   snapshot?: WorkspaceGitRuntimeSnapshot;
-  isPaseoOwnedWorktreeCwd?: ArchiveIfSafeDependencies["isPaseoOwnedWorktreeCwd"];
+  isClisbotOwnedWorktreeCwd?: ArchiveIfSafeDependencies["isClisbotOwnedWorktreeCwd"];
   archiveByScope?: ArchiveIfSafeDependencies["archiveByScope"];
 }) {
   const getSnapshot = vi.fn(async () =>
@@ -91,7 +91,7 @@ function createHarness(overrides?: {
     getSnapshot,
   } as unknown as AutoArchiveArchiveOptions["workspaceGitService"];
   const options: AutoArchiveArchiveOptions = {
-    paseoHome: PASEO_HOME,
+    clisbotHome: CLISBOT_HOME,
     daemonConfigStore: {
       get: () => ({ autoArchiveAfterMerge: true }),
     } as unknown as AutoArchiveArchiveOptions["daemonConfigStore"],
@@ -119,18 +119,18 @@ function createHarness(overrides?: {
           removedDirectory: false,
         }) satisfies ArchiveResult),
   ) as unknown as ArchiveIfSafeDependencies["archiveByScope"];
-  const isPaseoOwnedWorktreeCwd = vi.fn(
-    overrides?.isPaseoOwnedWorktreeCwd ??
+  const isClisbotOwnedWorktreeCwd = vi.fn(
+    overrides?.isClisbotOwnedWorktreeCwd ??
       (async () => ({
         allowed: true,
         repoRoot: "/tmp/repo",
         worktreeRoot: WORKTREES_ROOT,
         worktreePath: CWD,
       })),
-  ) as unknown as ArchiveIfSafeDependencies["isPaseoOwnedWorktreeCwd"];
+  ) as unknown as ArchiveIfSafeDependencies["isClisbotOwnedWorktreeCwd"];
   const deps: ArchiveIfSafeDependencies = {
     archiveByScope,
-    isPaseoOwnedWorktreeCwd,
+    isClisbotOwnedWorktreeCwd,
     killTerminalsForWorkspace: vi.fn(),
   };
   const log = createLogger();
@@ -172,11 +172,11 @@ function createGitRepo(): { tempDir: string; repoDir: string } {
   const repoDir = path.join(tempDir, "repo");
   mkdirSync(repoDir, { recursive: true });
   execFileSync("git", ["init", "-b", "main"], { cwd: repoDir, stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], {
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], {
     cwd: repoDir,
     stdio: "pipe",
   });
@@ -187,9 +187,9 @@ function createGitRepo(): { tempDir: string; repoDir: string } {
   return { tempDir, repoDir };
 }
 
-async function createPaseoOwnedWorktree(
+async function createClisbotOwnedWorktree(
   repoDir: string,
-  paseoHome: string,
+  clisbotHome: string,
   worktreeSlug: string,
 ): Promise<WorktreeConfig> {
   return createWorktree({
@@ -201,7 +201,7 @@ async function createPaseoOwnedWorktree(
       branchName: worktreeSlug,
     },
     runSetup: false,
-    paseoHome,
+    clisbotHome,
   });
 }
 
@@ -246,7 +246,7 @@ function createGitHubServiceStub(): ForgeService {
 }
 
 function createRealOutcomeHarness(input: {
-  paseoHome: string;
+  clisbotHome: string;
   repoDir: string;
   worktreePath: string;
   activeWorkspaces: ActiveWorkspaceRef[];
@@ -260,7 +260,7 @@ function createRealOutcomeHarness(input: {
   vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
   const options: AutoArchiveArchiveOptions = {
-    paseoHome: input.paseoHome,
+    clisbotHome: input.clisbotHome,
     daemonConfigStore: {
       get: () => ({ autoArchiveAfterMerge: true }),
     } as unknown as AutoArchiveArchiveOptions["daemonConfigStore"],
@@ -274,7 +274,7 @@ function createRealOutcomeHarness(input: {
             mainRepoRoot: input.repoDir,
             currentBranch: "feature",
             remoteUrl: "https://github.com/acme/repo.git",
-            isPaseoOwnedWorktree: true,
+            isClisbotOwnedWorktree: true,
             isDirty: false,
             baseRef: "main",
             aheadBehind: { ahead: 0, behind: 0 },
@@ -366,7 +366,7 @@ describe("archiveIfSafe", () => {
 
     await runArchiveIfSafe(harness);
 
-    expect(harness.deps.isPaseoOwnedWorktreeCwd).not.toHaveBeenCalled();
+    expect(harness.deps.isClisbotOwnedWorktreeCwd).not.toHaveBeenCalled();
     expect(harness.deps.archiveByScope).not.toHaveBeenCalled();
   });
 
@@ -377,7 +377,7 @@ describe("archiveIfSafe", () => {
 
     await runArchiveIfSafe(harness);
 
-    expect(harness.deps.isPaseoOwnedWorktreeCwd).not.toHaveBeenCalled();
+    expect(harness.deps.isClisbotOwnedWorktreeCwd).not.toHaveBeenCalled();
     expect(harness.deps.archiveByScope).not.toHaveBeenCalled();
   });
 
@@ -391,15 +391,15 @@ describe("archiveIfSafe", () => {
     expect(harness.deps.archiveByScope).toHaveBeenCalledTimes(1);
   });
 
-  test("does nothing when the cwd is not a Paseo-owned worktree", async () => {
+  test("does nothing when the cwd is not a Clisbot-owned worktree", async () => {
     const harness = createHarness({
-      isPaseoOwnedWorktreeCwd: async () => ({ allowed: false, worktreePath: CWD }),
+      isClisbotOwnedWorktreeCwd: async () => ({ allowed: false, worktreePath: CWD }),
     });
 
     await runArchiveIfSafe(harness);
 
-    expect(harness.deps.isPaseoOwnedWorktreeCwd).toHaveBeenCalledWith(CWD, {
-      paseoHome: PASEO_HOME,
+    expect(harness.deps.isClisbotOwnedWorktreeCwd).toHaveBeenCalledWith(CWD, {
+      clisbotHome: CLISBOT_HOME,
     });
     expect(harness.deps.archiveByScope).not.toHaveBeenCalled();
   });
@@ -419,7 +419,7 @@ describe("archiveIfSafe", () => {
     );
   });
 
-  test("archives a clean Paseo-owned worktree after merge", async () => {
+  test("archives a clean Clisbot-owned worktree after merge", async () => {
     const harness = createHarness();
 
     await runArchiveIfSafe(harness);
@@ -427,7 +427,7 @@ describe("archiveIfSafe", () => {
     expect(harness.deps.archiveByScope).toHaveBeenCalledTimes(1);
     expect(harness.deps.archiveByScope).toHaveBeenCalledWith(
       expect.objectContaining({
-        paseoHome: PASEO_HOME,
+        clisbotHome: CLISBOT_HOME,
         workspaceGitService: harness.options.workspaceGitService,
       }),
       {
@@ -505,14 +505,14 @@ describe("archiveIfSafe", () => {
 
   test("real outcome: keeps sibling workspace and directory on last reference", async () => {
     const { tempDir, repoDir } = createGitRepo();
-    const paseoHome = path.join(tempDir, ".paseo");
-    const worktree = await createPaseoOwnedWorktree(repoDir, paseoHome, "merged-with-sibling");
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const worktree = await createClisbotOwnedWorktree(repoDir, clisbotHome, "merged-with-sibling");
     const workspaceA = "ws-merged-with-sibling-a";
     const workspaceB = "ws-merged-with-sibling-b";
     const archivedWorkspaceIds = new Set<string>();
 
     const harness = createRealOutcomeHarness({
-      paseoHome,
+      clisbotHome,
       repoDir,
       worktreePath: worktree.worktreePath,
       activeWorkspaces: [
@@ -536,13 +536,13 @@ describe("archiveIfSafe", () => {
 
   test("real outcome: removes directory when no sibling workspace remains", async () => {
     const { tempDir, repoDir } = createGitRepo();
-    const paseoHome = path.join(tempDir, ".paseo");
-    const worktree = await createPaseoOwnedWorktree(repoDir, paseoHome, "merged-last-ref");
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const worktree = await createClisbotOwnedWorktree(repoDir, clisbotHome, "merged-last-ref");
     const workspaceA = "ws-merged-last-ref";
     const archivedWorkspaceIds = new Set<string>();
 
     const harness = createRealOutcomeHarness({
-      paseoHome,
+      clisbotHome,
       repoDir,
       worktreePath: worktree.worktreePath,
       activeWorkspaces: [{ workspaceId: workspaceA, cwd: worktree.worktreePath, kind: "worktree" }],
@@ -562,8 +562,12 @@ describe("archiveIfSafe", () => {
 
   test("real outcome: an unarchived workspace is not archived again for the same merged PR", async () => {
     const { tempDir, repoDir } = createGitRepo();
-    const paseoHome = path.join(tempDir, ".paseo");
-    const worktree = await createPaseoOwnedWorktree(repoDir, paseoHome, "merged-then-unarchived");
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const worktree = await createClisbotOwnedWorktree(
+      repoDir,
+      clisbotHome,
+      "merged-then-unarchived",
+    );
     const workspace = {
       workspaceId: "ws-merged-then-unarchived",
       cwd: worktree.worktreePath,
@@ -576,7 +580,7 @@ describe("archiveIfSafe", () => {
     };
     const archivedWorkspaceIds = new Set<string>();
     const harness = createRealOutcomeHarness({
-      paseoHome,
+      clisbotHome,
       repoDir,
       worktreePath: worktree.worktreePath,
       activeWorkspaces: [workspace, sibling],

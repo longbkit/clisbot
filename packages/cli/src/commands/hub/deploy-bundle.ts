@@ -3,9 +3,9 @@ import path from "node:path";
 import YAML from "yaml";
 import { HubCommandError } from "./error.js";
 
-const HUB_RESOURCE_PATH = ".paseo/hub.yml";
-const LEGACY_TOML_PATH = ".paseo/hub.toml";
-const WORKFLOW_DIRECTORY = ".paseo/workflows";
+const HUB_RESOURCE_PATH = ".clisbot/hub.yml";
+const LEGACY_TOML_PATH = ".clisbot/hub.toml";
+const WORKFLOW_DIRECTORY = ".clisbot/workflows";
 const PARTIAL_DIRECTORY = `${WORKFLOW_DIRECTORY}/partials`;
 const PROJECT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 

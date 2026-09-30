@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { QueryClient } from "@tanstack/react-query";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { assertPluginCompatibility } from "@clisbot/protocol/plugin-requirements";
 import { resolveAppVersion } from "@/utils/app-version";
 import { createPluginClientRuntime } from "./client-runtime";
 import { runPluginClientBundle, type PluginClientRuntime } from "./evaluate";
@@ -52,7 +52,7 @@ export class PluginRegistry {
           plugin.id !== options.replacePluginId &&
           plugin.id === entry.id &&
           plugin.clientBundle === entry.clientBundle &&
-          plugin.requirements?.paseo === entry.requirements?.paseo,
+          plugin.requirements?.clisbot === entry.requirements?.clisbot,
       );
       return existing ? [existing] : [];
     });
@@ -101,9 +101,9 @@ export class PluginRegistry {
           this.publish(),
         );
         Object.assign(installation, evaluated);
-        const paseo = runtime.paseo;
+        const clisbot = runtime.clisbot;
         installation.cleanup = async () => {
-          const results = await Promise.allSettled([paseo.dispose(), evaluated.cleanup()]);
+          const results = await Promise.allSettled([clisbot.dispose(), evaluated.cleanup()]);
           const failures = results.filter((result) => result.status === "rejected");
           if (failures.length)
             throw new AggregateError(
@@ -115,7 +115,7 @@ export class PluginRegistry {
         return [installation];
       } catch (error) {
         lifetime?.abort();
-        void runtime?.paseo
+        void runtime?.clisbot
           .dispose()
           .catch((failure) => console.warn(`[Plugins] API cleanup failed for ${key}`, failure));
         this.evaluationErrors.set(key, error instanceof Error ? error.message : String(error));

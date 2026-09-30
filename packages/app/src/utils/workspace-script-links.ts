@@ -1,8 +1,8 @@
-import { parseHostPort } from "@getpaseo/protocol/daemon-endpoints";
-import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
+import { parseHostPort } from "@clisbot/protocol/daemon-endpoints";
+import type { WorkspaceScriptPayload } from "@clisbot/protocol/messages";
 import type { ActiveConnection } from "@/runtime/host-runtime";
 
-export type WorkspaceScriptLinkKind = "public" | "paseo" | "direct";
+export type WorkspaceScriptLinkKind = "public" | "clisbot" | "direct";
 
 export interface WorkspaceScriptLinkTarget {
   kind: WorkspaceScriptLinkKind;
@@ -85,7 +85,7 @@ export function resolveWorkspaceScriptLink(input: {
 
   const targets: WorkspaceScriptLinkTarget[] = [];
   addTarget(targets, "public", publicProxyUrl);
-  addTarget(targets, "paseo", localProxyUrl);
+  addTarget(targets, "clisbot", localProxyUrl);
   addTarget(targets, "direct", buildDirectServiceUrl(activeConnection, script.port));
 
   return { primary: targets[0] ?? null, targets };

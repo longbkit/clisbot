@@ -8,7 +8,7 @@ import {
   upsertCreatedTerminalPayload,
   type ListTerminalsPayload,
 } from "@/screens/workspace/terminals/state";
-import type { CreateTerminalResponse } from "@getpaseo/protocol/messages";
+import type { CreateTerminalResponse } from "@clisbot/protocol/messages";
 
 function listedTerminal(id: string): ListTerminalsPayload["terminals"][number] {
   return { id, name: id, title: id };

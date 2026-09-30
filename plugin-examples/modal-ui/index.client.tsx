@@ -1,4 +1,4 @@
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { ModalExamples } from "./client/examples";
 
 export default function contribute(plugin: PluginClientContext) {

@@ -3,7 +3,7 @@ import {
   BUILTIN_PROVIDER_ICON_NAMES,
   KNOWN_PROVIDER_ICON_NAMES,
   TERMINAL_PROFILE_ICON_NAMES,
-} from "@getpaseo/protocol/provider-icon-names";
+} from "@clisbot/protocol/provider-icon-names";
 import { ACP_PROVIDER_CATALOG } from "@/data/acp-provider-catalog";
 import { replaceProviderSnapshotIcons, resolveProviderIconName } from "./provider-icon-name";
 

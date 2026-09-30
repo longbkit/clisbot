@@ -1,6 +1,6 @@
 # Settings example
 
-Install this directory with `paseo plugin install /absolute/path/to/plugin-examples/settings`.
+Install this directory with `clisbot plugin install /absolute/path/to/plugin-examples/settings`.
 Open Settings → Plugins → settings-example → Display, or run **Configure agent monitor** in Command Center.
 
 The select and switch save immediately. The title editor keeps a draft and its original revision,

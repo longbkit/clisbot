@@ -390,10 +390,10 @@ describe("OpenCode v2 session lifecycle", () => {
           runtime: harness.runtime,
           settings: {
             env: {
-              PASEO_ENV_TEST: "configured",
-              PASEO_AGENT_ID: "configured",
+              CLISBOT_ENV_TEST: "configured",
+              CLISBOT_AGENT_ID: "configured",
               ELECTRON_RUN_AS_NODE: "1",
-              PASEO_SUPERVISED: "1",
+              CLISBOT_SUPERVISED: "1",
               CLAUDECODE: "1",
             },
           },
@@ -401,19 +401,19 @@ describe("OpenCode v2 session lifecycle", () => {
     );
     const config = { provider: "opencode" as const, cwd: "/tmp/project" };
     const launches = ["first", "second"].map((id) => ({
-      env: { PASEO_AGENT_ID: id, PASEO_AGENT_CWD: config.cwd },
+      env: { CLISBOT_AGENT_ID: id, CLISBOT_AGENT_CWD: config.cwd },
     }));
     const assertEnvironment = (index: number) => {
       const env = environments.get([first, second][index].info.id);
       expect(env?.PATH).toBe(process.env.PATH);
-      expect(env).toMatchObject({ ...launches[index].env, PASEO_ENV_TEST: "configured" });
+      expect(env).toMatchObject({ ...launches[index].env, CLISBOT_ENV_TEST: "configured" });
       expect(env?.USER).toBe(process.env.USER);
       for (const key of [
         "ELECTRON_RUN_AS_NODE",
-        "PASEO_SUPERVISED",
+        "CLISBOT_SUPERVISED",
         "CLAUDECODE",
         "ESBUILD_BINARY_PATH",
-        "PASEO_NODE_ENV",
+        "CLISBOT_NODE_ENV",
       ]) {
         expect(env).not.toHaveProperty(key);
       }
@@ -540,13 +540,13 @@ describe("OpenCode v2 session lifecycle", () => {
           {
             type: "tool",
             id: "output",
-            name: "paseo_structured_output",
+            name: "clisbot_structured_output",
             time: { created: 2 },
             state: {
               status: "completed",
               input: { value: { answer: 42 } },
               content: [{ type: "text", text: "accepted" }],
-              metadata: { paseoStructuredOutput: { answer: 42 } },
+              metadata: { clisbotStructuredOutput: { answer: 42 } },
             },
           },
         ],
@@ -834,14 +834,14 @@ describe("OpenCode v2 session lifecycle", () => {
     const client = new OpenCodeV2AgentClient({ logger: createTestLogger(), runtime });
     const session = await client.createSession(
       { provider: "opencode", cwd: "/tmp/project" },
-      { agentId: "agent", env: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" } },
+      { agentId: "agent", env: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" } },
     );
     try {
       expect(acquires).toEqual([{}]);
       expect(harness.environments).toMatchObject([
         {
           sessionID: "session",
-          variables: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" },
+          variables: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" },
         },
       ]);
     } finally {
@@ -866,7 +866,7 @@ describe("OpenCode v2 session lifecycle", () => {
         cwd: "/tmp/project",
         mcpServers: { custom: { type: "stdio", command: "custom", args: [] } },
       },
-      { agentId: "agent", env: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" } },
+      { agentId: "agent", env: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" } },
     );
     try {
       expect(acquires).toHaveLength(1);

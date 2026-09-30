@@ -31,7 +31,7 @@ import type {
   ToolCallTimelineItem,
 } from "../agent-sdk-types.js";
 import { importSessionFromPersistence } from "../provider-session-import.js";
-import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
+import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 
 export const MOCK_LOAD_TEST_PROVIDER_ID = "mock";
 export const MOCK_LOAD_TEST_DEFAULT_MODEL_ID = "five-minute-stream";
@@ -620,7 +620,7 @@ function buildCycleQueue(turnId: string, cycle: number): CycleEvent[] {
   const shellDetail: ToolCallDetail = {
     type: "shell",
     command: "node scripts/simulate-stream-burst.mjs",
-    cwd: "/tmp/paseo-mock-load",
+    cwd: "/tmp/clisbot-mock-load",
     output:
       "[burst] tick 1 userIsAtBottom=true\n[burst] tick 2 userIsAtBottom=true\n[burst] drag-start isDragging=true\n[burst] tick 3 suppressed\n[burst] drag-end isDragging=false\n",
     exitCode: 0,
@@ -1159,7 +1159,7 @@ export class MockLoadTestAgentSession implements AgentSession {
       const detail: ToolCallDetail = {
         type: "shell",
         command: "sleep 5",
-        cwd: "/tmp/paseo-mock-load",
+        cwd: "/tmp/clisbot-mock-load",
       };
       this.emitTimeline(
         turn.turnId,

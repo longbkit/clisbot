@@ -392,7 +392,7 @@ export function createLoggedNdJsonStream(
 
 // Lets a provider that publishes its slash commands through a vendor-specific
 // ACP extension notification (rather than the standard
-// `available_commands_update` session update) translate that payload into Paseo
+// `available_commands_update` session update) translate that payload into Clisbot
 // slash commands, without the generic ACP session/client carrying any vendor
 // knowledge. Return the parsed commands (possibly empty) for a notification this
 // provider owns, or null to ignore notifications it does not handle.
@@ -1410,7 +1410,7 @@ export class ACPAgentClient implements AgentClient {
               this.clientCapabilityMeta,
               this.clientCapabilities,
             ),
-            clientInfo: { name: "Paseo", version: "dev" },
+            clientInfo: { name: "Clisbot", version: "dev" },
           }),
           transport.spawnError,
           ...(initializeTimeoutPromise ? [initializeTimeoutPromise] : []),
@@ -2482,7 +2482,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       }
     }
 
-    // Match Zed acp.rs:3189-3220 when Paseo is not handling the request locally.
+    // Match Zed acp.rs:3189-3220 when Clisbot is not handling the request locally.
     const requestId = randomUUID();
     let toolSnapshot =
       this.toolCalls.get(params.toolCall.toolCallId) ??
@@ -2773,7 +2773,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
             this.clientCapabilityMeta,
             this.clientCapabilities,
           ),
-          clientInfo: { name: "Paseo", version: "dev" },
+          clientInfo: { name: "Clisbot", version: "dev" },
         }),
         spawnError,
       ]),
@@ -2877,9 +2877,9 @@ export class ACPAgentSession implements AgentSession, ACPClient {
 
   /**
    * A stored feature value is a preference carried over from whichever model the user
-   * last configured, so the session it lands on may have no such option. Paseo's own
+   * last configured, so the session it lands on may have no such option. Clisbot's own
    * guard says so when the session's options are accurate. A model switch answers with
-   * an empty response, leaving Paseo holding the previous model's options, and then the
+   * an empty response, leaving Clisbot holding the previous model's options, and then the
    * provider is the one that rejects the write as invalid params. Outside those two
    * cases the write failed for a reason the user needs to see.
    */

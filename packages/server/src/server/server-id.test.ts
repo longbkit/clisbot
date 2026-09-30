@@ -17,7 +17,7 @@ const MODE_MASK = 0o777;
 const PERMISSIVE_FILE_MODE = 0o644;
 
 function tmpHome(): string {
-  return mkdtempSync(path.join(tmpdir(), "paseo-server-id-"));
+  return mkdtempSync(path.join(tmpdir(), "clisbot-server-id-"));
 }
 
 function modeOf(filePath: string): number {
@@ -30,7 +30,7 @@ describe("getOrCreateServerId", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.PASEO_SERVER_ID;
+    delete process.env.CLISBOT_SERVER_ID;
     home = tmpHome();
   });
 
@@ -39,7 +39,7 @@ describe("getOrCreateServerId", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it("creates and persists a stable id per PASEO_HOME", () => {
+  it("creates and persists a stable id per CLISBOT_HOME", () => {
     const first = getOrCreateServerId(home);
     const second = getOrCreateServerId(home);
     expect(first).toBe(second);
@@ -50,8 +50,8 @@ describe("getOrCreateServerId", () => {
     expect(readFileSync(idPath, "utf8").trim()).toBe(first);
   });
 
-  it("respects and persists PASEO_SERVER_ID override", () => {
-    process.env.PASEO_SERVER_ID = "test-daemon-id";
+  it("respects and persists CLISBOT_SERVER_ID override", () => {
+    process.env.CLISBOT_SERVER_ID = "test-daemon-id";
     const id = getOrCreateServerId(home);
     expect(id).toBe("test-daemon-id");
 
@@ -78,7 +78,7 @@ describe("getOrCreateServerId", () => {
 
     it("repairs existing server-id permissions when using an env override", () => {
       const idPath = path.join(home, "server-id");
-      process.env.PASEO_SERVER_ID = "test-daemon-id";
+      process.env.CLISBOT_SERVER_ID = "test-daemon-id";
       writeFileSync(idPath, "srv_existing\n", { mode: PERMISSIVE_FILE_MODE });
       chmodSync(idPath, PERMISSIVE_FILE_MODE);
 

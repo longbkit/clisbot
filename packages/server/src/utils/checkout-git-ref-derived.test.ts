@@ -31,7 +31,7 @@ function seedFeatureCheckout(): {
   cwd: string;
   facts: Extract<CheckoutSnapshotFacts, { isGit: true }>;
 } {
-  const cwd = mkdtempSync(join(tmpdir(), "paseo-ref-derived-"));
+  const cwd = mkdtempSync(join(tmpdir(), "clisbot-ref-derived-"));
   cleanupPaths.push(cwd);
   git(cwd, ["init", "-b", "main"]);
   git(cwd, ["config", "user.email", "repro@example.com"]);
@@ -55,7 +55,7 @@ function seedFeatureCheckout(): {
       remoteUrl: "https://example.com/repo.git",
       absoluteGitDir: join(cwd, ".git"),
       gitCommonDir: join(cwd, ".git"),
-      paseoWorktree: { isPaseoOwnedWorktree: false },
+      clisbotWorktree: { isClisbotOwnedWorktree: false },
       storedBaseRef: null,
       resolvedBaseRef: "main",
       mainRepoRoot: null,
@@ -75,7 +75,7 @@ function seedMainCheckout(): {
   cwd: string;
   facts: Extract<CheckoutSnapshotFacts, { isGit: true }>;
 } {
-  const cwd = mkdtempSync(join(tmpdir(), "paseo-ref-derived-main-"));
+  const cwd = mkdtempSync(join(tmpdir(), "clisbot-ref-derived-main-"));
   cleanupPaths.push(cwd);
   git(cwd, ["init", "-b", "main"]);
   git(cwd, ["config", "user.email", "repro@example.com"]);
@@ -97,7 +97,7 @@ function seedMainCheckout(): {
       remoteUrl: "https://example.com/repo.git",
       absoluteGitDir: join(cwd, ".git"),
       gitCommonDir: join(cwd, ".git"),
-      paseoWorktree: { isPaseoOwnedWorktree: false },
+      clisbotWorktree: { isClisbotOwnedWorktree: false },
       storedBaseRef: null,
       resolvedBaseRef: "main",
       mainRepoRoot: null,

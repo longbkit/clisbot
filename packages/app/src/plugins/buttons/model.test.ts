@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { PluginButton } from "@getpaseo/plugin/client";
+import type { PluginButton } from "@clisbot/plugin/client";
 import type { InstalledPlugin } from "../types";
 import { PluginButtonStore, buttonMatches } from "./model";
 

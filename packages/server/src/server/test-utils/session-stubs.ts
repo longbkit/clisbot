@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CreationService } from "../creation/index.js";
 
-import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
+import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 
 import type { ProviderSnapshotEntry } from "../agent/agent-sdk-types.js";
 import type { ProviderSnapshot } from "../agent/provider-snapshot-manager.js";
@@ -15,7 +15,7 @@ import {
   ProviderSnapshotManager,
 } from "../agent/provider-snapshot-manager.js";
 import type { SessionOptions } from "../session.js";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { asInternals, createStub } from "./class-mocks.js";
 
 // ---------------------------------------------------------------------------

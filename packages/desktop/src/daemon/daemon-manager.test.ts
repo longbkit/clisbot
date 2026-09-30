@@ -7,7 +7,7 @@ import { DEFAULT_DESKTOP_SETTINGS } from "../settings/desktop-settings";
 import { createDaemonCommandHandlers } from "./daemon-manager";
 
 const mocks = vi.hoisted(() => ({
-  paseoHome: "",
+  clisbotHome: "",
   settings: {
     releaseChannel: "stable",
     daemon: {
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("electron", () => ({
   app: {
-    getPath: vi.fn(() => mocks.paseoHome),
+    getPath: vi.fn(() => mocks.clisbotHome),
     getVersion: vi.fn(() => "1.2.3"),
     isPackaged: true,
   },
@@ -51,9 +51,9 @@ vi.mock("electron-log/main", () => ({
   },
 }));
 
-vi.mock("@getpaseo/server/daemon-control", async (importOriginal) => ({
+vi.mock("@clisbot/server/daemon-control", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  resolvePaseoHome: () => mocks.paseoHome,
+  resolveClisbotHome: () => mocks.clisbotHome,
   spawnProcess: mocks.spawnProcess,
 }));
 
@@ -68,7 +68,7 @@ vi.mock("../settings/desktop-settings-electron.js", () => ({
 vi.mock("./runtime-paths.js", () => ({
   createNodeEntrypointInvocation: mocks.createNodeEntrypointInvocation,
   resolveDaemonRunnerEntrypoint: vi.fn(() => ({
-    entryPath: path.join(mocks.paseoHome, "daemon.js"),
+    entryPath: path.join(mocks.clisbotHome, "daemon.js"),
     execArgv: [],
   })),
 }));
@@ -82,8 +82,8 @@ describe("daemon-manager commands", () => {
   let fixtureRoot: string;
 
   beforeEach(() => {
-    fixtureRoot = mkdtempSync(path.join(tmpdir(), "paseo daemon manager "));
-    mocks.paseoHome = path.join(fixtureRoot, "home");
+    fixtureRoot = mkdtempSync(path.join(tmpdir(), "clisbot daemon manager "));
+    mocks.clisbotHome = path.join(fixtureRoot, "home");
     mocks.appLogPath = path.join(fixtureRoot, "main.log");
     mocks.settings = DEFAULT_DESKTOP_SETTINGS;
     mocks.runExternalCliJsonCommand.mockReset();
@@ -126,9 +126,9 @@ describe("daemon-manager commands", () => {
   });
 
   it("returns a local credential only for its live managed daemon listen", async () => {
-    mkdirSync(mocks.paseoHome);
+    mkdirSync(mocks.clisbotHome);
     const token = "a".repeat(43);
-    writeFileSync(path.join(mocks.paseoHome, "local-credential"), `${token}\n`, { mode: 0o600 });
+    writeFileSync(path.join(mocks.clisbotHome, "local-credential"), `${token}\n`, { mode: 0o600 });
     const lock = {
       pid: process.pid,
       startedAt: new Date().toISOString(),
@@ -137,7 +137,7 @@ describe("daemon-manager commands", () => {
       listen: "127.0.0.1:6799",
       desktopManaged: true,
     };
-    const lockPath = path.join(mocks.paseoHome, "paseo.pid");
+    const lockPath = path.join(mocks.clisbotHome, "clisbot.pid");
     writeFileSync(lockPath, JSON.stringify(lock));
     const handler = createDaemonCommandHandlers().desktop_local_credential;
     expect(await handler({ listen: "localhost:6799" })).toBe(token);

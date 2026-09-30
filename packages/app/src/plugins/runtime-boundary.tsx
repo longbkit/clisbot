@@ -1,9 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { PaseoApiProvider, PluginRpcProvider } from "@getpaseo/plugin/client/host";
+import { ClisbotApiProvider, PluginRpcProvider } from "@clisbot/plugin/client/host";
 import type { ReactNode } from "react";
 import type { InstalledPlugin } from "./types";
 import { usePluginSurfaceRuntime } from "./surface-runtime";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 
 export function PluginRuntimeBoundary({
   plugin,
@@ -18,9 +18,9 @@ export function PluginRuntimeBoundary({
   if (!runtime) return null;
   return (
     <QueryClientProvider client={plugin.queryClient}>
-      <PaseoApiProvider paseo={runtime.paseo}>
+      <ClisbotApiProvider clisbot={runtime.clisbot}>
         <PluginRpcProvider invoke={runtime.invoke}>{children}</PluginRpcProvider>
-      </PaseoApiProvider>
+      </ClisbotApiProvider>
     </QueryClientProvider>
   );
 }

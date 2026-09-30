@@ -79,14 +79,14 @@ describe("createMarkdownClipboardContent", () => {
   it("preserves assistant file links without allowing unsafe link schemes", () => {
     const content = createMarkdownClipboardContent(
       [
-        "[file](file:///tmp/paseo%20notes.md#L4)",
+        "[file](file:///tmp/clisbot%20notes.md#L4)",
         '[javascript](javascript:alert("x"))',
         "[data](data:text/html,unsafe)",
         "[vbscript](vbscript:msgbox(1))",
       ].join("\n\n"),
     );
 
-    expect(content.html).toContain('<a href="file:///tmp/paseo%20notes.md#L4">file</a>');
+    expect(content.html).toContain('<a href="file:///tmp/clisbot%20notes.md#L4">file</a>');
     expect(content.html).not.toMatch(/href="(?:javascript|data|vbscript):/);
   });
 });

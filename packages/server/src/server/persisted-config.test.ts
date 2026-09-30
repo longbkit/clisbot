@@ -15,7 +15,7 @@ const MODE_MASK = 0o777;
 const PERMISSIVE_FILE_MODE = 0o644;
 
 function createTempHome(): string {
-  return mkdtempSync(path.join(tmpdir(), "paseo-config-"));
+  return mkdtempSync(path.join(tmpdir(), "clisbot-config-"));
 }
 
 function modeOf(filePath: string): number {
@@ -120,11 +120,11 @@ describe("PersistedConfigSchema worktrees config", () => {
   test("accepts optional worktree root", () => {
     const parsed = PersistedConfigSchema.parse({
       worktrees: {
-        root: "/mnt/fast/paseo-worktrees",
+        root: "/mnt/fast/clisbot-worktrees",
       },
     });
 
-    expect(parsed.worktrees?.root).toBe("/mnt/fast/paseo-worktrees");
+    expect(parsed.worktrees?.root).toBe("/mnt/fast/clisbot-worktrees");
   });
 
   test("accepts service port allocation", () => {
@@ -663,7 +663,7 @@ describe("PersistedConfigSchema voice mode config", () => {
 });
 
 describe("loadPersistedConfig", () => {
-  test("materializes relay disabled for a new Paseo home", () => {
+  test("materializes relay disabled for a new Clisbot home", () => {
     const home = createTempHome();
     try {
       const config = loadPersistedConfig(home);
@@ -681,10 +681,10 @@ describe("loadPersistedConfig", () => {
         configPath,
         `${JSON.stringify(
           {
-            $schema: "https://paseo.sh/schemas/paseo.config.v1.json",
+            $schema: "https://clisbot.com/schemas/clisbot.config.v1.json",
             version: 1,
             daemon: {
-              listen: "127.0.0.1:6767",
+              listen: "127.0.0.1:6868",
               hostnames: ["localhost", ".localhost"],
               mcp: { enabled: true },
             },
@@ -696,7 +696,7 @@ describe("loadPersistedConfig", () => {
 
       const config = loadPersistedConfig(home);
 
-      expect(config.daemon?.listen).toBe("127.0.0.1:6767");
+      expect(config.daemon?.listen).toBe("127.0.0.1:6868");
       expect(config.daemon?.hostnames).toEqual(["localhost", ".localhost"]);
       expect(config.daemon?.mcp?.enabled).toBe(true);
     } finally {
@@ -740,14 +740,14 @@ describe("loadPersistedConfig", () => {
 describe("config.json saved with a UTF-8 byte order mark", () => {
   // Windows Notepad writes this shape: a BOM, then CRLF line endings.
   const notepadConfig =
-    '﻿{\r\n  "version": 1,\r\n  "daemon": { "listen": "127.0.0.1:6767" }\r\n}\r\n';
+    '﻿{\r\n  "version": 1,\r\n  "daemon": { "listen": "127.0.0.1:6868" }\r\n}\r\n';
 
   test("loadPersistedConfig reads it", () => {
     const home = createTempHome();
     try {
       writeFileSync(path.join(home, "config.json"), notepadConfig);
 
-      expect(loadPersistedConfig(home).daemon?.listen).toBe("127.0.0.1:6767");
+      expect(loadPersistedConfig(home).daemon?.listen).toBe("127.0.0.1:6868");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
@@ -758,7 +758,7 @@ describe("config.json saved with a UTF-8 byte order mark", () => {
     try {
       writeFileSync(path.join(home, "config.json"), notepadConfig);
 
-      expect(readPersistedConfig(home).daemon?.listen).toBe("127.0.0.1:6767");
+      expect(readPersistedConfig(home).daemon?.listen).toBe("127.0.0.1:6868");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

@@ -5,4 +5,4 @@ Fixed
 - Fixed OpenCode v2 patch edits from GPT models showing as a raw Patch card instead of an edit diff
 - Fixed completed OpenCode v2 edits showing no diff
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

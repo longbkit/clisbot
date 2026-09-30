@@ -9,10 +9,10 @@ describe("OpenCode v2 permission rules", () => {
         provider: "opencode",
         cwd: "/tmp/project",
         providerOptions: { permission: { bash: { pwd: "allow" }, task: "ask" } },
-        toolPolicy: { preapproved: [{ server: "paseo.host", tool: "read/info" }] },
+        toolPolicy: { preapproved: [{ server: "clisbot.host", tool: "read/info" }] },
       }),
     ).toEqual([
-      { action: "paseo_host_read_info", resource: "*", effect: "allow" },
+      { action: "clisbot_host_read_info", resource: "*", effect: "allow" },
       { action: "shell", resource: "pwd", effect: "allow" },
       { action: "subagent", resource: "*", effect: "ask" },
     ]);
@@ -24,7 +24,7 @@ describe("OpenCode v2 helper isolation", () => {
     expect(
       requiresDedicatedV2Server(
         { provider: "opencode", cwd: "/tmp/project" },
-        { agentId: "agent", env: { PASEO_AGENT_ID: "agent", PASEO_AGENT_CWD: "/tmp/project" } },
+        { agentId: "agent", env: { CLISBOT_AGENT_ID: "agent", CLISBOT_AGENT_CWD: "/tmp/project" } },
       ),
     ).toBe(false);
   });

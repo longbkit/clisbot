@@ -27,7 +27,7 @@ function inMemoryStorage(initial: Record<string, string> = {}): InMemoryStorage 
 
 describe("clientIdResolver", () => {
   it("returns the stored client id when present and does not regenerate", async () => {
-    const storage = inMemoryStorage({ "@paseo:client-id-v1": "cid_existing" });
+    const storage = inMemoryStorage({ "@clisbot:client-id-v1": "cid_existing" });
     const resolver = createClientIdResolver({
       storage,
       generateUuid: () => {
@@ -47,7 +47,7 @@ describe("clientIdResolver", () => {
     });
 
     expect(await resolver.getOrCreate()).toBe("cid_123456781234123412341234567890ab");
-    expect(storage.items.get("@paseo:client-id-v1")).toBe("cid_123456781234123412341234567890ab");
+    expect(storage.items.get("@clisbot:client-id-v1")).toBe("cid_123456781234123412341234567890ab");
   });
 
   it("dedupes concurrent callers behind a single storage write", async () => {
@@ -70,13 +70,13 @@ describe("clientIdResolver", () => {
   });
 
   it("ignores stored blank strings and treats them as missing", async () => {
-    const storage = inMemoryStorage({ "@paseo:client-id-v1": "   " });
+    const storage = inMemoryStorage({ "@clisbot:client-id-v1": "   " });
     const resolver = createClientIdResolver({
       storage,
       generateUuid: () => "newuuid",
     });
 
     expect(await resolver.getOrCreate()).toBe("cid_newuuid");
-    expect(storage.items.get("@paseo:client-id-v1")).toBe("cid_newuuid");
+    expect(storage.items.get("@clisbot:client-id-v1")).toBe("cid_newuuid");
   });
 });

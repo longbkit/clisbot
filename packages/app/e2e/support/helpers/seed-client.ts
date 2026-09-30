@@ -1,6 +1,6 @@
 import path from "node:path";
 import { readFileSync } from "node:fs";
-import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivity } from "@clisbot/protocol/terminal-activity";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { withProjectOwnership } from "./project-ownership";
 import { createTempDirectory, createTempGitRepo } from "./workspace";
@@ -187,7 +187,7 @@ export interface SeedDaemonClient {
 
 export async function connectSeedClient(options?: {
   port?: number;
-  /** Use only with a private host whose teardown removes its entire PASEO_HOME. */
+  /** Use only with a private host whose teardown removes its entire CLISBOT_HOME. */
   projectOwnership?: "client" | "host";
 }): Promise<SeedDaemonClient> {
   const client = await connectDaemonClient<SeedDaemonClient>({

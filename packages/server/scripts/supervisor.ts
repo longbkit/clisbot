@@ -19,25 +19,25 @@ interface SupervisorLogFileOptions {
 
 type WorkerLifecycleMessage =
   | {
-      type: "paseo:shutdown";
+      type: "clisbot:shutdown";
       reason?: string;
     }
   | {
-      type: "paseo:ready";
+      type: "clisbot:ready";
       listen: string;
       serverId: string;
     }
   | {
-      type: "paseo:restart";
+      type: "clisbot:restart";
       reason?: string;
     };
 
 interface SupervisorHeartbeatMessage {
-  type: "paseo:supervisor-heartbeat";
+  type: "clisbot:supervisor-heartbeat";
 }
 
 interface SupervisorGracefulShutdownMessage {
-  type: "paseo:graceful-shutdown";
+  type: "clisbot:graceful-shutdown";
   reason: string;
 }
 
@@ -73,14 +73,14 @@ function parseLifecycleMessage(msg: unknown): WorkerLifecycleMessage | null {
     return null;
   }
   const type = (msg as { type?: unknown }).type;
-  if (type === "paseo:shutdown") {
+  if (type === "clisbot:shutdown") {
     const reason = (msg as { reason?: unknown }).reason;
     return {
-      type: "paseo:shutdown",
+      type: "clisbot:shutdown",
       ...(typeof reason === "string" && reason.trim().length > 0 ? { reason } : {}),
     };
   }
-  if (type === "paseo:ready") {
+  if (type === "clisbot:ready") {
     const { listen, serverId } = msg as { listen?: unknown; serverId?: unknown };
     if (typeof listen !== "string" || listen.trim().length === 0) {
       return null;
@@ -88,12 +88,12 @@ function parseLifecycleMessage(msg: unknown): WorkerLifecycleMessage | null {
     if (typeof serverId !== "string" || serverId.trim().length === 0) {
       return null;
     }
-    return { type: "paseo:ready", listen, serverId };
+    return { type: "clisbot:ready", listen, serverId };
   }
-  if (type === "paseo:restart") {
+  if (type === "clisbot:restart") {
     const reason = (msg as { reason?: unknown }).reason;
     return {
-      type: "paseo:restart",
+      type: "clisbot:restart",
       ...(typeof reason === "string" && reason.trim().length > 0 ? { reason } : {}),
     };
   }
@@ -292,7 +292,7 @@ export function runSupervisor(options: SupervisorOptions): SupervisorController 
     let reachedReady = false;
     // Serialize endpoint writes with exit/clear before allowing another worker to spawn.
     const heartbeat = setInterval(() => {
-      const message: SupervisorHeartbeatMessage = { type: "paseo:supervisor-heartbeat" };
+      const message: SupervisorHeartbeatMessage = { type: "clisbot:supervisor-heartbeat" };
       if (currentChild.connected) {
         currentChild.send?.(message, (error) => {
           if (error) {
@@ -327,7 +327,7 @@ export function runSupervisor(options: SupervisorOptions): SupervisorController 
         return;
       }
 
-      if (lifecycleMessage.type === "paseo:ready") {
+      if (lifecycleMessage.type === "clisbot:ready") {
         reachedReady = true;
         writeLifecycleLog("Worker ready", { listen: lifecycleMessage.listen });
         publication = publication
@@ -346,7 +346,7 @@ export function runSupervisor(options: SupervisorOptions): SupervisorController 
         return;
       }
 
-      if (lifecycleMessage.type === "paseo:shutdown") {
+      if (lifecycleMessage.type === "clisbot:shutdown") {
         const reason = lifecycleMessage.reason ?? "worker_requested_shutdown";
         writeLifecycleLog("Worker requested shutdown", { reason });
         requestShutdown(reason);
@@ -418,7 +418,7 @@ export function runSupervisor(options: SupervisorOptions): SupervisorController 
     }
     const currentChild = child;
     const message: SupervisorGracefulShutdownMessage = {
-      type: "paseo:graceful-shutdown",
+      type: "clisbot:graceful-shutdown",
       reason,
     };
     writeLifecycleLog("Supervisor requesting graceful worker shutdown", {

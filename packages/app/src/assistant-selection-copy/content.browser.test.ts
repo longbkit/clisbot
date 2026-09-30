@@ -3,12 +3,12 @@ import { createAssistantSelectionClipboardContent } from "./content.web";
 
 const fixture = `
   <div data-testid="assistant-message">
-    <div data-paseo-markdown-tag="p">Prefix <span data-paseo-markdown-tag="strong">bold text</span> and <span data-paseo-markdown-tag="code">inline code</span> suffix.</div>
-    <div data-paseo-markdown-tag="ul">
-      <div data-paseo-markdown-tag="li"><span data-paseo-markdown-ignore="true" data-paseo-markdown-list-marker="true">•</span><div><span>First bullet text</span></div></div>
-      <div data-paseo-markdown-tag="li"><span data-paseo-markdown-ignore="true" data-paseo-markdown-list-marker="true">•</span><div><span>Second bullet text</span></div></div>
+    <div data-clisbot-markdown-tag="p">Prefix <span data-clisbot-markdown-tag="strong">bold text</span> and <span data-clisbot-markdown-tag="code">inline code</span> suffix.</div>
+    <div data-clisbot-markdown-tag="ul">
+      <div data-clisbot-markdown-tag="li"><span data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">•</span><div><span>First bullet text</span></div></div>
+      <div data-clisbot-markdown-tag="li"><span data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">•</span><div><span>Second bullet text</span></div></div>
     </div>
-    <div data-paseo-markdown-tag="pre" data-paseo-markdown-language="ts"><span data-paseo-markdown-tag="code">const answer = true;</span></div>
+    <div data-clisbot-markdown-tag="pre" data-clisbot-markdown-language="ts"><span data-clisbot-markdown-tag="code">const answer = true;</span></div>
   </div>
 `;
 
@@ -104,7 +104,7 @@ function mountTranscript(messages: TranscriptMessage[]): HTMLElement {
       const row = document.createElement("div");
       row.setAttribute("data-history-row-id", `${messageId}:block:${index}`);
       row.setAttribute("data-message-id", messageId);
-      row.innerHTML = `<div data-testid="assistant-message"><div data-paseo-markdown-tag="p">${text}</div></div>`;
+      row.innerHTML = `<div data-testid="assistant-message"><div data-clisbot-markdown-tag="p">${text}</div></div>`;
       transcript.append(row);
     }
   }
@@ -126,7 +126,7 @@ describe("assistant selection copy ranges", () => {
     expect(createAssistantSelectionClipboardContent(null)).toBeNull();
 
     const message = mountFixture();
-    const strong = fixtureElement(message, '[data-paseo-markdown-tag="strong"]');
+    const strong = fixtureElement(message, '[data-clisbot-markdown-tag="strong"]');
     expect(copiedMarkdown(selectText(strong, 2, 2))).toBeNull();
 
     const outside = document.createElement("span");
@@ -139,7 +139,7 @@ describe("assistant selection copy ranges", () => {
     const transcript = mountTranscript([
       { messageId: "message-1", blocks: ["First paragraph.", "Second paragraph."] },
     ]);
-    const blocks = transcript.querySelectorAll('[data-paseo-markdown-tag="p"]');
+    const blocks = transcript.querySelectorAll('[data-clisbot-markdown-tag="p"]');
     expect(copiedMarkdown(selectRange(blocks[0]!, 6, blocks[1]!, 6))).toBe("paragraph.\n\nSecond");
   });
 
@@ -148,7 +148,7 @@ describe("assistant selection copy ranges", () => {
       { messageId: "message-1", blocks: ["First paragraph.", "Second paragraph."] },
       { messageId: "message-2", blocks: ["Reply paragraph."] },
     ]);
-    const blocks = transcript.querySelectorAll('[data-paseo-markdown-tag="p"]');
+    const blocks = transcript.querySelectorAll('[data-clisbot-markdown-tag="p"]');
     expect(copiedMarkdown(selectRange(blocks[1]!, 0, blocks[2]!, 5))).toBeNull();
   });
 
@@ -161,15 +161,15 @@ describe("assistant selection copy ranges", () => {
     ]);
     document.body.append(...transcript.children);
     transcript.remove();
-    const blocks = document.querySelectorAll('[data-paseo-markdown-tag="p"]');
+    const blocks = document.querySelectorAll('[data-clisbot-markdown-tag="p"]');
     expect(copiedMarkdown(selectRange(blocks[0]!, 0, blocks[1]!, 17))).toBeNull();
   });
 
   it("does not replace the browser clipboard for a range spanning assistant messages", () => {
     const firstMessage = mountFixture();
     const secondMessage = mountFixture();
-    const firstText = fixtureElement(firstMessage, '[data-paseo-markdown-tag="strong"]');
-    const secondText = fixtureElement(secondMessage, '[data-paseo-markdown-tag="strong"]');
+    const firstText = fixtureElement(firstMessage, '[data-clisbot-markdown-tag="strong"]');
+    const secondText = fixtureElement(secondMessage, '[data-clisbot-markdown-tag="strong"]');
     expect(copiedMarkdown(selectRange(firstText, 0, secondText, 4))).toBeNull();
   });
 
@@ -201,7 +201,7 @@ describe("assistant selection copy ranges", () => {
     "copies a partial $tag range without expanding to its delimiters",
     ({ tag, range, expected, forbiddenHtml }) => {
       const message = mountFixture();
-      const element = fixtureElement(message, `[data-paseo-markdown-tag="${tag}"]`);
+      const element = fixtureElement(message, `[data-clisbot-markdown-tag="${tag}"]`);
       const content = createAssistantSelectionClipboardContent(
         selectText(element, range[0], range[1]),
       );
@@ -214,8 +214,8 @@ describe("assistant selection copy ranges", () => {
     "copies all content selected from inside a %s element without its syntax",
     (tag) => {
       const message = mountFixture();
-      const element = fixtureElement(message, '[data-paseo-markdown-tag="strong"]');
-      element.setAttribute("data-paseo-markdown-tag", tag);
+      const element = fixtureElement(message, '[data-clisbot-markdown-tag="strong"]');
+      element.setAttribute("data-clisbot-markdown-tag", tag);
       const content = createAssistantSelectionClipboardContent(
         selectText(element, 0, textNode(element).length),
       );
@@ -226,7 +226,7 @@ describe("assistant selection copy ranges", () => {
 
   it("copies complete inline code without delimiters when the selection stays inside", () => {
     const message = mountFixture();
-    const element = fixtureElement(message, '[data-paseo-markdown-tag="code"]');
+    const element = fixtureElement(message, '[data-clisbot-markdown-tag="code"]');
     const content = createAssistantSelectionClipboardContent(
       selectText(element, 0, textNode(element).length),
     );
@@ -236,14 +236,14 @@ describe("assistant selection copy ranges", () => {
 
   it("keeps a complete inline node but drops formatting from a partial node at the other edge", () => {
     const message = mountFixture();
-    const strong = fixtureElement(message, '[data-paseo-markdown-tag="strong"]');
-    const code = fixtureElement(message, '[data-paseo-markdown-tag="code"]');
+    const strong = fixtureElement(message, '[data-clisbot-markdown-tag="strong"]');
+    const code = fixtureElement(message, '[data-clisbot-markdown-tag="code"]');
     expect(copiedMarkdown(selectRange(strong, 0, code, 6))).toBe("**bold text** and inline");
   });
 
   it("copies list-item text without inventing a bullet", () => {
     const message = mountFixture();
-    const itemText = fixtureElement(message, '[data-paseo-markdown-tag="li"] div span');
+    const itemText = fixtureElement(message, '[data-clisbot-markdown-tag="li"] div span');
     const content = createAssistantSelectionClipboardContent(
       selectText(itemText, 0, textNode(itemText).length),
     );
@@ -254,14 +254,14 @@ describe("assistant selection copy ranges", () => {
 
   it("retains a bullet when the range includes the marker and the complete item", () => {
     const message = mountFixture();
-    const item = fixtureElement(message, '[data-paseo-markdown-tag="li"]');
+    const item = fixtureElement(message, '[data-clisbot-markdown-tag="li"]');
     expect(copiedMarkdown(selectNodeContents(item))).toBe("- First bullet text");
   });
 
   it("retains a bullet when a drag selects from the rendered marker through the item text", () => {
     const message = mountFixture();
-    const marker = fixtureElement(message, '[data-paseo-markdown-list-marker="true"]');
-    const itemText = fixtureElement(message, '[data-paseo-markdown-tag="li"] div span');
+    const marker = fixtureElement(message, '[data-clisbot-markdown-list-marker="true"]');
+    const itemText = fixtureElement(message, '[data-clisbot-markdown-tag="li"] div span');
 
     const content = createAssistantSelectionClipboardContent(
       selectRange(marker, 0, itemText, textNode(itemText).length),
@@ -274,16 +274,16 @@ describe("assistant selection copy ranges", () => {
 
   it("retains a bullet when a drag includes the marker and part of the item text", () => {
     const message = mountFixture();
-    const marker = fixtureElement(message, '[data-paseo-markdown-list-marker="true"]');
-    const itemText = fixtureElement(message, '[data-paseo-markdown-tag="li"] div span');
+    const marker = fixtureElement(message, '[data-clisbot-markdown-list-marker="true"]');
+    const itemText = fixtureElement(message, '[data-clisbot-markdown-tag="li"] div span');
 
     expect(copiedMarkdown(selectRange(marker, 0, itemText, 5))).toBe("- First");
   });
 
   it("does not invent a bullet when a drag starts after the rendered marker", () => {
     const message = mountFixture();
-    const marker = fixtureElement(message, '[data-paseo-markdown-list-marker="true"]');
-    const itemText = fixtureElement(message, '[data-paseo-markdown-tag="li"] div span');
+    const marker = fixtureElement(message, '[data-clisbot-markdown-list-marker="true"]');
+    const itemText = fixtureElement(message, '[data-clisbot-markdown-tag="li"] div span');
 
     expect(
       copiedMarkdown(
@@ -294,8 +294,8 @@ describe("assistant selection copy ranges", () => {
 
   it("retains every selected marker across a partial multi-item drag", () => {
     const message = mountFixture();
-    const markerSelector = '[data-paseo-markdown-list-marker="true"]';
-    const textSelector = '[data-paseo-markdown-tag="li"] div span';
+    const markerSelector = '[data-clisbot-markdown-list-marker="true"]';
+    const textSelector = '[data-clisbot-markdown-tag="li"] div span';
     const firstMarker = fixtureElement(message, markerSelector);
     const secondText = fixtureElement(message, textSelector, 1);
 
@@ -306,14 +306,16 @@ describe("assistant selection copy ranges", () => {
 
   it("retains the original number when a marker drag starts mid-list", () => {
     const message = mountFixture();
-    const list = fixtureElement(message, '[data-paseo-markdown-tag="ul"]');
-    list.setAttribute("data-paseo-markdown-tag", "ol");
-    list.setAttribute("data-paseo-markdown-list-start", "5");
-    const markers = list.querySelectorAll<HTMLElement>('[data-paseo-markdown-list-marker="true"]');
+    const list = fixtureElement(message, '[data-clisbot-markdown-tag="ul"]');
+    list.setAttribute("data-clisbot-markdown-tag", "ol");
+    list.setAttribute("data-clisbot-markdown-list-start", "5");
+    const markers = list.querySelectorAll<HTMLElement>(
+      '[data-clisbot-markdown-list-marker="true"]',
+    );
     markers.item(0).textContent = "5.";
     markers.item(1).textContent = "6.";
-    const secondMarker = fixtureElement(list, '[data-paseo-markdown-list-marker="true"]', 1);
-    const secondText = fixtureElement(list, '[data-paseo-markdown-tag="li"] div span', 1);
+    const secondMarker = fixtureElement(list, '[data-clisbot-markdown-list-marker="true"]', 1);
+    const secondText = fixtureElement(list, '[data-clisbot-markdown-tag="li"] div span', 1);
 
     expect(
       copiedMarkdown(selectRange(secondMarker, 0, secondText, textNode(secondText).length)),
@@ -322,14 +324,14 @@ describe("assistant selection copy ranges", () => {
 
   it("retains nested markers when a drag includes the complete outer item", () => {
     const message = mountFixture();
-    const firstItem = fixtureElement(message, '[data-paseo-markdown-tag="li"]');
+    const firstItem = fixtureElement(message, '[data-clisbot-markdown-tag="li"]');
     firstItem.innerHTML = [
-      '<span data-paseo-markdown-ignore="true" data-paseo-markdown-list-marker="true">•</span>',
+      '<span data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">•</span>',
       "<div>",
       "<span>Outer text</span>",
-      '<div data-paseo-markdown-tag="ul">',
-      '<div data-paseo-markdown-tag="li">',
-      '<span data-paseo-markdown-ignore="true" data-paseo-markdown-list-marker="true">•</span>',
+      '<div data-clisbot-markdown-tag="ul">',
+      '<div data-clisbot-markdown-tag="li">',
+      '<span data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">•</span>',
       "<div><span>Inner text</span></div>",
       "</div>",
       "</div>",
@@ -337,11 +339,11 @@ describe("assistant selection copy ranges", () => {
     ].join("");
     const outerMarker = fixtureElement(
       firstItem,
-      ':scope > [data-paseo-markdown-list-marker="true"]',
+      ':scope > [data-clisbot-markdown-list-marker="true"]',
     );
     const innerText = fixtureElement(
       firstItem,
-      ':scope [data-paseo-markdown-tag="ul"] > [data-paseo-markdown-tag="li"] > div > span',
+      ':scope [data-clisbot-markdown-tag="ul"] > [data-clisbot-markdown-tag="li"] > div > span',
     );
 
     expect(copiedMarkdown(selectRange(outerMarker, 0, innerText, textNode(innerText).length))).toBe(
@@ -351,11 +353,11 @@ describe("assistant selection copy ranges", () => {
 
   it("preserves paragraph breaks when rich HTML flattens a loose list item", () => {
     const message = mountFixture();
-    const item = fixtureElement(message, '[data-paseo-markdown-tag="li"]');
+    const item = fixtureElement(message, '[data-clisbot-markdown-tag="li"]');
     item.replaceChildren();
     item.insertAdjacentHTML(
       "beforeend",
-      '<div data-paseo-markdown-tag="p">First paragraph</div><div data-paseo-markdown-tag="p">Second paragraph</div>',
+      '<div data-clisbot-markdown-tag="p">First paragraph</div><div data-clisbot-markdown-tag="p">Second paragraph</div>',
     );
 
     const content = createAssistantSelectionClipboardContent(selectNodeContents(item));
@@ -365,7 +367,7 @@ describe("assistant selection copy ranges", () => {
 
   it("omits a partial leading bullet and retains the marker crossed before the trailing item", () => {
     const message = mountFixture();
-    const selector = '[data-paseo-markdown-tag="li"] div span';
+    const selector = '[data-clisbot-markdown-tag="li"] div span';
     const first = fixtureElement(message, selector);
     const second = fixtureElement(message, selector, 1);
     expect(copiedMarkdown(selectRange(first, 6, second, textNode(second).length))).toBe(
@@ -377,7 +379,7 @@ describe("assistant selection copy ranges", () => {
     const message = mountFixture();
     const blockCode = fixtureElement(
       message,
-      '[data-paseo-markdown-tag="pre"] [data-paseo-markdown-tag="code"]',
+      '[data-clisbot-markdown-tag="pre"] [data-clisbot-markdown-tag="code"]',
     );
     const content = createAssistantSelectionClipboardContent(selectText(blockCode, 6, 12));
     expect(content?.plainText).toBe("answer");
@@ -389,7 +391,7 @@ describe("assistant selection copy ranges", () => {
     const message = mountFixture();
     const blockCode = fixtureElement(
       message,
-      '[data-paseo-markdown-tag="pre"] [data-paseo-markdown-tag="code"]',
+      '[data-clisbot-markdown-tag="pre"] [data-clisbot-markdown-tag="code"]',
     );
     expect(copiedMarkdown(selectText(blockCode, 0, textNode(blockCode).length))).toBe(
       "const answer = true;",
@@ -406,20 +408,20 @@ describe("assistant selection copy ranges", () => {
  */
 function highlightedFixture(language: string | null): string {
   const languageAttribute =
-    language === null ? "" : ` data-paseo-markdown-language="${escapeAttribute(language)}"`;
+    language === null ? "" : ` data-clisbot-markdown-language="${escapeAttribute(language)}"`;
   return [
     '<div data-testid="assistant-message">',
-    `<div data-paseo-markdown-tag="pre"${languageAttribute}>`,
-    '<span data-paseo-markdown-tag="code">',
+    `<div data-clisbot-markdown-tag="pre"${languageAttribute}>`,
+    '<span data-clisbot-markdown-tag="code">',
     "<span>const</span><span> answer</span><span> = 1;</span>",
     "<span>\n</span>",
     "<span>  if</span><span> (answer)</span><span> {</span>",
     "<span>\n</span>",
     "<span>    doThing();</span>",
     "</span>",
-    '<div data-paseo-markdown-ignore="true"><span>Copy</span></div>',
+    '<div data-clisbot-markdown-ignore="true"><span>Copy</span></div>',
     "</div>",
-    '<div data-paseo-markdown-tag="p"><span>After the block.</span></div>',
+    '<div data-clisbot-markdown-tag="p"><span>After the block.</span></div>',
     "</div>",
   ].join("");
 }
@@ -590,7 +592,7 @@ describe("assistant selection copy inside highlighted code", () => {
     const message = mountHighlighted();
     const blockCode = fixtureElement(
       message,
-      '[data-paseo-markdown-tag="pre"] [data-paseo-markdown-tag="code"]',
+      '[data-clisbot-markdown-tag="pre"] [data-clisbot-markdown-tag="code"]',
     );
 
     expect(copiedMarkdown(selectNodeContents(blockCode))).toBe(

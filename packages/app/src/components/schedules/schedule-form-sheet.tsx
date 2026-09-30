@@ -12,8 +12,8 @@ import {
 import { Text, View } from "react-native";
 import { Brain, Folder, GitBranch } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
-import type { ScheduleCadence, ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
+import type { ScheduleCadence, ScheduleSummary } from "@clisbot/protocol/schedule/types";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { ComboboxItem } from "@/components/ui/combobox";

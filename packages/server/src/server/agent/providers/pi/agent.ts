@@ -91,12 +91,12 @@ import {
 const PI_PROVIDER = "pi";
 const DEFAULT_PI_THINKING_LEVEL: PiThinkingLevel = "medium";
 const PI_BINARY_COMMAND = process.env.PI_COMMAND ?? process.env.PI_ACP_PI_COMMAND ?? "pi";
-const PASEO_PI_TREE_EXTENSION_COMMAND = "paseo_tree";
-const PASEO_PI_CAPTURE_EXTENSION_COMMAND = "paseo_capture_entries";
-const PASEO_PI_REWIND_ENTRY_TYPE = "paseo_rewind";
-const PASEO_PI_ENTRY_CAPTURE_MARKER = "PASEO_ENTRY_CAPTURE";
-const PASEO_PI_SUBMITTED_USER_ENTRY_MARKER = "PASEO_SUBMITTED_USER_ENTRY";
-const PASEO_PI_COMMAND_RESULT_MARKER = "PASEO_COMMAND_RESULT";
+const CLISBOT_PI_TREE_EXTENSION_COMMAND = "clisbot_tree";
+const CLISBOT_PI_CAPTURE_EXTENSION_COMMAND = "clisbot_capture_entries";
+const CLISBOT_PI_REWIND_ENTRY_TYPE = "clisbot_rewind";
+const CLISBOT_PI_ENTRY_CAPTURE_MARKER = "CLISBOT_ENTRY_CAPTURE";
+const CLISBOT_PI_SUBMITTED_USER_ENTRY_MARKER = "CLISBOT_SUBMITTED_USER_ENTRY";
+const CLISBOT_PI_COMMAND_RESULT_MARKER = "CLISBOT_COMMAND_RESULT";
 const DEFAULT_PI_EXTENSION_RESULT_TIMEOUT_MS = 30_000;
 const DEFAULT_PI_RPC_TIMEOUT_MS = 60_000;
 const QUESTION_RESPONSE_HEADER = "Response";
@@ -484,7 +484,7 @@ function buildResumeStartInput(input: {
   sessionFile: string;
   launchContext: AgentLaunchContext | undefined;
   mcpConfig: PiMcpConfigFile | null;
-  paseoExtension: PiTempFile | null;
+  clisbotExtension: PiTempFile | null;
 }): PiStartSessionInput {
   return {
     cwd: input.resumeConfig.cwd,
@@ -493,7 +493,7 @@ function buildResumeStartInput(input: {
     model: input.resumeConfig.model,
     thinkingOptionId: normalizePiThinkingOption(input.resumeConfig.thinkingOptionId) ?? undefined,
     mcpConfigPath: input.mcpConfig?.path,
-    extensionPaths: input.paseoExtension ? [input.paseoExtension.path] : undefined,
+    extensionPaths: input.clisbotExtension ? [input.clisbotExtension.path] : undefined,
   };
 }
 
@@ -569,7 +569,7 @@ function createPiMcpConfigFile(
     mcpServers[name] = toPiMcpConfig(serverConfig);
   }
 
-  const dir = mkdtempSync(join(tmpdir(), "paseo-pi-mcp-"));
+  const dir = mkdtempSync(join(tmpdir(), "clisbot-pi-mcp-"));
   const filePath = join(dir, "mcp.json");
   const mergedConfig: Record<string, unknown> = { ...globalConfig, mcpServers };
   delete mergedConfig["mcp-servers"];
@@ -583,9 +583,9 @@ function createPiMcpConfigFile(
   };
 }
 
-function createPiPaseoExtensionFile(systemPrompt?: string): PiTempFile {
-  const dir = mkdtempSync(join(tmpdir(), "paseo-pi-extension-"));
-  const filePath = join(dir, "paseo-integration.mjs");
+function createPiClisbotExtensionFile(systemPrompt?: string): PiTempFile {
+  const dir = mkdtempSync(join(tmpdir(), "clisbot-pi-extension-"));
+  const filePath = join(dir, "clisbot-integration.mjs");
   writeFileSync(
     filePath,
     `
@@ -622,7 +622,7 @@ function createPiPaseoExtensionFile(systemPrompt?: string): PiTempFile {
 
 	function emitEntryCapture(ctx, reason, requestId) {
 	  ctx.ui.notify(
-	    "${PASEO_PI_ENTRY_CAPTURE_MARKER} " +
+	    "${CLISBOT_PI_ENTRY_CAPTURE_MARKER} " +
 	      JSON.stringify({
 	        reason,
 	        requestId,
@@ -637,12 +637,12 @@ function createPiPaseoExtensionFile(systemPrompt?: string): PiTempFile {
 
 	function emitCommandResult(ctx, requestId, result) {
 	  ctx.ui.notify(
-	    "${PASEO_PI_COMMAND_RESULT_MARKER} " + JSON.stringify({ requestId, ...result }),
+	    "${CLISBOT_PI_COMMAND_RESULT_MARKER} " + JSON.stringify({ requestId, ...result }),
 	    result.ok ? "info" : "error",
 	  );
 	}
 
-	export default function paseoIntegration(pi) {
+	export default function clisbotIntegration(pi) {
 	  const submittedUserMessages = [];
 
 	  function emitSubmittedUserEntries(ctx) {
@@ -660,7 +660,7 @@ function createPiPaseoExtensionFile(systemPrompt?: string): PiTempFile {
 	      submittedUserMessages.splice(index, 1);
 	      index -= 1;
 	      ctx.ui.notify(
-	        "${PASEO_PI_SUBMITTED_USER_ENTRY_MARKER} " +
+	        "${CLISBOT_PI_SUBMITTED_USER_ENTRY_MARKER} " +
 	          JSON.stringify({ entry: toCapturedUserEntry(entry) }),
 	        "info",
 	      );
@@ -696,22 +696,22 @@ function createPiPaseoExtensionFile(systemPrompt?: string): PiTempFile {
 	    emitEntryCapture(ctx, "turn_end");
 	  });
 
-	  pi.registerCommand("${PASEO_PI_CAPTURE_EXTENSION_COMMAND}", {
-	    description: "Internal Paseo entry capture bridge",
+	  pi.registerCommand("${CLISBOT_PI_CAPTURE_EXTENSION_COMMAND}", {
+	    description: "Internal Clisbot entry capture bridge",
 	    handler: async (args, ctx) => {
 	      const payload = decodePayload(args.trim());
 	      emitEntryCapture(ctx, "command", payload.requestId);
 	    },
 	  });
 
-	  pi.registerCommand("${PASEO_PI_TREE_EXTENSION_COMMAND}", {
-	    description: "Internal Paseo tree navigation bridge",
+	  pi.registerCommand("${CLISBOT_PI_TREE_EXTENSION_COMMAND}", {
+	    description: "Internal Clisbot tree navigation bridge",
 	    handler: async (args, ctx) => {
 	      const payload = decodePayload(args.trim());
 	      try {
 	        const result = await ctx.navigateTree(payload.targetId, { summarize: false });
 	        // Pi reopens a session at its last entry, so record the rewind on the new branch to keep it.
-	        pi.appendEntry("${PASEO_PI_REWIND_ENTRY_TYPE}", { targetId: payload.targetId });
+	        pi.appendEntry("${CLISBOT_PI_REWIND_ENTRY_TYPE}", { targetId: payload.targetId });
 	        emitEntryCapture(ctx, "tree_navigation");
 	        emitCommandResult(ctx, payload.requestId, { ok: true, result });
 	      } catch (error) {
@@ -1513,7 +1513,7 @@ export class PiRpcAgentSession implements AgentSession {
     const requestId = randomUUID();
     const resultPromise = this.waitForExtensionResult(requestId);
     const payload = Buffer.from(JSON.stringify({ targetId, requestId })).toString("base64url");
-    await this.runtimeSession.prompt(`/${PASEO_PI_TREE_EXTENSION_COMMAND} ${payload}`);
+    await this.runtimeSession.prompt(`/${CLISBOT_PI_TREE_EXTENSION_COMMAND} ${payload}`);
     return await resultPromise;
   }
 
@@ -1821,7 +1821,7 @@ export class PiRpcAgentSession implements AgentSession {
     const requestId = randomUUID();
     const resultPromise = this.waitForExtensionResult(requestId);
     const payload = Buffer.from(JSON.stringify({ requestId, reason })).toString("base64url");
-    await this.runtimeSession.prompt(`/${PASEO_PI_CAPTURE_EXTENSION_COMMAND} ${payload}`);
+    await this.runtimeSession.prompt(`/${CLISBOT_PI_CAPTURE_EXTENSION_COMMAND} ${payload}`);
     await resultPromise;
   }
 
@@ -1873,7 +1873,7 @@ export class PiRpcAgentSession implements AgentSession {
   }
 
   private handleSubmittedUserEntryMarker(message: string): boolean {
-    const payload = parseExtensionMarkerPayload(message, PASEO_PI_SUBMITTED_USER_ENTRY_MARKER);
+    const payload = parseExtensionMarkerPayload(message, CLISBOT_PI_SUBMITTED_USER_ENTRY_MARKER);
     if (!payload) {
       return false;
     }
@@ -1900,7 +1900,7 @@ export class PiRpcAgentSession implements AgentSession {
   }
 
   private handleEntryCaptureMarker(message: string): boolean {
-    const payload = parseExtensionMarkerPayload(message, PASEO_PI_ENTRY_CAPTURE_MARKER);
+    const payload = parseExtensionMarkerPayload(message, CLISBOT_PI_ENTRY_CAPTURE_MARKER);
     if (!payload) {
       return false;
     }
@@ -1915,7 +1915,7 @@ export class PiRpcAgentSession implements AgentSession {
   }
 
   private handleCommandResultMarker(message: string): boolean {
-    const payload = parseExtensionMarkerPayload(message, PASEO_PI_COMMAND_RESULT_MARKER);
+    const payload = parseExtensionMarkerPayload(message, CLISBOT_PI_COMMAND_RESULT_MARKER);
     if (!payload) {
       return false;
     }
@@ -2432,7 +2432,7 @@ export class PiRpcAgentClient implements AgentClient {
       ...launchContext?.env,
     };
     const mcpConfig = await this.prepareMcpConfig(config.cwd, config.mcpServers, mcpEnv);
-    const paseoExtension = createPiPaseoExtensionFile(
+    const clisbotExtension = createPiClisbotExtensionFile(
       composeSystemPromptParts(config.systemPrompt, config.daemonAppendSystemPrompt),
     );
     let runtimeSession: PiRuntimeSession;
@@ -2444,11 +2444,11 @@ export class PiRpcAgentClient implements AgentClient {
         noSession: config.internal === true,
         env: launchContext?.env,
         mcpConfigPath: mcpConfig?.path,
-        extensionPaths: paseoExtension ? [paseoExtension.path] : undefined,
+        extensionPaths: clisbotExtension ? [clisbotExtension.path] : undefined,
       });
     } catch (error) {
       mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
+      clisbotExtension?.cleanup();
       throw error;
     }
     try {
@@ -2457,7 +2457,7 @@ export class PiRpcAgentClient implements AgentClient {
         config,
         initialState: await runtimeSession.getState(),
         capabilities: capabilitiesForSession(mcpConfig !== null),
-        cleanup: combineCleanup([mcpConfig?.cleanup, paseoExtension?.cleanup]),
+        cleanup: combineCleanup([mcpConfig?.cleanup, clisbotExtension?.cleanup]),
         extensionTimeoutMs: this.providerParams.extensionTimeoutMs,
         logger: this.logger,
         usagePollScheduler: this.usagePollScheduler,
@@ -2465,7 +2465,7 @@ export class PiRpcAgentClient implements AgentClient {
     } catch (error) {
       await runtimeSession.close().catch(() => undefined);
       mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
+      clisbotExtension?.cleanup();
       throw error;
     }
   }
@@ -2492,7 +2492,7 @@ export class PiRpcAgentClient implements AgentClient {
       resumeConfig.config.mcpServers,
       mcpEnv,
     );
-    const paseoExtension = createPiPaseoExtensionFile(
+    const clisbotExtension = createPiClisbotExtensionFile(
       composeSystemPromptParts(
         resumeConfig.config.systemPrompt,
         resumeConfig.config.daemonAppendSystemPrompt,
@@ -2506,12 +2506,12 @@ export class PiRpcAgentClient implements AgentClient {
           sessionFile,
           launchContext,
           mcpConfig,
-          paseoExtension,
+          clisbotExtension,
         }),
       );
     } catch (error) {
       mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
+      clisbotExtension?.cleanup();
       throw error;
     }
     try {
@@ -2520,7 +2520,7 @@ export class PiRpcAgentClient implements AgentClient {
         config: resumeConfig.config,
         initialState: await runtimeSession.getState(),
         capabilities: capabilitiesForSession(mcpConfig !== null),
-        cleanup: combineCleanup([mcpConfig?.cleanup, paseoExtension?.cleanup]),
+        cleanup: combineCleanup([mcpConfig?.cleanup, clisbotExtension?.cleanup]),
         extensionTimeoutMs: this.providerParams.extensionTimeoutMs,
         logger: this.logger,
         usagePollScheduler: this.usagePollScheduler,
@@ -2528,7 +2528,7 @@ export class PiRpcAgentClient implements AgentClient {
     } catch (error) {
       await runtimeSession.close().catch(() => undefined);
       mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
+      clisbotExtension?.cleanup();
       throw error;
     }
   }
