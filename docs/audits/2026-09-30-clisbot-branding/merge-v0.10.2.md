@@ -1,6 +1,22 @@
 # Fusion merge of rebranded upstream v0.10.2
 
-**CURRENT, 2026-09-30:** user-authorized integration on `rebrand/clisbot-fusion-test`. This is the candidate for acceptance; promotion to `main` remains a separate decision. The original `clisbot-paseoclaw-fusion` branch is unchanged.
+**CURRENT, 2026-10-01:** the user confirmed Slack works and approved promoting `rebrand/clisbot-fusion-test` to `main`, including the channel packaging fix at `a21735240`. The original `clisbot-paseoclaw-fusion` branch remains unchanged.
+
+## Main cutover acceptance (2026-10-01)
+
+- Accepted runtime code: `a217352407fbe59e2a798afbf20a824b73ad74bf`.
+- Additional evidence: the user reported a successful Slack test after the runtime fix.
+- The promotion includes this documentation-only acceptance record. No further
+  runtime changes are part of the cutover.
+- Old `main` and its GitHub backup `clisbot-v1-tmux-acp-deprecated` were both
+  checked at `21baca297f5995fb1dd3d0dc354d64a252dba9e9` before promotion.
+  Use a force-with-lease bound to that old-main SHA, as described in the playbook.
+- The user accepted the candidate after the remaining regression checks and
+  temporary upstream service endpoints had been disclosed. These remain
+  follow-up work; unrun checks are not recorded as passing. The known cleanup
+  failure predates the upstream merge. Publication/store/Nix work remains open.
+- Keep the original Fusion and rebrand test branches for reference. This
+  acceptance does not create a release or a `sync-verified-*` tag.
 
 ## Inputs and ancestry
 
@@ -112,7 +128,7 @@ After this merge, a newer raw upstream release descended from v0.10.2 will share
 - Production runtime: isolated daemon healthy, CLI v0.10.2 created a workspace, SDK WebSocket read it, Chrome displayed it and survived reload with **0 page errors**. Help points to `longbkit/clisbot`. [Desktop evidence](images/merge-v0.10.2-desktop.png), [mobile-width web evidence](images/merge-v0.10.2-mobile-web.png).
 - Changed-source lint passed. Whole-repo lint reports **159 errors / 8 warnings in 54 unchanged paths**; every diagnostic file was byte-identical to the premerge Fusion commit. These are not a green whole-repo lint result.
 
-## Open gates before main
+## Verification follow-ups
 
 ### Packaged channel runtime follow-up
 
@@ -135,10 +151,10 @@ the existing Slack account logs `channel daemon connected` and `channel plane
 started`; account/Host data and volumes were preserved. This verifies startup,
 not a real-agent Slack conversation round trip.
 
-### Remaining acceptance
+### Carried follow-ups at acceptance
 
 - **Existing Hub failure cleanup:** `packages/server/src/server/hub/daemon-executions.test.ts`, “failed Hub create cleans durable state when provider close rejects”, leaves a live owned agent; the suite also reports three `SessionDeletedError` rejections from asynchronous worktree-bootstrap writes racing permanent deletion. Both the failed assertion and three rejections were reproduced from an archive of **premerge `b5fa42353`**, using the same installed dependencies. This needs a focused ownership/cleanup fix before calling that failure path verified. The merge did not introduce it.
 - **Native acceptance:** the prior sidebar startup fix and reusable `tailnet-test-apk` profile are preserved. Native device/APK/iOS/Electron acceptance and real-provider/relay end-to-end checks are separate from the browser and simulated-provider evidence here.
 - **Publication:** temporary upstream service endpoints remain by prior agreement. Apply the [publication review gates](publication-review.md#remaining-publication-decisions) before launch. This release also adds an Orca comparison page and a Philosophy section; inherited app-store availability, funding/independence, account/telemetry and plugin-directory claims still require Clisbot-specific editorial verification.
 - **Nix:** upstream's npm-dependency hash was inherited; no Nix build was run for the expanded Fusion lockfile. Recompute/verify it before a Nix release.
-- A fresh APK for user acceptance and the user's separate approval of the candidate SHA precede promotion to `origin/main`. No push, publication or main cutover is part of this merge.
+- The earlier rebrand APK was built at `fd53207f3`; the postmerge Android bundle export passed. A new APK/device pass for subsequent client changes remains follow-up work. Main promotion was separately approved on 2026-10-01 as recorded above; this does not publish a release.

@@ -8,10 +8,12 @@ is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
 **Rebrand decision, 2026-09-29:** the target product branch is a fully branded
 Clisbot `main`. Each upstream snapshot will be renamed before it is merged;
 see the [decision and Git evidence](../../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md).
-The branch cutover is not implemented yet. The rename script and transformed
-snapshots are being tested on isolated branches; the existing commands below
-describe the current `clisbot-paseoclaw-fusion` branch until that migration is
-complete.
+**Cutover accepted, 2026-10-01:** the user confirmed Slack works and approved
+promoting `rebrand/clisbot-fusion-test` (runtime code `a21735240`) to `main`.
+The acceptance record and carried follow-ups are in the
+[merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md#main-cutover-acceptance-2026-10-01).
+Use the recurring transformed-upstream procedure for the new product branch;
+the original Fusion branch stays as a reference.
 
 ## The three repos, each with one job
 
@@ -27,7 +29,7 @@ complete.
   The fork's `main` is a lazy mirror: update it when cutting a contribution
   branch. It is not a sync relay.
 
-- **`clisbot-paseoclaw-fusion` (this repo today; `main` after cutover)** — the
+- **`longbkit/clisbot:main`** — the
   single product line. One long-lived branch. Don't grow a second product line
   in the fork clone; upstream-facing work happens in the fork, everything else
   lands here.
@@ -80,7 +82,8 @@ not silently move the product baseline.
 See [independent upstream validation](../../audits/2026-09-30-clisbot-branding/upstream-v0.10.2-validation.md)
 and [the actual merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md)
 (75 files / 179 conflict hunks, normalized-base resolution, integration fixes
-and remaining acceptance gates). `main` promotion is still pending.
+and remaining acceptance gates). The user accepted the resulting candidate
+on 2026-10-01 after the channel packaging fix and a successful Slack test.
 
 1. Apply and verify the repeatable text and visual rebrand on
    `rebrand/clisbot-fusion-test`, the isolated Fusion candidate. Keep
@@ -109,6 +112,12 @@ This step comes **after** the rebranded Fusion branch has merged the selected
 transformed upstream baseline and passed its gates. It comes **before** later
 upstream promotions directly into `main`. Promotion requires a separate user
 confirmation of the verified candidate SHA.
+
+The 2026-10-01 approval covers runtime code `a21735240` plus the documentation
+commit recording this acceptance. It retains the temporary service endpoints
+and carries the audit's remaining checks as follow-up work; it does not claim
+that every proposed regression check passed. Do not create a `sync-verified-*`
+tag from this acceptance alone.
 
 The old GitHub `main` was backed up on 2026-09-29 as
 `origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
@@ -297,14 +306,18 @@ target Clisbot product. The script preserves dated audits, lessons, and this
 upstream playbook as historical/provenance records. During the isolated test
 phase, add `--keep-upstream-endpoints` to both rename commands: live
 `app.paseo.sh`, `relay.paseo.sh`, and `hub.paseo.sh` remain reachable, while
-site/documentation links to `paseo.sh` become `clisbot.com`. Do not use that
-flag for the official cutover. The test branches now use Expo owner
+site/documentation links to `paseo.sh` become `clisbot.com`. The accepted
+2026-10-01 cutover retains this temporary endpoint exception. Keep the same
+transform option until replacement services are configured and verified;
+changing it requires a separate endpoint migration. The branches use Expo owner
 `lbk-company` and project ID `9314cc2c-4abe-4637-b1cf-647fbbfbd807`.
 Confirm project access and mobile signing before running EAS builds. The
 temporary service endpoints, publication identity, and native-build/storefront
-appearance still need review before the cutover.
+appearance still need review before public release.
 
-### Current promotion procedure before the cutover
+### Historical raw-upstream procedure before the cutover
+
+Retained for provenance. Use the transformed-upstream procedure above for `main`.
 
 ```bash
 git worktree add --detach <clean-sync-worktree> clisbot-paseoclaw-fusion
