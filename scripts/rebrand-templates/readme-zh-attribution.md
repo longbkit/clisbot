@@ -1,0 +1,2 @@
+- **Paseo** — [Mohamed Boudra 及贡献者开发的 Paseo](https://github.com/getpaseo/paseo) 是 Clisbot 的 daemon、Agent 会话、客户端和 relay 模型的源码基础。原有版权和许可声明保留在 [LICENSE](LICENSE) 中。
+- **OpenClaw** — [OpenClaw 及其贡献者](https://github.com/openclaw/openclaw) 为 `packages/channels/` 中移植的渠道代码提供了来源。各包的 `upstream-sync.json` 记录源码基线；打包依赖的声明见 [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES)。

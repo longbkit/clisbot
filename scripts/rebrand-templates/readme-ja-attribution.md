@@ -1,0 +1,2 @@
+- **Paseo** — [Mohamed Boudra 氏とコントリビューターによる Paseo](https://github.com/getpaseo/paseo) は、Clisbot のデーモン、エージェントセッション、クライアント、リレーモデルのソース基盤です。著作権とライセンスの表示は [LICENSE](LICENSE) に保持しています。
+- **OpenClaw** — [OpenClaw とコントリビューター](https://github.com/openclaw/openclaw) は、`packages/channels/` に移植したチャネルコードの出典です。ソースの基準は各パッケージの `upstream-sync.json` に、バンドルされた依存関係の表示は [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES) に記録しています。

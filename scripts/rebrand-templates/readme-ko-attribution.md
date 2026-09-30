@@ -1,0 +1,2 @@
+- **Paseo** — [Mohamed Boudra와 기여자들이 만든 Paseo](https://github.com/getpaseo/paseo)는 Clisbot의 데몬, 에이전트 세션, 클라이언트, 릴레이 모델의 소스 기반입니다. 기존 저작권 및 라이선스 고지는 [LICENSE](LICENSE)에 보존되어 있습니다.
+- **OpenClaw** — [OpenClaw와 기여자들](https://github.com/openclaw/openclaw)은 `packages/channels/`에 이식한 채널 코드의 출처입니다. 소스 기준은 각 패키지의 `upstream-sync.json`에, 번들 종속성 고지는 [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES)에 기록되어 있습니다.

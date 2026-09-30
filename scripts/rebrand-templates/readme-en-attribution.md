@@ -1,0 +1,2 @@
+- **Paseo** — [Paseo by Mohamed Boudra and contributors](https://github.com/getpaseo/paseo) is the source foundation for Clisbot's daemon, agent sessions, clients, and relay model. Its copyright and license notices remain in [LICENSE](LICENSE).
+- **OpenClaw** — [OpenClaw and its contributors](https://github.com/openclaw/openclaw) are credited for the channel code adapted in `packages/channels/`. The source baselines are recorded in that tree's `upstream-sync.json` files; bundled dependency notices are in [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES).
