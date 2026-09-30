@@ -167,6 +167,27 @@ below apply to official Clisbot `main`.
    The merge commit keeps the transformed snapshot and raw upstream history;
    no old `sync/rebranded-*` branch names need to remain.
 
+### File completeness and publication gate
+
+Read the [2026-10-01 lesson](../../lessons/2026-10-01-rebrand-file-completeness.md)
+before the next sync. Run this gate on the transformed upstream snapshot and
+again on the merged Fusion candidate, before either commit:
+
+1. Compare expected transformed paths from the baseline with the Git index.
+   Review every deletion; a clean working tree and `--check` cannot detect a
+   renamed file that was never staged. Verify the committed tree afterward.
+2. Resolve ignored destinations using `git check-ignore -v --no-index` and
+   narrow repository exceptions or `git add -f -- <exact-source-path>`.
+   The rename guard stops **after** files move; stage the corrected result,
+   then run `--check`. Disabling global ignores does not disable repository
+   or `.git/info/exclude` rules.
+3. Verify imports, npm script paths, package exports, branding assets and
+   symlinks. Run the affected tests; typecheck may exclude tests/manual scripts.
+4. Review staged files for scratch output, runtime state, secrets and real
+   identities in examples. Keep raw session artifacts in `.debug/scratch/`.
+5. Record intentional exclusions, verification results and unrun live checks
+   in the sync audit. Ancestry and file presence do not prove behavior survived.
+
 ### Current rename rules and remaining-name review
 
 **Track renamed files explicitly:** on 2026-10-01, an audit recovered 16 source
@@ -287,6 +308,8 @@ node scripts/branding/apply.mjs --root <rebrand-worktree> --check
 git -c core.excludesFile=/dev/null -C <rebrand-worktree> add -A
 node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --check \
   --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
+# Complete the file-completeness/publication gate above before committing.
+git -C <rebrand-worktree> diff --cached --name-status -M
 git -C <rebrand-worktree> diff --cached --check
 git -C <rebrand-worktree> commit -m "Rebrand upstream vX.Y.Z for Clisbot sync"
 
@@ -295,7 +318,9 @@ git -C <promotion-worktree> merge --no-ff --no-commit sync/rebranded-vX.Y.Z
 # Resolve conflicts; rerun the text rename/check and old-name scan.
 node scripts/branding/apply.mjs --root <promotion-worktree> --check
 # If needed, review and apply the visual transform; run the release gates.
-git -C <promotion-worktree> add -A
+git -c core.excludesFile=/dev/null -C <promotion-worktree> add -A
+# Repeat the gate against both Fusion and transformed-upstream baselines.
+git -C <promotion-worktree> diff --cached --name-status -M
 git -C <promotion-worktree> diff --cached --check
 git -C <promotion-worktree> commit -m "Sync rebranded upstream vX.Y.Z"
 
