@@ -75,8 +75,12 @@ not silently move the product baseline.
 
 ### Prepare Fusion before the one-time cutover
 
-**Current test target, 2026-09-30:** Paseo `v0.10.2` replaces `v0.10.1` for the
-next sync. See [independent upstream validation](../../audits/2026-09-30-clisbot-branding/upstream-v0.10.2-validation.md).
+**Current test integration, 2026-09-30:** Paseo `v0.10.2` was selected instead of
+`v0.10.1` and merged into `rebrand/clisbot-fusion-test` after user approval.
+See [independent upstream validation](../../audits/2026-09-30-clisbot-branding/upstream-v0.10.2-validation.md)
+and [the actual merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md)
+(75 files / 179 conflict hunks, normalized-base resolution, integration fixes
+and remaining acceptance gates). `main` promotion is still pending.
 
 1. Apply and verify the repeatable text and visual rebrand on
    `rebrand/clisbot-fusion-test`, the isolated Fusion candidate. Keep

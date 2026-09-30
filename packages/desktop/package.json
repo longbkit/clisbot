@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/desktop",
-  "version": "0.10.0-beta.1",
+  "version": "0.10.2",
   "private": true,
   "description": "Clisbot desktop app (Electron wrapper)",
   "homepage": "https://clisbot.com",

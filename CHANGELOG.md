@@ -1,10 +1,38 @@
 # Changelog
 
-## 0.10.0-beta.1 - 2026-09-27
+## 0.10.2 - 2026-09-30
+
+### Fixed
+
+- Fixed OpenCode v2 turns longer than five minutes failing with `UND_ERR_HEADERS_TIMEOUT` ([#5674](https://github.com/longbkit/clisbot/pull/5674))
+- Fixed the context meter staying empty during OpenCode v2 turns and disappearing after them ([#5710](https://github.com/longbkit/clisbot/pull/5710) by [@mcowger](https://github.com/mcowger))
+- Fixed OpenCode v2 question cards showing only the header and offering no typed answer ([#5679](https://github.com/longbkit/clisbot/pull/5679))
+- Fixed OpenCode v2 patch edits from GPT models showing as a raw Patch card instead of an edit diff ([#5696](https://github.com/longbkit/clisbot/pull/5696))
+- Fixed completed OpenCode v2 edits showing no diff ([#5609](https://github.com/longbkit/clisbot/pull/5609))
+
+## 0.10.1 - 2026-09-29
 
 ### Added
 
-- Added OpenCode v2 support, selected automatically from the installed `opencode` version ([#5198](https://github.com/longbkit/clisbot/pull/5198) by [@karrots](https://github.com/karrots), [@dsingal0](https://github.com/dsingal0))
+- Added Claude Sonnet 5.5 for Claude Code 2.1.284 and newer ([#5583](https://github.com/longbkit/clisbot/pull/5583) by [@yangqi](https://github.com/yangqi))
+
+### Fixed
+
+- Fixed OpenCode chats failing with "Variant unavailable" after switching to a model without the selected thinking level ([#5587](https://github.com/longbkit/clisbot/pull/5587))
+- Fixed rewinding a Codex chat dropping its custom provider and Clisbot tools ([#5345](https://github.com/longbkit/clisbot/pull/5345) by [@zbaibg](https://github.com/zbaibg))
+- Fixed streamed replies joining lines of code blocks and Mermaid diagrams until the chat reloads ([#5577](https://github.com/longbkit/clisbot/pull/5577))
+- Fixed a subagent opened from a split pane opening in a different pane ([#5451](https://github.com/longbkit/clisbot/pull/5451))
+- Fixed archiving a custom Codex provider's agent leaving its session in Import session ([#5572](https://github.com/longbkit/clisbot/pull/5572))
+- Fixed the `/` menu of a custom Codex provider with its own `CODEX_HOME` listing the daemon's prompts instead of its own ([#5450](https://github.com/longbkit/clisbot/pull/5450))
+- Fixed a background `send_agent_prompt` returning `idle` for a prompt the agent accepted ([#5386](https://github.com/longbkit/clisbot/pull/5386))
+- Fixed Windows file-link tooltips showing the full path for files inside the workspace ([#1987](https://github.com/longbkit/clisbot/pull/1987))
+- Fixed terminal profiles that run `cursor-agent` showing the generic terminal icon ([#5379](https://github.com/longbkit/clisbot/pull/5379))
+
+## 0.10.0 - 2026-09-28
+
+### Added
+
+- Added OpenCode v2 support, selected automatically from the installed `opencode` version ([#5198](https://github.com/longbkit/clisbot/pull/5198), [#5526](https://github.com/longbkit/clisbot/pull/5526) by [@karrots](https://github.com/karrots), [@dsingal0](https://github.com/dsingal0), [@gszep](https://github.com/gszep))
 - Added task lists from rpiv-todo, pi-goal-x, and Pi's example todo extension to Pi chats ([#5309](https://github.com/longbkit/clisbot/pull/5309))
 - Added subagent runs from pi-subagents, Tintinweb pi-subagents, and Gotgenes pi-subagents to the Subagents track ([#5309](https://github.com/longbkit/clisbot/pull/5309))
 - Added rpiv-ask-user-question dialogs to Pi chats as one question form ([#5309](https://github.com/longbkit/clisbot/pull/5309))

@@ -2316,6 +2316,7 @@ export class AgentManager {
     if (agent.runtimeInfo) {
       agent.runtimeInfo = { ...agent.runtimeInfo, model: normalizedModelId };
     }
+    this.refreshSessionPersistence(agent);
     this.touchUpdatedAt(agent);
     this.emitState(agent);
   }
@@ -5035,9 +5036,11 @@ export class AgentManager {
     const eventTurnId = identified.turnId;
     const isForegroundEvent = agent.activeForegroundTurnId === eventTurnId;
     this.traceHandleStreamEventStart(agent, event, eventTurnId, isForegroundEvent);
+    // A delayed provider start may arrive after the queued terminal was applied.
+    // The same turn cannot become an autonomous run after it has finished.
     if (
       eventTurnId &&
-      isTurnTerminalEvent(event) &&
+      (event.type === "turn_started" || isTurnTerminalEvent(event)) &&
       this.runs.hasFinalizedTurn(agent, eventTurnId)
     ) {
       return false;

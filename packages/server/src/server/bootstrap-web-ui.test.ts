@@ -45,7 +45,7 @@ function fetchDaemonWebUi(options: {
 
 function readInjectedConnectionHint(html: string): InitialDaemonConnectionHint {
   const match = html.match(
-    /window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__=(?<json>\{[^<]+})<\/script>/,
+    /window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__=(?<json>\{[^<;]+})(?:;|<\/script>)/,
   );
   if (!match?.groups?.json) {
     throw new Error("Missing initial daemon connection hint");

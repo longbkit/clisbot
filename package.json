@@ -1,6 +1,6 @@
 {
   "name": "clisbot",
-  "version": "0.10.0-beta.1",
+  "version": "0.10.2",
   "private": true,
   "description": "Clisbot: voice-controlled development environment for local AI coding agents",
   "keywords": [

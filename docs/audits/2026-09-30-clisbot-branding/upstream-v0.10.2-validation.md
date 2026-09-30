@@ -1,14 +1,14 @@
 # Upstream v0.10.2: independent rebrand validation
 
-**CURRENT, 2026-09-30:** the selected release is [Paseo v0.10.2](https://github.com/getpaseo/paseo/releases/tag/v0.10.2), replacing v0.10.1 for the next Fusion merge. Validation completed on an isolated upstream branch. The merge has not started.
+**CURRENT, 2026-09-30:** the selected release is [Paseo v0.10.2](https://github.com/getpaseo/paseo/releases/tag/v0.10.2), replacing v0.10.1 for the next Fusion merge. Validation completed on an isolated upstream branch. The subsequently authorized Fusion merge is recorded in [the merge audit](merge-v0.10.2.md).
 
 ## Exact inputs and branches
 
 - Raw release commit: `919c737c1948c5a16220307403a82e90d3e27ea0`, fetched with `--no-tags` into `refs/upstream-releases/v0.10.2`.
 - Transformed commit: `d4991268c11a27c77644654157cff02fda747331` on `rebrand/upstream-v0.10.2-test`.
 - Worktree: `/Volumes/Media/clisbot-worktrees/rebrand-upstream-v0.10.2`.
-- Future merge destination: `rebrand/clisbot-fusion-test`, after the user's confirmation.
-- The current Fusion baseline remains v0.10.0-beta.1. v0.10.2 adds 25 upstream commits from that baseline; it adds 7 commits / 32 changed files from v0.10.1.
+- Merge destination: `rebrand/clisbot-fusion-test`, authorized by the user.
+- Before the merge, the Fusion baseline was v0.10.0-beta.1. v0.10.2 adds 25 upstream commits from that baseline; it adds 7 commits / 32 changed files from v0.10.1.
 
 The same Fusion-owned text transform, publication rules, ports and Flow/Ocean 02 bytes were applied to the raw release. Service endpoints remain upstream under the approved temporary exception. Expo uses the configured Clisbot owner/project. The [machine-readable evidence](evidence/upstream-v0.10.2-validation.json) records input hashes, exact paths and results.
 
@@ -70,7 +70,7 @@ The general text replacement missed GitHub repository owners inside escaped rege
 
 ## Next gate and limits
 
-User confirmation authorizes merging **`rebrand/upstream-v0.10.2-test` → `rebrand/clisbot-fusion-test`**. Record actual conflict files, causes and resolutions during that merge. Retest Fusion-specific Hub proxy/auth, channels, Bots/Chats and Android startup after integration. Independent upstream validation does not establish those Fusion behaviors.
+The user subsequently authorized merging **`rebrand/upstream-v0.10.2-test` → `rebrand/clisbot-fusion-test`**. See [actual conflict files, causes, resolutions and integration gates](merge-v0.10.2.md). Retest Fusion-specific Hub proxy/auth, channels, Bots/Chats and Android startup after integration. Independent upstream validation does not establish those Fusion behaviors.
 
 Native APK/iOS/Electron installers, live LLM turns and relay end-to-end behavior were not tested here. Temporary upstream endpoints and the publication decisions in [the publication review](publication-review.md#remaining-publication-decisions) remain release gates. `main`, the reference Fusion branch and the v0.10.1 test branch have not been changed. Promotion to `main` requires a separate user confirmation after acceptance.
 
