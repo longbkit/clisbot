@@ -176,6 +176,7 @@ files omitted during rebrand staging: 15 Hub example/fixture files under
 ignores any destination. Add narrow repository exceptions or force-add only
 the listed source paths, then stage and check again. Never force-add the whole
 checkout; local runtime homes and credentials must stay ignored.
+The [file-completeness follow-up](../../audits/2026-09-30-clisbot-branding/file-completeness.md) records the full-tree comparison and stale-import checks.
 
 The test branch's [rename script](../../../scripts/rebrand-clisbot.mjs) applies
 the following rules to Git-tracked paths and UTF-8 text. These are string and

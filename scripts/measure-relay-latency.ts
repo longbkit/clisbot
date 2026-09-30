@@ -1,6 +1,6 @@
-import { DaemonClient } from "../packages/server/src/client/daemon-client.js";
-import { buildRelayWebSocketUrl } from "../packages/server/src/shared/daemon-endpoints.js";
-import { buildDaemonWebSocketUrl } from "../packages/server/src/shared/daemon-endpoints.js";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
+import { buildDaemonWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 
 const OFFER = {
   serverId: "srv_ETXtcjYRGrCI",

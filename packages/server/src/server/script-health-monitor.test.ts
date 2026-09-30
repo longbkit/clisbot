@@ -9,7 +9,7 @@ import { findFreePort, ScriptRouteStore } from "./script-proxy.js";
 import { ScriptHealthMonitor, type ScriptHealthEntry } from "./script-health-monitor.js";
 import { spawnWorkspaceScript } from "./worktree-bootstrap.js";
 import { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
-import type { TerminalManager } from "./terminal/terminal-manager.js";
+import type { TerminalManager } from "../terminal/terminal-manager.js";
 
 interface TcpServerHandle {
   port: number;

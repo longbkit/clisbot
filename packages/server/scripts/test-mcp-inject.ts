@@ -4,12 +4,10 @@ import path from "node:path";
 
 import pino from "pino";
 
-import { ClaudeAgentClient } from "../src/server/agent/providers/claude-agent.js";
+import { ClaudeAgentClient } from "../src/server/agent/providers/claude/agent.js";
 import { CodexAppServerAgentClient } from "../src/server/agent/providers/codex-app-server-agent.js";
-import {
-  getFullAccessConfig,
-  isProviderAvailable,
-} from "../src/server/daemon-e2e/agent-configs.js";
+import { getFullAccessConfig } from "../src/server/daemon-e2e/agent-configs.js";
+import { isCommandAvailable } from "../src/executable-resolution/executable-resolution.js";
 import { DaemonClient } from "../src/server/test-utils/daemon-client.js";
 import { createTestClisbotDaemon } from "../src/server/test-utils/clisbot-daemon.js";
 
@@ -123,13 +121,13 @@ async function verifyInjectedMcpForProvider(
 }
 
 async function main(): Promise<void> {
-  const claudeAvailable = await isProviderAvailable("claude");
+  const claudeAvailable = await isCommandAvailable("claude");
   if (!claudeAvailable) {
     throw new Error(
       "Claude is not available in this environment. Ensure the `claude` binary and credentials are configured.",
     );
   }
-  const codexAvailable = await isProviderAvailable("codex");
+  const codexAvailable = await isCommandAvailable("codex");
 
   const logger = pino({ level: "silent" });
   const rootCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-mcp-inject-real-"));
