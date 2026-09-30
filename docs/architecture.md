@@ -493,6 +493,6 @@ Worker restart retains supervisor arguments/environment and rereads the configur
 
 ## Deployment models
 
-1. **Local daemon** (default): `clisbot daemon start` on `127.0.0.1:6767`
+1. **Local daemon** (default): `clisbot daemon start` on `127.0.0.1:6868`
 2. **Managed desktop**: Electron uses the server package’s local-instance lifecycle capability for sanitized launch, published readiness, and captured-PID stop. Only a matching `{pid, startedAt}` from a spawn in the current Desktop session authorizes automatic stop or binary replacement. Preexisting instances, including legacy `desktopManaged` records, are attach-only. Keep-running survivors attach in the next session. Explicit attached Stop requires a confirmation naming the captured home/PID. Ordinary Restart uses the worker RPC on every app platform.
 3. **Remote + relay**: Daemon behind firewall, relay bridges with E2E encryption

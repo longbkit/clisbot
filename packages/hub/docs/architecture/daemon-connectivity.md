@@ -7,7 +7,7 @@ pointing opposite directions** — keep them straight before debugging any
 ## Two sockets, opposite directions
 
 **`/ws` — the daemon's own trusted-client server.** Lives on the **daemon**
-(`packages/server/.../websocket-server.ts`, `127.0.0.1:6767`, exposed via
+(`packages/server/.../websocket-server.ts`, `127.0.0.1:6868`, exposed via
 direct/relay). **Clients dial in.** Carries the **full interactive** wire,
 `scopes:["*"]`: `create_agent`, `send_agent_message` (steer),
 `agent_permission_response`, `agent_stream`/timeline, terminals, providers,
@@ -45,7 +45,7 @@ up to three ways to reach the same daemon's `/ws`:
 - **relay** — E2EE through the relay from `offer.relay.endpoint` + `serverId`, via
   `buildRelayWebSocketUrl` + the relay-E2EE transport
   (`packages/client/src/daemon-client-relay-e2ee-transport.ts`).
-- **loopback** — embedded Hub only: the daemon pid-lock `listen` / `127.0.0.1:6767`.
+- **loopback** — embedded Hub only: the daemon pid-lock `listen` / `127.0.0.1:6868`.
 
 **App selection is latency-based**, not a fixed priority: the app probes its
 candidates and keeps the lowest-latency one (with a few-probe hysteresis); direct

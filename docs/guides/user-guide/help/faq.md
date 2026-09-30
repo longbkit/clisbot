@@ -26,7 +26,7 @@ Bot có tên khác cần `--bot-name`; `bot status NAME --home ...` cũng in l�
 
 ### Hub chạy nhưng không mở được Clisbot web app
 
-URL **Hub** và URL **daemon** là hai địa chỉ khác nhau. Dùng địa chỉ thật được in ra, không mặc định mọi home đều dùng port 6767/6868.
+URL **Hub** và URL **daemon** là hai địa chỉ khác nhau. Dùng địa chỉ thật được in ra, không mặc định mọi home đều dùng port 6868/6868.
 
 ```bash
 clisbot daemon status --home "$HOME/.clisbot-dev-01"

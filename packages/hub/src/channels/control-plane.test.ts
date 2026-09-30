@@ -701,11 +701,11 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
 });
 
 describe("hubListenPort", () => {
-  it("reads PORT, falling back to 3000 for missing or invalid values", () => {
+  it("reads PORT, falling back to 6870 for missing or invalid values", () => {
     assert.equal(hubListenPort({ PORT: "6868" }), 6868);
-    assert.equal(hubListenPort({}), 3000);
-    assert.equal(hubListenPort({ PORT: "not-a-port" }), 3000);
-    assert.equal(hubListenPort({ PORT: "0" }), 3000);
+    assert.equal(hubListenPort({}), 6870);
+    assert.equal(hubListenPort({ PORT: "not-a-port" }), 6870);
+    assert.equal(hubListenPort({ PORT: "0" }), 6870);
   });
 });
 

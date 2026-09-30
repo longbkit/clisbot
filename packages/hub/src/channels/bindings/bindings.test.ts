@@ -98,7 +98,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
       workspaces.push({ cwd: input.cwd, prompt: input.firstAgentContext?.prompt });
       return { workspaceId: `workspace-${workspaces.length - 1}` };
     },
-    discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
+    discovery: { url: "ws://127.0.0.1:6868/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, options) => {
       sources.push(options?.source);

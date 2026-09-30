@@ -4,6 +4,12 @@ import { z } from "zod";
 
 const HubConfigurationSchema = z.object({ origin: z.string().url() }).strict();
 
+declare global {
+  interface Window {
+    __CLISBOT_HUB_ENABLED__?: boolean;
+  }
+}
+
 export interface HubConfiguration {
   origin: string;
 }
@@ -13,14 +19,21 @@ export function getHubConfiguration(): HubConfiguration | null {
     Platform.OS === "web" && typeof window !== "undefined" && window.clisbotDesktop === undefined
       ? window.location.origin
       : undefined;
-  return resolveHubConfiguration(Constants.expoConfig?.extra?.clisbotHub, browserOrigin);
+  return resolveHubConfiguration(
+    Constants.expoConfig?.extra?.clisbotHub,
+    browserOrigin,
+    browserOrigin !== undefined && window.__CLISBOT_HUB_ENABLED__ === true,
+  );
 }
 
 export function resolveHubConfiguration(
   input: unknown,
   browserOrigin?: string,
+  runtimeEnabled = false,
 ): HubConfiguration | null {
-  const configured = parseHubConfiguration(input);
+  const configured = parseHubConfiguration(
+    runtimeEnabled && browserOrigin ? { origin: browserOrigin } : input,
+  );
   if (configured === null || browserOrigin === undefined) return configured;
 
   // Browser Hub access is deliberately same-origin so its HTTP-only session

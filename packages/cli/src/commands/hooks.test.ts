@@ -6,7 +6,7 @@ import { runHooksCommand } from "./hooks.js";
 const hookEnv = {
   CLISBOT_TERMINAL_ID: "terminal-1",
   CLISBOT_ACTIVITY_TOKEN: "token-1",
-  CLISBOT_TERMINAL_ACTIVITY_URL: "http://127.0.0.1:6767/api/terminal-activity",
+  CLISBOT_TERMINAL_ACTIVITY_URL: "http://127.0.0.1:6868/api/terminal-activity",
 };
 
 function inputFrom(value: string) {

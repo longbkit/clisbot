@@ -38,7 +38,7 @@ appId: sh.clisbot
     timeout: 10000
 
 - tapOn:
-    text: "192.168.1.10:6767"
+    text: "192.168.1.10:6868"
 - eraseText
 - inputText: ${DIRECT_ENDPOINT}
 - tapOn: "Add"

@@ -8,6 +8,7 @@ import { buildAssistantPlan, type BotStartOptions } from "./plan.js";
 import path from "node:path";
 import { resolveBotHome } from "./home.js";
 import { startCommand, runStartCommand, extractBotStartOptions } from "./start.js";
+import { localWebUiOrigin } from "../hub/web-ui.js";
 
 /** API-first init: channel credentials opt into the same complete bot flow. */
 export function onboardingInitCommand(): Command {
@@ -61,7 +62,8 @@ const initSchema: OutputSchema<AssistantInitReport> = {
     return [
       `Assistant workspace ready: ${assistant.workspacePath}`,
       `  project ${assistant.projectId}; workspace ${assistant.workspaceId}`,
-      `  bot ${assistant.botId}; Hub ${assistant.hubUrl}`,
+      `  bot ${assistant.botId}; Hub backend ${assistant.hubUrl}`,
+      `  App ${assistant.appUrl}`,
       `  template created: ${assistant.template?.created.join(", ") || "none"}; preserved: ${assistant.template?.skipped.join(", ") || "none"}`,
       assistant.nextStep,
     ].join("\n");
@@ -97,8 +99,9 @@ export async function initializeAssistantWorkspace(
     return {
       ...assistant,
       hubUrl: hub.url,
+      appUrl: localWebUiOrigin(home, { ...env, CLISBOT_LISTEN: await deps.daemonHost(home, env) }),
       nextStep:
-        "Open your assistant in the app. For channel chat, finish Account setup at the Hub URL if needed, then run hub init or bot start with channel credentials.",
+        "Open the Clisbot app URL to finish Account setup. For channel chat, run hub init or bot start with channel credentials.",
     };
   } finally {
     await deps.closeDaemon(client);

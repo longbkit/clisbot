@@ -12,6 +12,7 @@ import { createSlackWebhookSource } from "../triggers/slack/webhook.js";
 import { createFetchServer } from "./node-server.js";
 import { registerResponseFinishCleanup } from "./response-lifecycle.js";
 import { TRUSTED_REQUEST_ORIGIN_HEADER } from "./request-origin.js";
+import { INTERNAL_CLIENT_ADDRESS_HEADER } from "./client-address.js";
 
 describe("trusted request origin metadata", () => {
   it("overwrites a caller-supplied internal header with direct HTTP metadata", async () => {
@@ -78,6 +79,27 @@ describe("trusted request origin metadata", () => {
 });
 
 describe("CLI authorization client address", () => {
+  it("accepts proxy IPs only from configured peers and sanitizes the auth header", async () => {
+    for (const trusted of [true, false]) {
+      let observed: string[] = [];
+      const server = createFetchServer(
+        (request) => {
+          observed = [
+            request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER) ?? "",
+            request.headers.get("x-clisbot-proxy-client-ip") ?? "",
+          ];
+          return new Response("ok");
+        },
+        {
+          trustedClientIpHeader: "x-clisbot-proxy-client-ip",
+          trustedProxyAddresses: trusted ? ["127.0.0.1"] : ["192.0.2.1"],
+        },
+      );
+      await requestOnce(server, { headers: { "x-clisbot-proxy-client-ip": "198.51.100.42" } });
+      const expected = trusted ? "198.51.100.42" : "127.0.0.1";
+      assert.deepEqual(observed, [expected, expected]);
+    }
+  });
   it("uses the socket peer regardless of caller-supplied proxy headers or user agents", async () => {
     const hub = await CliAuthorizationServer.start();
 

@@ -124,7 +124,7 @@ clisbot attach abc123                # 实时流式查看输出
 clisbot send abc123 "also add tests" # 发送后续任务
 
 # 在远程 daemon 上运行
-clisbot --host workstation.local:6767 run "run the full test suite"
+clisbot --host workstation.local:6868 run "run the full test suite"
 ```
 
 更多内容见[完整 CLI 参考](https://clisbot.com/docs/cli)。

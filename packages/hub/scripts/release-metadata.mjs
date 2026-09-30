@@ -43,7 +43,7 @@ export function releaseMetadata({ tag, packageVersion, changelog }) {
 }
 
 export function imageTags(owner, metadata) {
-  const image = `ghcr.io/${owner.toLowerCase()}/hub`;
+  const image = `ghcr.io/${owner.toLowerCase()}/clisbot`;
   const tags = [`${image}:${metadata.version}`];
   if (!metadata.prerelease) tags.push(`${image}:latest`);
   return tags;

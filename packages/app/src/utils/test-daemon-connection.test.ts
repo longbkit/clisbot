@@ -80,9 +80,9 @@ describe("test-daemon-connection connectToDaemon", () => {
     const { connectToDaemon } = await import("./test-daemon-connection");
     const first = await connectToDaemon(
       {
-        id: "direct:lan:6767",
+        id: "direct:lan:6868",
         type: "directTcp",
-        endpoint: "lan:6767",
+        endpoint: "lan:6868",
       },
       undefined,
       probe.deps,
@@ -91,9 +91,9 @@ describe("test-daemon-connection connectToDaemon", () => {
 
     const second = await connectToDaemon(
       {
-        id: "direct:lan:6767",
+        id: "direct:lan:6868",
         type: "directTcp",
-        endpoint: "lan:6767",
+        endpoint: "lan:6868",
       },
       undefined,
       probe.deps,
@@ -117,9 +117,9 @@ describe("test-daemon-connection connectToDaemon", () => {
 
     const result = await connectToDaemon(
       {
-        id: "direct:lan:6767",
+        id: "direct:lan:6868",
         type: "directTcp",
-        endpoint: "lan:6767",
+        endpoint: "lan:6868",
       },
       undefined,
       deps,
@@ -176,9 +176,9 @@ describe("test-daemon-connection connectToDaemon", () => {
     const { connectToDaemon } = await import("./test-daemon-connection");
     const result = await connectToDaemon(
       {
-        id: "direct:lan:6767",
+        id: "direct:lan:6868",
         type: "directTcp",
-        endpoint: "lan:6767",
+        endpoint: "lan:6868",
       },
       { password: "shared-secret" },
       probe.deps,
@@ -197,9 +197,9 @@ describe("test-daemon-connection connectToDaemon", () => {
     };
     const result = await connectToDaemon(
       {
-        id: "direct:lan:6767",
+        id: "direct:lan:6868",
         type: "directTcp",
-        endpoint: "lan:6767",
+        endpoint: "lan:6868",
       },
       { trace },
       probe.deps,
@@ -251,9 +251,9 @@ describe("test-daemon-connection connectToDaemon", () => {
     await expect(
       connectToDaemon(
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
         { password: "wrong-secret" },
         probe.deps,
@@ -271,9 +271,9 @@ describe("test-daemon-connection connectToDaemon", () => {
     await expect(
       connectToDaemon(
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
         { password: "shared-secret" },
         probe.deps,

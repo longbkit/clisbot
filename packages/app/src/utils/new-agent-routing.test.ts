@@ -44,8 +44,8 @@ describe("parseAgentKey", () => {
   });
 
   it("uses the last separator to preserve server ids with colons", () => {
-    expect(parseAgentKey("localhost:6767:agent-9")).toEqual({
-      serverId: "localhost:6767",
+    expect(parseAgentKey("localhost:6868:agent-9")).toEqual({
+      serverId: "localhost:6868",
       agentId: "agent-9",
     });
   });

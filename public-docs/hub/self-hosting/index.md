@@ -8,13 +8,24 @@ category: Hub
 
 # Self-hosting Hub
 
-The shortest path is one command:
+Set a persistent credential encryption key before starting Hub:
 
 ```sh
+export CLISBOT_HUB_CREDENTIAL_MASTER_KEY="$(openssl rand -base64 32)"
 npx @clisbot/hub
 ```
 
-Open <http://localhost:3000>. A fresh Hub creates its embedded database and authentication secret, then guides you through creating the operator account and the GitHub, Slack, or Discord apps you want.
+Hub listens on `http://localhost:6870` for backend APIs. It creates its embedded
+database and authentication secret. Manage it through the Hub settings integrated
+in the Clisbot app. Port `6870` does not serve a separate dashboard.
+
+For the daemon, web UI and Hub together, use the shared Docker image with
+`CLISBOT_RUN_MODE=all` and open `http://localhost:6868`; see
+[Docker service modes](/docs/docker#service-modes).
+
+Save that key in your deployment secrets and reuse it across restarts. You can
+instead mount a secret and set `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` to its
+absolute path. Set exactly one key source.
 
 Follow the [quickstart](/docs/hub/quickstart) to connect Slack over Socket Mode and run the first workflow without a public server.
 
@@ -32,7 +43,16 @@ Embedded mode supports one Hub process per data directory. It is intended for a 
 
 ## Public addresses
 
-Hub defaults to `http://localhost:3000`. That is enough for its dashboard, daemons, Slack Socket Mode, and providers that connect out from Hub.
+Hub's backend defaults to `http://localhost:6870`. Daemons and outbound provider
+connections can use it directly. Browser access uses the Clisbot web UI and Hub
+APIs on the same public origin. In Docker `all` mode, that origin defaults to
+`http://localhost:6868`.
+
+Standalone Hub also defaults browser links to `http://localhost:6868`.
+Starting Hub alone does not start the web UI. Local CLI onboarding prepares
+the shared UI and proxy when launching a fresh daemon, and uses its selected
+port for browser login links. If that daemon is already running without the
+proxy configured, onboarding explains which settings need a deliberate restart.
 
 GitHub event triggers use webhooks and need a public HTTPS address. Repository access can still work without the webhook. Slack's optional Webhooks transport also needs public HTTPS; Socket Mode does not.
 
@@ -42,7 +62,17 @@ When Hub is available at a stable public origin, set it before starting:
 CLISBOT_HUB_APP_URL=https://hub.example.com npx @clisbot/hub
 ```
 
-Changing the public origin requires updating callback and webhook settings in the provider apps. The **Apps** page generates the URLs for the origin Hub is currently using.
+`CLISBOT_HUB_APP_URL` must be the public app origin, with Hub APIs routed to the
+backend. For a separately hosted daemon web UI, configure its
+`CLISBOT_HUB_PROXY_URL=http://your-hub:6870`. Use HTTPS outside localhost.
+The daemon can instead persist `features.webUi.enabled=true` and
+`features.webUi.hubProxyUrl` in `config.json`; the environment URL takes precedence.
+On Hub, set `CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER=x-clisbot-proxy-client-ip` and
+`CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES` to the daemon proxy's IP address as seen by
+Hub (comma-separated IP literals). Docker `all` sets both for its local proxy.
+This preserves per-client quotas while rejecting IP headers from other peers.
+Changing the public origin requires updating callback and webhook settings in
+the provider apps. The app's Hub settings generate URLs for that public origin.
 
 ## PostgreSQL
 
@@ -111,57 +141,71 @@ The password must be at least 12 characters. Sign in once, replace it in the das
 The repository contains Hub and PostgreSQL as one Compose stack:
 
 ```sh
-git clone https://github.com/getpaseo/hub.git
-cd hub
+git clone https://github.com/longbkit/clisbot.git
+cd clisbot/packages/hub
 cp .env.example .env
-docker compose up -d
 ```
 
-Open <http://localhost:3000> and complete browser setup. For a public deployment, set `CLISBOT_HUB_APP_URL` and any reverse-proxy settings in `.env` before starting the stack.
+Set `CLISBOT_HUB_CREDENTIAL_MASTER_KEY` in `.env`, along with the public URL and
+bootstrap account settings, then run `docker compose up -d`.
 
-The stack publishes Hub on port `3000` and stores PostgreSQL data in a named volume. The Hub image is `ghcr.io/getpaseo/hub:latest`.
+This starts the backend on `6870`. Serve the Clisbot web UI separately and route
+its Hub APIs here, or use Docker `all` mode to run everything together.
+Complete account setup in the Clisbot app. Set `CLISBOT_HUB_APP_URL` to the app's
+public origin before starting the stack.
+
+The stack publishes Hub on port `6870` and stores PostgreSQL data in a named volume.
+It uses the shared `ghcr.io/longbkit/clisbot:latest` image with `CLISBOT_RUN_MODE=hub`.
+The same image supports `daemon` (port `6868`) or `all` (both services).
 
 ### HTTPS with Caddy
 
-Compose serves plain HTTP on port `3000`. Run Caddy on the same host to terminate TLS:
+For `all` mode, expose the shared UI through Caddy on the same host:
 
 ```caddyfile
 hub.example.com {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:6868
 }
 ```
 
 Point `hub.example.com` at the host and open ports 80 and 443. Caddy [obtains and renews the certificate](https://caddyserver.com/docs/automatic-https).
 
-Then set in `.env`:
+Set these environment values on the Clisbot container:
 
 ```dotenv
 CLISBOT_HUB_APP_URL=https://hub.example.com
-CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER=x-forwarded-for
+CLISBOT_HOSTNAMES=hub.example.com
 ```
 
-To keep port `3000` off the public interface, change the `hub` port in `compose.yml` to `"127.0.0.1:3000:3000"`.
+Only port `6868` needs to be published in `all` mode. For the Hub-only Compose
+stack, publish `6870` only to the network used by the UI proxy (for a proxy on
+the same host, use `"127.0.0.1:6870:6870"`).
 
 ## Fly
 
 Clone the repository and create an app and database under names you control:
 
 ```sh
-git clone https://github.com/getpaseo/hub.git
-cd hub
+git clone https://github.com/longbkit/clisbot.git
+cd clisbot/packages/hub
 fly apps create your-hub
 fly postgres create --name your-hub-db
 fly postgres attach your-hub-db -a your-hub
 ```
 
-Deploy the Dockerfile and give Hub its public origin:
+Copy `fly.example.toml` to `fly.toml` and set your app name. It selects the shared
+image in Hub mode. Set the persistent credential key as a Fly secret, then deploy:
 
 ```sh
+fly secrets set CLISBOT_HUB_CREDENTIAL_MASTER_KEY="$CLISBOT_HUB_CREDENTIAL_MASTER_KEY" -a your-hub
 fly deploy -a your-hub \
-  -e CLISBOT_HUB_APP_URL=https://your-hub.fly.dev
+  -e CLISBOT_HUB_APP_URL=https://clisbot.example.com
 ```
 
-Open that address and complete browser setup, or set the [bootstrap environment](#bootstrap-from-environment) before deploying.
+The Fly address serves the backend. Serve the Clisbot app at
+`https://clisbot.example.com` and configure its Hub proxy to reach that backend.
+Complete account setup in the app, or set the
+[bootstrap environment](#bootstrap-from-environment) before deploying.
 
 Keep one machine running. Hub holds Slack Socket Mode and Discord gateway connections and dispatches events to daemons, so a stopped machine misses events.
 

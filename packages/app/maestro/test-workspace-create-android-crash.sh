@@ -15,8 +15,8 @@
 #
 # Optional environment:
 #   CLISBOT_MAESTRO_APP_ID=sh.clisbot.debug
-#   CLISBOT_MAESTRO_DIRECT_ENDPOINT=127.0.0.1:6767
-#   CLISBOT_MAESTRO_DAEMON_WS_URL=ws://127.0.0.1:6767/ws
+#   CLISBOT_MAESTRO_DIRECT_ENDPOINT=127.0.0.1:6868
+#   CLISBOT_MAESTRO_DAEMON_WS_URL=ws://127.0.0.1:6868/ws
 #   CLISBOT_MAESTRO_PROJECT_PATH=/path/to/git/repo
 set -euo pipefail
 
@@ -27,8 +27,8 @@ OUT_DIR="/tmp/clisbot-workspace-create-android-$(date +%s)"
 CLIENT_EXPORTS="$REPO_ROOT/packages/client/dist/daemon-client.js"
 
 export CLISBOT_MAESTRO_APP_ID="${CLISBOT_MAESTRO_APP_ID:-sh.clisbot.debug}"
-export CLISBOT_MAESTRO_DIRECT_ENDPOINT="${CLISBOT_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6767}"
-export CLISBOT_MAESTRO_DAEMON_WS_URL="${CLISBOT_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6767/ws}"
+export CLISBOT_MAESTRO_DIRECT_ENDPOINT="${CLISBOT_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6868}"
+export CLISBOT_MAESTRO_DAEMON_WS_URL="${CLISBOT_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6868/ws}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -102,7 +102,7 @@ echo "Rendered flow: $FLOW"
 
 echo ""
 echo "Preparing Android port reverse..."
-adb reverse tcp:6767 tcp:6767 >/dev/null
+adb reverse tcp:6868 tcp:6868 >/dev/null
 
 echo ""
 echo "Opening project in daemon..."

@@ -39,8 +39,8 @@ export async function connectDaemonWebAppOnlyThroughRelay(
     updatedAt: now,
   };
 
-  await page.route(/:(6767)\b/, (route) => route.abort());
-  await page.routeWebSocket(/:(6767)\b/, async (socket) => {
+  await page.route(/:(6767|6768|6868|6869)\b/, (route) => route.abort());
+  await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (socket) => {
     await socket.close({ code: 1008, reason: "Blocked developer daemon during relay E2E" });
   });
   await page.route("**/*", async (route) => {

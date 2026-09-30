@@ -176,7 +176,7 @@ interface BootedDaemon {
 
 async function bootDaemon(): Promise<BootedDaemon> {
   const port = await getFreePort();
-  if (port === 6767) {
+  if ([6767, 6768, 6868, 6869].includes(port)) {
     throw new Error("Refusing to use port 6767 (the developer daemon)");
   }
   const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-bench-home-"));

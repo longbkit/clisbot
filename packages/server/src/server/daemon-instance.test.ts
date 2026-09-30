@@ -24,7 +24,7 @@ function lockFor(pid: number, startedAt: Date): PidLockInfo {
     startedAt: startedAt.toISOString(),
     hostname: "old-host",
     uid: process.getuid?.() ?? 0,
-    listen: "127.0.0.1:6767",
+    listen: "127.0.0.1:6868",
     desktopManaged: true,
     heartbeat: true,
   };

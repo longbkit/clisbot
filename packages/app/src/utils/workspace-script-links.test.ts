@@ -8,9 +8,9 @@ const runningService: WorkspaceScriptPayload = {
   type: "service",
   hostname: "web--feature--clisbot.localhost",
   port: 3000,
-  localProxyUrl: "http://web--feature--clisbot.localhost:6767",
+  localProxyUrl: "http://web--feature--clisbot.localhost:6868",
   publicProxyUrl: null,
-  proxyUrl: "http://web--feature--clisbot.localhost:6767",
+  proxyUrl: "http://web--feature--clisbot.localhost:6868",
   lifecycle: "running",
   health: "healthy",
   exitCode: null,
@@ -27,18 +27,18 @@ function resolveLink(
 describe("resolveWorkspaceScriptLink", () => {
   it("defaults to the memorable Clisbot URL locally and keeps direct as a fallback", () => {
     expect(
-      resolveLink({ type: "directTcp", endpoint: "localhost:6767", display: "localhost:6767" }),
+      resolveLink({ type: "directTcp", endpoint: "localhost:6868", display: "localhost:6868" }),
     ).toEqual({
       primary: {
         kind: "clisbot",
-        label: "web--feature--clisbot.localhost:6767",
-        url: "http://web--feature--clisbot.localhost:6767",
+        label: "web--feature--clisbot.localhost:6868",
+        url: "http://web--feature--clisbot.localhost:6868",
       },
       targets: [
         {
           kind: "clisbot",
-          label: "web--feature--clisbot.localhost:6767",
-          url: "http://web--feature--clisbot.localhost:6767",
+          label: "web--feature--clisbot.localhost:6868",
+          url: "http://web--feature--clisbot.localhost:6868",
         },
         { kind: "direct", label: "localhost:3000", url: "http://localhost:3000" },
       ],
@@ -66,8 +66,8 @@ describe("resolveWorkspaceScriptLink", () => {
         },
         {
           kind: "clisbot",
-          label: "web--feature--clisbot.localhost:6767",
-          url: "http://web--feature--clisbot.localhost:6767",
+          label: "web--feature--clisbot.localhost:6868",
+          url: "http://web--feature--clisbot.localhost:6868",
         },
         { kind: "direct", label: "localhost:3000", url: "http://localhost:3000" },
       ],
@@ -78,20 +78,20 @@ describe("resolveWorkspaceScriptLink", () => {
     expect(
       resolveLink({
         type: "directTcp",
-        endpoint: "mac-mini.tail123.ts.net:6767",
-        display: "mac-mini.tail123.ts.net:6767",
+        endpoint: "mac-mini.tail123.ts.net:6868",
+        display: "mac-mini.tail123.ts.net:6868",
       }),
     ).toEqual({
       primary: {
         kind: "clisbot",
-        label: "web--feature--clisbot.localhost:6767",
-        url: "http://web--feature--clisbot.localhost:6767",
+        label: "web--feature--clisbot.localhost:6868",
+        url: "http://web--feature--clisbot.localhost:6868",
       },
       targets: [
         {
           kind: "clisbot",
-          label: "web--feature--clisbot.localhost:6767",
-          url: "http://web--feature--clisbot.localhost:6767",
+          label: "web--feature--clisbot.localhost:6868",
+          url: "http://web--feature--clisbot.localhost:6868",
         },
         {
           kind: "direct",
@@ -106,15 +106,15 @@ describe("resolveWorkspaceScriptLink", () => {
     const publicUrl = "https://web--feature--clisbot.services.example.com";
     expect(
       resolveLink(
-        { type: "directTcp", endpoint: "mac-mini.tail123.ts.net:6767", display: "remote" },
+        { type: "directTcp", endpoint: "mac-mini.tail123.ts.net:6868", display: "remote" },
         { ...runningService, publicProxyUrl: publicUrl, proxyUrl: publicUrl },
       ).targets,
     ).toEqual([
       { kind: "public", label: "web--feature--clisbot.services.example.com", url: publicUrl },
       {
         kind: "clisbot",
-        label: "web--feature--clisbot.localhost:6767",
-        url: "http://web--feature--clisbot.localhost:6767",
+        label: "web--feature--clisbot.localhost:6868",
+        url: "http://web--feature--clisbot.localhost:6868",
       },
       {
         kind: "direct",
@@ -133,14 +133,14 @@ describe("resolveWorkspaceScriptLink", () => {
     expect(resolveLink(relay)).toEqual({
       primary: {
         kind: "clisbot",
-        label: "web--feature--clisbot.localhost:6767",
-        url: "http://web--feature--clisbot.localhost:6767",
+        label: "web--feature--clisbot.localhost:6868",
+        url: "http://web--feature--clisbot.localhost:6868",
       },
       targets: [
         {
           kind: "clisbot",
-          label: "web--feature--clisbot.localhost:6767",
-          url: "http://web--feature--clisbot.localhost:6767",
+          label: "web--feature--clisbot.localhost:6868",
+          url: "http://web--feature--clisbot.localhost:6868",
         },
         { kind: "direct", label: "localhost:3000", url: "http://localhost:3000" },
       ],
@@ -163,8 +163,8 @@ describe("resolveWorkspaceScriptLink", () => {
         },
         {
           kind: "clisbot",
-          label: "web--feature--clisbot.localhost:6767",
-          url: "http://web--feature--clisbot.localhost:6767",
+          label: "web--feature--clisbot.localhost:6868",
+          url: "http://web--feature--clisbot.localhost:6868",
         },
         { kind: "direct", label: "localhost:3000", url: "http://localhost:3000" },
       ],

@@ -16,6 +16,7 @@
 .wrangler
 **/.wrangler
 **/.tanstack
+**/.output
 PLAN.md
 valknut-report.html
 valknut-report.json

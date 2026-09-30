@@ -38,7 +38,7 @@ Write-Host @"
 ======================================================
   Home:    $($env:CLISBOT_HOME)
   Models:  $($env:CLISBOT_LOCAL_MODELS_DIR)
-  Daemon:  localhost:6768
+  Daemon:  localhost:6869
 ======================================================
 "@
 
@@ -49,9 +49,9 @@ $env:CLISBOT_CORS_ORIGINS = "*"
 
 # Configure the app to auto-connect to this daemon on localhost
 $env:APP_VARIANT = "development"
-$env:EXPO_PUBLIC_LOCAL_DAEMON = "localhost:6768"
+$env:EXPO_PUBLIC_LOCAL_DAEMON = "localhost:6869"
 $env:EXPO_PUBLIC_CLISBOT_DEV_BUILD_LABEL = (git branch --show-current).Trim()
-$env:CLISBOT_LISTEN = "127.0.0.1:6768"
+$env:CLISBOT_LISTEN = "127.0.0.1:6869"
 $env:BROWSER = "none"
 
 # Run both with concurrently

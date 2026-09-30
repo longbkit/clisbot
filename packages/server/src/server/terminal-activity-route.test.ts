@@ -87,7 +87,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
   temporaryDirs.push(cwd);
   const envPath = join(cwd, "activity-env.json");
   manager = createTerminalManager({
-    getTerminalActivityUrl: () => "http://127.0.0.1:6767/api/terminal-activity",
+    getTerminalActivityUrl: () => "http://127.0.0.1:6868/api/terminal-activity",
   });
 
   const session = await manager.createTerminal({
@@ -114,7 +114,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
   );
 
   expect(env.terminalId).toBe(session.id);
-  expect(env.url).toBe("http://127.0.0.1:6767/api/terminal-activity");
+  expect(env.url).toBe("http://127.0.0.1:6868/api/terminal-activity");
   expect(response.statusCode).toBe(204);
   expect(session.getActivity()?.state).toBe("working");
 });

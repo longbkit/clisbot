@@ -14,7 +14,7 @@ export const Route = createFileRoute("/privacy")({
 
 function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="August 29, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="September 30, 2026">
       <p>
         Clisbot is local-first. Installing or using the open-source software does not send us your
         code, prompts, files, terminal output, or agent conversations. This policy explains the
@@ -26,9 +26,9 @@ function Privacy() {
         <h2>Who is responsible</h2>
         <ClisbotLegalIdentity />
         <p>
-          Mohamed Boudra Ziani is the data controller for personal data processed through the
-          official Clisbot website, relay, and hosted Hub. Independently self-hosted daemons, Hubs,
-          and relays are controlled by their operators and are not covered by this policy.
+          Long Luong is the data controller for personal data processed through the official Clisbot
+          website, relay, and hosted Hub. Independently self-hosted daemons, Hubs, and relays are
+          controlled by their operators and are not covered by this policy.
         </p>
       </section>
 
@@ -160,7 +160,7 @@ function Privacy() {
         <p>
           Depending on applicable law, you may request access, correction, deletion, restriction,
           objection, or portability of your personal data. Email{" "}
-          <a href="mailto:hello@moboudra.com">hello@moboudra.com</a>. You may also complain to the{" "}
+          <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>. You may also complain to the{" "}
           <a href="https://www.aepd.es/" target="_blank" rel="noopener noreferrer">
             Spanish Data Protection Agency
           </a>
@@ -181,7 +181,7 @@ function Privacy() {
             security model
           </a>{" "}
           or report a vulnerability privately to{" "}
-          <a href="mailto:hello@moboudra.com">hello@moboudra.com</a>.
+          <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>.
         </p>
       </section>
 

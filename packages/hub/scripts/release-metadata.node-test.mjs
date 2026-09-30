@@ -35,12 +35,12 @@ test("marks prereleases without selecting a different changelog section", () => 
 });
 
 test("publishes latest only for stable releases", () => {
-  assert.deepEqual(imageTags("GetClisbot", { version: "0.1.0", prerelease: false }), [
-    "ghcr.io/getpaseo/hub:0.1.0",
-    "ghcr.io/getpaseo/hub:latest",
+  assert.deepEqual(imageTags("longbkit", { version: "0.1.0", prerelease: false }), [
+    "ghcr.io/longbkit/clisbot:0.1.0",
+    "ghcr.io/longbkit/clisbot:latest",
   ]);
-  assert.deepEqual(imageTags("GetClisbot", { version: "0.2.0-beta.1", prerelease: true }), [
-    "ghcr.io/getpaseo/hub:0.2.0-beta.1",
+  assert.deepEqual(imageTags("longbkit", { version: "0.2.0-beta.1", prerelease: true }), [
+    "ghcr.io/longbkit/clisbot:0.2.0-beta.1",
   ]);
 });
 

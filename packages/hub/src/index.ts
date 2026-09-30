@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import { validateHeaderName, type IncomingMessage, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
 import type { Duplex } from "node:stream";
@@ -18,6 +19,7 @@ import { reportFailure } from "./failures/index.js";
 import { installProcessFailureHandlers } from "./failures/process.js";
 import { createFetchServer } from "./http/node-server.js";
 import { loadBuiltStartServer } from "./server/build.js";
+import { publicAppOrigin } from "./server/backend.js";
 import { createAuthServer } from "./auth/server.js";
 import { startApplication, stopApplication, type ApplicationRuntime } from "./server/runtime.js";
 import { createApplicationRuntime } from "./application-runtime.js";
@@ -371,9 +373,22 @@ function loadRuntimeConfig(): RuntimeConfig {
   return {
     bind: process.env["CLISBOT_HUB_BIND"] ?? "0.0.0.0",
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
+    ...readTrustedProxyAddresses(),
     authPolicy: readInstanceAuthPolicy(process.env),
     ...(google === undefined ? {} : { google }),
   };
+}
+
+function readTrustedProxyAddresses(): { trustedProxyAddresses?: string[] } {
+  const value = process.env["CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES"];
+  if (value === undefined) return {};
+  const addresses = value.split(",").map((address) => address.trim());
+  if (addresses.some((address) => isIP(address) === 0)) {
+    throw new Error(
+      "CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES must contain comma-separated IP addresses",
+    );
+  }
+  return { trustedProxyAddresses: addresses };
 }
 
 interface HubIdentity {
@@ -387,7 +402,7 @@ async function resolveHubIdentity(
   effectivePort: number,
   credentialCipher: CredentialCipher,
 ): Promise<HubIdentity> {
-  const configuredAppUrl = nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]);
+  const configuredAppUrl = publicAppOrigin(effectivePort);
   const configuredAuthSecret = process.env["CLISBOT_HUB_AUTH_SECRET"];
   const configuration = createRuntimeConfiguration({
     database,
@@ -406,10 +421,6 @@ async function resolveHubIdentity(
   };
 }
 
-function nonEmptyEnvironment(value: string | undefined): string | undefined {
-  return value === undefined || value.trim().length === 0 ? undefined : value;
-}
-
 async function main(): Promise<void> {
   const removeProcessFailureHandlers = installProcessFailureHandlers();
   // COMPAT(clisbot-env-alias): fork operator namespace + shared home, applied at
@@ -420,7 +431,7 @@ async function main(): Promise<void> {
   await build.startProductionRuntime();
   const config = loadRuntimeConfig();
   const port = readPort();
-  const canonicalRequestOrigin = nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]);
+  const canonicalRequestOrigin = publicAppOrigin(port);
   // COMPAT(clisbot-control-plane): admission is closed before anything is torn
   // down (D-W4-05). Without it the first shutdown step disposed the runtime
   // while the listener was still accepting, so a request that arrived during
@@ -430,6 +441,9 @@ async function main(): Promise<void> {
     ...(config.trustedClientIpHeader === undefined
       ? {}
       : { trustedClientIpHeader: config.trustedClientIpHeader }),
+    ...(config.trustedProxyAddresses === undefined
+      ? {}
+      : { trustedProxyAddresses: config.trustedProxyAddresses }),
     ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
   });
   server.on("upgrade", (request, socket, head) => {
@@ -443,8 +457,7 @@ async function main(): Promise<void> {
       handle: () => build.handleDaemonUpgrade(request, socket, head),
     });
   });
-  const appUrl =
-    nonEmptyEnvironment(process.env["CLISBOT_HUB_APP_URL"]) ?? `http://localhost:${port}`;
+  const appUrl = publicAppOrigin(port);
   server.listen(port, config.bind, () => {
     logger.info(`server started, available at: ${appUrl}`);
   });
@@ -615,7 +628,7 @@ function requestPath(value: string | undefined): string {
 }
 
 function readPort(): number {
-  const value = process.env["PORT"] ?? "3000";
+  const value = process.env["PORT"] ?? "6870";
   const port = Number(value);
   if (!Number.isInteger(port) || port <= 0) throw new Error(`invalid PORT value: ${value}`);
   return port;

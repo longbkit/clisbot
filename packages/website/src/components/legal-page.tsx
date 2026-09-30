@@ -24,15 +24,9 @@ export function LegalPage({ title, lastUpdated, children }: LegalPageProps) {
 export function ClisbotLegalIdentity() {
   return (
     <address className="not-italic">
-      <strong className="font-medium text-white">Mohamed Boudra Ziani</strong>, operating as Clisbot
+      <strong className="font-medium text-white">Long Luong</strong>, operating as Clisbot
       <br />
-      NIF/VAT ID: ES26617095T
-      <br />
-      Roc Boronat 48, Bajos 2
-      <br />
-      08005 Barcelona, Spain
-      <br />
-      Email: <a href="mailto:hello@moboudra.com">hello@moboudra.com</a>
+      Email: <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>
     </address>
   );
 }

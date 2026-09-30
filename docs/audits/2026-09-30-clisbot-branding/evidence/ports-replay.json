@@ -1,0 +1,49 @@
+{
+  "rawUpstream": "c5236c00d8575cdc4423407dd4cb9f111135564e",
+  "defaults": {
+    "daemon": 6868,
+    "developmentDaemon": 6869,
+    "hubBackend": 6870
+  },
+  "files": {
+    "docker/base/Dockerfile": {
+      "6868": 4,
+      "6869": 0
+    },
+    "nix/module.nix": {
+      "6868": 1,
+      "6869": 0
+    },
+    "package.json": {
+      "6868": 0,
+      "6869": 3
+    },
+    "packages/app/src/components/add-host-modal.tsx": {
+      "6868": 4,
+      "6869": 0
+    },
+    "packages/app/src/runtime/host-runtime.ts": {
+      "6868": 1,
+      "6869": 0
+    },
+    "packages/protocol/src/ssh-transport.ts": {
+      "6868": 1,
+      "6869": 0
+    },
+    "packages/server/src/server/config.ts": {
+      "6868": 2,
+      "6869": 0
+    },
+    "packages/server/src/server/persisted-config.ts": {
+      "6868": 1,
+      "6869": 0
+    },
+    "scripts/dev-app.sh": {
+      "6868": 0,
+      "6869": 1
+    }
+  },
+  "changedFiles": 9,
+  "secondPassChangedFiles": 0,
+  "scope": "Isolated replay of nine real v0.10.1 files for daemon defaults; Hub default mappings are covered by the rename unit suite. No merge or edits to upstream worktree."
+}

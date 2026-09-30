@@ -21,7 +21,7 @@ function probes(input: Record<string, ConnectionProbeState>): Map<string, Connec
 describe("selectBestConnection", () => {
   it("picks the available connection with lowest latency regardless of transport", () => {
     const candidates: ConnectionCandidate[] = [
-      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6767") },
+      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6868") },
       {
         connectionId: "relay:b",
         connection: makeRelay("relay:b", "relay.example:443"),
@@ -41,8 +41,8 @@ describe("selectBestConnection", () => {
 
   it("picks the lowest-latency connection among mixed transport candidates", () => {
     const candidates: ConnectionCandidate[] = [
-      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6767") },
-      { connectionId: "direct:c", connection: makeDirect("direct:c", "c:6767") },
+      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6868") },
+      { connectionId: "direct:c", connection: makeDirect("direct:c", "c:6868") },
       {
         connectionId: "relay:b",
         connection: makeRelay("relay:b", "relay.example:443"),
@@ -63,12 +63,12 @@ describe("selectBestConnection", () => {
 
   it("ignores unavailable and pending probes", () => {
     const candidates: ConnectionCandidate[] = [
-      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6767") },
+      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6868") },
       {
         connectionId: "relay:b",
         connection: makeRelay("relay:b", "relay.example:443"),
       },
-      { connectionId: "direct:c", connection: makeDirect("direct:c", "c:6767") },
+      { connectionId: "direct:c", connection: makeDirect("direct:c", "c:6868") },
     ];
 
     const selected = selectBestConnection({
@@ -85,7 +85,7 @@ describe("selectBestConnection", () => {
 
   it("returns null when no candidates are available", () => {
     const candidates: ConnectionCandidate[] = [
-      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6767") },
+      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6868") },
       {
         connectionId: "relay:b",
         connection: makeRelay("relay:b", "relay.example:443"),
@@ -105,7 +105,7 @@ describe("selectBestConnection", () => {
 
   it("returns null when no probes are available even if candidates exist", () => {
     const candidates: ConnectionCandidate[] = [
-      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6767") },
+      { connectionId: "direct:a", connection: makeDirect("direct:a", "a:6868") },
       {
         connectionId: "relay:b",
         connection: makeRelay("relay:b", "relay.example:443"),

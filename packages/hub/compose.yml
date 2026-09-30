@@ -15,25 +15,27 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   hub:
-    image: ghcr.io/getpaseo/hub:latest
+    image: ghcr.io/longbkit/clisbot:latest
     pull_policy: always
     restart: unless-stopped
+    stop_grace_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
     env_file: .env
     environment:
+      CLISBOT_RUN_MODE: hub
       DATABASE_URL: postgres://clisbot:clisbot@postgres:5432/clisbot_hub
-      PORT: 3000
+      PORT: 6870
     ports:
-      - "3000:3000"
+      - "6870:6870"
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://localhost:6870/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s

@@ -14,7 +14,7 @@ async function fixture() {
     waitHubReady: async () => {},
     ensureDaemonUp: async () => ({ daemon: "started" }),
     waitDaemonUp: async () => {},
-    daemonHost: () => "localhost:6767",
+    daemonHost: () => "localhost:6868",
     daemonPassword: () => undefined,
     openDaemon: async () => ({}) as DaemonClient,
     closeDaemon: vi.fn(async () => {}),

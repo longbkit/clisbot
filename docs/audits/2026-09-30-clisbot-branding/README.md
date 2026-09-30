@@ -8,6 +8,7 @@ directions. It supplements the
 [upstream sync playbook](../../guides/developer-guide/upstream-sync-and-contribution.md).
 
 Start with [production artifacts and verification](production-artifacts.md),
+the [publication identity and marketing review](publication-review.md),
 the [brand kit](../../../assets/branding/clisbot/README.md), or its
 [visual preview](../../../assets/branding/clisbot/PREVIEW.html).
 The inventory and contact sheets below preserve the pre-replacement baseline.

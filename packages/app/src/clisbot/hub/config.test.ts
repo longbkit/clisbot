@@ -27,4 +27,12 @@ describe("Hub configuration", () => {
   it("does not enable Hub support from a browser origin alone", () => {
     expect(resolveHubConfiguration(undefined, "https://sandbox.example.test:8444")).toBeNull();
   });
+
+  it("enables the same bundled UI through an explicit runtime Hub proxy hint", () => {
+    expect(resolveHubConfiguration(undefined, "http://localhost:6868", true)).toEqual({
+      origin: "http://localhost:6868",
+    });
+    expect(resolveHubConfiguration(undefined, undefined, true)).toBeNull();
+    expect(resolveHubConfiguration(undefined, "http://untrusted.example", true)).toBeNull();
+  });
 });

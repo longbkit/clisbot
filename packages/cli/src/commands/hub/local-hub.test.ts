@@ -104,7 +104,7 @@ async function createHome(): Promise<string> {
   return home;
 }
 
-function writeHubState(home: string, pid: number, port = 6868): void {
+function writeHubState(home: string, pid: number, port = 6870): void {
   writeFileSync(
     path.join(home, "hub-local.json"),
     JSON.stringify({
@@ -144,8 +144,8 @@ describe("resolveLocalHubHome", () => {
 });
 
 describe("resolveHubPort", () => {
-  test("defaults to the fork port 6868", () => {
-    expect(resolveHubPort({})).toBe(6868);
+  test("defaults to the fork port 6870", () => {
+    expect(resolveHubPort({})).toBe(6870);
   });
 
   test("honors an explicit port", () => {
@@ -179,7 +179,7 @@ describe("readHubStateFile", () => {
     const home = await createHome();
     await writeFileSync(
       path.join(home, "hub-local.json"),
-      JSON.stringify({ version: 1, url: "http://127.0.0.1:6868", port: 6868, pid: "nope" }),
+      JSON.stringify({ version: 1, url: "http://127.0.0.1:6870", port: 6870, pid: "nope" }),
     );
     expect(readHubStateFile(home)).toBeNull();
   });
@@ -253,12 +253,12 @@ describe("startLocalHubDetached", () => {
       { home, initMasterKey: true },
       Object.assign(runtime, { selectPort }),
     );
-    expect(selectPort).toHaveBeenCalledWith(6868, true);
+    expect(selectPort).toHaveBeenCalledWith(6870, true);
     expect(result.url).toBe("http://127.0.0.1:7123");
     const recorded = readHubStateFile(home);
     expect(recorded?.instanceId).toBeTruthy();
     expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_INSTANCE_ID).toBe(recorded?.instanceId);
-    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_APP_URL).toBe(result.url);
+    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_APP_URL).toBe("http://127.0.0.1:6868");
   });
 
   test("keeps the selected port across stop and restart without treating a stopped PID as live", async () => {
@@ -331,29 +331,31 @@ describe("startLocalHubDetached", () => {
     expect(inherited.SLACK_APP_TOKEN).toBe("xapp-input");
   });
 
-  test("spawns the fork bin detached and records hub-local.json at loopback :6868", async () => {
+  test("spawns the fork bin detached and records hub-local.json at loopback :6870", async () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
 
     const result = await startLocalHubDetached({ home, initMasterKey: true }, runtime);
 
-    expect(result.url).toBe("http://127.0.0.1:6868");
+    expect(result.url).toBe("http://127.0.0.1:6870");
     expect(result.pid).toBe(4242);
     expect(runtime.process.unreferenced).toBe(true);
     const launch = runtime.lastDetached;
     expect(launch?.command).toBe(process.execPath);
     expect(launch?.args).toEqual([runtime.bin]);
     expect(launch?.options?.detached).toBe(true);
-    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6868");
-    expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_APP_URL).toBe(result.url);
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6870");
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_APP_URL).toBe(
+      "http://127.0.0.1:6868",
+    );
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_BIND).toBe("127.0.0.1");
     expect(
       (launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE,
     ).toBe(localHubMasterKeyPath(home));
 
     expect(readHubStateFile(home)).toMatchObject({
-      url: "http://127.0.0.1:6868",
-      port: 6868,
+      url: "http://127.0.0.1:6870",
+      port: 6870,
       pid: 4242,
     });
   });

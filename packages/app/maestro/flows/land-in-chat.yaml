@@ -22,11 +22,11 @@ appId: sh.clisbot
 - tapOn:
     id: "direct-host-input"
 - eraseText
-- inputText: "127.0.0.1:6767"
+- inputText: "127.0.0.1:6868"
 
 - assertVisible:
     id: "direct-host-input"
-    text: "127.0.0.1:6767"
+    text: "127.0.0.1:6868"
 
 - tapOn:
     id: "direct-host-submit"

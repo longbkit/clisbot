@@ -29,7 +29,7 @@ const server = net.createServer();
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
-assert.ok(port !== 6767 && port !== 6768);
+assert.ok(![6767, 6768, 6868, 6869].includes(port));
 await mkdir(path.join(root, "web"));
 await writeFile(path.join(root, "web/index.html"), "<html><body>Lifecycle web UI</body></html>");
 savePersistedConfig(home, {

@@ -451,7 +451,7 @@ function createHelloMessage(
 
 function createDirectRequest(
   remoteAddress = "127.0.0.1",
-  host = "localhost:6767",
+  host = "localhost:6868",
   origin = `http://${host}`,
 ) {
   return {
@@ -751,7 +751,7 @@ describe("relay external socket reconnect behavior", () => {
     proxiedExternalSocket.emit("message", JSON.stringify(createHelloMessage("proxied-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
       publicOriginSocket,
-      createDirectRequest("127.0.0.1", "localhost:6767", "https://clisbot.example.com"),
+      createDirectRequest("127.0.0.1", "localhost:6868", "https://clisbot.example.com"),
     );
     publicOriginSocket.emit("message", JSON.stringify(createHelloMessage("public-origin-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
@@ -761,7 +761,7 @@ describe("relay external socket reconnect behavior", () => {
     loopbackSocket.emit("message", JSON.stringify(createHelloMessage("loopback-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
       localhostSubdomainSocket,
-      createDirectRequest("127.0.0.1", "clisbot.localhost:6767"),
+      createDirectRequest("127.0.0.1", "clisbot.localhost:6868"),
     );
     localhostSubdomainSocket.emit(
       "message",

@@ -61,7 +61,7 @@ describe("CLI credential and managed admission composition", () => {
 
   it("retains an explicit password when retrying with managed admission", async () => {
     await connectToDaemon({
-      target: { kind: "endpoint", host: "tcp://localhost:6767?password=secret" },
+      target: { kind: "endpoint", host: "tcp://localhost:6868?password=secret" },
     });
     expect(mocks.configs).toHaveLength(2);
     expect(mocks.configs[1]).toMatchObject({

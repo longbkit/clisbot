@@ -10,8 +10,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_HOME_NAME = ".clisbot-dev-01";
-const DAEMON_PORT = 6768;
-const HUB_PORT = 6868;
+const DAEMON_PORT = 6869;
+const HUB_PORT = 6870;
 const APP_PORT = 8081;
 // The first Metro web bundle in a cold checkout can take several minutes on a
 // small dev host. Keep the stack alive while it warms instead of failing a

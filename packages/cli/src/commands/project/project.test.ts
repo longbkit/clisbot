@@ -69,15 +69,15 @@ describe("project commands", () => {
     );
     expect(resolveProjectPath({ cwd: "/home/user" })).toBe(path.resolve("/home/user"));
     expect(
-      resolveProjectPath({ cwd: "/home/user", pathArg: "/srv/repo", daemonTarget: "host:6767" }),
+      resolveProjectPath({ cwd: "/home/user", pathArg: "/srv/repo", daemonTarget: "host:6868" }),
     ).toBe("/srv/repo");
     expect(
-      resolveProjectPath({ cwd: "/home/user", pathArg: "~/repo", daemonTarget: "host:6767" }),
+      resolveProjectPath({ cwd: "/home/user", pathArg: "~/repo", daemonTarget: "host:6868" }),
     ).toBe("~/repo");
   });
 
   it("requires a daemon-owned path for an explicit target", () => {
-    expect(() => resolveProjectPath({ cwd: "/home/user", daemonTarget: "host:6767" })).toThrow();
+    expect(() => resolveProjectPath({ cwd: "/home/user", daemonTarget: "host:6868" })).toThrow();
   });
 
   it("lists projects", async () => {

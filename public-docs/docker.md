@@ -14,7 +14,7 @@ Docker images follow the stable Clisbot release cadence. `ghcr.io/longbkit/clisb
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
@@ -24,7 +24,7 @@ docker run -d --name clisbot \
 Then open:
 
 ```text
-http://localhost:6767
+http://localhost:6868
 ```
 
 If you set `CLISBOT_PASSWORD`, use that same password when adding the direct daemon connection in the web UI, mobile app, or CLI.
@@ -33,15 +33,55 @@ If you set `CLISBOT_PASSWORD`, use that same password when adding the direct dae
 
 The image:
 
-- installs the Clisbot daemon and CLI
+- installs the Clisbot daemon, CLI, Hub and channel packages
 - serves the bundled web UI
-- listens on `0.0.0.0:6767` inside the container
+- listens on `0.0.0.0:6868` inside the container
 - stores daemon state under `/home/clisbot/.clisbot`
 - runs the daemon and launched agents as the non-root `clisbot` user
 
 The image does not bundle agent CLIs such as Claude Code, Codex, OpenCode, Copilot, or Pi. Add the agents you use with a small child image.
 
-Host-side CLI commands select the container explicitly, for example `clisbot project ls --host 127.0.0.1:6767`. Without an endpoint selector the CLI looks for a local home’s supervisor. Container environment settings are deployment overrides; worker restart preserves them. Your container manager owns full supervisor replacement.
+Host-side CLI commands select the container explicitly, for example `clisbot project ls --host 127.0.0.1:6868`. Without an endpoint selector the CLI looks for a local home’s supervisor. Container environment settings are deployment overrides; worker restart preserves them. Your container manager owns full supervisor replacement.
+
+## Service modes
+
+One image supports three values of `CLISBOT_RUN_MODE`:
+
+| Mode               | Services                              | Default ports  |
+| ------------------ | ------------------------------------- | -------------- |
+| `daemon` (default) | Daemon and the shared web UI          | `6868`         |
+| `hub`              | Hub backend only                      | `6870`         |
+| `all`              | Daemon, shared web UI and Hub backend | `6868`, `6870` |
+
+To run everything together, generate a credential encryption key once, store it
+with your deployment secrets, and reuse it across restarts:
+
+```sh
+export CLISBOT_HUB_CREDENTIAL_MASTER_KEY="$(openssl rand -base64 32)"
+docker run -d --name clisbot --stop-timeout 40 \
+  -e CLISBOT_RUN_MODE=all \
+  -e CLISBOT_HUB_CREDENTIAL_MASTER_KEY \
+  -e CLISBOT_PASSWORD=change-me \
+  -p 6868:6868 \
+  -v "$PWD/clisbot-home:/home/clisbot" \
+  -v "$PWD:/workspace" \
+  ghcr.io/longbkit/clisbot:latest
+```
+
+Open `http://localhost:6868`. Hub management is integrated into the Clisbot app;
+`6870` has no separate dashboard. In `all` mode the app forwards Hub APIs to
+the backend, so publishing `6870` is optional. Starting both services does not
+automatically enroll the daemon into Hub; use the app's Hub connection flow.
+
+For a public deployment, set `CLISBOT_HUB_APP_URL` to the shared HTTPS app origin
+and configure the reverse proxy below. With a separate Hub container, set the
+daemon's `CLISBOT_HUB_PROXY_URL` to its reachable backend origin. Without that
+setting, daemon mode does not enable the Hub proxy.
+
+Persist `/home/clisbot` in every mode. Hub uses `.clisbot-hub` under that directory
+for embedded storage; `DATABASE_URL` selects PostgreSQL. Healthchecks cover all
+selected services. In `all` mode, a service failure stops the container; allow
+40 seconds for graceful shutdown.
 
 ## Docker Compose
 
@@ -52,7 +92,7 @@ services:
     container_name: clisbot
     restart: unless-stopped
     ports:
-      - "6767:6767"
+      - "6868:6868"
     environment:
       CLISBOT_PASSWORD: "change-me"
       # CLISBOT_HOSTNAMES: "clisbot.example.com,.lan"
@@ -116,7 +156,7 @@ Caddy:
 
 ```caddy
 clisbot.example.com {
-  reverse_proxy 127.0.0.1:6767
+  reverse_proxy 127.0.0.1:6868
 }
 ```
 
@@ -128,7 +168,7 @@ server {
     server_name clisbot.example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:6767;
+        proxy_pass http://127.0.0.1:6868;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";

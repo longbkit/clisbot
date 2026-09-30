@@ -14,11 +14,11 @@ export const Route = createFileRoute("/terms")({
 
 function Terms() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="August 29, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="September 30, 2026">
       <p>
-        These Terms govern the official services operated at clisbot.com, relay.paseo.sh, and
-        hub.paseo.sh. By using the official relay or hosted Hub, you agree to them. Our{" "}
-        <a href="/privacy">Privacy Policy</a> explains how those services process data.
+        These Terms apply to services operated by Clisbot. Third-party services are governed by
+        their operators&apos; terms. By using Clisbot-operated services, you agree to these Terms.
+        Our <a href="/privacy">Privacy Policy</a> explains how those services process data.
       </p>
 
       <section>
@@ -181,7 +181,7 @@ function Terms() {
         <p>
           We may update these Terms as the services change. We will announce material changes
           through the service or by email where appropriate. Questions can be sent to{" "}
-          <a href="mailto:hello@moboudra.com">hello@moboudra.com</a>.
+          <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>.
         </p>
       </section>
     </LegalPage>

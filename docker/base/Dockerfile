@@ -5,17 +5,26 @@ FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS source-pack
 
 ARG CLISBOT_VERSION
 
-ENV ONNXRUNTIME_NODE_INSTALL=skip
+ENV ONNXRUNTIME_NODE_INSTALL=skip \
+    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ git ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/clisbot-src
 COPY . .
 
-RUN set -eux; \
+RUN --mount=type=cache,target=/root/.npm set -eux; \
     if [ -n "${CLISBOT_VERSION:-}" ]; then \
       test "$(node -p "require('./package.json').version")" = "${CLISBOT_VERSION}"; \
     fi; \
     node -e 'const fs=require("node:fs"); const pkg=JSON.parse(fs.readFileSync("package.json","utf8")); delete pkg.scripts.prepare; fs.writeFileSync("package.json", `${JSON.stringify(pkg)}\n`);'; \
-    npm ci; \
+    npm ci
+
+ARG BUILD_NODE_OPTIONS=--max-old-space-size=6144
+ENV NODE_OPTIONS=${BUILD_NODE_OPTIONS}
+
+RUN --mount=type=cache,target=/root/.npm set -eux; \
     mkdir -p /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/highlight --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/relay --pack-destination /tmp/clisbot-packs; \
@@ -23,15 +32,19 @@ RUN set -eux; \
     npm pack --workspace=@clisbot/client --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/plugin --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/server --pack-destination /tmp/clisbot-packs; \
+    node docker/pack-channels.mjs; \
+    npm pack --workspace=@clisbot/hub --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/cli --pack-destination /tmp/clisbot-packs; \
-    npm cache clean --force; \
     rm -rf /tmp/clisbot-src/node_modules
 
 FROM ${NODE_IMAGE}
 
 ENV HOME=/home/clisbot \
+    CLISBOT_RUN_MODE=daemon \
     CLISBOT_HOME=/home/clisbot/.clisbot \
-    CLISBOT_LISTEN=0.0.0.0:6767 \
+    CLISBOT_HUB_DATA_DIR=/home/clisbot/.clisbot-hub \
+    CLISBOT_HUB_BIND=0.0.0.0 \
+    CLISBOT_LISTEN=0.0.0.0:6868 \
     CLISBOT_WEB_UI_ENABLED=true \
     CLISBOT_LOG_FORMAT=json \
     CLISBOT_LOG_LEVEL=info \
@@ -54,6 +67,9 @@ RUN set -eux; \
       lbzip2 \
       openssh-client \
       procps \
+      python3 \
+      make \
+      g++ \
       tini; \
     rm -rf /var/lib/apt/lists/*
 
@@ -65,7 +81,11 @@ RUN set -eux; \
     server_entry="$(npm root -g)/@clisbot/server/dist/scripts/supervisor-entrypoint.js"; \
     test -f "$server_entry"; \
     printf '%s\n' "$server_entry" > /etc/clisbot-server-entry; \
-    node --check "$server_entry"
+    node --check "$server_entry"; \
+    hub_entry="$(npm root -g)/@clisbot/hub/bin/clisbot-hub.js"; \
+    test -f "$hub_entry"; \
+    printf '%s\n' "$hub_entry" > /etc/clisbot-hub-entry; \
+    node --check "$hub_entry"
 
 RUN set -eux; \
     existing_group="$(getent group 1000 | cut -d: -f1 || true)"; \
@@ -96,10 +116,10 @@ RUN chmod +x /usr/local/bin/clisbot-docker-entrypoint
 
 WORKDIR /workspace
 
-EXPOSE 6767
+EXPOSE 6868 6870
 VOLUME ["/home/clisbot"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "const listen=process.env.CLISBOT_LISTEN||'0.0.0.0:6767'; const m=listen.match(/:(\\d+)$/); const port=m?Number(m[1]):6767; require('http').get({hostname:'127.0.0.1',port,path:'/api/health'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+  CMD node /usr/local/lib/clisbot-healthcheck.mjs
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/clisbot-docker-entrypoint"]

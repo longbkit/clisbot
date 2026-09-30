@@ -21,7 +21,7 @@ test("parseHubOrigin accepts HTTPS and loopback development origins", () => {
     parseHubOrigin("https://sandbox.example.ts.net:8444"),
     "https://sandbox.example.ts.net:8444",
   );
-  assert.equal(parseHubOrigin(undefined), "http://localhost:6868");
+  assert.equal(parseHubOrigin(undefined), "http://localhost:6870");
   assert.throws(() => parseHubOrigin("http://example.com"), /HTTPS origin/);
   assert.throws(() => parseHubOrigin("https://example.com/path"), /without a path/);
 });

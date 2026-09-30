@@ -21,7 +21,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "daemon",
         projectSlug: "clisbot",
         branchName: "main",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         peers: [{ scriptName: "daemon", port: 5173 }],
       }).HOST,
@@ -32,7 +32,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "daemon",
         projectSlug: "clisbot",
         branchName: "main",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: "localhost",
         peers: [{ scriptName: "daemon", port: 5173 }],
       }).HOST,
@@ -45,7 +45,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "daemon",
         projectSlug: "clisbot",
         branchName: "main",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: "100.64.0.20",
         peers: [{ scriptName: "daemon", port: 5173 }],
       }).HOST,
@@ -58,16 +58,16 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "daemon",
         projectSlug: "clisbot",
         branchName: "main",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         peers: [{ scriptName: "daemon", port: 5173 }],
       }),
     ).toEqual({
       HOST: "127.0.0.1",
       CLISBOT_PORT: "5173",
-      CLISBOT_URL: "http://daemon--clisbot.localhost:6767",
+      CLISBOT_URL: "http://daemon--clisbot.localhost:6868",
       CLISBOT_SERVICE_DAEMON_PORT: "5173",
-      CLISBOT_SERVICE_DAEMON_URL: "http://daemon--clisbot.localhost:6767",
+      CLISBOT_SERVICE_DAEMON_URL: "http://daemon--clisbot.localhost:6868",
     });
   });
 
@@ -77,16 +77,16 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "daemon",
         projectSlug: "clisbot",
         branchName: "feature-x",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         peers: [{ scriptName: "daemon", port: 5173 }],
       }),
     ).toEqual({
       HOST: "127.0.0.1",
       CLISBOT_PORT: "5173",
-      CLISBOT_URL: "http://daemon--feature-x--clisbot.localhost:6767",
+      CLISBOT_URL: "http://daemon--feature-x--clisbot.localhost:6868",
       CLISBOT_SERVICE_DAEMON_PORT: "5173",
-      CLISBOT_SERVICE_DAEMON_URL: "http://daemon--feature-x--clisbot.localhost:6767",
+      CLISBOT_SERVICE_DAEMON_URL: "http://daemon--feature-x--clisbot.localhost:6868",
     });
   });
 
@@ -95,7 +95,7 @@ describe("buildWorkspaceServiceEnv", () => {
       scriptName: "daemon",
       projectSlug: "clisbot",
       branchName: "main",
-      daemonPort: 6767,
+      daemonPort: 6868,
       daemonListenHost: null,
       peers: [{ scriptName: "daemon", port: 5173 }],
     });
@@ -127,7 +127,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "web",
         projectSlug: "clisbot",
         branchName: "feature-x",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         peers: [
           { scriptName: "api", port: 4000 },
@@ -137,11 +137,11 @@ describe("buildWorkspaceServiceEnv", () => {
     ).toEqual({
       HOST: "127.0.0.1",
       CLISBOT_PORT: "5173",
-      CLISBOT_URL: "http://web--feature-x--clisbot.localhost:6767",
+      CLISBOT_URL: "http://web--feature-x--clisbot.localhost:6868",
       CLISBOT_SERVICE_API_PORT: "4000",
-      CLISBOT_SERVICE_API_URL: "http://api--feature-x--clisbot.localhost:6767",
+      CLISBOT_SERVICE_API_URL: "http://api--feature-x--clisbot.localhost:6868",
       CLISBOT_SERVICE_WEB_PORT: "5173",
-      CLISBOT_SERVICE_WEB_URL: "http://web--feature-x--clisbot.localhost:6767",
+      CLISBOT_SERVICE_WEB_URL: "http://web--feature-x--clisbot.localhost:6868",
     });
   });
 
@@ -151,7 +151,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "web",
         projectSlug: "clisbot",
         branchName: "feature-x",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         serviceProxyPublicBaseUrl: "https://services.example.com",
         peers: [
@@ -172,7 +172,7 @@ describe("buildWorkspaceServiceEnv", () => {
         scriptName: "app-server",
         projectSlug: "clisbot",
         branchName: "main",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: null,
         peers: [
           { scriptName: "app-server", port: 5173 },

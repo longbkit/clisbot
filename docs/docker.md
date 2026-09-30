@@ -1,8 +1,9 @@
 # Running Clisbot in Docker
 
-Clisbot publishes a container image for running the daemon on a server, VM, NAS,
-or homelab box. The image also serves the bundled browser web UI, so one
-container gives you both the daemon API and a self-hosted UI.
+Clisbot uses one image, `ghcr.io/longbkit/clisbot`, for the daemon, Hub, or both.
+Choose the running services with `CLISBOT_RUN_MODE`. The daemon serves the shared
+Clisbot web UI, including Hub management. Hub is a backend service and can use
+embedded storage or PostgreSQL.
 
 The image source lives in [`docker/`](../docker/).
 
@@ -10,25 +11,114 @@ The image source lives in [`docker/`](../docker/).
 
 The official image:
 
-- builds `@clisbot/server` and `@clisbot/cli` from source-built workspace tarballs
-- runs the daemon as the non-root `clisbot` user
-- listens on `0.0.0.0:6767` inside the container
+- builds the daemon, CLI, Hub, and channel packages from the same source tree
+- runs selected services as the non-root `clisbot` user
+- defaults to daemon mode on `0.0.0.0:6868`
 - enables the bundled daemon web UI with `CLISBOT_WEB_UI_ENABLED=true`
 - stores daemon state and agent credentials under `/home/clisbot`
 - leaves agent CLIs out of the base image
 
-Open the container's HTTP origin, for example `http://localhost:6767`, to load
+Open the container's HTTP origin, for example `http://localhost:6868`, to load
 the web UI. The served app receives a same-origin connection hint and connects
 back to that daemon. Static UI files load without daemon auth; API and
 WebSocket requests still require `CLISBOT_PASSWORD` when one is configured.
 
-Host-side CLI commands select the container explicitly, for example `clisbot project ls --host 127.0.0.1:6767`. Without an endpoint selector the CLI looks for a local home’s supervisor. Container environment settings are deployment overrides; worker restart preserves them. Your container manager owns full supervisor replacement.
+Host-side CLI commands select the container explicitly, for example `clisbot project ls --host 127.0.0.1:6868`. Without an endpoint selector the CLI looks for a local home’s supervisor. Container environment settings are deployment overrides; worker restart preserves them. Your container manager owns full supervisor replacement.
+
+## Service modes
+
+| `CLISBOT_RUN_MODE` | Services              | Default container ports | Healthcheck              |
+| ------------------ | --------------------- | ----------------------- | ------------------------ |
+| `daemon` (default) | Daemon and its web UI | 6868                    | `/api/health`            |
+| `hub`              | Hub backend only      | 6870                    | `/health`                |
+| `all`              | Both services         | 6868 and 6870           | Both endpoints must pass |
+
+The mode selects processes. Docker publishes only the ports chosen with `-p`
+or Compose `ports:`. `CLISBOT_LISTEN` controls the daemon listener;
+`CLISBOT_HUB_BIND` and `PORT` control Hub. Invalid modes fail startup.
+
+Clisbot defaults are daemon `6868`, development daemon `6869`, and Hub `6870`
+(CLI, direct start, and Docker). These defaults differ from upstream.
+Explicit listen settings and a local Hub's saved port take precedence; existing
+configuration is not migrated automatically.
+An older Fusion Hub saved on `6868` must move to `6870` (for example with
+`clisbot hub start --port 6870`) before starting a daemon on the new default.
+
+Hub requires a persistent credential encryption key. Generate it once, save it
+in your deployment's secret store, and supply the same key on every restart:
+
+```sh
+export CLISBOT_HUB_CREDENTIAL_MASTER_KEY="$(openssl rand -base64 32)"
+```
+
+Alternatively mount a secret file and set `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE`
+to its absolute container path. Set exactly one key source. See the
+[Hub environment example](../packages/hub/.env.example) for owner bootstrap and
+public URL settings.
+
+```sh
+docker run -d --name clisbot --stop-timeout 40 \
+  -e CLISBOT_RUN_MODE=all \
+  -e CLISBOT_HUB_CREDENTIAL_MASTER_KEY \
+  -e CLISBOT_PASSWORD=change-me \
+  -p 6868:6868 \
+  -v "$PWD/clisbot-home:/home/clisbot" \
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/longbkit/clisbot:latest
+```
+
+Open `http://localhost:6868` for the app and Hub management. In `all` mode, the
+entrypoint sets `CLISBOT_HUB_PROXY_URL=http://127.0.0.1:6870` and defaults
+`CLISBOT_HUB_APP_URL` to `http://localhost:6868`. The daemon forwards Hub API and
+Hub WebSocket requests to the backend; browser cookies stay on the app's origin.
+The page enables Hub features at runtime. Daemon API and `/ws` authentication
+remain separate from Hub account authentication.
+
+Client-IP quotas are preserved through the proxy. In `all` mode, Hub trusts
+`x-clisbot-proxy-client-ip` only from `127.0.0.1` and `::1`; the daemon replaces
+any caller-supplied value with the address resolved by its own proxy policy.
+If an ingress proxy sits in front of the daemon, set `CLISBOT_TRUSTED_PROXIES`
+to that proxy's actual address or network so the daemon can resolve the client IP.
+For separately deployed services, set these on Hub:
+
+```dotenv
+CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER=x-clisbot-proxy-client-ip
+CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES=10.0.0.10
+```
+
+Replace `10.0.0.10` with the daemon proxy's address as seen by Hub. The allowlist
+accepts comma-separated IP literals; only those peers may supply proxy metadata.
+Keep the backend reachable only by the services that need it.
+
+Port `6870` has no management page; `/health` is its health endpoint. Publishing
+it is optional in `all` mode because the app already proxies the backend. When
+changing the public app origin, set `CLISBOT_HUB_APP_URL` to that exact origin.
+Use HTTPS for browser Hub access outside localhost.
+
+For Hub alone, select `hub` and publish port 6870. Connect it to a Clisbot client;
+for a separately deployed daemon web UI, set its `CLISBOT_HUB_PROXY_URL` to the
+reachable Hub origin and set Hub's `CLISBOT_HUB_APP_URL` to the public UI origin.
+This proxy is disabled when no URL is configured. Hub persists embedded storage
+in `/home/clisbot/.clisbot-hub`; `DATABASE_URL` selects external PostgreSQL.
+Persist `/home/clisbot` in every mode. The [Hub Compose example](../packages/hub/compose.yml)
+uses the shared image with PostgreSQL.
+
+Outside Docker, daemon `config.json` can persist the same setting as
+`features.webUi.hubProxyUrl`, alongside `features.webUi.enabled=true`.
+`CLISBOT_HUB_PROXY_URL` takes precedence. A fresh CLI local onboarding configures
+this before starting its daemon. An existing daemon needs an operator restart
+after configuration; onboarding reports that requirement without restarting it.
+
+In `all` mode, either service exiting stops both and fails the container.
+SIGTERM/SIGINT reach both services; remaining processes are killed after 25
+seconds. Allow 40 seconds for container shutdown. Running both does not enroll
+the daemon into Hub automatically; use the existing Hub connection flow.
 
 ## Quick Start
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
@@ -38,7 +128,7 @@ docker run -d --name clisbot \
 Then open:
 
 ```text
-http://localhost:6767
+http://localhost:6868
 ```
 
 If you set `CLISBOT_PASSWORD`, enter the same password when adding the direct
@@ -62,7 +152,7 @@ services:
     image: ghcr.io/longbkit/clisbot:latest
     restart: unless-stopped
     ports:
-      - "6767:6767"
+      - "6868:6868"
     environment:
       CLISBOT_PASSWORD: "change-me"
     volumes:
@@ -126,7 +216,7 @@ The image defaults:
 | ---------------- | ------------------------ |
 | `HOME`           | `/home/clisbot`          |
 | `CLISBOT_HOME`   | `/home/clisbot/.clisbot` |
-| `CLISBOT_LISTEN` | `0.0.0.0:6767`           |
+| `CLISBOT_LISTEN` | `0.0.0.0:6868`           |
 
 If you bind-mount host directories on Linux, make sure the container user can
 write them. The built-in `clisbot` user has uid/gid `1000:1000`. For a different
@@ -142,7 +232,7 @@ Caddy example:
 
 ```caddy
 clisbot.example.com {
-  reverse_proxy 127.0.0.1:6767
+  reverse_proxy 127.0.0.1:6868
 }
 ```
 
@@ -154,7 +244,7 @@ server {
     server_name clisbot.example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:6767;
+        proxy_pass http://127.0.0.1:6868;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -173,6 +263,9 @@ environment:
 ```
 
 IPs and `localhost` are allowed by default.
+
+With Hub enabled, also set `CLISBOT_HUB_APP_URL=https://clisbot.example.com`.
+The reverse proxy still forwards to port `6868`; Hub API routing happens there.
 
 ## Security
 
@@ -195,6 +288,11 @@ See [SECURITY.md](../SECURITY.md) for the daemon trust model.
 docker build -f docker/base/Dockerfile -t clisbot:local .
 ```
 
+The build stage defaults to a 6 GiB Node heap for the large generated validator
+module in the browser bundle. Override it with `--build-arg
+BUILD_NODE_OPTIONS=--max-old-space-size=8192` if needed. This setting is not
+carried into the runtime image.
+
 To assert the source tree version while building:
 
 ```bash
@@ -205,7 +303,11 @@ docker build \
   .
 ```
 
-The Docker workflow builds the image on pull requests and on `main` as a
+The root `.github/workflows/docker.yml` is the only image publisher.
+`packages/hub/Dockerfile` links to the shared Dockerfile; builds use the
+monorepo root as context. The nested Hub workflow no longer publishes images.
+
+The Docker workflow builds the image on `main` as a
 non-publishing check. Stable `vX.Y.Z` tag pushes publish
 `ghcr.io/longbkit/clisbot:X.Y.Z` and `ghcr.io/longbkit/clisbot:latest`. Beta tags
 publish only the exact prerelease tag, such as

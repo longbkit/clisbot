@@ -3072,7 +3072,7 @@ describe("PiRpcAgentClient", () => {
         mcpServers: {
           clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           },
           localSecret: {
             type: "stdio",
@@ -3116,7 +3116,7 @@ describe("PiRpcAgentClient", () => {
           directTools: ["brave_llm_context"],
         },
         clisbot: {
-          url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+          url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           auth: false,
           oauth: false,
         },
@@ -3145,7 +3145,7 @@ describe("PiRpcAgentClient", () => {
       client.createSession(
         createConfig({
           mcpServers: {
-            clisbot: { type: "http", url: "http://127.0.0.1:6767/mcp/agents" },
+            clisbot: { type: "http", url: "http://127.0.0.1:6868/mcp/agents" },
           },
         }),
         { env: { PI_CODING_AGENT_DIR: agentDir } },
@@ -3163,7 +3163,7 @@ describe("PiRpcAgentClient", () => {
         mcpServers: {
           clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           },
         },
       }),

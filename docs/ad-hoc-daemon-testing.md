@@ -1,6 +1,6 @@
 # Ad-hoc daemon testing
 
-Spin up an isolated in-process daemon test harness without touching the main daemon on port 6767.
+Spin up an isolated in-process daemon test harness without touching the main daemon on port 6868.
 
 This is for test code only. Executable daemon processes must start through
 `scripts/supervisor-entrypoint.ts` or `dist/scripts/supervisor-entrypoint.js`;

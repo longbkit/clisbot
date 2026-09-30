@@ -268,7 +268,7 @@ function createSessionForWorkspaceGitWatchTests(options?: {
     serviceProxy: options?.serviceProxy,
     scriptRuntimeStore: options?.scriptRuntimeStore,
     onBranchChanged: options?.onBranchChanged,
-    getDaemonTcpPort: () => 6767,
+    getDaemonTcpPort: () => 6868,
   });
 
   asInternals<SessionInternals>(session).listAgentPayloads = async () => [];

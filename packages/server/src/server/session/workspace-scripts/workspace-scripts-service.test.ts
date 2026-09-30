@@ -102,7 +102,7 @@ function buildService(options: BuildOptions = {}) {
     workspaceRegistry: fakeWorkspaceRegistry(workspace),
     projectRegistry: fakeProjectRegistry(options.project ?? null),
     workspaceGitService: options.gitService ?? fakeGitService(),
-    getDaemonTcpPort: () => 6767,
+    getDaemonTcpPort: () => 6868,
     getDaemonTcpHost: () => "127.0.0.1",
     serviceProxyPublicBaseUrl: null,
     resolveScriptHealth: null,
@@ -206,7 +206,7 @@ describe("buildSnapshot", () => {
         projectSlug: deriveProjectServiceSlug(project),
         branchName: workspace.branch,
         scriptName: "app",
-        daemonPort: 6767,
+        daemonPort: 6868,
       }).hostname,
     );
     await service.start({ ...request, workspaceId: workspace.workspaceId });
@@ -342,7 +342,7 @@ describe("start", () => {
       projectSlug: "clisbot",
       branchName: "feature/scripts",
       scriptName: "app",
-      daemonPort: 6767,
+      daemonPort: 6868,
       daemonListenHost: "127.0.0.1",
     });
     expect(emitted).toContainEqual({

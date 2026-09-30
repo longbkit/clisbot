@@ -14,6 +14,7 @@ import {
 import type { BotTemplateResult } from "@clisbot/protocol/bots/rpc-schemas";
 type WorkspaceTemplateResult = BotTemplateResult & { directory: string; backupDirectory?: string };
 import { connectOnboardingDaemon, isOnboardingEnabled } from "./onboarding-client.js";
+import { configureLocalHubWebUi, localWebUiOrigin } from "../hub/web-ui.js";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandError } from "../../output/index.js";
@@ -483,21 +484,31 @@ function buildNextStep(channel: "slack" | "telegram"): string {
 
 /** The real boundary implementations, wired to the shared home + env. */
 export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotStartDeps {
+  const ensureHubUp: BotStartDeps["ensureHubUp"] = async (_home, childEnv) => {
+    const state = resolveLocalHubState({ home }, childEnv);
+    if (state.running) return { hub: "already-running", url: state.state?.url ?? "" };
+    const started = await startLocalHubDetached({ home }, undefined, childEnv);
+    return { hub: "started", url: started.url };
+  };
   return {
-    ensureHubUp: async (_home, childEnv) => {
-      const state = resolveLocalHubState({ home }, env);
-      if (state.running) {
-        return { hub: "already-running", url: state.state?.url ?? "" };
-      }
-      const started = await startLocalHubDetached({ home }, undefined, childEnv);
-      return { hub: "started", url: started.url };
-    },
+    ensureHubUp,
     waitHubReady: (url) => waitForOnboardingHub(url, home),
-    ensureDaemonUp: async () => {
+    ensureDaemonUp: async (_home, childEnv) => {
       if (isOnboardingEnabled(env)) await assertLocalOnboardingAccess(home, env);
       const state = await readDaemonInstance(home);
+      const listen =
+        state?.listen ??
+        (isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined);
+      if (isOnboardingEnabled(env) && listen) {
+        const uiEnv = { ...childEnv, CLISBOT_LISTEN: listen };
+        const hub = await ensureHubUp(home, {
+          ...childEnv,
+          CLISBOT_HUB_APP_URL: localWebUiOrigin(home, uiEnv),
+        });
+        await waitForOnboardingHub(hub.url, home);
+        configureLocalHubWebUi(home, hub.url, { running: Boolean(state), listen });
+      }
       if (state) return { daemon: "already-running" };
-      const listen = isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined;
       await startLocalDaemonDetached({ home, ...(listen ? { listen } : {}) });
       return { daemon: "started" };
     },

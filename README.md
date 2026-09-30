@@ -120,14 +120,14 @@ Run the Clisbot daemon and self-hosted web UI in Docker:
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
   ghcr.io/longbkit/clisbot:latest
 ```
 
-Open `http://localhost:6767` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/clisbot` volume. See the [Docker documentation](docs/docker.md) for full setup details.
+Open `http://localhost:6868` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/clisbot` volume. See the [Docker documentation](docs/docker.md) for full setup details.
 
 ## CLI
 
@@ -142,7 +142,7 @@ clisbot attach abc123                # stream live output
 clisbot send abc123 "also add tests" # follow-up task
 
 # run on a remote daemon; --cwd is a path on that host
-clisbot run --host workstation.local:6767 --cwd /workspace "run the full test suite"
+clisbot run --host workstation.local:6868 --cwd /workspace "run the full test suite"
 ```
 
 See the [full CLI reference](https://clisbot.com/docs/cli) for more.
@@ -154,7 +154,7 @@ Build issue integrations, dashboards, and orchestration services with `@clisbot/
 ```ts
 import { createClisbotClient } from "@clisbot/client";
 
-const client = createClisbotClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 await client.connect();
 
 const agent = await client.agents.create({

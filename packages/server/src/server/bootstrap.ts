@@ -223,6 +223,7 @@ import {
 } from "./auth.js";
 import { deleteLocalCredential, writeLocalCredential } from "./local-credential.js";
 import { createWebUiMiddleware } from "./web-ui.js";
+import { createHubHttpProxy } from "./hub/http-proxy.js";
 import { WorkspaceAutoName } from "./workspace-auto-name.js";
 import { createGitMutationService } from "./session/git-mutation/git-mutation-service.js";
 import { workspaceIdsOnCheckout } from "./workspace-directory.js";
@@ -449,6 +450,7 @@ export interface ClisbotDaemonConfig {
     enabled: boolean;
     distDir: string | null;
   };
+  hubHttpProxyUrl?: string | undefined;
   appBaseUrl?: string;
   auth?: DaemonAuthConfig;
   managedAccessMode?: import("@clisbot/protocol/managed-access").ManagedAccessMode;
@@ -545,6 +547,7 @@ function mountWebUi(app: express.Application, config: ClisbotDaemonConfig, logge
       enabled: config.webUi?.enabled ?? false,
       distDir: config.webUi?.distDir ?? null,
       label: getHostname(),
+      hubEnabled: Boolean(config.hubHttpProxyUrl),
       logger,
     }),
   );
@@ -881,6 +884,8 @@ export async function createClisbotDaemon(
   // classification and host/CORS handling, but before daemon bearer auth, so
   // static app files load without the daemon password while API/WebSocket calls
   // remain protected.
+  const hubHttpProxy = createHubHttpProxy(config.hubHttpProxyUrl);
+  app.use(hubHttpProxy.middleware);
   mountWebUi(app, config, logger);
 
   let localCredential: string | null = null;
@@ -974,6 +979,7 @@ export async function createClisbotDaemon(
   // script-bound upgrades are forwarded first. The handler is a no-op for
   // requests that don't match a registered script route.
   httpServer.on("upgrade", serviceProxy.upgradeHandler({ passthroughUnknown: true }));
+  httpServer.on("upgrade", hubHttpProxy.upgrade);
 
   if (config.serviceProxy?.standaloneListen) {
     serviceProxyListenTarget = parseListenString(config.serviceProxy.standaloneListen);
@@ -1939,6 +1945,7 @@ export async function createClisbotDaemon(
               mcpBaseUrl,
               {
                 getAllowedOrigins: () => allowedOrigins,
+                shouldHandleUpgrade: (request) => !hubHttpProxy.handlesUpgrade(request),
                 getHostnames: () => configuredHostnames,
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,

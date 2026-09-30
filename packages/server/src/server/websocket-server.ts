@@ -14,6 +14,7 @@ import { CreationService } from "./creation/index.js";
 import { MessageReceipts } from "./message-receipts/index.js";
 import { WebSocket, WebSocketServer } from "ws";
 import type { IncomingMessage, Server as HTTPServer } from "http";
+import type { Duplex } from "node:stream";
 import { isAbsolute, join, relative, resolve as resolvePath } from "path";
 import { hostname as getHostname } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -178,6 +179,7 @@ interface WebSocketConnectionIdentity {
 }
 
 interface WebSocketServerConfig {
+  shouldHandleUpgrade?: (request: IncomingMessage) => boolean;
   allowedOrigins?: Set<string>;
   hostnames?: HostnamesConfig;
   getAllowedOrigins?: () => Set<string>;
@@ -931,7 +933,7 @@ export class VoiceAssistantWebSocketServer {
   ): WebSocketServer {
     const password = auth?.password;
     const wss = new WebSocketServer({
-      server,
+      noServer: true,
       path: "/ws",
       handleProtocols: (protocols) => selectWebSocketProtocol(protocols, password),
       verifyClient: ({ req }, callback) => {
@@ -943,6 +945,12 @@ export class VoiceAssistantWebSocketServer {
         );
       },
     });
+    const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+      if (wsConfig.shouldHandleUpgrade?.(request) === false) return;
+      wss.handleUpgrade(request, socket, head, (ws) => wss.emit("connection", ws, request));
+    };
+    server.on("upgrade", upgrade);
+    wss.once("close", () => server.off("upgrade", upgrade));
     wss.on("connection", (ws, request) => {
       void this.attachAuthenticatedSocket(ws, request, password);
     });

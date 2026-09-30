@@ -118,7 +118,6 @@ export function LandingPage({ title, subtitle }: LandingPageProps) {
       <div className="landing-content bg-background">
         <main className="p-6 md:p-20 md:pt-40 max-w-5xl mx-auto">
           <div className="space-y-24">
-            <SocialProofWall />
             <MultiProviderSection />
             <TurnkeySection />
             <AutomationSection />
@@ -161,88 +160,6 @@ const CURSOR_BADGE_ICON = <CursorIcon className="h-6 w-6" />;
 
 const FEATURED_AGENT_COUNT = 5;
 const ADDITIONAL_AGENT_COUNT = AGENT_PAGES.length - FEATURED_AGENT_COUNT;
-
-const SOCIAL_PROOF_TWEETS = [
-  {
-    name: "Cam",
-    handle: "@ceeebeeebeee",
-    date: "Apr 6, 2026",
-    avatar: "/social-proof/ceeebeeebeee.jpg",
-    url: "https://x.com/ceeebeeebeee/status/2041008798798864537",
-    text: "without a doubt the most slept on orchestrator right now. Open source, every OS, and a mobile experience that truly blew me away.",
-  },
-  {
-    name: "Erik Sherman",
-    handle: "@erikksherman",
-    date: "Apr 11, 2026",
-    avatar: "/social-proof/erikksherman.jpg",
-    url: "https://x.com/erikksherman/status/2043011630590751008",
-    text: "control agents from anywhere - mac, phone, web. one simple change transformed my health while INCREASING productivity",
-  },
-  {
-    name: "Aman Kumar Jagdev",
-    handle: "@amankumarjagdev",
-    date: "Apr 16, 2026",
-    avatar: "/social-proof/amankumarjagdev.jpg",
-    url: "https://x.com/amankumarjagdev/status/2044815258414674307",
-    text: "I have tried 100s of agent orchestrator, cli and gui. the best one i have found. Please give it a try! it's really good",
-  },
-  {
-    name: "RUI",
-    handle: "@tietougongshiba",
-    date: "May 3, 2026",
-    avatar: "/social-proof/tietougongshiba.jpg",
-    url: "https://x.com/tietougongshiba/status/2050886374941925754",
-    text: "Being able to check and manage agent progress from my phone while I'm out is so convenient.",
-  },
-  {
-    name: "Jason Torres",
-    handle: "@jasontorres",
-    date: "May 11, 2026",
-    avatar: "/social-proof/jasontorres.jpg",
-    url: "https://x.com/jasontorres/status/2053875385515790731",
-    text: "Can interchange between Codex, Claude Code, Opencode, Pi. Stable mobile and desktop apps connected through a secure relay from your VMs.",
-  },
-  {
-    name: "A9",
-    handle: "@aadtyn",
-    date: "May 29, 2026",
-    avatar: "/social-proof/aadtyn.jpg",
-    url: "https://x.com/aadtyn/status/2060371229773803943",
-    text: "cross platform agent orchestration with inbuilt relay and tailscale / self host daemon options + the best UI ive seen in this segment",
-  },
-  {
-    name: "boris evstratov",
-    handle: "@bevstratov",
-    date: "May 30, 2026",
-    avatar: "/social-proof/bevstratov.jpg",
-    url: "https://x.com/bevstratov/status/2060733983042781550",
-    text: "It’s an incredible piece of software. The last building block I needed to fully work from my phone. everything super smooth.",
-  },
-  {
-    name: "Arnold Gamboa",
-    handle: "@arnoldgamboa",
-    date: "May 28, 2026",
-    avatar: "/social-proof/arnoldgamboa.jpg",
-    url: "https://x.com/arnoldgamboa/status/2059832028099436921",
-    text: "Clisbot is a really good interface for Pi. It’s not the only thing it does, but that’s my current use case for now.",
-  },
-  {
-    name: "Dong",
-    handle: "@dongnaebi",
-    date: "Apr 12, 2026",
-    avatar: "/social-proof/dongnaebi.jpg",
-    url: "https://x.com/dongnaebi/status/2043162391941398735",
-    text: "Clisbot is the best software I've used this year. Absolutely amazing!",
-  },
-] as const;
-
-const SOCIAL_PROOF_ROWS = [
-  { id: "top", tweets: SOCIAL_PROOF_TWEETS.slice(0, 5), reverse: false },
-  { id: "bottom", tweets: SOCIAL_PROOF_TWEETS.slice(5), reverse: true },
-] as const;
-
-type SocialProofTweet = (typeof SOCIAL_PROOF_TWEETS)[number];
 
 function AgentBadge({ name, icon }: { name: string; icon: React.ReactNode }) {
   const [hovered, setHovered] = React.useState(false);
@@ -338,84 +255,6 @@ function SectionTitle({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function SocialProofWall() {
-  return (
-    <motion.section
-      initial={FADE_IN_UP}
-      whileInView={FADE_IN}
-      viewport={VIEWPORT_60}
-      transition={EASE_OUT_05}
-    >
-      <SectionTitle
-        title="Loved by developers"
-        description="See what developers are saying about Clisbot"
-      />
-
-      <div className="social-proof-marquee space-y-4 overflow-hidden">
-        {SOCIAL_PROOF_ROWS.map((row) => (
-          <SocialProofRow key={row.id} tweets={row.tweets} reverse={row.reverse} />
-        ))}
-      </div>
-    </motion.section>
-  );
-}
-
-function SocialProofRow({
-  tweets,
-  reverse,
-}: {
-  tweets: readonly SocialProofTweet[];
-  reverse: boolean;
-}) {
-  return (
-    <div className="social-proof-row">
-      <div className={`social-proof-track ${reverse ? "social-proof-track-reverse" : ""}`}>
-        <div className="flex shrink-0 gap-4 pr-4">
-          {tweets.map((tweet) => (
-            <SocialProofCard key={tweet.url} tweet={tweet} />
-          ))}
-        </div>
-        <div className="flex shrink-0 gap-4 pr-4" aria-hidden="true">
-          {tweets.map((tweet) => (
-            <SocialProofCard key={`${tweet.url}-clone`} tweet={tweet} inert />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SocialProofCard({ tweet, inert }: { tweet: SocialProofTweet; inert?: boolean }) {
-  return (
-    <a
-      href={tweet.url}
-      target="_blank"
-      rel="noreferrer"
-      tabIndex={inert ? -1 : undefined}
-      className="group flex h-[154px] w-[320px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-white/20 hover:bg-white/[0.05] md:w-[420px]"
-      aria-label={`Read ${tweet.name}'s original post`}
-    >
-      <div>
-        <div className="flex min-w-0 items-center gap-3">
-          <img
-            src={tweet.avatar}
-            alt=""
-            width={28}
-            height={28}
-            loading="lazy"
-            decoding="async"
-            className="h-7 w-7 shrink-0 rounded-full bg-white/10 object-cover"
-          />
-          <p className="truncate text-sm font-medium text-white/60">{tweet.handle}</p>
-        </div>
-        <p className="social-proof-card-text mt-4 text-sm leading-relaxed text-white/72">
-          {tweet.text}
-        </p>
-      </div>
-    </a>
   );
 }
 

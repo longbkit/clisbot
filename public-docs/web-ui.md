@@ -48,14 +48,14 @@ Or persist it in `config.json` so it survives restarts:
 Then open the daemon's address in a browser:
 
 ```
-http://localhost:6767/
+http://localhost:6868/
 ```
 
 If your daemon doesn't recognize `--web-ui`, update it, the flag was added with the bundled web UI.
 
 ## How the connection works
 
-The page is served from the same origin as the daemon's API and WebSocket. When you open it, the app automatically connects back to that same origin, so you usually skip the "Add Host" step entirely, open `http://localhost:6767/` and you're looking at your agents.
+The page is served from the same origin as the daemon's API and WebSocket. When you open it, the app automatically connects back to that same origin, so you usually skip the "Add Host" step entirely, open `http://localhost:6868/` and you're looking at your agents.
 
 The same HTTP server keeps serving the API (`/api/*`), MCP (`/mcp/*`), service-proxy routes, and the WebSocket upgrade. Only the static files are new. To point the served UI at a _different_ daemon, add that daemon as a host from the UI as usual.
 
@@ -63,7 +63,7 @@ The same HTTP server keeps serving the API (`/api/*`), MCP (`/mcp/*`), service-p
 
 Three common ways to run it, in order of exposure:
 
-- **Same machine.** Daemon and browser on one box. Open `http://localhost:6767/`. Nothing else to configure.
+- **Same machine.** Daemon and browser on one box. Open `http://localhost:6868/`. Nothing else to configure.
 - **Private network (LAN or VPN).** Reach the daemon from other devices on a network you trust, a home LAN or a [Tailscale](https://tailscale.com) tailnet. Follow the [Connectivity guide](/docs/connectivity#tailscale) for the complete direct setup.
 - **Public reverse proxy or tunnel.** Expose the UI on a domain over HTTPS, terminating TLS at a reverse proxy or a tunnel. This is the full self-hosted setup.
 
@@ -71,10 +71,10 @@ The rest of this page builds from local to public. **Verify a direct connection 
 
 ## Exposing beyond localhost
 
-By default the daemon listens on `127.0.0.1:6767`, reachable only from the same machine. To reach it from other devices, bind it to a network interface:
+By default the daemon listens on `127.0.0.1:6868`, reachable only from the same machine. To reach it from other devices, bind it to a network interface:
 
 ```bash
-clisbot daemon config set daemon.listen 0.0.0.0:6767
+clisbot daemon config set daemon.listen 0.0.0.0:6868
 clisbot daemon start
 ```
 
@@ -130,7 +130,7 @@ server {
   client_max_body_size 100m;
 
   location / {
-    proxy_pass http://127.0.0.1:6767;
+    proxy_pass http://127.0.0.1:6868;
     proxy_http_version 1.1;
 
     # WebSocket upgrade
@@ -156,7 +156,7 @@ Caddy handles TLS, the WebSocket upgrade, header forwarding, and streaming for y
 
 ```caddy
 clisbot.example.com {
-  reverse_proxy 127.0.0.1:6767
+  reverse_proxy 127.0.0.1:6868
 }
 ```
 
@@ -166,7 +166,7 @@ That's the whole config. Caddy provisions a certificate automatically and preser
 
 Terminate TLS at the proxy (or tunnel) and forward to the daemon over plain HTTP on localhost, that's what the configs above do. When the page is served over HTTPS and the proxy passes `X-Forwarded-Proto: https`, the app automatically connects back over `wss://`. You don't configure the scheme anywhere; it follows the edge.
 
-The daemon trusts forwarded headers from loopback proxies by default, which is what all the setups above do, the proxy or tunnel forwards to `127.0.0.1:6767`.
+The daemon trusts forwarded headers from loopback proxies by default, which is what all the setups above do, the proxy or tunnel forwards to `127.0.0.1:6868`.
 
 If your proxy reaches the daemon from another address, as in some Docker, LAN, or load-balancer setups, configure the trusted proxy ranges:
 
@@ -197,7 +197,7 @@ If you don't want to manage a reverse proxy or open ports, a tunnel gives you an
 - **Tailscale Serve** keeps it inside your tailnet, no public exposure, TLS handled for you:
 
   ```bash
-  tailscale serve https / http://127.0.0.1:6767
+  tailscale serve https / http://127.0.0.1:6868
   ```
 
   Reach it at `https://<your-machine>.<tailnet>.ts.net/`. Only devices on your tailnet can connect.
@@ -205,7 +205,7 @@ If you don't want to manage a reverse proxy or open ports, a tunnel gives you an
 - **Cloudflare Tunnel** exposes it on a public hostname with TLS and WebSocket support:
 
   ```bash
-  cloudflared tunnel --url http://localhost:6767
+  cloudflared tunnel --url http://localhost:6868
   ```
 
   Cloudflare terminates TLS and sets `X-Forwarded-Proto: https`, so auto-connect works. Because the URL is public, **set a daemon password.**

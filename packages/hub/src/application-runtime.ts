@@ -664,7 +664,7 @@ async function createChannelSupervisorAtComposition(
       // Channel accounts run in the Hub process, while the execution daemon
       // may live in a separate sandbox pod. An explicit URL is required in
       // that deployment; otherwise discovery incorrectly targets Hub-local
-      // 127.0.0.1:6767.
+      // 127.0.0.1:6868.
       ...(process.env["CLISBOT_HUB_CHANNEL_DAEMON_URL"]
         ? { daemon: { url: process.env["CLISBOT_HUB_CHANNEL_DAEMON_URL"] } }
         : {}),

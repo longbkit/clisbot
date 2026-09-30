@@ -17,7 +17,7 @@ const simulatorName =
   process.env.CLISBOT_IOS_SIMULATOR_NAME || `Clisbot ${worktreeName} ${worktreeHash}`;
 const daemonEndpoint =
   process.env.CLISBOT_DEV_DAEMON_ENDPOINT ||
-  `localhost:${process.env.CLISBOT_SERVICE_DAEMON_PORT || "6768"}`;
+  `localhost:${process.env.CLISBOT_SERVICE_DAEMON_PORT || "6869"}`;
 
 const env = {
   ...process.env,

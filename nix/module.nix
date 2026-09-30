@@ -46,7 +46,7 @@ in
 
     port = lib.mkOption {
       type = lib.types.port;
-      default = 6767;
+      default = 6868;
       description = "Port for the Clisbot daemon to listen on.";
     };
 

@@ -606,7 +606,7 @@ describe("workspace message schemas", () => {
               scriptName: "web",
               hostname: "web.clisbot.localhost",
               port: 3000,
-              proxyUrl: "http://web.clisbot.localhost:6767",
+              proxyUrl: "http://web.clisbot.localhost:6868",
               lifecycle: "running",
               health: "healthy",
             },
@@ -625,7 +625,7 @@ describe("workspace message schemas", () => {
         type: "service",
         hostname: "web.clisbot.localhost",
         port: 3000,
-        proxyUrl: "http://web.clisbot.localhost:6767",
+        proxyUrl: "http://web.clisbot.localhost:6868",
         lifecycle: "running",
         health: "healthy",
         exitCode: null,
@@ -824,7 +824,7 @@ describe("workspace message schemas", () => {
             type: "service",
             hostname: "web--repo.localhost",
             port: 3000,
-            proxyUrl: "http://web--repo.localhost:6767",
+            proxyUrl: "http://web--repo.localhost:6868",
             lifecycle: "running",
             health: "healthy",
             terminalId: "terminal-1",
@@ -870,14 +870,14 @@ describe("workspace message schemas", () => {
       type: "service",
       hostname: "web--repo.localhost",
       port: 3000,
-      proxyUrl: "http://web--repo.localhost:6767",
+      proxyUrl: "http://web--repo.localhost:6868",
       lifecycle: "running",
       health: "healthy",
     });
 
     expect(parsed.localProxyUrl).toBeUndefined();
     expect(parsed.publicProxyUrl).toBeUndefined();
-    expect(parsed.proxyUrl).toBe("http://web--repo.localhost:6767");
+    expect(parsed.proxyUrl).toBe("http://web--repo.localhost:6868");
   });
 
   test("parses workspace service payloads with split local and public proxy URLs", () => {
@@ -886,14 +886,14 @@ describe("workspace message schemas", () => {
       type: "service",
       hostname: "web--repo.localhost",
       port: 3000,
-      localProxyUrl: "http://web--repo.localhost:6767",
+      localProxyUrl: "http://web--repo.localhost:6868",
       publicProxyUrl: "https://web--repo.services.example.com",
       proxyUrl: "https://web--repo.services.example.com",
       lifecycle: "running",
       health: "healthy",
     });
 
-    expect(parsed.localProxyUrl).toBe("http://web--repo.localhost:6767");
+    expect(parsed.localProxyUrl).toBe("http://web--repo.localhost:6868");
     expect(parsed.publicProxyUrl).toBe("https://web--repo.services.example.com");
     expect(parsed.proxyUrl).toBe("https://web--repo.services.example.com");
   });

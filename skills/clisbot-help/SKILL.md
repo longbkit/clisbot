@@ -57,7 +57,7 @@ clisbot daemon status --json
 clisbot provider diagnostic <provider> --json
 ```
 
-Use the status-reported home, listen address, and log path for further checks. Probe `http://127.0.0.1:6767/api/health` or read `~/.clisbot/daemon.log` only when those values match the affected daemon. Do not restart the daemon, edit config, update software, or expose a network listener without the user's explicit permission. A daemon restart can interrupt the agent doing the diagnosis.
+Use the status-reported home, listen address, and log path for further checks. Probe `http://127.0.0.1:6868/api/health` or read `~/.clisbot/daemon.log` only when those values match the affected daemon. Do not restart the daemon, edit config, update software, or expose a network listener without the user's explicit permission. A daemon restart can interrupt the agent doing the diagnosis.
 
 For a missing provider or `command not found`, run `clisbot provider diagnostic <provider>` against the affected host, or open **Settings → your host → Providers → provider → Diagnostic**. Compare its resolved binary, daemon `PATH`, and provider version with a brand-new login shell. Shell aliases and functions are not executable paths.
 

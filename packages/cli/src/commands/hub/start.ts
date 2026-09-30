@@ -1,6 +1,6 @@
 // COMPAT(clisbot-hub-local): `hub start` — spawn/detach the fork's embedded Hub
 // (implementation doc §3.2: the `daemon start` pattern applied to the Hub's bin
-// entry; binds loopback :6868 and writes hub-local.json).
+// entry; binds loopback :6870 and writes hub-local.json).
 
 import { Command } from "commander";
 import chalk from "chalk";
@@ -14,7 +14,7 @@ import {
 export function startCommand(): Command {
   return new Command("start")
     .description("Start the local Clisbot Hub (embedded channel control plane)")
-    .option("--port <port>", "Fixed port (background default: saved port, or 6868 when available)")
+    .option("--port <port>", "Fixed port (background default: saved port, or 6870 when available)")
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--foreground", "Run in foreground (don't detach)")
     .option(

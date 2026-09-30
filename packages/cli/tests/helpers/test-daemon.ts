@@ -5,7 +5,7 @@
  * Each test gets an isolated daemon on an available local port with its own CLISBOT_HOME.
  *
  * CRITICAL RULES (from design doc):
- * 1. Port: Use an available ephemeral local port - NEVER use 6767 (production)
+ * 1. Port: Use an available ephemeral local port - NEVER use 6868 (production)
  * 2. Protocol: WebSocket ONLY - daemon has no HTTP endpoints
  * 3. Temp dirs: Create temp directories for CLISBOT_HOME and agent --cwd
  * 4. Model: Always use claude provider with haiku model for fast, cheap tests
@@ -21,7 +21,7 @@ import { ChildProcess, spawn } from "child_process";
 import { getAvailablePort } from "./network.ts";
 
 export interface TestDaemonContext {
-  /** Available local port for test daemon (never 6767) */
+  /** Available local port for test daemon (never 6868) */
   port: number;
   /** WebSocket URL for connecting to daemon */
   wsUrl: string;
@@ -145,7 +145,7 @@ async function terminateProcessTree(processRef: ChildProcess, timeoutMs: number)
 /**
  * Generate a random port for test daemon
  * Uses range 20000-30000 to avoid conflicts
- * NEVER uses 6767 (user's running daemon)
+ * NEVER uses 6868 (user's running daemon)
  */
 export function getRandomPort(): number {
   return 20000 + Math.floor(Math.random() * 10000);

@@ -36,9 +36,9 @@ import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-creden
 it("requests the managed connection credential through desktop main without a web hint", async () => {
   const requests: string[] = [];
   const connection: HostConnection = {
-    id: "direct:localhost:6767",
+    id: "direct:localhost:6868",
     type: "directTcp",
-    endpoint: "localhost:6767",
+    endpoint: "localhost:6868",
   };
   let token = "local-token";
   const invoke = async (listen: string) => {
@@ -48,7 +48,7 @@ it("requests the managed connection credential through desktop main without a we
   expect(await readDesktopManagedLocalCredential(connection, invoke)).toBe("local-token");
   token = "rotated-token";
   expect(await readDesktopManagedLocalCredential(connection, invoke)).toBe("rotated-token");
-  expect(requests).toEqual(["localhost:6767", "localhost:6767"]);
+  expect(requests).toEqual(["localhost:6868", "localhost:6868"]);
 });
 
 class FakeDaemonClient {
@@ -399,9 +399,9 @@ function agentPermission(id: string): AgentPermissionRequest {
 
 function makeHost(input: Partial<HostProfile> = {}): HostProfile {
   const direct: HostConnection = {
-    id: "direct:lan:6767",
+    id: "direct:lan:6868",
     type: "directTcp",
-    endpoint: "lan:6767",
+    endpoint: "lan:6868",
   };
   const relay: HostConnection = {
     id: "relay:relay.paseo.sh:443",
@@ -717,9 +717,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -741,9 +741,9 @@ describe("HostRuntimeController", () => {
       // Intentionally do not emit a connected state; stay in idle.
     };
 
-    await controller.activateConnection({ connectionId: "direct:lan:6767" });
+    await controller.activateConnection({ connectionId: "direct:lan:6868" });
 
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     expect(controller.getSnapshot().connectionStatus).toBe("connecting");
     expect(controller.getSnapshot().agentDirectoryStatus).toBe("initial_loading");
   });
@@ -752,9 +752,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -774,14 +774,14 @@ describe("HostRuntimeController", () => {
       },
     });
 
-    await controller.activateConnection({ connectionId: "direct:lan:6767" });
+    await controller.activateConnection({ connectionId: "direct:lan:6868" });
 
     expect(seenClientIds).toEqual(["cid_runtime_stable"]);
     expect(controller.getSnapshot().connectionStatus).toBe("online");
   });
 
   it("keeps browser client lifecycle tied to the active host runtime client", async () => {
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const fakeClient = makeConnectedProbeClient(12);
     const lifecycle = new BrowserClientLifecycle();
     const controller = new HostRuntimeController({
@@ -801,12 +801,12 @@ describe("HostRuntimeController", () => {
     await controller.start({
       autoProbe: false,
       initialConnection: {
-        connectionId: "direct:lan:6767",
+        connectionId: "direct:lan:6868",
         existingClient: fakeClient as unknown as DaemonClient,
       },
     });
 
-    expect(lifecycle.active).toEqual([{ serverId: "srv_test", connectionId: "direct:lan:6767" }]);
+    expect(lifecycle.active).toEqual([{ serverId: "srv_test", connectionId: "direct:lan:6868" }]);
 
     await controller.stop();
 
@@ -814,10 +814,10 @@ describe("HostRuntimeController", () => {
   });
 
   it("adopts the first successful probe on startup", async () => {
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 82,
+      "direct:lan:6868": 82,
       "relay:relay.paseo.sh:443": 18,
     };
     const controller = new HostRuntimeController({
@@ -827,7 +827,7 @@ describe("HostRuntimeController", () => {
 
     await controller.start({ autoProbe: false });
     const snapshot = controller.getSnapshot();
-    expect(snapshot.activeConnectionId).toBe("direct:lan:6767");
+    expect(snapshot.activeConnectionId).toBe("direct:lan:6868");
     expect(snapshot.connectionStatus).toBe("online");
     expect(clients).toHaveLength(2);
     expect(snapshot.client).toBe(clients[0] as unknown as DaemonClient);
@@ -836,7 +836,7 @@ describe("HostRuntimeController", () => {
   });
 
   it("activates the first successful probe without waiting for slower probes", async () => {
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const slowPing = createDeferred<number>();
     const clients: FakeDaemonClient[] = [];
 
@@ -847,7 +847,7 @@ describe("HostRuntimeController", () => {
           throw new Error("should adopt the probe client");
         },
         connectToDaemon: async ({ host: hostProfile, connection }) => {
-          const client = makeConnectedProbeClient(connection.id === "direct:lan:6767" ? 12 : 30);
+          const client = makeConnectedProbeClient(connection.id === "direct:lan:6868" ? 12 : 30);
           if (connection.id === "relay:relay.paseo.sh:443") {
             client.ping = async () => ({ rttMs: await slowPing.promise });
           }
@@ -868,7 +868,7 @@ describe("HostRuntimeController", () => {
     while (Date.now() < timeoutAt) {
       const snapshot = controller.getSnapshot();
       if (
-        snapshot.activeConnectionId === "direct:lan:6767" &&
+        snapshot.activeConnectionId === "direct:lan:6868" &&
         snapshot.connectionStatus === "online"
       ) {
         break;
@@ -876,7 +876,7 @@ describe("HostRuntimeController", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     expect(controller.getSnapshot().connectionStatus).toBe("online");
 
     slowPing.resolve(30);
@@ -884,7 +884,7 @@ describe("HostRuntimeController", () => {
   });
 
   it("restarts with a fresh probe cycle when the stopped run's cycle never settles", async () => {
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     let attempts = 0;
     const controller = new HostRuntimeController({
       host,
@@ -916,10 +916,10 @@ describe("HostRuntimeController", () => {
 
   it("ranks the live connection by its heartbeat RTT without pinging it again", async () => {
     useHostRuntimeClock();
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const probeAttempts: string[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -948,7 +948,7 @@ describe("HostRuntimeController", () => {
     });
 
     await controller.start({ autoProbe: false });
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
     probeAttempts.length = 0;
     const activeClient = controller.getSnapshot().client as unknown as FakeDaemonClient;
@@ -959,9 +959,9 @@ describe("HostRuntimeController", () => {
     await controller.runProbeCycleNow();
 
     expect(probeAttempts).toEqual([]);
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     expect(controller.getSnapshot().connectionStatus).toBe("online");
-    expect(controller.getSnapshot().probeByConnectionId.get("direct:lan:6767")).toEqual({
+    expect(controller.getSnapshot().probeByConnectionId.get("direct:lan:6868")).toEqual({
       status: "available",
       latencyMs: 42,
     });
@@ -1019,9 +1019,9 @@ describe("HostRuntimeController", () => {
       serverId: "srv_old",
       connections: [
         {
-          id: "direct:localhost:6767",
+          id: "direct:localhost:6868",
           type: "directTcp",
-          endpoint: "localhost:6767",
+          endpoint: "localhost:6868",
         },
       ],
     });
@@ -1045,7 +1045,7 @@ describe("HostRuntimeController", () => {
 
     expect(controller.getSnapshot().connectionStatus).toBe("connecting");
     expect(controller.getSnapshot().activeConnectionId).toBeNull();
-    expect(controller.getSnapshot().probeByConnectionId.get("direct:localhost:6767")).toEqual({
+    expect(controller.getSnapshot().probeByConnectionId.get("direct:localhost:6868")).toEqual({
       status: "unavailable",
       latencyMs: null,
     });
@@ -1054,10 +1054,10 @@ describe("HostRuntimeController", () => {
 
   it("keeps the live connection when one probe cycle looks slow", async () => {
     useHostRuntimeClock();
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 15,
+      "direct:lan:6868": 15,
       "relay:relay.paseo.sh:443": 55,
     };
     const controller = new HostRuntimeController({
@@ -1066,7 +1066,7 @@ describe("HostRuntimeController", () => {
     });
 
     await controller.start({ autoProbe: false });
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     const initialClient = controller.getSnapshot().client;
     expect(initialClient).toBeTruthy();
 
@@ -1078,7 +1078,7 @@ describe("HostRuntimeController", () => {
     await controller.runProbeCycleNow();
 
     const snapshot = controller.getSnapshot();
-    expect(snapshot.activeConnectionId).toBe("direct:lan:6767");
+    expect(snapshot.activeConnectionId).toBe("direct:lan:6868");
     expect(snapshot.connectionStatus).toBe("online");
     expect(snapshot.client).toBe(initialClient);
     expect(activeClient.isDisposed()).toBe(false);
@@ -1087,9 +1087,9 @@ describe("HostRuntimeController", () => {
   it("does not mark the live connection unavailable before its first heartbeat resolves", async () => {
     useHostRuntimeClock();
     const direct: HostConnection = {
-      id: "direct:lan:6767",
+      id: "direct:lan:6868",
       type: "directTcp",
-      endpoint: "lan:6767",
+      endpoint: "lan:6868",
     };
     const host = makeHost({
       connections: [direct],
@@ -1122,10 +1122,10 @@ describe("HostRuntimeController", () => {
 
   it("backs off inactive connection probes while a host is online", async () => {
     useHostRuntimeClock();
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 10,
+      "direct:lan:6868": 10,
       "relay:relay.paseo.sh:443": 50,
     };
     const controller = new HostRuntimeController({
@@ -1134,14 +1134,14 @@ describe("HostRuntimeController", () => {
     });
 
     await controller.start({ autoProbe: false });
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     const activeClient = controller.getSnapshot().client as unknown as FakeDaemonClient;
     const initialClientCount = clients.length;
     const initialRelayProbe = controller
       .getSnapshot()
       .probeByConnectionId.get("relay:relay.paseo.sh:443");
 
-    latencies["direct:lan:6767"] = 12;
+    latencies["direct:lan:6868"] = 12;
     latencies["relay:relay.paseo.sh:443"] = 25;
     activeClient.heartbeatReportsRtt(12);
     await vi.advanceTimersByTimeAsync(60_000);
@@ -1150,7 +1150,7 @@ describe("HostRuntimeController", () => {
 
     const snapshot = controller.getSnapshot();
     expect(clients.length).toBe(initialClientCount);
-    expect(snapshot.probeByConnectionId.get("direct:lan:6767")).toEqual({
+    expect(snapshot.probeByConnectionId.get("direct:lan:6868")).toEqual({
       status: "available",
       latencyMs: 12,
     });
@@ -1159,10 +1159,10 @@ describe("HostRuntimeController", () => {
 
   it("switches only after the faster alternative wins consecutive probes", async () => {
     useHostRuntimeClock();
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 15,
+      "direct:lan:6868": 15,
       "relay:relay.paseo.sh:443": 60,
     };
     const controller = new HostRuntimeController({
@@ -1171,19 +1171,19 @@ describe("HostRuntimeController", () => {
     });
 
     await controller.start({ autoProbe: false });
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     const activeClient = controller.getSnapshot().client as unknown as FakeDaemonClient;
 
-    latencies["direct:lan:6767"] = 95;
+    latencies["direct:lan:6868"] = 95;
     latencies["relay:relay.paseo.sh:443"] = 30;
     activeClient.heartbeatReportsRtt(95);
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
     let switched = controller.getSnapshot().activeConnectionId === "relay:relay.paseo.sh:443";
     for (let index = 0; index < 6 && !switched; index += 1) {
@@ -1197,10 +1197,10 @@ describe("HostRuntimeController", () => {
 
   it("does not switch on a transient latency spike", async () => {
     useHostRuntimeClock();
-    const host = makeHost({ preferredConnectionId: "direct:lan:6767" });
+    const host = makeHost({ preferredConnectionId: "direct:lan:6868" });
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 15,
+      "direct:lan:6868": 15,
       "relay:relay.paseo.sh:443": 80,
     };
     const controller = new HostRuntimeController({
@@ -1209,33 +1209,33 @@ describe("HostRuntimeController", () => {
     });
 
     await controller.start({ autoProbe: false });
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
     const activeClient = controller.getSnapshot().client as unknown as FakeDaemonClient;
 
-    latencies["direct:lan:6767"] = 100;
+    latencies["direct:lan:6868"] = 100;
     latencies["relay:relay.paseo.sh:443"] = 20;
     activeClient.heartbeatReportsRtt(100);
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
-    latencies["direct:lan:6767"] = 20;
+    latencies["direct:lan:6868"] = 20;
     latencies["relay:relay.paseo.sh:443"] = 90;
     activeClient.heartbeatReportsRtt(20);
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
-    latencies["direct:lan:6767"] = 100;
+    latencies["direct:lan:6868"] = 100;
     latencies["relay:relay.paseo.sh:443"] = 20;
     activeClient.heartbeatReportsRtt(100);
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
     await vi.advanceTimersByTimeAsync(120_000);
     await controller.runProbeCycleNow();
-    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6767");
+    expect(controller.getSnapshot().activeConnectionId).toBe("direct:lan:6868");
 
     let switched = controller.getSnapshot().activeConnectionId === "relay:relay.paseo.sh:443";
     for (let index = 0; index < 6 && !switched; index += 1) {
@@ -1250,7 +1250,7 @@ describe("HostRuntimeController", () => {
     const host = makeHost();
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -1271,7 +1271,7 @@ describe("HostRuntimeController", () => {
     });
 
     const latest = observed[observed.length - 1];
-    expect(latest?.activeConnectionId).toBe("direct:lan:6767");
+    expect(latest?.activeConnectionId).toBe("direct:lan:6868");
     expect(latest?.connectionStatus).toBe("error");
     expect(latest?.lastError).toBe("transport closed");
     unsubscribe();
@@ -1281,9 +1281,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -1292,7 +1292,7 @@ describe("HostRuntimeController", () => {
       host,
       deps: makeDeps(
         {
-          "direct:lan:6767": 12,
+          "direct:lan:6868": 12,
         },
         clients,
       ),
@@ -1316,9 +1316,9 @@ describe("HostRuntimeController", () => {
       const host = makeHost({
         connections: [
           {
-            id: "direct:lan:6767",
+            id: "direct:lan:6868",
             type: "directTcp",
-            endpoint: "lan:6767",
+            endpoint: "lan:6868",
           },
         ],
       });
@@ -1327,7 +1327,7 @@ describe("HostRuntimeController", () => {
         host,
         deps: makeDeps(
           {
-            "direct:lan:6767": 12,
+            "direct:lan:6868": 12,
           },
           clients,
         ),
@@ -1354,7 +1354,7 @@ describe("HostRuntimeController", () => {
     const host = makeHost();
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -1374,7 +1374,7 @@ describe("HostRuntimeController", () => {
     const host = makeHost();
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -1405,7 +1405,7 @@ describe("HostRuntimeController", () => {
     const host = makeHost();
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -1427,7 +1427,7 @@ describe("HostRuntimeController", () => {
     const host = makeHost();
     const clients: FakeDaemonClient[] = [];
     const latencies: Record<string, number | Error> = {
-      "direct:lan:6767": 12,
+      "direct:lan:6868": 12,
       "relay:relay.paseo.sh:443": 65,
     };
     const controller = new HostRuntimeController({
@@ -1456,9 +1456,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
         {
           id: "relay:relay.paseo.sh:443",
@@ -1473,7 +1473,7 @@ describe("HostRuntimeController", () => {
     const deps: HostRuntimeControllerDeps = {
       createClient: ({ connection }) => {
         const client = new FakeDaemonClient();
-        if (connection.id === "direct:lan:6767") {
+        if (connection.id === "direct:lan:6868") {
           client.connect = async () => {
             client.connectCalls += 1;
             await firstConnectGate.promise;
@@ -1506,13 +1506,13 @@ describe("HostRuntimeController", () => {
     };
 
     const switchDirect = controller.activateConnection({
-      connectionId: "direct:lan:6767",
+      connectionId: "direct:lan:6868",
     });
     await waitUntil(() => {
       const snapshot = controller.getSnapshot();
       return (
         createdClients.length === 1 &&
-        snapshot.activeConnectionId === "direct:lan:6767" &&
+        snapshot.activeConnectionId === "direct:lan:6868" &&
         snapshot.connectionStatus === "connecting"
       );
     });
@@ -1543,9 +1543,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -1583,7 +1583,7 @@ describe("HostRuntimeController", () => {
 
     slowProbe.resolve(900);
     await Promise.all([first, second]);
-    const probeAfterCycle = controller.getSnapshot().probeByConnectionId.get("direct:lan:6767");
+    const probeAfterCycle = controller.getSnapshot().probeByConnectionId.get("direct:lan:6868");
     expect(probeAfterCycle).toEqual({
       status: "available",
       latencyMs: 900,
@@ -1595,9 +1595,9 @@ describe("HostRuntimeController", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -1699,7 +1699,7 @@ describe("HostRuntimeStore", () => {
     });
     await store.upsertDirectConnection({
       serverId: "srv_offer",
-      endpoint: "localhost:6767",
+      endpoint: "localhost:6868",
       label: "My Mac",
     });
 
@@ -1711,20 +1711,20 @@ describe("HostRuntimeStore", () => {
     expect(store.getHosts()).toHaveLength(1);
     expect(store.getHosts()[0]?.management).toEqual({
       ...management,
-      manualConnectionIds: ["direct:localhost:6767"],
+      manualConnectionIds: ["direct:localhost:6868"],
     });
 
     // A later synchronization carries no adoption record; the store keeps the original one.
     await store.upsertManagedConnectionFromOffer({ offer: makeOffer(), management, label: "mac" });
-    expect(store.getHosts()[0]?.management?.manualConnectionIds).toEqual(["direct:localhost:6767"]);
+    expect(store.getHosts()[0]?.management?.manualConnectionIds).toEqual(["direct:localhost:6868"]);
 
     const restart = vi.spyOn(store, "restartHostConnection");
     await expect(store.removeManagedHost(management)).resolves.toBe(true);
     expect(restart).toHaveBeenCalledWith("srv_offer");
     expect(store.getHosts()).toHaveLength(1);
     expect(store.getHosts()[0]).not.toHaveProperty("management");
-    expect(store.getHosts()[0]?.connections.map(({ id }) => id)).toEqual(["direct:localhost:6767"]);
-    expect(store.getHosts()[0]?.preferredConnectionId).toBe("direct:localhost:6767");
+    expect(store.getHosts()[0]?.connections.map(({ id }) => id)).toEqual(["direct:localhost:6868"]);
+    expect(store.getHosts()[0]?.preferredConnectionId).toBe("direct:localhost:6868");
     store.syncHosts([]);
   });
 
@@ -2266,9 +2266,9 @@ describe("HostRuntimeStore", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -2311,9 +2311,9 @@ describe("HostRuntimeStore", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -2386,9 +2386,9 @@ describe("HostRuntimeStore", () => {
       serverId: "srv_no_session",
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -2434,7 +2434,7 @@ describe("HostRuntimeStore", () => {
   it("drains snapshot and buffered running transitions exactly once", async () => {
     const host = makeHost({
       serverId: "srv_legacy_transitions",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -2579,9 +2579,9 @@ describe("HostRuntimeStore", () => {
       serverId: "srv_paged",
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -2670,7 +2670,7 @@ describe("HostRuntimeStore", () => {
   it("replays agent updates received while a later bootstrap page is loading", async () => {
     const host = makeHost({
       serverId: "srv_paged_delta",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -2791,7 +2791,7 @@ describe("HostRuntimeStore", () => {
   it("applies agent updates received during initial directory bootstrap", async () => {
     const host = makeHost({
       serverId: "srv_pre_session",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -2846,7 +2846,7 @@ describe("HostRuntimeStore", () => {
   it("rejects a superseded refresh without overwriting the newer replica", async () => {
     const host = makeHost({
       serverId: "srv_overlap",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -2918,7 +2918,7 @@ describe("HostRuntimeStore", () => {
   it("replays inherited deltas when a superseding refresh fails", async () => {
     const host = makeHost({
       serverId: "srv_overlap_failure",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -2981,7 +2981,7 @@ describe("HostRuntimeStore", () => {
   it("rejects a refresh when the session generation changes before commit", async () => {
     const host = makeHost({
       serverId: "srv_stale_generation",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -3037,7 +3037,7 @@ describe("HostRuntimeStore", () => {
   it("drains queued messages once for snapshot and buffered running transitions", async () => {
     const host = makeHost({
       serverId: "srv_queued_transitions",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -3385,7 +3385,7 @@ describe("HostRuntimeStore", () => {
   it("applies buffered stale side effects from the accepted page agent", async () => {
     const host = makeHost({
       serverId: "srv_buffered_stale_side_effects",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const fakeClient = new FakeDaemonClient();
     fakeClient.setConnectionState({ status: "connected" });
@@ -3496,9 +3496,9 @@ describe("HostRuntimeStore", () => {
       serverId: "srv_resubscribe",
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -3570,9 +3570,9 @@ describe("HostRuntimeStore", () => {
       serverId: "srv_archived_rehydrate",
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -3650,9 +3650,9 @@ describe("HostRuntimeStore", () => {
     const host = makeHost({
       connections: [
         {
-          id: "direct:lan:6767",
+          id: "direct:lan:6868",
           type: "directTcp",
-          endpoint: "lan:6767",
+          endpoint: "lan:6868",
         },
       ],
     });
@@ -3672,7 +3672,7 @@ describe("HostRuntimeStore", () => {
     let snapshot = store.getSnapshot(host.serverId);
     const timeoutAt = Date.now() + 100;
     while (
-      snapshot?.probeByConnectionId.get("direct:lan:6767")?.status !== "unavailable" &&
+      snapshot?.probeByConnectionId.get("direct:lan:6868")?.status !== "unavailable" &&
       Date.now() < timeoutAt
     ) {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -3681,7 +3681,7 @@ describe("HostRuntimeStore", () => {
 
     expect(snapshot?.connectionStatus).toBe("connecting");
     expect(snapshot?.lastError).toBeNull();
-    expect(snapshot?.probeByConnectionId.get("direct:lan:6767")).toEqual({
+    expect(snapshot?.probeByConnectionId.get("direct:lan:6868")).toEqual({
       status: "unavailable",
       latencyMs: null,
     });
@@ -3704,7 +3704,7 @@ describe("HostRuntimeStore", () => {
     // this.hosts and syncs controllers — matching the real init path.
     await store.upsertDirectConnection({
       serverId: "srv_rename",
-      endpoint: "lan:6767",
+      endpoint: "lan:6868",
       label: "old name",
     });
     expect(store.getHosts().find((h) => h.serverId === "srv_rename")?.label).toBe("old name");
@@ -3736,14 +3736,14 @@ describe("HostRuntimeStore", () => {
 
     try {
       await store.upsertConnectionFromListen({
-        listenAddress: "127.0.0.1:6767",
+        listenAddress: "127.0.0.1:6868",
         serverId: "srv_desktop",
         hostname: advertisedHostname,
       });
       await store.renameHost("srv_desktop", "mac-dev");
 
       await store.upsertConnectionFromListen({
-        listenAddress: "127.0.0.1:6767",
+        listenAddress: "127.0.0.1:6868",
         serverId: "srv_desktop",
         hostname: advertisedHostname,
       });
@@ -3791,9 +3791,9 @@ describe("HostRuntimeStore", () => {
 
   it("probeAndUpsertConnection learns the real server id before storing a direct host", async () => {
     const connection: HostConnection = {
-      id: "direct:lan:6767",
+      id: "direct:lan:6868",
       type: "directTcp",
-      endpoint: "lan:6767",
+      endpoint: "lan:6868",
     };
     const probeClient = makeConnectedProbeClient(5);
     const seenProbeHosts: string[] = [];
@@ -3832,9 +3832,9 @@ describe("HostRuntimeStore", () => {
 
   it("probeAndUpsertConnection replaces a matching placeholder host with the real server id", async () => {
     const connection: HostConnection = {
-      id: "direct:lan:6767",
+      id: "direct:lan:6868",
       type: "directTcp",
-      endpoint: "lan:6767",
+      endpoint: "lan:6868",
     };
     const store = new HostRuntimeStore({
       deps: {
@@ -3853,8 +3853,8 @@ describe("HostRuntimeStore", () => {
       }
     ).hosts = [
       makeHost({
-        serverId: "local:lan:6767",
-        label: "local:lan:6767",
+        serverId: "local:lan:6868",
+        label: "local:lan:6868",
         connections: [connection],
         preferredConnectionId: connection.id,
       }),
@@ -4026,10 +4026,10 @@ describe("readInitialDaemonConnectionHint", () => {
 
   it("parses a valid listen-only hint", () => {
     (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ = {
-      listen: "localhost:6767",
+      listen: "localhost:6868",
     };
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toEqual({
-      listen: "localhost:6767",
+      listen: "localhost:6868",
       useTls: false,
     });
   });
@@ -4047,7 +4047,7 @@ describe("readInitialDaemonConnectionHint", () => {
 
   it("ignores invalid shapes", () => {
     (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ =
-      "localhost:6767";
+      "localhost:6868";
     expect(readInitialDaemonConnectionHint({ isWebRuntime: true })).toBeNull();
 
     (globalThis as Record<string, unknown>).__CLISBOT_INITIAL_DAEMON_CONNECTION__ = {
@@ -4150,7 +4150,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     const host = makeHost({
       serverId: "srv_changed_password",
       password: "old-password",
-      connections: [{ id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767" }],
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
     });
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage(),
@@ -4270,7 +4270,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     });
     for (let index = 1; index <= 5; index += 1) {
       const serverId = `srv_rejected_${index}`;
-      await store.upsertDirectConnection({ serverId, endpoint: `host-${index}:6767` });
+      await store.upsertDirectConnection({ serverId, endpoint: `host-${index}:6868` });
       await onceHostSnapshotMatches(
         store,
         serverId,
@@ -4358,7 +4358,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
         getClientId: async () => "cid_test_password_setting",
       },
     });
-    await store.upsertDirectConnection({ serverId: "srv_test", endpoint: "lan:6767" });
+    await store.upsertDirectConnection({ serverId: "srv_test", endpoint: "lan:6868" });
     await onceHostSnapshotMatches(
       store,
       "srv_test",
@@ -4394,7 +4394,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
         },
         getClientId: async () => "cid_test_runtime",
         readInitialConnectionHint: () => ({
-          listen: "daemon-origin:6767",
+          listen: "daemon-origin:6868",
           useTls: true,
         }),
       },
@@ -4406,7 +4406,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     await hostAdded;
 
     expect(seenProbes).toContainEqual({
-      endpoint: "daemon-origin:6767",
+      endpoint: "daemon-origin:6868",
       useTls: true,
     });
     const host = store.getHosts()[0];
@@ -4414,7 +4414,7 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     expect(host?.connections).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          endpoint: "daemon-origin:6767",
+          endpoint: "daemon-origin:6868",
           useTls: true,
         }),
       ]),

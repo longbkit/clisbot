@@ -1,0 +1,17 @@
+{
+  "source": "c5236c00d8575cdc4423407dd4cb9f111135564e",
+  "scope": [
+    "packages/website/src/components/legal-page.tsx",
+    "packages/website/src/routes/privacy.tsx",
+    "packages/website/src/routes/terms.tsx",
+    "packages/website/src/components/landing-page.tsx",
+    "packages/website/src/posts.ts",
+    "packages/website/src/routes/blog/$.tsx",
+    "packages/website/src/routes/hub.tsx",
+    "packages/website/posts/hello-world.md",
+    "packages/website/posts/i-was-wrong-about-electron.md"
+  ],
+  "firstApplicationFiles": 9,
+  "archivedPaths": 2,
+  "repeatApplicationFiles": 0
+}

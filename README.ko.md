@@ -112,14 +112,14 @@ Docker에서 Clisbot 데몬과 셀프 호스팅 웹 UI를 실행하세요:
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
   ghcr.io/longbkit/clisbot:latest
 ```
 
-컨테이너가 시작되면 `http://localhost:6767`을 여세요. 사용하는 에이전트 CLI를 기본 이미지에 추가한 뒤, 환경 변수나 영구 `/home/clisbot` 볼륨으로 인증 정보를 설정하세요. 자세한 내용은 [Docker 문서](docs/docker.md)를 참고하세요.
+컨테이너가 시작되면 `http://localhost:6868`을 여세요. 사용하는 에이전트 CLI를 기본 이미지에 추가한 뒤, 환경 변수나 영구 `/home/clisbot` 볼륨으로 인증 정보를 설정하세요. 자세한 내용은 [Docker 문서](docs/docker.md)를 참고하세요.
 
 ## CLI
 
@@ -134,7 +134,7 @@ clisbot attach abc123                # 실시간 출력 스트리밍
 clisbot send abc123 "also add tests" # 후속 작업 전송
 
 # 원격 데몬에서 실행
-clisbot --host workstation.local:6767 run "run the full test suite"
+clisbot --host workstation.local:6868 run "run the full test suite"
 ```
 
 자세한 내용은 [전체 CLI 레퍼런스](https://clisbot.com/docs/cli)를 참고하세요.

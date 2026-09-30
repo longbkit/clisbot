@@ -1,15 +1,17 @@
 # Minimal Clisbot daemon + web UI deployment.
 #
-# Open http://localhost:6767 after `docker compose up -d`.
+# Open http://localhost:6868 after `docker compose up -d`.
 # For any network-reachable deployment, change CLISBOT_PASSWORD first.
 services:
   clisbot:
     image: ghcr.io/longbkit/clisbot:latest
     container_name: clisbot
     restart: unless-stopped
+    stop_grace_period: 40s
     ports:
-      - "6767:6767"
+      - "6868:6868"
     environment:
+      CLISBOT_RUN_MODE: daemon
       CLISBOT_PASSWORD: "change-me"
       # Add DNS names you use to reach this container. IPs and localhost are
       # already allowed by default.

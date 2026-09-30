@@ -13,13 +13,13 @@ describe("withRuntimeClisbotMcpServer", () => {
     const result = withRuntimeClisbotMcpServer({
       config: BASE_CONFIG,
       agentId: "agent-1",
-      mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+      mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
       mcpAuthToken: "cap-token",
     });
 
     expect(result.mcpServers?.clisbot).toEqual({
       type: "http",
-      url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+      url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
       headers: { Authorization: "Bearer cap-token" },
     });
   });
@@ -28,13 +28,13 @@ describe("withRuntimeClisbotMcpServer", () => {
     const result = withRuntimeClisbotMcpServer({
       config: BASE_CONFIG,
       agentId: "agent-1",
-      mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+      mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
       mcpAuthToken: null,
     });
 
     expect(result.mcpServers?.clisbot).toEqual({
       type: "http",
-      url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+      url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
     });
   });
 

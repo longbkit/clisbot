@@ -4,32 +4,32 @@ import { isHostnameAllowed, mergeHostnames, parseHostnamesEnv } from "./hostname
 
 describe("hostnames (vite-style)", () => {
   it("allows localhost by default", () => {
-    expect(isHostnameAllowed("localhost:6767", undefined)).toBe(true);
+    expect(isHostnameAllowed("localhost:6868", undefined)).toBe(true);
   });
 
   it("allows subdomains of .localhost by default", () => {
-    expect(isHostnameAllowed("foo.localhost:6767", undefined)).toBe(true);
+    expect(isHostnameAllowed("foo.localhost:6868", undefined)).toBe(true);
   });
 
   it("allows IP addresses by default", () => {
-    expect(isHostnameAllowed("127.0.0.1:6767", undefined)).toBe(true);
-    expect(isHostnameAllowed("[::1]:6767", undefined)).toBe(true);
+    expect(isHostnameAllowed("127.0.0.1:6868", undefined)).toBe(true);
+    expect(isHostnameAllowed("[::1]:6868", undefined)).toBe(true);
   });
 
   it("rejects non-default hosts when no allowlist is provided", () => {
-    expect(isHostnameAllowed("evil.com:6767", undefined)).toBe(false);
+    expect(isHostnameAllowed("evil.com:6868", undefined)).toBe(false);
   });
 
   it("allows any host when set to true", () => {
-    expect(isHostnameAllowed("evil.com:6767", true)).toBe(true);
+    expect(isHostnameAllowed("evil.com:6868", true)).toBe(true);
   });
 
   it("supports leading-dot patterns", () => {
     const hostnames = [".example.com"];
-    expect(isHostnameAllowed("example.com:6767", hostnames)).toBe(true);
-    expect(isHostnameAllowed("foo.example.com:6767", hostnames)).toBe(true);
-    expect(isHostnameAllowed("foo.bar.example.com:6767", hostnames)).toBe(true);
-    expect(isHostnameAllowed("notexample.com:6767", hostnames)).toBe(false);
+    expect(isHostnameAllowed("example.com:6868", hostnames)).toBe(true);
+    expect(isHostnameAllowed("foo.example.com:6868", hostnames)).toBe(true);
+    expect(isHostnameAllowed("foo.bar.example.com:6868", hostnames)).toBe(true);
+    expect(isHostnameAllowed("notexample.com:6868", hostnames)).toBe(false);
   });
 
   it("merges arrays (append + de-dupe) and short-circuits on true", () => {

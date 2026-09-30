@@ -15,7 +15,7 @@ npm run dev:desktop
 
 Root checkout dev is intentionally split across terminals:
 
-- `npm run dev:server` runs the daemon on `127.0.0.1:6768`.
+- `npm run dev:server` runs the daemon on `127.0.0.1:6869`.
 - `npm run dev:app` runs Expo on `http://localhost:8081` and connects to the dev daemon.
 - `npm run dev:desktop` runs its own Electron-flavored Expo server on the first free port from `8082` through `8089`. It never claims port `8081`.
 
@@ -27,7 +27,7 @@ The web and desktop dev launchers pass the current Git branch to Metro as
 `EXPO_PUBLIC_CLISBOT_DEV_BUILD_LABEL`. The expanded desktop sidebar shows it in
 the titlebar row. Production builds leave the variable unset and show no label.
 
-`npm run dev` is only a shorthand for `npm run dev:server`. Keep `127.0.0.1:6767` for the packaged app and production-style `~/.clisbot` state.
+`npm run dev` is only a shorthand for `npm run dev:server`. Keep `127.0.0.1:6868` for the packaged app and production-style `~/.clisbot` state.
 
 For the unified Clisbot Web App, Hub, and daemon, use one command:
 
@@ -35,20 +35,20 @@ For the unified Clisbot Web App, Hub, and daemon, use one command:
 npm run dev:clisbot -- https://your-host.example:8444
 ```
 
-The runner uses `~/.clisbot-dev-01` for daemon state, `~/.clisbot-dev-01/hub` for the embedded Hub database, and a persistent `~/.clisbot-dev-01.key` for credential encryption. It ignores ambient production `CLISBOT_HOME` and `DATABASE_URL` values, starts the daemon source on `6768`, Hub on `6868`, and Expo Web on `8081`, then prints `Ready` only after the daemon and Hub respond, the daemon WebSocket rejects an unauthenticated upgrade with 401, and Metro finishes the first Web bundle. Override the root only with an absolute `CLISBOT_DEV_HOME`. The Hosts screen then shows `CLISBOT_HOME=<dev home> npm run cli -- hub login <origin>` instead of `clisbot hub login`; run it from the repository root to enroll the dev daemon.
+The runner uses `~/.clisbot-dev-01` for daemon state, `~/.clisbot-dev-01/hub` for the embedded Hub database, and a persistent `~/.clisbot-dev-01.key` for credential encryption. It ignores ambient production `CLISBOT_HOME` and `DATABASE_URL` values, starts the daemon source on `6869`, Hub on `6870`, and Expo Web on `8081`, then prints `Ready` only after the daemon and Hub respond, the daemon WebSocket rejects an unauthenticated upgrade with 401, and Metro finishes the first Web bundle. Override the root only with an absolute `CLISBOT_DEV_HOME`. The Hosts screen then shows `CLISBOT_HOME=<dev home> npm run cli -- hub login <origin>` instead of `clisbot hub login`; run it from the repository root to enroll the dev daemon.
 
 The Hub Vite plugin forwards `/api/daemons/socket` upgrades through the same TanStack SSR entry and
 application runtime as HTTP. Without this adapter, HTTP pages can work while enrolled daemons stay
 offline with `Opening handshake has timed out`. Keep WebSocket upgrades enabled on the `/api` proxy.
-Diagnose the dev daemon with `clisbot hub status --host localhost:6768 --json`. A registered Host appears
+Diagnose the dev daemon with `clisbot hub status --host localhost:6869 --json`. A registered Host appears
 in the app's Host list after its daemon publishes connection details; registration alone does not
 provide a usable connection. Account and Configuration explain recovery when those details are missing.
 
-The external origin must proxy `/` to Expo on `8081`, and `/api`, `/mcp`, `/agent-executions`, and `/health` to Hub on `6868`, preserving those prefixes. `/mcp` serves Channel reply tools and `/agent-executions` serves Workflow tools and attachments, including Agents on another Host; routing it to Expo returns HTML instead of the tool protocol. For an existing Tailscale dev endpoint, add the tool routes once:
+The external origin must proxy `/` to Expo on `8081`, and `/api`, `/mcp`, `/agent-executions`, and `/health` to Hub on `6870`, preserving those prefixes. `/mcp` serves Channel reply tools and `/agent-executions` serves Workflow tools and attachments, including Agents on another Host; routing it to Expo returns HTML instead of the tool protocol. For an existing Tailscale dev endpoint, add the tool routes once:
 
 ```bash
-tailscale serve --bg --https=8444 --set-path=/mcp http://127.0.0.1:6868/mcp
-tailscale serve --bg --https=8444 --set-path=/agent-executions http://127.0.0.1:6868/agent-executions
+tailscale serve --bg --https=8444 --set-path=/mcp http://127.0.0.1:6870/mcp
+tailscale serve --bg --https=8444 --set-path=/agent-executions http://127.0.0.1:6870/agent-executions
 ```
 
 Cold Metro builds can take up to 15 minutes before readiness times out. If a service exits during startup or you stop the stack, pending readiness requests are cancelled so the command exits promptly.
@@ -86,11 +86,11 @@ CLISBOT_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived w
 
 ### Daemon endpoints
 
-- Stable daemon launched by the desktop app: `localhost:6767`.
-- Root checkout dev daemon: `localhost:6768`.
+- Stable daemon launched by the desktop app: `localhost:6868`.
+- Root checkout dev daemon: `localhost:6869`.
 - Root checkout Expo: `http://localhost:8081`.
 - Root checkout desktop dev Expo: first free port from `8082` through `8089`.
-- `npm run dev` (Windows): `localhost:6767` for the daemon.
+- `npm run dev` (Windows): `localhost:6868` for the daemon.
 
 In Clisbot-managed worktree services, use the injected service environment rather than hardcoded root checkout ports.
 
@@ -130,11 +130,11 @@ npm run ios        # → expo run:ios (packages/app): builds and launches the ap
 
 `expo run:ios` starts its own Metro and gives you the normal Simulator.app window (full speed, native touch, no stream).
 
-**Pointing the app at a daemon.** The client resolves its local daemon from `EXPO_PUBLIC_LOCAL_DAEMON` (`packages/app/src/runtime/host-runtime.ts`); when unset it falls back to `localhost:6767`, the production `~/.clisbot` daemon. To target a worktree's dev daemon instead, set it on the build command:
+**Pointing the app at a daemon.** The client resolves its local daemon from `EXPO_PUBLIC_LOCAL_DAEMON` (`packages/app/src/runtime/host-runtime.ts`); when unset it falls back to `localhost:6868`, the production `~/.clisbot` daemon. To target a worktree's dev daemon instead, set it on the build command:
 
 ```bash
 EXPO_PUBLIC_LOCAL_DAEMON=localhost:${CLISBOT_SERVICE_DAEMON_PORT} npm run ios   # worktree daemon running as a Clisbot service
-EXPO_PUBLIC_LOCAL_DAEMON=localhost:6768 npm run ios                          # standalone `npm run dev:server`
+EXPO_PUBLIC_LOCAL_DAEMON=localhost:6869 npm run ios                          # standalone `npm run dev:server`
 ```
 
 The iOS simulator shares the Mac's loopback, so `localhost:<port>` reaches the host daemon directly.
@@ -272,7 +272,7 @@ For the desktop Explorer sidebar toggle, run the app against the root checkout's
 npm run profile:explorer-toggle --workspace=@clisbot/app
 ```
 
-The harness verifies port `6768`, opens the Clisbot workspace, creates and warms the Explorer pane,
+The harness verifies port `6869`, opens the Clisbot workspace, creates and warms the Explorer pane,
 records an idle control, then measures settled and 50 ms burst Cmd+E toggles. It reports
 input-to-DOM and input-to-paint latency, React commits, mounts, unmounts, and DOM mutations. Set
 `CLISBOT_PROFILE_TRACE_PATH=/tmp/explorer-toggle.trace.json` or
@@ -493,9 +493,9 @@ Or persist it in `config.json`:
 }
 ```
 
-When enabled, opening the daemon HTTP origin (for example `http://localhost:6767/`) serves the web app. The same HTTP server continues to serve `/api/*`, `/mcp/*`, `/public/*`, the WebSocket upgrade, and service-proxy routes. Static files load without daemon bearer auth; API and WebSocket calls still enforce auth.
+When enabled, opening the daemon HTTP origin (for example `http://localhost:6868/`) serves the web app. The same HTTP server continues to serve `/api/*`, `/mcp/*`, `/public/*`, the WebSocket upgrade, and service-proxy routes. Static files load without daemon bearer auth; API and WebSocket calls still enforce auth.
 
-The served app auto-bootstraps a connection to the same origin, so opening `http://localhost:6767/` directly usually skips the Add Host step.
+The served app auto-bootstraps a connection to the same origin, so opening `http://localhost:6868/` directly usually skips the Add Host step.
 
 Build the artifact for packaging or measurement with:
 
@@ -591,7 +591,7 @@ npm run cli -- --host ssh://user@host ls -a
 Set `CLISBOT_HOST` to use the same target across invocations. An explicit
 selector overrides both environment selectors. With both `CLISBOT_HOME` and `CLISBOT_HOST` set, pass an explicit selector. See [CLI target selection](../public-docs/cli.md#select-one-daemon).
 
-In an SSH URI, the URL port is the SSH server port. The remote daemon defaults to `127.0.0.1:6767`; use `?daemonPort=7777` to override it. The transport runs non-interactively through the local OpenSSH client and never installs, starts, or configures the remote daemon. User-facing setup and troubleshooting live in [public-docs/connectivity.md](../public-docs/connectivity.md#ssh).
+In an SSH URI, the URL port is the SSH server port. The remote daemon defaults to `127.0.0.1:6868`; use `?daemonPort=7777` to override it. The transport runs non-interactively through the local OpenSSH client and never installs, starts, or configures the remote daemon. User-facing setup and troubleshooting live in [public-docs/connectivity.md](../public-docs/connectivity.md#ssh).
 
 Desktop integrations can focus an existing agent without creating one or
 sending a message. Use `clisbot://h/<server-id>/agent/<agent-id>`, or run

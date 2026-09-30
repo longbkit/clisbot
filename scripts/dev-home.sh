@@ -88,7 +88,7 @@ resolve_dev_daemon_endpoint() {
     return
   fi
 
-  case "${CLISBOT_LISTEN:-127.0.0.1:6768}" in
+  case "${CLISBOT_LISTEN:-127.0.0.1:6869}" in
     0.0.0.0:*) echo "localhost:${CLISBOT_LISTEN#0.0.0.0:}" ;;
     127.0.0.1:*) echo "localhost:${CLISBOT_LISTEN#127.0.0.1:}" ;;
     *) echo "$CLISBOT_LISTEN" ;;
@@ -127,7 +127,7 @@ configure_dev_command_env() {
     if [ -n "${CLISBOT_SERVICE_DAEMON_PORT:-}" ]; then
       export CLISBOT_LISTEN="0.0.0.0:${CLISBOT_SERVICE_DAEMON_PORT}"
     else
-      export CLISBOT_LISTEN="127.0.0.1:6768"
+      export CLISBOT_LISTEN="127.0.0.1:6869"
     fi
   fi
 

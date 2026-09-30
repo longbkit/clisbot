@@ -22,6 +22,8 @@ interface StreamingRequestInit extends RequestInit {
 
 interface FetchServerOptions {
   trustedClientIpHeader?: string;
+  /** When set, only these socket peers may supply proxy metadata. */
+  trustedProxyAddresses?: readonly string[];
   /** Explicit public URL whose origin is authoritative over proxy request metadata. */
   canonicalRequestOrigin?: string;
   /** Test and embedded adapters may terminate TLS directly; production normally uses its proxy. */
@@ -54,7 +56,7 @@ async function forwardRequest(
   options: FetchServerOptions,
 ): Promise<void> {
   try {
-    const clientAddress = resolveClientAddress(incoming, options.trustedClientIpHeader);
+    const clientAddress = resolveClientAddress(incoming, options);
     const request = toRequest(incoming, clientAddress, options);
     const tracked = await runWithFailureTracking(async () => {
       const response = await fetchHandler(request);
@@ -179,6 +181,9 @@ function toRequest(
   const origin = `http://${incoming.headers.host ?? "localhost"}`;
   const headers = requestHeaders(incoming);
   headers.set(INTERNAL_CLIENT_ADDRESS_HEADER, clientAddress);
+  // Better Auth reads this header too. Replace an untrusted caller's value
+  // with the same validated address used by our own rate limiters.
+  if (options.trustedClientIpHeader) headers.set(options.trustedClientIpHeader, clientAddress);
   headers.set(TRUSTED_REQUEST_ORIGIN_HEADER, requestOrigin(incoming, options));
   const base = { method, headers } satisfies RequestInit;
   if (method === "GET" || method === "HEAD") {
@@ -192,16 +197,21 @@ function toRequest(
   return new Request(new URL(incoming.url ?? "/", origin), streaming);
 }
 
-function resolveClientAddress(
-  incoming: IncomingMessage,
-  trustedClientIpHeader: string | undefined,
-): string {
+function resolveClientAddress(incoming: IncomingMessage, options: FetchServerOptions): string {
   const peerAddress = incoming.socket.remoteAddress ?? "unknown";
-  if (trustedClientIpHeader === undefined) return peerAddress;
+  const { trustedClientIpHeader } = options;
+  if (trustedClientIpHeader === undefined || !isTrustedProxy(incoming, options)) return peerAddress;
   const value = incoming.headers[trustedClientIpHeader.toLowerCase()];
   if (typeof value !== "string") return peerAddress;
   const address = value.trim();
   return isIP(address) === 0 ? peerAddress : address;
+}
+
+function isTrustedProxy(incoming: IncomingMessage, options: FetchServerOptions): boolean {
+  if (options.trustedProxyAddresses === undefined) return true;
+  const normalize = (address: string) => address.replace(/^::ffff:/i, "");
+  const peer = normalize(incoming.socket.remoteAddress ?? "");
+  return options.trustedProxyAddresses.some((address) => normalize(address) === peer);
 }
 
 function requestBody(incoming: IncomingMessage): ReadableStream<Uint8Array> {
@@ -252,7 +262,7 @@ function requestOrigin(incoming: IncomingMessage, options: FetchServerOptions): 
   if (options.canonicalRequestOrigin !== undefined) return options.canonicalRequestOrigin;
   const directProtocol = Reflect.get(incoming.socket, "encrypted") === true ? "https" : "http";
   const directHost = incoming.headers.host;
-  if (options.trustedClientIpHeader === undefined) {
+  if (options.trustedClientIpHeader === undefined || !isTrustedProxy(incoming, options)) {
     return validatedOrigin(directProtocol, directHost);
   }
   const forwardedProtocol = firstForwardedValue(incoming.headers["x-forwarded-proto"]);

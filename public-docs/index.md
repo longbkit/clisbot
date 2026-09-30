@@ -58,14 +58,14 @@ For servers, dev boxes, NAS devices, or homelab hosts, run the official image:
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
   ghcr.io/longbkit/clisbot:latest
 ```
 
-Then open `http://localhost:6767`.
+Then open `http://localhost:6868`.
 
 The image runs the daemon and serves the bundled web UI. It does not bundle agent CLIs, so extend it with the agents you use. See [Docker](/docs/docker) for Compose, reverse proxy, agent install, and security examples.
 

@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const appUrl = process.env.CLISBOT_PROFILE_APP_URL ?? "http://127.0.0.1:8081";
-const daemonPort = Number(process.env.CLISBOT_PROFILE_DAEMON_PORT ?? 6768);
+const daemonPort = Number(process.env.CLISBOT_PROFILE_DAEMON_PORT ?? 6869);
 const workspaceCwd = process.env.CLISBOT_PROFILE_WORKSPACE_CWD ?? repoRoot;
 const workspaceId = process.env.CLISBOT_PROFILE_WORKSPACE_ID ?? resolveClisbotWorkspaceId();
 const serverId =

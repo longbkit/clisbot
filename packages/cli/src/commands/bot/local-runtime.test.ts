@@ -5,6 +5,8 @@ import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { selectLocalPort } from "../hub/local-port.js";
+import { configureLocalHubWebUi, localWebUiOrigin } from "../hub/web-ui.js";
+import { loadConfig } from "@clisbot/server/configuration";
 import {
   assertLocalOnboardingAccess,
   onboardingDaemonListen,
@@ -34,11 +36,44 @@ async function createHome(): Promise<string> {
   return directory;
 }
 
+it("prepares the shared UI and Hub proxy before starting a fresh daemon", async () => {
+  const home = await createHome();
+  const daemonListen = "127.0.0.1:7181";
+  await writeFile(
+    path.join(home, "config.json"),
+    JSON.stringify({ daemon: { relay: { enabled: false } } }),
+  );
+  configureLocalHubWebUi(home, "http://127.0.0.1:7182", { running: false, listen: daemonListen });
+  const config = loadConfig(home, { env: { CLISBOT_HOME: home } });
+  expect(config.listen).toBe(daemonListen);
+  expect(config.webUi?.enabled).toBe(true);
+  expect(config.hubHttpProxyUrl).toBe("http://127.0.0.1:7182");
+  expect(config.relayEnabled).toBe(false);
+  expect(localWebUiOrigin(home, {})).toBe("http://127.0.0.1:7181");
+  expect(localWebUiOrigin(home, { CLISBOT_HUB_APP_URL: "https://work.example.test" })).toBe(
+    "https://work.example.test",
+  );
+});
+
+it("leaves a running daemon unchanged when shared UI setup requires a restart", async () => {
+  const home = await createHome();
+  const file = path.join(home, "config.json");
+  const original = JSON.stringify({ daemon: { listen: "127.0.0.1:7181" } });
+  await writeFile(file, original);
+  expect(() =>
+    configureLocalHubWebUi(home, "http://127.0.0.1:7182", {
+      running: true,
+      listen: "127.0.0.1:7181",
+    }),
+  ).toThrow(/restart that daemon/);
+  expect(await readFile(file, "utf8")).toBe(original);
+});
+
 it("rejects managed TCP onboarding before connection while preserving policy and IPC recovery", async () => {
   const directory = await createHome();
   const configPath = path.join(directory, "config.json");
   const config = JSON.stringify({
-    daemon: { listen: "127.0.0.1:6767", managedAccess: { mode: "external" } },
+    daemon: { listen: "127.0.0.1:6868", managedAccess: { mode: "external" } },
   });
   await writeFile(configPath, config);
   await writeFile(
@@ -64,7 +99,7 @@ it("allows onboarding while external has no Hub to ask for tickets yet", async (
   const directory = await createHome();
   await writeFile(
     path.join(directory, "config.json"),
-    JSON.stringify({ daemon: { listen: "127.0.0.1:6767", managedAccess: { mode: "external" } } }),
+    JSON.stringify({ daemon: { listen: "127.0.0.1:6868", managedAccess: { mode: "external" } } }),
   );
   await expect(assertLocalOnboardingAccess(directory, {})).resolves.toBeUndefined();
   await writeFile(

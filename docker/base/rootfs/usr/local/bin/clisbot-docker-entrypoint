@@ -5,7 +5,9 @@ IMAGE_HOME="/home/clisbot"
 
 : "${HOME:=$IMAGE_HOME}"
 : "${CLISBOT_HOME:=${HOME}/.clisbot}"
-: "${CLISBOT_LISTEN:=0.0.0.0:6767}"
+: "${CLISBOT_RUN_MODE:=daemon}"
+: "${CLISBOT_HUB_DATA_DIR:=${HOME}/.clisbot-hub}"
+: "${CLISBOT_LISTEN:=0.0.0.0:6868}"
 : "${CLISBOT_WEB_UI_ENABLED:=true}"
 : "${CLISBOT_LOG_LEVEL:=info}"
 : "${CLISBOT_LOG_FORMAT:=json}"
@@ -18,6 +20,8 @@ IMAGE_HOME="/home/clisbot"
 
 export HOME
 export CLISBOT_HOME
+export CLISBOT_RUN_MODE
+export CLISBOT_HUB_DATA_DIR
 export CLISBOT_LISTEN
 export CLISBOT_WEB_UI_ENABLED
 export CLISBOT_LOG_LEVEL
@@ -28,6 +32,13 @@ export XDG_CONFIG_HOME
 export XDG_DATA_HOME
 export XDG_STATE_HOME
 export XDG_CACHE_HOME
+
+if [[ "$CLISBOT_RUN_MODE" == "all" ]]; then
+  export CLISBOT_HUB_PROXY_URL="${CLISBOT_HUB_PROXY_URL:-http://127.0.0.1:${PORT:-6870}}"
+  export CLISBOT_HUB_APP_URL="${CLISBOT_HUB_APP_URL:-http://localhost:6868}"
+  export CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER="${CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER:-x-clisbot-proxy-client-ip}"
+  export CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES="${CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES:-127.0.0.1,::1}"
+fi
 
 ensure_dir() {
   local dir="$1"
@@ -43,6 +54,7 @@ ensure_dir() {
 
 ensure_dir "$HOME"
 ensure_dir "$CLISBOT_HOME"
+ensure_dir "$CLISBOT_HUB_DATA_DIR"
 ensure_dir "$CLAUDE_CONFIG_DIR"
 ensure_dir "$CODEX_HOME"
 ensure_dir "$XDG_CONFIG_HOME"
@@ -57,7 +69,7 @@ if [[ "$#" -gt 0 ]]; then
   exec "$@"
 fi
 
-if [[ -z "${CLISBOT_PASSWORD:-}" ]]; then
+if [[ "$CLISBOT_RUN_MODE" != "hub" && -z "${CLISBOT_PASSWORD:-}" ]]; then
   {
     echo "[clisbot] WARNING: CLISBOT_PASSWORD is not set."
     echo "[clisbot] The daemon accepts unauthenticated control connections from any client that can reach it."
@@ -65,14 +77,7 @@ if [[ -z "${CLISBOT_PASSWORD:-}" ]]; then
   } >&2
 fi
 
-if [[ ! -f /etc/clisbot-server-entry ]]; then
-  echo "[clisbot] FATAL: /etc/clisbot-server-entry is missing." >&2
-  exit 1
-fi
-
-entry="$(cat /etc/clisbot-server-entry)"
-echo "[clisbot] starting daemon on ${CLISBOT_LISTEN} with web UI ${CLISBOT_WEB_UI_ENABLED}"
 if [[ "$(id -u)" == "0" ]]; then
-  exec gosu clisbot node "$entry"
+  exec gosu clisbot node /usr/local/lib/clisbot-container.mjs
 fi
-exec node "$entry"
+exec node /usr/local/lib/clisbot-container.mjs

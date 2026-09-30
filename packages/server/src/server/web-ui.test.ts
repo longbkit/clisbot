@@ -70,6 +70,7 @@ async function request(
 }
 
 function createApp(options: {
+  hubEnabled?: boolean;
   enabled: boolean;
   distDir: string | null;
   publicDir?: string;
@@ -80,6 +81,7 @@ function createApp(options: {
       enabled: options.enabled,
       distDir: options.distDir,
       label: "test-label",
+      hubEnabled: options.hubEnabled,
       logger,
     }),
   );
@@ -163,6 +165,17 @@ describe("daemon web UI route module", () => {
     const res = await request(app, "GET", "/index.html");
 
     expect(res.body).toMatch(/window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__.*<\/head>/);
+  });
+
+  test("enables Hub only when the host explicitly wires its same-origin proxy", async () => {
+    const enabled = await request(
+      createApp({ enabled: true, distDir, hubEnabled: true }),
+      "GET",
+      "/",
+    );
+    const disabled = await request(createApp({ enabled: true, distDir }), "GET", "/");
+    expect(enabled.body).toContain("window.__CLISBOT_HUB_ENABLED__=true");
+    expect(disabled.body).toContain("window.__CLISBOT_HUB_ENABLED__=false");
   });
 
   test("escapes the injected host hint for inline script safety", async () => {

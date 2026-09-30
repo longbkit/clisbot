@@ -36,7 +36,7 @@ export {
   type PersistedConfig,
 } from "./persisted-config.js";
 
-const DEFAULT_PORT = 6767;
+const DEFAULT_PORT = 6868;
 const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
 const DEFAULT_APP_BASE_URL = "https://app.paseo.sh";
 const DEFAULT_TRUSTED_PROXIES = ["loopback"];
@@ -470,7 +470,7 @@ function resolveTrustedProxiesConfig(
 // - host:port (TCP)
 // - /path/to/socket (Unix socket)
 // - unix:///path/to/socket (Unix socket)
-// Default is TCP at 127.0.0.1:6767
+// Default is TCP at 127.0.0.1:6868
 function resolveListenAddress(
   env: NodeJS.ProcessEnv,
   cli: CliConfigOverrides | undefined,
@@ -655,6 +655,7 @@ export function resolveConfigFromPersisted(
     hubSocketStaleTimeoutMs: parsePositiveIntegerEnv(env.CLISBOT_HUB_SOCKET_STALE_TIMEOUT_MS),
     serviceProxy,
     webUi,
+    hubHttpProxyUrl: env.CLISBOT_HUB_PROXY_URL?.trim() || persisted.features?.webUi?.hubProxyUrl,
     appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
     // COMPAT(clisbot-managed-access-default): upstream Clisbot runs `off`. The Clisbot fusion
@@ -807,6 +808,7 @@ function resolveServiceAndWebUiOverridePaths(
     paths.push("features.webUi.enabled");
   }
   if (env.CLISBOT_WEB_UI_DIST_DIR !== undefined) paths.push("features.webUi.distDir");
+  if (env.CLISBOT_HUB_PROXY_URL !== undefined) paths.push("features.webUi.hubProxyUrl");
   return paths;
 }
 

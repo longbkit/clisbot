@@ -46,6 +46,7 @@ export type {
 export interface RuntimeConfig {
   bind: string;
   trustedClientIpHeader?: string;
+  trustedProxyAddresses?: string[];
   authPolicy: InstanceAuthPolicy;
   /** Google sign-in client credentials; absent disables the provider. */
   google?: GoogleAuthConfig;

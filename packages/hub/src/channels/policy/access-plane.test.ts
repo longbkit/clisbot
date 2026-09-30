@@ -182,7 +182,7 @@ function makeHarness(options: {
       if (config.featureValues !== undefined)
         agent.featureValues = { ...agent.featureValues, ...config.featureValues };
     },
-    discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
+    discovery: { url: "ws://127.0.0.1:6868/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, opts) => {
       created.push({ config });

@@ -30,7 +30,7 @@ Ask the daemon to inspect the provider environment it actually uses:
 ```bash
 clisbot provider diagnostic claude
 clisbot provider diagnostic codex --json
-clisbot --host devbox:6767 provider diagnostic opencode
+clisbot --host devbox:6868 provider diagnostic opencode
 ```
 
 The diagnostic includes the configured command, daemon `PATH` and shell, matching binaries, resolved path, version, model count, and provider status. Use the global `--host` option for a remote daemon. This is the same diagnostic shown under **Settings → your host → Providers → provider → Diagnostic**.
@@ -82,7 +82,7 @@ clisbot project delete <project-id>
 For a local daemon, `clisbot project create [path]` defaults to the current directory and resolves relative paths on the CLI machine. When you use the global `--host` option or `CLISBOT_HOST`, provide a path that the target daemon can access:
 
 ```bash
-clisbot --host devbox:6767 project create /srv/repos/api
+clisbot --host devbox:6868 project create /srv/repos/api
 ```
 
 The remote daemon interprets that path on its own machine. See [Workspaces](/docs/workspaces) for how projects group working directories and sessions.

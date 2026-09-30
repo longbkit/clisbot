@@ -1,7 +1,8 @@
 import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import { selectLocalPort } from "./local-port.js";
+import { localWebUiOrigin } from "./web-ui.js";
 // COMPAT(clisbot-hub-local): local lifecycle + discovery for the fork's embedded
-// Hub. `hub start` spawns the `@clisbot/hub` bin detached (default loopback :6868,
+// Hub. `hub start` spawns the `@clisbot/hub` bin detached (default loopback :6870,
 // the fork default distinct from upstream's :3000) and records url + pid in
 // `hub-local.json` under the shared Clisbot home ($CLISBOT_HOME, default ~/.clisbot);
 // the `channels`/`users` verbs read that file to reach the control plane without
@@ -29,7 +30,7 @@ const require = createRequire(import.meta.url);
 
 const HUB_STATE_FILENAME = "hub-local.json";
 // The fork's default Hub port (implementation doc §3.2), distinct from upstream's 3000.
-const FORK_DEFAULT_HUB_PORT = 6868;
+const FORK_DEFAULT_HUB_PORT = 6870;
 // The Hub binds loopback; the embedded control plane trusts loopback only.
 const FORK_HUB_BIND = "127.0.0.1";
 const FORK_DEFAULT_HOME_DIRECTORY_NAME = ".clisbot";
@@ -432,7 +433,11 @@ function buildChildEnv(
     CLISBOT_HOME: home,
     PORT: String(port),
     CLISBOT_HUB_BIND: FORK_HUB_BIND,
-    CLISBOT_HUB_APP_URL: inherited.CLISBOT_HUB_APP_URL?.trim() || `http://${FORK_HUB_BIND}:${port}`,
+    CLISBOT_HUB_APP_URL: localWebUiOrigin(home, inherited),
+    CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER:
+      inherited.CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER ?? "x-clisbot-proxy-client-ip",
+    CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES:
+      inherited.CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES ?? "127.0.0.1,::1",
   };
   // A token reference for CLI onboarding is not an environment-managed Application.
   // Preserve explicit legacy Application configuration, but keep bare input tokens local to the CLI.

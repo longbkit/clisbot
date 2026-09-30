@@ -8,7 +8,7 @@ import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 function clientFor(daemon: TestClisbotDaemon) {
-  if (daemon.port === 6767) throw new Error("Production daemon port is forbidden");
+  if (daemon.port === 6868) throw new Error("Production daemon port is forbidden");
   const clients: unknown = Reflect.get(daemon.daemon.agentManager, "clients");
   if (!(clients instanceof Map) || clients.get("codex") !== daemon.config.agentClients?.codex)
     throw new Error("Daemon did not install the injected fake provider");

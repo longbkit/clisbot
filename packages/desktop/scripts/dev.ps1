@@ -68,7 +68,7 @@ if (-not $env:CLISBOT_LISTEN) { $env:CLISBOT_LISTEN = "127.0.0.1:$DevDaemonPort"
 # Seed the isolated daemon config. The desktop daemon-manager decides whether a
 # daemon is already running by reading `daemon.listen` from this config.json
 # (it does NOT honor the CLISBOT_LISTEN env var) and probing that address. Without
-# this it reads the default 6767, finds a production daemon there, and connects
+# this it reads the default 6868, finds a production daemon there, and connects
 # the dev app to prod — whose CORS allowlist then rejects the Metro origin. Pin
 # the dev port + wildcard CORS in the file so the dev app starts its OWN daemon.
 # ONLY seed the script-managed home: never rewrite a user-supplied CLISBOT_HOME

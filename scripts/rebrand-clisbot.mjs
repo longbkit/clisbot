@@ -16,6 +16,7 @@ import {
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
+import { publicationPath, rebrandPublication } from "./rebrand-templates/publication.mjs";
 
 const options = parseArgs(process.argv.slice(2));
 const root = resolve(options.root);
@@ -185,7 +186,7 @@ for (const path of tracked) {
     continue;
   }
   const protectedPath = isProtectedPath(path);
-  const target = protectedPath ? path : renameProductText(path);
+  const target = protectedPath ? path : renameProductText(publicationPath(path));
   const prior = destinationOwners.get(target);
   if (prior && prior !== path) {
     throw new Error(`Path collision: ${prior} and ${path} both map to ${target}`);
@@ -206,8 +207,12 @@ for (const path of tracked) {
         after =
           path === "LICENSE"
             ? addClisbotLicenseNotice(before)
-            : (productTemplates.get(path) ??
-              removeCollapsedAliases(path, renameProductText(before)));
+            : rebrandPublication(
+                path,
+                productTemplates.get(path) ??
+                  removeCollapsedAliases(path, renameProductText(before)),
+                { repoSlug },
+              );
         occurrences = countBrandTokens(before);
       }
     }
@@ -273,6 +278,7 @@ function isProtectedPath(path) {
     path.startsWith("scripts/branding/") ||
     path.startsWith("assets/branding/") ||
     path.startsWith("scripts/rebrand-templates/") ||
+    path.startsWith("packages/website/posts/upstream/") ||
     path === "LICENSE" ||
     path.startsWith("docs/audits/") ||
     path.startsWith("docs/lessons/") ||

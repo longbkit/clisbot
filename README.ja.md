@@ -124,7 +124,7 @@ clisbot attach abc123                # ライブ出力をストリーミング
 clisbot send abc123 "also add tests" # 追加タスクを送信
 
 # リモートデーモンで実行
-clisbot --host workstation.local:6767 run "run the full test suite"
+clisbot --host workstation.local:6868 run "run the full test suite"
 ```
 
 詳細は[完全な CLI リファレンス](https://clisbot.com/docs/cli)を参照してください。

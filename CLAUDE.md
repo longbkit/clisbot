@@ -136,7 +136,7 @@ npm run format                       # Auto-format with Biome
 npm run format:check                 # Check formatting without writing
 ```
 
-Repo dev commands use checkout-local state by default. In this checkout, `CLISBOT_HOME` resolves to `.dev/clisbot-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.clisbot` on port `6767`.
+Repo dev commands use checkout-local state by default. In this checkout, `CLISBOT_HOME` resolves to `.dev/clisbot-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.clisbot` on port `6868`.
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 

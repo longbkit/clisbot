@@ -212,11 +212,11 @@ Services launched from the same workspace see each other's ports and proxy URLs.
 
 ```
 CLISBOT_PORT=3000                         # this service's port
-CLISBOT_URL=http://web--my-app.localhost:6767  # this service's proxy URL
+CLISBOT_URL=http://web--my-app.localhost:6868  # this service's proxy URL
 CLISBOT_SERVICE_API_PORT=51732
-CLISBOT_SERVICE_API_URL=http://api--my-app.localhost:6767
+CLISBOT_SERVICE_API_URL=http://api--my-app.localhost:6868
 CLISBOT_SERVICE_WEB_PORT=3000
-CLISBOT_SERVICE_WEB_URL=http://web--my-app.localhost:6767
+CLISBOT_SERVICE_WEB_URL=http://web--my-app.localhost:6868
 ```
 
 Script names are upper-cased and non-alphanumerics become `_`. Point your frontend at `$CLISBOT_SERVICE_API_URL` instead of hard-coding a port.

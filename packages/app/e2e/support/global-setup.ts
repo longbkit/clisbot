@@ -19,8 +19,10 @@ export interface WaitForServerOptions {
 type ServerProbe = (host: string, port: number) => Promise<void>;
 
 const RESERVED_LOCAL_PORTS = new Set([
-  6767, // Installed daemon.
-  6768, // Developer daemon.
+  6767, // Legacy installed daemon.
+  6868, // Clisbot daemon.
+  6768, // Legacy dev daemon.
+  6869, // Clisbot dev daemon.
   61680, // OpenCode's default local server.
 ]);
 

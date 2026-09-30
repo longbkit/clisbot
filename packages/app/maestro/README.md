@@ -77,8 +77,8 @@ the wrong route. The header assertion and the `New workspace` negative assertion
 are what prove the redirect actually completed.
 
 The scripts assume a development build with package id `sh.clisbot.debug`, an
-already-running local daemon on `127.0.0.1:6767`, and a connected Android device
-or emulator. They call `adb reverse tcp:6767 tcp:6767`; they do not restart the
+already-running local daemon on `127.0.0.1:6868`, and a connected Android device
+or emulator. They call `adb reverse tcp:6868 tcp:6868`; they do not restart the
 daemon.
 
 ```bash
@@ -90,7 +90,7 @@ Optional environment:
 
 ```bash
 CLISBOT_MAESTRO_APP_ID=sh.clisbot.debug
-CLISBOT_MAESTRO_DIRECT_ENDPOINT=127.0.0.1:6767
-CLISBOT_MAESTRO_DAEMON_WS_URL=ws://127.0.0.1:6767/ws
+CLISBOT_MAESTRO_DIRECT_ENDPOINT=127.0.0.1:6868
+CLISBOT_MAESTRO_DAEMON_WS_URL=ws://127.0.0.1:6868/ws
 CLISBOT_MAESTRO_PROJECT_PATH=/path/to/git/repo
 ```

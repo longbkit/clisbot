@@ -25,7 +25,7 @@ interface ProviderLaunchCase {
   launchMode?: "spawnProcess" | "piRuntime";
 }
 
-const JSON_ARG = '{"mcpServers":{"clisbot":{"type":"http","url":"http://127.0.0.1:6767/mcp"}}}';
+const JSON_ARG = '{"mcpServers":{"clisbot":{"type":"http","url":"http://127.0.0.1:6868/mcp"}}}';
 const tempDirs: string[] = [];
 
 function makeFixture(

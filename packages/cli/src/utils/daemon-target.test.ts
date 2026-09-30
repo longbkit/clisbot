@@ -19,7 +19,7 @@ test("explicit selectors win over both environment selectors", () => {
 test("endpoint connections resolve local credentials from CLISBOT_HOME", () => {
   expect(
     resolveClientClisbotHome(
-      { kind: "endpoint", host: "localhost:6767" },
+      { kind: "endpoint", host: "localhost:6868" },
       { CLISBOT_HOME: "/tmp/custom-home" },
     ),
   ).toBe("/tmp/custom-home");
@@ -50,14 +50,14 @@ test("CLI selects an explicit password before a matching local credential and ne
   delete process.env.CLISBOT_PASSWORD;
   try {
     const token = "a".repeat(43);
-    await writeFile(join(home, "clisbot.pid"), JSON.stringify({ listen: "127.0.0.1:6767" }));
+    await writeFile(join(home, "clisbot.pid"), JSON.stringify({ listen: "127.0.0.1:6868" }));
     await writeFile(join(home, "local-credential"), token);
-    expect(resolveDaemonCredential("tcp://localhost:6767", home)).toEqual({
+    expect(resolveDaemonCredential("tcp://localhost:6868", home)).toEqual({
       kind: "localCredential",
       token,
     });
-    expect(resolveDaemonCredential("tcp://remote.example:6767", home)).toBeNull();
-    expect(resolveDaemonCredential("tcp://localhost:6767?password=explicit", home)).toEqual({
+    expect(resolveDaemonCredential("tcp://remote.example:6868", home)).toBeNull();
+    expect(resolveDaemonCredential("tcp://localhost:6868?password=explicit", home)).toEqual({
       kind: "password",
       password: "explicit",
     });

@@ -70,7 +70,7 @@ export async function verifyAttachedDaemonControls({ repo, root, env, home, port
     });
     page = await desktop.firstWindow();
     page.on("pageerror", (error) => console.log("Renderer error:", error.message));
-    await page.route(/:(6767|6768)\b/, (route) => route.abort());
+    await page.route(/:(6767|6768|6868|6869)\b/, (route) => route.abort());
     await page.getByRole("button", { name: "Settings", exact: true }).click({ timeout: 90_000 });
     await page.getByRole("button", { name: "Enable built-in daemon", exact: true }).click();
     await expect(page.getByText("Attached to an existing daemon", { exact: true })).toBeVisible();

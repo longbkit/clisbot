@@ -1,11 +1,13 @@
 ---
 title: "I was wrong about Electron"
-description: "Why I migrated Clisbot from Tauri to Electron after the small-binary story stopped mattering more than rendering, notifications, and bundling a Node daemon."
+description: "Why I migrated Paseo from Tauri to Electron after the small-binary story stopped mattering more than rendering, notifications, and bundling a Node daemon."
 date: "2026-05-28"
 draft: "false"
 ---
 
-When I started building Clisbot, I picked Tauri.
+> Archived upstream article by Mo Boudra about Paseo. Source: [getpaseo/paseo](https://github.com/getpaseo/paseo). Excluded from the Clisbot blog.
+
+When I started building Paseo, I picked Tauri.
 
 The reasoning felt obvious at the time. I was building a desktop app with a web UI, and I cared about shipping something that did not feel bloated. Like a lot of developers, I had also internalized the idea that Electron was the bad option.
 
@@ -21,11 +23,11 @@ Linux is where things started getting complicated.
 
 Tauri does not bundle one browser engine across platforms. That is the point. On Linux, it relies on WebKitGTK, which sounds elegant until you are debugging rendering behavior across distros, GPU setups, and Wayland/X11 differences.
 
-For Clisbot, this turned into a lot of product work I did not want to be doing. The WebKitGTK bindings Tauri was using were too old. Wayland had problems. And once I got the app running, it just looked different. It was not just small stuff like font weights or aliasing, some screens had real layout differences.
+For Paseo, this turned into a lot of product work I did not want to be doing. The WebKitGTK bindings Tauri was using were too old. Wayland had problems. And once I got the app running, it just looked different. It was not just small stuff like font weights or aliasing, some screens had real layout differences.
 
 I could maybe have lived with all of this, but then I started implementing notifications.
 
-For Clisbot, notifications are not a nice to have. If an agent finishes, fails, or needs attention, I want the user to click the notification and land in the right place.
+For Paseo, notifications are not a nice to have. If an agent finishes, fails, or needs attention, I want the user to click the notification and land in the right place.
 
 Tauri's notification plugin can show notifications, but [desktop click handling](https://github.com/tauri-apps/plugins-workspace/issues/2150) was not there in the way I needed. There's something called the Actions API that allows you to attach callbacks to notifications, but the docs mark it as mobile-only, which was strange.
 
@@ -35,14 +37,14 @@ I tried a bunch of Rust crates, but none of them worked the way I wanted, so I e
 
 There was also the daemon. This part is not really Tauri's fault, but it pushed me further toward Electron.
 
-Clisbot has a Node.js daemon, and I wanted a one-click experience. Download the app, open it, and go. I did not want to tell users "go run this command first" or teach them what a "daemon" was.
+Paseo has a Node.js daemon, and I wanted a one-click experience. Download the app, open it, and go. I did not want to tell users "go run this command first" or teach them what a "daemon" was.
 
 Tauri supports sidecars, so I got the daemon bundled and it worked. But it became its own project: different binaries for different platforms and target triples, packaging details, permissions, process spawning, paths, upgrades.
 
 At some point I had the realization that I was building Electron with extra steps.
 
-So I decided to try Electron. The migration was a bit of a pain, but I got things working surprisingly fast, and after a week of solid work Clisbot actually felt lighter and simpler. The UI looked the same across platforms. Notifications behaved the way I needed. The daemon was simpler since it had Node pre-bundled.
+So I decided to try Electron. The migration was a bit of a pain, but I got things working surprisingly fast, and after a week of solid work Paseo actually felt lighter and simpler. The UI looked the same across platforms. Notifications behaved the way I needed. The daemon was simpler since it had Node pre-bundled.
 
 Overall, I have been really happy with Electron since. It mostly gets out of my way. And when there are performance problems, they tend to come from my application code rather than Electron itself. I guess that is also why Electron gets a bad reputation, it is really easy to make a bloated Electron app.
 
-My conclusion here is not that Tauri is bad. It was just the wrong choice for Clisbot, and I made that choice more by vibes than by looking at the tradeoffs objectively.
+My conclusion here is not that Tauri is bad. It was just the wrong choice for Paseo, and I made that choice more by vibes than by looking at the tradeoffs objectively.

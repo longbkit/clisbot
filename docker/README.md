@@ -1,20 +1,22 @@
 # Clisbot Docker Image
 
-This directory contains the official Clisbot daemon image.
+This directory owns the shared Clisbot daemon and Hub image.
 
-The image runs the daemon headless and serves the bundled web UI from the same
-HTTP origin. Start it, then open the daemon URL in a browser.
+Set `CLISBOT_RUN_MODE=daemon` (default), `hub`, or `all` to choose services.
+See [service modes](../docs/docker.md#service-modes) for ports, persistence,
+healthchecks, and shutdown. The daemon serves the shared browser UI on `6868`,
+including Hub management in `all` mode. Hub on `6870` serves only the backend.
 
 ```bash
 docker run -d --name clisbot \
-  -p 6767:6767 \
+  -p 6868:6868 \
   -e CLISBOT_PASSWORD=change-me \
   -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
   ghcr.io/longbkit/clisbot:latest
 ```
 
-Then open `http://localhost:6767`.
+Then open `http://localhost:6868`.
 
 The base image intentionally does not bundle agent CLIs. Extend it with the
 agents you use:

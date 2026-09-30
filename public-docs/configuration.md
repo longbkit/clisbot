@@ -35,7 +35,7 @@ Minimal example that configures listening address, hostnames, and MCP:
   "$schema": "https://clisbot.com/schemas/clisbot.config.v1.json",
   "version": 1,
   "daemon": {
-    "listen": "127.0.0.1:6767",
+    "listen": "127.0.0.1:6868",
     "hostnames": ["localhost", ".localhost"],
     "mcp": { "enabled": true }
   }
@@ -133,7 +133,7 @@ Or persist it in `config.json`:
 }
 ```
 
-When enabled, open the daemon HTTP origin, for example `http://localhost:6767/`, to load the web app. Static UI files load without daemon auth; API and WebSocket requests still require the configured password.
+When enabled, open the daemon HTTP origin, for example `http://localhost:6868/`, to load the web app. Static UI files load without daemon auth; API and WebSocket requests still require the configured password.
 
 ## Logging
 
@@ -203,14 +203,14 @@ The CLI picks up a password from, in order:
 1. The `password` query parameter on a `tcp://` host URI:
 
    ```bash
-   clisbot --host "tcp://192.168.1.10:6767?password=my-secret" ls
+   clisbot --host "tcp://192.168.1.10:6868?password=my-secret" ls
    ```
 
-2. The `CLISBOT_PASSWORD` environment variable, used as a fallback when the host carries no embedded password (works for `localhost:6767`, bare `host:port`, or `tcp://` hosts without a `password=` query):
+2. The `CLISBOT_PASSWORD` environment variable, used as a fallback when the host carries no embedded password (works for `localhost:6868`, bare `host:port`, or `tcp://` hosts without a `password=` query):
 
    ```bash
    CLISBOT_PASSWORD=my-secret clisbot ls
-   CLISBOT_PASSWORD=my-secret clisbot --host 192.168.1.10:6767 ls
+   CLISBOT_PASSWORD=my-secret clisbot --host 192.168.1.10:6868 ls
    ```
 
 A `password=` in the URI always wins over the env var, so you can keep `CLISBOT_PASSWORD` set globally and still target a different daemon by spelling its password into the URI.

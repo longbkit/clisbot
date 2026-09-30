@@ -8,6 +8,7 @@ import {
 } from "./index.js";
 import { hasApplication, startApplication } from "./server/runtime.js";
 import { applyClisbotEnvAliases } from "./env-alias.js";
+import { isHubRequestEnabled } from "./server/backend.js";
 export { startApplication } from "./server/runtime.js";
 
 const startFetch = createStartHandler(defaultStreamHandler);
@@ -25,6 +26,7 @@ export function handleDaemonUpgrade(request: IncomingMessage, socket: Duplex, he
 export { stopProductionRuntime };
 
 const fetch = async (request: Request) => {
+  if (!isHubRequestEnabled(request)) return Response.json({ error: "not_found" }, { status: 404 });
   if (!hasApplication()) await startProductionRuntime();
   return startFetch(request);
 };

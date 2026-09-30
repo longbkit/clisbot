@@ -8,6 +8,54 @@ import test from "node:test";
 
 const script = fileURLToPath(new URL("./rebrand-clisbot.mjs", import.meta.url));
 
+test("rebrands service ports without changing timers, evidence, or stored user settings", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-ports-"));
+  git(root, "init", "-q");
+  const files = {
+    "packages/server/src/server/config.ts": "const DEFAULT_PORT = 6767;\n",
+    "packages/protocol/src/ssh-transport.ts": "export const DEFAULT_SSH_DAEMON_PORT = 6767;\n",
+    "packages/app/src/runtime/host-runtime.ts": 'const endpoint = "localhost:6767";\n',
+    "packages/hub/src/index.ts":
+      'const port = process.env["PORT"] ?? "3000";\nconst timeout = 3000;\n',
+    "packages/cli/src/commands/hub/local-hub.ts": "const FORK_DEFAULT_HUB_PORT = 6868;\n",
+    "packages/app/e2e/support/helpers/daemon-port.ts":
+      'if (port === "6767") throw Error("reserved");\n',
+    "docker/base/Dockerfile": "EXPOSE 6767 3000\n",
+    "scripts/dev-app.sh": 'export PASEO_LISTEN="${PASEO_LISTEN:-127.0.0.1:6768}"\n',
+    "docs/audits/old.md": "6767 6768 3000 6868\n",
+    "user-state/settings.json": '{"listen":"127.0.0.1:6767"}\n',
+    "packages/app/src/assets/logo.svg": '<svg viewBox="0 0 6767 3000"/>\n',
+  };
+  for (const [path, content] of Object.entries(files)) put(root, path, content);
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--apply"]);
+  const read = (path) => readFileSync(join(root, path), "utf8");
+  assert.match(read("packages/server/src/server/config.ts"), /= 6868/);
+  assert.match(read("packages/protocol/src/ssh-transport.ts"), /= 6868/);
+  assert.match(read("packages/app/src/runtime/host-runtime.ts"), /localhost:6868/);
+  assert.match(read("packages/cli/src/commands/hub/local-hub.ts"), /= 6870/);
+  assert.equal(read("docker/base/Dockerfile"), "EXPOSE 6868 6870\n");
+  assert.match(read("scripts/dev-app.sh"), /CLISBOT_LISTEN:-127\.0\.0\.1:6869/);
+  assert.equal(
+    read("packages/hub/src/index.ts"),
+    'const port = process.env["PORT"] ?? "6870";\nconst timeout = 3000;\n',
+  );
+  for (const path of [
+    "docs/audits/old.md",
+    "user-state/settings.json",
+    "packages/app/src/assets/logo.svg",
+  ]) {
+    assert.equal(read(path), files[path]);
+  }
+  const guard = new Function("port", read("packages/app/e2e/support/helpers/daemon-port.ts"));
+  for (const port of ["6767", "6768", "6868", "6869"]) assert.throws(() => guard(port), /reserved/);
+  assert.doesNotThrow(() => guard("54321"));
+  const check = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),
+  );
+  assert.equal(check.changedFiles, 0);
+});
+
 test("rebrands source, paths, links, packages, and env names idempotently", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-test-"));
   git(root, "init", "-q");
@@ -291,6 +339,96 @@ test("keeps source attribution across all README translations", () => {
     assert.doesNotMatch(contents, new RegExp(`## ${related}\\n`));
   }
   assert.match(readFileSync(join(root, "README.zh-CN.md"), "utf8"), /## 自托管 relay TLS/);
+});
+
+test("keeps Clisbot publication identity and archives upstream endorsements idempotently", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-publication-"));
+  git(root, "init", "-q");
+  put(root, "packages/hub/compose.yml", "image: ghcr.io/getpaseo/hub:latest\n");
+  put(
+    root,
+    "packages/website/src/components/legal-page.tsx",
+    [
+      "Mohamed Boudra Ziani, operating as Paseo",
+      "      NIF/VAT ID: ES26617095T",
+      "      <br />",
+      "      Roc Boronat 48, Bajos 2",
+      "      <br />",
+      "      08005 Barcelona, Spain",
+      "      <br />",
+      "hello@moboudra.com",
+      "",
+    ].join("\n"),
+  );
+  put(
+    root,
+    "packages/website/src/routes/privacy.tsx",
+    "Mohamed Boudra Ziani: hello@moboudra.com\n",
+  );
+  put(
+    root,
+    "packages/website/posts/hello-world.md",
+    '---\ntitle: "Hello World"\n---\nWelcome to the Paseo blog.\n',
+  );
+  put(
+    root,
+    "packages/website/src/components/landing-page.tsx",
+    [
+      "            <SocialProofWall />",
+      "const SOCIAL_PROOF_TWEETS = [",
+      '  { text: "Paseo is the best software", url: "https://x.com/example" },',
+      "] as const;",
+      "function AgentBadge() {}",
+      "function SocialProofWall() {}",
+      'const PROVIDER_ICON_CLASS = "h-5";',
+      "",
+    ].join("\n"),
+  );
+  git(root, "add", "-A");
+  const args = [script, "--root", root, "--keep-upstream-endpoints"];
+  execFileSync("node", [...args, "--apply"]);
+  git(root, "add", "-A");
+  assert.equal(
+    JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" })).changedFiles,
+    0,
+  );
+  assert.match(
+    readFileSync(join(root, "packages/hub/compose.yml"), "utf8"),
+    /ghcr\.io\/longbkit\/clisbot:latest/,
+  );
+  const legal = readFileSync(join(root, "packages/website/src/components/legal-page.tsx"), "utf8");
+  assert.match(legal, /Long Luong, operating as Clisbot/);
+  assert.match(legal, /clisbot@gmail\.com/);
+  assert.doesNotMatch(legal, /Boudra|ES26617095T|Barcelona|Roc Boronat/);
+  const landing = readFileSync(
+    join(root, "packages/website/src/components/landing-page.tsx"),
+    "utf8",
+  );
+  assert.doesNotMatch(landing, /SocialProof|SOCIAL_PROOF|best software|x\.com/);
+  assert.match(landing, /function AgentBadge/);
+  const archived = readFileSync(
+    join(root, "packages/website/posts/upstream/hello-world.md"),
+    "utf8",
+  );
+  assert.match(archived, /Mo Boudra about Paseo/);
+  assert.match(archived, /Welcome to the Paseo blog/);
+});
+
+test("stops on unfamiliar testimonial markup before applying any rename", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-editorial-"));
+  git(root, "init", "-q");
+  put(root, "packages/example.ts", 'const brand = "Paseo";\n');
+  put(
+    root,
+    "packages/website/src/components/landing-page.tsx",
+    "const SOCIAL_PROOF_TWEETS = newerLayout();\n",
+  );
+  git(root, "add", "-A");
+  assert.throws(
+    () => execFileSync("node", [script, "--root", root, "--apply"], { stdio: "pipe" }),
+    /Review upstream publication block/,
+  );
+  assert.match(readFileSync(join(root, "packages/example.ts"), "utf8"), /Paseo/);
 });
 
 function git(root, ...args) {

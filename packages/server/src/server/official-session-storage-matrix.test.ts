@@ -23,7 +23,7 @@ async function artifactFile(name: string, file: string): Promise<string> {
   return target;
 }
 function connect(Client: typeof DaemonClient, daemon: TestClisbotDaemon, clientId: string) {
-  if (daemon.port === 6767) throw new Error("Production daemon port is forbidden");
+  if (daemon.port === 6868) throw new Error("Production daemon port is forbidden");
   // Fail before creating any agent if the published bootstrap did not preserve the fixture seam.
   const clients: unknown = Reflect.get(daemon.daemon.agentManager, "clients");
   if (!(clients instanceof Map) || clients.get("codex") !== daemon.config.agentClients?.codex)

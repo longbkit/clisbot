@@ -3,11 +3,12 @@ app = 'your-clisbot-hub'
 primary_region = 'iad'
 
 [build]
-dockerfile = "Dockerfile"
+image = "ghcr.io/longbkit/clisbot:latest"
 
 [env]
+CLISBOT_RUN_MODE = 'hub'
 NODE_ENV = 'production'
-PORT = '3000'
+PORT = '6870'
 CLISBOT_HUB_APP_URL = 'https://your-clisbot-hub.fly.dev'
 CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER = 'fly-client-ip'
 CLISBOT_REGISTRATION_MODE = 'invite_only'
@@ -16,7 +17,7 @@ CLISBOT_ORGANIZATION_CREATION = 'disabled'
 # Advanced deployments may override it with the CLISBOT_HUB_AUTH_SECRET app secret.
 
 [http_service]
-internal_port = 3000
+internal_port = 6870
 force_https = true
 auto_stop_machines = 'stop'
 auto_start_machines = true

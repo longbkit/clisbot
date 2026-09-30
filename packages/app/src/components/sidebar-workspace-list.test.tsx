@@ -80,7 +80,7 @@ const runningScript: WorkspaceScriptPayload = {
   type: "service",
   hostname: "web.clisbot.localhost",
   port: 3000,
-  proxyUrl: "http://web.clisbot.localhost:6767",
+  proxyUrl: "http://web.clisbot.localhost:6868",
   lifecycle: "running",
   health: "healthy",
   exitCode: null,

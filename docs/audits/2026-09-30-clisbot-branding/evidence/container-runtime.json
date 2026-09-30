@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-30",
+  "branch": "rebrand/clisbot-fusion-test",
+  "image": {
+    "tag": "clisbot:rebrand-unified-test",
+    "id": "sha256:539eba2e2972d2ad57c261fd3e91b8231e5a7d39d5a7b480c556e198fed56755",
+    "os": "linux",
+    "architecture": "arm64",
+    "sizeBytes": 531744372
+  },
+  "ports": {
+    "daemonAndSharedUi": 6868,
+    "developmentDaemon": 6869,
+    "hubBackend": 6870
+  },
+  "modes": [
+    {
+      "mode": "daemon",
+      "health": "passed",
+      "webUi": "passed",
+      "daemonSocket": "missing/wrong password 4401, valid password server_info",
+      "hubProxy": null,
+      "inactivePortClosed": true,
+      "restart": "passed",
+      "shutdown": "graceful"
+    },
+    {
+      "mode": "hub",
+      "health": "passed",
+      "webUi": "absent (backend only)",
+      "daemonSocket": null,
+      "hubProxy": null,
+      "inactivePortClosed": true,
+      "restart": "passed",
+      "shutdown": "graceful"
+    },
+    {
+      "mode": "all",
+      "health": "passed",
+      "webUi": "passed",
+      "daemonSocket": "missing/wrong password 4401, valid password server_info",
+      "hubProxy": "account, cookie and WebSocket admission passed",
+      "inactivePortClosed": null,
+      "restart": "passed",
+      "shutdown": "fails when Hub exits"
+    }
+  ],
+  "postgresql": "Hub mode with PostgreSQL 17: health passed; isolated fixtures removed",
+  "scope": "Local Linux arm64 image build and HTTP/WebSocket/process smoke. No image publication, upstream merge or main promotion. No browser rendering, real provider/channel turn, or amd64 build checked in this iteration.",
+  "logsDirectory": "/Volumes/Media/clisbot-builds/unified-image-20260930"
+}

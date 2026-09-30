@@ -2034,7 +2034,7 @@ describe("daemon status + pairing RPC", () => {
       clisbotHome: makeHome(),
       serverId: "srv-test",
       daemonVersion: "9.9.9",
-      daemonRuntimeConfig: { listen: "127.0.0.1:6767", getRelayConfig: () => null },
+      daemonRuntimeConfig: { listen: "127.0.0.1:6868", getRelayConfig: () => null },
       agentManager: {
         listProviderAvailability: vi.fn().mockResolvedValue([
           { provider: "claude", available: true },
@@ -2055,7 +2055,7 @@ describe("daemon status + pairing RPC", () => {
           pid: process.pid,
           nodePath: process.execPath,
           startedAt: null,
-          listen: "127.0.0.1:6767",
+          listen: "127.0.0.1:6868",
           relay: null,
           providers: [
             { provider: "claude", available: true, error: null },
@@ -2073,7 +2073,7 @@ describe("daemon status + pairing RPC", () => {
       clisbotHome: makeHome(),
       serverId: "srv-test",
       daemonVersion: "9.9.9",
-      daemonRuntimeConfig: { listen: "127.0.0.1:6767", getRelayConfig: () => null },
+      daemonRuntimeConfig: { listen: "127.0.0.1:6868", getRelayConfig: () => null },
       agentManager: {
         listProviderAvailability: vi.fn().mockRejectedValue(new Error("provider listing failed")),
       },
@@ -2108,7 +2108,7 @@ describe("daemon status + pairing RPC", () => {
       messages,
       clisbotHome: makeHome(),
       daemonRuntimeConfig: {
-        listen: "127.0.0.1:6767",
+        listen: "127.0.0.1:6868",
         getRelayConfig: () => ({
           enabled: false,
           endpoint: "relay.paseo.sh:443",
@@ -4815,7 +4815,7 @@ describe("session workspace script handling", () => {
       },
       serviceProxy: { listRoutesForWorkspace: vi.fn(() => []) },
       scriptRuntimeStore: { listForWorkspace: vi.fn(() => []) },
-      getDaemonTcpPort: () => 6767,
+      getDaemonTcpPort: () => 6868,
       getDaemonTcpHost: () => "127.0.0.1",
       messages,
     });
@@ -4834,7 +4834,7 @@ describe("session workspace script handling", () => {
         projectSlug: "clisbot",
         branchName: "feature/service-scripts",
         scriptName: "api",
-        daemonPort: 6767,
+        daemonPort: 6868,
         daemonListenHost: "127.0.0.1",
       }),
     );

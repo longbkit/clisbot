@@ -42,7 +42,8 @@ the local Hub as needed. The default personal workspace is
 `<resolved Clisbot home>/workspaces/default`, independent of your current directory.
 Team assistants use `workspaces/team`. Existing files are preserved.
 
-Open the Hub URL printed by the command to finish Account setup. Supply Slack or
+Finish Account setup in the integrated Hub settings of the Clisbot app. Hub's
+backend URL has no separate management UI. Supply Slack or
 Telegram credentials to `hub init` or `bot start` to configure the Connection,
 member routes, and owner identity through APIs. A previously linked owner can use
 the bot immediately; an unlinked owner gets a private one-time linking command.
@@ -64,7 +65,9 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. Hub stores the embedded database and its generated authentication secret under `$XDG_DATA_HOME/clisbot-hub`, falling back to `~/.local/share/clisbot-hub`, and keeps both across restarts. Set `CLISBOT_HUB_DATA_DIR` to use a different directory, or set `DATABASE_URL` to use PostgreSQL instead:
+Hub listens on <http://localhost:6870> for backend requests only. Use `npm run
+dev:clisbot` from the monorepo root for the integrated app development setup; see
+[development](../../docs/development.md). Hub stores the embedded database and its generated authentication secret under `$XDG_DATA_HOME/clisbot-hub`, falling back to `~/.local/share/clisbot-hub`, and keeps both across restarts. Set `CLISBOT_HUB_DATA_DIR` to use a different directory, or set `DATABASE_URL` to use PostgreSQL instead:
 
 ```sh
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/clisbot_hub npm run dev
@@ -77,8 +80,8 @@ Embedded mode supports one Hub process per data directory. Docker Compose contin
 You need Docker, Docker Compose, and a public HTTPS URL when connecting external providers.
 
 ```sh
-git clone https://github.com/getpaseo/hub.git
-cd hub
+git clone https://github.com/longbkit/clisbot.git
+cd clisbot/packages/hub
 cp .env.example .env
 ```
 
@@ -86,10 +89,16 @@ Set these values in `.env`:
 
 ```dotenv
 CLISBOT_HUB_APP_URL=https://hub.example.com
+CLISBOT_HUB_CREDENTIAL_MASTER_KEY=replace-with-a-persistent-32-byte-base64-key
 CLISBOT_BOOTSTRAP_ORGANIZATION=My organization
 CLISBOT_BOOTSTRAP_OWNER_EMAIL=me@example.com
 CLISBOT_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
 ```
+
+Generate the credential encryption key once with `openssl rand -base64 32` and
+keep it with your deployment secrets. Reuse it across restarts. Alternatively,
+configure `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` with an absolute mounted-secret
+path. See [Docker service modes](../../docs/docker.md#service-modes).
 
 Hub generates and stores its authentication secret in the database. Advanced deployments may set
 `CLISBOT_HUB_AUTH_SECRET` to override it without replacing the stored secret.
@@ -108,13 +117,19 @@ Then start Hub and PostgreSQL:
 docker compose up -d
 ```
 
-Open `CLISBOT_HUB_APP_URL`, sign in with the bootstrap account, and replace its temporary password. Connect a daemon with:
+Serve the Clisbot web UI at `CLISBOT_HUB_APP_URL`, routing its Hub APIs to this
+backend. The daemon's optional `CLISBOT_HUB_PROXY_URL` handles this routing.
+For a single container with the app, daemon and Hub, use `CLISBOT_RUN_MODE=all`
+and open `http://localhost:6868`; see [Docker service modes](../../docs/docker.md#service-modes).
+Sign in with the bootstrap account in the app and replace its temporary password.
+Connect a daemon using the public origin that serves Hub APIs:
 
 ```sh
 clisbot hub connect https://hub.example.com
 ```
 
-The image is published as `ghcr.io/getpaseo/hub:latest`.
+Hub uses the shared `ghcr.io/longbkit/clisbot` image. This Compose file selects
+`CLISBOT_RUN_MODE=hub`. See [container modes and builds](../../docs/docker.md).
 
 See the [self-hosting guide](https://clisbot.com/docs/hub/self-hosting) for production deployment details.
 For Linear setup and workflows, see the public [Linear app](https://clisbot.com/docs/hub/self-hosting/linear-app) and [Linear triggers](https://clisbot.com/docs/hub/triggers/linear) guides.
@@ -146,7 +161,9 @@ authorization remains enforced by the execution MCP server.
 
 ## Public API
 
-Each Hub serves a self-hosted API reference at `/api/reference` and its generated OpenAPI 3.1 contract at `/api/openapi.json`. The short [public API guide](docs/public-api.md) covers CLI login, versioning, credential scopes, and request correlation.
+Each Hub serves its generated OpenAPI 3.1 contract at `/api/openapi.json`.
+The short [public API guide](docs/public-api.md) covers CLI login, versioning,
+credential scopes, and request correlation.
 
 ## License
 

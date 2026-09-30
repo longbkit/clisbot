@@ -15,13 +15,13 @@ export interface DaemonDiscoveryResult {
 }
 
 const DEFAULT_HOST = "127.0.0.1";
-const DEFAULT_PORT = 6767;
+const DEFAULT_PORT = 6868;
 const PID_FILE_NAME = "clisbot.pid";
 
 /**
  * Resolve the local daemon WebSocket URL. Precedence: an explicit host (the
  * `CLISBOT_HOME`-adjacent operator override, or a configured target) > the pid
- * lock's `listen` field > the default `127.0.0.1:6767`. A pid lock that names a
+ * lock's `listen` field > the default `127.0.0.1:6868`. A pid lock that names a
  * unix socket path is reported as unsupported for the P0 loopback leg.
  */
 export function discoverLocalDaemon(

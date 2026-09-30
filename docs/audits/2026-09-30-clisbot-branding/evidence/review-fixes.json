@@ -1,0 +1,94 @@
+{
+  "date": "2026-09-30",
+  "branch": "rebrand/clisbot-fusion-test",
+  "image": {
+    "tag": "clisbot:rebrand-review-fixed",
+    "id": "sha256:597bf5419defdb763595a4b6865bf86d678e307bc06f907fee7a40cd0a366cf9",
+    "os": "linux",
+    "architecture": "arm64",
+    "sizeBytes": 531763680
+  },
+  "runtime": {
+    "image": "clisbot:rebrand-review-fixed",
+    "results": [
+      {
+        "mode": "daemon",
+        "health": "passed",
+        "webUi": "passed",
+        "daemonSocket": "missing/wrong password 4401, valid password server_info",
+        "hubProxy": null,
+        "inactivePortClosed": true,
+        "restart": "passed",
+        "shutdown": "graceful"
+      },
+      {
+        "mode": "hub",
+        "health": "passed",
+        "webUi": "absent (backend only)",
+        "daemonSocket": null,
+        "hubProxy": null,
+        "inactivePortClosed": true,
+        "restart": "passed",
+        "shutdown": "graceful"
+      },
+      {
+        "mode": "all",
+        "health": "passed",
+        "webUi": "passed",
+        "daemonSocket": "missing/wrong password 4401, valid password server_info",
+        "hubProxy": "account, cookie, CLI login, WebSocket admission, malformed upgrade and per-client quotas passed",
+        "inactivePortClosed": null,
+        "restart": "passed",
+        "shutdown": "fails when Hub exits"
+      }
+    ],
+    "localOnboarding": "passed"
+  },
+  "reviewRegressions": {
+    "malformedUpgrade": "GET // with WebSocket upgrade: 400, subsequent daemon health: 200",
+    "cliLoginOrigin": "all mode: localhost:6868; local onboarding: 127.0.0.1:7181; login page: 200; Hub root: 404",
+    "distinctClientQuotas": [201, 201, 201, 201, 201, 201],
+    "sameClientForgedHeadersViaProxy": [201, 201, 201, 201, 201, 429],
+    "sameClientForgedHeadersDirectBackend": [201, 201, 201, 201, 201, 429]
+  },
+  "postgresql": "Hub mode with PostgreSQL 17: boot/health passed",
+  "checks": {
+    "workspaceTypecheck": "passed",
+    "targetedLint": "0 errors, 0 warnings",
+    "proxyAndBackendTests": 20,
+    "cliAndConfigTests": 62,
+    "productionColdStartTests": 4,
+    "renameTests": 11,
+    "renameCheck": {
+      "mode": "check",
+      "root": "/Volumes/Media/clisbot-worktrees/rebrand-clisbot",
+      "changedFiles": 0,
+      "renamedPaths": 0,
+      "oldBrandOccurrencesInChangedFiles": 0,
+      "changedFilesByTopLevel": {},
+      "skippedBinaryFiles": 103,
+      "replacements": {
+        "siteHost": "clisbot.com",
+        "appHost": null,
+        "relayHost": null,
+        "repoSlug": "longbkit/clisbot",
+        "expoOwner": "lbk-company",
+        "expoProjectId": "9314cc2c-4abe-4637-b1cf-647fbbfbd807"
+      }
+    }
+  },
+  "knownTestFailure": {
+    "test": "packages/hub/src/index.bootstrap.test.ts: starts the manual source that serves production manual runs",
+    "result": "400 invalid_request",
+    "cause": "Unchanged HubHarness.runManual sends projectSlug, which unchanged strict DispatchManualRunRequestSchema does not accept. Both files match HEAD.",
+    "status": "Separate inherited test-contract mismatch left open"
+  },
+  "limits": [
+    "No full test suite",
+    "No browser rendering or full interactive login approval",
+    "No live provider/channel turn",
+    "No amd64 runtime check",
+    "No image publication, upstream merge, commit or main promotion"
+  ],
+  "logsDirectory": "/Volumes/Media/clisbot-builds/unified-image-20260930"
+}

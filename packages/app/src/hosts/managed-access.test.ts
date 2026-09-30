@@ -10,8 +10,8 @@ const management = {
 
 describe("isHubProvidedConnection", () => {
   it("keeps the connections a user saved before Hub was attached as theirs", () => {
-    const host = { management: { ...management, manualConnectionIds: ["direct:localhost:6768"] } };
-    expect(isHubProvidedConnection(host, { id: "direct:localhost:6768" })).toBe(false);
+    const host = { management: { ...management, manualConnectionIds: ["direct:localhost:6869"] } };
+    expect(isHubProvidedConnection(host, { id: "direct:localhost:6869" })).toBe(false);
     expect(isHubProvidedConnection(host, { id: "relay:wss:relay.paseo.sh:443" })).toBe(true);
   });
 

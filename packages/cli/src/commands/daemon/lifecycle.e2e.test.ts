@@ -18,7 +18,7 @@ async function port() {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const value = (server.address() as net.AddressInfo).port;
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (value === 6767 || value === 6768) throw new Error("Unsafe test port");
+  if (value === 6868 || value === 6869) throw new Error("Unsafe test port");
   return value;
 }
 

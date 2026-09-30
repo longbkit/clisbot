@@ -955,23 +955,23 @@ export default function contribute(plugin: unknown) {
   });
 
   test("parses whitespace-padded numeric port strings", () => {
-    expect(parseListenString(" 6767 ")).toEqual({
+    expect(parseListenString(" 6868 ")).toEqual({
       type: "tcp",
       host: "127.0.0.1",
-      port: 6767,
+      port: 6868,
     });
   });
 
   test("parses IPv6 listen targets correctly", () => {
-    expect(parseListenString("[::1]:6767")).toEqual({
+    expect(parseListenString("[::1]:6868")).toEqual({
       type: "tcp",
       host: "::1",
-      port: 6767,
+      port: 6868,
     });
-    expect(parseListenString("[::]:6767")).toEqual({
+    expect(parseListenString("[::]:6868")).toEqual({
       type: "tcp",
       host: "::",
-      port: 6767,
+      port: 6868,
     });
   });
 

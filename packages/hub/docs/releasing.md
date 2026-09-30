@@ -1,6 +1,10 @@
 # Releasing Clisbot Hub
 
-Hub releases publish the npm executable locally, then push a Git tag that publishes the container image and GitHub release.
+Hub package releases and the shared Clisbot container use separate versions.
+Only the root Docker workflow publishes the container; see
+[Docker publishing](../../../docs/docker.md#building-locally).
+The standalone procedure below covers the npm package and release notes.
+The nested Hub workflow does not run automatically in this monorepo.
 
 ## Prepare
 
@@ -31,7 +35,7 @@ npx @clisbot/hub
 
 Open the URL printed by Hub and stop it with Ctrl+C after the first-run page loads.
 
-## Publish the container and GitHub release
+## Publish standalone Hub release notes
 
 Create and push the matching tag:
 
@@ -41,4 +45,5 @@ git tag "v$HUB_VERSION"
 git push origin "v$HUB_VERSION"
 ```
 
-The tag workflow publishes `ghcr.io/getpaseo/hub:<version>` and `latest` for stable releases, then creates the GitHub release from the matching changelog section.
+The standalone tag workflow creates the GitHub release from the changelog.
+It does not publish a separate Hub container or overwrite the shared image.

@@ -183,10 +183,10 @@ class BuiltApplications {
     await Promise.all(
       this.sourceClisbots
         .splice(0)
-        .reverse()
+        .toReversed()
         .map((source) => source.stop()),
     );
-    const applications = this.running.splice(0).reverse();
+    const applications = this.running.splice(0).toReversed();
     await Promise.all(
       applications.map(async (application) => {
         await stopServer(application.server);
@@ -239,9 +239,17 @@ interface ApplicationEnvironmentInput {
 
 function applicationEnvironment(input: ApplicationEnvironmentInput): NodeJS.ProcessEnv {
   const browserAuthEnabled = input.browserAuth !== false;
+  let providerScenario = input.providerScenario;
+  if (providerScenario === undefined) {
+    providerScenario = "connected";
+    if (input.providerConnections === false) providerScenario = "not-configured";
+    else if (input.githubApprovalRequired === true) providerScenario = "approval";
+  }
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
     PORT: String(input.port),
+    // These inherited dashboard fixtures opt in; Clisbot deployments use the shared app.
+    CLISBOT_HUB_WEB_UI_ENABLED: "true",
     CLISBOT_HUB_BIND: "127.0.0.1",
     CLISBOT_REGISTRATION_MODE:
       input.registrationMode ?? (input.bootstrap === undefined ? "open" : "invite_only"),
@@ -258,13 +266,7 @@ function applicationEnvironment(input: ApplicationEnvironmentInput): NodeJS.Proc
     CLISBOT_E2E_SLACK_SIGNING_SECRET: "phase-zero-slack-webhook-secret",
     STRIPE_WEBHOOK_SECRET: "whsec_phase_zero_fixture_secret",
     CLISBOT_BROWSER_BILLING_SCENARIO: input.billing === true ? "configured" : "unconfigured",
-    CLISBOT_BROWSER_PROVIDER_SCENARIO:
-      input.providerScenario ??
-      (input.providerConnections === false
-        ? "not-configured"
-        : input.githubApprovalRequired === true
-          ? "approval"
-          : "connected"),
+    CLISBOT_BROWSER_PROVIDER_SCENARIO: providerScenario,
     CLISBOT_BROWSER_PROVIDER_APPS: input.providerApplications === true ? "dynamic" : "static",
     ...(input.reverseProxy === true
       ? { CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER: "x-clisbot-e2e-client-ip" }
@@ -475,7 +477,10 @@ async function stopProxy(proxy: Server | undefined): Promise<void> {
   proxy.closeIdleConnections();
   proxy.closeAllConnections();
   await new Promise<void>((resolve, reject) => {
-    proxy.close((error) => (error === undefined ? resolve() : reject(error)));
+    proxy.close((error) => {
+      if (error !== undefined) return reject(error);
+      resolve();
+    });
   });
 }
 
@@ -558,7 +563,8 @@ async function handoffPortWhenRequested(server: ChildProcess, lease: PortLease):
       void lease.handoff().then(
         () =>
           server.send({ type: "port-handoff-ready" }, (error) => {
-            error === null ? resolve() : reject(error);
+            if (error !== null) return reject(error);
+            resolve();
           }),
         reject,
       );
@@ -578,6 +584,9 @@ async function handoffPortWhenRequested(server: ChildProcess, lease: PortLease):
 
 async function closeServer(server: NetServer): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => (error === undefined ? resolve() : reject(error)));
+    server.close((error) => {
+      if (error !== undefined) return reject(error);
+      resolve();
+    });
   });
 }

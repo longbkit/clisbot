@@ -187,7 +187,7 @@ describe("DaemonSession", () => {
     const { subsystem, emitted } = makeSubsystem({
       serverId: "srv-1",
       daemonVersion: "1.2.3",
-      daemonRuntimeConfig: { listen: "127.0.0.1:6767", getRelayConfig: () => null },
+      daemonRuntimeConfig: { listen: "127.0.0.1:6868", getRelayConfig: () => null },
       listProviderAvailability: async () => [
         { provider: "claude", available: true, error: null },
         { provider: "codex", available: false, error: "boom" },
@@ -206,7 +206,7 @@ describe("DaemonSession", () => {
           pid: process.pid,
           nodePath: process.execPath,
           startedAt: null,
-          listen: "127.0.0.1:6767",
+          listen: "127.0.0.1:6868",
           relay: null,
           providers: [
             { provider: "claude", available: true, error: null },
@@ -221,7 +221,7 @@ describe("DaemonSession", () => {
     const { subsystem, emitted } = makeSubsystem({
       serverId: "srv-1",
       daemonVersion: "1.2.3",
-      daemonRuntimeConfig: { listen: "127.0.0.1:6767", getRelayConfig: () => null },
+      daemonRuntimeConfig: { listen: "127.0.0.1:6868", getRelayConfig: () => null },
       listProviderAvailability: async () => {
         throw new Error("provider listing failed");
       },
@@ -250,7 +250,7 @@ describe("DaemonSession", () => {
   test("pairing offer is empty when relay is disabled", async () => {
     const { subsystem, emitted } = makeSubsystem({
       daemonRuntimeConfig: {
-        listen: "127.0.0.1:6767",
+        listen: "127.0.0.1:6868",
         getRelayConfig: () => ({
           enabled: false,
           endpoint: "relay.paseo.sh:443",
@@ -277,7 +277,7 @@ describe("DaemonSession", () => {
   test("pairing offer mints a real connection URL when relay is enabled", async () => {
     const { subsystem, emitted } = makeSubsystem({
       daemonRuntimeConfig: {
-        listen: "127.0.0.1:6767",
+        listen: "127.0.0.1:6868",
         appBaseUrl: "https://app.example.test",
         getRelayConfig: () => ({
           enabled: true,
@@ -310,7 +310,7 @@ describe("DaemonSession", () => {
     let enabled = false;
     const { subsystem, emitted } = makeSubsystem({
       daemonRuntimeConfig: {
-        listen: "127.0.0.1:6767",
+        listen: "127.0.0.1:6868",
         appBaseUrl: "https://app.example.test",
         getRelayConfig: () => ({
           enabled,
@@ -345,7 +345,7 @@ describe("DaemonSession", () => {
       serverId: "srv-1",
       daemonVersion: "1.2.3",
       daemonRuntimeConfig: {
-        listen: "127.0.0.1:6767",
+        listen: "127.0.0.1:6868",
         getRelayConfig: () => ({
           enabled: true,
           endpoint: "relay.secret.test:443",

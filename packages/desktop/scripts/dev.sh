@@ -8,7 +8,7 @@ ROOT_DIR="$(cd "$DESKTOP_DIR/../.." && pwd)"
 source "$ROOT_DIR/scripts/dev-home.sh"
 
 export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
-export CLISBOT_LISTEN="${CLISBOT_LISTEN:-127.0.0.1:6768}"
+export CLISBOT_LISTEN="${CLISBOT_LISTEN:-127.0.0.1:6869}"
 configure_dev_clisbot_home
 
 DEV_ROOT="${CLISBOT_DEV_ROOT:-$(default_dev_clisbot_root)}"

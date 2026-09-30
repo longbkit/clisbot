@@ -54,7 +54,7 @@ The QR code or pairing link is the trust anchor. It contains the daemon's public
 
 ## Direct connections
 
-By default, the daemon listens on `127.0.0.1:6767` (localhost only). This is safe for local CLI usage but not reachable from your phone or other devices.
+By default, the daemon listens on `127.0.0.1:6868` (localhost only). This is safe for local CLI usage but not reachable from your phone or other devices.
 
 For relay and Tailscale setup instructions, see [Connectivity](/docs/connectivity).
 
@@ -107,7 +107,7 @@ We still recommend the relay for mobile access, it combines authentication with 
 
 ## Docker self-hosting
 
-The official Docker image runs the daemon and bundled web UI in one container. It binds to `0.0.0.0:6767` inside the container so Docker port publishing and reverse proxies work normally.
+The official Docker image runs the daemon and bundled web UI in one container. It binds to `0.0.0.0:6868` inside the container so Docker port publishing and reverse proxies work normally.
 
 For Docker deployments:
 

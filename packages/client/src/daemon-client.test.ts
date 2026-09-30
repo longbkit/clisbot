@@ -4533,7 +4533,7 @@ test("requires non-empty clientId", () => {
 test("requires non-empty clientId for direct connections", () => {
   expect(() => {
     const _client = new DaemonClient({
-      url: "ws://127.0.0.1:6767/ws",
+      url: "ws://127.0.0.1:6868/ws",
       clientId: "   ",
       reconnect: { enabled: false },
     });

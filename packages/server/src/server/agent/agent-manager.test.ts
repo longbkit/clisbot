@@ -2964,7 +2964,7 @@ test("createAgent injects clisbot MCP server only into provider launch config", 
     },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     idFactory: () => "00000000-0000-4000-8000-000000000103",
   });
 
@@ -2992,7 +2992,7 @@ test("createAgent injects clisbot MCP server only into provider launch config", 
   expect(client.lastConfig?.mcpServers).toEqual({
     clisbot: {
       type: "http",
-      url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${snapshot.id}`,
+      url: `http://127.0.0.1:6868/mcp/agents?callerAgentId=${snapshot.id}`,
     },
     custom: {
       type: "stdio",
@@ -3212,7 +3212,7 @@ test("createAgent passes native Clisbot tools through launch context without int
     },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     clisbotToolCatalogFactory: () => clisbotTools,
     idFactory: () => "00000000-0000-4000-8000-000000000106",
   });
@@ -3276,7 +3276,7 @@ test("createAgent allows best-effort internal MCP when the provider session repo
     },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     mcpAuthToken: "cap-token",
     idFactory: () => "00000000-0000-4000-8000-000000000104",
   });
@@ -3293,7 +3293,7 @@ test("createAgent allows best-effort internal MCP when the provider session repo
   expect(manager.getMcpAuthToken()).toBe("cap-token");
   expect(client.lastConfig?.mcpServers?.clisbot).toEqual({
     type: "http",
-    url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${snapshot.id}`,
+    url: `http://127.0.0.1:6868/mcp/agents?callerAgentId=${snapshot.id}`,
     headers: { Authorization: "Bearer cap-token" },
   });
 
@@ -3341,7 +3341,7 @@ test("uses each provider's current policy for new sessions and snapshots it by a
     clients: { codex, claude },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     resolveClisbotToolPolicy: (provider) => policies.get(provider),
     clisbotToolCatalogFactory: async (context) => {
       policyInputs.push(context);
@@ -3421,7 +3421,7 @@ test("keeps the global Clisbot-tools gate outside provider policy and MCP inject
     clients: { codex: enabledClient },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     resolveClisbotToolPolicy: () => ({ disabledTools: ["list_agents"] }),
   });
   const enabledAgent = await enabledManager.createAgent(
@@ -3432,7 +3432,7 @@ test("keeps the global Clisbot-tools gate outside provider policy and MCP inject
 
   expect(enabledClient.lastConfig?.mcpServers?.clisbot).toEqual({
     type: "http",
-    url: `http://127.0.0.1:6767/mcp/agents?callerAgentId=${enabledAgent.id}`,
+    url: `http://127.0.0.1:6868/mcp/agents?callerAgentId=${enabledAgent.id}`,
   });
 
   const disabledClient = new McpClient();
@@ -3441,7 +3441,7 @@ test("keeps the global Clisbot-tools gate outside provider policy and MCP inject
     clients: { codex: disabledClient },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     clisbotToolsEnabled: false,
     resolveClisbotToolPolicy: () => ({ enabled: true }),
     clisbotToolCatalogFactory: () => {
@@ -3473,7 +3473,7 @@ test("resumeAgentFromPersistence replaces stored internal clisbot MCP with curre
     },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6768/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6869/mcp/agents",
     idFactory: () => "00000000-0000-4000-8000-000000000105",
   });
   const handle: AgentPersistenceHandle = {
@@ -3489,7 +3489,7 @@ test("resumeAgentFromPersistence replaces stored internal clisbot MCP with curre
     mcpServers: {
       clisbot: {
         type: "http",
-        url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=stale-agent",
+        url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=stale-agent",
       },
       custom: {
         type: "stdio",
@@ -3501,7 +3501,7 @@ test("resumeAgentFromPersistence replaces stored internal clisbot MCP with curre
   expect(client.resumeOverrides[0]?.mcpServers).toEqual({
     clisbot: {
       type: "http",
-      url: `http://127.0.0.1:6768/mcp/agents?callerAgentId=${snapshot.id}`,
+      url: `http://127.0.0.1:6869/mcp/agents?callerAgentId=${snapshot.id}`,
     },
     custom: {
       type: "stdio",
@@ -3541,7 +3541,7 @@ test("resumeAgentFromPersistence drops stored internal clisbot MCP when runtime 
     mcpServers: {
       clisbot: {
         type: "http",
-        url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=stale-agent",
+        url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=stale-agent",
       },
     },
   });
@@ -3571,7 +3571,7 @@ test("createAgent preserves a user-provided clisbot MCP config", async () => {
     },
     registry: storage,
     logger,
-    mcpBaseUrl: "http://127.0.0.1:6767/mcp/agents",
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
     idFactory: () => "00000000-0000-4000-8000-000000000104",
   });
 

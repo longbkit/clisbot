@@ -10,7 +10,7 @@ function makeSources(): DesktopDiagnosticSources {
     getStatus: async () => ({
       serverId: "server-1",
       status: "running",
-      listen: "127.0.0.1:6767",
+      listen: "127.0.0.1:6868",
       hostname: "host",
       pid: 4242,
       home: "/clisbot/home",

@@ -19,7 +19,7 @@ Requires Node.js 22 or newer.
 ```ts
 import { createClisbotClient } from "@clisbot/client";
 
-const client = createClisbotClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 await client.connect();
 ```
 

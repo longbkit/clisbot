@@ -30,8 +30,10 @@ uses Oxfmt, not Prettier.
 
 ## Publish a release
 
-Hub releases contain a multi-architecture container image and a GitHub Release. There are no
-separate binary assets.
+The root Docker workflow publishes the shared daemon and Hub image using the
+root version. See [Docker publishing](../../docs/docker.md#building-locally).
+The nested workflow below is retained for standalone Hub release notes only;
+GitHub does not run `packages/hub/.github/` workflows in this monorepo.
 
 1. Update the version in `package.json` and `package-lock.json`.
 2. Add a matching `## <version> - YYYY-MM-DD` section to `CHANGELOG.md`.
@@ -51,11 +53,9 @@ separate binary assets.
 
 The tag must match both `package.json` and the changelog section. A tag push runs only the
 [Release](.github/workflows/release.yml) workflow; it does not rerun the main CI suite. The
-workflow publishes `ghcr.io/getpaseo/hub:<version>`, updates `latest` for stable releases, and
-creates or updates the GitHub Release from the matching changelog section. Prereleases do not
-move `latest`.
+workflow creates or updates the GitHub Release from the matching changelog section.
 
-Verify the GitHub Release and anonymous access to both image tags before announcing the release.
+Verify the GitHub Release before announcing the release.
 Later changes to the current changelog section update the existing release notes through
 [Release Notes Sync](.github/workflows/release-notes-sync.yml).
 

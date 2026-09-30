@@ -168,7 +168,7 @@ function savedHost(
     management,
     appearance: defaultHostAppearance(),
     lifecycle: {},
-    connections: [{ id: "direct", type: "directTcp", endpoint: "localhost:6768" }],
+    connections: [{ id: "direct", type: "directTcp", endpoint: "localhost:6869" }],
     preferredConnectionId: "direct",
     createdAt: "2026-09-01T00:00:00.000Z",
     updatedAt: "2026-09-01T00:00:00.000Z",

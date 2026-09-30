@@ -25,14 +25,14 @@ Use it to:
 npx @clisbot/cli
 ```
 
-It listens on `ws://127.0.0.1:6767/ws`.
+It listens on `ws://127.0.0.1:6868/ws`.
 
 ## Run an agent
 
 ```ts
 import { createClisbotClient } from "@clisbot/client";
 
-const client = createClisbotClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 await client.connect();
 
 const agent = await client.agents.create({

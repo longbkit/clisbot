@@ -236,13 +236,13 @@ function createChannelAgentAccessTargetResolver(bundle: CompiledHubBundle) {
   };
 }
 
-/** The Hub's loopback listen port: `PORT` at process entry, 3000 otherwise
+/** The Hub's loopback listen port: `PORT` at process entry, 6870 otherwise
  * (the same source index.ts `readPort` reads — the CLI `hub start` sets it
- * to 6868). Exported so tests can pin it. */
+ * to 6870). Exported so tests can pin it. */
 export function hubListenPort(environment: Record<string, string | undefined>): number {
-  const value = environment["PORT"] ?? "3000";
+  const value = environment["PORT"] ?? "6870";
   const port = Number(value);
-  return Number.isInteger(port) && port > 0 ? port : 3000;
+  return Number.isInteger(port) && port > 0 ? port : 6870;
 }
 
 /** The reference names `compileChannelControlPlane` validates route targets

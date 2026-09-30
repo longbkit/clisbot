@@ -444,13 +444,13 @@ describe("runAsyncWorktreeBootstrap", () => {
     expect(createTerminalCalls[0]?.env?.CLISBOT_PORT).toEqual(expect.any(String));
     expect(createTerminalCalls[0]?.env?.HOST).toBe("127.0.0.1");
     expect(createTerminalCalls[0]?.env?.CLISBOT_URL).toBe(
-      "http://api--feature-socket-service--repo.localhost:6767",
+      "http://api--feature-socket-service--repo.localhost:6868",
     );
     expect(createTerminalCalls[0]?.env?.CLISBOT_SERVICE_API_PORT).toBe(
       createTerminalCalls[0]?.env?.CLISBOT_PORT,
     );
     expect(createTerminalCalls[0]?.env?.CLISBOT_SERVICE_API_URL).toBe(
-      "http://api--feature-socket-service--repo.localhost:6767",
+      "http://api--feature-socket-service--repo.localhost:6868",
     );
   }
 
@@ -474,7 +474,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       String(plannedAppServerPort),
     );
     expect(createTerminalCalls[0]?.env?.CLISBOT_SERVICE_APP_SERVER_URL).toBe(
-      "http://app-server--feature-socket-service--repo.localhost:6767",
+      "http://app-server--feature-socket-service--repo.localhost:6868",
     );
   }
 
@@ -809,7 +809,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-socket-service",
       scriptName: "api",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager: createStubTerminalManager(createTerminalCalls, terminalRecords),
@@ -863,7 +863,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-public-service",
       scriptName: "api",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxyPublicBaseUrl: "https://services.example.com",
       serviceProxy: routeStore,
       runtimeStore,
@@ -929,7 +929,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-respawn-service",
       scriptName: "api",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager,
@@ -941,7 +941,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-respawn-service",
       scriptName: "worker",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager,
@@ -975,7 +975,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-respawn-service",
       scriptName: "api",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager,
@@ -1032,7 +1032,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-before-rename",
       scriptName: "api",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager,
@@ -1097,7 +1097,7 @@ describe("runAsyncWorktreeBootstrap", () => {
         projectSlug: "repo",
         branchName: "feature-collision-service",
         scriptName: "app-server",
-        daemonPort: 6767,
+        daemonPort: 6868,
         serviceProxy: routeStore,
         runtimeStore,
         terminalManager: createStubTerminalManager(createTerminalCalls),
@@ -1132,7 +1132,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-collision-service",
       scriptName: "app-server",
-      daemonPort: 6767,
+      daemonPort: 6868,
       serviceProxy: routeStore,
       runtimeStore,
       terminalManager: createStubTerminalManager(createTerminalCalls),
@@ -1184,7 +1184,7 @@ describe("runAsyncWorktreeBootstrap", () => {
       projectSlug: "repo",
       branchName: "feature-remote-service",
       scriptName: "web",
-      daemonPort: 6767,
+      daemonPort: 6868,
       daemonListenHost: "100.64.0.20",
       serviceProxy: routeStore,
       runtimeStore,
@@ -1194,7 +1194,7 @@ describe("runAsyncWorktreeBootstrap", () => {
     expect(createTerminalCalls).toHaveLength(1);
     expect(createTerminalCalls[0]?.env?.HOST).toBe("0.0.0.0");
     expect(createTerminalCalls[0]?.env?.CLISBOT_URL).toBe(
-      "http://web--feature-remote-service--repo.localhost:6767",
+      "http://web--feature-remote-service--repo.localhost:6868",
     );
   });
 });

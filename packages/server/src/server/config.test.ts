@@ -25,6 +25,12 @@ describe("server config", () => {
 
     expect(desktopConfig.desktopManaged).toBe(true);
     expect(standaloneConfig.desktopManaged).toBe(false);
+    expect(standaloneConfig.listen).toBe("127.0.0.1:6868");
+    expect(standaloneConfig.hubHttpProxyUrl).toBeUndefined();
+    expect(
+      loadConfig(clisbotHome, { env: { CLISBOT_HUB_PROXY_URL: "http://127.0.0.1:6870" } })
+        .hubHttpProxyUrl,
+    ).toBe("http://127.0.0.1:6870");
   });
 
   test("loads the provider catalog refresh timeout", async () => {

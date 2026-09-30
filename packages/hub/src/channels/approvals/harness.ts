@@ -136,7 +136,7 @@ function makeFakeDaemon() {
   const responses: { agentId: string; requestId: string; response: AgentPermissionResponse }[] = [];
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
-    discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
+    discovery: { url: "ws://127.0.0.1:6868/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async () => ({
       agentId: "agent-0",

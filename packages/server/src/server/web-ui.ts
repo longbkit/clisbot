@@ -140,6 +140,7 @@ function setResponseCacheHeaders(res: Response, isIndexHtml: boolean, resolvedFi
 }
 
 export interface WebUiMiddlewareOptions {
+  hubEnabled?: boolean;
   enabled: boolean;
   distDir: string | null;
   label: string;
@@ -175,11 +176,19 @@ export function createWebUiMiddleware(options: WebUiMiddlewareOptions): RequestH
       return;
     }
 
-    serveWebUiFile({ distDir, requestPath: req.path, label, req, res });
+    serveWebUiFile({
+      distDir,
+      requestPath: req.path,
+      label,
+      req,
+      res,
+      hubEnabled: options.hubEnabled === true,
+    });
   };
 }
 
 interface ServeWebUiFileOptions {
+  hubEnabled: boolean;
   distDir: string;
   requestPath: string;
   label: string;
@@ -213,7 +222,7 @@ function serveWebUiFile(options: ServeWebUiFileOptions): void {
   }
 
   if (isIndexHtml) {
-    sendIndexHtml(res, finalFile, req, label);
+    sendIndexHtml(res, finalFile, req, label, options.hubEnabled);
     return;
   }
 
@@ -233,10 +242,11 @@ function sendIndexHtml(
   filePath: string,
   req: Parameters<RequestHandler>[0],
   label: string,
+  hubEnabled: boolean,
 ): void {
   try {
     const html = readFileSync(filePath, "utf-8");
-    const injected = injectConnectionHint(html, req, label);
+    const injected = injectConnectionHint(html, req, label, hubEnabled);
     res.status(200).send(injected);
   } catch {
     res.status(500).end();
@@ -254,6 +264,7 @@ function injectConnectionHint(
   html: string,
   req: Parameters<RequestHandler>[0],
   label: string,
+  hubEnabled: boolean,
 ): string {
   const host = typeof req.headers.host === "string" ? req.headers.host : "";
   const useTls = req.protocol === "https";
@@ -262,7 +273,7 @@ function injectConnectionHint(
     useTls,
     label,
   };
-  const script = `<script>window.__CLISBOT_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)}</script>`;
+  const script = `<script>window.__CLISBOT_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)};window.__CLISBOT_HUB_ENABLED__=${hubEnabled}</script>`;
   const headClose = /<\/head>/i;
   if (headClose.test(html)) {
     return html.replace(headClose, `${script}</head>`);
