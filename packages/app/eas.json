@@ -31,6 +31,17 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease -x generateReleaseLintModel -x generateReleaseLintVitalModel"
       }
+    },
+    "tailnet-test-apk": {
+      "extends": "production-apk",
+      "environment": "development",
+      "env": {
+        "APP_VARIANT": "development"
+      },
+      "android": {
+        "resourceClass": "medium",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease -x generateReleaseLintModel -x generateReleaseLintVitalModel"
+      }
     }
   },
   "submit": {

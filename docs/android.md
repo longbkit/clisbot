@@ -4,14 +4,50 @@
 
 Controlled by `APP_VARIANT` in `packages/app/app.config.js` (vanilla Expo, no custom Gradle plugin):
 
-| Variant       | App name      | Package ID         |
-| ------------- | ------------- | ------------------ |
-| `production`  | Clisbot       | `sh.clisbot`       |
-| `development` | Clisbot Debug | `sh.clisbot.debug` |
+| Variant       | App name      | Package ID            |
+| ------------- | ------------- | --------------------- |
+| `production`  | Clisbot       | `com.clisbot.app`     |
+| `development` | Clisbot Debug | `com.clisbot.app.dev` |
 
-EAS profiles: `development`, `production`, and `production-apk` in `packages/app/eas.json`.
+EAS profiles: `development`, `production`, `production-apk`, and
+`tailnet-test-apk` in `packages/app/eas.json`.
 
 `development` uses Android `debug`.
+
+### Reusable release APK for testing
+
+Use `tailnet-test-apk` to build an internal release APK with the development
+app identity. It installs alongside the production app, bundles JavaScript with
+`assembleRelease`, and targets `arm64-v8a` to reduce build work and APK size.
+Use an ARM64 device or emulator for this profile.
+
+Set `CLISBOT_HUB_ORIGIN` in the Expo project's **development** EAS environment
+(Project settings → Environment variables), using Plain text or Sensitive
+visibility. Use your reachable HTTPS Hub origin, such as `https://hub.example.com`,
+without a path. The URL is embedded in the app's public Expo configuration;
+do not put credentials in it. Each EAS project can supply its own value.
+
+The profile explicitly selects the `development` EAS environment. This keeps
+the test Hub separate from the environments selected by `production` and
+`production-apk`. Setting a variable only in the local shell does not configure
+the remote build worker; configure it in EAS before a cloud build. See
+[Expo's environment-variable guide](https://docs.expo.dev/eas/environment-variables/usage/).
+
+From `packages/app`:
+
+```bash
+npx eas build --platform android --profile tailnet-test-apk
+```
+
+`app.config.js` already reads `CLISBOT_HUB_ORIGIN` into `extra.clisbotHub.origin`.
+For local Expo commands, supply it through the shell or an untracked local env
+file. Rebuild after changing the value; an installed APK keeps its bundled
+configuration. The profile name is retained for existing build commands; the
+Hub can be any supported HTTPS origin, including one outside a tailnet.
+
+After installing a candidate APK, cold-launch it and exercise the first session
+icon render after pairing. See the
+[startup import lesson](guides/developer-guide/cross-platform-development.md).
 
 ## Version codes
 
@@ -75,10 +111,10 @@ For a production-ID release APK that local Android profiling tools can attach to
 CLISBOT_PROFILE_BUILD=1 npm run android:production
 ```
 
-This keeps the `sh.clisbot` package id, release Hermes bundle, and release optimizations. It adds
+This keeps the `com.clisbot.app` package id, release Hermes bundle, and release optimizations. It adds
 `<profileable android:shell="true" />` and enables local Android trace markers for workspace mounts
 and daemon WebSocket traffic. The markers contain message types and sizes, never payload contents,
-and emit only while a system trace records the `sh.clisbot` app (`perfetto -a sh.clisbot ...`).
+and emit only while a system trace records the `com.clisbot.app` app (`perfetto -a com.clisbot.app ...`).
 
 Or from `packages/app`:
 
