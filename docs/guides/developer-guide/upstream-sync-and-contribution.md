@@ -277,6 +277,14 @@ git -C <main-worktree> branch -d sync/promotion-vX.Y.Z
 git -C <main-worktree> branch -d sync/rebranded-vX.Y.Z
 ```
 
+For rename conflicts, apply the same rebrand transform and formatter to a
+temporary copy of the actual merge base, without changing Git ancestry.
+Compare whole-file contents against this normalized base: keep Fusion when
+upstream equals it, take upstream when Fusion equals it, otherwise attempt a
+three-way content merge using it as the base.
+Review remaining conflicts and run affected tests; a clean content merge
+does not guarantee behavioral compatibility.
+
 Stop if the final fast-forward fails because `main` moved during validation;
 reconcile that movement before tagging or deleting the worktrees. Review the
 staged merge diff before committing, especially lockfile changes. The current
