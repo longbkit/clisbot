@@ -1,0 +1,1552 @@
+{
+  "date": "2026-09-30",
+  "releaseUrl": "https://github.com/getpaseo/paseo/releases/tag/v0.10.2",
+  "rawRef": "refs/upstream-releases/v0.10.2",
+  "rawCommit": "919c737c1948c5a16220307403a82e90d3e27ea0",
+  "branch": "rebrand/upstream-v0.10.2-test",
+  "transformedCommit": "d4991268c11a27c77644654157cff02fda747331",
+  "mergeTarget": "rebrand/clisbot-fusion-test",
+  "mergeStatus": "not attempted; requires user confirmation",
+  "transformFilesSha256": {
+    "scripts/rebrand-clisbot.mjs": "30ae17e41b2c028016c694de97296dd3619a899a39714b2a72e736ac0d6334ff",
+    "scripts/rebrand-templates/ports.mjs": "8ffe552177f74f940d3b70cc5b50aefaf0dc9e4b4b9ff051afbfd088377a0b64",
+    "scripts/rebrand-templates/publication.mjs": "3f7fbcb325a7fa4462417c79fb4e72c12943dee3fe9361934207385dabd814d2",
+    "scripts/branding/apply.mjs": "0ea0ee4405d921e48147bde7ceceb084bf42577bbb0134dba0c35a3b96fa097d",
+    "scripts/branding/source-patches.mjs": "ba887ddf576fff8302ddc3463285078d2a7babaa90e1ee6f8e97d577a92dbc36",
+    "assets/branding/clisbot/manifest.json": "166fd3f6313bfd9b19f5784602768a940d6e424227d64350e64188ae5bd10ecc"
+  },
+  "initialRename": {
+    "mode": "apply",
+    "root": "/Volumes/Media/clisbot-worktrees/rebrand-upstream-v0.10.2",
+    "changedFiles": 2175,
+    "renamedPaths": 84,
+    "oldBrandOccurrencesInChangedFiles": 23021,
+    "changedFilesByTopLevel": {
+      ".agents": 2,
+      ".dockerignore": 1,
+      ".github": 14,
+      ".gitignore": 1,
+      ".oxlintrc.json": 1,
+      "CHANGELOG.md": 1,
+      "CLAUDE.md": 1,
+      "CONTRIBUTING.md": 1,
+      "LICENSE": 1,
+      "README.ja.md": 1,
+      "README.ko.md": 1,
+      "README.md": 1,
+      "README.zh-CN.md": 1,
+      "SECURITY.md": 1,
+      "docker": 5,
+      "docs": 30,
+      "fastlane": 44,
+      "flake.nix": 1,
+      "knip.json": 1,
+      "nix": 3,
+      "package-lock.json": 1,
+      "package.json": 1,
+      "packages": 1899,
+      "paseo.json": 1,
+      "plugin-examples": 65,
+      "public-docs": 61,
+      "scripts": 28,
+      "skills": 6,
+      "vitest.config.ts": 1
+    },
+    "skippedBinaryFiles": 92,
+    "replacements": {
+      "siteHost": "clisbot.com",
+      "appHost": null,
+      "relayHost": null,
+      "repoSlug": "longbkit/clisbot",
+      "expoOwner": "lbk-company",
+      "expoProjectId": "9314cc2c-4abe-4637-b1cf-647fbbfbd807"
+    }
+  },
+  "visualBranding": {
+    "mode": "apply",
+    "root": "/Volumes/Media/clisbot-worktrees/rebrand-upstream-v0.10.2",
+    "changedFiles": 64,
+    "byFolder": {
+      "packages/website/public": 18,
+      "packages/app/assets/images": 22,
+      "packages/desktop/assets": 8,
+      "fastlane/metadata/android/en-US/images": 1,
+      "packages/app/public": 3,
+      "fastlane/metadata/android/en-US/images/phoneScreenshots": 3,
+      "packages/app/src/components/icons": 1,
+      "packages/app/src/screens": 1,
+      "packages/website/src/components/mockup": 2,
+      "packages/website/src/components/mockup/mobile": 2,
+      "packages/app": 1,
+      "packages/app/src/utils": 1,
+      "packages/website/src/routes": 1
+    },
+    "skippedPackages": [],
+    "files": [
+      "packages/website/public/logo.svg",
+      "packages/app/assets/images/butterfly-green.svg",
+      "packages/app/assets/images/butterfly-white.svg",
+      "packages/desktop/assets/32x32.png",
+      "packages/desktop/assets/64x64.png",
+      "packages/desktop/assets/128x128.png",
+      "packages/desktop/assets/128x128@2x.png",
+      "packages/desktop/assets/icon.png",
+      "packages/app/assets/images/icon.png",
+      "fastlane/metadata/android/en-US/images/icon.png",
+      "packages/desktop/assets/icon-dev.png",
+      "packages/app/public/apple-touch-icon.png",
+      "packages/website/public/apple-touch-icon.png",
+      "packages/app/public/pwa-icon-192.png",
+      "packages/app/public/pwa-icon-512.png",
+      "packages/app/assets/images/android-icon-foreground.png",
+      "packages/app/assets/images/android-icon-monochrome.png",
+      "packages/app/assets/images/notification-icon.png",
+      "packages/app/assets/images/browser-notification-icon.png",
+      "packages/app/assets/images/splash-icon.png",
+      "packages/app/assets/images/splash-icon-dark.png",
+      "packages/app/assets/images/favicon-dark.svg",
+      "packages/app/assets/images/favicon-dark.png",
+      "packages/app/assets/images/favicon.png",
+      "packages/app/assets/images/favicon-dark-running.svg",
+      "packages/app/assets/images/favicon-dark-running.png",
+      "packages/app/assets/images/favicon-dark-attention.svg",
+      "packages/app/assets/images/favicon-dark-attention.png",
+      "packages/app/assets/images/favicon-light.svg",
+      "packages/app/assets/images/favicon-light.png",
+      "packages/app/assets/images/favicon-light-running.svg",
+      "packages/app/assets/images/favicon-light-running.png",
+      "packages/app/assets/images/favicon-light-attention.svg",
+      "packages/app/assets/images/favicon-light-attention.png",
+      "packages/website/public/favicon.svg",
+      "packages/desktop/assets/icon.ico",
+      "packages/website/public/favicon.ico",
+      "packages/desktop/assets/icon.icns",
+      "packages/website/public/og-image.png",
+      "packages/website/public/hero-mockup.png",
+      "packages/website/public/homepage-hero.png",
+      "packages/website/public/mobile-mockup.png",
+      "packages/website/public/iphone-mockup-left.png",
+      "packages/website/public/phone-1.png",
+      "packages/website/public/phone-1-320.webp",
+      "packages/website/public/phone-1-480.webp",
+      "fastlane/metadata/android/en-US/images/phoneScreenshots/1.png",
+      "packages/website/public/phone-2.png",
+      "packages/website/public/phone-2-320.webp",
+      "packages/website/public/phone-2-480.webp",
+      "fastlane/metadata/android/en-US/images/phoneScreenshots/2.png",
+      "packages/website/public/phone-3.png",
+      "packages/website/public/phone-3-320.webp",
+      "packages/website/public/phone-3-480.webp",
+      "fastlane/metadata/android/en-US/images/phoneScreenshots/3.png",
+      "packages/app/src/components/icons/clisbot-logo.tsx",
+      "packages/app/src/screens/startup-splash-screen.tsx",
+      "packages/website/src/components/mockup/icons.tsx",
+      "packages/website/src/components/mockup/mobile/atoms.tsx",
+      "packages/app/app.config.js",
+      "packages/app/src/utils/os-notifications.ts",
+      "packages/website/src/routes/__root.tsx",
+      "packages/website/src/components/mockup/mobile/chat.tsx",
+      "packages/website/src/components/mockup/sidebar.tsx"
+    ]
+  },
+  "renameFinal": {
+    "mode": "check",
+    "root": "/Volumes/Media/clisbot-worktrees/rebrand-upstream-v0.10.2",
+    "changedFiles": 0,
+    "renamedPaths": 0,
+    "oldBrandOccurrencesInChangedFiles": 0,
+    "changedFilesByTopLevel": {},
+    "skippedBinaryFiles": 99,
+    "replacements": {
+      "siteHost": "clisbot.com",
+      "appHost": null,
+      "relayHost": null,
+      "repoSlug": "longbkit/clisbot",
+      "expoOwner": "lbk-company",
+      "expoProjectId": "9314cc2c-4abe-4637-b1cf-647fbbfbd807"
+    }
+  },
+  "brandingFinal": {
+    "mode": "check",
+    "root": "/Volumes/Media/clisbot-worktrees/rebrand-upstream-v0.10.2",
+    "changedFiles": 0,
+    "byFolder": {},
+    "skippedPackages": [],
+    "files": []
+  },
+  "folderStatistics": {
+    "(root)": {
+      "files": 19,
+      "added": 1558,
+      "removed": 1446,
+      "binary": 0
+    },
+    ".agents": {
+      "files": 2,
+      "added": 2,
+      "removed": 2,
+      "binary": 0
+    },
+    ".github": {
+      "files": 14,
+      "added": 111,
+      "removed": 125,
+      "binary": 0
+    },
+    "docker": {
+      "files": 6,
+      "added": 145,
+      "removed": 145,
+      "binary": 0
+    },
+    "docs": {
+      "files": 30,
+      "added": 606,
+      "removed": 606,
+      "binary": 0
+    },
+    "fastlane": {
+      "files": 48,
+      "added": 64,
+      "removed": 64,
+      "binary": 4
+    },
+    "nix": {
+      "files": 3,
+      "added": 110,
+      "removed": 110,
+      "binary": 0
+    },
+    "packages/app": {
+      "files": 870,
+      "added": 3689,
+      "removed": 3648,
+      "binary": 17
+    },
+    "packages/cli": {
+      "files": 170,
+      "added": 1478,
+      "removed": 1444,
+      "binary": 0
+    },
+    "packages/client": {
+      "files": 31,
+      "added": 448,
+      "removed": 434,
+      "binary": 0
+    },
+    "packages/desktop": {
+      "files": 108,
+      "added": 889,
+      "removed": 857,
+      "binary": 8
+    },
+    "packages/expo-two-way-audio": {
+      "files": 2,
+      "added": 3,
+      "removed": 3,
+      "binary": 0
+    },
+    "packages/highlight": {
+      "files": 2,
+      "added": 2,
+      "removed": 2,
+      "binary": 0
+    },
+    "packages/plugin": {
+      "files": 16,
+      "added": 70,
+      "removed": 64,
+      "binary": 0
+    },
+    "packages/protocol": {
+      "files": 41,
+      "added": 369,
+      "removed": 362,
+      "binary": 0
+    },
+    "packages/relay": {
+      "files": 6,
+      "added": 10,
+      "removed": 10,
+      "binary": 0
+    },
+    "packages/server": {
+      "files": 639,
+      "added": 8007,
+      "removed": 8162,
+      "binary": 0
+    },
+    "packages/website": {
+      "files": 78,
+      "added": 520,
+      "removed": 964,
+      "binary": 16
+    },
+    "plugin-examples": {
+      "files": 67,
+      "added": 133,
+      "removed": 133,
+      "binary": 0
+    },
+    "public-docs": {
+      "files": 61,
+      "added": 1312,
+      "removed": 1312,
+      "binary": 0
+    },
+    "scripts": {
+      "files": 28,
+      "added": 203,
+      "removed": 200,
+      "binary": 0
+    },
+    "skills": {
+      "files": 7,
+      "added": 226,
+      "removed": 226,
+      "binary": 0
+    }
+  },
+  "totals": {
+    "files": 2248,
+    "added": 19955,
+    "removed": 20319,
+    "binary": 45
+  },
+  "remainingNames": {
+    "pathMatches": [],
+    "lines": 238,
+    "files": 81,
+    "categories": {
+      "temporary service endpoint": 153,
+      "attribution or source reference": 22,
+      "upstream account example or test fixture": 52,
+      "archived upstream article": 11
+    },
+    "locations": [
+      {
+        "file": ".github/workflows/deploy-relay.yml",
+        "line": 4,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "LICENSE",
+        "line": 7,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "LICENSE",
+        "line": 14,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "LICENSE",
+        "line": 16,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ja.md",
+        "line": 62,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ja.md",
+        "line": 184,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ja.md",
+        "line": 193,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ko.md",
+        "line": 56,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ko.md",
+        "line": 194,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.ko.md",
+        "line": 203,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.md",
+        "line": 56,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.md",
+        "line": 226,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.md",
+        "line": 235,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.zh-CN.md",
+        "line": 62,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.zh-CN.md",
+        "line": 230,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "README.zh-CN.md",
+        "line": 239,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "SECURITY.md",
+        "line": 23,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "docs/ad-hoc-daemon-testing.md",
+        "line": 37,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "docs/ad-hoc-daemon-testing.md",
+        "line": 38,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "docs/architecture.md",
+        "line": 183,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "docs/docker.md",
+        "line": 181,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "docs/hub.md",
+        "line": 7,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "docs/release.md",
+        "line": 163,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "docs/release.md",
+        "line": 414,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "nix/module.nix",
+        "line": 97,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "nix/module.nix",
+        "line": 162,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/components/hosts/host-picker.tsx",
+        "line": 41,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/components/pair-link-credentials.test.ts",
+        "line": 35,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/components/pair-link-credentials.test.ts",
+        "line": 36,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/components/pair-link-modal.tsx",
+        "line": 233,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 53,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 121,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 155,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 215,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 220,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 246,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 267,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 291,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 317,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/git/pull-request-panel/use-data.test.ts",
+        "line": 328,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 400,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 402,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 425,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 437,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 653,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 655,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 804,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 834,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 875,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 926,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 928,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1013,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1028,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1081,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1094,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1097,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1109,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1118,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1130,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1140,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1144,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1156,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1168,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1175,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1182,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1192,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1196,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1206,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1310,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1330,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1361,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1383,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1416,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1418,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1471,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1476,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 1485,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 3581,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 3589,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 3591,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.test.ts",
+        "line": 3643,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/tool-calls/detail-level/projection.test.ts",
+        "line": 329,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/app/src/utils/test-daemon-connection.test.ts",
+        "line": 229,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/utils/test-daemon-connection.test.ts",
+        "line": 231,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/utils/test-daemon-connection.test.ts",
+        "line": 241,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/utils/workspace-script-links.test.ts",
+        "line": 130,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/app/src/utils/workspace-script-links.test.ts",
+        "line": 184,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/authority.ts",
+        "line": 16,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/client.test.ts",
+        "line": 163,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/client.test.ts",
+        "line": 164,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 45,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 91,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 92,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 95,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 318,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 341,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/commands.test.ts",
+        "line": 345,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/help.ts",
+        "line": 4,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/init-plan.test.ts",
+        "line": 49,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/init-plan.test.ts",
+        "line": 92,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/init.ts",
+        "line": 247,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 11,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 12,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 29,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 52,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 53,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/cli/src/commands/hub/starter-trigger.test.ts",
+        "line": 55,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "packages/cli/src/commands/onboard.ts",
+        "line": 120,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/output/pairing.test.ts",
+        "line": 5,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/output/pairing.test.ts",
+        "line": 38,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/output/pairing.test.ts",
+        "line": 42,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/src/utils/daemon-target.test.ts",
+        "line": 43,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/cli/tests/32-daemon-set-password.test.ts",
+        "line": 44,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/client/src/daemon-client.test.ts",
+        "line": 4534,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/client/src/daemon-client.test.ts",
+        "line": 4547,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.test.ts",
+        "line": 23,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.test.ts",
+        "line": 36,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.test.ts",
+        "line": 40,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.test.ts",
+        "line": 68,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.test.ts",
+        "line": 77,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/connection-offer.ts",
+        "line": 49,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 105,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 119,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 133,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 158,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 171,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 197,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 224,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.test.ts",
+        "line": 231,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/daemon-endpoints.ts",
+        "line": 70,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/protocol/src/messages.checkout-pr-schema.test.ts",
+        "line": 520,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.checkout-pr-schema.test.ts",
+        "line": 529,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.checkout-pr-schema.test.ts",
+        "line": 709,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.pull-request-timeline.test.ts",
+        "line": 25,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.pull-request-timeline.test.ts",
+        "line": 34,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.pull-request-timeline.test.ts",
+        "line": 45,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/protocol/src/messages.pull-request-timeline.test.ts",
+        "line": 54,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/relay/src/cutover-proxy.test.ts",
+        "line": 71,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/relay/src/live-relay.e2e.test.ts",
+        "line": 15,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/relay/src/live-relay.e2e.test.ts",
+        "line": 93,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/relay/wrangler.toml",
+        "line": 6,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/agent/mutable-provider-config-owner.test.ts",
+        "line": 93,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap-auth.test.ts",
+        "line": 128,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap-managed-processes.test.ts",
+        "line": 46,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap-provider-availability.test.ts",
+        "line": 82,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 450,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 565,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 701,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 790,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 928,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 942,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.smoke.test.ts",
+        "line": 946,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.ts",
+        "line": 543,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.ts",
+        "line": 673,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.ts",
+        "line": 678,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.ts",
+        "line": 1637,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/bootstrap.ts",
+        "line": 1639,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/checkout/status-projection.test.ts",
+        "line": 52,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/config.ts",
+        "line": 39,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/config.ts",
+        "line": 40,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/daemon-config-store.test.ts",
+        "line": 38,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/daemon-e2e/connection-offer.e2e.test.ts",
+        "line": 98,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/daemon-e2e/connection-offer.e2e.test.ts",
+        "line": 111,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/daemon-version.test.ts",
+        "line": 41,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/hub/test-utils/relationship-harness.ts",
+        "line": 1418,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/hub/test-utils/relationship-harness.ts",
+        "line": 1419,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/pairing-offer.ts",
+        "line": 34,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/pairing-offer.ts",
+        "line": 36,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/pairing-offer.ts",
+        "line": 38,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/pairing-qr.test.ts",
+        "line": 10,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/persisted-config.ts",
+        "line": 348,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/persisted-config.ts",
+        "line": 355,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/relay-transport.test.ts",
+        "line": 154,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/relay-transport.test.ts",
+        "line": 178,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/relay-transport.test.ts",
+        "line": 202,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/relay-transport.test.ts",
+        "line": 230,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/relay-transport.test.ts",
+        "line": 268,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/resolve-worktree-creation-intent.test.ts",
+        "line": 165,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 2043,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 2044,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4901,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4926,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4934,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4964,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4965,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4967,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4969,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4970,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 4971,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 5020,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 5086,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session.test.ts",
+        "line": 5096,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/session/daemon/daemon-session.test.ts",
+        "line": 256,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/session/daemon/daemon-session.test.ts",
+        "line": 257,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/test-utils/clisbot-daemon.ts",
+        "line": 187,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/test-utils/clisbot-daemon.ts",
+        "line": 190,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/server/src/server/worktree-core.posix.test.ts",
+        "line": 646,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/worktree-core.posix.test.ts",
+        "line": 900,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/worktree-core.posix.test.ts",
+        "line": 945,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/worktree-core.posix.test.ts",
+        "line": 986,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/server/worktree-core.posix.test.ts",
+        "line": 1107,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/services/github-service.test.ts",
+        "line": 433,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/server/src/services/github-service.test.ts",
+        "line": 809,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "packages/website/posts/upstream/hello-world.md",
+        "line": 3,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/hello-world.md",
+        "line": 7,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/hello-world.md",
+        "line": 9,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 3,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 8,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 10,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 26,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 30,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 40,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 46,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/posts/upstream/i-was-wrong-about-electron.md",
+        "line": 50,
+        "category": "archived upstream article"
+      },
+      {
+        "file": "packages/website/src/content/alternatives/orca.md",
+        "line": 34,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "packages/website/src/downloads.tsx",
+        "line": 32,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/website/src/hub-plans.ts",
+        "line": 4,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/website/src/routes/hub.tsx",
+        "line": 35,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "packages/website/src/routes/hub.tsx",
+        "line": 548,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "public-docs/cli.md",
+        "line": 356,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/cli.md",
+        "line": 364,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/cli.md",
+        "line": 379,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/cli.md",
+        "line": 427,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/api.md",
+        "line": 17,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/api.md",
+        "line": 18,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/api.md",
+        "line": 24,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/configuration/index.md",
+        "line": 103,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/daemons.md",
+        "line": 45,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/hosted.md",
+        "line": 11,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/index.md",
+        "line": 58,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "public-docs/hub/self-hosting/github-app.md",
+        "line": 42,
+        "category": "upstream account example or test fixture"
+      },
+      {
+        "file": "public-docs/security.md",
+        "line": 26,
+        "category": "attribution or source reference"
+      },
+      {
+        "file": "public-docs/web-ui.md",
+        "line": 11,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "scripts/measure-relay-latency.ts",
+        "line": 8,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "scripts/measure-relay-latency.ts",
+        "line": 113,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "scripts/measure-relay-latency.ts",
+        "line": 122,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "scripts/prove-relay-prod.mjs",
+        "line": 27,
+        "category": "temporary service endpoint"
+      },
+      {
+        "file": "scripts/prove-relay-prod.mjs",
+        "line": 28,
+        "category": "temporary service endpoint"
+      }
+    ]
+  },
+  "checks": {
+    "npmCi": "passed; no lockfile regeneration",
+    "npmLsDepth0": "passed",
+    "serverAndCliBuild": "passed",
+    "webExportAndCompression": "passed",
+    "websiteBuild": "passed",
+    "workspaceTypecheck": "passed",
+    "fullBranchLint": "0 errors, 0 warnings",
+    "serverFocusedTests": 113,
+    "appFocusedTests": 19,
+    "protocolFocusedTests": 37,
+    "transformTests": 12,
+    "commitHooks": "format, lint, typecheck passed"
+  },
+  "runtime": {
+    "origin": "http://127.0.0.1:55192",
+    "version": "0.10.2",
+    "daemon": "healthy",
+    "cliWorkspaceCreate": "passed",
+    "sdkWebSocket": "passed",
+    "browserWorkspaceAndReload": "passed",
+    "supportLinkAndMatcher": "longbkit/clisbot passed (remote navigation intercepted)",
+    "browserErrors": [],
+    "screenshots": ["app-desktop.png", "app-mobile-web.png"]
+  },
+  "limits": [
+    "No native APK/iOS/Electron installer run",
+    "No live LLM turn or relay end-to-end test",
+    "Hub/channels absent from raw Paseo; Fusion integration requires post-merge testing",
+    "No merge, push, publication or main promotion"
+  ],
+  "logsDirectory": "/Volumes/Media/clisbot-builds/upstream-v0.10.2-20260930"
+}

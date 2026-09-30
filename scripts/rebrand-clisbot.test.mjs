@@ -8,6 +8,28 @@ import test from "node:test";
 
 const script = fileURLToPath(new URL("./rebrand-clisbot.mjs", import.meta.url));
 
+test("renames escaped and encoded issue URLs, including previously renamed matchers", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-issue-url-"));
+  git(root, "init", "-q");
+  const file = "packages/app/e2e/browser/sidebar-help.spec.ts";
+  put(
+    root,
+    file,
+    String.raw`getpaseo\/paseo\/issues getpaseo%2Fpaseo%2Fissues getpaseo\/clisbot\/issues getpaseo%2Fclisbot%2Fissues getpaseo\/paseo-relay\/issues`,
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--apply"]);
+  assert.equal(
+    readFileSync(join(root, file), "utf8"),
+    String.raw`longbkit\/clisbot\/issues longbkit%2Fclisbot%2Fissues longbkit\/clisbot\/issues longbkit%2Fclisbot%2Fissues getpaseo\/paseo-relay\/issues`,
+  );
+  assert.equal(
+    JSON.parse(execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }))
+      .changedFiles,
+    0,
+  );
+});
+
 test("rebrands service ports without changing timers, evidence, or stored user settings", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-ports-"));
   git(root, "init", "-q");

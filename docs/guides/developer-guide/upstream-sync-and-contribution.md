@@ -75,23 +75,27 @@ not silently move the product baseline.
 
 ### Prepare Fusion before the one-time cutover
 
-1. Implement the repeatable rename transformation and apply it to the current
-   `clisbot-paseoclaw-fusion` branch. Commit the completed Clisbot rebrand there;
-   check paths, source, generated output, and product documentation for old
-   names. This first step removes the branch's current mixed naming.
+**Current test target, 2026-09-30:** Paseo `v0.10.2` replaces `v0.10.1` for the
+next sync. See [independent upstream validation](../../audits/2026-09-30-clisbot-branding/upstream-v0.10.2-validation.md).
+
+1. Apply and verify the repeatable text and visual rebrand on
+   `rebrand/clisbot-fusion-test`, the isolated Fusion candidate. Keep
+   `clisbot-paseoclaw-fusion` as the pre-cutover reference while testing.
 2. Pick the upstream release tag to become the initial official baseline.
    Fetch its raw commit, create a disposable branch from it, run the same
-   transformation over the upstream snapshot, and commit that result.
-3. Merge the transformed upstream branch into the fully rebranded Fusion
-   branch. Resolve source conflicts by keeping the upstream functional changes
-   with Clisbot names. Rerun the rename and old-name scan, reconcile the
-   lockfile, and pass the build, typecheck, focused tests, and release gates.
-4. Put the verified merge result at the tip of `clisbot-paseoclaw-fusion` and
-   record its exact SHA. Delete the disposable sync branch name after the merge.
-   This verified Fusion SHA is what the cutover pushes to `origin/main`.
+   text and visual transformation, test it independently, and commit that result.
+   The selected branch is `rebrand/upstream-v0.10.2-test`.
+3. After the user's merge confirmation, merge that transformed branch into
+   `rebrand/clisbot-fusion-test`. Record conflict files, causes and resolutions;
+   retain upstream functionality with Clisbot names. Rerun rename and branding
+   checks, reconcile the lockfile, and pass the affected build and runtime gates.
+4. Record the verified candidate SHA on `rebrand/clisbot-fusion-test` and build
+   the app for acceptance. A separate user confirmation authorizes promoting
+   this exact SHA to `origin/main`. Keep `clisbot-paseoclaw-fusion` temporarily
+   for reference. The disposable upstream branch name may be deleted after merge.
 
 For step 3, use the transformed-upstream Git sequence below with
-`clisbot-paseoclaw-fusion` in place of `main`, and with its clean worktree in
+`rebrand/clisbot-fusion-test` in place of `main`, and with its clean worktree in
 place of `<main-worktree>`. The recurring procedure below targets `main` only
 after the cutover.
 
@@ -99,8 +103,8 @@ after the cutover.
 
 This step comes **after** the rebranded Fusion branch has merged the selected
 transformed upstream baseline and passed its gates. It comes **before** later
-upstream promotions directly into `main`. Do not push the current partially
-branded Fusion tip as the final product.
+upstream promotions directly into `main`. Promotion requires a separate user
+confirmation of the verified candidate SHA.
 
 The old GitHub `main` was backed up on 2026-09-29 as
 `origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
@@ -112,7 +116,7 @@ the verified old-main commit; if `main` moved, stop and review the new tip.
 ```bash
 git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
 # After full rebrand and validation, record the exact approved Fusion commit.
-git rev-parse clisbot-paseoclaw-fusion
+git rev-parse rebrand/clisbot-fusion-test
 git push --force-with-lease=refs/heads/main:<verified-old-main-sha> origin <verified-fusion-sha>:refs/heads/main
 git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
 ```
@@ -145,6 +149,10 @@ official Clisbot `main`.
 The test branch's [rename script](../../../scripts/rebrand-clisbot.mjs) applies
 the following rules to Git-tracked paths and UTF-8 text. These are string and
 path rules, not a semantic determination that every retained old name is valid.
+
+Repository URLs also match escaped slashes in regexes and `%2F` separators in
+encoded login return URLs. The transform repairs old `getpaseo/clisbot` forms
+in those encodings; upstream relay repository references remain protected.
 
 | Input                                                                                                                                                                                               | Current rule                                                                                                                                                                                                                                                                                                                                                                                | Review when syncing                                                                                                                                                                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

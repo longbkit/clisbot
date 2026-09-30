@@ -290,10 +290,19 @@ function isProtectedPath(path) {
 function renameProductText(input) {
   const retainedHosts = [];
   const retainedRepos = [];
-  const withExternalRepos = input.replace(/getpaseo\/paseo-relay\b/g, (repo) => {
-    const index = retainedRepos.push(repo) - 1;
-    return `__CLISBOT_UPSTREAM_REPO_${index}__`;
-  });
+  // URL matchers and login return URLs encode separators; also repair the
+  // partially renamed form produced by older revisions of this transform.
+  const repositoryUrls = input.replace(
+    /getpaseo(\\\/|%2[fF])(?:paseo|clisbot)(?=\\\/|%2[fF])/g,
+    (_match, separator) => repoSlug.replaceAll("/", separator),
+  );
+  const withExternalRepos = repositoryUrls.replace(
+    /getpaseo(?:\/|\\\/|%2[fF])paseo-relay\b/g,
+    (repo) => {
+      const index = retainedRepos.push(repo) - 1;
+      return `__CLISBOT_UPSTREAM_REPO_${index}__`;
+    },
+  );
   const prepared = options.keepUpstreamEndpoints
     ? withExternalRepos.replace(/(?:relay|app|hub)\.paseo\.sh/g, (host) => {
         const index = retainedHosts.push(host) - 1;

@@ -9,6 +9,7 @@ directions. It supplements the
 
 Start with [production artifacts and verification](production-artifacts.md),
 the [publication identity and marketing review](publication-review.md),
+the [upstream v0.10.2 validation](upstream-v0.10.2-validation.md),
 the [brand kit](../../../assets/branding/clisbot/README.md), or its
 [visual preview](../../../assets/branding/clisbot/PREVIEW.html).
 The inventory and contact sheets below preserve the pre-replacement baseline.
@@ -78,3 +79,6 @@ replace. This audit's contact sheets and future concept images are excluded.
   consumers updated on `rebrand/clisbot-fusion-test`.
 - Repeatability: verified on disposable Fusion and upstream v0.10.1 snapshots.
   See [results and remaining release checks](production-artifacts.md#verification).
+- Next upstream candidate: `rebrand/upstream-v0.10.2-test`, built and tested
+  independently with the full kit. See the [validation report](upstream-v0.10.2-validation.md).
+  Its merge into `rebrand/clisbot-fusion-test` awaits the user's confirmation.
