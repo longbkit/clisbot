@@ -188,6 +188,8 @@ again on the merged Fusion candidate, before either commit:
 5. Record intentional exclusions, verification results and unrun live checks
    in the sync audit. Ancestry and file presence do not prove behavior survived.
 
+Use the [2026-10-01 Fusion feature review](../../audits/2026-09-30-clisbot-branding/fusion-regression.md) as the grouping template: record changed shared integration points even when a feature’s own files are unchanged, and distinguish known premerge failures from new regressions.
+
 ### Current rename rules and remaining-name review
 
 **Track renamed files explicitly:** on 2026-10-01, an audit recovered 16 source

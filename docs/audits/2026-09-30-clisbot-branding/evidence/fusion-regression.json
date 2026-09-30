@@ -1,0 +1,266 @@
+{
+  "baseline": "b5fa42353",
+  "candidate": "fe04488e4f703409b4b27dec34d325b4ce04120d",
+  "note": "Scopes overlap; counts include tests and manifests. Runtime was last changed before the documentation-only candidate commit. These are targeted checks, not full regression certification.",
+  "surfaces": [
+    {
+      "group": "Bots and Chats",
+      "scope": [
+        "packages/server/src/server/bots/",
+        "packages/server/src/server/chats/",
+        "packages/server/src/server/session/bots/",
+        "packages/server/src/server/session/chats/",
+        "packages/app/src/clisbot/bots/",
+        "packages/app/src/clisbot/bot-projects/",
+        "packages/cli/src/commands/bot/"
+      ],
+      "files": 274,
+      "changed": [],
+      "addedLines": 0,
+      "removedLines": 0
+    },
+    {
+      "group": "Session storage",
+      "scope": [
+        "packages/server/src/server/agent/session-storage/",
+        "packages/server/src/server/session-storage/",
+        "packages/app/src/clisbot/session-storage/"
+      ],
+      "files": 57,
+      "changed": [],
+      "addedLines": 0,
+      "removedLines": 0
+    },
+    {
+      "group": "Channels and automation",
+      "scope": [
+        "packages/hub/src/channels/",
+        "packages/hub/src/workflows/",
+        "packages/hub/src/triggers/",
+        "packages/channels/",
+        "packages/app/src/clisbot/automations/"
+      ],
+      "files": 1692,
+      "changed": [
+        "packages/channels/core/package.json",
+        "packages/channels/slack/package.json",
+        "packages/channels/telegram/package.json"
+      ],
+      "addedLines": 8,
+      "removedLines": 3
+    },
+    {
+      "group": "Access",
+      "scope": ["packages/hub/src/access/", "packages/server/src/server/managed-access/"],
+      "files": 41,
+      "changed": [
+        "packages/server/src/server/managed-access/browse-project-directories.test.ts",
+        "packages/server/src/server/managed-access/browse-project-directories.ts",
+        "packages/server/src/server/managed-access/resource-authorizer.ts"
+      ],
+      "addedLines": 137,
+      "removedLines": 0
+    },
+    {
+      "group": "Workspace/sidebar",
+      "scope": [
+        "packages/app/src/clisbot/workspace-sessions/",
+        "packages/app/src/clisbot/workspace/",
+        "packages/app/src/clisbot/projects/"
+      ],
+      "files": 12,
+      "changed": ["packages/app/src/clisbot/projects/host-directory-browser.tsx"],
+      "addedLines": 246,
+      "removedLines": 0
+    },
+    {
+      "group": "Hub identity/enrollment",
+      "scope": [
+        "packages/hub/src/cli-authorizations/",
+        "packages/hub/src/auth/",
+        "packages/hub/src/db/",
+        "packages/hub/src/public-api/",
+        "packages/cli/src/commands/hub/",
+        "packages/server/src/server/hub/"
+      ],
+      "files": 199,
+      "changed": [
+        "packages/cli/src/commands/hub/commands.test.ts",
+        "packages/cli/src/commands/hub/connect-approval.test.ts",
+        "packages/cli/src/commands/hub/connect.ts",
+        "packages/cli/src/commands/hub/daemon-client.ts",
+        "packages/cli/src/commands/hub/help.ts",
+        "packages/cli/src/commands/hub/hub-client/index.ts",
+        "packages/cli/src/commands/hub/hub-client/internal/contracts.ts",
+        "packages/cli/src/commands/hub/init-flow.test.ts",
+        "packages/cli/src/commands/hub/login-flow.test.ts",
+        "packages/cli/src/commands/hub/login-flow.ts",
+        "packages/cli/src/commands/hub/login.ts",
+        "packages/hub/src/cli-authorizations/approval.tsx",
+        "packages/hub/src/cli-authorizations/cli-authorizations.test.ts",
+        "packages/hub/src/cli-authorizations/functions.ts",
+        "packages/hub/src/cli-authorizations/host-enrollment.embedded.integration.test.ts",
+        "packages/hub/src/cli-authorizations/index.ts",
+        "packages/hub/src/db/memory.ts",
+        "packages/hub/src/db/pg.ts",
+        "packages/hub/src/db/schema.ts",
+        "packages/hub/src/db/types.ts",
+        "packages/hub/src/public-api/contracts.ts",
+        "packages/hub/src/public-api/openapi.ts",
+        "packages/server/src/server/hub/relationship-controller.test.ts",
+        "packages/server/src/server/hub/relationship-controller.ts"
+      ],
+      "addedLines": 992,
+      "removedLines": 99
+    },
+    {
+      "group": "Provider lifecycle",
+      "scope": [
+        "packages/server/src/server/agent/providers/",
+        "packages/server/src/server/agent/agent-manager.ts",
+        "packages/server/src/server/agent/provider-registry.ts",
+        "packages/server/src/server/agent/provider-launch-config.ts",
+        "packages/server/src/server/agent/tools/"
+      ],
+      "files": 303,
+      "changed": [
+        "packages/server/src/server/agent/agent-manager.ts",
+        "packages/server/src/server/agent/provider-launch-config.ts",
+        "packages/server/src/server/agent/provider-registry.ts",
+        "packages/server/src/server/agent/providers/claude/agent.test.ts",
+        "packages/server/src/server/agent/providers/claude/model-manifest.ts",
+        "packages/server/src/server/agent/providers/claude/models.test.ts",
+        "packages/server/src/server/agent/providers/codex-app-server-agent.test.ts",
+        "packages/server/src/server/agent/providers/codex-app-server-agent.ts",
+        "packages/server/src/server/agent/providers/codex/rewind.ts",
+        "packages/server/src/server/agent/providers/opencode-agent.test.ts",
+        "packages/server/src/server/agent/providers/opencode-agent.ts",
+        "packages/server/src/server/agent/providers/opencode/test-utils/v2-harness.ts",
+        "packages/server/src/server/agent/providers/opencode/tool-call-detail-parser.ts",
+        "packages/server/src/server/agent/providers/opencode/tool-call-mapper.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/agent.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/agent.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/api.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/permissions.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/permissions.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/session.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/streaming.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/timeline.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/turns.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/usage.test.ts",
+        "packages/server/src/server/agent/providers/opencode/v2/usage.ts",
+        "packages/server/src/server/agent/tools/clisbot-tools.ts"
+      ],
+      "addedLines": 1571,
+      "removedLines": 185
+    },
+    {
+      "group": "Client Host onboarding",
+      "scope": [
+        "packages/app/src/clisbot/hub/",
+        "packages/app/src/add-project-flow/",
+        "packages/app/src/components/add-project-flow.tsx",
+        "packages/app/src/stores/add-project-flow-store.ts"
+      ],
+      "files": 309,
+      "changed": [
+        "packages/app/src/add-project-flow/model.test.ts",
+        "packages/app/src/add-project-flow/model.ts",
+        "packages/app/src/add-project-flow/options.ts",
+        "packages/app/src/clisbot/hub/cli-authorization-summary.tsx",
+        "packages/app/src/clisbot/hub/cli-login-form.test.ts",
+        "packages/app/src/clisbot/hub/cli-login-form.ts",
+        "packages/app/src/clisbot/hub/cli-login-screen.tsx",
+        "packages/app/src/clisbot/hub/connected-host-actions.tsx",
+        "packages/app/src/clisbot/hub/host-onboarding.test.ts",
+        "packages/app/src/clisbot/hub/host-onboarding.ts",
+        "packages/app/src/clisbot/hub/managed-host-discovery.ts",
+        "packages/app/src/clisbot/hub/settings/account-settings.test.tsx",
+        "packages/app/src/clisbot/hub/settings/first-host-setup.tsx",
+        "packages/app/src/clisbot/hub/settings/hosts-settings.test.tsx",
+        "packages/app/src/clisbot/hub/settings/hosts-settings.tsx",
+        "packages/app/src/clisbot/hub/settings/screen.tsx",
+        "packages/app/src/clisbot/hub/welcome-status.test.ts",
+        "packages/app/src/clisbot/hub/welcome-status.ts",
+        "packages/app/src/components/add-project-flow.tsx",
+        "packages/app/src/stores/add-project-flow-store.ts"
+      ],
+      "addedLines": 920,
+      "removedLines": 153
+    },
+    {
+      "group": "Wire/shared integration",
+      "scope": [
+        "packages/protocol/src/",
+        "packages/client/src/",
+        "packages/server/src/server/session.ts",
+        "packages/server/src/server/websocket-server.ts",
+        "packages/server/src/server/bootstrap.ts"
+      ],
+      "files": 178,
+      "changed": [
+        "packages/client/src/daemon-client.ts",
+        "packages/protocol/src/messages.ts",
+        "packages/protocol/src/terminal-profiles.test.ts",
+        "packages/protocol/src/terminal-profiles.ts",
+        "packages/server/src/server/session.ts",
+        "packages/server/src/server/websocket-server.ts"
+      ],
+      "addedLines": 86,
+      "removedLines": 2
+    }
+  ],
+  "tests": [
+    {
+      "run": "access-revocation",
+      "passed": 23,
+      "skipped": 34,
+      "files": 3
+    },
+    {
+      "run": "acp-cancel",
+      "passed": 7,
+      "skipped": 112,
+      "files": 1
+    },
+    {
+      "run": "app-features",
+      "passed": 29,
+      "skipped": 0,
+      "files": 6
+    },
+    {
+      "run": "automation-engine",
+      "passed": 7,
+      "skipped": 39,
+      "files": 1
+    },
+    {
+      "run": "cli-connect",
+      "passed": 10,
+      "skipped": 0,
+      "files": 2
+    },
+    {
+      "run": "hub-boundaries",
+      "passed": 34,
+      "skipped": 0,
+      "files": 5
+    },
+    {
+      "run": "provider-lifecycle",
+      "passed": 41,
+      "skipped": 0,
+      "files": 3
+    },
+    {
+      "run": "server-core",
+      "passed": 23,
+      "skipped": 0,
+      "files": 5
+    }
+  ],
+  "passed": 174,
+  "filteredOut": 185,
+  "testFiles": 26
+}

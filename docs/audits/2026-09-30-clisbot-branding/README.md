@@ -11,6 +11,7 @@ Start with [production artifacts and verification](production-artifacts.md),
 the [publication identity and marketing review](publication-review.md),
 the [upstream v0.10.2 validation](upstream-v0.10.2-validation.md),
 the [Fusion merge results and conflicts](merge-v0.10.2.md),
+the [feature-group regression review](fusion-regression.md),
 the [file-completeness audit](file-completeness.md) and
 [rebrand staging lessons](../../lessons/2026-10-01-rebrand-file-completeness.md),
 the [brand kit](../../../assets/branding/clisbot/README.md), or its
