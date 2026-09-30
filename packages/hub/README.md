@@ -13,7 +13,7 @@
 </p>
 
 > [!WARNING]
-> Clisbot Hub is in early development. Expect breaking changes and data loss. [Join the Clisbot Discord](https://discord.gg/jz8T2uahpH) to learn more about the project.
+> Clisbot Hub is in early development. Expect breaking changes and data loss. [Join the Clisbot Discord](https://discord.gg/awGmcmFXC) to learn more about the project.
 
 Clisbot Hub is the self-hosted automation layer for [Clisbot](https://clisbot.com). Connect the services where work arrives and run agents on the machines where your development environments already live.
 

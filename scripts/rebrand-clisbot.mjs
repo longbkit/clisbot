@@ -14,6 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
 
 const options = parseArgs(process.argv.slice(2));
@@ -23,6 +24,44 @@ const appHost = options.keepUpstreamEndpoints ? null : (options.appHost ?? `app.
 const relayHost = options.keepUpstreamEndpoints ? null : (options.relayHost ?? `relay.${siteHost}`);
 const repoSlug = options.repoSlug;
 const decoder = new TextDecoder("utf-8", { fatal: true });
+const templateRoot = join(dirname(fileURLToPath(import.meta.url)), "rebrand-templates");
+const productTemplates = new Map(
+  [
+    ["packages/website/src/components/sponsorship.tsx", "website-sponsorship.tsx"],
+    ["packages/website/src/data/sponsors.ts", "website-sponsors.ts"],
+    ["packages/website/src/routes/sponsor.tsx", "website-sponsor-route.tsx"],
+  ].map(([path, template]) => [path, readFileSync(join(templateRoot, template), "utf8")]),
+);
+const readmeSponsorSections = new Map([
+  [
+    "README.md",
+    [
+      "Sponsors",
+      "Related projects",
+      "Sponsorship options for Clisbot are being set up. Check back here when they are ready.",
+    ],
+  ],
+  [
+    "README.zh-CN.md",
+    ["赞助", "相关项目", "Clisbot 的赞助方式正在准备中。设置完成后，我们会在此更新。"],
+  ],
+  [
+    "README.ja.md",
+    [
+      "スポンサー",
+      "関連プロジェクト",
+      "Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。",
+    ],
+  ],
+  [
+    "README.ko.md",
+    [
+      "스폰서",
+      "관련 프로젝트",
+      "Clisbot 후원 안내를 준비 중입니다. 준비가 완료되면 이곳에 업데이트하겠습니다.",
+    ],
+  ],
+]);
 
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root })
   .toString("utf8")
@@ -60,7 +99,8 @@ for (const path of tracked) {
     } else {
       before = decodeText(bytes, path);
       if (before !== null) {
-        after = removeCollapsedAliases(path, renameProductText(before));
+        after =
+          productTemplates.get(path) ?? removeCollapsedAliases(path, renameProductText(before));
         occurrences = countBrandTokens(before);
       }
     }
@@ -123,6 +163,7 @@ function isProtectedPath(path) {
   return (
     path === "scripts/rebrand-clisbot.mjs" ||
     path === "scripts/rebrand-clisbot.test.mjs" ||
+    path.startsWith("scripts/rebrand-templates/") ||
     path === "LICENSE" ||
     path.startsWith("docs/audits/") ||
     path.startsWith("docs/lessons/") ||
@@ -145,6 +186,8 @@ function renameProductText(input) {
       })
     : withExternalRepos;
   const renamed = prepared
+    .replaceAll("jz8T2uahpH", "awGmcmFXC")
+    .replaceAll("https://github.com/sponsors/boudra", `https://${siteHost}/sponsor`)
     .replaceAll("@getpaseo", "@clisbot")
     .replace(/getpaseo\/paseo(?![\w-])/g, repoSlug)
     .replaceAll("relay.paseo.sh", relayHost ?? "relay.paseo.sh")
@@ -173,6 +216,34 @@ function renameProductText(input) {
 // environment names. A full rename maps those two names to the same key. Remove
 // the resulting duplicate code; raw upstream snapshots simply lack these seams.
 function removeCollapsedAliases(path, input) {
+  if (path === ".github/FUNDING.yml") {
+    return "# Add Clisbot funding options after sponsorship setup is ready.\n";
+  }
+  if (readmeSponsorSections.has(path)) {
+    return replaceReadmeSponsorSection(path, input)
+      .replace(/  <a href="https:\/\/x\.com\/moboudra">[\s\S]*?  <\/a>\n/g, "")
+      .replace(/  <a href="https:\/\/www\.reddit\.com\/r\/ClisbotAI\/">[\s\S]*?  <\/a>\n/g, "")
+      .replace(
+        "> 如果问题很紧急或阻塞了你，[Discord](https://discord.gg/awGmcmFXC) 是最快联系到我的地方。",
+        "> 有问题或想参与社区讨论，请加入 [Clisbot Discord](https://discord.gg/awGmcmFXC)。",
+      )
+      .replace(
+        "> 急ぎの問題や作業がブロックされている場合は、[Discord](https://discord.gg/awGmcmFXC) から連絡するのが一番早いです。",
+        "> 質問やコミュニティでの交流は、[Clisbot Discord](https://discord.gg/awGmcmFXC) に参加してください。",
+      );
+  }
+  if (path === ".github/ISSUE_TEMPLATE/bug-report.yml") {
+    return input.replace(
+      "or `#product` in [Discord](https://discord.gg/awGmcmFXC)",
+      "or [Clisbot Discord](https://discord.gg/awGmcmFXC)",
+    );
+  }
+  if (path === "packages/website/src/components/site-footer.tsx") {
+    return input.replace(
+      /\s*<a\n\s*href="https:\/\/www\.reddit\.com\/r\/ClisbotAI\/"[\s\S]*?<\/a>/,
+      "",
+    );
+  }
   if (path === "packages/desktop/electron-builder.yml") {
     return input.replace(
       "  owner: getpaseo\n  repo: clisbot",
@@ -256,6 +327,21 @@ function removeCollapsedAliases(path, input) {
     );
   }
   return input;
+}
+
+function replaceReadmeSponsorSection(path, input) {
+  const [heading, nextHeading, message] = readmeSponsorSections.get(path);
+  const start = `## ${heading}\n`;
+  const end = `\n## ${nextHeading}`;
+  const first = input.indexOf(start);
+  if (first < 0) return input;
+  const last = input.indexOf(end, first + start.length);
+  if (last < 0) throw new Error(`Cannot find the end of the sponsor section in ${path}`);
+  return (
+    input.slice(0, first) +
+    `${start}\n${message}\n\n<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->\n` +
+    input.slice(last)
+  );
 }
 
 function countBrandTokens(input) {

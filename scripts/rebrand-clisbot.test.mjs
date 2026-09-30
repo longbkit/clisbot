@@ -124,6 +124,71 @@ test("removes Paseo EAS ownership without Clisbot Expo details", () => {
   assert.match(configured, /owner: "company"/);
 });
 
+test("replaces upstream sponsorship with placeholders and uses the Clisbot community", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-community-"));
+  git(root, "init", "-q");
+  put(root, ".github/FUNDING.yml", "github: [boudra]\n");
+  put(
+    root,
+    "README.md",
+    '<a href="https://discord.gg/jz8T2uahpH">Discord</a>\n\n## Sponsors\nSupport [Mo](https://github.com/sponsors/boudra).\n\n## Related projects\n',
+  );
+  put(
+    root,
+    "packages/app/src/components/community-links.tsx",
+    'openExternalUrl("https://github.com/sponsors/boudra");\nopenExternalUrl("https://discord.gg/jz8T2uahpH");\n',
+  );
+  put(
+    root,
+    "packages/website/src/components/sponsorship.tsx",
+    'const payment = "https://buy.stripe.com/upstream";\nconst github = "https://github.com/sponsors/boudra";\n',
+  );
+  put(root, "packages/website/src/data/sponsors.ts", 'export const SPOT_PRICE = "$500";\n');
+  put(
+    root,
+    "packages/website/src/routes/sponsor.tsx",
+    'export const description = "Sponsor via Mohamed Boudra";\n',
+  );
+  git(root, "add", "-A");
+
+  const args = [script, "--root", root, "--site-host", "clisbot.example"];
+  execFileSync("node", [...args, "--apply"]);
+  git(root, "add", "-A");
+  const result = JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" }));
+  assert.equal(result.changedFiles, 0);
+
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  assert.match(readme, /discord\.gg\/awGmcmFXC/);
+  assert.match(readme, /Sponsorship options for Clisbot are being set up/);
+  assert.doesNotMatch(readme, /boudra/);
+  assert.equal(
+    readFileSync(join(root, ".github/FUNDING.yml"), "utf8"),
+    "# Add Clisbot funding options after sponsorship setup is ready.\n",
+  );
+
+  const appLinks = readFileSync(
+    join(root, "packages/app/src/components/community-links.tsx"),
+    "utf8",
+  );
+  assert.match(appLinks, /https:\/\/clisbot\.example\/sponsor/);
+  assert.match(appLinks, /discord\.gg\/awGmcmFXC/);
+
+  const sponsorPage = readFileSync(
+    join(root, "packages/website/src/components/sponsorship.tsx"),
+    "utf8",
+  );
+  assert.match(sponsorPage, /Sponsorship options for Clisbot are being set up/);
+  assert.doesNotMatch(sponsorPage, /stripe|boudra/i);
+  assert.match(
+    readFileSync(join(root, "packages/website/src/data/sponsors.ts"), "utf8"),
+    /HOMEPAGE_SPONSORS: ReadonlyArray<HomepageSponsor> = \[\]/,
+  );
+  assert.match(
+    readFileSync(join(root, "packages/website/src/routes/sponsor.tsx"), "utf8"),
+    /SponsorClisbotSection/,
+  );
+});
+
 function git(root, ...args) {
   execFileSync("git", args, { cwd: root });
 }

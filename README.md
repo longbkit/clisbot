@@ -18,14 +18,8 @@
   <a href="https://github.com/longbkit/clisbot/releases">
     <img src="https://img.shields.io/github/v/release/longbkit/clisbot?style=flat&logo=github" alt="GitHub release">
   </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
+  <a href="https://discord.gg/awGmcmFXC">
     <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
-  </a>
-  <a href="https://www.reddit.com/r/ClisbotAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
   </a>
 </p>
 
@@ -195,7 +189,7 @@ npm run typecheck
 
 ## Sponsors
 
-Clisbot is built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Clisbot](https://clisbot.com/sponsor#spot) monthly and have their logo shown here and on the clisbot.com homepage.
+Sponsorship options for Clisbot are being set up. Check back here when they are ready.
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 

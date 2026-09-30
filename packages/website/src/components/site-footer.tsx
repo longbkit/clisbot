@@ -112,20 +112,12 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
           <p className="text-white/60 font-medium">Community</p>
           <div className="space-y-2">
             <a
-              href="https://discord.gg/jz8T2uahpH"
+              href="https://discord.gg/awGmcmFXC"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
               Discord
-            </a>
-            <a
-              href="https://www.reddit.com/r/ClisbotAI/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Reddit
             </a>
             <a
               href="https://github.com/longbkit/clisbot"

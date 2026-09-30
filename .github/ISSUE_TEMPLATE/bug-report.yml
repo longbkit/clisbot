@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Issues are only for bugs. Product discussions go in [GitHub Discussions](https://github.com/longbkit/clisbot/discussions) or `#product` in [Discord](https://discord.gg/jz8T2uahpH) — feature requests opened as issues get closed automatically.
+        Issues are only for bugs. Product discussions go in [GitHub Discussions](https://github.com/longbkit/clisbot/discussions) or [Clisbot Discord](https://discord.gg/awGmcmFXC) — feature requests opened as issues get closed automatically.
 
         Before opening, please:
 

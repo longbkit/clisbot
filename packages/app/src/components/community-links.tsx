@@ -16,11 +16,11 @@ export function CommunityLinks() {
   }, []);
 
   const handleOpenSponsor = useCallback(() => {
-    void openExternalUrl("https://github.com/sponsors/boudra");
+    void openExternalUrl("https://clisbot.com/sponsor");
   }, []);
 
   const handleOpenDiscord = useCallback(() => {
-    void openExternalUrl("https://discord.gg/jz8T2uahpH");
+    void openExternalUrl("https://discord.gg/awGmcmFXC");
   }, []);
 
   return (

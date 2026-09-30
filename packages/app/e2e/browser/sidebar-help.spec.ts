@@ -4,7 +4,7 @@ import { openSettingsSection } from "../support/helpers/settings";
 import { openWhatsNew, release, serveChangelog } from "../support/helpers/changelog";
 
 const DISCORD_DESTINATION =
-  /^https:\/\/(?:discord\.gg\/jz8T2uahpH|discord\.com\/invite\/jz8T2uahpH)(?:[/?#]|$)/;
+  /^https:\/\/(?:discord\.gg\/awGmcmFXC|discord\.com\/invite\/awGmcmFXC)(?:[/?#]|$)/;
 const GITHUB_ISSUE_DESTINATION =
   /^https:\/\/github\.com\/(?:getpaseo\/clisbot\/issues\/new(?:\/choose)?(?:[/?#]|$)|login\?return_to=https%3A%2F%2Fgithub\.com%2Fgetpaseo%2Fclisbot%2Fissues%2Fnew$)/;
 const CHANGELOG_DESTINATION = /^https:\/\/clisbot\.com\/changelog(?:[/?#]|$)/;

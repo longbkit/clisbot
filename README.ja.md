@@ -18,14 +18,8 @@
   <a href="https://github.com/longbkit/clisbot/releases">
     <img src="https://img.shields.io/github/v/release/longbkit/clisbot?style=flat&logo=github" alt="GitHub release">
   </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
+  <a href="https://discord.gg/awGmcmFXC">
     <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
-  </a>
-  <a href="https://www.reddit.com/r/ClisbotAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
   </a>
 </p>
 
@@ -41,7 +35,7 @@
 
 > [!NOTE]
 > 私はひとりでメンテナンスしているため、GitHub Issues を毎日確認できるとは限りません。
-> 急ぎの問題や作業がブロックされている場合は、[Discord](https://discord.gg/jz8T2uahpH) から連絡するのが一番早いです。
+> 質問やコミュニティでの交流は、[Clisbot Discord](https://discord.gg/awGmcmFXC) に参加してください。
 
 ---
 
@@ -153,7 +147,7 @@ npm run typecheck
 
 ## スポンサー
 
-Clisbot は一人で開発しており、使ってくれる人たちの支援で成り立っています。[GitHub Sponsors](https://github.com/sponsors/boudra) で支援できます。企業として毎月[スポンサー](https://clisbot.com/sponsor#spot)になっていただくと、ロゴをここと clisbot.com のホームページに掲載します。
+Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
