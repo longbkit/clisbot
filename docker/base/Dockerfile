@@ -113,6 +113,7 @@ RUN set -eux; \
 
 COPY docker/base/rootfs/ /
 RUN chmod +x /usr/local/bin/clisbot-docker-entrypoint
+RUN node /usr/local/lib/clisbot-hub-smoke.mjs
 
 WORKDIR /workspace
 

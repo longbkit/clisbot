@@ -13,6 +13,17 @@ export default defineConfig(({ command, isPreview }) => {
   return {
     build: { outDir: ".output" },
     envDir: false,
+    // Keep workspace runtime dependencies at their installed package boundary.
+    // Inlining relay code leaves its externals (e.g. tweetnacl) resolving from
+    // Hub, where npm's production install need not hoist them.
+    ssr: {
+      external: [
+        "@clisbot/relay",
+        "@clisbot/protocol",
+        "@clisbot/channels-core",
+        "@clisbot/channels-shared",
+      ],
+    },
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
       dedupe: ["react", "react-dom"],

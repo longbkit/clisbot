@@ -15,7 +15,9 @@
     "bin",
     "dist",
     ".output",
-    "drizzle"
+    "drizzle",
+    "channel-pins.json",
+    "THIRD_PARTY_NOTICES"
   ],
   "type": "module",
   "publishConfig": {

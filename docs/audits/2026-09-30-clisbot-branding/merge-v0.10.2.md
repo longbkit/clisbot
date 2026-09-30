@@ -114,6 +114,29 @@ After this merge, a newer raw upstream release descended from v0.10.2 will share
 
 ## Open gates before main
 
+### Packaged channel runtime follow-up
+
+The full Docker acceptance test exposed `Runtime unavailable`: Hub SSR had
+inlined relay code while leaving `tweetnacl` external, so npm's nested production
+layout could not resolve it from Hub. Source tests and HTTP health missed this.
+Keeping the four Hub workspace dependencies external fixes the resolution owner.
+The package also omitted `channel-pins.json`; Hub now packs it and
+`THIRD_PARTY_NOTICES`. Loading the installed verticals then exposed undeclared
+imports: Slack needs `zod` and `typebox`, core needs `zod`, and Telegram needs
+`typebox` and `undici`. Their manifests and lockfile now declare those dependencies.
+
+The image build now runs `clisbot-hub-smoke.mjs` against the installed SSR bundle
+and a temporary database: claim a disposable account, assert the authenticated
+channel-status API reports `runtimeAvailable: true`, and load all seven packaged
+channel entries/plugins without starting monitors or sending messages. The old
+image fails the runtime assertion; the corrected image passes all seven loads.
+The disabled-channel case returns the expected 404. On the updated test deployment,
+the existing Slack account logs `channel daemon connected` and `channel plane
+started`; account/Host data and volumes were preserved. This verifies startup,
+not a real-agent Slack conversation round trip.
+
+### Remaining acceptance
+
 - **Existing Hub failure cleanup:** `packages/server/src/server/hub/daemon-executions.test.ts`, “failed Hub create cleans durable state when provider close rejects”, leaves a live owned agent; the suite also reports three `SessionDeletedError` rejections from asynchronous worktree-bootstrap writes racing permanent deletion. Both the failed assertion and three rejections were reproduced from an archive of **premerge `b5fa42353`**, using the same installed dependencies. This needs a focused ownership/cleanup fix before calling that failure path verified. The merge did not introduce it.
 - **Native acceptance:** the prior sidebar startup fix and reusable `tailnet-test-apk` profile are preserved. Native device/APK/iOS/Electron acceptance and real-provider/relay end-to-end checks are separate from the browser and simulated-provider evidence here.
 - **Publication:** temporary upstream service endpoints remain by prior agreement. Apply the [publication review gates](publication-review.md#remaining-publication-decisions) before launch. This release also adds an Orca comparison page and a Philosophy section; inherited app-store availability, funding/independence, account/telemetry and plugin-directory claims still require Clisbot-specific editorial verification.

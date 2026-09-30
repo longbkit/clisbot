@@ -296,6 +296,17 @@ module in the browser bundle. Override it with `--build-arg
 BUILD_NODE_OPTIONS=--max-old-space-size=8192` if needed. This setting is not
 carried into the runtime image.
 
+The image build also boots the installed Hub server bundle with channels enabled
+against a disposable database and checks the authenticated channel-status API.
+It also reads the packaged channel pins and loads every in-repo channel's entry
+and plugin. This catches missing dependencies and assets that `/health` alone
+does not detect. Hub SSR keeps its workspace dependencies external so their
+dependencies resolve from their installed packages. Each channel declares the
+libraries it imports; source-workspace hoisting is not a production dependency.
+The smoke check starts no channel monitors, sends no messages, and removes its
+temporary data. Rerun it independently with
+`docker run --rm --entrypoint node <image> /usr/local/lib/clisbot-hub-smoke.mjs`.
+
 To assert the source tree version while building:
 
 ```bash

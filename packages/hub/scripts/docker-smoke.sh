@@ -17,6 +17,7 @@ repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 if [ -z "${CLISBOT_DOCKER_IMAGE:-}" ]; then
   docker build --file "$repo_root/docker/base/Dockerfile" --tag "$image" "$repo_root"
 fi
+docker run --rm --entrypoint node "$image" /usr/local/lib/clisbot-hub-smoke.mjs
 docker network create "$network" >/dev/null
 docker run --detach --rm --name "$database" --network "$network" \
   --env POSTGRES_PASSWORD=postgres \
