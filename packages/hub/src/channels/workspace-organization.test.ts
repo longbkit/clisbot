@@ -47,6 +47,32 @@ function fakeDaemon(options: { agents?: AgentSnapshot[]; multiplicity?: boolean 
 }
 
 describe("workspace organization", () => {
+  it("honors an explicitly selected workspace before organization rules", async () => {
+    const f = fakeDaemon({ agents: [agent("source", "workspace-source")] });
+    expect(
+      await resolveSessionWorkspaceId(f.daemon, {
+        organize: false,
+        workspaceId: "workspace-selected",
+        sourceAgentId: "source",
+        cwd: "/repo",
+      }),
+    ).toBe("workspace-selected");
+    expect(f.listAgents).not.toHaveBeenCalled();
+  });
+
+  it("leaves a selected worktree request for create_agent", async () => {
+    const f = fakeDaemon();
+    expect(
+      await resolveSessionWorkspaceId(f.daemon, {
+        organize: true,
+        cwd: "/repo",
+        worktree: { mode: "branch-off", newBranch: "feature/login" },
+        firstAgentContext: { prompt: "ship the login fix" },
+      }),
+    ).toBeUndefined();
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+  });
+
   it("sends no workspace and touches the daemon when organization is off (A6)", async () => {
     const f = fakeDaemon({ agents: [agent("source", "workspace-source")] });
     const resolved = await resolveSessionWorkspaceId(f.daemon, {
