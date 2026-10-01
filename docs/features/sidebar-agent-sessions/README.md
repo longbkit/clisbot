@@ -1,6 +1,6 @@
 # Agent sessions in the sidebar
 
-**Shipped 2026-09-15, on by default since 2026-09-16. Not yet checked in a running app — see [What is not done yet](#what-is-not-done-yet).**
+**Shipped 2026-09-15, on by default since 2026-09-16. Workspace expansion checked in a running web app on 2026-10-01.**
 
 Lists a workspace's sessions under its sidebar row, so opening one takes a single press. Without it, you open the workspace first and then pick a tab, and with many sessions the tab bar truncates their titles.
 
@@ -29,8 +29,8 @@ Everything lives on one page, **Show → Agent sessions** — the first row of t
 | Full titles          | on / off                                                                               | on                                           |
 | Details (last group) | Model, Created user, Updated user, Channels, Created time, Updated time, Last activity | Model, Created user, Channels, Last activity |
 
-- **Auto collapse** opens the selected workspace and closes it when you select another. Outside a workspace route (Settings, for example) nothing is selected, so every workspace is closed.
-- **Keep as is** puts a chevron under the workspace's status mark, in the same column. It is hidden when the workspace has no session. Which workspaces are open is remembered per device (`sidebar-workspace-sessions-expansion`), not synced.
+- **Auto collapse** opens the selected workspace and closes it when you select another. Press the selected workspace again to hide its sessions; another press shows them again, without changing the focused tab. Selecting a different workspace and returning opens the sessions again. Outside a workspace route (Settings, for example) nothing is selected, so every workspace is closed.
+- **Keep as is** lets you toggle sessions by pressing the workspace row or the chevron under its status mark. Pressing a different workspace row also selects it; pressing the current row keeps its focused tab. Other workspaces keep their open or closed state. The chevron is hidden when the workspace has no session. Which workspaces are open is remembered per device (`sidebar-workspace-sessions-expansion`), not synced.
 - **Active sessions only** hides sessions in the `done` status bucket — no status mark on their icon. Running, needs-input, failed and unread (`attention`) sessions stay. The chevron ignores the filter, so it does not flicker as sessions go idle and busy.
 - **Full titles** wraps a long title over as many lines as it needs; the status mark and Last activity stay on its first line. Off cuts the title to one line, and hovering a cut title shows it in full in a tooltip. The tooltip only opens when the title is actually cut, and only on web, where the title's overflow can be measured and hover exists.
 - Changing expansion, Active sessions only, Full titles, or details while sessions are hidden is kept for when you turn them back on.
@@ -77,7 +77,6 @@ What those items say is fixed by the Hub when it records each channel message, n
 
 | Gap                                 | Notes                                                                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Checked in a running app            | Unit-tested and typechecked only. The dev daemon requires Hub access, so the web UI was not driven.                   |
 | Translations                        | Menu labels are English strings, like the other Clisbot display items. The untitled fallback uses the tab's i18n key. |
 | A cap per workspace                 | Every session is listed. Use Active sessions only to keep long lists short.                                           |
 | Tab order                           | Lines follow creation order, not a tab order you rearranged by hand.                                                  |

@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { useWorkspaceSessionsExpansionStore } from "./expansion-store";
+import { useWorkspaceSessionsAutoCollapse } from "./auto-collapse";
 import type {
   SidebarWorkspaceSessionDetail,
   SidebarWorkspaceSessionExpansion,
@@ -95,16 +96,42 @@ export function useWorkspaceSessionsExpanded(input: {
   selected: boolean;
 }): boolean {
   const { visible, expansion } = input.preference;
+  const { collapsedWorkspaceKey } = useWorkspaceSessionsAutoCollapse();
   const manuallyExpanded = useWorkspaceSessionsExpansionStore(
     (state) => state.expandedWorkspaceKeys[input.workspaceKey] === true,
   );
   if (!visible) return false;
   if (expansion === "alwaysExpanded") return true;
-  if (expansion === "autoCollapse") return input.selected;
+  if (expansion === "autoCollapse") {
+    return input.selected && collapsedWorkspaceKey !== input.workspaceKey;
+  }
   return manuallyExpanded;
 }
 
-/** The chevron's state; only mounted under `manual`, where the user decides openness. */
+/** Row presses share the manual chevron's state; Auto collapse only toggles the current row. */
+export function useWorkspaceSessionsRowPress(input: {
+  workspaceKey: string;
+  selected: boolean;
+  onPress: () => void;
+}): () => void {
+  const { visible, expansion } = useSidebarWorkspaceSessions();
+  const { toggle } = useWorkspaceSessionsAutoCollapse();
+  const { toggle: toggleManual } = useWorkspaceSessionsManualToggle(input.workspaceKey);
+  const { selected, onPress } = input;
+  return useCallback(() => {
+    if (visible && expansion === "manual") {
+      toggleManual();
+      if (selected) return;
+    }
+    if (visible && expansion === "autoCollapse" && selected) {
+      toggle();
+      return;
+    }
+    onPress();
+  }, [visible, expansion, selected, toggleManual, toggle, onPress]);
+}
+
+/** State and action shared by the manual chevron and workspace row. */
 export function useWorkspaceSessionsManualToggle(workspaceKey: string): {
   expanded: boolean;
   toggle: () => void;

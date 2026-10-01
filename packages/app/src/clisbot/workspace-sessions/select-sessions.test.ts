@@ -114,7 +114,7 @@ describe("selectWorkspaceSessions", () => {
 });
 
 describe("SidebarWorkspaceSessionsSchema", () => {
-  it("defaults to off when absent or malformed", () => {
+  it("defaults to visible when absent or malformed", () => {
     expect(SidebarWorkspaceSessionsSchema.parse(undefined)).toEqual(
       DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
     );
@@ -140,6 +140,23 @@ describe("SidebarWorkspaceSessionsSchema", () => {
       details: { ...DEFAULT_SIDEBAR_WORKSPACE_SESSIONS.details, model: true },
     });
   });
+
+  it.each(["autoCollapse", "manual", "alwaysExpanded"])(
+    "preserves the %s expansion setting when sessions are hidden",
+    (expansion) => {
+      expect(
+        SidebarWorkspaceSessionsSchema.parse({
+          ...DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
+          visible: false,
+          expansion,
+        }),
+      ).toEqual({
+        ...DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
+        visible: false,
+        expansion,
+      });
+    },
+  );
 });
 
 describe("toggleExpandedWorkspaceKey", () => {

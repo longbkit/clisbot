@@ -16,8 +16,9 @@ export const SIDEBAR_WORKSPACE_SESSION_EXPANSIONS = [
 ] as const;
 
 /**
- * - `autoCollapse`: only the selected workspace is open; selecting another closes it.
- * - `manual`: each workspace keeps whatever its own chevron last said.
+ * - `autoCollapse`: selecting a workspace opens it and closes the previous one; pressing the
+ *   selected workspace again toggles its sessions.
+ * - `manual`: the workspace row or its chevron toggles its sessions independently of other rows.
  * - `alwaysExpanded`: every workspace is open and there is no chevron.
  */
 export type SidebarWorkspaceSessionExpansion =

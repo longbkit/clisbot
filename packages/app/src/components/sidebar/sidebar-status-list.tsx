@@ -20,7 +20,10 @@ import {
 } from "react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import type { GestureType } from "react-native-gesture-handler";
-import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
+import {
+  useWorkspaceRowSelectionFill,
+  useWorkspaceSessionsRowPress,
+} from "@/clisbot/workspace-sessions/model";
 import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
@@ -541,6 +544,11 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
     onWorkspacePress?.();
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
   }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
+  const handleRowPress = useWorkspaceSessionsRowPress({
+    workspaceKey: workspace.workspaceKey,
+    selected,
+    onPress: handlePress,
+  });
 
   return (
     <>
@@ -556,7 +564,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
         onToggleWorkspacePin={onToggleWorkspacePin}
         reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
         inStatusGroup={inStatusGroup}
-        onPress={handlePress}
+        onPress={handleRowPress}
         drag={drag}
         isDragging={isDragging}
         dragHandleProps={dragHandleProps}

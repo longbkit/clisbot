@@ -8,6 +8,8 @@ import {
   expectMobileAgentSidebarVisible,
   openMobileAgentSidebar,
   pinWorkspaceFromSidebar,
+  closeSidebarDisplayPreferences,
+  selectSidebarStatusGrouping,
 } from "../support/helpers/sidebar";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { expectWorkspaceHeader } from "../support/helpers/workspace-ui";
@@ -19,6 +21,93 @@ import { openFilesPanel } from "../support/helpers/workspace-tabs";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
 const GITHUB_REMOTE_URL = "https://github.com/test-owner/test-repo.git";
+
+test.use({ e2eDaemonEnvironment: { CLISBOT_BOTS_ENABLED: "0" } });
+
+test.describe("Keep as is session expansion", () => {
+  for (const grouping of ["project", "status"] as const) {
+    test(`toggles workspace rows and chevrons independently in ${grouping} grouping`, async ({
+      page,
+    }) => {
+      const a = await seedMockAgentWorkspace({ repoPrefix: "keep-as-is-a-", title: "Session A" });
+      const b = await seedMockAgentWorkspace({ repoPrefix: "keep-as-is-b-", title: "Session B" });
+      const key = (id: string) => `${getServerId()}:${id}`;
+      const row = (id: string) => page.getByTestId(`sidebar-workspace-row-${key(id)}`);
+      const sessions = (id: string) => page.getByTestId(`sidebar-workspace-sessions-${key(id)}`);
+      const chevron = (id: string) =>
+        page.getByTestId(`sidebar-workspace-sessions-toggle-${key(id)}`);
+      const openSessionsMenu = async () => {
+        await page.getByTestId("sidebar-display-preferences-menu").click();
+        await page.getByTestId("sidebar-display-show").click();
+        await page.getByTestId("sidebar-display-workspace-sessions").click();
+      };
+
+      try {
+        await page.setViewportSize({ width: 1440, height: 1000 });
+        await gotoAppShell(page);
+        await expect(row(a.workspaceId)).toBeVisible({ timeout: 30_000 });
+        if (grouping === "status") await selectSidebarStatusGrouping(page);
+        await openSessionsMenu();
+        await page.getByTestId("sidebar-workspace-sessions-expansion-manual").click();
+        await closeSidebarDisplayPreferences(page);
+
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await expect(sessions(b.workspaceId)).toHaveCount(0);
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`/workspace/${a.workspaceId}$`));
+        const currentUrl = page.url();
+
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await expect(chevron(a.workspaceId)).toHaveAttribute("aria-expanded", "false");
+        expect(page.url()).toBe(currentUrl);
+        await chevron(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        expect(page.url()).toBe(currentUrl);
+
+        await row(b.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        await expect(sessions(b.workspaceId)).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`/workspace/${b.workspaceId}$`));
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await expect(sessions(b.workspaceId)).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`/workspace/${a.workspaceId}$`));
+
+        await page.reload();
+        await expect(row(a.workspaceId)).toBeVisible({ timeout: 30_000 });
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await expect(sessions(b.workspaceId)).toBeVisible();
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        await expect(chevron(a.workspaceId)).toHaveAttribute("aria-expanded", "true");
+
+        await a.client.setWorkspacePinned(a.workspaceId, true);
+        await expect(page.getByTestId("sidebar-pinned-section")).toBeVisible();
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await chevron(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        await expect(sessions(b.workspaceId)).toBeVisible();
+
+        await openSessionsMenu();
+        await page.getByTestId("sidebar-workspace-sessions-visible").click();
+        await closeSidebarDisplayPreferences(page);
+        await row(a.workspaceId).click();
+        await expect(sessions(a.workspaceId)).toHaveCount(0);
+        await openSessionsMenu();
+        await page.getByTestId("sidebar-workspace-sessions-visible").click();
+        await closeSidebarDisplayPreferences(page);
+        await expect(sessions(a.workspaceId)).toBeVisible();
+        await expect(sessions(b.workspaceId)).toBeVisible();
+      } finally {
+        await a.cleanup();
+        await b.cleanup();
+      }
+    });
+  }
+});
 
 function getWorkspaceRowTestId(workspaceId: string): string {
   return `sidebar-workspace-row-${getServerId()}:${workspaceId}`;

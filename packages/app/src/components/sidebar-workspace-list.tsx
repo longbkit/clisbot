@@ -3,7 +3,11 @@ import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
+import {
+  useWorkspaceRowSelectionFill,
+  useWorkspaceSessionsRowPress,
+} from "@/clisbot/workspace-sessions/model";
+import { WorkspaceSessionsAutoCollapseProvider } from "@/clisbot/workspace-sessions/auto-collapse";
 import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
 import {
   View,
@@ -1458,6 +1462,11 @@ function WorkspaceRowItem({
     workspaceId: workspace.workspaceId,
     enabled: selectionEnabled,
   });
+  const handleRowPress = useWorkspaceSessionsRowPress({
+    workspaceKey: workspace.workspaceKey,
+    selected,
+    onPress: handlePress,
+  });
 
   return (
     <>
@@ -1474,7 +1483,7 @@ function WorkspaceRowItem({
         reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
         isCreating={isCreating}
         selected={selected}
-        onPress={handlePress}
+        onPress={handleRowPress}
         drag={drag ?? noop}
         isDragging={isDragging}
         dragHandleProps={dragHandleProps}
@@ -2077,7 +2086,7 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return content;
+  return <WorkspaceSessionsAutoCollapseProvider>{content}</WorkspaceSessionsAutoCollapseProvider>;
 }
 
 /**
