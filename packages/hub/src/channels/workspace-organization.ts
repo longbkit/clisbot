@@ -46,7 +46,7 @@
 //    thread. That is the loud failure, not a silent placement elsewhere.
 
 import type { DaemonConnection } from "./daemon/client.js";
-import type { FirstAgentContext } from "./daemon/types.js";
+import type { CreateAgentConfig, FirstAgentContext } from "./daemon/types.js";
 import type { InboundMessage, PlaneLogger } from "./plane/types.js";
 
 export interface SessionWorkspaceInput {
@@ -58,6 +58,10 @@ export interface SessionWorkspaceInput {
   /** The route environment's directory, backing a newly created workspace. */
   cwd: string;
   projectId?: string | undefined;
+  /** Explicit selection from `/worktree resume` or `/worktree new`. */
+  workspaceId?: string | undefined;
+  /** Worktree creation belongs to create_agent; do not pre-create a directory. */
+  worktree?: CreateAgentConfig["worktree"];
   /** The first request that will run in a new workspace; the daemon names it from this. */
   firstAgentContext?: FirstAgentContext | undefined;
   /** The inbound this creation is attributed to (the session-operation ticket). */
@@ -75,6 +79,8 @@ export async function resolveSessionWorkspaceId(
   daemon: DaemonConnection,
   input: SessionWorkspaceInput,
 ): Promise<string | undefined> {
+  if (input.workspaceId !== undefined) return input.workspaceId;
+  if (input.worktree !== undefined) return undefined;
   if (input.organize === false) return undefined;
   if (input.sourceAgentId !== undefined) {
     return await inheritSourceWorkspaceId(daemon, input.sourceAgentId, input.logger);

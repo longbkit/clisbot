@@ -2057,6 +2057,9 @@ export const channelConversationSelections = pgTable(
     selectedThinkingOption: text("selected_thinking_option"),
     selectedMode: text("selected_mode"),
     selectedFeatureValues: jsonb("selected_feature_values").$type<Record<string, unknown>>(),
+    selectedProjectId: text("selected_project_id"),
+    selectedProjectRoot: text("selected_project_root"),
+    selectedWorkspaceId: text("selected_workspace_id"),
     /** Who switched, for the activity trail. */
     selectedBy: text("selected_by").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

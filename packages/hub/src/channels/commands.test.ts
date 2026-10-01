@@ -162,6 +162,21 @@ describe("parseChannelIdentityLinkCode", () => {
 });
 
 describe("parseChannelTextCommand", () => {
+  it("parses Project and worktree placement commands", () => {
+    expect(parseChannelTextCommand("/project list")).toEqual({ name: "project", value: "list" });
+    expect(parseChannelTextCommand("/project repo-a")).toEqual({
+      name: "project",
+      value: "repo-a",
+    });
+    expect(parseChannelTextCommand("/worktree new feature/login main")).toEqual({
+      name: "worktree",
+      value: "new feature/login main",
+    });
+    expect(parseChannelTextCommand("/worktree resume wks_123")).toEqual({
+      name: "worktree",
+      value: "resume wks_123",
+    });
+  });
   it("parses the shared verbs, with or without a leading slash", () => {
     assert.deepEqual(parseChannelTextCommand("/status"), { name: "status" });
     assert.deepEqual(parseChannelTextCommand("status"), { name: "status" });

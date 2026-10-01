@@ -18,6 +18,9 @@ export interface ConfigurationSelection {
   selectedThinkingOption: string | null;
   selectedMode: string | null;
   selectedFeatureValues: Record<string, unknown> | null;
+  selectedProjectId?: string | null;
+  selectedProjectRoot?: string | null;
+  selectedWorkspaceId?: string | null;
 }
 export interface ConfigurationCommandInput {
   command: { name: "agent" | "provider" | "model" | "effort" | "permission"; value?: string };
@@ -44,8 +47,22 @@ export function resolveConversationConfiguration(
   base: CreateAgentConfig,
   selection: Partial<ConfigurationSelection> | null | undefined,
 ): CreateAgentConfig {
+  const placement = selection?.selectedProjectId
+    ? {
+        projectId: selection.selectedProjectId,
+        ...(selection.selectedProjectRoot == null ? {} : { cwd: selection.selectedProjectRoot }),
+        ...(selection.selectedWorkspaceId == null
+          ? {}
+          : { workspaceId: selection.selectedWorkspaceId }),
+        // A selected workspace is already a concrete placement. Do not let a
+        // route-level worktree target cut a second worktree underneath it.
+        worktree: undefined,
+      }
+    : {};
   if (selection?.selectedProvider == null)
-    return selection?.selectedModel == null ? base : { ...base, model: selection.selectedModel };
+    return selection?.selectedModel == null
+      ? { ...base, ...placement }
+      : { ...base, model: selection.selectedModel, ...placement };
   const {
     model: _model,
     thinkingOptionId: _thinking,
@@ -56,6 +73,7 @@ export function resolveConversationConfiguration(
   } = base;
   return {
     ...common,
+    ...placement,
     provider: selection.selectedProvider,
     ...(selection.selectedProvider === base.provider && providerOptions !== undefined
       ? { providerOptions }

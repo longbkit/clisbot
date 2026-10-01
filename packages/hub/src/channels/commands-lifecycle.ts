@@ -36,7 +36,9 @@ export interface LifecycleCommandDependencies {
     context: LifecycleCommandContext,
     capability?: ChannelReplyAgentCapability,
   ): Promise<CreateAgentConfig>;
-  issueCapability?(context: LifecycleCommandContext): ChannelReplyAgentCapability;
+  issueCapability?(
+    context: LifecycleCommandContext,
+  ): ChannelReplyAgentCapability | Promise<ChannelReplyAgentCapability>;
   bindCapability?(token: string, agentId: string): boolean;
   revokeCapability?(token: string): void;
   /** Revoke what a create that was given up was launched with. */
@@ -207,7 +209,7 @@ export class ChannelLifecycleCommands {
     const attachments = await this.forkAttachments(name, context);
     // One-offs have their own relay association and never inherit a bound Agent's tool capability.
     const outputContext = oneOff ? this.relayContext(context) : context;
-    const capability = this.capabilityFor(outputContext);
+    const capability = await this.capabilityFor(outputContext);
     const created = await this.createConfiguredAgent(
       name,
       outputContext,
@@ -252,7 +254,9 @@ export class ChannelLifecycleCommands {
       : `Forked into session ${created.agentId}.`;
   }
 
-  private capabilityFor(context: LifecycleCommandContext): ChannelReplyAgentCapability | undefined {
+  private async capabilityFor(
+    context: LifecycleCommandContext,
+  ): Promise<ChannelReplyAgentCapability | undefined> {
     if (!outboundAttachesTool(context.route.defaults.outbound.path)) return undefined;
     if (!this.deps.issueCapability || !this.deps.bindCapability || !this.deps.revokeCapability) {
       throw new Error("Channel reply capability is unavailable.");
@@ -301,6 +305,8 @@ export class ChannelLifecycleCommands {
       ...(continues ? { sourceAgentId: context.agentId } : {}),
       cwd: config.cwd,
       ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
+      ...(config.workspaceId === undefined ? {} : { workspaceId: config.workspaceId }),
+      ...(config.worktree === undefined ? {} : { worktree: config.worktree }),
       ...(continues || prompt === undefined ? {} : { firstAgentContext: { prompt } }),
       source: context.message,
       ...(this.deps.logger === undefined ? {} : { logger: this.deps.logger }),

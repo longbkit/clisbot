@@ -33,6 +33,7 @@ import {
 import { promoteRouteDefault, routeDefaultText } from "./commands-route-default.js";
 import type { AgentControls } from "./config/agent-controls.js";
 import { outboundAttachesTool } from "./config/enums.js";
+import { runPlacementCommand } from "./commands-placement.js";
 
 export interface CommandDispatcherDependencies {
   plane: ChannelPlaneDeps;
@@ -110,6 +111,8 @@ export class ChannelCommandDispatcher {
       if (lifecycle) return lifecycle;
       if (command.name === "routedefault" || command.name === "promoteroutedefault")
         return this.routeDefault(command, context);
+      if (command.name === "project" || command.name === "worktree")
+        return this.placement(command, context);
       if (["agent", "provider", "model", "effort", "permission"].includes(command.name)) {
         return this.configuration(
           command as Parameters<typeof runConfigurationCommand>[0]["command"],
@@ -206,12 +209,14 @@ export class ChannelCommandDispatcher {
     route: CompiledRoute;
     config: CreateAgentConfig;
   }): Promise<{ allowed: boolean; reason?: string }> {
+    const target = this.accessTargetForConfig(input.route, input.config);
     const request = commandAccessRequest(
       this.deps.plane,
       input.message,
       input.account,
       input.route,
       "agent.create",
+      target,
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) return { allowed: false, reason: "Agent configuration access is unavailable." };
@@ -244,6 +249,7 @@ export class ChannelCommandDispatcher {
 
   async authorizeResume(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<boolean> {
     const config = await this.resolveConfig(context);
+    const target = this.accessTargetForConfig(context.route, config);
     if (config.projectId !== undefined) {
       if (!(await this.deps.daemon.isAgentInProject(agent, config.projectId))) return false;
     } else if (agent.cwd !== config.cwd) return false;
@@ -253,11 +259,11 @@ export class ChannelCommandDispatcher {
       context.account,
       context.route,
       "agent.interact",
-      context.accessTarget,
+      target,
     );
     if (!(await this.deps.plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed)
       return false;
-    if (!(await this.mayUseLiveMode(agent, context))) return false;
+    if (!(await this.mayUseLiveMode(agent, context, config))) return false;
     return (
       await this.authorizeConfiguration({
         ...context,
@@ -269,18 +275,23 @@ export class ChannelCommandDispatcher {
   private async mayUseLiveMode(
     agent: AgentSnapshot,
     context: LifecycleCommandContext,
+    config?: CreateAgentConfig,
   ): Promise<boolean> {
-    return agent.modeId !== undefined || (await this.canSuppressApprovals(context));
+    return agent.modeId !== undefined || (await this.canSuppressApprovals(context, config));
   }
 
-  private async canSuppressApprovals(context: LifecycleCommandContext): Promise<boolean> {
+  private async canSuppressApprovals(
+    context: LifecycleCommandContext,
+    config?: CreateAgentConfig,
+  ): Promise<boolean> {
+    const resolvedConfig = config ?? (await this.resolveConfig(context));
     const request = commandAccessRequest(
       this.deps.plane,
       context.message,
       context.account,
       context.route,
       "agent.interact",
-      context.accessTarget,
+      this.accessTargetForConfig(context.route, resolvedConfig),
     );
     const checks = await Promise.all(
       APPROVAL_PRIVILEGES.map((privilege) =>
@@ -318,21 +329,45 @@ export class ChannelCommandDispatcher {
     );
   }
 
+  private async placement(
+    command: Extract<ChannelTextCommand, { name: "project" | "worktree" }>,
+    context: LifecycleCommandContext,
+  ): Promise<CommandResult> {
+    const response = await runPlacementCommand({
+      command,
+      plane: this.deps.plane,
+      daemon: this.deps.daemon,
+      store: this.deps.store.access,
+      message: context.message,
+      account: context.account,
+      route: context.route,
+      selectionKey: this.selectionKey(context),
+      routeConfig: this.routeConfig(context),
+    });
+    if (response.selection !== undefined) {
+      await this.deps.store.access.setConversationSelection(this.selectionKey(context), {
+        ...response.selection,
+        selectedBy: context.message.senderIdentity,
+      });
+    }
+    return this.reply(context, response.text);
+  }
+
   private async configurationInput(
     command: Parameters<typeof runConfigurationCommand>[0]["command"],
     context: LifecycleCommandContext,
   ): Promise<Parameters<typeof runConfigurationCommand>[0]> {
+    const config = await this.resolveConfig(context);
     const request = commandAccessRequest(
       this.deps.plane,
       context.message,
       context.account,
       context.route,
       "agent.interact",
-      context.accessTarget,
+      this.accessTargetForConfig(context.route, config),
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) throw new Error("Agent configuration access is unavailable.");
-    const config = await this.resolveConfig(context);
     const boundAgent = context.agentId
       ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
       : undefined;
@@ -342,7 +377,7 @@ export class ChannelCommandDispatcher {
       command.value &&
       !/^(list|search)(?:\s|$)/iu.test(command.value) &&
       command.name !== "permission" &&
-      !(await this.mayUseLiveMode(agent, context))
+      !(await this.mayUseLiveMode(agent, context, config))
     ) {
       throw new Error(
         "The current session mode is unavailable. Select an explicit /permission mode before changing its configuration.",
@@ -364,8 +399,18 @@ export class ChannelCommandDispatcher {
           }
         : {}),
       access,
-      canSuppressApprovals: await this.canSuppressApprovals(context),
+      canSuppressApprovals: await this.canSuppressApprovals(context, config),
       canUseFastMode: fastAccess?.allowed === true,
+    };
+  }
+
+  private accessTargetForConfig(route: CompiledRoute, config: CreateAgentConfig) {
+    if (route.target.kind !== "agent") return undefined;
+    const routeTarget = this.deps.plane.resolveAgentAccessTarget(route.target);
+    return {
+      ...routeTarget,
+      ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
+      ...(config.cwd === undefined ? {} : { projectRoot: config.cwd }),
     };
   }
 

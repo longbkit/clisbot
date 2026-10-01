@@ -18,6 +18,8 @@ import type {
   CreateAgentConfig,
   CreateAgentOptions,
   CreateWorkspaceInput,
+  WorkspaceSnapshot,
+  ProjectSnapshot,
   DaemonServerInfo,
   ProviderModel,
   ProviderMode,
@@ -104,6 +106,9 @@ export interface DaemonConnection {
     input: CreateWorkspaceInput,
     options?: { source?: InboundMessage },
   ): Promise<{ workspaceId: string }>;
+  /** Directory placement discovery; absent on legacy test/daemon facades. */
+  listWorkspaces?: () => Promise<WorkspaceSnapshot[]>;
+  listProjects?: () => Promise<ProjectSnapshot[]>;
   sendAgentMessage(
     agentId: string,
     text: string,
@@ -391,6 +396,8 @@ function createFacade(
           ),
         ),
       ),
+    listWorkspaces: () => fetchAllWorkspaces(socket),
+    listProjects: () => listField(socket, "project.list.request", {}, "projects"),
     sendAgentMessage: async (agentId, text, options) => {
       const payload = await socket.call(
         "send_agent_message_request",
@@ -511,7 +518,7 @@ function withTitle(config: CreateAgentConfig, title?: string): CreateAgentConfig
 
 function createWorkspacePayload(input: CreateWorkspaceInput) {
   return {
-    source: {
+    source: input.source ?? {
       kind: "directory",
       path: input.cwd,
       ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
@@ -541,11 +548,69 @@ function workspaceIdFromResponse(payload: unknown): { workspaceId: string } {
   return { workspaceId };
 }
 
+async function fetchAllWorkspaces(socket: ChannelDaemonSocket): Promise<WorkspaceSnapshot[]> {
+  const result: WorkspaceSnapshot[] = [];
+  const cursors = new Set<string>();
+  let cursor: string | undefined;
+  while (true) {
+    const payload = checkedPayload(
+      await socket.call("fetch_workspaces_request", {
+        page: { limit: 200, ...(cursor === undefined ? {} : { cursor }) },
+      }),
+    );
+    const entries = Array.isArray(payload["entries"]) ? payload["entries"] : [];
+    for (const value of entries) {
+      const workspace = asRecord(value);
+      if (
+        workspace === undefined ||
+        typeof workspace["id"] !== "string" ||
+        typeof workspace["projectId"] !== "string" ||
+        typeof workspace["projectDisplayName"] !== "string" ||
+        typeof workspace["projectRootPath"] !== "string" ||
+        typeof workspace["workspaceDirectory"] !== "string" ||
+        !isWorkspaceKind(workspace["workspaceKind"]) ||
+        typeof workspace["name"] !== "string"
+      )
+        continue;
+      result.push({
+        id: workspace["id"],
+        projectId: workspace["projectId"],
+        projectDisplayName: workspace["projectDisplayName"],
+        projectRootPath: workspace["projectRootPath"],
+        workspaceDirectory: workspace["workspaceDirectory"],
+        workspaceKind: workspace["workspaceKind"],
+        name: workspace["name"],
+        ...(typeof workspace["worktreeSlug"] === "string"
+          ? { worktreeSlug: workspace["worktreeSlug"] }
+          : {}),
+      });
+    }
+    const page = asRecord(payload["pageInfo"]);
+    if (page?.["hasMore"] !== true) return result;
+    const next = page["nextCursor"];
+    if (typeof next !== "string" || next === "" || cursors.has(next))
+      throw new Error("Invalid daemon workspace pagination.");
+    cursors.add(next);
+    cursor = next;
+  }
+}
+
+function isWorkspaceKind(value: unknown): value is WorkspaceSnapshot["workspaceKind"] {
+  return (
+    value === "directory" ||
+    value === "local_checkout" ||
+    value === "checkout" ||
+    value === "worktree"
+  );
+}
+
 function createAgentPayload(config: CreateAgentConfig, options?: CreateAgentOptions) {
-  const { projectId, worktree, ...sessionConfig } = config;
+  const { projectId, workspaceId, worktree, ...sessionConfig } = config;
   return {
     config: withTitle(sessionConfig, options?.title),
-    ...(options?.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
+    ...((workspaceId ?? options?.workspaceId) === undefined
+      ? {}
+      : { workspaceId: workspaceId ?? options?.workspaceId }),
     ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     ...(options?.initialPrompt === undefined ? {} : { initialPrompt: options.initialPrompt }),
     ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),

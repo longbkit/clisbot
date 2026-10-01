@@ -133,6 +133,7 @@ function issueReplyCapability(
     executionId: string;
     requester: InboundMessage;
     target: Extract<CompiledRoute["target"], { kind: "agent" }>;
+    projectRoot?: string;
   },
 ): { token: string; canSendFiles: boolean } {
   const { account, route, ref, executionId, requester } = input;
@@ -161,7 +162,9 @@ function issueReplyCapability(
     ...(requester.externalMessageId === undefined
       ? {}
       : { requesterMessageId: requester.externalMessageId }),
-    ...(accessTarget.projectRoot === undefined ? {} : { projectRoot: accessTarget.projectRoot }),
+    ...((input.projectRoot ?? accessTarget.projectRoot)
+      ? { projectRoot: input.projectRoot ?? accessTarget.projectRoot }
+      : {}),
   });
   return { token, canSendFiles: true };
 }
@@ -199,7 +202,15 @@ export async function createRouteSession(
   });
   const target = routeTarget;
   const issued = outboundAttachesTool(route.defaults.outbound.path)
-    ? issueReplyCapability(context, { account, route, ref, executionId, requester, target })
+    ? issueReplyCapability(context, {
+        account,
+        route,
+        ref,
+        executionId,
+        requester,
+        target,
+        ...(chosen?.selectedProjectRoot == null ? {} : { projectRoot: chosen.selectedProjectRoot }),
+      })
     : undefined;
   const capabilityToken = issued?.token;
   const canSendFiles = issued?.canSendFiles === true;
@@ -272,6 +283,8 @@ async function resolveSessionWorkspace(
     organize: route.defaults.workspace?.organize,
     cwd: config.cwd,
     ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
+    ...(config.workspaceId === undefined ? {} : { workspaceId: config.workspaceId }),
+    ...(config.worktree === undefined ? {} : { worktree: config.worktree }),
     firstAgentContext: { prompt: requester.text },
     source: requester,
     logger: context.logger,

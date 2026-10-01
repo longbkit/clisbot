@@ -107,6 +107,8 @@ export interface CreateAgentConfig {
   cwd: string;
   /** Stable daemon Project placement; sent beside, not inside, session config. */
   projectId?: string;
+  /** Existing workspace selected by a channel command. */
+  workspaceId?: string;
   worktree?:
     | { mode: "branch-off"; newBranch: string; base?: string }
     | { mode: "checkout-branch"; branch: string }
@@ -198,4 +200,38 @@ export interface CreateWorkspaceInput {
   cwd: string;
   projectId?: string;
   firstAgentContext?: FirstAgentContext;
+  source?:
+    | {
+        kind: "directory";
+        path: string;
+        projectId?: string;
+      }
+    | {
+        kind: "worktree";
+        cwd?: string;
+        projectId?: string;
+        action?: "branch-off" | "checkout";
+        refName?: string;
+        baseBranch?: string;
+        branchName?: string;
+        worktreeSlug?: string;
+      };
+}
+
+export interface WorkspaceSnapshot {
+  id: string;
+  projectId: string;
+  projectDisplayName: string;
+  projectRootPath: string;
+  workspaceDirectory: string;
+  workspaceKind: "directory" | "local_checkout" | "checkout" | "worktree";
+  name: string;
+  worktreeSlug?: string;
+}
+
+export interface ProjectSnapshot {
+  projectId: string;
+  projectDisplayName: string;
+  projectRootPath: string;
+  projectKind: "git" | "non_git" | "directory";
 }

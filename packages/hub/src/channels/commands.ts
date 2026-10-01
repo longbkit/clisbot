@@ -58,6 +58,24 @@ export interface ApprovalCommand {
  */
 export const CHANNEL_COMMANDS = [
   {
+    name: "project",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/project [list|search <text>|id|name|clear]",
+    description: "select a Project for the next session (Project access required)",
+  },
+  {
+    name: "worktree",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/worktree [list|new <branch> [base]|resume <workspace-id>|clear]",
+    description: "create or select a worktree for the next session (Project access required)",
+  },
+  {
     name: "status",
     aliases: ["state"],
     args: false,
@@ -272,6 +290,8 @@ const PRIVILEGE_NEEDS: Readonly<Record<string, string>> = {
   "agent.create": "Project access",
   "approval.config": "permission to manage this Connection's commands",
   "channel.manage": "permission to manage this Connection",
+  "project.use": "Project access",
+  "workspace.create": "permission to create a Workspace in this Project",
 };
 
 /**
@@ -284,6 +304,10 @@ export function commandRefusalText(commandLabel: string, privilege: string): str
 }
 
 export function channelCommandAccess(command: ChannelTextCommand) {
+  // Placement commands resolve and authorize their selected Project after
+  // reading the daemon directory. The route Project is only a fallback and
+  // must not gate selecting another authorized Project.
+  if (command.name === "project" || command.name === "worktree") return "chat" as const;
   if (command.name === "command" && /^(add|remove)(?:\s|$)/iu.test(command.value ?? "")) {
     return "approval.config" as const;
   }

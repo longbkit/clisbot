@@ -40,6 +40,18 @@ requires your own access to the Host — but anyone reading the channel sees the
 | To continue an existing session here                      | `/resume <id>`                  |
 | To stop the current turn (or cancel a running automation) | `/stop`                         |
 
+Before starting a session, choose its Project or worktree:
+
+```text
+/project list
+/project <project-id-or-name>
+/worktree new <branch> [base]
+/worktree resume <workspace-id>
+```
+
+The choice is saved for this conversation and applies to the next `/new` or `/fork`.
+Use `/project clear` or `/worktree clear` to return to the Route defaults.
+
 `<id>` is the agent id shown by `/status` or in the app's URL. `/resume` replaces
 whatever session was bound here before, after checking your access to the target. A session already bound to another conversation cannot be resumed here. Bare `/new` clears the binding; your next message starts the new session.
 

@@ -31,6 +31,9 @@ export interface ChannelConversationSelectionRecord {
   selectedThinkingOption: string | null;
   selectedMode: string | null;
   selectedFeatureValues: Record<string, unknown> | null;
+  selectedProjectId: string | null;
+  selectedProjectRoot: string | null;
+  selectedWorkspaceId: string | null;
   selectedBy: string;
   updatedAt: Date;
 }
@@ -222,6 +225,9 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
         selectedThinkingOption: selection.selectedThinkingOption ?? null,
         selectedMode: selection.selectedMode ?? null,
         selectedFeatureValues: selection.selectedFeatureValues ?? null,
+        selectedProjectId: selection.selectedProjectId ?? null,
+        selectedProjectRoot: selection.selectedProjectRoot ?? null,
+        selectedWorkspaceId: selection.selectedWorkspaceId ?? null,
         selectedBy: selection.selectedBy,
         updatedAt,
       })
@@ -257,6 +263,9 @@ function toSelection(
     selectedThinkingOption: row.selectedThinkingOption,
     selectedMode: row.selectedMode,
     selectedFeatureValues: row.selectedFeatureValues,
+    selectedProjectId: row.selectedProjectId,
+    selectedProjectRoot: row.selectedProjectRoot,
+    selectedWorkspaceId: row.selectedWorkspaceId,
     selectedBy: row.selectedBy,
     updatedAt: row.updatedAt,
   };

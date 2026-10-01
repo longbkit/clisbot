@@ -609,10 +609,16 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         resolveConfig: (context, capability) =>
           commandDispatcher!.resolveConfig(context, capability),
-        issueCapability: (context) => {
+        issueCapability: async (context) => {
           if (!deps.replyCapabilities || context.route.target.kind !== "agent")
             throw new Error("Channel reply capability is unavailable");
           const target = deps.resolveAgentAccessTarget(context.route.target);
+          const selection = await channelStore.access.findConversationSelection({
+            organizationId: deps.organizationId,
+            channel: context.message.channel,
+            accountId: context.account.accountId,
+            ...deriveBindingKey(context.message, context.route),
+          });
           const token = deps.replyCapabilities.issue({
             organizationId: deps.organizationId,
             channelRevisionId: deps.channelRevisionId ?? null,
@@ -627,7 +633,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             requesterSenderId: context.message.senderIdentity.slice(
               context.message.channel.length + 1,
             ),
-            ...(target.projectRoot ? { projectRoot: target.projectRoot } : {}),
+            ...(selection?.selectedProjectRoot ?? target.projectRoot
+              ? { projectRoot: selection?.selectedProjectRoot ?? target.projectRoot }
+              : {}),
           });
           return { token, canSendFiles: true };
         },

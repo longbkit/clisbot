@@ -45,8 +45,28 @@ group:
 | `approval.config` | manage dynamic commands                                    | `/command add`, `/command remove`                                                                                                                                    |
 | `approval.*`      | answer or suppress prompts                                 | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
 | `channel.manage`  | change a Connection's Route defaults³                      | `/promoteroutedefault`                                                                                                                                               |
+| `project.use` / `workspace.create` | choose a daemon Project or worktree for the next session | `/project`, `/worktree` |
 
 The per-command **Requires** columns below repeat this at the row level.
+
+### Project and worktree placement
+
+Placement is conversation-scoped and applies to the next `/new` or `/fork`.
+The current bound session keeps running where it was created.
+
+```text
+/project list
+/project search <text>
+/project <project-id-or-name>
+/project clear
+/worktree list
+/worktree new <branch> [base]
+/worktree resume <workspace-id-or-name>
+/worktree clear
+```
+
+Listings are filtered by Project access. Selecting a Project requires `project.use`;
+creating a worktree additionally requires `workspace.create`.
 
 ### Session controls and approvals
 
