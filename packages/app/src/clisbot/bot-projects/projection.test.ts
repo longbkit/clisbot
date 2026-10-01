@@ -3,8 +3,7 @@ import { splitPinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
 import { buildSidebarWorkspacePlacementModel } from "@/hooks/sidebar-workspaces-view-model";
 import { describe, expect, it } from "vitest";
 import type { WorkspaceStructureProject } from "@/projects/workspace-structure";
-import { projectBotWorkspaces, isBotProject, splitBotStatusGroups } from "./projection";
-import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
+import { projectBotWorkspaces } from "./projection";
 
 const mixed: WorkspaceStructureProject = {
   viewKey: "shared",
@@ -13,8 +12,18 @@ const mixed: WorkspaceStructureProject = {
   projectKind: "directory",
   iconWorkingDir: "/a",
   hosts: [
-    { serverId: "a", projectId: "p", iconWorkingDir: "/a", worktreeSupport: "unsupported" },
-    { serverId: "b", projectId: "p", iconWorkingDir: "/b", worktreeSupport: "unsupported" },
+    {
+      serverId: "a",
+      projectId: "p",
+      iconWorkingDir: "/a",
+      worktreeSupport: "unsupported",
+    },
+    {
+      serverId: "b",
+      projectId: "p",
+      iconWorkingDir: "/b",
+      worktreeSupport: "unsupported",
+    },
   ],
   workspaceKeys: ["a:wa", "b:wb"],
 };
@@ -35,23 +44,21 @@ describe("Bot project visibility projection", () => {
     expect(regular.hosts.map((h) => h.serverId)).toEqual(["b"]);
     expect(mixed.workspaceKeys).toEqual(["a:wa", "b:wb"]);
   });
-  it("splits mixed projects with distinct stable keys and disjoint workspace identities", () => {
-    const projects = projectBotWorkspaces([mixed], keys, true);
-    expect(new Set(projects.map((p) => p.viewKey)).size).toBe(2);
-    expect(projects.flatMap((p) => p.workspaceKeys)).toEqual(["b:wb", "a:wa"]);
-    expect(projects.map((p) => isBotProject(p))).toEqual([false, true]);
-    expect(projects.map((p) => p.projectName)).toEqual(["Shared", "Shared"]);
+  it("keeps visible Bot and regular Host placements together in one project", () => {
+    const projects = [mixed];
+    expect(projectBotWorkspaces(projects, keys, true)).toBe(projects);
+    expect(projects[0].workspaceKeys).toEqual(["a:wa", "b:wb"]);
   });
-  it("keeps real view keys distinct from allocated Bot partition keys", () => {
+  it("keeps unrelated projects unchanged when hiding Bot placements", () => {
     const regular = {
       ...mixed,
       viewKey: "bot-project:shared",
       hosts: [mixed.hosts[1]],
       workspaceKeys: ["b:other"],
     };
-    const projected = projectBotWorkspaces([mixed, regular], keys, true);
-    expect(new Set(projected.map((p) => p.viewKey)).size).toBe(3);
-    expect(isBotProject(projected[2])).toBe(false);
+    const projected = projectBotWorkspaces([mixed, regular], keys, false);
+    expect(projected.map((project) => project.viewKey)).toEqual(["shared", "bot-project:shared"]);
+    expect(projected[1]).toBe(regular);
   });
   it("uses the longest Host prefix to avoid duplicate placements", () => {
     const source = {
@@ -59,27 +66,11 @@ describe("Bot project visibility projection", () => {
       hosts: [mixed.hosts[0], { ...mixed.hosts[1], serverId: "a:b" }],
       workspaceKeys: ["a:wa", "a:b:wb"],
     };
-    const projected = projectBotWorkspaces([source], keys, true);
-    expect(projected.map((p) => p.workspaceKeys)).toEqual([["a:b:wb"], ["a:wa"]]);
+    const projected = projectBotWorkspaces([source], keys, false);
+    expect(projected.map((p) => p.workspaceKeys)).toEqual([["a:b:wb"]]);
   });
   it("hides bot-only workspaces before any downstream pinned extraction", () => {
     expect(projectBotWorkspaces([mixed], new Set(["a:p", "b:p"]), false)).toEqual([]);
-  });
-  it("partitions existing status rows, retaining bucket labels and distinct collapse keys", () => {
-    const projects = projectBotWorkspaces([mixed], keys, true);
-    const rows = projects.map((p) => ({
-      projectViewKey: p.viewKey,
-      botProject: p.botProject,
-      workspaceKey: p.workspaceKeys[0],
-    }));
-    const groups = [
-      { key: "running", label: "Running", rows, leading: { kind: "status", bucket: "running" } },
-    ] as SidebarWorkspaceGroup[];
-    const split = splitBotStatusGroups(groups);
-    expect(split.regular[0].key).toBe("running");
-    expect(split.bots[0].key).not.toBe(split.regular[0].key);
-    expect(split.bots[0].label).toBe("Running");
-    expect([...split.regular, ...split.bots].flatMap((g) => g.rows)).toEqual(rows);
   });
 });
 
@@ -89,7 +80,10 @@ it("extracts visible pins once and never resurrects hidden Bot pins", () => {
       projects: buildSidebarWorkspacePlacementModel({
         projects: projectBotWorkspaces([mixed], keys, show),
       }).projects,
-      keys: { pinnedWorkspaceKeys: ["a:wa"], pinnedAtByKey: { "a:wa": "2026-09-26" } },
+      keys: {
+        pinnedWorkspaceKeys: ["a:wa"],
+        pinnedAtByKey: { "a:wa": "2026-09-26" },
+      },
       pinnedWorkspaceOrder: [],
     });
   expect(split(false).pinnedChats).toEqual([]);

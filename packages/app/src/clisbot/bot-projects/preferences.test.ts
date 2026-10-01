@@ -1,35 +1,47 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const storage = vi.hoisted(() => ({
-  getItem: vi.fn(async () => null),
+  getItem: vi.fn(async (): Promise<string | null> => null),
   setItem: vi.fn(async () => {}),
   removeItem: vi.fn(async () => {}),
 }));
-vi.mock("@react-native-async-storage/async-storage", () => ({ default: storage }));
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: storage,
+}));
 import { useBotProjectsPreference } from "./preferences";
 beforeEach(() => {
-  useBotProjectsPreference.setState({ showBotProjects: false });
+  useBotProjectsPreference.setState({ showBotProjects: true });
   storage.setItem.mockClear();
 });
-it("defaults off and persists the same preference for both controls on this device", () => {
-  expect(useBotProjectsPreference.getState().showBotProjects).toBe(false);
+it("defaults visible and remembers the Projects display preference on this device", () => {
+  expect(useBotProjectsPreference.getInitialState().showBotProjects).toBe(true);
+  expect(useBotProjectsPreference.getState().showBotProjects).toBe(true);
+  useBotProjectsPreference.getState().toggleBotProjects();
+  expect(storage.setItem).toHaveBeenCalledWith(
+    "sidebar-bot-projects",
+    expect.stringContaining('"showBotProjects":false'),
+  );
   useBotProjectsPreference.getState().toggleBotProjects();
   expect(useBotProjectsPreference.getState().showBotProjects).toBe(true);
-  expect(storage.setItem).toHaveBeenCalledWith(
-    "sidebar-bot-projects",
-    expect.stringContaining('"showBotProjects":true'),
-  );
-  useBotProjectsPreference.getState().toggleBotProjects();
-  expect(useBotProjectsPreference.getState().showBotProjects).toBe(false);
 });
 
-it("defaults the always-visible Bot projects section closed and persists expansion separately", () => {
-  useBotProjectsPreference.setState({ botProjectsCollapsed: true });
-  useBotProjectsPreference.getState().toggleBotProjectsCollapsed();
-  expect(useBotProjectsPreference.getState().botProjectsCollapsed).toBe(false);
-  expect(storage.setItem).toHaveBeenCalledWith(
-    "sidebar-bot-projects",
-    expect.stringContaining('"botProjectsCollapsed":false'),
+it("shows merged Bot projects when upgrading the former collapsed section", async () => {
+  storage.getItem.mockResolvedValueOnce(
+    JSON.stringify({
+      state: { showBotProjects: false, botProjectsCollapsed: true },
+      version: 0,
+    }),
   );
-  useBotProjectsPreference.getState().toggleBotProjectsCollapsed();
-  expect(useBotProjectsPreference.getState().botProjectsCollapsed).toBe(true);
+  await useBotProjectsPreference.persist.rehydrate();
+  expect(useBotProjectsPreference.getState().showBotProjects).toBe(true);
+});
+
+it("restores an explicit hidden preference after the upgrade", async () => {
+  storage.getItem.mockResolvedValueOnce(
+    JSON.stringify({
+      state: { showBotProjects: false },
+      version: 1,
+    }),
+  );
+  await useBotProjectsPreference.persist.rehydrate();
+  expect(useBotProjectsPreference.getState().showBotProjects).toBe(false);
 });

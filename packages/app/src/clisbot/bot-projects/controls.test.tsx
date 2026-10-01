@@ -2,58 +2,52 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { BotProjectsGroup, BotProjectsToggle } from "./controls";
+import { BotProjectsToggle } from "./controls";
 import { useBotProjectsPreference } from "./preferences";
-vi.mock("react-native", () => ({ View: "div" }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
-vi.mock("@react-native-async-storage/async-storage", () => ({
-  default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} },
+vi.mock("react-native-unistyles", () => ({
+  withUnistyles: (component: unknown) => component,
 }));
-vi.mock("@/clisbot/bots/sidebar/section-header", () => ({
-  BotsSectionHeader: ({
-    label,
-    collapsed,
-    onToggle,
+vi.mock("lucide-react-native", () => ({ Bot: () => null }));
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: {
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
+  },
+}));
+vi.mock("@/components/ui/menu", () => ({
+  MenuItem: ({
+    children,
+    selected,
+    onSelect,
   }: {
-    label: string;
-    collapsed: boolean;
-    onToggle: () => void;
+    children: React.ReactNode;
+    selected: boolean;
+    onSelect: () => void;
   }) => (
-    <button type="button" aria-expanded={!collapsed} onClick={onToggle}>
-      {label}
+    <button type="button" role="menuitemcheckbox" aria-checked={selected} onClick={onSelect}>
+      {children}
     </button>
   ),
 }));
 beforeEach(() => {
   vi.stubGlobal("React", React);
-  useBotProjectsPreference.setState({ botProjectsCollapsed: true });
+  useBotProjectsPreference.setState({ showBotProjects: true });
 });
 afterEach(cleanup);
-it("keeps the section visible, starts collapsed, and respects the user's expansion", () => {
-  const view = render(
-    <BotProjectsGroup>
-      <span>Bot workspace</span>
-    </BotProjectsGroup>,
-  );
-  expect(screen.queryByText("Bot workspace")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Bot projects" }));
-  expect(screen.getByText("Bot workspace")).toBeTruthy();
+it("toggles Bot project visibility from Show and retains the choice when reopened", () => {
+  const view = render(<BotProjectsToggle />);
+  const option = screen.getByRole("menuitemcheckbox", { name: "Bot projects" });
+  expect(option.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(option);
+  expect(option.getAttribute("aria-checked")).toBe("false");
+  expect(useBotProjectsPreference.getState().showBotProjects).toBe(false);
   view.unmount();
-  render(
-    <BotProjectsGroup>
-      <span>Bot workspace</span>
-    </BotProjectsGroup>,
-  );
-  expect(screen.getByText("Bot workspace")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Bot projects" }));
-  expect(screen.queryByText("Bot workspace")).toBeNull();
-});
-it("removes both obsolete visibility toggles", () => {
-  const { container } = render(
-    <>
-      <BotProjectsToggle />
-      <BotProjectsToggle menu />
-    </>,
-  );
-  expect(container.childElementCount).toBe(0);
+  render(<BotProjectsToggle />);
+  const reopened = screen.getByRole("menuitemcheckbox", {
+    name: "Bot projects",
+  });
+  expect(reopened.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(reopened);
+  expect(reopened.getAttribute("aria-checked")).toBe("true");
 });

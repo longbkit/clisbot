@@ -19,7 +19,6 @@ const EMPTY_PROJECTS: SidebarProjectEntry[] = [];
 export type SidebarStateBucket = WorkspaceDescriptor["status"];
 
 export interface SidebarWorkspacePlacement {
-  botProject?: boolean;
   workspaceKey: string;
   serverId: string;
   workspaceId: string;
@@ -58,7 +57,6 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement, 
 }
 
 export interface SidebarProjectEntry {
-  botProject?: boolean;
   viewKey: string;
   projectName: string;
   projectKind: WorkspaceStructureProject["projectKind"];
@@ -151,14 +149,12 @@ export function createSidebarWorkspaceEntry(input: {
   serverId: string;
   workspace: WorkspaceDescriptor;
   projectViewKey?: string;
-  botProject?: boolean;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
 }): SidebarWorkspaceEntry {
   const projectViewKey = input.projectViewKey ?? input.workspace.projectId;
   const effectiveStatus = deriveEffectiveWorkspaceStatus(input);
   return {
-    ...(input.botProject ? { botProject: true } : {}),
     workspaceKey: `${input.serverId}:${input.workspace.id}`,
     createdBy: input.workspace.createdBy,
     createdAt: input.workspace.createdAt,
@@ -321,7 +317,6 @@ function createStructuralWorkspaceEntry(input: {
   });
 
   return {
-    ...(input.project.botProject ? { botProject: true } : {}),
     workspaceKey: identity.workspaceKey,
     serverId: identity.serverId,
     workspaceId: identity.workspaceId,
@@ -403,7 +398,6 @@ export function buildSidebarWorkspaceEntries(input: {
       serverId: placement.serverId,
       workspace,
       projectViewKey: placement.projectViewKey,
-      botProject: placement.botProject,
       pendingCreateAttempts: input.pendingCreateAttempts,
       workspaceAgentActivity: session.workspaceAgentActivity,
     });
@@ -448,7 +442,6 @@ export function buildSidebarProjectsFromStructure(input: {
 }): SidebarProjectEntry[] {
   return buildSidebarProjectsFromHostProjects({
     projects: input.projects.map((project) => ({
-      ...(project.botProject ? { botProject: true } : {}),
       viewKey: project.viewKey,
       projectKey: project.projectKey,
       projectName: project.projectName,
@@ -468,7 +461,6 @@ export function buildSidebarProjectsFromHostProjects(input: {
   }
 
   return input.projects.map((project) => ({
-    ...(project.botProject ? { botProject: true } : {}),
     viewKey: project.viewKey,
     projectName: project.projectName,
     projectKind: project.projectKind,

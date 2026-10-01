@@ -1,7 +1,5 @@
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
-import { splitBotStatusGroups } from "@/clisbot/bot-projects/projection";
-import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
 import {
   memo,
   useCallback,
@@ -242,10 +240,7 @@ export function SidebarStatusWorkspaceList({
       {listHeaderComponent}
       {!(fusion && projectsCollapsed) &&
         (sidebarFilterEmpty ? (
-          <>
-            <SidebarFilterEmptyState />
-            {fusion ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
-          </>
+          <SidebarFilterEmptyState />
         ) : (
           <StatusGroupList
             groups={groups}
@@ -308,8 +303,6 @@ function StatusGroupList({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
-  const fusion = useBotsFeatureHosts().length > 0;
-  const sections = splitBotStatusGroups(groups);
   const renderGroup = (group: SidebarWorkspaceGroup) => (
     <StatusGroupRows
       key={group.key}
@@ -324,14 +317,7 @@ function StatusGroupList({
       onToggleWorkspacePin={onToggleWorkspacePin}
     />
   );
-  return (
-    <>
-      {sections.regular.map(renderGroup)}
-      {fusion || sections.bots.length > 0 ? (
-        <BotProjectsGroup>{sections.bots.map(renderGroup)}</BotProjectsGroup>
-      ) : null}
-    </>
-  );
+  return <>{groups.map(renderGroup)}</>;
 }
 
 function StatusGroupRows({

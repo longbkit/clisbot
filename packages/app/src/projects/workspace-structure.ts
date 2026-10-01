@@ -11,8 +11,6 @@ export interface WorkspaceStructureHostPlacement {
 }
 
 export interface WorkspaceStructureProject {
-  /** Client-only Bot projects display grouping. */
-  botProject?: boolean;
   viewKey: string;
   projectKey: string | null;
   projectName: string;

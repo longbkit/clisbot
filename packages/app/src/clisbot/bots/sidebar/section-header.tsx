@@ -23,7 +23,6 @@ const icons = {
   Bots: withUnistyles(Bot),
   "Group chats": withUnistyles(ListFilter),
   Projects: withUnistyles(LayoutGrid),
-  "Bot projects": withUnistyles(Bot),
   Pinned: withUnistyles(Pin),
 };
 const Fallback = withUnistyles(Layers);

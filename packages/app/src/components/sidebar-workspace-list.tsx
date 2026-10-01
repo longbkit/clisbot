@@ -1,8 +1,6 @@
 import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
-import { isBotProject } from "@/clisbot/bot-projects/projection";
-import { BotProjectsGroup } from "@/clisbot/bot-projects/controls";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useWorkspaceRowSelectionFill } from "@/clisbot/workspace-sessions/model";
@@ -2488,23 +2486,12 @@ function ProjectModeList({
       containerStyle={styles.projectListContainer}
     />
   );
-  const regularProjects = unpinnedProjects.filter((project) => !isBotProject(project));
-  const botProjects = unpinnedProjects.filter((project) => isBotProject(project));
-  const hasRegularProjects = projects.some((project) => !isBotProject(project));
-  const projectBody = (
-    <>
-      {(hasBotsFeature ? !hasRegularProjects : projects.length === 0) ? (
-        <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
-      ) : (
-        renderProjectList(regularProjects, "sidebar-project-list")
-      )}
-      {hasBotsFeature ? (
-        <BotProjectsGroup>
-          {renderProjectList(botProjects, "sidebar-bot-project-list")}
-        </BotProjectsGroup>
-      ) : null}
-    </>
-  );
+  const projectBody =
+    projects.length === 0 ? (
+      <SidebarProjectEmptyState onAddProject={onAddProject} onImportSession={onImportSession} />
+    ) : (
+      renderProjectList(unpinnedProjects, "sidebar-project-list")
+    );
 
   const content = (
     <>
@@ -2553,14 +2540,7 @@ function ProjectModeList({
         ? listHeaderComponent
         : null}
       {!(hasBotsFeature && projectsCollapsed) &&
-        (sidebarFilterEmpty ? (
-          <>
-            <SidebarFilterEmptyState />
-            {hasBotsFeature ? <BotProjectsGroup>{null}</BotProjectsGroup> : null}
-          </>
-        ) : (
-          projectBody
-        ))}
+        (sidebarFilterEmpty ? <SidebarFilterEmptyState /> : projectBody)}
       {listFooterComponent}
     </>
   );

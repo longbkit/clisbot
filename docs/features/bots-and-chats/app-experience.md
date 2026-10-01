@@ -1,7 +1,9 @@
 # Bots and Chats app experience
 
 Date: 2026-09-27. Approved interaction contract; implementation and verification are tracked in
-[implementation.md](implementation.md). This revises the earlier hidden Bot projects toggle and
+[implementation.md](implementation.md). Updated 2026-10-01: Bot projects are part of Projects,
+visible by default, with their device visibility controlled by Projects → Show → Bot projects.
+This revises the separate, initially collapsed Bot projects section and
 automatic navigation to cowork when opening a chat artifact. The daemon's Bot/Chat/session ownership,
 turn rules, grants and execution remain unchanged.
 
@@ -15,10 +17,13 @@ turn rules, grants and execution remain unchanged.
   Actions and ask the sidebar to open its sheet. All show only for a query, and rank above
   Workspaces, so a bot's own workspace no longer stands in for the bot. Message text is not
   searched yet; that needs a daemon search.
-- Pinned appears before Group chats, Bots, Projects and Bot projects. Pins can identify a bot,
+- Pinned appears before Group chats, Bots and Projects. Pins can identify a bot,
   chat, project, workspace or session; a pinned flat conversation is not repeated in its collection.
-- Section collapse state is a view preference. Bot projects is always available, initially
-  collapsed, and remembers subsequent changes. No separate visibility toggle remains.
+- Section collapse state is a view preference. Bot projects use the same Projects list,
+  ordering, grouping and collapse state as other projects. Projects → Show places the
+  **Bot projects** switch directly below **Agent sessions**, in its own group between dividers.
+  It defaults on and remembers the device's visibility choice. Turning it off also hides Bot
+  workspace pins, while regular Host placements in the same logical project stay visible.
 - Preserve existing workspace/session rows, project filters, display preferences and shallow
   indentation. Creation actions remain discoverable on section headings. Avoid unread-count badges.
 - A section heading keeps its display menu at the right edge; the create action appears to its

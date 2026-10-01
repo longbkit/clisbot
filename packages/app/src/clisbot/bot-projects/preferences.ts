@@ -7,30 +7,27 @@ import { createValidatedPersistStorage } from "@/storage/validated-persist-stora
 /** A device view preference, never part of daemon or synced Bot configuration. */
 export const useBotProjectsPreference = create<{
   showBotProjects: boolean;
-  botProjectsCollapsed: boolean;
-  toggleBotProjectsCollapsed: () => void;
   toggleBotProjects: () => void;
 }>()(
   persist(
     (set) => ({
-      showBotProjects: false,
-      botProjectsCollapsed: true,
-      toggleBotProjectsCollapsed: () =>
-        set((state) => ({ botProjectsCollapsed: !state.botProjectsCollapsed })),
+      showBotProjects: true,
       toggleBotProjects: () => set((state) => ({ showBotProjects: !state.showBotProjects })),
     }),
     {
       name: "sidebar-bot-projects",
+      version: 1,
+      // The former section stored an unused, default-off visibility flag. Start the merged
+      // Projects list visible rather than hiding it because of that obsolete section state.
+      migrate: () => ({ showBotProjects: true }),
       storage: createValidatedPersistStorage(
         AsyncStorage,
         z.object({
-          showBotProjects: z.boolean().catch(false),
-          botProjectsCollapsed: z.boolean().catch(true),
+          showBotProjects: z.boolean().catch(true),
         }),
       ),
       partialize: (state) => ({
         showBotProjects: state.showBotProjects,
-        botProjectsCollapsed: state.botProjectsCollapsed,
       }),
     },
   ),

@@ -1,4 +1,5 @@
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
 import {
   workspaceSessionsMenuPage,
   WorkspaceSessionsSubTrigger,
@@ -655,7 +656,8 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Below Agent sessions, two groups split by the separator. Above it, what a row may say about a workspace — each one
+ * Agent sessions and Bot projects each own a group above the workspace details. Below them,
+ * two groups split by the separator. Above it, what a row may say about a workspace — each one
  * independent. Below it, the one thing the slot to the right of the title holds, so picking the
  * one already showing empties the slot and gives the width back to the title.
  *
@@ -670,6 +672,8 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
   return (
     <>
       <WorkspaceSessionsSubTrigger />
+      <MenuSeparator />
+      <BotProjectsToggle />
       <MenuSeparator />
       {SIDEBAR_ROW_ITEMS.map((item) => (
         <OptionItem
