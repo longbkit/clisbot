@@ -60,6 +60,17 @@ jobs:
         working-directory: packages/app
         run: npx expo export --platform web
 
+      - name: Check Cloudflare Worker access
+        working-directory: packages/app
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::Cloudflare authentication check skipped (no deployment token)."
+            exit 0
+          fi
+          npx wrangler versions list --json > /dev/null
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
+
       - name: Validate deployment
         if: ${{ inputs.dry_run }}
         working-directory: packages/app

@@ -650,6 +650,8 @@ source of truth for the account, Worker name, custom domain and SPA fallback.
 GitHub Actions **Deploy App** deploys stable `v*` / `app-v*` tags (excluding
 `*-beta.*`) and supports manual runs. A manual run with `dry_run=true` installs,
 builds, typechecks and validates the deployment without uploading to Cloudflare.
+When the app token is configured, dry runs also verify read access to the existing
+Worker. They do not change production traffic.
 Production deployments are serialized and check a nested app URL afterward.
 CI uploads a version tagged with the run ID and attempt, then deploys that exact
 version at 100% traffic. It preserves the existing custom domain configuration.
