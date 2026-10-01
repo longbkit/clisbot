@@ -57,6 +57,7 @@ export function SidebarHeaderRow({
       styles.button,
       touch && styles.buttonTouch,
       (Boolean(hovered) || isActive) && styles.buttonHovered,
+      isActive && styles.buttonSelected,
     ],
     [isActive, touch],
   );
@@ -144,6 +145,9 @@ const styles = StyleSheet.create((theme) => ({
   buttonTouch: { minHeight: 44 },
   buttonHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
+  },
+  buttonSelected: {
+    backgroundColor: theme.colors.surfaceSidebarSelected,
   },
   label: {
     fontSize: theme.fontSize.base,

@@ -76,6 +76,8 @@ export const BotsSection = memo(function BotsSection({
   const openDirectory = useCallback(() => setDirectory(true), []);
   const closeDirectory = useCallback(() => setDirectory(false), []);
   const [collapsed, toggleCollapsed] = useSectionCollapsed("bots");
+  const visibleBots = recentSidebarBots(bots, selectedBotKey);
+  const hasMoreBots = bots.length > visibleBots.length;
   return (
     <View testID="sidebar-bots-section">
       <BotsSectionHeader
@@ -90,7 +92,7 @@ export const BotsSection = memo(function BotsSection({
       />
       {!collapsed ? (
         <>
-          {recentSidebarBots(bots, selectedBotKey).map((bot) => (
+          {visibleBots.map((bot) => (
             <BotRow
               key={bot.key}
               bot={bot}
@@ -99,13 +101,15 @@ export const BotsSection = memo(function BotsSection({
               onOpenMenu={onOpenBotMenu}
             />
           ))}
-          <Pressable
-            style={directoryStyles.link}
-            onPress={openDirectory}
-            accessibilityRole="button"
-          >
-            <Text style={directoryStyles.text}>View all bots ({directoryBots.length})</Text>
-          </Pressable>
+          {hasMoreBots ? (
+            <Pressable
+              style={directoryStyles.link}
+              onPress={openDirectory}
+              accessibilityRole="button"
+            >
+              <Text style={directoryStyles.text}>View all bots ({directoryBots.length})</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
       <BotDirectory

@@ -320,19 +320,20 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
   };
 }
 
+// Bright neutral surfaces with charcoal text, following Slack's light-theme contrast.
 const lightSemanticColors = buildLightSemanticColors({
   surface0: "#ffffff",
-  surface1: "#fafafa",
-  surface2: "#f4f4f5",
-  surface3: "#e4e4e7",
-  surface4: "#d4d4d8",
+  surface1: "#f3f3f3",
+  surface2: "#ededed",
+  surface3: "#e2e2e2",
+  surface4: "#cecece",
   surfaceDiffEmpty: "#f6f6f6",
-  surfaceSidebar: "#f4f4f5",
-  foreground: "#1a1a1e",
-  foregroundMuted: "#71717a",
-  foregroundExtraMuted: "#a1a1aa",
-  border: "#e4e4e7",
-  borderAccent: "#ececf1",
+  surfaceSidebar: "#fafafa",
+  foreground: "#1d1c1d",
+  foregroundMuted: "#4a4a4a",
+  foregroundExtraMuted: "#707070",
+  border: "#d8d8d8",
+  borderAccent: "#bdbdbd",
   accent: "#20744A",
   accentBright: "#239956",
   accentForeground: "#ffffff",

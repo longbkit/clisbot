@@ -44,6 +44,12 @@ Foreground is for the thing being acted on: row titles, section headings, the se
 
 `foregroundExtraMuted` is reserved for passive chrome that must sit behind muted text, such as an always-visible window control. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
 
+The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
+(`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
+The sidebar is near-white (`#fafafa`); hover uses `surface1`, while selected navigation and
+workspace rows use the stronger `surfaceSidebarSelected` fill (`#e2e2e2`). Borders use
+`#d8d8d8` so panes and controls remain legible against the bright surfaces.
+
 Accent is the one CTA per surface. A `<Button variant="default">` filled with `accent` appears at most once on a page. Most pages have zero — settings is mostly toggles and text, the workspace pane is mostly content, the chat composer is the input itself.
 
 Destructive is a color, not a click. Restart-daemon and remove-host are `<Button variant="outline">` in the row trailing slot; the destructive surface only appears inside the `confirmDialog` (`packages/app/src/screens/settings/host-page.tsx:541-547`). Workspace archive opens a confirm dialog before any red appears (`packages/app/src/components/sidebar-workspace-list.tsx`). Red appears after the user has indicated intent.
@@ -125,6 +131,10 @@ Settings detail pages, the projects detail page, and any list+detail content sit
 Workspace and chat surfaces use the full width — these are working surfaces, not reading surfaces. The composer carries `MAX_CONTENT_WIDTH` from `packages/app/src/constants/layout.ts` to keep lines readable while letting the workspace pane fill the rest.
 
 Sections sit apart. `<SettingsSection>` owns its own bottom margin; the next thing is wrapped in another `<SettingsSection>`. The agent-list `sectionHeading` carries the same `marginTop`/`marginBottom` rhythm (`packages/app/src/components/agent-list.tsx:511-517`). Adding `marginBottom` to a section is wrong.
+
+The app sidebar's top-level Pinned, Group chats, Bots and Projects headings share
+`BotsSectionHeader`, which owns a 12px gap above each section. Keep this gap when a section is
+empty or collapsed; rows inside a section retain their compact spacing.
 
 A section or group explains itself through the `info` prop on `<SettingsSection>` or `<SettingsGroup>` — an info icon beside the header that opens a tooltip (`packages/app/src/components/settings/headings/settings-info-tip.tsx`). A muted paragraph between the header and the card is wrong: it sits in the section's own gap, so it reads as a second heading rather than as prose belonging to the header. Explanatory copy that describes one row belongs to that row, as `settingsStyles.rowHint` inside the card.
 

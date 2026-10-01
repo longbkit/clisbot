@@ -134,6 +134,8 @@ export function BotsSectionHeader({
 }
 const styles = StyleSheet.create((theme) => ({
   header: {
+    // Separate top-level sections while keeping their headers and rows compact.
+    marginTop: theme.spacing[3],
     minHeight: 36,
     flexDirection: "row",
     alignItems: "center",

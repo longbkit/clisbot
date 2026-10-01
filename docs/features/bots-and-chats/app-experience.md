@@ -42,6 +42,10 @@ not new daemon grants or a synchronized team pin contract. Resolve every pin aga
 accessible catalog and scope identity by Host and resource. An inaccessible resource must not be
 rendered from stale pin metadata.
 
+The Bots section shows up to five recent bots matching its Host filter, with pins shown separately
+above it. Show **View all bots** only when this recent list leaves matching, unpinned bots out;
+omit the row for empty lists and when every matching bot is already shown.
+
 The Bots directory filters the accessible catalog by Host and sorts by Recent or Name. Mine and
 Shared with me use the optional, session-projected `BotPayload.isOwner` value, never `canConfigure`
 or template kind. Ownership compares the same canonical actor identity used at creation; it neither
