@@ -8,9 +8,26 @@ on:
       - "app-v*"
       - "!app-v*-beta.*"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and validate without deploying to production
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-clisbot-app-production
+  cancel-in-progress: false
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+  CLOUDFLARE_ACCOUNT_ID: 78ee33c981d5b6b0032d1f5550a5d7ca
 
 jobs:
   deploy:
+    if: ${{ github.repository == 'longbkit/clisbot' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -20,21 +37,44 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@boudra"
+
+      - name: Check deployment credentials
+        if: ${{ !inputs.dry_run }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Set the CLOUDFLARE_APP_API_TOKEN repository secret before deploying."
+            exit 1
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
 
       - name: Install dependencies
         run: node scripts/npm-retry.mjs ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build app dependencies
         run: npm run build:app-deps
 
       - name: Typecheck
         run: npm run typecheck --workspace=@clisbot/app
 
-      - name: Build and deploy to Cloudflare Pages
-        run: npm run deploy:web --workspace=@clisbot/app
+      - name: Build web app
+        working-directory: packages/app
+        run: npx expo export --platform web
+
+      - name: Validate deployment
+        if: ${{ inputs.dry_run }}
+        working-directory: packages/app
+        run: npx wrangler versions upload --dry-run
+
+      - name: Deploy to Cloudflare Workers Static Assets
+        if: ${{ !inputs.dry_run }}
+        working-directory: packages/app
+        run: |
+          version_tag="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          npx wrangler versions upload --tag "$version_tag"
+          npx wrangler versions deploy --version-tag "${version_tag}@100" --yes
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 10ed39a1dbf316e30abd0c409bed40d6
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
+
+      - name: Check production URL
+        if: ${{ !inputs.dry_run }}
+        run: curl --fail --silent --show-error --retry 3 https://app.clisbot.com/settings/general > /dev/null

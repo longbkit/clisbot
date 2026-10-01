@@ -1,0 +1,11 @@
+name = "clisbot-app"
+account_id = "78ee33c981d5b6b0032d1f5550a5d7ca"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+routes = [{ pattern = "app.clisbot.com", custom_domain = true }]
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"

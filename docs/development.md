@@ -643,7 +643,23 @@ Do NOT use browser history (back/forward). Always navigate by clicking UI elemen
 ## App web deploys
 
 `packages/app` exports a single-page Expo web app and deploys the `dist/`
-directory to Cloudflare Pages with `npm run deploy:web --workspace=@clisbot/app`.
+directory to Cloudflare Workers Static Assets at `https://app.clisbot.com` with
+`npm run deploy:web --workspace=@clisbot/app`. `packages/app/wrangler.toml` is the
+source of truth for the account, Worker name, custom domain and SPA fallback.
+
+GitHub Actions **Deploy App** deploys stable `v*` / `app-v*` tags (excluding
+`*-beta.*`) and supports manual runs. A manual run with `dry_run=true` installs,
+builds, typechecks and validates the deployment without uploading to Cloudflare.
+Production deployments are serialized and check a nested app URL afterward.
+CI uploads a version tagged with the run ID and attempt, then deploys that exact
+version at 100% traffic. It preserves the existing custom domain configuration.
+
+Set the `CLOUDFLARE_APP_API_TOKEN` Actions repository secret in `longbkit/clisbot`
+to a Cloudflare token with **Individual Workers → clisbot-app → Editor** permission
+in the account configured in Wrangler. Domain setup is a separate operation that
+requires Workers Routes write permission for `clisbot.com`. This secret is scoped to
+the app workflow; the website and legacy relay workflows use separate credentials.
+Keep token values out of Git and logs. Missing app credentials fail before the build.
 
 PWA install metadata lives in `packages/app/public/manifest.json` and is linked
 from `packages/app/public/index.html`. Keep the install icons in `public/` so
