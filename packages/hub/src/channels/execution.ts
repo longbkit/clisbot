@@ -58,6 +58,7 @@ import {
   BindingEngine,
   deriveBindingKey,
   parseStoredRouteSummary,
+  parseStoredRoutePlacement,
   recordedRoute,
   storedRouteOwner,
   type FollowUpAdmission,
@@ -609,6 +610,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         resolveConfig: (context, capability) =>
           commandDispatcher!.resolveConfig(context, capability),
+        resolvePlacement: (context) => commandDispatcher!.resolvePlacement(context),
         issueCapability: async (context) => {
           if (!deps.replyCapabilities || context.route.target.kind !== "agent")
             throw new Error("Channel reply capability is unavailable");
@@ -633,7 +635,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             requesterSenderId: context.message.senderIdentity.slice(
               context.message.channel.length + 1,
             ),
-            ...(selection?.selectedProjectRoot ?? target.projectRoot
+            ...((selection?.selectedProjectRoot ?? target.projectRoot)
               ? { projectRoot: selection?.selectedProjectRoot ?? target.projectRoot }
               : {}),
           });
@@ -2175,7 +2177,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       account,
       route,
       ...(route.target.kind === "agent"
-        ? { accessTarget: deps.resolveAgentAccessTarget(route.target) }
+        ? {
+            accessTarget: {
+              ...deps.resolveAgentAccessTarget(route.target),
+              ...parseStoredRoutePlacement(binding.route),
+            },
+          }
         : {}),
       // The approval card's `inlineButtons` dm/group gate decides on the
       // binding's stored route summary's kind (thread → channel, topic →

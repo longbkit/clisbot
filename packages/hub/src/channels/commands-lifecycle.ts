@@ -36,6 +36,10 @@ export interface LifecycleCommandDependencies {
     context: LifecycleCommandContext,
     capability?: ChannelReplyAgentCapability,
   ): Promise<CreateAgentConfig>;
+  resolvePlacement?(context: LifecycleCommandContext): Promise<{
+    projectId?: string;
+    projectRoot?: string;
+  }>;
   issueCapability?(
     context: LifecycleCommandContext,
   ): ChannelReplyAgentCapability | Promise<ChannelReplyAgentCapability>;
@@ -339,6 +343,7 @@ export class ChannelLifecycleCommands {
       key.externalConversationId,
       key.externalThreadId,
     );
+    const placement = await this.deps.resolvePlacement?.(context);
     const binding = await this.deps.store.rebindThreadBinding({
       organizationId: this.deps.organizationId,
       channel: context.message.channel,
@@ -356,6 +361,7 @@ export class ChannelLifecycleCommands {
             position: routePosition(context.account, context.route),
           },
           context.message.conversationLabel,
+          placement,
         ),
         ...(forceRelay ? { commandReplyPath: "relay" } : {}),
       },

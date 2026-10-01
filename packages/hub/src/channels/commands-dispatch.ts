@@ -175,6 +175,26 @@ export class ChannelCommandDispatcher {
     );
   }
 
+  async resolvePlacement(
+    context: LifecycleCommandContext,
+  ): Promise<{ projectId?: string; projectRoot?: string }> {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    const routeTarget: { projectId?: string; projectRoot?: string } =
+      context.route.target.kind === "agent"
+        ? this.deps.plane.resolveAgentAccessTarget(context.route.target)
+        : {};
+    return {
+      ...((selection?.selectedProjectId ?? routeTarget.projectId)
+        ? { projectId: selection?.selectedProjectId ?? routeTarget.projectId }
+        : {}),
+      ...((selection?.selectedProjectRoot ?? routeTarget.projectRoot)
+        ? { projectRoot: selection?.selectedProjectRoot ?? routeTarget.projectRoot }
+        : {}),
+    };
+  }
+
   /** What the Route starts for this conversation, before the conversation's own choice. */
   routeConfig(
     context: LifecycleCommandContext,

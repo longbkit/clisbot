@@ -39,6 +39,8 @@ export interface StoredRouteSummary {
   replyAnchor: EffectiveDefaults["replyAnchor"];
   /** Human label observed at admission; display-only and never an access key. */
   conversationLabel?: string;
+  /** Conversation selection used when the Agent was created. */
+  placement?: { projectId?: string; projectRoot?: string };
   /** Provenance of the bind — which revision and which route position minted
    * this session, and that route's content hash. Recorded for operators
    * reading rows back; no routing decision reads it. */
@@ -54,6 +56,7 @@ export function bindingSummary(
   conversation: InboundConversationDetail,
   selection?: { revisionId: string | null; position: number },
   conversationLabel?: string,
+  placement?: { projectId?: string; projectRoot?: string },
 ): StoredRouteSummary {
   const match = {
     kind: conversation.kind,
@@ -68,6 +71,7 @@ export function bindingSummary(
     bindingKey: route.defaults.bindingKey,
     replyAnchor: route.defaults.replyAnchor,
     ...(safeConversationLabel ? { conversationLabel: safeConversationLabel } : {}),
+    ...(placement === undefined ? {} : { placement }),
     ...(selection === undefined
       ? {}
       : {
@@ -77,6 +81,23 @@ export function bindingSummary(
             fingerprint: routeFingerprint(route),
           },
         }),
+  };
+}
+
+export function parseStoredRoutePlacement(
+  stored: unknown,
+): StoredRouteSummary["placement"] | undefined {
+  if (typeof stored !== "object" || stored === null) return undefined;
+  const placement = (stored as { placement?: unknown }).placement;
+  if (typeof placement !== "object" || placement === null) return undefined;
+  const projectId = (placement as { projectId?: unknown }).projectId;
+  const projectRoot = (placement as { projectRoot?: unknown }).projectRoot;
+  if (projectId !== undefined && typeof projectId !== "string") return undefined;
+  if (projectRoot !== undefined && typeof projectRoot !== "string") return undefined;
+  if (projectId === undefined && projectRoot === undefined) return undefined;
+  return {
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(projectRoot === undefined ? {} : { projectRoot }),
   };
 }
 

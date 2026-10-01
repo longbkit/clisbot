@@ -44,6 +44,13 @@ export async function recordSessionMarker(
 ): Promise<ThreadBindingRecord | undefined> {
   const { account, route, key, message } = start;
   try {
+    const selection = await context.store.access.findConversationSelection({
+      organizationId: context.organizationId,
+      channel: account.channel as SupportedChannelName,
+      accountId: account.accountId,
+      externalConversationId: key.externalConversationId,
+      externalThreadId: key.externalThreadId,
+    });
     await context.store.recordPendingThreadBinding({
       organizationId: context.organizationId,
       channel: account.channel as SupportedChannelName,
@@ -57,6 +64,16 @@ export async function recordSessionMarker(
         message.conversation,
         { revisionId: context.channelRevisionId ?? null, position: routePosition(account, route) },
         message.conversationLabel,
+        selection?.selectedProjectId == null && selection?.selectedProjectRoot == null
+          ? undefined
+          : {
+              ...(selection.selectedProjectId == null
+                ? {}
+                : { projectId: selection.selectedProjectId }),
+              ...(selection.selectedProjectRoot == null
+                ? {}
+                : { projectRoot: selection.selectedProjectRoot }),
+            },
       ),
     });
     return undefined;

@@ -65,6 +65,7 @@ export {
   bindingSummary,
   deriveBindingKey,
   parseStoredRouteSelection,
+  parseStoredRoutePlacement,
   parseStoredRouteSummary,
   parseStoredRouteTarget,
   routeFingerprint,
