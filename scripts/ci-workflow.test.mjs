@@ -110,6 +110,15 @@ test("change gating allows superseded workflow runs to cancel", () => {
   }
 });
 
+test("regular CI does not provide live LLM credentials or run live-provider suites", () => {
+  const source = readFileSync(ciWorkflowPath, "utf8");
+  assert.doesNotMatch(
+    source,
+    /secrets\.(?:OPENAI_API_KEY|OPENROUTER_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)/,
+  );
+  assert.doesNotMatch(source, /npm run test:(?:integration|e2e):real\b/);
+});
+
 test("focused contracts stay inside existing required checks", () => {
   const jobs = jobBlocks(readFileSync(ciWorkflowPath, "utf8"));
   const changes = jobs.get("changes")?.join("\n") ?? "";

@@ -222,6 +222,8 @@ Vitest picks up tests by suffix. The suffix tells the runner which category it b
 
 Browser Playwright specs live in `packages/app/e2e/browser/`. Desktop Playwright and real-Electron E2E live in `packages/desktop/e2e/`. Harness code shared by both suites lives in `packages/app/e2e/support/`; neither suite may place specs there. App Playwright specs that hit real providers use `*.real.spec.ts` and run through `npm run test:e2e:real --workspace=@clisbot/app`; the default browser project ignores that suffix so CI does not need provider credentials.
 
+The regular `CI` workflow uses fake/mock providers and does not inject live LLM credentials, including on manual full runs. Daemon fixtures supply fake Claude, Codex and OpenCode clients; browser tests select the `mock` provider. Provider CLIs may still be installed for adapter, catalog and runtime tests. Run live-provider coverage explicitly with the separate `:real` commands.
+
 Live provider smoke tests belong in `*.real.e2e.test.ts`, not `*.test.ts`, even when guarded by environment variables. Default unit suites must use deterministic provider adapters/fakes so missing credits, auth outages, and upstream model drift do not block normal CI.
 
 Codex MultiAgentV2 real tests use local Codex authentication rather than the OpenRouter-compatible test provider. OpenRouter does not accept Codex collaboration-history items on the parent follow-up request, so it cannot verify a complete native sub-agent turn.
