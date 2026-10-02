@@ -58,6 +58,15 @@ function hubFavicon(input) {
   return input.replace(match[0], `href: "${data}"`);
 }
 
+function appFavicon(input) {
+  if (!input.includes("FAVICON_IMAGES") || !input.includes("/assets/images/favicon-")) {
+    throw new Error("Unrecognized app favicon selector; review upstream changes.");
+  }
+  return input
+    .replaceAll("../../assets/images/favicon-light", "../../assets/images/favicon-dark")
+    .replace("favicon-${colorScheme}${suffix}", "favicon-dark${suffix}");
+}
+
 const logoFiles = [
   "packages/app/src/components/icons/clisbot-logo.tsx",
   "packages/app/src/screens/startup-splash-screen.tsx",
@@ -97,6 +106,7 @@ export const sourcePatches = new Map(
 sourcePatches.set("packages/hub/src/components/app/auth-layout.tsx", hubGlyph);
 sourcePatches.set("packages/hub/src/routes/__root.tsx", hubFavicon);
 sourcePatches.set("packages/app/app.config.js", appConfig);
+sourcePatches.set("packages/app/src/hooks/use-favicon-status.ts", appFavicon);
 sourcePatches.set("packages/app/src/utils/os-notifications.ts", (s) =>
   s.replace(
     "../../assets/images/notification-icon.png",

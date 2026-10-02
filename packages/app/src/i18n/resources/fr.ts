@@ -1181,6 +1181,10 @@ export const fr: TranslationResources = {
       searchPlaceholder: "Rechercher des hôtes...",
     },
     actions: {
+      new: "Nouveau…",
+      newProject: "Nouveau projet",
+      newBot: "Nouveau bot",
+      newGroup: "Nouvelle discussion de groupe",
       addProject: "Ajouter un projet",
       newWorkspace: "Nouvel espace de travail",
       hosts: "Hôtes",
@@ -2246,6 +2250,9 @@ export const fr: TranslationResources = {
         description: "Afficher un plan pour passer d’une requête à l’autre",
       },
       sidebar: {
+        bottomTitle: "Bas",
+        bottomDescription:
+          "Choisissez les actions du bas et leur ordre. Nouveau, Ajouter un projet et Rechercher restent à gauche ; les hôtes et Importer une session, à droite. Aide et Paramètres sont toujours visibles à des positions fixes.",
         title: "Barre latérale",
         description: "Choisissez les éléments affichés en haut de la barre latérale et leur ordre",
         moveUp: "Déplacer vers le haut",

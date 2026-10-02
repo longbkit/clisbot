@@ -12,7 +12,7 @@ describe("isHubProvidedConnection", () => {
   it("keeps the connections a user saved before Hub was attached as theirs", () => {
     const host = { management: { ...management, manualConnectionIds: ["direct:localhost:6869"] } };
     expect(isHubProvidedConnection(host, { id: "direct:localhost:6869" })).toBe(false);
-    expect(isHubProvidedConnection(host, { id: "relay:wss:relay.paseo.sh:443" })).toBe(true);
+    expect(isHubProvidedConnection(host, { id: "relay:wss:relay.clisbot.com:443" })).toBe(true);
   });
 
   it("treats every connection of a Hub-created Host as provided, and none of a manual Host", () => {

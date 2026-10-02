@@ -1181,6 +1181,10 @@ export const es: TranslationResources = {
       searchPlaceholder: "Buscar hosts...",
     },
     actions: {
+      new: "Nuevo…",
+      newProject: "Nuevo proyecto",
+      newBot: "Nuevo bot",
+      newGroup: "Nuevo chat grupal",
       addProject: "Agregar proyecto",
       newWorkspace: "Nuevo espacio de trabajo",
       hosts: "Hosts",
@@ -2242,6 +2246,9 @@ export const es: TranslationResources = {
         description: "Muestra un esquema para saltar entre instrucciones",
       },
       sidebar: {
+        bottomTitle: "Parte inferior",
+        bottomDescription:
+          "Elige las acciones inferiores y su orden. Nuevo, Añadir proyecto y Buscar quedan a la izquierda; los hosts e Importar sesión, a la derecha. Ayuda y Ajustes siempre están visibles en posiciones fijas.",
         title: "Barra lateral",
         description:
           "Elige qué elementos aparecen en la parte superior de la barra lateral y en qué orden",

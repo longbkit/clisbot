@@ -90,7 +90,7 @@ function mutableConfig(persisted: PersistedConfig): MutableDaemonConfig {
       maxProcessesPerSecond: persisted.daemon?.git?.maxProcessesPerSecond ?? 64,
       maxProcessConcurrency: persisted.daemon?.git?.maxProcessConcurrency ?? 8,
     },
-    app: { baseUrl: persisted.app?.baseUrl ?? "https://app.paseo.sh" },
+    app: { baseUrl: persisted.app?.baseUrl ?? "https://app.clisbot.com" },
   };
 }
 

@@ -40,7 +40,7 @@ test("endpoint descriptions redact pairing material and credentials", () => {
     }),
   ).not.toMatch(/private|secret/);
   expect(
-    describeDaemonTarget({ kind: "endpoint", host: "https://app.paseo.sh/#offer=private" }),
+    describeDaemonTarget({ kind: "endpoint", host: "https://app.clisbot.com/#offer=private" }),
   ).not.toContain("private");
 });
 

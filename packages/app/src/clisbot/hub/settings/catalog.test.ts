@@ -13,7 +13,7 @@ describe("Hub Settings navigation", () => {
     );
   });
 
-  it("keeps People and Hosts visible to a signed-in Member, for their own access", () => {
+  it("keeps People visible to a signed-in Member and leaves Hosts in the Host group", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({
         signedIn: true,
@@ -22,7 +22,6 @@ describe("Hub Settings navigation", () => {
       [
         { section: "account", label: "Account" },
         { section: "team", label: "People & access" },
-        { section: "hosts", label: "Hosts" },
       ],
     );
   });
@@ -34,11 +33,11 @@ describe("Hub Settings navigation", () => {
         canManage: false,
         grants: [{ resourceKind: "automation", privileges: ["automation.run"] }],
       }).map(({ section }) => section),
-      ["account", "automations", "team", "hosts"],
+      ["account", "automations", "team"],
     );
   });
 
-  it("opens Channels, Automations, People, and Hosts to scoped Admins", () => {
+  it("opens Channels, Automations, and People to scoped Admins", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({
         signedIn: true,
@@ -49,14 +48,14 @@ describe("Hub Settings navigation", () => {
           { resourceKind: "team", privileges: ["hub.access.manage"] },
         ],
       }).map(({ section }) => section),
-      ["account", "channels", "automations", "team", "hosts"],
+      ["account", "channels", "automations", "team"],
     );
   });
 
   it("shows every management destination to an owner or administrator", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({ signedIn: true, canManage: true }).map(({ section }) => section),
-      ["account", "channels", "automations", "team", "hosts", "integrations"],
+      ["account", "channels", "automations", "team", "integrations"],
     );
   });
 
@@ -67,7 +66,7 @@ describe("Hub Settings navigation", () => {
         canManage: true,
         isInstanceOperator: true,
       }).map(({ section }) => section),
-      ["account", "channels", "automations", "team", "hosts", "integrations", "instance"],
+      ["account", "channels", "automations", "team", "integrations", "instance"],
     );
   });
 

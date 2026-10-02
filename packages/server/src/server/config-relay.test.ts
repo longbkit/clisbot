@@ -119,7 +119,11 @@ describe("daemon relay config", () => {
       version: 1,
       daemon: { relay: {} },
     });
-    expect(loadConfig(hostedHome, { env: {} }).relayUseTls).toBe(true);
+    const hosted = loadConfig(hostedHome, { env: {} });
+    expect(hosted.relayEndpoint).toBe("relay.clisbot.com:443");
+    expect(hosted.relayPublicEndpoint).toBe("relay.clisbot.com:443");
+    expect(hosted.relayUseTls).toBe(true);
+    expect(hosted.relayPublicUseTls).toBe(true);
   });
 
   test("relayPublicUseTls falls back to relayUseTls when unset", async () => {

@@ -48,6 +48,7 @@ function Download() {
   const activeBeta = channel === "beta" ? beta : null;
   const onBeta = activeBeta !== null;
   const release = activeBeta ?? stable;
+  if (!release) return <DownloadUnavailable />;
   const { version } = release;
   const urls = downloadUrls(release);
 
@@ -212,6 +213,33 @@ function Download() {
         </a>
         .
       </p>
+    </SiteShell>
+  );
+}
+
+function DownloadUnavailable() {
+  return (
+    <SiteShell width="default">
+      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4">Download</h1>
+      <section className="rounded-xl border border-border bg-card/40 p-6 md:p-8">
+        <h2 className="text-2xl font-semibold mb-3">Desktop downloads are currently unavailable</h2>
+        <p className="text-muted-foreground mb-6">
+          Check GitHub for published releases or follow the setup guide to get started.
+        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <DownloadPill
+            href="https://github.com/longbkit/clisbot/releases"
+            label="View releases"
+            external
+          />
+          <Link
+            to="/docs"
+            className="text-sm underline underline-offset-4 hover:text-foreground transition-colors"
+          >
+            Setup guide
+          </Link>
+        </div>
+      </section>
     </SiteShell>
   );
 }

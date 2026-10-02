@@ -660,7 +660,7 @@ Set the `CLOUDFLARE_APP_API_TOKEN` Actions repository secret in `longbkit/clisbo
 to a Cloudflare token with **Individual Workers → clisbot-app → Editor** permission
 in the account configured in Wrangler. Domain setup is a separate operation that
 requires Workers Routes write permission for `clisbot.com`. This secret is scoped to
-the app workflow; the website and legacy relay workflows use separate credentials.
+the app workflow; the website and relay Worker workflows use separate credentials.
 Keep token values out of Git and logs. Missing app credentials fail before the build.
 
 PWA install metadata lives in `packages/app/public/manifest.json` and is linked

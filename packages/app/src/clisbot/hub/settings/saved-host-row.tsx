@@ -30,7 +30,9 @@ export function SavedHostRow({
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{host.label}</Text>
-        <Text style={settingsStyles.rowHint}>Added on this device</Text>
+        <Text style={settingsStyles.rowHint} selectable>
+          Host ID: {host.serverId}
+        </Text>
       </View>
       <StatusBadge label={badge.label} variant={badge.variant} />
       <Button size="sm" variant="outline" onPress={open}>

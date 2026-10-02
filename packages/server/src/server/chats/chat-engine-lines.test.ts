@@ -14,4 +14,7 @@ test("a session that never saw the room gets the whole contract, rules included"
 test("a session that saw this room hears nothing; one that saw an older room hears the update", () => {
   expect(roomUpdateFor(room, roomFingerprint(room))).toBeNull();
   expect(roomUpdateFor(room, "older")?.startsWith("[Room update]")).toBe(true);
+  expect(roomUpdateFor(room, "older")).toContain(
+    "A greeting or casual conversation is worth answering",
+  );
 });

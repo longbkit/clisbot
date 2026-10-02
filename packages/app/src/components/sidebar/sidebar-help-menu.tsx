@@ -15,6 +15,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
 import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
@@ -78,6 +81,8 @@ function HostVersionHint({ host }: { host: HostProfile }) {
 
 export function SidebarHelpMenu() {
   const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
+  const finePointer = useHasFinePointer();
   const shortcutsAvailable = useKeyboardShortcutsAvailable();
   const openAppDiagnostic = useAppDiagnosticStore((state) => state.open);
   const setShortcutsDialogOpen = useKeyboardShortcutsStore((state) => state.setShortcutsDialogOpen);
@@ -103,7 +108,7 @@ export function SidebarHelpMenu() {
         <TooltipTrigger asChild>
           <View>
             <DropdownMenuTrigger
-              style={styles.trigger}
+              style={[styles.trigger, compact || !finePointer ? styles.touchTrigger : null]}
               testID="sidebar-help"
               accessibilityRole="button"
               accessibilityLabel={t("sidebar.help.trigger")}
@@ -192,6 +197,10 @@ const styles = StyleSheet.create((theme) => ({
   tooltipText: {
     fontSize: theme.fontSize.base,
     color: theme.colors.popoverForeground,
+  },
+  touchTrigger: {
+    width: MIN_TOUCH_TARGET_SIZE,
+    height: MIN_TOUCH_TARGET_SIZE,
   },
   versionList: {
     gap: theme.spacing[1],

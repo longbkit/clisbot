@@ -1,0 +1,48 @@
+name: clisbot-relay
+services:
+  relay:
+    image: ${CLISBOT_RELAY_IMAGE:?Pass --env-file source.env}
+    container_name: clisbot-relay
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "127.0.0.1:4000:4000"
+    cpus: 1.0
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 256
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=64m,mode=1777
+    environment:
+      HOME: /tmp
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      RELEASE_TMP: /tmp
+      RELEASE_DISTRIBUTION: none
+      ERL_FLAGS: "+S 1:1 +SDcpu 1 +SDio 1"
+      # These names belong to the upstream Elixir service.
+      PASEO_RELAY_HOST: "0.0.0.0"
+      PASEO_RELAY_PORT: "4000"
+      PASEO_RELAY_MIN_CLUSTER_SIZE: "1"
+      PASEO_RELAY_ACCEPTORS: "10"
+      PASEO_RELAY_CONNECTIONS_PER_ACCEPTOR: "100"
+      PASEO_RELAY_INGRESS_BUDGET_BYTES: "134217728"
+      PASEO_RELAY_MEMORY_WATERMARK_BYTES: "671088640"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "3", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

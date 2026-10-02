@@ -41,7 +41,7 @@ try {
             listen: "127.0.0.1:9999",
             relay: { enabled: false },
           },
-          app: { baseUrl: "https://app.paseo.sh" },
+          app: { baseUrl: "https://app.clisbot.com" },
         },
         null,
         2,

@@ -1,4 +1,5 @@
 import { test, expect } from "../support/fixtures";
+import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import {
   buildHostWorkspaceRoute,
   buildOpenProjectRoute,
@@ -192,7 +193,10 @@ test.describe("Settings — compact master-detail", () => {
     await openWorkspace(page, workspace);
     await page.getByRole("button", { name: "Open menu", exact: true }).click();
     await page.getByTestId("sidebar-hosts-trigger").click();
-    await page.getByRole("button", { name: /Open .* settings/ }).click();
+    await page
+      .getByTestId(`sidebar-host-row-${getServerId()}`)
+      .getByRole("button", { name: /Open .* settings/ })
+      .click();
 
     await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "host"));
     await expect(page.getByText("Overview", { exact: true })).toBeVisible();
@@ -200,6 +204,39 @@ test.describe("Settings — compact master-detail", () => {
     await goBackInSettings(page);
     await expectCompactSettingsList(page);
 
+    await goBackInSettings(page);
+    await expectAppRoute(page, workspaceRoute);
+  });
+
+  test("All hosts settings opens the compact Hosts list without Hub sign-in", async ({
+    page,
+    withWorkspace,
+  }, testInfo) => {
+    const workspace = await withWorkspace({ prefix: "all-hosts-settings-back-" });
+    const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
+    await openWorkspace(page, workspace);
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await page.getByTestId("sidebar-hosts-trigger").click();
+    await expect(page.getByPlaceholder("Search hosts")).toBeVisible();
+    await page
+      .getByTestId("sidebar-host-row-__all_hosts__")
+      .getByRole("button", { name: "Open All hosts settings", exact: true })
+      .click();
+    await expectAppRoute(page, buildHubSettingsRoute("hosts"));
+    await expect(page.getByPlaceholder("Search hosts")).not.toBeVisible();
+    await expect(
+      page.getByTestId("settings-hosts-list").getByText("Online", { exact: true }),
+    ).toBeVisible();
+    await expectSettingsSidebarHidden(page);
+    await testInfo.attach("compact-hosts-settings", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+    await goBackInSettings(page);
+    await expectCompactSettingsList(page);
+    await expect(
+      page.getByTestId("settings-hosts").getByLabel("1 online out of 1 Hosts"),
+    ).toHaveText("1/1");
     await goBackInSettings(page);
     await expectAppRoute(page, workspaceRoute);
   });

@@ -68,7 +68,7 @@ describe("cutover proxy", () => {
     const originUrl = await origin.start();
 
     const response = await relayWorker.fetch(
-      new Request("https://relay.paseo.sh/ws?serverId=srv_prod&role=server&v=2", {
+      new Request("https://relay.clisbot.com/ws?serverId=srv_prod&role=server&v=2", {
         headers: { "x-relay-probe": "production" },
       }),
       { CLISBOT_RELAY_UPSTREAM: originUrl } as RelayEnv,

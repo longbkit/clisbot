@@ -31,6 +31,7 @@ import { isFdroidBuild } from "@/constants/build-profile";
 import { isWeb, isNative } from "@/constants/platform";
 import { isElectronRuntime } from "@/desktop/host";
 import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "@/clisbot/hub/welcome-sign-in";
+import { ProductAnalyticsWelcomeNotice } from "@/clisbot/analytics/welcome-notice";
 
 interface WelcomeAction {
   key: "scan-qr" | "direct-connection" | "remote-ssh" | "paste-pairing-link";
@@ -336,6 +337,7 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
             ))}
           </View>
         </View>
+        <ProductAnalyticsWelcomeNotice />
         <Text style={styles.versionLabel}>{appVersionText}</Text>
 
         <AddHostModal

@@ -1145,6 +1145,10 @@ export const ar: TranslationResources = {
       searchPlaceholder: "بحث عن المضيفين...",
     },
     actions: {
+      new: "جديد…",
+      newProject: "مشروع جديد",
+      newBot: "بوت جديد",
+      newGroup: "دردشة جماعية جديدة",
       addProject: "إضافة مشروع",
       newWorkspace: "مساحة عمل جديدة",
       hosts: "المضيفون",
@@ -2190,6 +2194,9 @@ export const ar: TranslationResources = {
         description: "عرض مخطط للتنقل بين المطالبات",
       },
       sidebar: {
+        bottomTitle: "الجزء السفلي",
+        bottomDescription:
+          "اختر إجراءات الجزء السفلي وترتيبها. تبقى إجراءات جديد وإضافة مشروع والبحث على اليسار، واختيار المضيف واستيراد الجلسة على اليمين. تبقى المساعدة والإعدادات ظاهرة دائمًا في مواضع ثابتة.",
         title: "الشريط الجانبي",
         description: "اختر العناصر التي تظهر أعلى الشريط الجانبي وترتيبها",
         moveUp: "نقل لأعلى",

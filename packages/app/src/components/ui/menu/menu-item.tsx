@@ -11,6 +11,7 @@ import {
   Text,
   View,
   type PressableStateCallbackType,
+  type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -222,6 +223,7 @@ function resolveItemLabel(input: {
 }
 
 export interface MenuItemProps {
+  style?: StyleProp<ViewStyle>;
   description?: string;
   onSelect?: () => void;
   disabled?: boolean;
@@ -255,6 +257,7 @@ export interface MenuItemProps {
 
 export function MenuItem({
   children,
+  style,
   description,
   onSelect,
   disabled,
@@ -310,6 +313,7 @@ export function MenuItem({
       focused = false,
     }: PressableStateCallbackType & { hovered?: boolean; focused?: boolean }) => [
       styles.item,
+      style,
       active ? styles.itemActive : null,
       isDisabled ? styles.itemDisabled : null,
       muted && !isDisabled ? styles.itemMuted : null,
@@ -317,7 +321,7 @@ export function MenuItem({
       focused && !isDisabled ? styles.itemHovered : null,
       pressed && !isDisabled ? styles.itemPressed : null,
     ],
-    [active, isDisabled, muted],
+    [active, isDisabled, muted, style],
   );
 
   const itemTextStyle = useMemo(

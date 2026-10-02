@@ -58,6 +58,7 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
+import { ProductAnalyticsSettings } from "@/clisbot/analytics/settings";
 import {
   useAppSettings,
   useSettings,
@@ -67,6 +68,7 @@ import {
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { HostSettingsAccess } from "@/clisbot/hub/settings/host-settings-access";
+import { HostsConnectionCount } from "@/clisbot/hub/settings/hosts-settings-label";
 import { useSessionStore } from "@/stores/session-store";
 import {
   orderHostsLocalFirst,
@@ -87,6 +89,7 @@ import { EditorSection } from "@/screens/settings/editor-section";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommunityLinks } from "@/components/community-links";
+import { ClisbotBrand } from "@/components/clisbot-brand";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
@@ -470,6 +473,9 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
   const { t } = useTranslation();
   return (
     <>
+      <View style={styles.brandHeader} testID="settings-about-brand">
+        <ClisbotBrand />
+      </View>
       <SettingsSection title={t("settings.about.title")}>
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
@@ -759,6 +765,8 @@ function useSortedHosts(hosts: HostProfile[], localServerId: string | null): Hos
 interface SidebarSectionButtonProps<Section extends string> {
   itemId: Section;
   label: string;
+  trailing?: ReactNode;
+  testID?: string;
   icon: ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   isSelected: boolean;
   onSelect: (section: Section) => void;
@@ -770,6 +778,8 @@ const SIDEBAR_ICON_STROKE_WIDTH = 1.5;
 function SidebarSectionButton<Section extends string>({
   itemId,
   label,
+  trailing,
+  testID,
   icon: IconComponent,
   isSelected,
   onSelect,
@@ -787,6 +797,7 @@ function SidebarSectionButton<Section extends string>({
     <Pressable
       accessibilityRole="button"
       accessibilityState={accessibilityState}
+      testID={testID}
       onPress={handlePress}
       style={isSelected ? selectedSidebarItemStyle : sidebarItemStyle}
     >
@@ -798,6 +809,7 @@ function SidebarSectionButton<Section extends string>({
       <Text style={labelStyle} numberOfLines={1}>
         {label}
       </Text>
+      {trailing}
     </Pressable>
   );
 }
@@ -991,6 +1003,7 @@ function SettingsSidebar({
   const localServerId = useLocalDaemonServerId();
   const sortedHosts = useSortedHosts(hosts, localServerId);
   const hasHosts = sortedHosts.length > 0;
+  const hostsCount = useMemo(() => <HostsConnectionCount compact />, []);
   const enableBuiltInDaemonOption = useEnableBuiltInDaemonOption();
   const isDesktopApp = isElectronRuntime();
   const hub = useHubAccount();
@@ -1072,65 +1085,76 @@ function SettingsSidebar({
           ))}
         </View>
       ) : null}
-      {hasHosts ? (
-        <View style={sidebarStyles.list}>
-          <Text style={sidebarStyles.groupLabel}>{t("settings.groups.host")}</Text>
-          <HostPicker
-            activeServerId={activeHostServerId}
-            sortedHosts={sortedHosts}
-            onSelectHost={onSelectHost}
-            onAddHost={onAddHost}
-            enableBuiltInDaemonOption={enableBuiltInDaemonOption}
-          />
-          {HOST_SECTION_ITEMS.map((item) => (
-            <SidebarHostSectionButton
-              key={item.id}
-              itemId={item.id}
-              label={t(item.labelKey)}
-              icon={item.icon}
-              isSelected={selectedHostSection === item.id}
-              onSelect={onSelectHostSection}
+      <View style={sidebarStyles.list}>
+        <Text style={sidebarStyles.groupLabel}>{t("settings.groups.host")}</Text>
+        <SidebarSectionButton
+          itemId="hosts"
+          label="Hosts"
+          trailing={hostsCount}
+          icon={Server}
+          isSelected={selectedHubSection === "hosts"}
+          onSelect={onSelectHubSection}
+          testID="settings-hosts"
+        />
+        {hasHosts ? (
+          <>
+            <HostPicker
+              activeServerId={activeHostServerId}
+              sortedHosts={sortedHosts}
+              onSelectHost={onSelectHost}
+              onAddHost={onAddHost}
+              enableBuiltInDaemonOption={enableBuiltInDaemonOption}
             />
-          ))}
-        </View>
-      ) : (
-        <View style={sidebarStyles.list}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("settings.addHost")}
-            onPress={onAddHost}
-            testID="settings-add-host"
-            style={sidebarItemStyle}
-          >
-            <Plus
-              size={theme.iconSize.md}
-              color={theme.colors.foregroundMuted}
-              strokeWidth={SIDEBAR_ICON_STROKE_WIDTH}
-            />
-            <Text style={sidebarStyles.label} numberOfLines={1}>
-              {t("settings.addHost")}
-            </Text>
-          </Pressable>
-          {enableBuiltInDaemonOption.visible ? (
+            {HOST_SECTION_ITEMS.map((item) => (
+              <SidebarHostSectionButton
+                key={item.id}
+                itemId={item.id}
+                label={t(item.labelKey)}
+                icon={item.icon}
+                isSelected={selectedHostSection === item.id}
+                onSelect={onSelectHostSection}
+              />
+            ))}
+          </>
+        ) : (
+          <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("settings.enableBuiltInDaemon")}
-              onPress={enableBuiltInDaemonOption.onPress}
-              testID="settings-enable-built-in-daemon"
+              accessibilityLabel={t("settings.addHost")}
+              onPress={onAddHost}
+              testID="settings-add-host"
               style={sidebarItemStyle}
             >
-              <Server
+              <Plus
                 size={theme.iconSize.md}
                 color={theme.colors.foregroundMuted}
                 strokeWidth={SIDEBAR_ICON_STROKE_WIDTH}
               />
               <Text style={sidebarStyles.label} numberOfLines={1}>
-                {t("settings.enableBuiltInDaemon")}
+                {t("settings.addHost")}
               </Text>
             </Pressable>
-          ) : null}
-        </View>
-      )}
+            {enableBuiltInDaemonOption.visible ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("settings.enableBuiltInDaemon")}
+                onPress={enableBuiltInDaemonOption.onPress}
+                testID="settings-enable-built-in-daemon"
+                style={sidebarItemStyle}
+              >
+                <Server
+                  size={theme.iconSize.md}
+                  color={theme.colors.foregroundMuted}
+                  strokeWidth={SIDEBAR_ICON_STROKE_WIDTH}
+                />
+                <Text style={sidebarStyles.label} numberOfLines={1}>
+                  {t("settings.enableBuiltInDaemon")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </View>
     </>
   );
 
@@ -1466,8 +1490,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           case "general":
             return (
               <>
+                <View style={styles.brandHeader} testID="settings-general-brand">
+                  <ClisbotBrand />
+                </View>
                 <GeneralSection settings={settings} handleLanguageChange={handleLanguageChange} />
                 <SendingSection />
+                <ProductAnalyticsSettings />
                 {isDesktopApp ? <OpenLocationSection /> : null}
               </>
             );
@@ -1689,6 +1717,9 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize["4xl"],
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
+  },
+  brandHeader: {
+    marginBottom: theme.spacing[8],
   },
   aboutValue: {
     color: theme.colors.foregroundMuted,

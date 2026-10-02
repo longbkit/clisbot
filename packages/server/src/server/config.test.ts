@@ -14,6 +14,33 @@ describe("server config", () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
+  test("initializes pairing and CORS with the official web app", async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-pairing-"));
+    roots.push(home);
+
+    const config = loadConfig(home, { env: {} });
+    expect(config.appBaseUrl).toBe("https://app.clisbot.com");
+    expect(config.corsAllowedOrigins).toEqual(["https://app.clisbot.com"]);
+    expect(loadPersistedConfig(home).app?.baseUrl).toBe("https://app.clisbot.com");
+    expect(resolveConfigFromPersisted(home, { version: 1 }, { env: {} }).appBaseUrl).toBe(
+      "https://app.clisbot.com",
+    );
+  });
+
+  test("preserves a custom pairing app URL and gives the environment precedence", () => {
+    const persisted = { version: 1, app: { baseUrl: "https://self-hosted.example" } };
+    const home = "/tmp/clisbot-pairing-custom-app";
+
+    expect(resolveConfigFromPersisted(home, persisted, { env: {} }).appBaseUrl).toBe(
+      "https://self-hosted.example",
+    );
+    const overridden = resolveConfigFromPersisted(home, persisted, {
+      env: { CLISBOT_APP_BASE_URL: "https://override.example" },
+    });
+    expect(overridden.appBaseUrl).toBe("https://override.example");
+    expect(overridden.configReload?.overrideControlledPaths).toContain("app.baseUrl");
+  });
+
   test("records when the daemon is managed by Clisbot Desktop", async () => {
     const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-desktop-managed-"));
     roots.push(clisbotHome);

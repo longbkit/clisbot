@@ -1171,6 +1171,10 @@ export const ptBR: TranslationResources = {
       searchPlaceholder: "Buscar hosts...",
     },
     actions: {
+      new: "Novo…",
+      newProject: "Novo projeto",
+      newBot: "Novo bot",
+      newGroup: "Nova conversa em grupo",
       addProject: "Adicionar projeto",
       newWorkspace: "Novo workspace",
       hosts: "Hosts",
@@ -2225,6 +2229,9 @@ export const ptBR: TranslationResources = {
         description: "Mostrar uma estrutura para navegar entre prompts",
       },
       sidebar: {
+        bottomTitle: "Parte inferior",
+        bottomDescription:
+          "Escolha as ações inferiores e sua ordem. Novo, Adicionar projeto e Buscar ficam à esquerda; os hosts e Importar sessão, à direita. Ajuda e Configurações ficam sempre visíveis em posições fixas.",
         title: "Barra lateral",
         description: "Escolha quais itens aparecem no topo da barra lateral e em que ordem",
         moveUp: "Mover para cima",

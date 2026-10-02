@@ -1,0 +1,15 @@
+{
+  "react-native": {
+    "app_data_collection_default_enabled": false,
+    "analytics_auto_collection_enabled": false,
+    "analytics_default_allow_analytics_storage": false,
+    "analytics_default_allow_ad_storage": false,
+    "analytics_default_allow_ad_user_data": false,
+    "analytics_default_allow_ad_personalization_signals": false,
+    "analytics_idfv_collection_enabled": false,
+    "google_analytics_adid_collection_enabled": false,
+    "google_analytics_ssaid_collection_enabled": false,
+    "google_analytics_automatic_screen_reporting_enabled": false,
+    "google_analytics_registration_with_ad_network_enabled": false
+  }
+}

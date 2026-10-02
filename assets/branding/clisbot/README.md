@@ -19,6 +19,10 @@ lists every export, its SHA-256, and the repository paths that receive it.
 - The native store icon has opaque square corners; the platform applies its mask.
 - Running remains blue `#3B82F6`; attention remains green `#22C55E`, matching the
   existing application semantics.
+- Website and web app favicons use the Ocean background and seafoam mark in both
+  system themes. The app keeps its running and attention dots; light artwork
+  remains available in the kit for other surfaces. The visual application script
+  also updates the app's runtime selector after an upstream sync.
 
 The wordmark is outlined so SVG consumers do not need to install the font.
 The variable Manrope font and a generated 700-weight instance are included under

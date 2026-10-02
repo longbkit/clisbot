@@ -21,13 +21,15 @@ export class ImportSessionFlow {
   async revealMobileEntryPoint() {
     await openMobileAgentSidebar(this.page);
     await expectMobileAgentSidebarVisible(this.page);
-    const button = this.page.getByTestId("sidebar-import-session");
-    await expect(button).toHaveAccessibleName("Import session");
+    const button = this.page.getByTestId("sidebar-new");
+    await expect(button).toHaveAccessibleName("New…");
     await expect(button).toBeInViewport();
   }
   async openGlobally() {
-    await expect(this.page.getByTestId("sidebar-import-session")).toBeVisible();
-    await this.page.getByTestId("sidebar-import-session").click();
+    await expect(this.page.getByTestId("sidebar-new")).toBeVisible();
+    await this.page.getByTestId("sidebar-new").click();
+    await this.page.getByTestId("sidebar-new-import-session").click();
+    await this.page.getByTestId(`host-chooser-row-${getServerId()}`).click();
     await this.expectSheetReady();
   }
   async openFromWorkspaceHeader() {

@@ -29,7 +29,7 @@ export function downloadUrls(release: ReleaseAssetInfo) {
 
 export const appStoreUrl = "https://apps.apple.com/app/clisbot-pocket-engineer/id6758887924";
 export const playStoreUrl = "https://play.google.com/store/apps/details?id=sh.clisbot";
-export const webAppUrl = "https://app.paseo.sh";
+export const webAppUrl = "https://app.clisbot.com";
 
 export interface PrimaryDownload {
   label: string;

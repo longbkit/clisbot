@@ -648,9 +648,32 @@ describe("absolute directory-path configuration", () => {
     });
 
     expect(result.map((entry) => realpathSync.native(entry))).toEqual([
-      realpathSync.native(path.join(homeDir, "projects", "clisbot")),
       realpathSync.native(path.join(homeDir, "projects", "playground")),
     ]);
+  });
+
+  it.each(["~/.clisbot", "~/.clisbot/workspaces"])(
+    "resolves the explicitly named hidden path %s without scanning the home tree",
+    async (query) => {
+      mkdirSync(path.join(homeDir, ".clisbot", "workspaces"), { recursive: true });
+
+      await expect(
+        searchAbsoluteDirectoryPaths({ homeDir, query, maxDirectoriesScanned: 0 }),
+      ).resolves.toEqual([path.join(homeDir, query.slice(2))]);
+    },
+  );
+
+  it("completes an explicit hidden parent path without scanning the home tree", async () => {
+    const workspaceRoot = path.join(homeDir, ".clisbot", "workspaces");
+    mkdirSync(workspaceRoot, { recursive: true });
+
+    await expect(
+      searchAbsoluteDirectoryPaths({
+        homeDir,
+        query: "~/.clisbot/work",
+        maxDirectoriesScanned: 0,
+      }),
+    ).resolves.toEqual([workspaceRoot]);
   });
 
   it("prioritizes partial matches that appear earlier in the path", async () => {

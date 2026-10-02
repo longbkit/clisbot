@@ -1,0 +1,16 @@
+# Optional self-hosted Electron analytics collector, for LOCAL development only.
+# Guide: ../../docs/product-analytics.md#self-hosted-electron-analytics
+# Copy to .dev.vars in this directory, fill privately, and chmod 600 .dev.vars.
+# Production: set GA4_DESKTOP_MEASUREMENT_ID in wrangler.toml [vars], then use
+#   npx wrangler secret put GA4_DESKTOP_API_SECRET
+# The root .env does not configure this Worker's bindings.
+
+# Your desktop GA4 WEB stream's Measurement ID (G-...), not its numeric stream ID.
+GA4_DESKTOP_MEASUREMENT_ID=""
+
+# GA4 Admin -> Data streams -> your stream -> Measurement Protocol API secrets.
+# Create a secret and paste its Secret value here, not its nickname or ID.
+# Must belong to the same stream as the Measurement ID above.
+# Keep this value out of git and all VITE_*/EXPO_PUBLIC_* client variables.
+# Empty values disable the collector (503); nothing needs to be filled for daemon/Hub/relay hosting.
+GA4_DESKTOP_API_SECRET=""

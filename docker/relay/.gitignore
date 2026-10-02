@@ -1,0 +1,8 @@
+# Host credentials and inventory must stay outside the public checkout.
+tunnel-token
+credentials*.json
+cert.pem
+deployment.json
+public-route.json
+verification.json
+private/

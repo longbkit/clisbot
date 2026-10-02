@@ -8,7 +8,7 @@ category: Getting started
 
 # Self-hosting the web UI
 
-Clisbot's daemon can serve the browser web app itself, from the same address it already uses for the API. You don't need the hosted app at [app.paseo.sh](https://app.paseo.sh): point a browser at your own daemon and you get the full UI, connected to your own agents, on infrastructure you control.
+Clisbot's daemon can serve the browser web app itself, from the same address it already uses for the API. You don't need the hosted app at [app.clisbot.com](https://app.clisbot.com): point a browser at your own daemon and you get the full UI, connected to your own agents, on infrastructure you control.
 
 This is useful when you want to:
 

@@ -1,5 +1,5 @@
 name = "clisbot-website"
-account_id = "10ed39a1dbf316e30abd0c409bed40d6"
+account_id = "78ee33c981d5b6b0032d1f5550a5d7ca"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 main = "./src/server-entry.ts"
@@ -9,9 +9,17 @@ routes = [
   { pattern = "www.clisbot.com", custom_domain = true },
 ]
 
+[vars]
+GA4_DESKTOP_MEASUREMENT_ID = "G-V91TM1TD18"
+
 [observability]
 enabled = true
 
 [[kv_namespaces]]
 binding = "WEBSITE_CACHE"
-id = "cb4d8779806544e9b673142a80c1eb5f"
+id = "ff77612425414e4695294410e7c6c2e1"
+
+[[ratelimits]]
+name = "DESKTOP_ANALYTICS_LIMITER"
+namespace_id = "556929300"
+simple = { limit = 120, period = 60 }

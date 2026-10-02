@@ -106,7 +106,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 - **Respect the layers.** `CONTRIBUTING.md` and this file name things and link out. Activity docs like `docs/qa.md` and `docs/testing.md` set the bar for a kind of work. Subject docs like `docs/unistyles.md` own one thing completely. A layer never re-explains the one below it.
 - **One subject per doc.** If the subject doesn't fit in a sentence, split the doc. A section per provider, vendor, or platform is a table plus one worked example.
 - **Delete.** Obsolete sections go. Prefer a `packages/app/src/thing.ts:120` reference over a pasted block.
-- **New doc?** Add a row to the table above and link it from the docs that should send readers there.
+- **New doc?** Make it discoverable from the relevant topic index or related docs. Keep the Docs table above focused on topic indexes and essential starting docs.
 - Code-level facts belong in comments next to the code, not here.
 
 ### Doc voice

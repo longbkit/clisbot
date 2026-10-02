@@ -234,6 +234,7 @@ export function SearchInput({
 export interface ComboboxItemProps {
   label: string;
   description?: string;
+  descriptionLayout?: "inline" | "stacked";
   kind?: "directory" | "file";
   leadingSlot?: ReactNode;
   trailingSlot?: ReactNode;
@@ -250,6 +251,7 @@ export interface ComboboxItemProps {
 export function ComboboxItem({
   label,
   description,
+  descriptionLayout = "inline",
   kind,
   leadingSlot,
   trailingSlot,
@@ -292,8 +294,14 @@ export function ComboboxItem({
   );
 
   const itemContentStyle = useMemo(
-    () => [styles.comboboxItemContent, description && styles.comboboxItemContentInline],
-    [description],
+    () => [
+      styles.comboboxItemContent,
+      description &&
+        (descriptionLayout === "inline"
+          ? styles.comboboxItemContentInline
+          : styles.comboboxItemContentStacked),
+    ],
+    [description, descriptionLayout],
   );
 
   return (
@@ -311,7 +319,10 @@ export function ComboboxItem({
           {label}
         </Text>
         {description ? (
-          <Text numberOfLines={1} style={styles.comboboxItemDescription}>
+          <Text
+            numberOfLines={descriptionLayout === "inline" ? 1 : undefined}
+            style={styles.comboboxItemDescription}
+          >
             {description}
           </Text>
         ) : null}
@@ -1765,6 +1776,10 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "baseline",
     gap: theme.spacing[2],
+  },
+  comboboxItemContentStacked: {
+    gap: theme.spacing[1],
+    minWidth: 0,
   },
   comboboxItemLeadingSlot: {
     width: 16,

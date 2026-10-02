@@ -13,6 +13,7 @@ import type { AgentClient, AgentProvider } from "../agent/agent-sdk-types.js";
 import { createTestAgentClients } from "./fake-agent-client.js";
 import type { PushNotificationSender } from "../push/index.js";
 import type { AgentProfile } from "@clisbot/protocol/messages";
+import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
 
 interface TestClisbotDaemonOptions {
   bots?: ClisbotDaemonConfig["bots"];
@@ -189,10 +190,10 @@ async function prepareTestDaemonConfig(
     providerOverrides: options.providerOverrides,
     agentStoragePath: path.join(clisbotHome, "agents"),
     relayEnabled: options.relayEnabled ?? false,
-    relayEndpoint: options.relayEndpoint ?? "relay.paseo.sh:443",
+    relayEndpoint: options.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT,
     relayUseTls: options.relayUseTls,
     relayPublicUseTls: options.relayPublicUseTls,
-    appBaseUrl: "https://app.paseo.sh",
+    appBaseUrl: "https://app.clisbot.com",
     auth: options.auth,
     pushNotificationSender: options.pushNotificationSender,
     serviceProxy: options.serviceProxy,

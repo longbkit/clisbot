@@ -26,6 +26,8 @@ const TIGHT_CONTROL_HEIGHT = 28;
 const COMPACT_CONTROL_HEIGHT = 32;
 const FIELD_CONTROL_HEIGHT = 44;
 export const HEADER_CONTROL_HEIGHT = 26;
+/** Actual hit target for controls operated by touch, independent of their desktop size tier. */
+export const MIN_TOUCH_TARGET_SIZE = 48;
 const SEGMENTED_TIGHT_INSET = 2;
 const SEGMENTED_COMPACT_INSET = 2;
 const SEGMENTED_FIELD_INSET = 3;

@@ -1,0 +1,24 @@
+[Unit]
+Description=Cloudflare Tunnel for relay.clisbot.com
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=tunnel-token:/opt/clisbot-relay/tunnel-token
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate tunnel --metrics 127.0.0.1:20242 run --token-file %d/tunnel-token
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=256M
+CPUQuota=25%
+LimitNOFILE=8192
+Environment=LANG=C.UTF-8
+
+[Install]
+WantedBy=multi-user.target

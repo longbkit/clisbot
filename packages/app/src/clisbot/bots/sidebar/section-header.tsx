@@ -45,7 +45,6 @@ export function BotsSectionHeader({
   collapsed = false,
   onToggle,
   actions,
-  nested = false,
 }: {
   label: string;
   testID: string;
@@ -55,25 +54,20 @@ export function BotsSectionHeader({
   collapsed?: boolean;
   onToggle?: () => void;
   actions?: ReactNode;
-  nested?: boolean;
 }) {
   const compact = useIsCompactFormFactor() || isNative;
   const [hovered, setHovered] = useState(false);
-  const [createFocused, setCreateFocused] = useState(false);
   const accessibilityState = useMemo(() => ({ expanded: !collapsed }), [collapsed]);
   const onPointerEnter = useCallback(() => setHovered(true), []);
   const onPointerLeave = useCallback(() => setHovered(false), []);
-  const onCreateFocus = useCallback(() => setCreateFocused(true), []);
-  const onCreateBlur = useCallback(() => setCreateFocused(false), []);
   const buttonStyle = useCallback(
     ({ hovered: buttonHovered, pressed }: import("react-native").PressableStateCallbackType) => [
       styles.button,
       compact && styles.touch,
       disabled && styles.disabled,
-      !(hovered || createFocused || compact) && styles.actionHidden,
       (buttonHovered || pressed) && styles.hovered,
     ],
-    [compact, disabled, hovered, createFocused],
+    [compact, disabled],
   );
   const Icon = icons[label as keyof typeof icons] ?? Fallback;
   return (
@@ -98,9 +92,9 @@ export function BotsSectionHeader({
           return (
             <>
               <View style={styles.iconSlot}>
-                <Leading size={nested ? 14 : 16} uniProps={color} />
+                <Leading size={14} uniProps={color} />
               </View>
-              <Text numberOfLines={1} style={[styles.title, nested && styles.nestedTitle]}>
+              <Text numberOfLines={1} style={styles.title}>
                 {label}
               </Text>
             </>
@@ -116,8 +110,6 @@ export function BotsSectionHeader({
               accessibilityLabel={createLabel}
               testID={`${testID}-create`}
               onPress={onCreate}
-              onFocus={onCreateFocus}
-              onBlur={onCreateBlur}
               style={buttonStyle}
             >
               <ThemedPlus size={16} uniProps={color} />
@@ -153,19 +145,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.normal,
     lineHeight: 20,
     flexShrink: 1,
   },
-  nestedTitle: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-  },
   iconSlot: { width: 16, height: 20, alignItems: "center", justifyContent: "center" },
-  // Collapsed rather than transparent, so the actions after it keep the right edge; still
-  // reachable by keyboard, and focusing it shows it.
-  actionHidden: { width: 0, minWidth: 0, opacity: 0, overflow: "hidden" },
   button: {
     width: 32,
     height: 32,

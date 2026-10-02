@@ -39,8 +39,16 @@ const FADE_IN_UP_40 = { opacity: 0, y: 40 };
 const FADE_IN_UP_4 = { opacity: 0, y: 4 };
 const FADE_OUT_UP_4 = { opacity: 0, y: 4 };
 
-const EASE_OUT_06_DELAY_01: Transition = { duration: 0.6, delay: 0.1, ease: "easeOut" };
-const EASE_OUT_08_DELAY_05: Transition = { duration: 0.8, delay: 0.5, ease: "easeOut" };
+const EASE_OUT_06_DELAY_01: Transition = {
+  duration: 0.6,
+  delay: 0.1,
+  ease: "easeOut",
+};
+const EASE_OUT_08_DELAY_05: Transition = {
+  duration: 0.8,
+  delay: 0.5,
+  ease: "easeOut",
+};
 const EASE_OUT_05: Transition = { duration: 0.5, ease: "easeOut" };
 const EASE_OUT_015: Transition = { duration: 0.15, ease: "easeOut" };
 const DURATION_05: Transition = { duration: 0.5 };
@@ -268,9 +276,15 @@ const PROVIDER_ICON_CLASS = "h-5 w-5 sm:h-7 sm:w-7";
 
 function MultiProviderSection() {
   const providers = [
-    { name: "Claude Code", icon: <ClaudeIcon className={PROVIDER_ICON_CLASS} /> },
+    {
+      name: "Claude Code",
+      icon: <ClaudeIcon className={PROVIDER_ICON_CLASS} />,
+    },
     { name: "Codex", icon: <CodexIcon className={PROVIDER_ICON_CLASS} /> },
-    { name: "OpenCode", icon: <OpenCodeIcon className={PROVIDER_ICON_CLASS} /> },
+    {
+      name: "OpenCode",
+      icon: <OpenCodeIcon className={PROVIDER_ICON_CLASS} />,
+    },
     { name: "Pi", icon: <PiIcon className={PROVIDER_ICON_CLASS} /> },
     { name: "Cursor", icon: <CursorIcon className={PROVIDER_ICON_CLASS} /> },
   ];
@@ -723,11 +737,16 @@ function ExtensibleCard({
   );
 }
 
-const PRINCIPLES: ReadonlyArray<{ icon: LucideIcon; title: string; description: string }> = [
+const PRINCIPLES: ReadonlyArray<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}> = [
   {
     icon: Lock,
     title: "Private",
-    description: "No telemetry, tracking, or forced login. Code stays on your machine.",
+    description:
+      "Code stays on your machine. Usage analytics never includes code or chats and can be turned off in Privacy settings. No forced login.",
   },
   {
     icon: Compass,
@@ -824,7 +843,16 @@ const SECONDARY_CTA_CLASS =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-white/12 px-3 py-2.5 text-sm text-white hover:bg-white/10 transition-colors";
 
 function DesktopDownloadButton({ platform }: { platform: DesktopPlatform }) {
-  const download = getDesktopDownload(useRelease(), platform);
+  const release = useRelease();
+  if (!release) {
+    return (
+      <a href="/download" className={PRIMARY_CTA_CLASS}>
+        <TerminalIcon className="h-4 w-4" />
+        Get started
+      </a>
+    );
+  }
+  const download = getDesktopDownload(release, platform);
   const Icon = download.icon;
   return (
     <a href={download.href} target="_blank" rel="noopener noreferrer" className={PRIMARY_CTA_CLASS}>

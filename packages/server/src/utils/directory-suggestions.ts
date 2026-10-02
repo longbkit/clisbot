@@ -145,16 +145,29 @@ export async function searchDirectoryEntries(
   const input = buildSearchInput(options, root, gitIgnoredPaths);
   if (!input) return [];
 
+  const rootedPath = options.pathQueryPolicy === "rooted" && input.plan.isPathQuery;
   const exact =
-    input.plan.browseExactPath || (input.matchMode === "suffix" && input.plan.isPathQuery)
+    rootedPath ||
+    input.plan.browseExactPath ||
+    (input.matchMode === "suffix" && input.plan.isPathQuery)
       ? await findExactEntry(input)
       : null;
-  if (exact && input.limit === 1) return [exact];
+  // A named project path is retrieval, including hidden paths. Do not walk the whole home tree
+  // before returning it, or skip it under discovery's hidden-directory policy.
+  if (
+    exact &&
+    (input.limit === 1 ||
+      (rootedPath && !input.plan.browseExactPath && !input.plan.normalizedQuery.endsWith("/")))
+  )
+    return [exact];
 
   const browsesRoot = input.plan.isPathQuery && !input.plan.normalizedQuery;
   const browsesAbsoluteParent = input.plan.browseExactPath === true;
+  const completesRootedPath = rootedPath && Boolean(input.plan.parentPart);
   const ranked =
-    browsesRoot || browsesAbsoluteParent ? await searchChildren(input) : await searchTree(input);
+    browsesRoot || browsesAbsoluteParent || completesRootedPath
+      ? await searchChildren(input)
+      : await searchTree(input);
   const results = sortAndFormat(ranked, input.root, input.pathFormat).slice(0, input.limit);
   return exact
     ? [exact, ...results.filter((entry) => !sameEntry(entry, exact))].slice(0, input.limit)

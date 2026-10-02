@@ -1,4 +1,6 @@
 import type { Logger } from "pino";
+import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 
 import { createConnectionOfferV2, encodeOfferToFragmentUrl } from "./connection-offer.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
@@ -31,11 +33,11 @@ export async function generateLocalPairingOffer(args: {
     };
   }
 
-  const relayEndpoint = args.relayEndpoint ?? "relay.paseo.sh:443";
+  const relayEndpoint = args.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT;
   const relayPublicEndpoint = args.relayPublicEndpoint ?? relayEndpoint;
-  const relayUseTls = args.relayUseTls ?? relayEndpoint === "relay.paseo.sh:443";
+  const relayUseTls = args.relayUseTls ?? relayEndpoint === DEFAULT_RELAY_ENDPOINT;
   const relayPublicUseTls = args.relayPublicUseTls ?? relayUseTls;
-  const appBaseUrl = args.appBaseUrl ?? "https://app.paseo.sh";
+  const appBaseUrl = args.appBaseUrl ?? DEFAULT_APP_BASE_URL;
   const serverId = getOrCreateServerId(args.clisbotHome, { logger: args.logger });
   const daemonKeyPair = await loadOrCreateDaemonKeyPair(args.clisbotHome, args.logger);
   const offer = await createConnectionOfferV2({

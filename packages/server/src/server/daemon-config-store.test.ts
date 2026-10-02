@@ -35,7 +35,7 @@ function reloadableConfig(
       maxProcessesPerSecond: git.maxProcessesPerSecond ?? 64,
       maxProcessConcurrency: git.maxProcessConcurrency ?? 8,
     },
-    app: { baseUrl: "https://app.paseo.sh" },
+    app: { baseUrl: "https://app.clisbot.com" },
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins ?? {},
   };

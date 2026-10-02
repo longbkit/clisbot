@@ -1137,6 +1137,10 @@ export const zhCN: TranslationResources = {
       searchPlaceholder: "搜索 Hosts...",
     },
     actions: {
+      new: "新建…",
+      newProject: "新建项目",
+      newBot: "新建机器人",
+      newGroup: "新建群聊",
       addProject: "添加 project",
       newWorkspace: "新建工作区",
       hosts: "Hosts",
@@ -2165,6 +2169,9 @@ export const zhCN: TranslationResources = {
         description: "显示用于在提示词之间跳转的大纲",
       },
       sidebar: {
+        bottomTitle: "底部",
+        bottomDescription:
+          "选择底部操作及其顺序。新建、添加项目和搜索位于左侧；主机选择和导入会话位于右侧。帮助和设置始终显示在固定位置。",
         title: "侧边栏",
         description: "选择侧边栏顶部显示的项目及其顺序",
         moveUp: "上移",

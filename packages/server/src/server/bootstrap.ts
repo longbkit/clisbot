@@ -15,6 +15,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Logger } from "pino";
 import { z } from "zod";
 import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@clisbot/protocol/client-capabilities";
+import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import { createBranchChangeRouteHandler } from "./script-route-branch-handler.js";
 
@@ -633,7 +635,7 @@ function createInitialMutableDaemonConfig(config: ClisbotDaemonConfig): MutableD
     cors: { allowedOrigins: config.corsAllowedOrigins },
     trustedProxies: config.trustedProxies ?? ["loopback"],
     git: config.git ?? resolveGitProcessPolicy({ env: process.env }),
-    app: { baseUrl: config.appBaseUrl ?? "https://app.paseo.sh" },
+    app: { baseUrl: config.appBaseUrl ?? DEFAULT_APP_BASE_URL },
     ...(config.providerCatalogRefreshTimeoutMs !== undefined
       ? { catalogRefreshTimeoutMs: config.providerCatalogRefreshTimeoutMs }
       : {}),
@@ -786,12 +788,12 @@ export async function createClisbotDaemon(
   const scriptRuntimeStore = new WorkspaceScriptRuntimeStore();
   const workspaceSetupRuntime = new WorkspaceSetupRuntime();
   let configuredHostnames = config.hostnames ?? config.allowedHosts;
-  let appBaseUrl = config.appBaseUrl ?? "https://app.paseo.sh";
+  let appBaseUrl = config.appBaseUrl ?? DEFAULT_APP_BASE_URL;
   daemonConfigStore.onFieldChange("hostnames", (value) => {
     configuredHostnames = value as HostnamesConfig | undefined;
   });
   daemonConfigStore.onFieldChange("app.baseUrl", (value) => {
-    appBaseUrl = typeof value === "string" ? value : "https://app.paseo.sh";
+    appBaseUrl = typeof value === "string" ? value : DEFAULT_APP_BASE_URL;
   });
   let wsServer: VoiceAssistantWebSocketServer | null = null;
   let serviceProxyListenTarget: ListenTarget | null = null;
@@ -1464,9 +1466,9 @@ export async function createClisbotDaemon(
       const relay = daemonConfigStore.get().relay;
       const enabled = relay?.enabled ?? config.relayEnabled ?? true;
       if (!enabled) return null;
-      const endpoint = config.relayPublicEndpoint ?? config.relayEndpoint ?? "relay.paseo.sh:443";
+      const endpoint = config.relayPublicEndpoint ?? config.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT;
       const useTls =
-        config.relayPublicUseTls ?? config.relayUseTls ?? endpoint === "relay.paseo.sh:443";
+        config.relayPublicUseTls ?? config.relayUseTls ?? endpoint === DEFAULT_RELAY_ENDPOINT;
       const directEndpoint = config.directEndpoint?.trim();
       return createConnectionOfferV2({
         serverId,
@@ -1905,9 +1907,9 @@ export async function createClisbotDaemon(
               agentManager.setAppendSystemPrompt(typeof value === "string" ? value : "");
             });
             const relayEnabled = config.relayEnabled ?? true;
-            const relayEndpoint = config.relayEndpoint ?? "relay.paseo.sh:443";
+            const relayEndpoint = config.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT;
             const relayPublicEndpoint = config.relayPublicEndpoint ?? relayEndpoint;
-            const relayUseTls = config.relayUseTls ?? relayEndpoint === "relay.paseo.sh:443";
+            const relayUseTls = config.relayUseTls ?? relayEndpoint === DEFAULT_RELAY_ENDPOINT;
             const relayPublicUseTls = config.relayPublicUseTls ?? relayUseTls;
             if (boundListenTarget.type === "tcp") {
               logger.info(

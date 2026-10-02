@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { formatConnectionStatus } from "@/utils/daemons";
 import {
   type HostRuntimeConnectionStatus,
   useHostRuntimeConnectionStatus,
@@ -8,7 +9,13 @@ import {
 export function HostStatusDot({ serverId }: { serverId: string }) {
   const status = useHostRuntimeConnectionStatus(serverId);
 
-  return <View style={[styles.dot, statusStyle(status)]} />;
+  return (
+    <View
+      accessibilityRole="image"
+      accessibilityLabel={formatConnectionStatus(status)}
+      style={[styles.dot, statusStyle(status)]}
+    />
+  );
 }
 
 function statusStyle(status: HostRuntimeConnectionStatus) {

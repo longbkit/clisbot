@@ -1,11 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { DaemonClient } from "@clisbot/client/internal/daemon-client";
-import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
-import { buildDaemonWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
+import {
+  DEFAULT_RELAY_ENDPOINT,
+  buildRelayWebSocketUrl,
+  buildDaemonWebSocketUrl,
+} from "@clisbot/protocol/daemon-endpoints";
 
 const OFFER = {
-  serverId: "srv_ETXtcjYRGrCI",
-  daemonPublicKeyB64: "12yCG8sqNumkwHMOQyRM/vMXfPc6nb430pj27sfARBc=",
-  relay: { endpoint: "relay.paseo.sh:443" },
+  serverId: process.env.CLISBOT_SERVER_ID ?? "",
+  daemonPublicKeyB64: process.env.CLISBOT_DAEMON_PUBLIC_KEY_B64 ?? "",
+  relay: {
+    endpoint: process.env.CLISBOT_RELAY_ENDPOINT ?? DEFAULT_RELAY_ENDPOINT,
+    useTls: process.env.CLISBOT_RELAY_USE_TLS !== "false",
+  },
 };
 
 const DIRECT_ENDPOINT = "localhost:6868";
@@ -84,12 +91,18 @@ async function measurePings(
 }
 
 async function main() {
+  if (!OFFER.serverId || !OFFER.daemonPublicKeyB64) {
+    throw new Error(
+      "Set CLISBOT_SERVER_ID and CLISBOT_DAEMON_PUBLIC_KEY_B64 for the target daemon.",
+    );
+  }
   console.log("=== Relay Latency Measurement ===\n");
 
   // Measure direct connection
   console.log("Connecting direct...");
   const directClient = await connectClient("Direct", {
-    url: buildDaemonWebSocketUrl(DIRECT_ENDPOINT),
+    clientId: `latency_direct_${randomUUID()}`,
+    url: buildDaemonWebSocketUrl(DIRECT_ENDPOINT, { useTls: false }),
   });
 
   await measurePings("Direct (localhost:6868)", directClient, PING_COUNT, WARMUP_COUNT);
@@ -98,11 +111,13 @@ async function main() {
   console.log("\nConnecting via relay...");
   const relayUrl = buildRelayWebSocketUrl({
     endpoint: OFFER.relay.endpoint,
+    useTls: OFFER.relay.useTls,
     serverId: OFFER.serverId,
     role: "client",
   });
 
   const relayClient = await connectClient("Relay", {
+    clientId: `latency_relay_${randomUUID()}`,
     url: relayUrl,
     e2ee: {
       enabled: true,
@@ -110,7 +125,7 @@ async function main() {
     },
   });
 
-  await measurePings("Relay (relay.paseo.sh:443)", relayClient, PING_COUNT, WARMUP_COUNT);
+  await measurePings(`Relay (${OFFER.relay.endpoint})`, relayClient, PING_COUNT, WARMUP_COUNT);
 
   // Measure raw WebSocket to relay (no E2EE, no daemon, just WS open+close timing)
   console.log("\nMeasuring raw WebSocket connect time to relay...");
@@ -119,7 +134,12 @@ async function main() {
     const start = Date.now();
     const { WebSocket } = await import("ws");
     const ws = new WebSocket(
-      `wss://relay.paseo.sh/ws?serverId=latency_probe_${Date.now()}&role=client&clientId=probe_${i}`,
+      buildRelayWebSocketUrl({
+        endpoint: OFFER.relay.endpoint,
+        useTls: OFFER.relay.useTls,
+        serverId: `latency_probe_${Date.now()}_${i}`,
+        role: "client",
+      }),
     );
     await new Promise<void>((resolve, reject) => {
       ws.on("open", () => {

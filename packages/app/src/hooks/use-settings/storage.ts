@@ -89,8 +89,10 @@ export interface AppSettings {
   sidebarRowItems: SidebarRowItems;
   sidebarChecksDisplay: SidebarChecksDisplay;
   sidebarWorkspaceSessions: SidebarWorkspaceSessions;
-  /** Top-level sidebar rows in display order; empty means the default order, all visible. */
+  /** Top-level sidebar rows in display order; Add project and Search default to hidden. */
   sidebarNavItems: SidebarNavPreference[];
+  /** Footer visibility and order within the left actions and right controls. */
+  sidebarFooterItems: SidebarNavPreference[];
   autoExpandReasoning: boolean;
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
@@ -146,6 +148,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarWorkspaceSessions: DEFAULT_SIDEBAR_WORKSPACE_SESSIONS,
   sidebarNavItems: [],
+  sidebarFooterItems: [],
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
@@ -244,6 +247,7 @@ const StoredAppSettingsSchema = z
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarWorkspaceSessions: SidebarWorkspaceSessionsSchema,
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
+    sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     autoExpandReasoning: z.boolean().catch(false),
     toolCallDetailLevel: z
       .enum(["overview", "detailed"])

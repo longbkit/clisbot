@@ -6,6 +6,12 @@ export const baseColors = {
   white: "#ffffff",
   black: "#000000",
 
+  // Approved Clisbot Flow / Ocean 02 brand kit.
+  brand: {
+    ocean: "#153B43",
+    seafoam: "#A1DFD4",
+  },
+
   // Zinc scale (primary gray palette)
   zinc: {
     50: "#fafafa",

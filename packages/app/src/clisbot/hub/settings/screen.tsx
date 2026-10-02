@@ -40,6 +40,7 @@ export function HubSettingsContent({
 }) {
   const hub = useHubAccount();
   if (section === "account") return <HubAccountSettings />;
+  if (section === "hosts") return <HostsSettings />;
   return (
     <SignedInHubSettings
       key={JSON.stringify([hub.origin, hub.signedIn?.account.id, hub.signedIn?.organization.id])}
@@ -53,7 +54,7 @@ function SignedInHubSettings({
   section,
   initialAutomationCreate,
 }: {
-  section: Exclude<HubSectionSlug, "account">;
+  section: Exclude<HubSectionSlug, "account" | "hosts">;
   initialAutomationCreate?: boolean;
 }) {
   const account = useHubAccount();
@@ -75,8 +76,6 @@ function SignedInHubSettings({
       );
     case "team":
       return <TeamSettings />;
-    case "hosts":
-      return <HostsSettings />;
     case "integrations":
       return <IntegrationsSettings />;
     case "instance":

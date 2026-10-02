@@ -21,6 +21,8 @@ import type {
 } from "./agent/provider-launch-config.js";
 import { ProviderOverrideSchema } from "./agent/provider-launch-config.js";
 import { AgentProviderSchema } from "@clisbot/protocol/provider-manifest";
+import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 import { hashDaemonPassword } from "./auth.js";
 import { resolveSpeechConfig } from "./speech/speech-config-resolver.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
@@ -37,8 +39,6 @@ export {
 } from "./persisted-config.js";
 
 const DEFAULT_PORT = 6868;
-const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
-const DEFAULT_APP_BASE_URL = "https://app.paseo.sh";
 const DEFAULT_TRUSTED_PROXIES = ["loopback"];
 // Releases provider processes of agents nobody is using; the next prompt or load resumes them.
 const DEFAULT_CLOSE_IDLE_SESSIONS_AFTER_MS = 30 * 60_000;

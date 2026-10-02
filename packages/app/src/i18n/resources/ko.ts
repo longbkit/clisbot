@@ -1152,6 +1152,10 @@ export const ko: TranslationResources = {
       searchPlaceholder: "호스트 검색...",
     },
     actions: {
+      new: "새로 만들기…",
+      newProject: "새 프로젝트",
+      newBot: "새 봇",
+      newGroup: "새 그룹 채팅",
       addProject: "프로젝트 추가",
       newWorkspace: "새 워크스페이스",
       hosts: "호스트",
@@ -2202,6 +2206,9 @@ export const ko: TranslationResources = {
         description: "프롬프트 사이를 이동하기 위한 개요 표시",
       },
       sidebar: {
+        bottomTitle: "하단",
+        bottomDescription:
+          "하단 작업과 순서를 선택하세요. 새로 만들기, 프로젝트 추가, 검색은 왼쪽에, 호스트 선택과 세션 가져오기는 오른쪽에 표시됩니다. 도움말과 설정은 항상 고정된 위치에 표시됩니다.",
         title: "사이드바",
         description: "사이드바 상단에 표시할 항목과 순서를 선택하세요",
         moveUp: "위로 이동",

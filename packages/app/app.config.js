@@ -116,6 +116,12 @@ const variants = {
 };
 
 const variant = variants[appVariant] ?? variants.production;
+const analyticsEnabled =
+  appVariant === "production" &&
+  !isFdroidBuild &&
+  process.env.EXPO_PUBLIC_CLISBOT_ANALYTICS !== "0";
+const firebaseConfigured =
+  analyticsEnabled && Boolean(variant.googleServicesFile && variant.googleServiceInfoPlist);
 const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
 
 export default {
@@ -154,7 +160,9 @@ export default {
       permissions: buildProfile.androidPermissions,
       package: variant.packageId,
       versionCode: nativeReleaseVersion.androidVersionCode,
-      ...(variant.googleServicesFile ? { googleServicesFile: variant.googleServicesFile } : {}),
+      ...(variant.googleServicesFile && !isFdroidBuild
+        ? { googleServicesFile: variant.googleServicesFile }
+        : {}),
     },
     web: {
       output: "single",
@@ -196,6 +204,7 @@ export default {
       [
         "expo-build-properties",
         {
+          ...(firebaseConfigured ? { ios: { useFrameworks: "static" } } : {}),
           android: {
             minSdkVersion: 29,
             kotlinVersion: "2.1.20",
@@ -205,6 +214,12 @@ export default {
         },
       ],
       ...buildProfile.fdroidPlugins,
+      ...(firebaseConfigured
+        ? [
+            ["@react-native-firebase/app", { ios: { disableSPM: true } }],
+            ["@react-native-firebase/analytics", { ios: { withoutAdIdSupport: true } }],
+          ]
+        : []),
       ...(isProfileBuild ? [withAndroidProfileable] : []),
     ],
     experiments: {
@@ -215,6 +230,10 @@ export default {
     extra: {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
+      productAnalytics: {
+        enabled: analyticsEnabled,
+        nativeConfigured: firebaseConfigured,
+      },
       ...(clisbotHubOrigin === undefined ? {} : { clisbotHub: { origin: clisbotHubOrigin } }),
       router: {},
       eas: {

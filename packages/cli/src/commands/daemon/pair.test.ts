@@ -16,7 +16,7 @@ test("offline pairing requires relay consent and saves it in the selected home",
     expect(existsSync(home)).toBe(false);
     const offer = await resolveLocalPairingOffer({ clisbotHome: home, enableRelay: true });
     expect(offer.relayEnabled).toBe(true);
-    expect(offer.url).toContain("offer=");
+    expect(offer.url).toMatch(/^https:\/\/app\.clisbot\.com\/#offer=/);
     expect(
       JSON.parse(await readFile(path.join(home, "config.json"), "utf8")).daemon.relay.enabled,
     ).toBe(true);

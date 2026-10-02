@@ -34,8 +34,8 @@ const daemon = await createClisbotDaemon(
     agentClients: {},
     agentStoragePath: path.join(clisbotHome, "agents"),
     relayEnabled: false,
-    relayEndpoint: "relay.paseo.sh:443",
-    appBaseUrl: "https://app.paseo.sh",
+    relayEndpoint: "relay.clisbot.com:443",
+    appBaseUrl: "https://app.clisbot.com",
     // Add custom config here, e.g.:
     // providerOverrides: { ... },
   },

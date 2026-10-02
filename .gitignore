@@ -14,8 +14,9 @@ result
 .env.local
 .env.test.local
 .env*.local
-.dev.vars
-**/.dev.vars
+.dev.vars*
+**/.dev.vars*
+!**/.dev.vars.example
 
 # Logs
 *.log

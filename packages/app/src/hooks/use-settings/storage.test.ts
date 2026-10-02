@@ -237,6 +237,31 @@ describe("loadAppSettingsFromStorage", () => {
     expect(result.sidebarNavItems).toEqual([]);
   });
 
+  it("loads bottom preferences independently from top navigation on existing installs", async () => {
+    const preferences = [
+      { key: "import-session", visible: false },
+      { key: "hosts", visible: true },
+      { key: "search", visible: false },
+    ];
+    const result = await loadAppSettingsFromStorage(
+      makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ sidebarFooterItems: preferences }),
+        }),
+      }),
+    );
+    expect(result.sidebarFooterItems).toEqual(preferences);
+    expect(result.sidebarNavItems).toEqual([]);
+    const malformed = await loadAppSettingsFromStorage(
+      makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ sidebarFooterItems: [{ key: "search" }] }),
+        }),
+      }),
+    );
+    expect(malformed.sidebarFooterItems).toEqual([]);
+  });
+
   it("collapses legacy diff destinations into the former Explorer choice", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({

@@ -50,8 +50,9 @@ keeps it. It has two parts:
 1. **Fixed frame**, in code, not stored, not editable. It states the bot's display name, slug and
    description; every member as `@slug — display name — description`; and how the room works:
    - a mention or `@everyone` is an invitation to speak, not an obligation;
-   - speak only to answer a question aimed at you, add new information, disagree, or take a step you
-     own; otherwise reply exactly `PASS`;
+   - answer the user's message naturally, including greetings and casual conversation, or add new
+     information, disagree, or take a step you own; when another member already answered adequately
+     and there is nothing useful to add, or the message needs no reply, reply exactly `PASS`;
    - even when the user tagged only you, decide whether another member's role covers part of the
      request, and tag them with one concrete ask each;
    - never tag for thanks, agreement or a passing reference; never write `@everyone`;
@@ -71,9 +72,12 @@ A bot with no description is listed with its display name as its role. The bot f
 field **Role** and says other bots read it; Add bots and Participants show each bot's role, or
 that it has none yet.
 
-Membership, description or room-instruction changes do not reset sessions. Each participant stores
+Room-rule, membership, description or room-instruction changes do not reset sessions. Each participant stores
 the fingerprint of the room it was last told (`roomSeen`); when it differs, the bot's next wake
-starts with a `[Room update]` block restating the members and instructions. Sessions created before
+starts with a `[Room update]` block restating the fixed rules, members and instructions. The
+fingerprint includes the fixed rules because a resumed session retains its original system prompt.
+The 2026-10-01 correction allows greetings: the former question-only frame made both bots pass on
+an opening `hi`. Existing sessions receive the correction on their next wake. Sessions created before
 the room contract existed have no fingerprint, so their next wake starts with the whole contract,
 rules included: a members-only update would never teach them `PASS`.
 
@@ -100,7 +104,9 @@ One bot speaks at a time per Chat. Bots in different Chats still run concurrentl
   the room in unless that bot tags them.
 - **End**: a round in which nobody speaks ends the discussion. `rounds.max` (default 5) is a guard
   rail, not a target: bots are told to stop as soon as the question is settled, and the last round's
-  wake says the room is wrapping up. Reaching the cap appends a `system` line. The daemon runs at
+  wake says the room is wrapping up only after the opening round. A one-round limit still invites
+  an answer to the user's first message; a wrap-up cue there suppressed even a greeting.
+  Reaching the cap appends a `system` line. The daemon runs at
   most 20 rounds whatever the stored value says.
 - **Preempt**: every user line in a group ends the running discussion. When it names or addresses
   bots, it opens a new one. A bot still speaking keeps the floor: the new discussion's first bot

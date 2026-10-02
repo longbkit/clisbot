@@ -8,6 +8,7 @@ import {
   type ComponentProps,
   type ReactElement,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
@@ -116,6 +117,8 @@ export interface MenuSurfaceProps {
   horizontalPadding?: number;
   scrollable?: boolean;
   testID?: string;
+  /** Popover surface bounds, including padding, for hover tracking across a portal. */
+  surfaceRef?: RefObject<View | null>;
   /** Limits ordinary app shortcuts to the time this menu owns keyboard focus. */
   keyboardFocusScope?: KeyboardFocusScope;
 }
@@ -206,6 +209,7 @@ function MenuPopoverSurface({
   scrollable = false,
   testID,
   keyboardFocusScope,
+  surfaceRef,
 }: MenuSurfaceProps): ReactElement | null {
   const menu = useMenuContext("MenuSurface");
   const { value: surfaceValue, getAnchor } = useSubAnchors();
@@ -262,6 +266,7 @@ function MenuPopoverSurface({
             scrollable={scrollable}
             testID={testID}
             keyboardFocusScope={keyboardFocusScope}
+            surfaceRef={surfaceRef}
           >
             <MenuPage depth={0}>{children}</MenuPage>
           </AnchoredSurface>

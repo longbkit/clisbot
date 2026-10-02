@@ -1153,6 +1153,10 @@ export const en = {
       searchPlaceholder: "Search hosts...",
     },
     actions: {
+      new: "New…",
+      newProject: "New project",
+      newBot: "New bot",
+      newGroup: "New group chat",
       addProject: "Add project",
       newWorkspace: "New workspace",
       hosts: "Hosts",
@@ -2323,6 +2327,9 @@ export const en = {
         description: "Show an outline for jumping between prompts",
       },
       sidebar: {
+        bottomTitle: "Bottom",
+        bottomDescription:
+          "Choose the bottom actions and their order. New, Add project and Search stay on the left; Host selection and Import session stay on the right. Help and Settings are always visible in fixed positions.",
         title: "Sidebar",
         description: "Choose which items appear at the top of the sidebar and in what order",
         moveUp: "Move up",

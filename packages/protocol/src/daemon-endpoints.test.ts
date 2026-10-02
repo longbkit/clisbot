@@ -102,7 +102,7 @@ describe("relay websocket URL versioning", () => {
   test("defaults relay URLs to v2", () => {
     const url = new URL(
       buildRelayWebSocketUrl({
-        endpoint: "relay.paseo.sh:443",
+        endpoint: "relay.clisbot.com:443",
         useTls: true,
         serverId: "srv_test",
         role: "client",
@@ -116,7 +116,7 @@ describe("relay websocket URL versioning", () => {
   test("includes connectionId when provided (server data sockets)", () => {
     const url = new URL(
       buildRelayWebSocketUrl({
-        endpoint: "relay.paseo.sh:443",
+        endpoint: "relay.clisbot.com:443",
         useTls: true,
         serverId: "srv_test",
         role: "server",
@@ -130,7 +130,7 @@ describe("relay websocket URL versioning", () => {
   test("allows explicitly requesting v1 relay URLs", () => {
     const url = new URL(
       buildRelayWebSocketUrl({
-        endpoint: "relay.paseo.sh:443",
+        endpoint: "relay.clisbot.com:443",
         useTls: true,
         serverId: "srv_test",
         role: "server",
@@ -155,7 +155,7 @@ describe("relay websocket URLs", () => {
   test("uses ws for port 443 when TLS is disabled", () => {
     const url = new URL(
       buildRelayWebSocketUrl({
-        endpoint: "relay.paseo.sh:443",
+        endpoint: "relay.clisbot.com:443",
         useTls: false,
         serverId: "srv_test",
         role: "client",
@@ -168,7 +168,7 @@ describe("relay websocket URLs", () => {
   test("uses wss for non-443 ports when TLS is enabled", () => {
     const url = new URL(
       buildRelayWebSocketUrl({
-        endpoint: "relay.paseo.sh:6868",
+        endpoint: "relay.clisbot.com:6868",
         useTls: true,
         serverId: "srv_test",
         role: "client",
@@ -194,7 +194,7 @@ describe("relay websocket URLs", () => {
 
 describe("shouldUseTlsForDefaultHostedRelay", () => {
   test("returns true for the hosted Clisbot relay on port 443", () => {
-    expect(shouldUseTlsForDefaultHostedRelay("relay.paseo.sh:443")).toBe(true);
+    expect(shouldUseTlsForDefaultHostedRelay("relay.clisbot.com:443")).toBe(true);
   });
 
   test("returns true for any self-hosted relay on port 443", () => {
@@ -221,14 +221,14 @@ describe("relay connection URI", () => {
         v: 2 as const,
         serverId: "srv_test",
         daemonPublicKeyB64: "abc+/=",
-        relay: { endpoint: "relay.paseo.sh:443", useTls: true },
+        relay: { endpoint: "relay.clisbot.com:443", useTls: true },
       },
       password: "two words",
     };
     const uri = serializeRelayConnectionUri(parts);
     expect(parseRelayConnectionUri(uri)).toEqual(parts);
     expect(
-      parseRelayConnectionUri(`https://app.paseo.sh/#connect=${encodeURIComponent(uri)}`),
+      parseRelayConnectionUri(`https://app.clisbot.com/#connect=${encodeURIComponent(uri)}`),
     ).toEqual(parts);
   });
 });

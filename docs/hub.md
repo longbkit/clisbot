@@ -6,11 +6,43 @@ Clisbot Hub is an explicit opt-in connection from one Clisbot daemon to one Hub.
 not register it with a Hub. The relationship begins only when a user runs
 `clisbot hub connect [url]` from the daemon machine and approves that Host in the browser. Clisbot assistant onboarding can also explicitly enroll the local daemon through the authenticated local operator API when channel credentials are supplied.
 
+## Hosts in Settings
+
+**Settings → Host → Hosts** is the first destination in the Host group and remains
+available before Hub sign-in and when Hub support is disabled. It lists Hosts saved on
+the device and, after sign-in, organization Hosts the current account may access. The
+existing inventory owns visibility; this page does not grant access or retain a previous
+account's organization Hosts after sign-out or account changes. Organization management
+actions keep their existing permissions.
+
+If the Hub account or Host inventory fails to load, the page shows an error with a retry
+action and keeps saved Hosts available. An unresolved inventory does not show empty-list
+guidance.
+
+The main page title is **Hosts**. The navigation row and **All hosts** picker option
+show a separate compact **active/total** status badge. The smaller Hosts section heading
+spells this out as **1 active / 2 total**. Each badge has a status dot beside the active
+count. Active means the app's connection is online, independently of
+the Host's Hub link. Each listed Host counts once, including organization Hosts still
+waiting for connection details; a saved connection to the same Host is not counted again.
+
+Host rows in the picker and the Hosts list expose the Host ID to distinguish equal names.
+Picker accessibility labels include the name, connection status, and Host ID.
+An organization Host still waiting for connection details exposes its Hub ID until the Host
+ID is available. Picker rows also spell out their connection status: green means online,
+the warning dot means connecting (not active), and the danger dot means offline or error.
+
+The sidebar footer and Settings Host selectors always show **Search hosts** when opened,
+even with one Host. The footer always offers **All hosts**, whose separate Settings button
+opens the Hosts list and closes the picker without changing the sidebar filter. The
+existing `/settings/hub/hosts` URL is retained for links; it now opens the list directly
+without a sign-in gate.
+
 ## Host onboarding
 
 With `CLISBOT_ONBOARDING_ENABLED` enabled (the default), onboarding uses **one command: `clisbot hub connect <Hub URL>`**. It reads the daemon's public identity, starts a browser approval request, and shows the Host, organization and Hub-on-Host permissions before consent. Owner/Admin approval issues a single-use enrollment token bound to the server ID, daemon public key and exact permission set. The request and token expire 10 minutes after the request starts. Approval and token disclosure are persisted transactionally; issuing a Host token never inserts an organization CLI credential. The daemon exchanges the token and keeps its own relationship credential.
 
-The CLI returns the enrollment response, which may still say `connecting`; the daemon finishes the connection in the background and the browser follows its progress. Enrollment activates Managed Access and closes the ticketless CLI session, so onboarding does not poll through that session or obtain a broader credential. Non-TTY and JSON modes use the same browser approval flow; instructions go to stderr. Both the printed link and automatically opened URL include the approval code, so the user does not need to copy it separately. An already enrolled Host on the same Hub is reused without changing permissions. A different Hub requires an explicit disconnect. Lost or expired approval results require a new request; follow connection progress in Hub → Hosts. `hub status` and rerunning `connect` on an enrolled Host require an already authorized daemon connection (local IPC or a managed access ticket). No stored CLI credential is consulted. An explicit `--api-key` or `CLISBOT_HUB_API_KEY` selects unattended enrollment instead; use an API key restricted to `daemons:enroll`.
+The CLI returns the enrollment response, which may still say `connecting`; the daemon finishes the connection in the background and the browser follows its progress. Enrollment activates Managed Access and closes the ticketless CLI session, so onboarding does not poll through that session or obtain a broader credential. Non-TTY and JSON modes use the same browser approval flow; instructions go to stderr. Both the printed link and automatically opened URL include the approval code, so the user does not need to copy it separately. An already enrolled Host on the same Hub is reused without changing permissions. A different Hub requires an explicit disconnect. Lost or expired approval results require a new request; follow connection progress in Settings → Host → Hosts. `hub status` and rerunning `connect` on an enrolled Host require an already authorized daemon connection (local IPC or a managed access ticket). No stored CLI credential is consulted. An explicit `--api-key` or `CLISBOT_HUB_API_KEY` selects unattended enrollment instead; use an API key restricted to `daemons:enroll`.
 
 The existing Hub relationship status RPC adds optional `enrollmentIdentity` data (public only), gated once by `server_info.features.hubEnrollmentIdentity`. Older daemons remain readable; browser enrollment requires the field and fails with an update instruction rather than creating a broad CLI login. Browser decisions include their purpose so an older approval page cannot approve a Host request as a CLI login. The rollout toggle belongs to CLI and Hub: disabling `CLISBOT_ONBOARDING_ENABLED` restores the legacy credential-based CLI connect/login flow and rejects new browser Host-enrollment requests on Hub. Existing authorized requests keep their original scope and expiry.
 

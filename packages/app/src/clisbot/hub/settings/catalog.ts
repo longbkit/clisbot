@@ -55,7 +55,6 @@ const SIGNED_IN_ITEMS: readonly HubSettingsNavigationItem[] = [
   CHANNELS_ITEM,
   AUTOMATIONS_ITEM,
   PEOPLE_ITEM,
-  HOSTS_ITEM,
   INTEGRATIONS_ITEM,
 ];
 
@@ -68,7 +67,7 @@ export interface HubNavigationGrant {
 /**
  * Which Hub destinations a Member reaches without the organization's management role:
  * Channels when they administer a Connection, Automations when they may run or create one,
- * and People and Hosts always (their own access, and the Hosts they may use and open).
+ * and People always (their own access). Hosts lives in the Host group for every account state.
  * Instance settings are the Hub operator's alone.
  */
 export function hubSettingsNavigationItems(input: {
@@ -94,13 +93,12 @@ export function hubSettingsNavigationItems(input: {
       ? [AUTOMATIONS_ITEM]
       : []),
     PEOPLE_ITEM,
-    HOSTS_ITEM,
   ];
   return [ACCOUNT_ITEM, ...destinations, ...instance];
 }
 
 export function hubSettingsSection(section: HubSectionSlug): HubSettingsNavigationItem {
-  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, INSTANCE_ITEM].find(
+  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, HOSTS_ITEM, INSTANCE_ITEM].find(
     (candidate) => candidate.section === section,
   );
   return item ?? ACCOUNT_ITEM;

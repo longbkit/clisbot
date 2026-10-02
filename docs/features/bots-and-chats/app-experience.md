@@ -10,13 +10,24 @@ turn rules, grants and execution remain unchanged.
 ## Navigation
 
 - Account access sits with the organization context at the top, on desktop and mobile.
-- Primary navigation is New workspace, Search, History, Automations. Search extends the existing
-  Command Center; it is not a second search system. Bots and group chats register as contribution
+- Primary navigation defaults to New workspace, History and Automations. The top Search row is
+  opt-in; Search stays visible in the footer by default and extends the existing Command Center.
+  Bots and group chats register as contribution
   sections (`clisbot/bots/search/`): **Bots** match name, Role or `@slug` and open the bot's
   chat; **Group chats** match the title or a member's name. New bot and New group chat join
   Actions and ask the sidebar to open its sheet. All show only for a query, and rank above
   Workspaces, so a bot's own workspace no longer stands in for the bot. Message text is not
   searched yet; that needs a daemon search.
+- Settings → Sidebar also configures **Bottom**. The default left actions are an accent **New…**
+  button and a Search field with the configured Command Center shortcut. New offers workspace,
+  project, bot and group chat creation through the existing owners and authority checks, then a
+  separator and Import session. The standalone Import session button defaults to hidden. Add project
+  is opt-in both below New workspace and in the footer. Left actions and right Host/Import controls
+  can be hidden or reordered within their group; Help and Settings always stay visible at the right
+  end. Hover opens New on desktop and closes it 260ms after the pointer leaves the trigger,
+  menu and the bridge between them. Selection, outside press and Escape also close it; compact
+  layouts open a sheet by tap. Footer controls and New menu actions have actual touch targets of
+  at least 48px on mobile web, touch tablets and native clients; desktop pointer sizes stay compact.
 - Pinned appears before Group chats, Bots and Projects. Pins can identify a bot,
   chat, project, workspace or session; a pinned flat conversation is not repeated in its collection.
 - Section collapse state is a view preference. Bot projects use the same Projects list,
@@ -26,16 +37,19 @@ turn rules, grants and execution remain unchanged.
   workspace pins, while regular Host placements in the same logical project stay visible.
 - Preserve existing workspace/session rows, project filters, display preferences and shallow
   indentation. Creation actions remain discoverable on section headings. Avoid unread-count badges.
+- Sidebar collection headings use muted, normal-weight `fontSize.sm` labels and 14px icons,
+  below primary navigation and item titles, retaining the existing touch targets.
 - A section heading keeps its display menu at the right edge; the create action appears to its
-  left on hover and takes no space otherwise. Bots and Group chats each have a display menu like
+  left and is always visible for Group chats, Bots and Projects. Bots and Group chats each have
+  a display menu like
   Projects (`clisbot/bots/sidebar/display/`): **Show** toggles what the row's second line says,
   and **Host** narrows the section when there are several Hosts. A bot row shows Host, provider,
   permission mode and thinking by default (model and Role are off); a group row shows Host and
   its bot count (member names are off). A value the bot leaves unset shows as the default it runs
   with, named from the Host's provider snapshot. The choices are a device preference, stored apart
   from the upstream sidebar settings.
-- Footer retains Add project, Hosts, Import session, Help and Settings. Account is no longer there;
-  there is no additional theme shortcut.
+- Footer defaults to New, Search, Hosts, Help and Settings; Add project and Import session are opt-in.
+  Account is no longer there; there is no additional theme shortcut.
 
 Workspace pins keep their existing owner. Additional resource pins are client view preferences,
 not new daemon grants or a synchronized team pin contract. Resolve every pin against the current

@@ -1159,6 +1159,10 @@ export const ja: TranslationResources = {
       searchPlaceholder: "ホストを検索...",
     },
     actions: {
+      new: "新規…",
+      newProject: "新規プロジェクト",
+      newBot: "新規ボット",
+      newGroup: "新規グループチャット",
       addProject: "プロジェクトを追加",
       newWorkspace: "新しいワークスペース",
       hosts: "ホスト",
@@ -2209,6 +2213,9 @@ export const ja: TranslationResources = {
         description: "プロンプト間を移動するためのアウトラインを表示します",
       },
       sidebar: {
+        bottomTitle: "下部",
+        bottomDescription:
+          "下部のアクションと順序を設定します。新規、プロジェクト追加、検索は左側、ホスト選択とセッションのインポートは右側です。ヘルプと設定は常に固定位置に表示されます。",
         title: "サイドバー",
         description: "サイドバー上部に表示する項目とその順序を選択します",
         moveUp: "上に移動",

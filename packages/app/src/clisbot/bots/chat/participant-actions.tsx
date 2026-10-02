@@ -4,7 +4,7 @@ import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { botsSessionScope } from "../data/session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
-import { CoworkIcon } from "./cowork-icon";
+import { PanelsTopLeft } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatParticipantPayload } from "@clisbot/protocol/chats/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -61,7 +61,7 @@ export function ParticipantActions({
       <ChatHeaderAction
         label="Open in cowork"
         text="Cowork"
-        icon={CoworkIcon}
+        icon={PanelsTopLeft}
         iconSize={20}
         onPress={open}
       />

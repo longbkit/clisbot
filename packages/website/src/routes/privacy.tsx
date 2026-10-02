@@ -14,7 +14,7 @@ export const Route = createFileRoute("/privacy")({
 
 function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="September 30, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 1, 2026">
       <p>
         Clisbot is local-first. Installing or using the open-source software does not send us your
         code, prompts, files, terminal output, or agent conversations. This policy explains the
@@ -35,8 +35,27 @@ function Privacy() {
       <section>
         <h2>Local Clisbot apps and daemons</h2>
         <p>
-          Clisbot runs on your machines. It does not send us analytics, telemetry, advertising
-          identifiers, or crash reports.
+          Clisbot runs on your machines. Usage analytics is optional and enabled by default in
+          supported production builds. You can enable or disable it in Settings → General → Privacy.
+          The daemon does not send product analytics or crash reports.
+        </p>
+        <p>
+          We use these measurements to understand feature adoption and improve Clisbot. A random
+          identifier can link usage from the same installation; this is pseudonymous data, not
+          guaranteed anonymity. Google processes this metadata. We reduce exposure by collecting
+          only standardized screen names, excluding work content and identifying details, and
+          disabling advertising identifiers and personalization. Turning analytics off stops future
+          collection and resets local identifiers; it does not erase data Google has already
+          processed.
+        </p>
+        <p>
+          When enabled, the app sends Google Analytics app opens, standardized screen names, usage
+          duration, app version, and platform information. Android and iOS use Firebase Analytics,
+          which also collects basic device and app lifecycle information. Electron sends these
+          limited usage events through our Cloudflare collector. Analytics identifiers are
+          pseudonymous and reset on this device when you turn analytics off. Advertising identifiers
+          and personalization are disabled. Analytics never includes prompts, chats, code, project
+          names, file paths, host addresses, or account email addresses.
         </p>
         <p>
           Packaged desktop apps check GitHub Releases for updates. GitHub receives the ordinary
@@ -148,9 +167,29 @@ function Privacy() {
       </section>
 
       <section>
+        <h2>Website analytics</h2>
+        <p>
+          If you accept analytics cookies, clisbot.com uses Google Analytics to measure page visits
+          and understand website usage. Google receives page paths, browser and device information,
+          approximate location, and pseudonymous browser identifiers. We do not send code, prompts,
+          files, or agent conversations through website analytics. Advertising personalization and
+          Google signals are disabled.
+        </p>
+        <p>
+          Analytics is optional and is not loaded before you accept. You can decline or withdraw
+          consent using Cookie settings in the footer. Learn more in{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+            Google&apos;s privacy policy
+          </a>
+          .
+        </p>
+      </section>
+
+      <section>
         <h2>Cookies</h2>
         <p>
-          The marketing website does not use analytics or advertising cookies. Hub uses only the
+          The marketing website stores your analytics preference locally and uses first-party Google
+          Analytics cookies only if you accept. It does not use advertising cookies. Hub uses the
           session and security cookies needed to sign you in and operate your account.
         </p>
       </section>

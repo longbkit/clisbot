@@ -4,8 +4,9 @@ import { getCanonicalRedirect } from "~/canonical-url";
 import { getDoc, getLegacyDocsRedirect } from "~/docs";
 import { getLatestAndroidVersion } from "~/latest-release";
 import { buildLlmsTxt } from "~/llms";
+import { collectDesktopAnalytics, type DesktopAnalyticsEnv } from "~/desktop-analytics";
 
-interface WebsiteEnv {
+interface WebsiteEnv extends DesktopAnalyticsEnv {
   WEBSITE_CACHE?: KVNamespace;
 }
 
@@ -62,6 +63,7 @@ function variesByUserAgent(pathname: string, response: Response): boolean {
 export default {
   async fetch(request: Request, env: WebsiteEnv, context: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/api/analytics/desktop") return collectDesktopAnalytics(request, env);
 
     const environment = import.meta.env.DEV ? "development" : "production";
     const canonicalRedirect = getCanonicalRedirect(url, environment);

@@ -2,6 +2,10 @@
 
 This directory owns the shared Clisbot daemon and Hub image.
 
+The official relay server has a separate pinned Elixir build in [`relay/`](relay/).
+See [relay deployment](../docs/relay-deployment.md) for its Docker container,
+Cloudflare Tunnel, verification and private credential storage.
+
 Set `CLISBOT_RUN_MODE=daemon` (default), `hub`, or `all` to choose services.
 See [service modes](../docs/docker.md#service-modes) for ports, persistence,
 healthchecks, and shutdown. The daemon serves the shared browser UI on `6868`,

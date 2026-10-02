@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
-import { OctagonX } from "lucide-react-native";
+import { Square, type LucideProps } from "lucide-react-native";
 import { useHostRuntimeClient, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import { ChatHeaderAction } from "./header-action";
+
+function StopIcon({ color = "currentColor", ...props }: LucideProps) {
+  return <Square {...props} color={color} fill={color} strokeWidth={0} />;
+}
 
 /**
  * Stop all (docs/features/bots-and-chats/plans/group-discussion.md): ends the group discussion
@@ -40,7 +44,8 @@ export function StopAllAction({
     <ChatHeaderAction
       label="Stop all bots"
       text="Stop all"
-      icon={OctagonX}
+      icon={StopIcon}
+      iconSize={20}
       onPress={stop}
       disabled={!online || stopping}
     />

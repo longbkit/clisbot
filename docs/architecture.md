@@ -180,7 +180,7 @@ Enables remote access when the daemon is behind a firewall.
 - Optional E2EE capability negotiation preserves application frame kind: text plaintext uses base64 ciphertext text frames, while binary plaintext uses raw ciphertext binary frames; mixed-version peers remain base64-only
 - Self-hosted relays opt into TLS with `daemon.relay.useTls` or `CLISBOT_RELAY_USE_TLS=true`; the public (client-facing) TLS setting can be overridden independently via `daemon.relay.publicUseTls` or `CLISBOT_RELAY_PUBLIC_USE_TLS`
 
-The production relay server lives in [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay). It is a distributed Elixir service. The Cloudflare relay implementation in this monorepo is retained as legacy code and is not deployed.
+The official production relay is `relay.clisbot.com:443` with TLS. It currently uses the Elixir source in [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay); the pinned Docker build, Compose configuration and Cloudflare Tunnel service are maintained in `docker/relay/`. The Cloudflare Worker implementation in this monorepo is another deployment option: it can run the relay or proxy to an upstream origin such as Fly. See [relay deployment](relay-deployment.md) for the options, operations and private credential storage.
 
 See [SECURITY.md](../SECURITY.md) for the full threat model.
 
@@ -304,6 +304,11 @@ searches that workspace and returns relative entries. Clients may prepend their 
 recent-project list for bare queries, but must not parse filesystem query syntax or re-filter a
 correlated daemon response. The legacy `directories` response field remains a projection of the
 typed `entries` list.
+
+Host project searches resolve explicitly named paths before discovery, including hidden paths.
+Completing a rooted path such as `~/.clisbot/work` reads its named parent, while bare fuzzy queries
+retain home-tree search. Otherwise an exact hidden path can spend seconds scanning unrelated home
+directories and still be omitted by discovery's hidden-directory policy.
 
 **Binary frames (terminal stream protocol):**
 

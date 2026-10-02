@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { chromium } from "playwright";
+import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 
 function parseArgs(argv) {
   const args = {};
@@ -24,8 +26,8 @@ const serverId = args["server-id"] ?? process.env.CLISBOT_SERVER_ID;
 const daemonPublicKeyB64 =
   args["daemon-public-key-b64"] ?? process.env.CLISBOT_DAEMON_PUBLIC_KEY_B64;
 const relayEndpoint =
-  args["relay-endpoint"] ?? process.env.CLISBOT_RELAY_ENDPOINT ?? "relay.paseo.sh:443";
-const baseUrl = args["base-url"] ?? process.env.CLISBOT_APP_URL ?? "https://app.paseo.sh";
+  args["relay-endpoint"] ?? process.env.CLISBOT_RELAY_ENDPOINT ?? DEFAULT_RELAY_ENDPOINT;
+const baseUrl = args["base-url"] ?? process.env.CLISBOT_APP_URL ?? DEFAULT_APP_BASE_URL;
 const timeoutMs = Number(args["timeout-ms"] ?? process.env.CLISBOT_PROVE_TIMEOUT_MS ?? 60_000);
 const stabilityMs = Number(
   args["stability-ms"] ?? process.env.CLISBOT_PROVE_STABILITY_MS ?? 30_000,

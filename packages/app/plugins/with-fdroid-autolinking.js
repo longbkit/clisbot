@@ -4,6 +4,8 @@ const { withAppBuildGradle, withDangerousMod, withSettingsGradle } = require("ex
 const { FDROID_ABI_VERSION_CODE_SUFFIXES } = require("../native-release-version");
 
 const EXCLUDED_ANDROID_MODULES = [
+  "@react-native-firebase/app",
+  "@react-native-firebase/analytics",
   "expo-camera",
   "expo-notifications",
   "expo-dev-client",

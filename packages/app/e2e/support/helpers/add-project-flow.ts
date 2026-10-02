@@ -47,7 +47,8 @@ async function openAddProjectFlowSurface(
   page: Page,
   expectedPage: "host" | "method",
 ): Promise<void> {
-  await page.getByTestId("sidebar-add-project").click();
+  await page.getByTestId("sidebar-new").click();
+  await page.getByTestId("sidebar-new-project").click();
   await expect(addProjectFlow(page)).toBeVisible({ timeout: 30_000 });
   await expectAddProjectPage(page, expectedPage);
 }

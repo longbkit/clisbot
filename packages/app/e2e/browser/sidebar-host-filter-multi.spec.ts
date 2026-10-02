@@ -4,7 +4,6 @@ import { gotoAppShell } from "../support/helpers/app";
 import { expectAppRoute } from "../support/helpers/route-assertions";
 import {
   addOfflineHostAndReload,
-  addOfflineHostsAndReload,
   expectHostFilterRow,
   openSidebarHostFilter,
   openSidebarHostPicker,
@@ -15,6 +14,8 @@ import {
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
+import { clickSettingsBackToWorkspace } from "../support/helpers/settings";
 
 const SECONDARY_HOST_ID = "host-filter-secondary";
 
@@ -61,7 +62,7 @@ test.describe("Sidebar host filter (multi-select)", () => {
 
   test("footer host picker filters the sidebar and opens settings from the gear", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const seeded = await seedWorkspace({ repoPrefix: "host-picker-filter-" });
     const serverId = getServerId();
     const workspaceRow = page.getByTestId(
@@ -77,6 +78,31 @@ test.describe("Sidebar host filter (multi-select)", () => {
 
       await openSidebarHostPicker(page);
       await expect(page.getByTestId("sidebar-host-row-__all_hosts__")).toBeVisible();
+      await expect(
+        page.getByTestId("sidebar-host-row-__all_hosts__").getByLabel("1 online out of 2 Hosts"),
+      ).toHaveText("1/2");
+      const onlineDot = page
+        .getByTestId(`sidebar-host-row-${serverId}`)
+        .getByRole("img", { name: "Online", exact: true });
+      const inactiveDot = page
+        .getByTestId(`sidebar-host-row-${SECONDARY_HOST_ID}`)
+        .getByRole("img", { name: /Connecting|Offline|Error/ });
+      await expect(onlineDot).toBeVisible();
+      await expect(inactiveDot).toBeVisible();
+      const onlineColor = await onlineDot.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      await expect(inactiveDot).not.toHaveCSS("background-color", onlineColor);
+      await expect(page.getByTestId(`sidebar-host-row-${serverId}`)).toContainText(
+        `Host ID: ${serverId}`,
+      );
+      await expect(page.getByTestId(`sidebar-host-row-${SECONDARY_HOST_ID}`)).toContainText(
+        `Host ID: ${SECONDARY_HOST_ID}`,
+      );
+      await testInfo.attach("host-picker-states", {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
       await selectSidebarHostPickerHost(page, SECONDARY_HOST_ID);
 
       await expect(workspaceRow).toHaveCount(0, { timeout: 10_000 });
@@ -93,9 +119,31 @@ test.describe("Sidebar host filter (multi-select)", () => {
       await expect(filterIndicator).toHaveCount(0);
 
       await openSidebarHostPicker(page);
+      await selectSidebarHostPickerHost(page, SECONDARY_HOST_ID);
+      await expect(filterIndicator).toBeVisible();
+      await expect(workspaceRow).toHaveCount(0);
+      await openSidebarHostPicker(page);
       await page
+        .getByTestId("sidebar-host-row-__all_hosts__")
+        .getByRole("button", { name: "Open All hosts settings", exact: true })
+        .click();
+      await expectAppRoute(page, buildHubSettingsRoute("hosts"));
+      await expect(
+        page.getByTestId("settings-hosts").getByLabel("1 online out of 2 Hosts"),
+      ).toHaveText("1/2");
+      await expect(page.getByTestId("settings-hosts-list")).toContainText("Secondary Host");
+      await expect(page.getByTestId("settings-hosts-list")).toContainText("1 active / 2 total");
+      await expect(page.getByPlaceholder("Search hosts")).not.toBeVisible();
+      await clickSettingsBackToWorkspace(page);
+      await expect(filterIndicator).toBeVisible();
+      await expect(workspaceRow).toHaveCount(0);
+      await page.getByTestId("sidebar-active-filters-clear").click();
+      await expect(workspaceRow).toBeVisible();
+
+      await openSidebarHostPicker(page);
+      await page
+        .getByTestId(`sidebar-host-row-${serverId}`)
         .getByRole("button", { name: /Open .* settings/ })
-        .first()
         .click();
       await expectAppRoute(page, buildSettingsHostSectionRoute(serverId, "host"));
     } finally {
@@ -103,23 +151,36 @@ test.describe("Sidebar host filter (multi-select)", () => {
     }
   });
 
-  test("footer host picker searches once there are four hosts", async ({ page }) => {
+  test("footer host picker always searches, including with one or two hosts", async ({ page }) => {
     const seeded = await seedWorkspace({ repoPrefix: "host-picker-search-" });
 
     try {
       await gotoAppShell(page);
-      await addOfflineHostsAndReload(page, [
-        { serverId: "host-search-two", label: "Search Host Two" },
-        { serverId: "host-search-three", label: "Search Host Three" },
-        { serverId: "host-search-four", label: "Search Host Four" },
-      ]);
+      await openSidebarHostPicker(page);
+      await expect(page.getByPlaceholder("Search hosts")).toBeVisible();
+      await expect(
+        page
+          .getByTestId("sidebar-host-row-__all_hosts__")
+          .getByRole("button", { name: "Open All hosts settings", exact: true }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await addOfflineHostAndReload(page, {
+        serverId: "host-search-two",
+        label: "localhost",
+      });
 
       await openSidebarHostPicker(page);
       const search = page.getByPlaceholder("Search hosts");
       await expect(search).toBeVisible({ timeout: 10_000 });
-      await search.fill("Four");
-      await expect(page.getByTestId("sidebar-host-row-host-search-four")).toBeVisible();
-      await expect(page.getByTestId("sidebar-host-row-host-search-two")).toHaveCount(0);
+      await expect(page.getByTestId(`sidebar-host-row-${getServerId()}`)).toHaveAccessibleName(
+        `localhost, Online, Host ID: ${getServerId()}`,
+      );
+      await expect(page.getByTestId("sidebar-host-row-host-search-two")).toHaveAccessibleName(
+        /^localhost, (Connecting|Offline|Error), Host ID: host-search-two$/,
+      );
+      await search.fill("Two");
+      await expect(page.getByTestId("sidebar-host-row-host-search-two")).toBeVisible();
+      await expect(page.getByTestId(`sidebar-host-row-${getServerId()}`)).toHaveCount(0);
     } finally {
       await seeded.cleanup();
     }

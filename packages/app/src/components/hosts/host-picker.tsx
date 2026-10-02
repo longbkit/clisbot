@@ -4,6 +4,7 @@ import type { GestureResponderEvent } from "react-native";
 import { Plus, Server, Settings } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { HostStatusDot } from "@/components/host-status-dot";
+import { HostsConnectionCount } from "@/clisbot/hub/settings/hosts-settings-label";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
@@ -15,11 +16,11 @@ import {
 } from "@/hosts/managed-access";
 import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { orderHostsLocalFirst } from "@/types/host-connection";
+import { formatConnectionStatus } from "@/utils/daemons";
 import {
   ADD_HOST_OPTION_ID,
   ALL_HOSTS_OPTION_ID,
   ENABLE_BUILT_IN_DAEMON_OPTION_ID,
-  shouldSearchHostPicker,
 } from "./host-picker-constants";
 
 export {
@@ -28,8 +29,6 @@ export {
   ENABLE_BUILT_IN_DAEMON_OPTION_ID,
   getHostFilterPickerValue,
   getHostPickerLabel,
-  HOST_PICKER_SEARCHABLE_THRESHOLD,
-  shouldSearchHostPicker,
 } from "./host-picker-constants";
 
 type RenderHostOption = NonNullable<ComboboxProps["renderOption"]>;
@@ -111,7 +110,7 @@ function HostSettingsButton({
 }
 
 // Standard secure/plain web ports carry no information in the host display, so
-// "relay.paseo.sh:443" reads as "relay.paseo.sh" while "127.0.0.1:6868" is kept.
+// "relay.clisbot.com:443" reads as "relay.clisbot.com" while "127.0.0.1:6868" is kept.
 function formatConnectionEndpoint(endpoint: string): string {
   return endpoint.replace(/:(?:443|80)$/, "");
 }
@@ -146,7 +145,10 @@ export function HostPickerOption({
   onOpenHostSettings,
   testID,
 }: HostPickerOptionProps): ReactElement {
-  const activeConnection = useHostRuntimeSnapshot(serverId)?.activeConnection ?? null;
+  const snapshot = useHostRuntimeSnapshot(serverId);
+  const activeConnection = snapshot?.activeConnection ?? null;
+  const status = snapshot?.connectionStatus ?? "idle";
+  const statusLabel = formatConnectionStatus(status);
   const connectionLabel =
     showActiveConnection && activeConnection
       ? formatActiveConnectionLabel(activeConnection)
@@ -174,7 +176,9 @@ export function HostPickerOption({
   return (
     <ComboboxItem
       label={label}
-      description={hostOptionDescription(managedAccess, connectionLabel)}
+      accessibilityLabel={`${label}, ${statusLabel}, Host ID: ${serverId}`}
+      description={hostOptionDescription(serverId, statusLabel, managedAccess, connectionLabel)}
+      descriptionLayout="stacked"
       leadingSlot={leadingSlot}
       trailingSlot={trailingSlot}
       selected={selected}
@@ -196,12 +200,14 @@ function SystemHostPickerOption({
   selected,
   onPress,
   kind,
+  onOpenSettings,
   testID,
 }: {
   active: boolean;
   selected?: boolean;
   onPress: () => void;
   kind: "add" | "all" | "enableBuiltInDaemon";
+  onOpenSettings?: () => void;
   testID?: string;
 }): ReactElement {
   const { theme } = useUnistyles();
@@ -211,11 +217,28 @@ function SystemHostPickerOption({
     () => <Icon size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
     [Icon, theme.colors.foregroundMuted, theme.iconSize.sm],
   );
+  const handleSettingsPress = useCallback(
+    (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      onOpenSettings?.();
+    },
+    [onOpenSettings],
+  );
+  const trailingSlot = useMemo(() => {
+    if (kind !== "all" && !onOpenSettings) return undefined;
+    return (
+      <View style={styles.trailing}>
+        {kind === "all" ? <HostsConnectionCount compact /> : null}
+        {onOpenSettings ? <HostSettingsButton label={label} onPress={handleSettingsPress} /> : null}
+      </View>
+    );
+  }, [kind, onOpenSettings, label, handleSettingsPress]);
 
   return (
     <ComboboxItem
       label={label}
       leadingSlot={leadingSlot}
+      trailingSlot={trailingSlot}
       selected={selected}
       active={active}
       onPress={onPress}
@@ -238,6 +261,7 @@ export interface HostPickerProps {
   onEnableBuiltInDaemon?: () => void;
   showActiveConnection?: boolean;
   onOpenHostSettings?: (serverId: string) => void;
+  onOpenAllHostsSettings?: () => void;
   searchable?: boolean;
   title?: string;
   desktopPlacement?: ComboboxProps["desktopPlacement"];
@@ -261,6 +285,7 @@ export function HostPicker({
   onEnableBuiltInDaemon,
   showActiveConnection,
   onOpenHostSettings,
+  onOpenAllHostsSettings,
   searchable,
   title,
   desktopPlacement = "bottom-start",
@@ -287,8 +312,6 @@ export function HostPicker({
     return hostOptions;
   }, [orderedHosts, includeAllHost, includeAddHost, includeEnableBuiltInDaemon]);
 
-  const isSearchable = shouldSearchHostPicker(orderedHosts.length, searchable);
-
   const handleSelect = useCallback(
     (id: string) => {
       if (id === ADD_HOST_OPTION_ID) {
@@ -310,6 +333,10 @@ export function HostPicker({
     },
     [onOpenHostSettings, onOpenChange],
   );
+  const handleOpenAllHostsSettings = useCallback(() => {
+    onOpenChange(false);
+    onOpenAllHostsSettings?.();
+  }, [onOpenAllHostsSettings, onOpenChange]);
 
   const renderOption = useCallback<RenderHostOption>(
     ({ option, selected, active, onPress }) => {
@@ -330,6 +357,7 @@ export function HostPicker({
             active={active}
             selected={selected}
             onPress={onPress}
+            onOpenSettings={onOpenAllHostsSettings ? handleOpenAllHostsSettings : undefined}
             testID={hostOptionTestID?.(option.id)}
           />
         );
@@ -356,6 +384,8 @@ export function HostPicker({
       addHostTestID,
       hostOptionTestID,
       onOpenHostSettings,
+      onOpenAllHostsSettings,
+      handleOpenAllHostsSettings,
       showActiveConnection,
       handleOpenHostSettings,
     ],
@@ -369,7 +399,7 @@ export function HostPicker({
         value={value}
         onSelect={handleSelect}
         renderOption={renderOption}
-        searchable={isSearchable}
+        searchable={searchable}
         searchPlaceholder="Search hosts"
         title={title ?? "Host"}
         open={open}
@@ -382,16 +412,17 @@ export function HostPicker({
   );
 }
 
-/** A managed access Host names how it is reached before the endpoint, so the row reads the same
- * whether or not the active connection is shown. */
+/** Status and endpoint describe the connection; the stable ID distinguishes equal Host names. */
 function hostOptionDescription(
+  serverId: string,
+  status: string,
   managedAccess: boolean,
   connectionLabel: string | undefined,
-): string | undefined {
-  if (!managedAccess) return connectionLabel;
-  return connectionLabel
-    ? `${MANAGED_ACCESS_HOST_LABEL} · ${connectionLabel}`
-    : MANAGED_ACCESS_HOST_LABEL;
+): string {
+  const connection = [status, managedAccess ? MANAGED_ACCESS_HOST_LABEL : null, connectionLabel]
+    .filter(Boolean)
+    .join(" · ");
+  return `${connection}\nHost ID: ${serverId}`;
 }
 
 const styles = StyleSheet.create((theme) => ({

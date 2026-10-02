@@ -1,0 +1,12 @@
+{
+  "config": {
+    "ingress": [
+      {
+        "hostname": "relay.clisbot.com",
+        "path": "^/(ws|health|ready)$",
+        "service": "http://127.0.0.1:4000"
+      },
+      { "service": "http_status:404" }
+    ]
+  }
+}

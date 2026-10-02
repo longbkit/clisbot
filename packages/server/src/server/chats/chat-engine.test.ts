@@ -268,6 +268,26 @@ describe("ChatEngine", () => {
     expect(h.sent[2]!.agentId).toBe("agent-bot_b-2");
   });
 
+  test("a one-round group invites both bots to answer the opening greeting and ends after a reply", async () => {
+    const h = await harness();
+    await h.store.create({
+      id: "cht_1",
+      botIds: [alpha.id, beta.id],
+      rules: { rounds: { max: 1 } },
+    });
+    await h.engine.send({ chatId: "cht_1", text: "hi", messageId: "m1" });
+    await h.engine.idle();
+    expect(String(h.sent[0]!.prompt)).toContain("round 1 of at most 1");
+    expect(String(h.sent[0]!.prompt)).not.toContain("essential");
+    await h.completeTurn("agent-bot_a-1", "Hi!");
+    expect(String(h.sent[1]!.prompt)).toContain("Alpha (bot:alpha): Hi!");
+    expect(String(h.sent[1]!.prompt)).toContain("round 1 of at most 1");
+    expect(String(h.sent[1]!.prompt)).not.toContain("essential");
+    await h.completeTurn("agent-bot_b-2", "PASS");
+    expect((await h.lines("cht_1")).map((line) => line.text)).toEqual(["hi", "Hi!"]);
+    expect(h.sent).toHaveLength(2);
+  });
+
   test("an addressed bot can bring in another; the discussion stops at rounds.max with a notice", async () => {
     const h = await harness();
     await h.store.create({
@@ -808,6 +828,27 @@ describe("group room contract (plans/group-discussion.md)", () => {
     const fourth = String(h.sent.at(-1)!.prompt);
     expect(fourth.startsWith("[Room update]")).toBe(true);
     expect(fourth).toContain("<<<\nAnswer in Vietnamese.\n>>>");
+  });
+
+  test("new fixed room rules reach an existing session without a membership edit or reset", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_g", text: "hi", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS");
+    await h.completeTurn("agent-bot_b-2", "PASS");
+    await h.store.setParticipantRoomSeen("cht_g", alpha.id, "former-fixed-rules");
+    await h.engine.send({ chatId: "cht_g", text: "@alpha hi", messageId: "m2" });
+    await h.engine.idle();
+    const update = String(h.sent.at(-1)!.prompt);
+    expect(update.startsWith("[Room update]")).toBe(true);
+    expect(update).toContain("These rules replace the previous room rules.");
+    expect(update).toContain("A greeting or casual conversation is worth answering");
+    expect(h.createInputs).toHaveLength(2);
+    await h.completeTurn("agent-bot_a-1", "Hi!");
+    await h.engine.send({ chatId: "cht_g", text: "@alpha thanks", messageId: "m3" });
+    await h.engine.idle();
+    expect(String(h.sent.at(-1)!.prompt)).not.toContain("[Room update]");
   });
 
   test("PASS and an empty turn are silence in a group: no line, no notice, no forwarding", async () => {

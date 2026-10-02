@@ -54,7 +54,6 @@ vi.mock("react-native", () => ({
     </button>
   ),
 }));
-vi.mock("./cowork-icon", () => ({ CoworkIcon: () => <i /> }));
 afterEach(() => {
   cleanup();
   navigate.mockClear();

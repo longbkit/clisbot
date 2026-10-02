@@ -91,24 +91,23 @@ describe("ConnectionOfferV2 (daemon E2E)", () => {
       const offerUrl = await getPairingOfferUrl({
         clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
-        relayEndpoint: daemon.config.relayEndpoint,
-        relayPublicEndpoint: daemon.config.relayPublicEndpoint,
         appBaseUrl: daemon.config.appBaseUrl,
       });
-      expect(offerUrl.startsWith("https://app.paseo.sh/#offer=")).toBe(true);
+      expect(offerUrl.startsWith("https://app.clisbot.com/#offer=")).toBe(true);
 
       const offer = decodeOfferFromFragmentUrl(offerUrl) as {
         v: number;
         serverId: string;
         daemonPublicKeyB64: string;
-        relay: { endpoint: string };
+        relay: { endpoint: string; useTls: boolean };
       };
 
       expect(offer.v).toBe(2);
       expect(typeof offer.serverId).toBe("string");
       expect(offer.serverId.length).toBeGreaterThan(0);
       expect(offer.serverId.startsWith("srv_")).toBe(true);
-      expect(offer.relay.endpoint).toBe("relay.paseo.sh:443");
+      expect(offer.relay.endpoint).toBe("relay.clisbot.com:443");
+      expect(offer.relay.useTls).toBe(true);
       expect(typeof offer.daemonPublicKeyB64).toBe("string");
       expect(offer.daemonPublicKeyB64.length).toBeGreaterThan(0);
       expect(() => Buffer.from(offer.daemonPublicKeyB64, "base64")).not.toThrow();

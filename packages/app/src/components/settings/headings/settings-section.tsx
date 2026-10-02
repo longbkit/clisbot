@@ -6,6 +6,7 @@ import { settingsStyles } from "@/styles/settings";
 
 interface SettingsSectionProps {
   title: string;
+  titleAccessory?: ReactNode;
   prominence?: "default" | "primary";
   /**
    * What this section is for. Renders as an info tooltip on the header; a
@@ -30,6 +31,7 @@ interface SettingsSectionProps {
  */
 export function SettingsSection({
   title,
+  titleAccessory,
   prominence = "default",
   info,
   trailing,
@@ -54,6 +56,7 @@ export function SettingsSection({
           >
             {title}
           </Text>
+          {titleAccessory}
           {info ? (
             <SettingsInfoTip
               title={title}

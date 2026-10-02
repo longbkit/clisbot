@@ -2,7 +2,7 @@ import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/s
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
-import { FolderPlus, GitBranch, Import, Server, Settings, X } from "lucide-react-native";
+import { FolderPlus, GitBranch, Import, Search, Server, Settings, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
@@ -11,7 +11,6 @@ import {
   Text,
   useWindowDimensions,
   View,
-  type PressableStateCallbackType,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
@@ -32,10 +31,13 @@ import {
 import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
 import { SidebarHelpMenu } from "@/components/sidebar/sidebar-help-menu";
+import { SidebarNewMenu } from "@/components/sidebar/sidebar-new-menu";
 import { SidebarResizeHandle } from "@/components/sidebar-resize-handle";
 import { Shortcut } from "@/components/ui/shortcut";
+import { buttonControlHeight, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HEADER_INNER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
+import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -44,12 +46,15 @@ import {
   type SidebarWorkspaceEntry,
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarModel } from "@/components/sidebar/sidebar-model";
+import { useSidebarFooterItems } from "@/sidebar-nav/use-sidebar-footer-items";
+import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import type { PinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
+import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
@@ -65,6 +70,7 @@ import { SidebarNavGroup } from "@/clisbot/hub/sidebar-nav-group";
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 
 const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_CLISBOT_DEV_BUILD_LABEL?.trim() || null;
+const FOOTER_SEARCH_MIN_WIDTH = 104;
 
 interface SidebarSharedProps {
   theme: SidebarTheme;
@@ -297,12 +303,17 @@ function FooterIconButton({
   indicator?: boolean;
   indicatorTestID?: string;
 }) {
+  const compact = useIsCompactFormFactor();
+  const finePointer = useHasFinePointer();
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>
         <Pressable
           ref={buttonRef}
-          style={styles.footerIconButton}
+          style={[
+            styles.footerIconButton,
+            compact || !finePointer ? styles.footerTouchIconButton : null,
+          ]}
           testID={testID}
           nativeID={testID}
           collapsable={false}
@@ -336,61 +347,34 @@ function FooterIconButton({
   );
 }
 
-function footerAddProjectButtonStyle({
-  hovered,
-}: PressableStateCallbackType & { hovered?: boolean }) {
-  return [styles.footerAddProjectButton, Boolean(hovered) && styles.footerAddProjectButtonHovered];
-}
-
-function FooterAddProjectButton({
-  onPress,
-  label,
-  shortcutKeys,
-  theme,
-}: {
-  onPress: () => void;
-  label: string;
-  shortcutKeys: ReturnType<typeof useShortcutKeys>;
-  theme: SidebarTheme;
-}) {
+function FooterSearchField({ theme }: { theme: SidebarTheme }) {
+  const { t } = useTranslation();
+  const shortcutKeys = useShortcutKeys("toggle-command-center");
+  const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
+  const compact = useIsCompactFormFactor();
+  const finePointer = useHasFinePointer();
+  const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
+  const openSearch = useCallback(() => {
+    if (compact) showMobileAgent();
+    setCommandCenterOpen(true);
+  }, [compact, showMobileAgent, setCommandCenterOpen]);
   return (
-    <Tooltip delayDuration={300}>
-      <TooltipTrigger asChild>
-        <Pressable
-          style={footerAddProjectButtonStyle}
-          testID="sidebar-add-project"
-          nativeID="sidebar-add-project"
-          accessible
-          accessibilityLabel={label}
-          accessibilityRole="button"
-          onPress={onPress}
-        >
-          {({ hovered }) => {
-            const isHovered = Boolean(hovered);
-            return (
-              <>
-                <FolderPlus
-                  size={theme.iconSize.sm}
-                  color={isHovered ? theme.colors.foreground : theme.colors.foregroundMuted}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.footerAddProjectLabel,
-                    isHovered && styles.footerAddProjectLabelHovered,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </>
-            );
-          }}
-        </Pressable>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
-        <IconTooltipContent label={label} shortcutKeys={shortcutKeys} />
-      </TooltipContent>
-    </Tooltip>
+    <Pressable
+      style={[
+        styles.footerSearchField,
+        compact || !finePointer ? styles.footerTouchSearchField : null,
+      ]}
+      testID="sidebar-footer-search"
+      accessibilityRole="button"
+      accessibilityLabel={t("sidebar.sections.search")}
+      onPress={openSearch}
+    >
+      <Search size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
+      <Text style={styles.footerSearchLabel} numberOfLines={1}>
+        {t("sidebar.sections.search")}
+      </Text>
+      {shortcutKeys ? <Shortcut chord={shortcutKeys} /> : null}
+    </Pressable>
   );
 }
 
@@ -413,7 +397,6 @@ function SidebarHostPicker({
   const triggerRef = useRef<View | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const hasActiveHostFilter = hostFilters.length > 0;
-  const includeAllHost = hosts.length > 1 || hasActiveHostFilter;
   const triggerLabel = hasActiveHostFilter ? t("sidebar.actions.hostsFiltered") : label;
 
   const handleSelect = useCallback(
@@ -430,20 +413,24 @@ function SidebarHostPicker({
   );
 
   const handleOpen = useCallback(() => setIsOpen(true), []);
+  const handleOpenAllHostsSettings = useCallback(() => {
+    router.push(buildHubSettingsRoute("hosts"));
+  }, []);
 
   return (
     <HostPicker
       hosts={hosts}
-      value={includeAllHost ? getHostFilterPickerValue(hostFilters) : ""}
+      value={getHostFilterPickerValue(hostFilters)}
       onSelect={handleSelect}
       open={isOpen}
       onOpenChange={setIsOpen}
       anchorRef={triggerRef}
-      includeAllHost={includeAllHost}
+      includeAllHost
       includeAddHost
       onAddHost={onAddHost}
       showActiveConnection
       onOpenHostSettings={onOpenHostSettings}
+      onOpenAllHostsSettings={handleOpenAllHostsSettings}
       searchable
       title="Filter by host"
       desktopPlacement="top-start"
@@ -506,29 +493,72 @@ function SidebarFooter({
 }) {
   const newAgentKeys = useShortcutKeys("new-agent");
   const settingsKeys = useShortcutKeys("toggle-settings");
+  const { items } = useSidebarFooterItems();
+  const compact = useIsCompactFormFactor();
+  const finePointer = useHasFinePointer();
+  const touchTarget = compact || !finePointer;
+  const actions = items.filter((item) => item.visible && item.group === "actions");
+  const actionWidths: Record<string, number> = {
+    search: FOOTER_SEARCH_MIN_WIDTH,
+    new: touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.sm,
+    "add-project": touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.xs,
+  };
+  const actionMinWidth =
+    actions.reduce((width, item) => width + actionWidths[item.key], 0) +
+    Math.max(0, actions.length - 1) * theme.spacing[touchTarget ? 2 : 1];
 
   return (
-    <View style={styles.sidebarFooter}>
-      <FooterAddProjectButton
-        onPress={handleOpenProject}
-        label={labels.addProject}
-        shortcutKeys={newAgentKeys}
-        theme={theme}
-      />
+    <View style={styles.sidebarFooter} testID="sidebar-footer">
+      <View style={styles.footerActions(actionMinWidth, touchTarget)}>
+        {actions.map((item) => {
+          if (item.key === "new") {
+            return (
+              <SidebarNewMenu
+                key={item.key}
+                onAddProject={handleOpenProject}
+                onImportSession={handleImportSession}
+              />
+            );
+          }
+          if (item.key === "search") {
+            return <FooterSearchField key={item.key} theme={theme} />;
+          }
+          return (
+            <FooterIconButton
+              key={item.key}
+              onPress={handleOpenProject}
+              label={labels.addProject}
+              shortcutKeys={newAgentKeys}
+              icon={FolderPlus}
+              testID="sidebar-add-project"
+              theme={theme}
+            />
+          );
+        })}
+      </View>
       <View style={styles.footerIconRow}>
-        <SidebarHostPicker
-          theme={theme}
-          label={labels.hosts}
-          onAddHost={handleAddHost}
-          onOpenHostSettings={handleOpenHostSettings}
-        />
-        <FooterIconButton
-          onPress={handleImportSession}
-          testID="sidebar-import-session"
-          label={labels.importSession}
-          icon={Import}
-          theme={theme}
-        />
+        {items
+          .filter((item) => item.visible && item.group === "controls")
+          .map((item) =>
+            item.key === "hosts" ? (
+              <SidebarHostPicker
+                key={item.key}
+                theme={theme}
+                label={labels.hosts}
+                onAddHost={handleAddHost}
+                onOpenHostSettings={handleOpenHostSettings}
+              />
+            ) : (
+              <FooterIconButton
+                key={item.key}
+                onPress={handleImportSession}
+                testID="sidebar-import-session"
+                label={labels.importSession}
+                icon={Import}
+                theme={theme}
+              />
+            ),
+          )}
         <SidebarHelpMenu />
 
         <FooterIconButton
@@ -1014,6 +1044,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   sidebarFooter: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
@@ -1026,30 +1057,37 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[2],
     flexShrink: 0,
+    marginLeft: "auto",
   },
-  footerAddProjectButton: {
-    minWidth: 0,
-    minHeight: 32,
+  footerActions: (minWidth: number, touchTarget: boolean) => ({
+    flex: 1,
+    minWidth,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[touchTarget ? 2 : 1],
+  }),
+  footerSearchField: {
+    minWidth: FOOTER_SEARCH_MIN_WIDTH,
+    height: buttonControlHeight.sm,
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
-    paddingVertical: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[2],
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[1],
     borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  footerAddProjectButtonHovered: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
-  },
-  footerAddProjectLabel: {
+  footerSearchLabel: {
     minWidth: 0,
-    flexShrink: 1,
-    fontSize: theme.fontSize.base,
+    flex: 1,
+    fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foregroundMuted,
   },
-  footerAddProjectLabelHovered: {
-    color: theme.colors.foreground,
+  footerTouchSearchField: {
+    height: MIN_TOUCH_TARGET_SIZE,
+    paddingHorizontal: theme.spacing[2],
   },
   footerIconButton: {
     width: 28,
@@ -1063,6 +1101,10 @@ const styles = StyleSheet.create((theme) => ({
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
+  },
+  footerTouchIconButton: {
+    width: MIN_TOUCH_TARGET_SIZE,
+    height: MIN_TOUCH_TARGET_SIZE,
   },
   footerIconIndicator: {
     position: "absolute",

@@ -63,12 +63,23 @@ function isInsideSafeZone(
   if (isInsideRect(content, x, y)) return true;
   if (!trigger || !content) return false;
 
-  // Bridge: the horizontal strip connecting trigger and content, stretched
-  // vertically to span both. If they overlap horizontally there's no bridge.
+  // Bridge beside the trigger, spanning both boxes vertically.
   const bridgeLeft = Math.min(trigger.right, content.right);
   const bridgeRight = Math.max(trigger.left, content.left);
-  if (bridgeLeft >= bridgeRight) return false;
-  const bridgeTop = Math.min(trigger.top, content.top);
-  const bridgeBottom = Math.max(trigger.bottom, content.bottom);
-  return x >= bridgeLeft && x <= bridgeRight && y >= bridgeTop && y <= bridgeBottom;
+  if (bridgeLeft < bridgeRight) {
+    const bridgeTop = Math.min(trigger.top, content.top);
+    const bridgeBottom = Math.max(trigger.bottom, content.bottom);
+    return x >= bridgeLeft && x <= bridgeRight && y >= bridgeTop && y <= bridgeBottom;
+  }
+
+  // A menu above or below its trigger needs the same bridge across its vertical gap.
+  const bridgeTop = Math.min(trigger.bottom, content.bottom);
+  const bridgeBottom = Math.max(trigger.top, content.top);
+  if (bridgeTop >= bridgeBottom) return false;
+  return (
+    x >= Math.min(trigger.left, content.left) &&
+    x <= Math.max(trigger.right, content.right) &&
+    y >= bridgeTop &&
+    y <= bridgeBottom
+  );
 }

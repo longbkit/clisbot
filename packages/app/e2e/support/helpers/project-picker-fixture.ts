@@ -25,7 +25,7 @@ export async function createProjectPickerFixture(): Promise<ProjectPickerFixture
     fixture: {
       projectPath,
       projectName: path.basename(projectPath),
-      fuzzyQuery: `psodfzt${nonce}`,
+      fuzzyQuery: `clbtdfzt${nonce}`,
     },
     removeDirectory: () => rm(root, { recursive: true, force: true }),
   };

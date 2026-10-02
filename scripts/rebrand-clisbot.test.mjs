@@ -8,6 +8,56 @@ import test from "node:test";
 
 const script = fileURLToPath(new URL("./rebrand-clisbot.mjs", import.meta.url));
 
+test("defaults to official pairing and relay hosts and keeps a manual Worker deployment option", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-relay-"));
+  git(root, "init", "-q");
+  put(root, "packages/protocol/src/daemon-endpoints.ts", 'const relay = "relay.paseo.sh:443";\n');
+  const pairingFiles = [
+    "packages/protocol/src/connection-offer.ts",
+    "packages/server/src/server/config.ts",
+    "packages/server/src/server/bootstrap.ts",
+    "packages/server/src/server/persisted-config.ts",
+    "packages/server/src/server/pairing-offer.ts",
+    "packages/cli/src/commands/onboard.ts",
+    "packages/app/src/components/pair-link-modal.tsx",
+    "scripts/prove-relay-prod.mjs",
+  ];
+  for (const file of pairingFiles) put(root, file, 'const app = "https://app.paseo.sh";\n');
+  put(root, ".github/workflows/deploy-relay.yml", "name: Deploy Relay\nrun: npx wrangler deploy\n");
+  put(root, "packages/relay/wrangler.toml", 'routes = [{ pattern = "relay.paseo.sh" }]\n');
+  put(root, "docker/relay/Dockerfile", "ENV PASEO_RELAY_PORT=4000\nCMD paseo_relay\n");
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--apply"]);
+  assert.match(
+    readFileSync(join(root, "packages/protocol/src/daemon-endpoints.ts"), "utf8"),
+    /relay\.clisbot\.com:443/,
+  );
+  for (const file of pairingFiles) {
+    const content = readFileSync(join(root, file), "utf8");
+    assert.match(content, /https:\/\/app\.clisbot\.com/, file);
+    assert.doesNotMatch(content, /app\.paseo\.sh/, file);
+  }
+  const workflow = readFileSync(join(root, ".github/workflows/deploy-relay.yml"), "utf8");
+  assert.match(workflow, /npm run test/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /wrangler deploy/);
+  assert.match(workflow, /CLISBOT_RELAY_UPSTREAM/);
+  assert.doesNotMatch(workflow, /\n  (?:push|pull_request):/);
+  const worker = readFileSync(join(root, "packages/relay/wrangler.toml"), "utf8");
+  assert.doesNotMatch(worker, /routes\s*=|account_id|fly\.dev/);
+  assert.match(worker, /workers_dev = false/);
+  assert.match(worker, /name = "clisbot-relay-worker"/);
+  assert.equal(
+    readFileSync(join(root, "docker/relay/Dockerfile"), "utf8"),
+    "ENV PASEO_RELAY_PORT=4000\nCMD paseo_relay\n",
+  );
+  git(root, "add", "-A");
+  const check = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),
+  );
+  assert.equal(check.changedFiles, 0);
+});
+
 test("renames escaped and encoded issue URLs, including previously renamed matchers", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-issue-url-"));
   git(root, "init", "-q");

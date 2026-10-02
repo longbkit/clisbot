@@ -6,9 +6,14 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarClock,
+  CircleHelp,
+  FolderPlus,
   History,
+  Import,
   Plus,
   Search,
+  Server,
+  Settings,
   type LucideIcon,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -25,6 +30,12 @@ import {
   type SidebarNavItem,
 } from "@/sidebar-nav/model";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
+import {
+  canMoveSidebarFooterItem,
+  sidebarFooterShortcutAction,
+  type SidebarFooterId,
+} from "@/sidebar-nav/footer-model";
+import { useSidebarFooterItems } from "@/sidebar-nav/use-sidebar-footer-items";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
@@ -38,9 +49,20 @@ const moveDownIcon = <ThemedArrowDown size={ICON_SIZE.sm} uniProps={mutedColorMa
 
 const BUILTIN_ICONS: Record<BuiltinSidebarNavId, LucideIcon> = {
   "new-workspace": Plus,
+  "add-project": FolderPlus,
   history: History,
   search: Search,
   schedules: CalendarClock,
+};
+
+const FOOTER_ICONS: Record<SidebarFooterId, LucideIcon> = {
+  new: Plus,
+  "add-project": FolderPlus,
+  search: Search,
+  hosts: Server,
+  "import-session": Import,
+  help: CircleHelp,
+  settings: Settings,
 };
 
 function NavIcon({ Icon, color = "" }: { Icon: LucideIcon; color?: string }) {
@@ -58,30 +80,41 @@ function navItemLabel(t: TFunction, item: SidebarNavItem): string {
 }
 
 /** Own component so the row can stay hook-free about which items have a shortcut. */
-function NavItemShortcut({ item }: { item: SidebarNavItem }): ReactElement | null {
-  const chord = useShortcutKeys(
-    item.kind === "builtin" ? builtinSidebarNavShortcutAction(item.id) : null,
-  );
+function NavItemShortcut({ action }: { action: string | null }): ReactElement | null {
+  const chord = useShortcutKeys(action);
   return chord ? <Shortcut chord={chord} /> : null;
 }
 
 interface SidebarNavRowProps {
-  item: SidebarNavItem;
+  item: { key: string; visible: boolean };
+  label: string;
+  Icon: LucideIcon;
+  shortcutAction: string | null;
+  testIDPrefix: string;
   isFirst: boolean;
   isLast: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  locked?: boolean;
   onMove: (key: string, direction: "up" | "down") => void;
   onSetVisible: (key: string, visible: boolean) => void;
 }
 
 function SidebarNavRow({
   item,
+  label,
+  Icon,
+  shortcutAction,
+  testIDPrefix,
   isFirst,
   isLast,
+  canMoveUp = !isFirst,
+  canMoveDown = !isLast,
+  locked = false,
   onMove,
   onSetVisible,
 }: SidebarNavRowProps): ReactElement {
   const { t } = useTranslation();
-  const label = navItemLabel(t, item);
 
   const handleMoveUp = useCallback(() => onMove(item.key, "up"), [item.key, onMove]);
   const handleMoveDown = useCallback(() => onMove(item.key, "down"), [item.key, onMove]);
@@ -96,13 +129,13 @@ function SidebarNavRow({
   );
 
   return (
-    <View style={rowStyle} testID={`sidebar-nav-item-${item.key}`}>
+    <View style={rowStyle} testID={`${testIDPrefix}-item-${item.key}`}>
       <View style={styles.rowMain}>
-        <ThemedNavIcon Icon={navItemIcon(item)} uniProps={mutedColorMapping} />
+        <ThemedNavIcon Icon={Icon} uniProps={mutedColorMapping} />
         <Text style={settingsStyles.rowTitle} numberOfLines={1}>
           {label}
         </Text>
-        <NavItemShortcut item={item} />
+        <NavItemShortcut action={shortcutAction} />
       </View>
       <View style={styles.rowActions}>
         <Button
@@ -110,24 +143,25 @@ function SidebarNavRow({
           size="sm"
           leftIcon={moveUpIcon}
           onPress={handleMoveUp}
-          disabled={isFirst}
+          disabled={!canMoveUp || locked}
           accessibilityLabel={t("settings.appearance.sidebar.moveUp")}
-          testID={`sidebar-nav-move-up-${item.key}`}
+          testID={`${testIDPrefix}-move-up-${item.key}`}
         />
         <Button
           variant="ghost"
           size="sm"
           leftIcon={moveDownIcon}
           onPress={handleMoveDown}
-          disabled={isLast}
+          disabled={!canMoveDown || locked}
           accessibilityLabel={t("settings.appearance.sidebar.moveDown")}
-          testID={`sidebar-nav-move-down-${item.key}`}
+          testID={`${testIDPrefix}-move-down-${item.key}`}
         />
         <Switch
           value={item.visible}
           onValueChange={handleVisibleChange}
+          disabled={locked}
           accessibilityLabel={label}
-          testID={`sidebar-nav-toggle-${item.key}`}
+          testID={`${testIDPrefix}-toggle-${item.key}`}
         />
       </View>
     </View>
@@ -137,26 +171,60 @@ function SidebarNavRow({
 export function SidebarNavSection(): ReactElement {
   const { t } = useTranslation();
   const { items, setVisible, move } = useSidebarNavItems();
+  const footer = useSidebarFooterItems();
 
   return (
-    <SettingsSection
-      title={t("settings.appearance.sidebar.title")}
-      info={t("settings.appearance.sidebar.description")}
-      testID="sidebar-nav-section"
-    >
-      <View style={settingsStyles.card}>
-        {items.map((item, index) => (
-          <SidebarNavRow
-            key={item.key}
-            item={item}
-            isFirst={index === 0}
-            isLast={index === items.length - 1}
-            onMove={move}
-            onSetVisible={setVisible}
-          />
-        ))}
-      </View>
-    </SettingsSection>
+    <>
+      <SettingsSection
+        title={t("settings.appearance.sidebar.title")}
+        info={t("settings.appearance.sidebar.description")}
+        testID="sidebar-nav-section"
+      >
+        <View style={settingsStyles.card}>
+          {items.map((item, index) => (
+            <SidebarNavRow
+              key={item.key}
+              item={item}
+              label={navItemLabel(t, item)}
+              Icon={navItemIcon(item)}
+              shortcutAction={
+                item.kind === "builtin" ? builtinSidebarNavShortcutAction(item.id) : null
+              }
+              testIDPrefix="sidebar-nav"
+              isFirst={index === 0}
+              isLast={index === items.length - 1}
+              onMove={move}
+              onSetVisible={setVisible}
+            />
+          ))}
+        </View>
+      </SettingsSection>
+      <SettingsSection
+        title={t("settings.appearance.sidebar.bottomTitle")}
+        info={t("settings.appearance.sidebar.bottomDescription")}
+        testID="sidebar-footer-section"
+      >
+        <View style={settingsStyles.card}>
+          {footer.items.map((item, index) => (
+            <SidebarNavRow
+              key={item.key}
+              item={item}
+              label={t(item.labelKey)}
+              Icon={FOOTER_ICONS[item.key]}
+              shortcutAction={sidebarFooterShortcutAction(item.key)}
+              testIDPrefix="sidebar-footer"
+              isFirst={index === 0}
+              isLast={index === footer.items.length - 1}
+              canMoveUp={canMoveSidebarFooterItem(footer.items, item.key, "up")}
+              canMoveDown={canMoveSidebarFooterItem(footer.items, item.key, "down")}
+              locked={item.group === "fixed"}
+              onMove={footer.move}
+              onSetVisible={footer.setVisible}
+            />
+          ))}
+        </View>
+      </SettingsSection>
+    </>
   );
 }
 

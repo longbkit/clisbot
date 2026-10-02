@@ -209,6 +209,16 @@ Repository URLs also match escaped slashes in regexes and `%2F` separators in
 encoded login return URLs. The transform repairs old `getpaseo/clisbot` forms
 in those encodings; upstream relay repository references remain protected.
 
+The production relay is now `relay.clisbot.com:443` with TLS. Keep
+`--keep-upstream-endpoints` limited to isolated upstream reference branches.
+`docker/relay/` is protected from product text replacement because its pinned
+external Elixir release retains `PASEO_RELAY_*` and `paseo_relay` names. The
+transform keeps `deploy-relay.yml` manual-only under Clisbot naming and
+keeps the Worker deployment option separate from the current official relay route
+through maintained Wrangler templates.
+See [relay deployment](../../relay-deployment.md) for the independent server
+release process and private credential storage.
+
 | Input                                                                                                                                                                                               | Current rule                                                                                                                                                                                                                                                                                                                                                                                | Review when syncing                                                                                                                                                                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/audits/**`; `docs/lessons/**`; `docs/overview/product-vision.md`; this playbook; the rename script, its test, `scripts/rebrand-templates/**`, `scripts/branding/**`, and `assets/branding/**` | Preserve the entire path and contents.                                                                                                                                                                                                                                                                                                                                                      | Historical and legal provenance can retain Paseo, but protection does not make every statement in these files current.                                                                                                                                                            |
@@ -240,7 +250,10 @@ README versions and the script when either source changes.
 
 Files with binary or invalid UTF-8 contents are skipped. `--check` verifies
 that another run would make no further changes; it does **not** validate the
-names left behind. After each transformed-upstream commit and after each merge,
+names left behind. With `--keep-upstream-endpoints`, a successful check still
+allows upstream service hosts. Production checks use the default Clisbot host
+transform and verify the pairing URL and embedded relay separately. After each
+transformed-upstream commit and after each merge,
 scan both tracked contents and paths case-insensitively for `paseo`, then
 classify every remaining match as provenance, an intentional test endpoint, or
 work still required before release. Do not treat the table as a blanket
@@ -348,16 +361,20 @@ staged merge diff before committing, especially lockfile changes. The current
 procedure below lists the dependency and typecheck gates; add the focused and
 live checks required by the release being promoted.
 
-Use the same transform and checks for disposable `upstream/main` rehearsals.
-No legacy `paseo://` handler or `PASEO_*` environment alias is part of the
-target Clisbot product. The script preserves dated audits, lessons, and this
-upstream playbook as historical/provenance records. During the isolated test
-phase, add `--keep-upstream-endpoints` to both rename commands: live
-`app.paseo.sh`, `relay.paseo.sh`, and `hub.paseo.sh` remain reachable, while
-site/documentation links to `paseo.sh` become `clisbot.com`. The accepted
-2026-10-01 cutover retains this temporary endpoint exception. Keep the same
-transform option until replacement services are configured and verified;
-changing it requires a separate endpoint migration. The branches use Expo owner
+Use the same default Clisbot transform and checks for disposable `upstream/main`
+rehearsals intended for promotion. No legacy `paseo://` handler or `PASEO_*`
+environment alias is part of the target Clisbot product. The script preserves
+dated audits, lessons, and this upstream playbook as historical/provenance records.
+
+Use `--keep-upstream-endpoints` only on disposable reference branches that
+explicitly test upstream services. It keeps `app.paseo.sh`, `relay.paseo.sh`,
+and `hub.paseo.sh`, while site/documentation links become `clisbot.com`. Do not
+promote a snapshot transformed with that flag to production.
+
+Historical: the initial rebrand and 2026-10-01 cutover retained that temporary
+exception; the [validation record](../../audits/2026-09-30-clisbot-branding/evidence/upstream-v0.10.2-validation.json)
+shows `appHost` and `relayHost` as `null`. The current official pairing and relay
+endpoints are owned by [relay deployment](../../relay-deployment.md). The branches use Expo owner
 `lbk-company` and project ID `9314cc2c-4abe-4637-b1cf-647fbbfbd807`.
 Confirm project access and mobile signing before running EAS builds. The
 temporary service endpoints, publication identity, and native-build/storefront

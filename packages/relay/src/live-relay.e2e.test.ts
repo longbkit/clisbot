@@ -12,7 +12,7 @@ import {
 // This live test uses the hosted relay's real TLS endpoint. Self-hosted relay TLS
 // opt-in is covered at URL-building/integration level so the local E2E does not
 // need to provision trusted certificates.
-const RELAY_BASE_URL = process.env.CLISBOT_LIVE_RELAY_URL ?? "wss://relay.paseo.sh";
+const RELAY_BASE_URL = process.env.CLISBOT_LIVE_RELAY_URL ?? "wss://relay.clisbot.com";
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -90,7 +90,7 @@ function waitForOnceMessage<T extends "string" | "buffer">(
   });
 }
 
-describe("Live relay (relay.paseo.sh) E2E", () => {
+describe("Live relay (relay.clisbot.com) E2E", () => {
   const liveIt = process.env.RUN_LIVE_RELAY_E2E === "1" ? it : it.skip;
 
   liveIt("bridges encrypted traffic end-to-end", { timeout: 45_000 }, async () => {

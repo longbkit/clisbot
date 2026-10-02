@@ -1,5 +1,6 @@
 import { getAlternativePages } from "~/data/alternative-pages";
 import { appStoreUrl, playStoreUrl, webAppUrl } from "~/downloads";
+import { openAnalyticsSettings } from "~/components/website-analytics";
 
 interface SiteFooterProps {
   width?: "default" | "prose";
@@ -57,6 +58,13 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
             >
               Terms
             </a>
+            <button
+              type="button"
+              onClick={openAnalyticsSettings}
+              className="block text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cookie settings
+            </button>
             <a
               href="/sponsor"
               className="block text-muted-foreground hover:text-foreground transition-colors"

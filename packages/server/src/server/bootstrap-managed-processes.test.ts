@@ -43,7 +43,7 @@ describe("daemon managed process bootstrap", () => {
         agentClients: createTestAgentClients(),
         agentStoragePath: path.join(clisbotHome, "agents"),
         relayEnabled: false,
-        appBaseUrl: "https://app.paseo.sh",
+        appBaseUrl: "https://app.clisbot.com",
         managedProcesses,
       } as ClisbotDaemonConfig,
       pino({ level: "silent" }),

@@ -6,35 +6,24 @@ import type { VisitorPlatform } from "~/platform";
 import { getVisitorPlatform } from "~/platform";
 import { getLatestRelease } from "~/release";
 import { getStarCount } from "~/stars";
+import { WebsiteAnalytics } from "~/components/website-analytics";
 
 interface StarsContext {
   stars: string;
 }
 
-const ReleaseCtx = createContext<ReleaseChannels>({
-  stable: {
-    version: "",
-    linuxAppImageAsset: "",
-    windowsX64Asset: null,
-    windowsArm64Asset: null,
-  },
-  beta: null,
-});
+const ReleaseCtx = createContext<ReleaseChannels | null>(null);
 const StarsCtx = createContext<StarsContext>({ stars: "" });
 const PlatformCtx = createContext<VisitorPlatform>("mac");
 
-const PLAUSIBLE_INIT_SCRIPT = {
-  __html: `window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()`,
-};
-
 /** The latest stable release. Everything on the site points here by default. */
-export function useRelease(): ReleaseInfo {
-  return useContext(ReleaseCtx).stable;
+export function useRelease(): ReleaseInfo | null {
+  return useContext(ReleaseCtx)?.stable ?? null;
 }
 
 /** The current beta, or null when there is no beta ahead of stable. */
 export function useBetaRelease(): ReleaseInfo | null {
-  return useContext(ReleaseCtx).beta;
+  return useContext(ReleaseCtx)?.beta ?? null;
 }
 
 export function useStars(): StarsContext {
@@ -49,8 +38,8 @@ export function useVisitorPlatform(): VisitorPlatform {
 export const Route = createRootRoute({
   loader: async () => {
     const [release, stars, platform] = await Promise.all([
-      getLatestRelease(),
-      getStarCount(),
+      getLatestRelease().catch(() => null),
+      getStarCount().catch(() => ({ stars: "" })),
       getVisitorPlatform(),
     ]);
     return { release, platform, ...stars };
@@ -95,11 +84,10 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
     <html lang="en">
       <head>
         <HeadContent />
-        <script async src="https://plausible.io/js/pa-cKNUoWbeH_Iksb2fh82s3.js" />
-        <script dangerouslySetInnerHTML={PLAUSIBLE_INIT_SCRIPT} />
       </head>
       <body className="antialiased bg-background text-foreground">
         {children}
+        <WebsiteAnalytics />
         <Scripts />
       </body>
     </html>

@@ -18,7 +18,8 @@ test.describe("Sidebar items in Appearance settings", () => {
     await gotoAppShell(page);
 
     await test.step("the sidebar starts in the default order", async () => {
-      await expectSidebarOrder(page, ["new-workspace", "history", "search", "schedules"]);
+      await expectSidebarOrder(page, ["new-workspace", "history", "schedules"]);
+      await expectSidebarItemHidden(page, "search");
     });
 
     await test.step("the Sidebar section lists every item in the same order", async () => {
@@ -29,40 +30,53 @@ test.describe("Sidebar items in Appearance settings", () => {
       );
       await expectSidebarNavSettingsOrder(page, [
         "new-workspace",
-        "history",
+        "add-project",
         "search",
+        "history",
         "schedules",
       ]);
+      await expectSidebarNavSettingsRow(page, {
+        key: "search",
+        label: "Search",
+        visible: false,
+      });
       await expectSidebarNavSettingsRow(page, {
         key: "history",
         label: "History",
         visible: true,
       });
-      // Items with a keyboard shortcut badge it next to their name. Chords render
-      // with Ctrl off macOS, which is what the browser project runs on.
+      // Badges follow the browser's platform, including macOS runners.
       await expect(
-        page.getByTestId("sidebar-nav-item-new-workspace").getByText("Ctrl+N", { exact: true }),
+        page
+          .getByTestId("sidebar-nav-item-new-workspace")
+          .getByText(process.platform === "darwin" ? "⌘N" : "Ctrl+N", { exact: true }),
       ).toBeVisible();
     });
 
-    await test.step("moving Schedules up twice lifts it above History", async () => {
+    await test.step("the owner can enable the top Search row", async () => {
+      await setSidebarNavItemVisible(page, "search", true);
+    });
+
+    await test.step("moving Schedules up twice lifts it above Search", async () => {
       await moveSidebarNavItemUp(page, "schedules");
       await expectSidebarNavSettingsOrder(page, [
         "new-workspace",
-        "history",
-        "schedules",
+        "add-project",
         "search",
+        "schedules",
+        "history",
       ]);
       await moveSidebarNavItemUp(page, "schedules");
       await expectSidebarNavSettingsOrder(page, [
         "new-workspace",
+        "add-project",
         "schedules",
-        "history",
         "search",
+        "history",
       ]);
 
       await leaveSettings(page);
-      await expectSidebarOrder(page, ["new-workspace", "schedules", "history", "search"]);
+      await expectSidebarOrder(page, ["new-workspace", "schedules", "search", "history"]);
     });
 
     await test.step("turning History off removes it from the sidebar", async () => {
@@ -70,9 +84,10 @@ test.describe("Sidebar items in Appearance settings", () => {
       await setSidebarNavItemVisible(page, "history", false);
       await expectStoredSidebarNav(page, [
         { key: "new-workspace", visible: true },
+        { key: "add-project", visible: false },
         { key: "schedules", visible: true },
-        { key: "history", visible: false },
         { key: "search", visible: true },
+        { key: "history", visible: false },
       ]);
 
       await leaveSettings(page);

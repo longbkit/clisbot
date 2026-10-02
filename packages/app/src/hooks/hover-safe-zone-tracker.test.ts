@@ -94,14 +94,28 @@ describe("hover safe-zone tracker", () => {
     expect(handle.leaves).toBe(1);
   });
 
+  it.each([
+    { content: { left: 0, right: 240, top: -100, bottom: 16 }, gapY: 18 },
+    { content: { left: 0, right: 240, top: 64, bottom: 160 }, gapY: 62 },
+  ])("bridges the vertical gap to a menu at $gapY", ({ content, gapY }) => {
+    const handle = createHandle({ trigger: TRIGGER, content });
+
+    handle.pointerMoved(50, gapY);
+    expect(handle.enters).toBe(1);
+    expect(handle.leaves).toBe(0);
+
+    handle.pointerMoved(250, gapY);
+    expect(handle.leaves).toBe(1);
+  });
+
   it("treats overlapping trigger and content as having no bridge", () => {
     const handle = createHandle({
       trigger: { left: 0, right: 200, top: 0, bottom: 50 },
-      content: { left: 100, right: 300, top: 60, bottom: 100 },
+      content: { left: 100, right: 300, top: 40, bottom: 100 },
     });
 
     // Outside both rects, in what would be a bridge — should be outside.
-    handle.pointerMoved(150, 55);
+    handle.pointerMoved(250, 20);
     expect(handle.enters).toBe(0);
     expect(handle.leaves).toBe(1);
   });

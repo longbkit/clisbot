@@ -1,6 +1,7 @@
 import { addLocalDaemonOptions } from "../utils/command-options.js";
 import { cancel, confirm, intro, isCancel, log, note, outro } from "@clack/prompts";
 import { Command, Option } from "commander";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 import path from "node:path";
 import {
   readPersistedConfig as loadPersistedConfig,
@@ -117,7 +118,7 @@ function printNextSteps(pairingUrl: string | null, clisbotHome: string, richUi: 
     pairingUrl
       ? "1. Open Clisbot and scan the QR code above, or paste the pairing link."
       : "1. Open Clisbot and connect to your daemon.",
-    "2. Web app: https://app.paseo.sh",
+    `2. Web app: ${DEFAULT_APP_BASE_URL}`,
     "3. Desktop app: https://github.com/longbkit/clisbot/releases/latest",
     "4. Docs: https://clisbot.com/docs",
     `5. Example: clisbot run --home ${JSON.stringify(clisbotHome)} --output-schema schema.json "extract fields"`,

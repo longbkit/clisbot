@@ -238,6 +238,7 @@ export interface AnchoredSurfaceProps {
    */
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
+  surfaceRef?: RefObject<View | null>;
   testID?: string;
   keyboardFocusScope?: KeyboardFocusScope;
   children: ReactElement;
@@ -267,6 +268,7 @@ export function AnchoredSurface({
   backdrop = true,
   onPointerEnter,
   onPointerLeave,
+  surfaceRef,
   testID,
   keyboardFocusScope,
   children,
@@ -379,6 +381,7 @@ export function AnchoredSurface({
         />
       ) : null}
       <FloatingSurface
+        ref={surfaceRef}
         key={placed ? "placed" : "measuring"}
         collapsable={false}
         tabIndex={-1}

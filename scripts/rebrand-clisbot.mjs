@@ -28,6 +28,8 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 const templateRoot = join(dirname(fileURLToPath(import.meta.url)), "rebrand-templates");
 const productTemplates = new Map(
   [
+    [".github/workflows/deploy-relay.yml", "relay-deploy-workflow.yml"],
+    ["packages/relay/wrangler.toml", "relay-wrangler.toml"],
     ["packages/website/src/components/sponsorship.tsx", "website-sponsorship.tsx"],
     ["packages/website/src/data/sponsors.ts", "website-sponsors.ts"],
     ["packages/website/src/routes/sponsor.tsx", "website-sponsor-route.tsx"],
@@ -299,6 +301,8 @@ function isProtectedPath(path) {
     path === "scripts/rebrand-clisbot.test.mjs" ||
     path.startsWith("scripts/branding/") ||
     path.startsWith("assets/branding/") ||
+    // This deployment consumes an external Elixir release with upstream names.
+    path.startsWith("docker/relay/") ||
     path.startsWith("scripts/rebrand-templates/") ||
     path.startsWith("packages/website/posts/upstream/") ||
     path === "LICENSE" ||

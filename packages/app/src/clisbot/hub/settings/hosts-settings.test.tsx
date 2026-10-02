@@ -19,6 +19,9 @@ const adapters = vi.hoisted(() => ({
   role: "owner",
   accountId: "owner",
   hubEnabled: true,
+  signedIn: true,
+  accountError: null as string | null,
+  refresh: vi.fn(),
   copy: vi.fn(),
   openAddProject: vi.fn(),
   upsert: vi.fn(),
@@ -26,23 +29,36 @@ const adapters = vi.hoisted(() => ({
   restart: vi.fn(),
   hosts: [] as HostProfile[],
   statuses: new Map(),
+  statusListeners: new Set<() => void>(),
+  subscribeStatuses: (listener: () => void) => {
+    adapters.statusListeners.add(listener);
+    return () => {
+      adapters.statusListeners.delete(listener);
+    };
+  },
 }));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     enabled: adapters.hubEnabled,
     origin: "https://hub.example.test",
-    signedIn: {
-      account: { id: adapters.accountId },
-      organization: { id: "org" },
-      capabilities: { manageResources: adapters.canManageResources },
-      membership: { role: adapters.role },
-    },
+    state: null,
+    error: adapters.accountError,
+    refresh: adapters.refresh,
+    signedIn: adapters.signedIn
+      ? {
+          account: { id: adapters.accountId },
+          organization: { id: "org" },
+          capabilities: { manageResources: adapters.canManageResources },
+          membership: { role: adapters.role },
+        }
+      : null,
     api: () => ({ get: adapters.get, put: adapters.put, delete: adapters.delete }),
   }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => adapters.hosts,
-  useHostRuntimeConnectionStatuses: () => adapters.statuses,
+  useHostRuntimeConnectionStatuses: () =>
+    React.useSyncExternalStore(adapters.subscribeStatuses, () => adapters.statuses),
   getHostRuntimeStore: () => ({
     getHosts: () => adapters.hosts,
     upsertManagedConnectionFromOffer: adapters.upsert,
@@ -126,7 +142,12 @@ beforeEach(() => {
   adapters.role = "owner";
   adapters.accountId = "owner";
   adapters.hubEnabled = true;
+  adapters.signedIn = true;
+  adapters.accountError = null;
+  adapters.refresh.mockReset().mockResolvedValue(undefined);
   adapters.hosts = [];
+  adapters.statuses = new Map();
+  adapters.statusListeners.clear();
   adapters.copy.mockReset();
   adapters.upsert.mockReset();
   adapters.remove.mockReset().mockResolvedValue(undefined);
@@ -345,6 +366,90 @@ it("preserves the standalone Host chooser when Hub support is disabled", () => {
     "Personal Host",
   ]);
   expect(adapters.get).not.toHaveBeenCalled();
+});
+
+it("shows saved Hosts and their connection states without a Hub sign-in", () => {
+  adapters.signedIn = false;
+  adapters.hosts = [
+    savedHost("online", "Same Host"),
+    savedHost("offline", "Same Host"),
+    managedHost,
+  ];
+  adapters.statuses = new Map([
+    ["online", "online"],
+    ["offline", "offline"],
+  ]);
+  renderSection();
+  expect(screen.getAllByText("Same Host")).toHaveLength(2);
+  expect(screen.getByText("Host ID: online").textContent).toBe("Host ID: online");
+  expect(screen.getByText("Host ID: offline").textContent).toBe("Host ID: offline");
+  expect(screen.getByText("Online").textContent).toBe("Online");
+  expect(screen.getByText("Offline").textContent).toBe("Offline");
+  expect(screen.getByLabelText("1 online out of 2 Hosts").textContent).toBe("1 active / 2 total");
+  expect(screen.queryByText("Hub Host")).toBeNull();
+  expect(screen.queryByText("Refresh Hosts")).toBeNull();
+  expect(screen.queryByText("Add a Host")).toBeNull();
+  expect(adapters.get).not.toHaveBeenCalled();
+});
+
+it.each([{ manualHosts: [] }, { manualHosts: [savedHost("manual", "Personal Host")] }])(
+  "recovers from a failed Hub account lookup while keeping saved Hosts $manualHosts available",
+  async ({ manualHosts }) => {
+    adapters.signedIn = false;
+    adapters.accountError = "Hub account request failed";
+    adapters.hosts = [managedHost, ...manualHosts];
+    const view = renderSection();
+    expect(screen.getByRole("alert").textContent).toContain("Hosts unavailable");
+    expect(screen.queryByText("No Hosts yet")).toBeNull();
+    expect(screen.queryByText("Hub Host")).toBeNull();
+    expect(screen.queryAllByText("Personal Host")).toHaveLength(manualHosts.length);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(adapters.refresh).toHaveBeenCalledOnce();
+    expect(adapters.get).not.toHaveBeenCalled();
+
+    adapters.accountError = null;
+    adapters.signedIn = true;
+    adapters.get.mockResolvedValue({ daemons: [connectableDaemon] });
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <HostsSettings />
+      </QueryClientProvider>,
+    );
+    expect((await screen.findByText("Hub Host")).textContent).toBe("Hub Host");
+    expect(screen.queryByText("Hosts unavailable")).toBeNull();
+    expect(screen.queryAllByText("Personal Host")).toHaveLength(manualHosts.length);
+  },
+);
+
+it("keeps the Hosts page available with Hub support disabled, including zero Hosts", () => {
+  adapters.hubEnabled = false;
+  renderSection();
+  expect(screen.getByText("No Hosts yet").textContent).toBe("No Hosts yet");
+  expect(screen.getByLabelText("0 online out of 0 Hosts").textContent).toBe("0 active / 0 total");
+  expect(screen.queryByText("Loading Hosts...")).toBeNull();
+  expect(adapters.get).not.toHaveBeenCalled();
+});
+
+it("counts each Host once and uses the app connection state for online Hosts", async () => {
+  adapters.hosts = [managedHost, savedHost("manual", "Personal Host")];
+  adapters.statuses = new Map([
+    ["server-1", "offline"],
+    ["manual", "online"],
+  ]);
+  adapters.get.mockResolvedValue({
+    daemons: [connectableDaemon, { ...registeredDaemon, id: "waiting", slug: "Waiting Host" }],
+  });
+  renderSection();
+  await screen.findByText("Waiting Host");
+  expect(screen.getByLabelText("1 online out of 3 Hosts").textContent).toBe("1 active / 3 total");
+  act(() => {
+    adapters.statuses = new Map([
+      ["server-1", "online"],
+      ["manual", "online"],
+    ]);
+    for (const listener of adapters.statusListeners) listener();
+  });
+  expect(screen.getByLabelText("2 online out of 3 Hosts").textContent).toBe("2 active / 3 total");
 });
 
 describe("Host onboarding query recovery", () => {

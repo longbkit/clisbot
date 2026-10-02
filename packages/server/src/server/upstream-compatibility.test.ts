@@ -94,7 +94,7 @@ test("an unmodified Clisbot app pairs with a Fusion daemon", async () => {
     // The stock offer: the connection URL an app scans, an optional QR, and the
     // relay flag. Nothing channel-shaped rides along.
     expect(offer.relayEnabled).toBe(true);
-    expect(offer.url.startsWith("https://app.paseo.sh/#offer=")).toBe(true);
+    expect(offer.url.startsWith("https://app.clisbot.com/#offer=")).toBe(true);
     expect(Object.keys(offer).filter((key) => FORK_TERMS.test(key))).toEqual([]);
 
     // The offer is what an app scans; it must decode as an upstream offer, so a

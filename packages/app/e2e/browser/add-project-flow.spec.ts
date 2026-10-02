@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { test, expect } from "../support/fixtures";
 import {
@@ -214,6 +214,32 @@ test.describe("Add Project command-center flow", () => {
     });
   });
 
+  test("directory search completes and resolves a named hidden parent without staying in Loading", async ({
+    page,
+    projectPickerFixture,
+  }) => {
+    const target = path.join(
+      path.dirname(projectPickerFixture.projectPath),
+      ".clisbot",
+      "workspaces",
+    );
+    await mkdir(target, { recursive: true });
+    const query = `~/${path.relative(homedir(), target).split(path.sep).join("/")}`;
+
+    await gotoAppShell(page);
+    await openAddProjectFlow(page);
+    await chooseAddProjectMethod(page, "directory-search");
+    const suggestion = page.getByTestId(`add-project-flow-path-${encodeURIComponent(target)}`);
+
+    await addProjectFlowInput(page).fill(query.replace(/workspaces$/u, "work"));
+    await expect(suggestion).toBeVisible();
+    await expect(page.getByTestId("add-project-flow-loading")).toBeHidden();
+
+    await addProjectFlowInput(page).fill(query);
+    await expect(suggestion).toBeVisible();
+    await expect(page.getByTestId("add-project-flow-loading")).toBeHidden();
+  });
+
   test("keyboard directory search adds the selected Project", async ({
     page,
     projectPickerFixture,
@@ -221,8 +247,7 @@ test.describe("Add Project command-center flow", () => {
     await gotoAppShell(page);
     await openAddProjectFlow(page);
 
-    await page.keyboard.press("Enter");
-    await expectAddProjectPage(page, "directory-search");
+    await chooseAddProjectMethod(page, "directory-search");
     await page.keyboard.type(projectPickerFixture.fuzzyQuery);
     await expect(addProjectFlow(page)).toContainText(projectPickerFixture.projectName, {
       timeout: 30_000,

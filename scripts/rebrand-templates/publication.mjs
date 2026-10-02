@@ -24,7 +24,7 @@ export function rebrandPublication(path, input, { repoSlug }) {
   }
   if (/^packages\/website\/src\/routes\/(privacy|terms)\.tsx$/.test(path)) {
     return rebrandLegal(input).replace(
-      "These Terms govern the official services operated at clisbot.com, relay.paseo.sh, and\n        hub.paseo.sh. By using the official relay or hosted Hub, you agree to them.",
+      /These Terms govern the official services operated at clisbot\.com, relay\.[\w.-]+, and\n        hub\.[\w.-]+\. By using the official relay or hosted Hub, you agree to them\./,
       "These Terms apply to services operated by Clisbot. Third-party services are governed by\n        their operators&apos; terms. By using Clisbot-operated services, you agree to these Terms.",
     );
   }

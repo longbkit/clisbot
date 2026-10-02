@@ -1,15 +1,15 @@
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { router, usePathname } from "expo-router";
-import { CalendarClock, History, Plus, Search } from "lucide-react-native";
+import { CalendarClock, FolderPlus, History, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
+import { useOpenAddProject } from "@/hooks/use-open-add-project";
+import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { PluginSidebarItemRow } from "@/plugins/sidebar-items";
-import { canCreateWorktreeForProjectKind } from "@/projects/host-projects";
-import { useHostFeature } from "@/runtime/host-features";
 import {
   builtinSidebarNavLabelKey,
   builtinSidebarNavShortcutAction,
@@ -17,13 +17,7 @@ import {
 } from "@/sidebar-nav/model";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
-import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
-import { useWorkspace } from "@/stores/session-store-hooks";
-import {
-  buildNewWorkspaceRoute,
-  buildSchedulesRoute,
-  buildSessionsRoute,
-} from "@/utils/host-routes";
+import { buildSchedulesRoute, buildSessionsRoute } from "@/utils/host-routes";
 
 interface SidebarNavRowProps {
   onBeforeNavigate?: () => void;
@@ -41,17 +35,7 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
  */
 export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems();
-  const fusion = useBotsFeatureHosts().length > 0;
-  const visibleItems = useMemo(() => {
-    const visible = items.filter((item) => item.visible);
-    if (!fusion) return visible;
-    const order = ["new-workspace", "search", "history", "schedules"];
-    return visible.sort(
-      (a, b) =>
-        (a.kind === "builtin" ? order.indexOf(a.id) : 4) -
-        (b.kind === "builtin" ? order.indexOf(b.id) : 4),
-    );
-  }, [items, fusion]);
+  const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
 
   if (visibleItems.length === 0) return null;
 
@@ -79,35 +63,7 @@ const SidebarNewWorkspaceRow = memo(function SidebarNewWorkspaceRow({
 }: SidebarNavRowProps) {
   const { t } = useTranslation();
   const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("new-workspace"));
-  const activeWorkspaceSelection = useActiveWorkspaceSelection();
-  const activeWorkspaceServerId = activeWorkspaceSelection?.serverId ?? null;
-  const activeWorkspaceId = activeWorkspaceSelection?.workspaceId ?? null;
-  const activeWorkspace = useWorkspace(activeWorkspaceServerId, activeWorkspaceId);
-  const supportsWorkspaceMultiplicity = useHostFeature(
-    activeWorkspaceServerId,
-    "workspaceMultiplicity",
-  );
-  const canUseActiveWorkspaceContext = Boolean(
-    activeWorkspace &&
-    (supportsWorkspaceMultiplicity || canCreateWorktreeForProjectKind(activeWorkspace.projectKind)),
-  );
-
-  const handlePress = useCallback(() => {
-    onBeforeNavigate?.();
-    router.push(
-      activeWorkspaceServerId
-        ? buildNewWorkspaceRoute(
-            activeWorkspace && canUseActiveWorkspaceContext
-              ? {
-                  serverId: activeWorkspaceServerId,
-                  sourceDirectory: activeWorkspace.projectRootPath,
-                  projectId: activeWorkspace.projectId,
-                }
-              : { serverId: activeWorkspaceServerId },
-          )
-        : buildNewWorkspaceRoute(),
-    );
-  }, [activeWorkspace, activeWorkspaceServerId, canUseActiveWorkspaceContext, onBeforeNavigate]);
+  const handlePress = useOpenNewWorkspace(onBeforeNavigate);
 
   return (
     <SidebarHeaderRow
@@ -120,6 +76,26 @@ const SidebarNewWorkspaceRow = memo(function SidebarNewWorkspaceRow({
     />
   );
 });
+
+function SidebarAddProjectRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const { t } = useTranslation();
+  const openAddProject = useOpenAddProject();
+  const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("add-project"));
+  const handlePress = useCallback(() => {
+    onBeforeNavigate?.();
+    void openAddProject();
+  }, [onBeforeNavigate, openAddProject]);
+  return (
+    <SidebarHeaderRow
+      icon={FolderPlus}
+      label={t(builtinSidebarNavLabelKey("add-project"))}
+      onPress={handlePress}
+      testID="sidebar-nav-add-project"
+      variant="compact"
+      shortcutKeys={shortcutKeys}
+    />
+  );
+}
 
 function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
   const { t } = useTranslation();
@@ -186,6 +162,7 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
 
 const BUILTIN_ROWS: Record<BuiltinSidebarNavId, ComponentType<SidebarNavRowProps>> = {
   "new-workspace": SidebarNewWorkspaceRow,
+  "add-project": SidebarAddProjectRow,
   history: SidebarHistoryRow,
   search: SidebarSearchRow,
   schedules: SidebarSchedulesRow,

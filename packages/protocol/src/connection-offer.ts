@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const DEFAULT_APP_BASE_URL = "https://app.clisbot.com";
+
 /**
  * Relay-only pairing offer.
  *
@@ -53,7 +55,7 @@ function extractOfferFragmentEncoded(input: string): string | null {
 }
 
 /**
- * Parse a pairing-offer URL of the form `https://app.paseo.sh/#offer=<base64url>`.
+ * Parse a pairing-offer URL of the form `https://app.clisbot.com/#offer=<base64url>`.
  *
  * Returns `null` if the input has no `#offer=` fragment. Throws if the fragment
  * exists but the payload is malformed or fails schema validation.

@@ -68,6 +68,9 @@ export function HubHostOnboardingRow({
         <StatusBadge label={status.label} variant={status.variant} />
         <StatusBadge {...hubLinkPresentation(item.hubPresence)} />
       </View>
+      <Text style={settingsStyles.rowHint} selectable>
+        {item.serverId ? `Host ID: ${item.serverId}` : `Hub ID: ${item.daemonId}`}
+      </Text>
       <Text style={failure === null ? settingsStyles.rowHint : settingsStyles.rowError}>
         {failure?.message ?? description}
       </Text>

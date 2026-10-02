@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 
 import {
   AgentProviderRuntimeSettingsMapSchema,
@@ -359,14 +360,14 @@ const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
   daemon: {
     listen: "127.0.0.1:6868",
     cors: {
-      allowedOrigins: ["https://app.paseo.sh"],
+      allowedOrigins: [DEFAULT_APP_BASE_URL],
     },
     relay: {
       enabled: false,
     },
   },
   app: {
-    baseUrl: "https://app.paseo.sh",
+    baseUrl: DEFAULT_APP_BASE_URL,
   },
 }) as PersistedConfig;
 

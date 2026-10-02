@@ -274,9 +274,11 @@ The reverse proxy still forwards to port `6868`; Hub API routing happens there.
 
 - Set `CLISBOT_PASSWORD` for any published port or network-reachable deployment.
 - Prefer HTTPS at the reverse proxy for direct browser access.
-- Use the [official Clisbot relay](https://github.com/getpaseo/paseo-relay) for
+- Use the official Clisbot relay at `relay.clisbot.com:443` with TLS for
   untrusted networks or mobile access when you do not want to expose the daemon
   port directly.
+- The relay server has its own [Docker and Tunnel deployment](relay-deployment.md),
+  separate from the daemon/Hub image.
 - The container is the isolation boundary for agents. Agents can read and write
   whatever you mount into `/workspace` and whatever credentials you place in
   `/home/clisbot`.

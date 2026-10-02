@@ -1,4 +1,5 @@
 import "@/styles/unistyles";
+import { ProductAnalyticsHost } from "@/clisbot/analytics/host";
 import { ConfirmationProvider } from "@/components/confirmation-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PortalProvider } from "@gorhom/portal";
@@ -932,6 +933,7 @@ function AppShell() {
         <HubAccountEntryNavigation navigationReady={navigationReady} />
         <OpenProjectListener />
         <AgentNavigationListener />
+        <ProductAnalyticsHost />
         <AppWithSidebar>
           <WorkspaceRouteNavigationBridge />
           <RootStack />
