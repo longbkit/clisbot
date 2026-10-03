@@ -135,6 +135,9 @@ test("focused contracts stay inside existing required checks", () => {
   assert.match(desktop, /test:e2e:renderer/);
   assert.match(desktop, /test:e2e:browser-tabs/);
   assert.match(desktop, /npm run test --workspace=@clisbot\/desktop/);
+  assert.match(desktop, /npm run build:desktop-backends/);
+  assert.match(desktop, /test:e2e:personal-serving --workspace=@clisbot\/cli/);
+  assert.match(desktop, /test:e2e:personal-serving --workspace=@clisbot\/desktop/);
   assert.ok(!jobs.has("desktop-browser-bridge"));
   assert.ok(!jobs.has("playwright-desktop"));
 });
@@ -172,6 +175,15 @@ test("PR routing declares stable behavior ownership", () => {
     server: ["packages/server/**", "packages/app/e2e/support/fixtures/recording.*"],
     desktop: [
       "packages/desktop/**",
+      "packages/cli/src/commands/serve/**",
+      "packages/cli/src/commands/hub/**",
+      "packages/cli/tests/e2e/personal-serving.mjs",
+      "packages/device-access/**",
+      "packages/hub/src/device-access/**",
+      "packages/hub/drizzle/**",
+      "packages/server/src/server/device-access/**",
+      "packages/server/src/server/hub/local-start*",
+      "packages/protocol/src/{device-access,device-pairing-offer,hub-local,hub-device-http}.ts",
       "packages/app/src/desktop/**",
       "packages/server/src/server/browser-tools/**",
       "packages/app/e2e/support/**",
@@ -180,6 +192,7 @@ test("PR routing declares stable behavior ownership", () => {
     ],
     app: ["packages/app/**", "packages/expo-two-way-audio/**"],
     sdk: [
+      "packages/device-access/**",
       "packages/plugin/**",
       "plugin-examples/**",
       "public-docs/plugins/**",
@@ -261,6 +274,15 @@ test("browser and desktop tests have exclusive, directory-owned suites", () => {
   assert.doesNotMatch(routingSource, /desktop_bridge|playwright_desktop|browser-\*|browser-\*\//);
   assert.deepEqual(filters.desktop, [
     "packages/desktop/**",
+    "packages/cli/src/commands/serve/**",
+    "packages/cli/src/commands/hub/**",
+    "packages/cli/tests/e2e/personal-serving.mjs",
+    "packages/device-access/**",
+    "packages/hub/src/device-access/**",
+    "packages/hub/drizzle/**",
+    "packages/server/src/server/device-access/**",
+    "packages/server/src/server/hub/local-start*",
+    "packages/protocol/src/{device-access,device-pairing-offer,hub-local,hub-device-http}.ts",
     "packages/app/src/desktop/**",
     "packages/server/src/server/browser-tools/**",
     "packages/app/e2e/support/**",

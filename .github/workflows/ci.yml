@@ -129,6 +129,7 @@ jobs:
       - name: Verify public package contents
         run: |
           npm pack --dry-run --ignore-scripts --workspace=@clisbot/protocol
+          npm pack --dry-run --ignore-scripts --workspace=@clisbot/device-access
           npm pack --dry-run --ignore-scripts --workspace=@clisbot/client
           npm pack --dry-run --ignore-scripts --workspace=@clisbot/server
 
@@ -226,15 +227,29 @@ jobs:
       - name: Install dependencies with retry
         run: node scripts/npm-retry.mjs ci
 
-      - name: Build server stack
-        run: npm run build:server
+      - name: Build desktop backends
+        run: npm run build:desktop-backends
 
       - name: Run desktop tests
         run: npm run test --workspace=@clisbot/desktop
 
       - name: Install virtual display
         if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get update && sudo apt-get install -y xvfb xauth xdotool
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth xdotool dbus-x11 gnome-keyring libsecret-1-0
+
+      - name: Verify optional Hub and independent service lifecycle
+        run: npm run test:e2e:personal-serving --workspace=@clisbot/cli
+
+      - name: Verify installed npm artifact serving
+        run: npm run test:e2e:packaged-serving --workspace=@clisbot/cli
+
+      - name: Verify Electron personal onboarding (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        run: xvfb-run -a node packages/desktop/e2e/linux-secret-service.mjs -- npm run test:e2e:personal-serving --workspace=@clisbot/desktop
+
+      - name: Verify Electron personal onboarding (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        run: npm run test:e2e:personal-serving --workspace=@clisbot/desktop
 
       - name: Install Playwright browser
         if: ${{ runner.os == 'Linux' }}
@@ -318,6 +333,9 @@ jobs:
       - name: Run app unit tests
         run: npm run test --workspace=@clisbot/app
 
+      - name: Verify managed Google handoff destinations
+        run: node --test packages/app/scripts/hub-google-auth-page.test.mjs
+
   sdk-tests:
     name: sdk-tests
     needs: changes
@@ -348,6 +366,9 @@ jobs:
 
       - name: Run client tests
         run: npm run test --workspace=@clisbot/client
+
+      - name: Run device authority tests
+        run: npm run test --workspace=@clisbot/device-access -- --maxWorkers=1 --bail=1
 
       - name: Run highlight tests
         run: npm run test --workspace=@clisbot/highlight

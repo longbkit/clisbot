@@ -39,6 +39,15 @@ server:
 
 desktop:
   - "packages/desktop/**"
+  - "packages/cli/src/commands/serve/**"
+  - "packages/cli/src/commands/hub/**"
+  - "packages/cli/tests/e2e/personal-serving.mjs"
+  - "packages/device-access/**"
+  - "packages/hub/src/device-access/**"
+  - "packages/hub/drizzle/**"
+  - "packages/server/src/server/device-access/**"
+  - "packages/server/src/server/hub/local-start*"
+  - "packages/protocol/src/{device-access,device-pairing-offer,hub-local,hub-device-http}.ts"
   - "packages/app/src/desktop/**"
   - "packages/server/src/server/browser-tools/**"
   - "packages/app/e2e/support/**"
@@ -50,6 +59,7 @@ app:
   - "packages/expo-two-way-audio/**"
 
 sdk:
+  - "packages/device-access/**"
   - "packages/plugin/**"
   - "plugin-examples/**"
   - "public-docs/plugins/**"
