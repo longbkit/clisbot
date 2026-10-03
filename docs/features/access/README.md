@@ -5,6 +5,7 @@
 Who may manage people and grant access below the organization: [Delegated access](scoped-admins.md).
 Terminal versus Terminal profiles, and where Projects may be created: [Terminal profiles and Project creation](terminal-and-project-creation.md) (built 2026-09-26).
 The screen itself (People & access › Access): its jobs, layout and interaction are in [The Access screen](access-screen.md).
+Personal onboarding, Hub login policy and pairing versus Managed Access: [Device pairing](device-pairing.md).
 
 This page keeps only what those do not say: why the model is shaped this way, the implementation facts the code cannot explain on its own, and what later phases need.
 

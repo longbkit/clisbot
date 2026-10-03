@@ -3,6 +3,13 @@
 End-user steps live in the user guide: [setup and sign-in](../../guides/user-guide/account/setup-and-sign-in.md)
 and [profile](../../guides/user-guide/account/profile.md).
 
+This document describes the existing HTTP/browser Google implementation. The accepted v1
+extension for Google/Workspace over direct and encrypted relay connections lives in
+[Device pairing and Hub authentication](../access/device-pairing.md#google-sign-in-on-direct-and-relay-routes-target).
+That extension is not implemented yet. On a protected uninitialized Hub, first-owner creation
+requires operator-approved pairing and a setup grant; a URL or Google identity alone cannot
+claim the Hub. Existing provider/account rules below remain the admission baseline.
+
 ## Goal
 
 Add Google sign-in beside the existing email/password flow, while keeping one

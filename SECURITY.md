@@ -33,22 +33,36 @@ The relay sees only: IP addresses, timing, message sizes, session IDs, and the p
 The daemon requires a valid cryptographic handshake before processing any commands. A compromised relay cannot:
 
 - **Impersonate the daemon to your phone** — Without the daemon's secret key, it cannot derive the shared key, so any traffic it injects fails authenticated decryption on the phone
-- **Send commands as you** — The daemon only accepts traffic that decrypts and authenticates under a shared key derived with its own secret key. The phone's keypair is ephemeral per connection, so there is no persistent phone-side secret to steal; protection comes from the daemon's secret key never leaving the daemon.
+- **Send commands as a paired device** — With device pairing enabled, an encrypted handshake alone grants no authority. Admission also requires a signed device proof or a redeemable invitation; managed `external` sessions require a Hub ticket. Legacy admission has different rules, described below.
 - **Read your traffic** — All messages are encrypted with XSalsa20-Poly1305 (NaCl box) after the handshake
 - **Forge messages** — NaCl box provides authenticated encryption; tampered messages are rejected
-- **Replay old messages across sessions** — Each session derives fresh encryption keys, so ciphertext from one session cannot be replayed into another session. Within a live session, replay protection is not yet implemented; the protocol uses random nonces and does not track nonce reuse or message counters.
+- **Replay messages into an updated receiver** — Each session derives fresh encryption keys. Updated encrypted channels also verify the authenticated nonce before dispatch: replayed, reflected and decreasing-counter frames within a prefix close the channel. Current senders use a random 128-bit prefix per direction and an increasing 64-bit counter in the existing 24-byte nonce. This does not prevent the relay from dropping traffic, delaying it, or disconnecting clients.
+
+Replay checks require an updated receiving endpoint; old receivers still lack them. Updated receivers accept legacy random nonces with a bounded ledger of 4,096 prefixes per channel. A legacy sender reaching that limit must reconnect or update; the receiver closes instead of evicting evidence and permitting an old replay. Current senders use one prefix, so long sessions do not fill this ledger. These checks assume the existing ordered WebSocket transport and preserve the NaCl bundle, handshake and application schemas.
+
+The encrypted handshake buffer is bounded to 64 frames and 1 MiB while the ready send is pending. Hub ingress requires a verified persistent device proof within 15 seconds; public discovery and ephemeral account-entry proofs cannot keep an anonymous slot indefinitely. The deadline terminates the socket without waiting for a peer's close acknowledgement. Client requests reconnect after a long sign-in interaction. These bounds limit retained resources; they do not provide protection against a distributed flood.
 
 ### Trust model
 
-The QR code or pairing link is the trust anchor. It contains the daemon's public key, which is required to establish the encrypted connection. Treat it like a password — don't share it publicly.
+The QR code pins the backend's public encryption key. A legacy V2 offer contains public metadata; knowledge of that key alone is not a client authentication mechanism. Restrict legacy admission independently.
 
-When a daemon password is configured, new relay clients send it in the encrypted `hello` message. This release still admits relay clients that send no credential so existing mobile builds continue to connect. A wrong password is rejected. The next release will require the password for relay connections after updated mobile builds are available.
+New V3/V4 pairing links also contain an invitation secret. Keep these links private: an invitation grants one device the approved backend scope and expires after five minutes by default. Its verifier is stored at the backend; redemption binds it to an Ed25519 device key. A fresh signed retry from that key can recover the same credential within the invitation lifetime. Device proofs bind the backend identity, credential, operation, body, timestamp and nonce; reused proof nonces are rejected. Hub and daemon have separate credentials and durable revocation records.
+
+Existing `clisbot` onboarding provisions protected daemon access in a fresh personal home. Hub startup is explicit through the app or `clisbot hub start --personal`; there is no additional public `serve` command. Managed Access `off` requires the daemon's own device credential; a Hub owner account cannot replace it. `external` uses the Hub's existing grants, tickets and leases. A Hub can operate without account login, but enabling its persistent login policy requires every paired device to sign in before management or ticket issuance. Hub revocation invalidates its device leases and notifies connected daemons; a disconnected daemon is fenced at lease expiry.
+
+For an initialized account-required Hub, a URL opens a bounded, device-key-bound login exchange without granting management access. Only admitted account authentication issues persistent login credentials. An uninitialized owner still needs operator-approved pairing and a separate one-use setup grant; merely reaching the URL cannot claim the Hub. Sign-in sessions bind their refresh authority and managed leases to the authenticated device. Signing out a session removes that session's authority; an allowed account can authenticate again.
+
+Hub traffic uses its own pinned encrypted channel, directly or through a separate relay identity. The web/gateway only forwards fixed service namespaces and does not issue authority. Tailscale Serve exposes that gateway over HTTPS; tailnet membership does not replace device authentication. Native credentials use SecureStore, desktop credentials use OS encryption, and web credentials use non-extractable IndexedDB keys. Browser script compromise can still use credentials available to that origin; keep the app origin trusted.
+
+In legacy mode, when a daemon password is configured, new relay clients send it in the encrypted `hello` message. This release still admits relay clients that send no credential so existing mobile builds continue to connect. A wrong password is rejected. The next release will require the password for relay connections after updated mobile builds are available.
 
 ## Local daemon trust boundary
 
-By default, the daemon binds to `127.0.0.1`. With no password configured, anything that can reach the daemon socket can control the daemon. Loopback is reachable by other users on the machine and by some forwarding tools.
+With device pairing enabled, `/mcp/agents` requires the per-run MCP capability token injected into local agent configurations. Neither an absent daemon password nor a legacy password bearer opens this endpoint. Keep that token private; its tools control agents and terminals.
 
-The daemon supports an optional shared-secret password (set via `auth.password` in `config.json` or the `CLISBOT_PASSWORD` env var; stored bcrypt-hashed). WebSocket clients send the password in `hello`; the daemon sends no session data before admission. Direct connections still accept bearer headers and WebSocket bearer subprotocols for older clients. HTTP stays bearer-header based. Health (`GET /api/health`) and CORS preflight (`OPTIONS`) are exempt; `/api/files/download` and `/mcp/agents` use their own capability tokens.
+The daemon normally binds to `127.0.0.1`. In legacy mode, with no password configured, anything that can reach the socket can control it. Protected device admission also applies on loopback. Loopback is reachable by other users on the machine and by forwarding tools.
+
+Legacy daemon admission supports an optional shared-secret password (set via `auth.password` in `config.json` or the `CLISBOT_PASSWORD` env var; stored bcrypt-hashed). WebSocket clients send the password in `hello`; the daemon sends no session data before admission. Direct connections still accept bearer headers and WebSocket bearer subprotocols for older clients. Legacy HTTP stays bearer-header based. Protected HTTP requires a request-bound signed device proof or the OS local operator credential. Health (`GET /api/health`) and CORS preflight (`OPTIONS`) are exempt; `/api/files/download` and `/mcp/agents` use their own capability tokens.
 
 The daemon writes a new `$CLISBOT_HOME/local-credential` on every run with mode `0600` and removes it on shutdown. The CLI and desktop main process read it only for the daemon whose PID lock `listen` matches their connection target. A same-user process can read this credential, so the password protects against network clients and other OS users, not processes running as the daemon user. Protect `$CLISBOT_HOME` accordingly. Relay traffic remains end-to-end encrypted independently of password admission.
 
@@ -62,7 +76,7 @@ In Docker, the official image runs the daemon and agents as the non-root
 `clisbot` user by default. Mounted workspaces and credentials are still fully
 available to anything the agents run inside the container.
 
-For remote access, use the relay connection. It is the supported path for reaching the daemon off-machine, and it adds end-to-end encryption plus a pairing handshake before commands are accepted.
+Personal serving prefers Tailscale HTTPS and supports encrypted relay or a user-managed HTTPS proxy. All protected routes require admission; encryption alone does not authenticate a client.
 
 Host header validation and CORS origin checks are defense-in-depth controls for localhost exposure. They help block DNS rebinding and browser-based attacks, but they do not replace network isolation.
 

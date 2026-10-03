@@ -2,9 +2,17 @@
 
 User/channel metadata and session persistence: [agent session storage](features/agent-session-storage/README.md) — durable storage is implemented; the wider AC/W set is not yet fully accepted. Under consideration: [workspace naming and reuse](features/workspace-organization/README.md).
 
-Clisbot Hub is an explicit opt-in connection from one Clisbot daemon to one Hub. Running a daemon does
-not register it with a Hub. The relationship begins only when a user runs
-`clisbot hub connect [url]` from the daemon machine and approves that Host in the browser. Clisbot assistant onboarding can also explicitly enroll the local daemon through the authenticated local operator API when channel credentials are supplied.
+Personal serving now has a separate [device pairing and Hub policy decision](features/access/device-pairing.md):
+`clisbot hub start --personal` composes independent daemon, Hub and web/gateway services, pairs both with one QR,
+and auto-enrolls a new personal daemon through the local operator. Personal mode defaults to no
+account login and managed access `off`; enrollment alone does not require account-backed access.
+
+Outside that explicit composition, running a daemon does not register it with a Hub.
+`clisbot hub connect [url]` enrolls a Host with browser/account approval. Assistant onboarding can
+also explicitly enroll the local daemon through the authenticated local operator API when channel
+credentials are supplied. Existing account deployments retain their policy. The sections below
+describe that baseline; the device-pairing decision defines protected personal admission and Hub's
+separate app relay ingress.
 
 ## Hosts in Settings
 

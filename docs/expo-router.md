@@ -39,6 +39,16 @@ remembered workspace for that host after the remembered selection has hydrated
 and the workspace has not been proven missing. If there is no restorable
 workspace, it goes to global `/open-project`.
 
+When the workspace screen proves the remembered workspace missing (its Host is
+online, its workspaces have loaded, and there is nothing to recover), it forgets
+the selection, and a later visit to that stale URL does not remember it again.
+Without that, every cold launch restores the dead workspace before its Host
+connects, and the reader cannot get past it.
+
+The root index picks only Hosts in the Host inventory (`useHostInventory`), the
+same list the Host route renders. A saved Host the inventory hides would
+otherwise land on "Host unavailable".
+
 This restore is based on the last navigated workspace, not current connection
 status. Do not redirect to another online host just because the remembered host
 is still connecting or offline; the workspace screen owns that offline/loading
