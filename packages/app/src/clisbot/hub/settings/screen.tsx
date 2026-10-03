@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -30,6 +30,16 @@ import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
 import { BackLink } from "./back-link";
 import { FirstHostSetup } from "./first-host-setup";
+import {
+  HubConnectionSettings,
+  HubOverviewSettings,
+  HubLoginPolicySettings,
+} from "@/device-access/hub-settings";
+import { WhatIsHub } from "@/device-access/hub-help";
+import { useHubEditLock } from "@/device-access/hub-edit-lock";
+import { useHubProfiles } from "@/device-access/hub-profiles";
+import { AccountSessions } from "@/device-access/account-sessions";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 export function HubSettingsContent({
   section,
@@ -39,6 +49,27 @@ export function HubSettingsContent({
   initialAutomationCreate?: boolean;
 }) {
   const hub = useHubAccount();
+  const showHelp =
+    section === "hubs" || (section !== "overview" && section !== "sign-in" && !hub.signedIn);
+  return (
+    <>
+      {showHelp ? <WhatIsHub /> : null}
+      <HubSectionContent section={section} initialAutomationCreate={initialAutomationCreate} />
+    </>
+  );
+}
+
+function HubSectionContent({
+  section,
+  initialAutomationCreate,
+}: {
+  section: HubSectionSlug;
+  initialAutomationCreate?: boolean;
+}) {
+  const hub = useHubAccount();
+  if (section === "hubs") return <HubConnectionSettings />;
+  if (section === "overview") return <HubOverviewSettings />;
+  if (section === "sign-in") return <HubLoginPolicySettings />;
   if (section === "account") return <HubAccountSettings />;
   if (section === "hosts") return <HostsSettings />;
   return (
@@ -54,7 +85,7 @@ function SignedInHubSettings({
   section,
   initialAutomationCreate,
 }: {
-  section: Exclude<HubSectionSlug, "account" | "hosts">;
+  section: Exclude<HubSectionSlug, "account" | "hosts" | "hubs" | "overview" | "sign-in">;
   initialAutomationCreate?: boolean;
 }) {
   const account = useHubAccount();
@@ -85,6 +116,7 @@ function SignedInHubSettings({
 
 function HubAccountSettings() {
   const hub = useHubAccount();
+  if (hub.connection?.accountAuthentication === "personal") return <HubOverviewSettings />;
   if (!hub.enabled) return null;
   if (hub.loading) return <StateMessage message="Loading Hub account..." />;
   const state = hub.state;
@@ -94,13 +126,90 @@ function HubAccountSettings() {
   }
   const invitation = getAccountInvitation(state);
   const accountId = state !== null && "account" in state ? state.account.id : null;
-  return (
-    <HubAccountSettingsForm
+  const entry = (
+    <HubAccountSettingsEntry
       key={JSON.stringify([hub.origin, state?.status, accountId, invitation?.id])}
       hub={hub}
       invitation={invitation}
     />
   );
+  if (accountId && hub.origin?.startsWith("hub://"))
+    return (
+      <AuthenticatedAccountTabs key={JSON.stringify([hub.origin, accountId])}>
+        {entry}
+      </AuthenticatedAccountTabs>
+    );
+  return entry;
+}
+
+/** Account session management is independent of organization or resource access. */
+function AuthenticatedAccountTabs({ children }: { children: ReactNode }) {
+  const [tab, setTab] = useState<"profile" | "sessions">("profile");
+  return (
+    <View>
+      <SegmentedControl
+        options={[
+          { value: "profile", label: "Profile" },
+          { value: "sessions", label: "Sessions" },
+        ]}
+        value={tab}
+        onValueChange={setTab}
+      />
+      {tab === "sessions" ? <AccountSessions /> : children}
+    </View>
+  );
+}
+
+function HubAccountSettingsEntry({
+  hub,
+  invitation,
+}: {
+  hub: HubAccount;
+  invitation: HubInvitation | undefined;
+}) {
+  const router = useRouter();
+  const registry = useHubProfiles();
+  const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
+  const setupUnavailable = hub.error?.startsWith("Owner setup approval is unavailable") === true;
+  const setupBlocked = profile?.setupStatus === "blocked";
+  const state = hub.state;
+  const [pending, setPending] = useState(false);
+  const scanOwnerSetup = useCallback(() => router.push("/pair-scan"), [router]);
+  const retryAccount = useCallback(() => {
+    setPending(true);
+    void hub.refresh().finally(() => setPending(false));
+  }, [hub]);
+  if (setupBlocked)
+    return (
+      <SettingsSection title="Owner setup">
+        <Alert
+          variant="warning"
+          title="Hub setup needs operator recovery"
+          description="This Hub cannot safely offer first-owner creation. Ask the person operating it to repair setup from its local computer. A URL or ordinary pairing cannot reopen owner setup."
+        />
+      </SettingsSection>
+    );
+  if (setupUnavailable && state?.status === "instanceSetupRequired")
+    return (
+      <SettingsSection title="Owner setup">
+        <Alert
+          variant="warning"
+          title="New owner setup approval needed"
+          description="No owner account was created by this attempt. Ask the Hub operator for a new setup QR or link, then try again."
+        />
+        <Button variant="outline" onPress={retryAccount} disabled={pending}>
+          Check setup status
+        </Button>
+        <Button variant="outline" onPress={scanOwnerSetup} disabled={pending}>
+          Scan new setup QR
+        </Button>
+        <Text style={settingsStyles.rowHint}>
+          Your device pairing and your owner setup approval are separate.
+        </Text>
+      </SettingsSection>
+    );
+
+  return <HubAccountSettingsForm hub={hub} invitation={invitation} />;
 }
 
 function HubAccountSettingsForm({
@@ -110,6 +219,7 @@ function HubAccountSettingsForm({
   hub: HubAccount;
   invitation: HubInvitation | undefined;
 }) {
+  useHubEditLock(hub.state?.status === "instanceSetupRequired");
   const [form] = useState(() =>
     openHubAccountEntryForm({
       mode: accountEntryMode(hub.state, invitation),
@@ -480,6 +590,7 @@ function browserAuthenticationTitle(state: HubAccountState | null): string {
 }
 
 function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProps) {
+  useHubEditLock();
   const { email, password, confirmPassword, passwordsMatch } = fields;
   const { setEmail, setPassword, setConfirmPassword } = form;
   const compact = useIsCompactFormFactor();

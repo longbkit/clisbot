@@ -44,7 +44,9 @@ export interface ToastState {
 }
 
 export interface ToastApi {
-  show: (content: ReactNode, options?: ToastShowOptions) => void;
+  show: (content: ReactNode, options?: ToastShowOptions) => number | void;
+  /** Dismiss only the toast with this ID; a newer message stays visible. */
+  dismiss?: (id: number) => void;
   copied: (label?: string) => void;
   error: (message: string) => void;
 }
@@ -61,7 +63,9 @@ const ThemedWarning = withUnistyles(AlertTriangle);
 const foregroundIcon = (theme: Theme) => ({ color: theme.colors.foreground });
 const infoIcon = (theme: Theme) => ({ color: theme.colors.palette.blue[300] });
 const successIcon = (theme: Theme) => ({ color: theme.colors.primary });
-const warningIcon = (theme: Theme) => ({ color: theme.colors.palette.amber[500] });
+const warningIcon = (theme: Theme) => ({
+  color: theme.colors.palette.amber[500],
+});
 const errorIcon = (theme: Theme) => ({ color: theme.colors.destructive });
 
 export function useToastHost(): {
@@ -100,11 +104,18 @@ export function useToastHost(): {
       durationMs,
       testID: options?.testID,
     });
+    return idRef.current;
   }, []);
+
+  const dismissOwned = useCallback(
+    (id: number) => setToast((current) => (current?.id === id ? null : current)),
+    [],
+  );
 
   const api = useMemo<ToastApi>(
     () => ({
       show,
+      dismiss: dismissOwned,
       copied: (label?: string) =>
         show(label ? t("common.states.copiedLabel", { label }) : t("common.states.copied"), {
           variant: "success",
@@ -112,7 +123,7 @@ export function useToastHost(): {
         }),
       error: (message: string) => show(message, { variant: "error", durationMs: 3200 }),
     }),
-    [show, t],
+    [show, t, dismissOwned],
   );
 
   const dismiss = useCallback(() => {

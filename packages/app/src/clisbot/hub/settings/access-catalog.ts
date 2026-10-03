@@ -6,6 +6,7 @@ import type {
   HubMembersSchema,
   HubTeamsSchema,
 } from "../contracts";
+import { withEmail } from "@/clisbot/hub/account-email";
 
 export type AccessCatalog = z.infer<typeof HubAccessCatalogSchema>;
 export type AccessResource = AccessCatalog["resources"][number];
@@ -80,7 +81,7 @@ export function assignmentSubjectOptions(
       .map((member) => ({
         id: `member:${member.id}`,
         value: subjectKey("member", member.id),
-        label: `${member.name} · ${member.email}`,
+        label: withEmail(member.name, member.email),
         description: member.email,
         group: "Members",
       })),

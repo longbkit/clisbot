@@ -1,8 +1,14 @@
-import { useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsInfoTip } from "./settings-info-tip";
 import { settingsStyles } from "@/styles/settings";
+
+/**
+ * The title of the settings page a section renders in. A section whose title repeats it (a page
+ * that is one section, such as Sidebar) drops its own label instead of saying it twice.
+ */
+export const SettingsPageTitleContext = createContext<string | null>(null);
 
 interface SettingsSectionProps {
   title: string;
@@ -44,29 +50,35 @@ export function SettingsSection({
     () => [settingsStyles.section, flush ? styles.flush : null, style],
     [flush, style],
   );
+  const repeatsPage = useContext(SettingsPageTitleContext) === title;
+  const hasHeader = !repeatsPage || Boolean(titleAccessory || info || trailing);
   return (
     <View style={sectionStyle} testID={testID}>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Text
-            style={[
-              settingsStyles.sectionHeaderTitle,
-              prominence === "primary" ? styles.primaryTitle : null,
-            ]}
-          >
-            {title}
-          </Text>
-          {titleAccessory}
-          {info ? (
-            <SettingsInfoTip
-              title={title}
-              info={info}
-              testID={testID ? `${testID}-info` : undefined}
-            />
-          ) : null}
+      {hasHeader ? (
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            {repeatsPage ? null : (
+              <Text
+                style={[
+                  settingsStyles.sectionHeaderTitle,
+                  prominence === "primary" ? styles.primaryTitle : null,
+                ]}
+              >
+                {title}
+              </Text>
+            )}
+            {titleAccessory}
+            {info ? (
+              <SettingsInfoTip
+                title={title}
+                info={info}
+                testID={testID ? `${testID}-info` : undefined}
+              />
+            ) : null}
+          </View>
+          {trailing}
         </View>
-        {trailing}
-      </View>
+      ) : null}
       <View style={styles.content}>{children}</View>
     </View>
   );

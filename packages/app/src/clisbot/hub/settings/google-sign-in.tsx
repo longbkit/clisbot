@@ -37,7 +37,7 @@ export function GoogleSignInButton({
       disabled={pending}
       onPress={continueWithGoogle}
     >
-      Continue with Google
+      {hub.googleSignInLabel ?? "Continue with Google"}
     </Button>
   );
 }

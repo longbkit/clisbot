@@ -75,6 +75,7 @@ export interface HubHostManagement {
 
 export interface HostProfile {
   serverId: string;
+  devicePairing?: { backendId: string; daemonPublicKeyB64: string };
   password?: string;
   label: string;
   appearance: HostAppearance;
@@ -468,6 +469,9 @@ const StoredHostConnectionSchema = z.discriminatedUnion("type", [
 ]);
 const StoredHostProfileSchema = z.strictObject({
   serverId: z.string().trim().min(1),
+  devicePairing: z
+    .strictObject({ backendId: z.string().min(1), daemonPublicKeyB64: z.string().min(1) })
+    .optional(),
   password: z.string().optional(),
   label: z.string().optional(),
   appearance: HostAppearanceSchema.optional(),
@@ -578,6 +582,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
 
   return {
     serverId,
+    ...(record.devicePairing ? { devicePairing: record.devicePairing } : {}),
     ...(password ? { password } : {}),
     label,
     appearance: record.appearance ?? defaultHostAppearance(),

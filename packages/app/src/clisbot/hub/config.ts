@@ -12,6 +12,7 @@ declare global {
 
 export interface HubConfiguration {
   origin: string;
+  deviceProfile?: import("@/device-access/hub-profiles").HubProfile;
 }
 
 export function getHubConfiguration(): HubConfiguration | null {

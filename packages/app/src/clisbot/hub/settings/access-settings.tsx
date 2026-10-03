@@ -38,6 +38,7 @@ import {
   memberNamesByUserId,
 } from "./access-catalog";
 import { EmptyRow, QueryFeedback } from "./access-settings-feedback";
+import { withEmail } from "@/clisbot/hub/account-email";
 
 /**
  * Access opens for Organization Owners and Admins, and for any Member whose
@@ -311,7 +312,9 @@ function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
   return useMemo(
     () => ({
       teamById: new Map(teams.map((team) => [team.id, team.name])),
-      memberById: new Map(members.map((member) => [member.id, `${member.name} · ${member.email}`])),
+      memberById: new Map(
+        members.map((member) => [member.id, withEmail(member.name, member.email)]),
+      ),
       memberNameByUserId: memberNamesByUserId(members),
     }),
     [members, teams],

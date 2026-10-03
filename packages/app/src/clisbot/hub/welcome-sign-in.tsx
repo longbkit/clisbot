@@ -25,6 +25,7 @@ import {
   type HubWelcomeAction,
   type HubWelcomeStatusView,
 } from "./welcome-status";
+import { withEmail } from "@/clisbot/hub/account-email";
 
 const SIGN_IN_PARAM = "hubSignIn";
 // Returning here keeps the reader on Welcome even when a Host is already online: the account they
@@ -125,7 +126,7 @@ function HubWelcomeStatus({
 }) {
   const router = useRouter();
   const signedIn = hub.signedIn;
-  const identity = signedIn ? `${signedIn.account.email} · ${signedIn.organization.name}` : null;
+  const identity = signedIn ? withEmail(signedIn.organization.name, signedIn.account.email) : null;
   const run = useCallback(
     (action: HubWelcomeAction) => {
       if (action === "account") router.push(buildHubSettingsRoute("account"));

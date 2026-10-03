@@ -34,11 +34,18 @@ function parseStoredWorkspaceSelection(stored: string | null): ActiveWorkspaceSe
   }
 }
 
+function selectionKey(selection: ActiveWorkspaceSelection): string {
+  return JSON.stringify([selection.serverId, selection.workspaceId]);
+}
+
 export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectionStorage) {
   let selection: ActiveWorkspaceSelection | null = null;
   let hydrated = false;
   let hydrationPromise: Promise<void> | null = null;
   let revision = 0;
+  // A workspace its connected Host proved missing. Visiting its stale URL must not remember it
+  // again, or every launch restores the dead workspace.
+  let forgottenKey: string | null = null;
   const listeners = new Set<() => void>();
 
   function notifyListeners() {
@@ -49,9 +56,10 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
 
   function remember(next: ActiveWorkspaceSelection) {
     const normalized = normalizeWorkspaceSelection(next);
-    if (!normalized) {
+    if (!normalized || selectionKey(normalized) === forgottenKey) {
       return;
     }
+    forgottenKey = null;
     if (
       selection?.serverId === normalized.serverId &&
       selection.workspaceId === normalized.workspaceId
@@ -65,6 +73,18 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
     void storage.write(JSON.stringify(normalized)).catch(() => {});
   }
 
+  /** Drop a selection whose workspace is gone, so startup stops restoring it. */
+  function forget(missing: ActiveWorkspaceSelection) {
+    forgottenKey = selectionKey(missing);
+    if (selection === null || selectionKey(selection) !== forgottenKey) {
+      return;
+    }
+    selection = null;
+    revision += 1;
+    notifyListeners();
+    void storage.clear().catch(() => {});
+  }
+
   function hydrate(): Promise<void> {
     if (hydrationPromise) {
       return hydrationPromise;
@@ -75,6 +95,9 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
       .then((stored) => {
         if (revision === hydrationRevision) {
           selection = parseStoredWorkspaceSelection(stored);
+          if (selection !== null && selectionKey(selection) === forgottenKey) {
+            selection = null;
+          }
           if (stored !== null && selection === null) {
             void storage.clear().catch(() => {});
           }
@@ -97,6 +120,7 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
     getSelection: () => selection,
     hydrate,
     isHydrated: () => hydrated,
+    forget,
     remember,
     subscribe: (listener: () => void): (() => void) => {
       listeners.add(listener);

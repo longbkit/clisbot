@@ -1,6 +1,8 @@
 import { startDesktopDaemon, type DesktopDaemonStatus } from "@/desktop/daemon/desktop-daemon";
 import { connectionFromListen } from "@/types/host-connection";
 import type { HostRuntimeStore } from "@/runtime/host-runtime";
+import { pairHub } from "@/device-access/hub-transport";
+import { parseDevicePairingOfferFromUrl } from "@clisbot/protocol/device-pairing-offer";
 
 export type DaemonStartResult = { ok: true } | { ok: false; error: string };
 export type DaemonStartCondition = boolean | (() => boolean | Promise<boolean>);
@@ -25,7 +27,7 @@ export async function upsertDesktopDaemonConnection(
     return { ok: false, error: "Desktop daemon did not return a server id." };
   }
   if (store.getHosts().some((host) => host.serverId === serverId)) {
-    return { ok: true };
+    return pairDesktopHub(daemon);
   }
   const listenAddress = daemon.listen?.trim() ?? "";
   if (!listenAddress) {
@@ -42,7 +44,25 @@ export async function upsertDesktopDaemonConnection(
     serverId,
     hostname: daemon.hostname,
   });
-  return { ok: true };
+  return pairDesktopHub(daemon);
+}
+
+async function pairDesktopHub(daemon: DesktopDaemonStatus): Promise<DaemonStartResult> {
+  if (daemon.servingError)
+    return {
+      ok: false,
+      error: `Daemon connected; Hub/web startup needs attention: ${daemon.servingError}`,
+    };
+  try {
+    const offer = daemon.pairingUrl ? parseDevicePairingOfferFromUrl(daemon.pairingUrl) : null;
+    if (offer?.hub) await pairHub(offer.hub);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Daemon connected; Hub pairing needs a retry: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 export class DaemonStartService {

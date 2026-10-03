@@ -6,7 +6,8 @@ import {
   resolveStartupRoute,
   resolveWorkspaceSelectionStatus,
 } from "@/navigation/host-runtime-bootstrap";
-import { useHostRegistryStatus, useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
+import { useHostRegistryStatus, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { useHostInventory } from "@/clisbot/hub/host-inventory";
 import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 import {
   useIsLastWorkspaceSelectionHydrated,
@@ -19,9 +20,16 @@ const isDesktop = shouldUseDesktopDaemon();
 export default function Index() {
   const pathname = usePathname();
   const bootstrapState = useHostRuntimeBootstrapState();
-  const anyOnlineHostServerId = useEarliestOnlineHostServerId();
-  const hosts = useHosts();
-  const hostRegistryStatus = useHostRegistryStatus();
+  const earliestOnlineHostServerId = useEarliestOnlineHostServerId();
+  // Choose only among Hosts the Host route will render; a saved Host outside the inventory
+  // lands on "Host unavailable" with nowhere to go.
+  const inventory = useHostInventory();
+  const hosts = inventory.hosts;
+  const registryStatus = useHostRegistryStatus();
+  const hostRegistryStatus = inventory.status === "loading" ? "loading" : registryStatus;
+  const anyOnlineHostServerId = hosts.some((host) => host.serverId === earliestOnlineHostServerId)
+    ? earliestOnlineHostServerId
+    : null;
   const workspaceSelection = useLastWorkspaceSelection();
   const isWorkspaceSelectionLoaded = useIsLastWorkspaceSelectionHydrated();
   const workspaceSelectionServerId = workspaceSelection?.serverId ?? null;

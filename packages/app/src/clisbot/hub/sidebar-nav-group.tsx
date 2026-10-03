@@ -1,6 +1,6 @@
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useCallback } from "react";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Pressable, Text, View } from "react-native";
@@ -13,6 +13,9 @@ import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 import { HubSidebarAccountButton } from "./sidebar-account";
 import { OrganizationSidebarItem } from "./organization-sidebar-item";
 import { useHubAccount } from "./account-provider";
+import { PersonalHubSwitcher } from "./personal-hub-switcher";
+
+const PERSONAL_HUB_ROUTE = "/settings/hub/overview";
 
 function brandButtonStyle({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) {
   return [styles.brandButton, (hovered || pressed) && styles.brandButtonHovered];
@@ -29,39 +32,54 @@ export function SidebarNavGroup({
   const compact = useIsCompactFormFactor();
   const { t } = useTranslation();
   const router = useRouter();
+  const pathname = usePathname();
   const hub = useHubAccount();
   const openAbout = useCallback(() => {
     onBeforeNavigate?.();
     router.push(buildSettingsSectionRoute("about"));
   }, [onBeforeNavigate, router]);
+  const openPersonalHub = useCallback(() => {
+    onBeforeNavigate?.();
+    router.push(PERSONAL_HUB_ROUTE);
+  }, [onBeforeNavigate, router]);
+  const personal = hub.enabled && hub.connection?.accountAuthentication === "personal";
   const brandLabel = `Clisbot · ${t("settings.sections.about")}`;
   return (
     <View style={style}>
       <View style={[styles.accountRow, compact && styles.accountRowCompact]}>
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Pressable
-              onPress={openAbout}
-              accessibilityRole="button"
-              accessibilityLabel={brandLabel}
-              testID="sidebar-clisbot-brand"
-              style={brandButtonStyle}
-            >
-              <ClisbotBrand iconOnly />
-            </Pressable>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="start" offset={8}>
-            <Text style={styles.tooltipText}>{brandLabel}</Text>
-          </TooltipContent>
-        </Tooltip>
-        {hub.enabled && (
+        {personal ? (
+          <PersonalHubSwitcher
+            isActive={pathname === PERSONAL_HUB_ROUTE}
+            onPress={openPersonalHub}
+          />
+        ) : (
           <>
-            {hub.signedIn && (
-              <View style={styles.organization}>
-                <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
-              </View>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <Pressable
+                  onPress={openAbout}
+                  accessibilityRole="button"
+                  accessibilityLabel={brandLabel}
+                  testID="sidebar-clisbot-brand"
+                  style={brandButtonStyle}
+                >
+                  <ClisbotBrand iconOnly />
+                </Pressable>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" offset={8}>
+                <Text style={styles.tooltipText}>{brandLabel}</Text>
+              </TooltipContent>
+            </Tooltip>
+            {hub.enabled && (
+              <>
+                {hub.signedIn && (
+                  <View style={styles.organization}>
+                    <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
+                  </View>
+                )}
+                <HubSidebarAccountButton />
+              </>
             )}
-            <HubSidebarAccountButton />
           </>
         )}
       </View>

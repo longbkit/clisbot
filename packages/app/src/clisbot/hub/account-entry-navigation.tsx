@@ -11,6 +11,7 @@ export function HubAccountEntryNavigation({ navigationReady }: { navigationReady
   const router = useRouter();
   const url = Linking.useURL();
   const target = useMemo(() => hubAccountEntryRoute(url), [url]);
+  const connectionOrigin = hub.connectionOrigin === undefined ? hub.origin : hub.connectionOrigin;
 
   useEffect(() => {
     if (!navigationReady || !hub.enabled || target === null) return;
@@ -23,18 +24,19 @@ export function HubAccountEntryNavigation({ navigationReady }: { navigationReady
       !hub.enabled ||
       hub.loading ||
       hub.signInKind !== "password" ||
-      hub.origin === null ||
+      hub.connection ||
+      connectionOrigin === null ||
       typeof window === "undefined"
     ) {
       return;
     }
     const destination = hubClientAuthorizationContinuation({
       url,
-      origin: hub.origin,
+      origin: connectionOrigin,
       state: hub.state,
     });
     if (destination !== null) window.location.replace(destination);
-  }, [hub.enabled, hub.loading, hub.origin, hub.signInKind, hub.state, url]);
+  }, [connectionOrigin, hub.connection, hub.enabled, hub.loading, hub.signInKind, hub.state, url]);
 
   return null;
 }

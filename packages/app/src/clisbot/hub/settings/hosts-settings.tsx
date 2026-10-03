@@ -33,7 +33,10 @@ export function HostsSettings() {
   const openAddProject = useOpenAddProject();
   const signedIn = hub.enabled && hub.signedIn !== null;
   const canManage = signedIn && hub.signedIn?.capabilities.manageResources === true;
-  const command = buildHubConnectCommand(hub.origin ?? "", DEV_CLI_COMMAND);
+  const connectionOrigin = hub.connectionOrigin === undefined ? hub.origin : hub.connectionOrigin;
+  const command = connectionOrigin
+    ? buildHubConnectCommand(connectionOrigin, DEV_CLI_COMMAND)
+    : null;
   const connectionCount = useMemo(() => <HostsConnectionCount />, []);
   const refreshAction = useMemo(
     () => (
@@ -147,7 +150,7 @@ function HostsSettingsContent({
 }
 
 /** How to add a Host, always at hand for an Organization Admin, and where its access is set. */
-function AddHostSection({ command }: { command: string }) {
+function AddHostSection({ command }: { command: string | null }) {
   const router = useRouter();
   const openAccess = useCallback(
     () =>
@@ -171,9 +174,24 @@ function AddHostSection({ command }: { command: string }) {
       info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People & access › Access."
       trailing={accessLink}
     >
+      {command ? (
+        <HostEnrollmentCommand command={command} />
+      ) : (
+        <Text style={settingsStyles.rowHint}>
+          Add a Tailscale or HTTPS endpoint in Hub connections before enrolling another Host. This
+          device can continue using relay.
+        </Text>
+      )}
+    </SettingsSection>
+  );
+}
+
+function HostEnrollmentCommand({ command }: { command: string }) {
+  return (
+    <>
       <Text style={settingsStyles.rowHint}>Run on the computer you want to connect:</Text>
       <CopyableCommand command={command} />
       <Text style={settingsStyles.rowHint}>Open the terminal link and approve.</Text>
-    </SettingsSection>
+    </>
   );
 }

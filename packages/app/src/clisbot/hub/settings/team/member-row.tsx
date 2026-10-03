@@ -13,6 +13,7 @@ import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
 import { RowActionsMenu } from "./row-actions-menu";
 import { needsTeam } from "./team-membership";
 import type { HubCapabilities, HubMember, TeamSelection } from "./types";
+import { visibleEmail } from "@/clisbot/hub/account-email";
 
 export interface MemberRowHandlers {
   select(value: TeamSelection): void;
@@ -138,7 +139,9 @@ function MemberIdentity({ member, open }: { member: HubMember; open(): void }) {
       >
         {renderMemberName(member.name)}
       </Pressable>
-      <Text style={settingsStyles.rowHint}>{member.email}</Text>
+      {visibleEmail(member.email) ? (
+        <Text style={settingsStyles.rowHint}>{member.email}</Text>
+      ) : null}
     </View>
   );
 }

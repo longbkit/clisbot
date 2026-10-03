@@ -1,3 +1,4 @@
+import { useHubEditLock } from "@/device-access/hub-edit-lock";
 import { AutomationInputDraftContext, draftBaseline } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
@@ -1239,6 +1240,7 @@ function ChannelManagementSection({
   ): void;
   saveConnection(body: unknown): Promise<HubConnection>;
 }) {
+  useHubEditLock();
   const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
   const [addingConnection, setAddingConnection] = useState(false);
   const [connectionPending, setConnectionPending] = useState(false);
@@ -1979,21 +1981,8 @@ function ChannelRevisionHistory({
 }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
-  if (revisions === undefined || revisions.length === 0) {
-    return (
-      <SettingsSection title="Revision history">
-        <View style={settingsStyles.card}>
-          <EmptyRow
-            message={
-              revisions === undefined
-                ? "Loading revisions…"
-                : "No Channel configuration revision exists yet."
-            }
-          />
-        </View>
-      </SettingsSection>
-    );
-  }
+  // Nothing saved yet, or still loading: no section, rather than an empty card.
+  if (revisions === undefined || revisions.length === 0) return null;
   const active = revisions.find((revision) => revision.id === activeRevisionId) ?? revisions[0]!;
   const older = revisions.filter((revision) => revision.id !== active.id);
   return (

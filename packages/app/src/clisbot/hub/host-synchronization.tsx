@@ -145,29 +145,11 @@ function HubHostBinding({
   const labelRef = useRef(label);
   labelRef.current = label;
   const previousLabelRef = useRef(label);
+  const serializedOffer = JSON.stringify(offer);
   const synchronizedOffer = useMemo<ConnectionOffer>(
-    () => ({
-      v: offer.v,
-      serverId: offer.serverId,
-      daemonPublicKeyB64: offer.daemonPublicKeyB64,
-      relay: { endpoint: offer.relay.endpoint, useTls: offer.relay.useTls },
-      ...(offer.direct
-        ? {
-            direct: {
-              endpoint: offer.direct.endpoint,
-              useTls: offer.direct.useTls,
-            },
-          }
-        : {}),
-    }),
-    [
-      offer.daemonPublicKeyB64,
-      offer.direct,
-      offer.relay.endpoint,
-      offer.relay.useTls,
-      offer.serverId,
-      offer.v,
-    ],
+    // HubDaemonsSchema already validates the offer at the API boundary.
+    () => JSON.parse(serializedOffer) as ConnectionOffer,
+    [serializedOffer],
   );
   const issueAccessTicket = useCallback(
     (clientId: string) =>

@@ -7,3 +7,8 @@ export function requireOptionalNativeModule(): null {
 export function requireNativeModule(): never {
   throw new Error("requireNativeModule is unavailable in browser tests");
 }
+export class UnavailabilityError extends Error {
+  constructor(module: string, method: string) {
+    super(`${module}.${method} is unavailable in browser tests`);
+  }
+}

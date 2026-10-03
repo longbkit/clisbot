@@ -262,6 +262,7 @@ export function Button({
       {...props}
       accessibilityRole={accessibilityRole ?? "button"}
       accessibilityState={accessibilityState}
+      aria-busy={loading}
       disabled={isDisabled}
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}

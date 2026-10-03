@@ -5,6 +5,7 @@ import { Text } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { settingsStyles } from "@/styles/settings";
 import { DetailRow, OrganizationTitle } from "./organization-identity";
+import { withEmail } from "@/clisbot/hub/account-email";
 
 /** What an approved CLI credential can do, stated against the organization it acts in. */
 const CLI_CREDENTIAL_IMPACTS = [
@@ -42,7 +43,7 @@ export function CliAuthorizationSummary(subject: CliAuthorizationSubject) {
         {subject.account ? (
           <DetailRow
             label="Approved by"
-            value={`${subject.account.email} · ${subject.account.roleLabel}`}
+            value={withEmail(subject.account.roleLabel, subject.account.email)}
           />
         ) : null}
         {subject.hubOrigin ? <DetailRow label="Hub" value={subject.hubOrigin} /> : null}

@@ -1,3 +1,4 @@
+import { pairedHubSettingsRoute } from "@/device-access/pairing-target";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
@@ -172,13 +173,15 @@ export default function PairScanScreen() {
         .importConnectionLink(offerUrl, source === "onboarding" ? "hostRoot" : "hostSettings")
         .then((outcome) => {
           if (outcome.status === "connected") navigateToPairedHost(outcome.serverId);
+          else if (outcome.status === "hub_connected")
+            router.replace(pairedHubSettingsRoute(offerUrl));
           else setPasswordOfferUrl(offerUrl);
           return outcome;
         })
         .catch((error) => setScanError(error instanceof Error ? error.message : String(error)))
         .finally(() => setIsPairing(false));
     },
-    [isPairing, navigateToPairedHost, passwordOfferUrl, source],
+    [isPairing, navigateToPairedHost, passwordOfferUrl, source, router],
   );
 
   const handleRouterBack = useCallback(() => router.back(), [router]);

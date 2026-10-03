@@ -7,6 +7,7 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { visibleEmail } from "@/clisbot/hub/account-email";
 
 type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
@@ -59,7 +60,9 @@ export function ProfileSettings({
             {account.image ? <ProfileImage uri={account.image} /> : null}
             <View style={[settingsStyles.rowContent, account.image ? styles.identity : null]}>
               <Text style={settingsStyles.rowTitle}>{account.name}</Text>
-              <Text style={settingsStyles.rowHint}>{account.email}</Text>
+              {visibleEmail(account.email) ? (
+                <Text style={settingsStyles.rowHint}>{account.email}</Text>
+              ) : null}
               {isInstanceOperator ? (
                 <Text style={settingsStyles.rowHint}>Operator of this Hub instance</Text>
               ) : null}

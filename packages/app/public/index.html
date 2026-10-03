@@ -80,6 +80,11 @@
         outline: 2px solid #20744a;
         outline-offset: 2px;
       }
+      /* Containers focused by script (a modal's focus trap, a scroll region) are not controls;
+         ringing the whole dialog reads as a selected card. */
+      [tabindex="-1"]:focus-visible {
+        outline: none;
+      }
     </style>
   </head>
   <body>

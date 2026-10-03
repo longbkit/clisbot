@@ -15,8 +15,9 @@ const RECONNECT_TIMEOUT_MS = 30_000;
 export type ManagedAccessTransition =
   | { status: "idle" }
   | { status: "switching"; target: ManagedAccessMode }
+  | { status: "pairing-required" }
   | { status: "done"; mode: ManagedAccessMode }
-  | { status: "failed"; message: string };
+  | { status: "failed"; message: string; mode?: ManagedAccessMode };
 
 interface HubDaemonScope {
   origin: string | null;
@@ -26,41 +27,83 @@ interface HubDaemonScope {
 }
 
 /**
- * Switching managed access closes this device's own session when it turns on: the daemon now wants
- * a Hub ticket. That close is the expected outcome, not a failure. The switch then waits for Hub to
- * report the new mode, which is what makes this app present a ticket, reconnects, and finishes once
- * the Host is back online in the new mode.
+ * Policy changes can close this session before its response arrives. Confirm the new mode through
+ * Hub before reconnecting. Protected off mode needs independent daemon authority; a ticket-only
+ * device receives pairing guidance instead of an implicit credential upgrade.
  */
 export function useManagedAccessTransition(input: {
   serverId: string;
   scope: HubDaemonScope;
   daemonMode: ManagedAccessMode | undefined;
+  devicePairing?: boolean;
+  hasIndependentCredential?: () => Promise<boolean>;
   applyMode: (mode: ManagedAccessMode) => Promise<void>;
 }) {
-  const { serverId, scope, daemonMode, applyMode } = input;
+  const { serverId, scope, daemonMode, applyMode, devicePairing, hasIndependentCredential } = input;
   const queryClient = useQueryClient();
   const connectionStatus = useHostRuntimeConnectionStatus(serverId);
-  const [transition, setTransition] = useState<ManagedAccessTransition>({ status: "idle" });
+  const [transition, setTransition] = useState<ManagedAccessTransition>({
+    status: "idle",
+  });
 
   const switchMode = useCallback(
     async (target: ManagedAccessMode) => {
       setTransition({ status: "switching", target });
+      let sessionClosed = false;
       try {
         await applyMode(target);
       } catch (error) {
-        if (!(target === "external" && closedForManagedAccess(error))) {
+        if (
+          !(
+            (target === "external" && closedForManagedAccess(error)) ||
+            (target === "off" && devicePairing && closedForDeviceCredential(error))
+          )
+        ) {
           setTransition({ status: "failed", message: describe(error) });
           return;
         }
-        // The daemon applied the mode before closing the session that asked for it.
-        queryClient.setQueryData<MutableDaemonConfig>(daemonConfigQueryKey(serverId), (config) =>
-          config ? { ...config, managedAccess: { ...config.managedAccess, mode: target } } : config,
-        );
+        sessionClosed = true;
       }
-      await waitForHubMode(queryClient, scope, target);
-      await getHostRuntimeStore().restartHostConnection(serverId);
+      const reported = await waitForHubMode(queryClient, scope, target);
+      if (devicePairing && sessionClosed && !reported) {
+        setTransition({
+          status: "failed",
+          message:
+            "Unable to confirm the Host's access mode. Refresh its Hub connection and try again.",
+        });
+        return;
+      }
+      // A policy change can close the session before its config response arrives.
+      queryClient.setQueryData<MutableDaemonConfig>(daemonConfigQueryKey(serverId), (config) =>
+        config
+          ? {
+              ...config,
+              managedAccess: { ...config.managedAccess, mode: target },
+            }
+          : config,
+      );
+      if (target === "off" && devicePairing && hasIndependentCredential) {
+        const credentialAvailable = await hasIndependentCredential().catch(() => false);
+        if (!credentialAvailable) {
+          setTransition({ status: "pairing-required" });
+          // Drop the old ticket session. Reconnect never issues a daemon credential.
+          await getHostRuntimeStore()
+            .restartHostConnection(serverId)
+            .catch(() => undefined);
+          return;
+        }
+      }
+      try {
+        await getHostRuntimeStore().restartHostConnection(serverId);
+      } catch (error) {
+        setTransition({
+          status: "failed",
+          message: describe(error),
+          mode: target,
+        });
+      }
     },
-    [applyMode, queryClient, scope, serverId],
+    [applyMode, queryClient, scope, serverId, devicePairing, hasIndependentCredential],
   );
 
   const target = transition.status === "switching" ? transition.target : null;
@@ -75,16 +118,22 @@ export function useManagedAccessTransition(input: {
         status: "failed",
         message:
           "This Host did not reconnect. Use Reconnect in Settings → Hosts, or check its daemon.",
+        ...(devicePairing && target === "off" ? { mode: target } : {}),
       });
     }, RECONNECT_TIMEOUT_MS);
     return () => clearTimeout(timeout);
-  }, [connectionStatus, daemonMode, target]);
+  }, [connectionStatus, daemonMode, target, devicePairing]);
 
-  return { transition, switchMode };
+  const finishPairing = useCallback(() => setTransition({ status: "done", mode: "off" }), []);
+  return { transition, switchMode, finishPairing };
 }
 
 function closedForManagedAccess(error: unknown): boolean {
   return /managed access/i.test(describe(error));
+}
+
+function closedForDeviceCredential(error: unknown): boolean {
+  return /daemon device credentials are now required/i.test(describe(error));
 }
 
 function describe(error: unknown): string {
@@ -95,13 +144,14 @@ async function waitForHubMode(
   queryClient: QueryClient,
   scope: HubDaemonScope,
   mode: ManagedAccessMode,
-): Promise<void> {
+): Promise<boolean> {
   const queryKey = hubResourceQueryKey(scope, "daemons");
   for (let attempt = 0; attempt < HUB_MODE_ATTEMPTS; attempt += 1) {
     await queryClient.refetchQueries({ queryKey });
     const data = queryClient.getQueryData<z.infer<typeof HubDaemonsSchema>>(queryKey);
     const daemon = data?.daemons.find(({ id }) => id === scope.daemonId);
-    if (daemon?.managedAccessMode === mode) return;
+    if (daemon?.managedAccessMode === mode) return true;
     await new Promise((resolve) => setTimeout(resolve, HUB_MODE_RETRY_MS));
   }
+  return false;
 }

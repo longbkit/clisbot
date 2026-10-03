@@ -2,8 +2,15 @@
 // Hub, such as the Slack and GitHub Apps organizations install. Hidden from
 // everyone else (the sidebar lists it only for the operator).
 
+import { HubLoginPolicySummary } from "@/device-access/hub-login-policy-settings";
+
 import { ProviderApplicationSettings } from "./provider-application-settings";
 
 export function InstanceSettings() {
-  return <ProviderApplicationSettings />;
+  return (
+    <>
+      <HubLoginPolicySummary />
+      <ProviderApplicationSettings />
+    </>
+  );
 }

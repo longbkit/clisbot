@@ -1,3 +1,4 @@
+import { hubOnlyPairingTarget } from "@/device-access/pairing-target";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import equal from "fast-deep-equal/es6";
@@ -21,6 +22,14 @@ import {
   type HostProfile,
 } from "@/types/host-connection";
 import { defaultHostAppearance, type HostBadgeDisplay, type HostColor } from "@/hosts/appearance";
+import {
+  parseDevicePairingOfferFromUrl,
+  type DevicePairingOffer,
+} from "@clisbot/protocol/device-pairing-offer";
+import { devicePairedHost, offerConnections } from "@/device-access/host-profile";
+import { pairDaemon } from "@/device-access/pair-daemon";
+import { pairHub } from "@/device-access/hub-transport";
+import { daemonDeviceAccess } from "@/device-access/credentials";
 import {
   buildDaemonWebSocketUrl,
   buildRelayWebSocketUrl,
@@ -172,6 +181,7 @@ function sameHubManagement(left: HubHostManagement | undefined, right: HubHostMa
  * the offer comes from that daemon's own authenticated Hub connection.
  */
 function provesOfferedDaemon(host: HostProfile, offer: ConnectionOffer): boolean {
+  if (host.devicePairing) return host.devicePairing.daemonPublicKeyB64 === offer.daemonPublicKeyB64;
   const relayKeys = host.connections.flatMap((connection) =>
     connection.type === "relay" ? [connection.daemonPublicKeyB64] : [],
   );
@@ -577,6 +587,15 @@ function createDefaultDeps(
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
+        ...(host.devicePairing
+          ? {
+              resolveDeviceAccess: () =>
+                host.management?.managedAccessMode === "external"
+                  ? Promise.resolve(undefined)
+                  : daemonDeviceAccess(host.devicePairing!.backendId),
+              e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
+            }
+          : {}),
         suppressSendErrors: true,
         clientId,
         clientType: "mobile",
@@ -649,6 +668,15 @@ function createDefaultDeps(
     },
     connectToDaemon: ({ host, connection, timeoutMs }) =>
       connectToDaemon(connection, {
+        ...(host.devicePairing
+          ? {
+              resolveDeviceAccess: () =>
+                host.management?.managedAccessMode === "external"
+                  ? Promise.resolve(undefined)
+                  : daemonDeviceAccess(host.devicePairing!.backendId),
+              e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
+            }
+          : {}),
         ...(host.serverId ? { serverId: host.serverId } : {}),
         ...(host.password ? { password: host.password } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
@@ -2046,6 +2074,8 @@ export class HostRuntimeStore {
     label?: string,
     password?: string,
   ): Promise<HostProfile> {
+    if (offer.v === 5)
+      throw new Error("This protected Host needs a pairing invitation or a Hub access grant");
     // COMPAT(oldRelayOfferTls): added in v0.1.73, remove after 2026-11-10.
     const useTls = offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(offer.relay.endpoint);
     return this.upsertRelayConnection({
@@ -2063,6 +2093,7 @@ export class HostRuntimeStore {
     management: HubHostManagement;
     label?: string;
   }): Promise<HostProfile | null> {
+    if (input.offer.v === 5) return this.upsertDeviceManagedConnection(input);
     const useTls =
       input.offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(input.offer.relay.endpoint);
     const relayEndpoint = normalizeHostPort(input.offer.relay.endpoint);
@@ -2117,11 +2148,84 @@ export class HostRuntimeStore {
     });
   }
 
+  private async upsertDeviceManagedConnection(input: {
+    offer: ConnectionOffer;
+    management: HubHostManagement;
+    label?: string;
+  }): Promise<HostProfile | null> {
+    const existing = this.hosts.find((host) => host.serverId === input.offer.serverId);
+    if (
+      existing &&
+      (!provesOfferedDaemon(existing, input.offer) ||
+        (existing.management && !sameHubManagement(existing.management, input.management)))
+    )
+      return null;
+    const connections = offerConnections(input.offer);
+    const now = new Date().toISOString();
+    const management = withManualConnections(input.management, existing);
+    const profile: HostProfile = {
+      serverId: input.offer.serverId,
+      label: input.label ?? input.offer.serverId,
+      appearance: defaultHostAppearance(),
+      lifecycle: {},
+      createdAt: now,
+      ...existing,
+      devicePairing: {
+        backendId: input.offer.serverId,
+        daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
+      },
+      management,
+      connections: [
+        ...connections,
+        ...(existing?.connections ?? []).filter(
+          (old) => !connections.some((next) => next.id === old.id),
+        ),
+      ],
+      preferredConnectionId: connections[0]!.id,
+      updatedAt: now,
+    };
+    const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
+    await this.persistHosts(next);
+    this.setHostsAndSync(next);
+    return profile;
+  }
+
+  private async upsertDevicePairingOffer(
+    offer: DevicePairingOffer,
+    label?: string,
+    deviceLabel?: string,
+  ): Promise<HostProfile> {
+    if (offer.managedAccessMode === "external")
+      throw new Error(
+        "Pair the Hub for this managed Host, then sign in to load your granted Hosts",
+      );
+    const existing = this.hosts.find((host) => host.serverId === offer.serverId);
+    const profile = devicePairedHost({ offer, existing, label });
+    const hostname = await pairDaemon(offer, profile, deviceLabel);
+    if (!label && !existing && hostname) profile.label = hostname;
+    const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
+    await this.persistHosts(next);
+    this.setHostsAndSync(next);
+    if (offer.hub) {
+      try {
+        await pairHub(offer.hub, deviceLabel);
+      } catch (error) {
+        throw new Error(
+          `Daemon paired and saved. Hub pairing needs a retry with the same link: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+    }
+    return profile;
+  }
+
   async upsertConnectionFromOfferUrl(
     offerUrlOrFragment: string,
     label?: string,
     password?: string,
   ): Promise<HostProfile> {
+    const deviceOffer = parseDevicePairingOfferFromUrl(offerUrlOrFragment);
+    if (deviceOffer) return this.upsertDevicePairingOffer(deviceOffer, label);
     const parsed = parseOfferConnectionUrl(offerUrlOrFragment);
     return this.upsertConnectionFromOffer(parsed.offer, label, password ?? parsed.password);
   }
@@ -2129,13 +2233,21 @@ export class HostRuntimeStore {
   async probeAndUpsertConnectionFromOfferUrl(
     offerUrlOrFragment: string,
     password?: string,
+    deviceLabel?: string,
   ): Promise<{
     profile: HostProfile;
     serverId: string;
     hostname: string | null;
   }> {
+    const deviceOffer = parseDevicePairingOfferFromUrl(offerUrlOrFragment);
+    if (deviceOffer) {
+      const profile = await this.upsertDevicePairingOffer(deviceOffer, undefined, deviceLabel);
+      return { profile, serverId: profile.serverId, hostname: profile.label };
+    }
     const parsed = parseOfferConnectionUrl(offerUrlOrFragment);
     const offer = parsed.offer;
+    if (offer.v === 5)
+      throw new Error("This protected Host needs a pairing invitation or a Hub access grant");
     const credential = password ?? parsed.password;
     const useTls = offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(offer.relay.endpoint);
     const relayEndpoint = normalizeHostPort(offer.relay.endpoint);
@@ -2166,14 +2278,26 @@ export class HostRuntimeStore {
   async importConnectionLink(
     url: string,
     target: PairingNavigationTarget,
-  ): Promise<{ status: "connected"; serverId: string } | { status: "password_required" }> {
+  ): Promise<
+    | { status: "connected"; serverId: string }
+    | { status: "password_required" }
+    | { status: "hub_connected" }
+  > {
+    const deviceOffer = parseDevicePairingOfferFromUrl(url);
+    const hub = hubOnlyPairingTarget(url);
+    if (hub) {
+      await pairHub(hub);
+      return { status: "hub_connected" };
+    }
     if (target === "openProject") {
       const profile = await this.upsertConnectionFromOfferUrl(url);
-      return { status: "connected", serverId: profile.serverId };
+      return deviceOffer?.hub
+        ? { status: "hub_connected" }
+        : { status: "connected", serverId: profile.serverId };
     }
     try {
       const { serverId } = await this.probeAndUpsertConnectionFromOfferUrl(url);
-      return { status: "connected", serverId };
+      return deviceOffer?.hub ? { status: "hub_connected" } : { status: "connected", serverId };
     } catch (error) {
       if (!getConnectionAuthFailureReason(error)) throw error;
       return { status: "password_required" };
@@ -3032,6 +3156,7 @@ export interface HostMutations {
   probeAndUpsertConnectionFromOfferUrl: (
     offerUrlOrFragment: string,
     password?: string,
+    deviceLabel?: string,
   ) => Promise<{
     profile: HostProfile;
     serverId: string;
@@ -3055,8 +3180,8 @@ export function useHostMutations(): HostMutations {
       upsertConnectionFromOffer: (offer, label) => store.upsertConnectionFromOffer(offer, label),
       upsertConnectionFromOfferUrl: (url, label, password) =>
         store.upsertConnectionFromOfferUrl(url, label, password),
-      probeAndUpsertConnectionFromOfferUrl: (url, password) =>
-        store.probeAndUpsertConnectionFromOfferUrl(url, password),
+      probeAndUpsertConnectionFromOfferUrl: (url, password, deviceLabel) =>
+        store.probeAndUpsertConnectionFromOfferUrl(url, password, deviceLabel),
       renameHost: (serverId, label) => store.renameHost(serverId, label),
       setHostColor: (serverId, color) => store.setHostColor(serverId, color),
       setHostBadgeDisplay: (serverId, badgeDisplay) =>

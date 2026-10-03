@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 import {
+  Info,
+  Network,
   Blocks,
   KeyRound,
   MessageSquare,
@@ -16,6 +18,19 @@ export interface HubSettingsNavigationItem {
   label: string;
   icon: ComponentType<{ size: number; color: string }>;
 }
+
+const HUBS_ITEM: HubSettingsNavigationItem = { section: "hubs", label: "Hubs", icon: Network };
+const OVERVIEW_ITEM: HubSettingsNavigationItem = {
+  section: "overview",
+  label: "Overview",
+  icon: Info,
+};
+
+const SIGN_IN_ITEM: HubSettingsNavigationItem = {
+  section: "sign-in",
+  label: "Account sign-in",
+  icon: KeyRound,
+};
 
 const ACCOUNT_ITEM: HubSettingsNavigationItem = {
   section: "account",
@@ -72,15 +87,19 @@ export interface HubNavigationGrant {
  */
 export function hubSettingsNavigationItems(input: {
   signedIn: boolean;
+  deviceAccess?: boolean;
   canManage?: boolean;
   isInstanceOperator?: boolean;
   grants?: readonly HubNavigationGrant[];
 }): readonly HubSettingsNavigationItem[] {
   if (!input.signedIn) {
-    return [{ section: "account", label: "Sign in to Hub", icon: KeyRound }];
+    return input.deviceAccess
+      ? [OVERVIEW_ITEM, { section: "account", label: "Account", icon: KeyRound }]
+      : [{ section: "account", label: "Sign in to Hub", icon: KeyRound }];
   }
+  const overview = input.deviceAccess ? [OVERVIEW_ITEM] : [];
   const instance = input.isInstanceOperator ? [INSTANCE_ITEM] : [];
-  if (input.canManage) return [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, ...instance];
+  if (input.canManage) return [...overview, ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, ...instance];
   const holds = (kind: string, privilege: string) =>
     input.grants?.some(
       (grant) => grant.resourceKind === kind && grant.privileges.includes(privilege),
@@ -94,12 +113,18 @@ export function hubSettingsNavigationItems(input: {
       : []),
     PEOPLE_ITEM,
   ];
-  return [ACCOUNT_ITEM, ...destinations, ...instance];
+  return [...overview, ACCOUNT_ITEM, ...destinations, ...instance];
 }
 
 export function hubSettingsSection(section: HubSectionSlug): HubSettingsNavigationItem {
-  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, HOSTS_ITEM, INSTANCE_ITEM].find(
-    (candidate) => candidate.section === section,
-  );
+  const item = [
+    HUBS_ITEM,
+    OVERVIEW_ITEM,
+    ACCOUNT_ITEM,
+    SIGN_IN_ITEM,
+    ...SIGNED_IN_ITEMS,
+    HOSTS_ITEM,
+    INSTANCE_ITEM,
+  ].find((candidate) => candidate.section === section);
   return item ?? ACCOUNT_ITEM;
 }

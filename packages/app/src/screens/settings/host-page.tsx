@@ -24,6 +24,7 @@ import {
 import { AgentProfilesSection } from "@/agent-profiles";
 import { AgentSkillsSection } from "@/agent-skills";
 import { ManagedAccessHostSection } from "@/clisbot/hub/settings";
+import { DaemonPairedDevices } from "@/device-access/device-list";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { Alert as InlineAlert } from "@/components/ui/alert";
@@ -293,10 +294,14 @@ export function HostPairDevicePage({ serverId }: { serverId: string }) {
     return <HostNotFound />;
   }
 
+  // Sibling sections, not nested: a section inside another loses the gap between sections.
   return (
-    <SettingsSection title={t("settings.host.pairDevices.title")}>
-      <PairDeviceRow serverId={serverId} />
-    </SettingsSection>
+    <>
+      <SettingsSection title={t("settings.host.pairDevices.title")}>
+        <PairDeviceRow serverId={serverId} />
+      </SettingsSection>
+      <DaemonPairedDevices serverId={serverId} />
+    </>
   );
 }
 

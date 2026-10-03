@@ -3,6 +3,7 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { getDesktopHost, isElectronRuntime } from "@/desktop/host";
 import { invokeDesktopCommand } from "@/desktop/electron/invoke";
 import type { AgentSkillSelection } from "@clisbot/protocol/messages";
+import { z } from "zod";
 
 export type DesktopDaemonState = "starting" | "running" | "stopped" | "errored";
 export type DesktopDaemonStopReason =
@@ -26,6 +27,8 @@ export interface DesktopDaemonStatus {
   ownedByDesktop: boolean;
   startedAt: string | null;
   error: string | null;
+  pairingUrl?: string;
+  servingError?: string;
 }
 
 export interface DesktopDaemonLogs {
@@ -135,6 +138,8 @@ function parseDesktopDaemonStatus(raw: unknown): DesktopDaemonStatus {
     ownedByDesktop: raw.ownedByDesktop === true,
     startedAt: typeof raw.startedAt === "string" ? raw.startedAt : null,
     error: toStringOrNull(raw.error),
+    ...(typeof raw.pairingUrl === "string" ? { pairingUrl: raw.pairingUrl } : {}),
+    ...(typeof raw.servingError === "string" ? { servingError: raw.servingError } : {}),
   };
 }
 
@@ -184,6 +189,15 @@ export function shouldUseDesktopDaemon(): boolean {
 
 export async function getDesktopDaemonStatus(): Promise<DesktopDaemonStatus> {
   return parseDesktopDaemonStatus(await invokeDesktopCommand("desktop_daemon_status"));
+}
+
+export async function getDesktopDaemonPairingOffer(
+  serverId: string,
+): Promise<{ url: string; relayEnabled: boolean } | null> {
+  const result = await invokeDesktopCommand("desktop_daemon_pairing_offer", { serverId });
+  return result === null
+    ? null
+    : z.object({ url: z.string(), relayEnabled: z.boolean() }).parse(result);
 }
 
 export async function startDesktopDaemon(): Promise<DesktopDaemonStatus> {

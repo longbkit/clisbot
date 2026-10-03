@@ -1,3 +1,5 @@
+import { suggestedDeviceLabel } from "@/device-access/device-label";
+import { hubOnlyPairingTarget } from "@/device-access/pairing-target";
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Text, View } from "react-native";
@@ -15,6 +17,10 @@ import { AdaptiveModalSheet, AdaptiveTextInput, type SheetHeader } from "./adapt
 import { getConnectionAuthFailureReason } from "@/utils/test-daemon-connection";
 import { PairingTargetTracker } from "./pair-link-credentials";
 import { Button } from "@/components/ui/button";
+import { parseDevicePairingOfferFromUrl } from "@clisbot/protocol/device-pairing-offer";
+import { pairHub } from "@/device-access/hub-transport";
+import { useRouter } from "expo-router";
+import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import type { EditingTextInputHandle } from "@/components/ui/text-input";
 
 const FLEX_ONE_STYLE = { flex: 1 } as const;
@@ -108,6 +114,7 @@ function PairLinkModalContent({
 }: PairLinkModalProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
+  const router = useRouter();
   const daemons = useHosts();
   const { probeAndUpsertConnectionFromOfferUrl } = useHostMutations();
   const isMobile = useIsCompactFormFactor();
@@ -118,6 +125,7 @@ function PairLinkModalContent({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [password, setPassword] = useState("");
+  const [deviceLabel, setDeviceLabel] = useState(suggestedDeviceLabel);
   const [needsPassword, setNeedsPassword] = useState(initialPasswordRequired);
   const [passwordResetKey, resetPasswordInput] = useReducer((key: number) => key + 1, 0);
 
@@ -165,13 +173,28 @@ function PairLinkModalContent({
       try {
         setIsSaving(true);
         setErrorMessage("");
+        const hubOffer = hubOnlyPairingTarget(raw);
+        const deviceOffer = parseDevicePairingOfferFromUrl(raw);
+        if (hubOffer) {
+          await pairHub(hubOffer, deviceLabel);
+          clearInput();
+          onClose();
+          router.push(buildHubSettingsRoute(hubOffer.ownerSetupToken ? "account" : "overview"));
+          return;
+        }
         const { profile, serverId, hostname } = await probeAndUpsertConnectionFromOfferUrl(
           raw,
           password || undefined,
+          deviceLabel,
         );
         const isNewHost = !daemons.some((daemon) => daemon.serverId === serverId);
         onSaved?.({ profile, serverId, hostname, isNewHost });
-        handleClose();
+        clearInput();
+        onClose();
+        if (deviceOffer?.hub)
+          router.push(
+            buildHubSettingsRoute(deviceOffer.hub.ownerSetupToken ? "account" : "overview"),
+          );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : t("pairing.link.errors.unableToPair");
@@ -189,13 +212,16 @@ function PairLinkModalContent({
     },
     [
       daemons,
-      handleClose,
       isMobile,
       isSaving,
       onSaved,
       password,
+      deviceLabel,
       t,
       probeAndUpsertConnectionFromOfferUrl,
+      clearInput,
+      onClose,
+      router,
     ],
   );
 
@@ -223,6 +249,10 @@ function PairLinkModalContent({
       testID="pair-link-modal"
     >
       <Text style={styles.helper}>{t("pairing.link.helper")}</Text>
+      <Text style={styles.helper}>
+        For a direct connection and best speed, use Tailscale on the Host and this device. Encrypted
+        relay works without Tailscale.
+      </Text>
 
       <View style={styles.field}>
         <Text style={styles.label}>{t("pairing.link.label")}</Text>
@@ -244,6 +274,17 @@ function PairLinkModalContent({
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
       </View>
 
+      <View style={styles.field}>
+        <Text style={styles.label}>Device label</Text>
+        <AdaptiveTextInput
+          initialValue={deviceLabel}
+          onChangeText={setDeviceLabel}
+          accessibilityLabel="Device label"
+          maxLength={80}
+          style={styles.input}
+        />
+        <Text style={styles.helper}>Shown in paired devices. This name does not grant access.</Text>
+      </View>
       {needsPassword ? (
         <View style={styles.field}>
           <Text style={styles.label}>

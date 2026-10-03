@@ -137,6 +137,8 @@ export async function buildClientConfig(
     trace?: DaemonClientConfig["trace"];
     password?: string;
     localCredential?: DaemonClientConfig["localCredential"];
+    resolveDeviceAccess?: DaemonClientConfig["resolveDeviceAccess"];
+    e2ee?: DaemonClientConfig["e2ee"];
   },
   deps: Pick<
     DaemonConnectionDependencies<DaemonProbeClient>,
@@ -155,6 +157,8 @@ export async function buildClientConfig(
     suppressSendErrors: true,
     reconnect: { enabled: false },
     ...resolveConnectionCredentials(connection, options),
+    resolveDeviceAccess: options?.resolveDeviceAccess,
+    e2ee: options?.e2ee,
     ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
     ...(options?.trace ? { trace: options.trace } : {}),
     ...((connection.type === "directSocket" || connection.type === "directPipe") &&
@@ -280,6 +284,8 @@ interface ProbeOptions {
   timeoutMs?: number;
   password?: string;
   localCredential?: DaemonClientConfig["localCredential"];
+  resolveDeviceAccess?: DaemonClientConfig["resolveDeviceAccess"];
+  e2ee?: DaemonClientConfig["e2ee"];
   capabilities?: DaemonClientConfig["capabilities"];
   trace?: DaemonClientConfig["trace"];
 }

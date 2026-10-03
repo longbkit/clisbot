@@ -21,7 +21,8 @@ export async function connectDaemonWebAppOnlyThroughRelay(
 ): Promise<void> {
   const offerUrl = await daemon.pairingOfferUrl();
   const offer = parseConnectionOfferFromUrl(offerUrl);
-  if (!offer) throw new Error("Daemon pairing command returned an invalid offer URL");
+  if (!offer?.relay) throw new Error("Daemon pairing command returned no relay offer");
+  const relay = offer.relay;
   const relayConnection = {
     id: `relay:${offer.relay.endpoint}`,
     type: "relay" as const,
@@ -65,7 +66,7 @@ export async function connectDaemonWebAppOnlyThroughRelay(
 
   const relaySocketOpened = new Promise<void>((resolve) => {
     page.on("websocket", (socket) => {
-      if (socket.url().includes(offer.relay.endpoint)) resolve();
+      if (socket.url().includes(relay.endpoint)) resolve();
     });
   });
   await page.goto(daemon.origin);

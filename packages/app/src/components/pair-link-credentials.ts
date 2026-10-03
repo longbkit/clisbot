@@ -1,9 +1,12 @@
 import { parseConnectionOfferFromUrl } from "@clisbot/protocol/connection-offer";
+import { parseDevicePairingOfferFromUrl } from "@clisbot/protocol/device-pairing-offer";
 import { parseRelayConnectionUri } from "@/utils/daemon-endpoints";
 
 function pairingTarget(url: string): string | null {
   try {
     const trimmed = url.trim();
+    const deviceOffer = parseDevicePairingOfferFromUrl(trimmed);
+    if (deviceOffer) return `${deviceOffer.serverId}:${deviceOffer.daemonPublicKeyB64}`;
     const offer =
       trimmed.startsWith("relay://") || trimmed.includes("#connect=")
         ? parseRelayConnectionUri(trimmed).offer

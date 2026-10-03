@@ -11,6 +11,7 @@ import {
 } from "@/clisbot/hub/channel-identity-directory";
 import { ActorAvatar, actorLabel } from "./actor";
 import { usePersonProfile, type PersonProfile } from "./person";
+import { visibleEmail } from "@/clisbot/hub/account-email";
 
 function Field({ label, value }: { label: string; value: string | undefined }) {
   if (!value) return null;
@@ -29,7 +30,7 @@ function PersonSection({ actor, person }: { actor: SessionActor; person: PersonP
   return (
     <View style={styles.section}>
       <Field label="Hub user" value={person.member?.userId} />
-      <Field label="Email" value={person.member?.email} />
+      <Field label="Email" value={visibleEmail(person.member?.email) ?? undefined} />
       <Field label="Verified Member" value={actor.memberId} />
       <Field label="Organization" value={actor.organizationId} />
       <Field label="Hub" value={actor.hubOrigin} />

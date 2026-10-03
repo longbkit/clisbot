@@ -1,4 +1,7 @@
 export const HUB_SECTION_SLUGS = [
+  "hubs",
+  "overview",
+  "sign-in",
   "account",
   "channels",
   "automations",

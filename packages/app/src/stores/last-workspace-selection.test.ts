@@ -70,4 +70,44 @@ describe("last workspace selection", () => {
       workspaceId: "workspace-new",
     });
   });
+
+  it("forgets a missing workspace and stops remembering it from its stale URL", async () => {
+    const storage = new DelayedWorkspaceSelectionStorage();
+    const store = createLastWorkspaceSelectionStore(storage);
+    const missing = { serverId: "server-a", workspaceId: "workspace-gone" };
+    store.remember(missing);
+
+    store.forget(missing);
+    store.remember(missing);
+
+    expect(store.getSelection()).toBeNull();
+    expect(storage.getSavedSelection()).toBeNull();
+
+    const next = { serverId: "server-a", workspaceId: "workspace-live" };
+    store.remember(next);
+    expect(store.getSelection()).toEqual(next);
+  });
+
+  it("keeps the current selection when a different workspace is forgotten", () => {
+    const store = createLastWorkspaceSelectionStore(new DelayedWorkspaceSelectionStorage());
+    const current = { serverId: "server-a", workspaceId: "workspace-live" };
+    store.remember(current);
+
+    store.forget({ serverId: "server-a", workspaceId: "workspace-gone" });
+
+    expect(store.getSelection()).toEqual(current);
+  });
+
+  it("does not restore a forgotten workspace when storage hydration finishes late", async () => {
+    const storage = new DelayedWorkspaceSelectionStorage();
+    const store = createLastWorkspaceSelectionStore(storage);
+    const hydration = store.hydrate();
+    const missing = { serverId: "server-a", workspaceId: "workspace-gone" };
+
+    store.forget(missing);
+    storage.finishHydrationWith(missing);
+    await hydration;
+
+    expect(store.getSelection()).toBeNull();
+  });
 });

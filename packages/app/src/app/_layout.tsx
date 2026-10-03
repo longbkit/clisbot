@@ -1,9 +1,9 @@
+import { OfferLinkListener } from "@/device-access/offer-link-listener";
 import "@/styles/unistyles";
 import { ProductAnalyticsHost } from "@/clisbot/analytics/host";
 import { ConfirmationProvider } from "@/components/confirmation-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PortalProvider } from "@gorhom/portal";
-import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { Stack, useNavigationContainerRef, usePathname, useRouter } from "expo-router";
 import {
@@ -125,7 +125,6 @@ import {
   WindowChromeSafeArea,
 } from "@/utils/desktop-window";
 import {
-  buildOpenProjectRoute,
   parseHostWorkspaceRouteFromPathname,
   parseServerIdFromPathname,
 } from "@/utils/host-routes";
@@ -676,7 +675,6 @@ function ProvidersWrapper({ children }: { children: ReactNode }) {
     <AppearanceProvider>
       <VoiceProvider>
         <DesktopWindowControlsSync />
-        <OfferLinkListener />
         <HostSessionManager />
         <FaviconStatusSync />
         {children}
@@ -699,40 +697,6 @@ function DesktopWindowControlsSync() {
       console.warn("[DesktopWindow] Failed to update window controls overlay", error);
     });
   }, [isLoading, surface0]);
-
-  return null;
-}
-
-function OfferLinkListener() {
-  const router = useRouter();
-
-  useEffect(() => {
-    let cancelled = false;
-    const handleUrl = async (url: string | null) => {
-      if (!url) return;
-      if (!url.includes("#offer=") && !url.includes("#connect=") && !url.startsWith("relay://"))
-        return;
-      try {
-        const result = await getHostRuntimeStore().importConnectionLink(url, "openProject");
-        if (!cancelled && result.status === "connected") router.replace(buildOpenProjectRoute());
-      } catch (error) {
-        console.warn("[OfferLinkListener] Pairing link failed", error);
-      }
-    };
-
-    void Linking.getInitialURL()
-      .then((url) => handleUrl(url))
-      .catch(() => undefined);
-
-    const subscription = Linking.addEventListener("url", (event) => {
-      void handleUrl(event.url);
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, [router]);
 
   return null;
 }
@@ -963,15 +927,13 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
 function OverlayProviders({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   return (
-    <ToastProvider>
-      <PortalProvider>
-        <BottomSheetModalProvider>
-          <ConfirmationProvider webBackend scopeKey={pathname}>
-            {children}
-          </ConfirmationProvider>
-        </BottomSheetModalProvider>
-      </PortalProvider>
-    </ToastProvider>
+    <PortalProvider>
+      <BottomSheetModalProvider>
+        <ConfirmationProvider webBackend scopeKey={pathname}>
+          {children}
+        </ConfirmationProvider>
+      </BottomSheetModalProvider>
+    </PortalProvider>
   );
 }
 
@@ -991,18 +953,22 @@ function RootProviders({ children }: { children: ReactNode }) {
 
 function RootAppTree() {
   return (
-    <HubAccountProvider>
-      <HubHostSynchronization />
-      <GestureHandlerRootView style={flexStyle}>
-        <View style={layoutStyles.surfaceFill}>
-          <RootProviders>
-            <RuntimeProviders>
-              <AppShell />
-            </RuntimeProviders>
-          </RootProviders>
-        </View>
-      </GestureHandlerRootView>
-    </HubAccountProvider>
+    <GestureHandlerRootView style={flexStyle}>
+      <View style={layoutStyles.surfaceFill}>
+        <ToastProvider>
+          {/* Pairing can change the active Hub and remount its account scope. */}
+          <OfferLinkListener />
+          <HubAccountProvider>
+            <HubHostSynchronization />
+            <RootProviders>
+              <RuntimeProviders>
+                <AppShell />
+              </RuntimeProviders>
+            </RootProviders>
+          </HubAccountProvider>
+        </ToastProvider>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 

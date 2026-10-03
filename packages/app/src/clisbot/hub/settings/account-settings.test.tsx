@@ -85,6 +85,56 @@ vi.mock("./channel-identity-self-link", () => ({
   ),
 }));
 vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
+// This fixture verifies the existing Account flow. Hub runtime onboarding and
+// encrypted device sessions are exercised by their own fixtures and live E2E.
+vi.mock("@/device-access/hub-settings", () => ({
+  HubConnectionSettings: () => null,
+  HubOverviewSettings: () => null,
+  HubLoginPolicySettings: () => (
+    <div data-testid="hub-login-policy">Hub account sign-in settings</div>
+  ),
+}));
+vi.mock("@/device-access/account-sessions", () => ({
+  AccountSessions: () => <div data-testid="account-sessions">{hub.origin}</div>,
+}));
+vi.mock("@/device-access/hub-help", () => ({ WhatIsHub: () => null }));
+vi.mock("@/components/ui/segmented-control", () => ({
+  SegmentedControl: ({
+    options,
+    onValueChange,
+  }: {
+    options: { value: string; label: string }[];
+    onValueChange(value: string): void;
+  }) => (
+    <div>
+      {options.map(({ value, label }) => (
+        <TestSegmentedOption
+          key={value}
+          value={value}
+          label={label}
+          onValueChange={onValueChange}
+        />
+      ))}
+    </div>
+  ),
+}));
+function TestSegmentedOption({
+  value,
+  label,
+  onValueChange,
+}: {
+  value: string;
+  label: string;
+  onValueChange(value: string): void;
+}) {
+  const select = React.useCallback(() => onValueChange(value), [onValueChange, value]);
+  return (
+    <button type="button" onClick={select}>
+      {label}
+    </button>
+  );
+}
+
 // People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
 vi.mock("./team/team-settings", () => ({
   TeamSettings: () => <div data-testid="team-settings" />,
@@ -188,6 +238,7 @@ beforeEach(() => {
     navigation.params = { ...navigation.params, ...params };
   });
   hub.state = { status: "signedOut", registration: "open" };
+  hub.origin = "https://hub.example.test";
   hub.signedIn = null;
   inventory.status = "ready";
   inventory.hosts = [];
@@ -203,6 +254,66 @@ function view() {
 }
 
 const account = { id: "member", name: "Member", email: "member@example.test" };
+
+describe("Account Sessions independent of organization authority", () => {
+  it.each(["organizationRequired", "passwordChangeRequired"])(
+    "shows own sessions for %s without Hub administration or organization membership",
+    (status) => {
+      hub.origin = "hub://personal-hub";
+      hub.state = {
+        status,
+        account,
+        memberships: [],
+        canCreateOrganization: false,
+      };
+      render(view());
+      fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+      expect(screen.getByTestId("account-sessions").textContent).toBe("hub://personal-hub");
+    },
+  );
+
+  it("keeps session management available while an invitation needs recovery", () => {
+    hub.origin = "hub://work-hub";
+    hub.state = {
+      status: "organizationRequired",
+      account,
+      invitationUnavailable: true,
+    };
+    render(view());
+    expect(screen.getByRole("alert").textContent).toContain("This invitation is unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    expect(screen.getByTestId("account-sessions").textContent).toBe("hub://work-hub");
+  });
+
+  it("resets the selected tab when Hub or account identity changes", () => {
+    hub.origin = "hub://first-hub";
+    hub.state = {
+      status: "organizationRequired",
+      account,
+      memberships: [],
+      canCreateOrganization: false,
+    };
+    const ui = render(view());
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    hub.origin = "hub://second-hub";
+    ui.rerender(view());
+    expect(screen.queryByTestId("account-sessions")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    expect(screen.getByTestId("account-sessions").textContent).toBe("hub://second-hub");
+    hub.state = {
+      ...hub.state,
+      account: { ...account, id: "another-account" },
+    };
+    ui.rerender(view());
+    expect(screen.queryByTestId("account-sessions")).toBeNull();
+  });
+
+  it("does not expose Sessions before authentication or change the legacy mount", () => {
+    hub.origin = "hub://work-hub";
+    render(view());
+    expect(screen.queryByRole("button", { name: "Sessions" })).toBeNull();
+  });
+});
 
 describe("Account entry lifecycle and recovery", () => {
   it.each(["active", "appSetupRequired"])(
@@ -220,7 +331,9 @@ describe("Account entry lifecycle and recovery", () => {
       expect(screen.getByTestId("identity-settings").textContent).toBe("slack-connection");
       expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Back to Account" }));
-      expect(navigation.setParams).toHaveBeenCalledWith({ channelConnectionId: undefined });
+      expect(navigation.setParams).toHaveBeenCalledWith({
+        channelConnectionId: undefined,
+      });
       ui.rerender(view());
       expect(screen.queryByRole("button", { name: "Back to Account" })).toBeNull();
       expect(screen.getByRole("button", { name: "Sign out" })).toBeDefined();
@@ -272,7 +385,10 @@ describe("Account entry lifecycle and recovery", () => {
     enter("Email", account.email);
     enter("Password", "member-password");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sign in" })));
-    expect(hub.signIn).toHaveBeenCalledWith({ email: account.email, password: "member-password" });
+    expect(hub.signIn).toHaveBeenCalledWith({
+      email: account.email,
+      password: "member-password",
+    });
     hub.state = {
       status: "active",
       account,
@@ -299,7 +415,10 @@ describe("Account entry lifecycle and recovery", () => {
     enter("Email", account.email);
     enter("Password", "member-password");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sign in" })));
-    expect(hub.signIn).toHaveBeenCalledWith({ email: account.email, password: "member-password" });
+    expect(hub.signIn).toHaveBeenCalledWith({
+      email: account.email,
+      password: "member-password",
+    });
     hub.state = {
       status: "active",
       account,
@@ -321,7 +440,11 @@ describe("Account entry lifecycle and recovery", () => {
   it("leads sign-in with Google and keeps the email form one step away", () => {
     const signInWithGoogle = vi.fn(async () => {});
     Object.assign(hub, { signInWithGoogle });
-    hub.state = { status: "signedOut", registration: "open", googleSignIn: true };
+    hub.state = {
+      status: "signedOut",
+      registration: "open",
+      googleSignIn: true,
+    };
     try {
       render(view());
       expect(screen.queryByLabelText("Email")).toBeNull();
@@ -349,7 +472,11 @@ describe("Account entry lifecycle and recovery", () => {
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Confirm password") as HTMLInputElement).value).toBe("");
     expect(
-      (screen.getByRole("button", { name: "Create account" }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole("button", {
+          name: "Create account",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
   });
 
@@ -373,8 +500,20 @@ describe("Account entry lifecycle and recovery", () => {
       status: "organizationRequired",
       account,
       memberships: [
-        { id: "org-a", name: "vexere.com", slug: "vexere-com", membershipId: "m-a", role: "owner" },
-        { id: "org-b", name: "Acme", slug: "acme", membershipId: "m-b", role: "member" },
+        {
+          id: "org-a",
+          name: "vexere.com",
+          slug: "vexere-com",
+          membershipId: "m-a",
+          role: "owner",
+        },
+        {
+          id: "org-b",
+          name: "Acme",
+          slug: "acme",
+          membershipId: "m-b",
+          role: "member",
+        },
       ],
       canCreateOrganization: false,
     };
@@ -480,7 +619,10 @@ describe("first Host after signing in", () => {
     signedIn();
     const ui = render(view());
     if (kind === "direct") inventory.hosts = [{ serverId: "offline-host" }];
-    else inventory.daemons.data = { daemons: [{ id: "registered-without-an-offer" }] };
+    else
+      inventory.daemons.data = {
+        daemons: [{ id: "registered-without-an-offer" }],
+      };
     ui.rerender(view());
     expect(screen.queryByText("Add your first Host")).toBeNull();
   });
@@ -494,4 +636,10 @@ describe("first Host after signing in", () => {
     fireEvent.click(screen.getByRole("button", { name: "View shared Hosts" }));
     expect(navigation.push).toHaveBeenCalledWith("/settings/hub/hosts");
   });
+});
+
+it("opens Hub account sign-in configuration without redirecting it to the Account login form", () => {
+  render(<HubSettingsContent section="sign-in" />);
+  expect(screen.getByTestId("hub-login-policy")).toBeTruthy();
+  expect(screen.queryByText("Continue with Google")).toBeNull();
 });

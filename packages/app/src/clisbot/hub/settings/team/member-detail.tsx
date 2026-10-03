@@ -15,6 +15,7 @@ import type { TeamActions } from "./use-team-actions";
 import { BackLink } from "../back-link";
 import { DetailHeader, LabeledRow } from "../detail-header";
 import { RowActionsMenu } from "./row-actions-menu";
+import { visibleEmail } from "@/clisbot/hub/account-email";
 
 const NO_TEAMS: HubTeam[] = [];
 const NO_MEMBERS: HubMember[] = [];
@@ -52,7 +53,11 @@ export function SelectedMemberDetail({
   return (
     <View>
       <BackLink to="People & access" onPress={back} disabled={pending} />
-      <DetailHeader title={member.name} subtitle={member.email} actions={menu} />
+      <DetailHeader
+        title={member.name}
+        subtitle={visibleEmail(member.email) ?? undefined}
+        actions={menu}
+      />
       {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
       <SettingsSection title="Details">
         <View style={settingsStyles.card}>

@@ -193,6 +193,18 @@ export interface DesktopHubBridge {
 }
 
 export interface DesktopHostBridge {
+  google?: {
+    signIn(input: {
+      clientId: string;
+      nonce: string;
+      transactionId: string;
+    }): Promise<{ transactionId: string; idToken: string }>;
+  };
+  deviceSecrets?: {
+    read(key: string): Promise<string | null>;
+    write(key: string, value: string): Promise<void>;
+    delete(key: string): Promise<void>;
+  };
   platform?: string;
   windowChromeMode?: string;
   invoke?: DesktopInvokeBridge["invoke"];

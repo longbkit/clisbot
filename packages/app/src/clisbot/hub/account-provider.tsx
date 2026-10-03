@@ -3,10 +3,12 @@ import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import {
   createContext,
+  memo,
   type ReactNode,
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -23,10 +25,22 @@ import {
 } from "./contracts";
 import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
+import { useHubProfiles, updateHubProfile } from "@/device-access/hub-profiles";
+import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
+import { PairedHubTransport } from "@/device-access/hub-transport";
+import {
+  readHubDeviceCapabilities,
+  type HubDeviceCapabilities,
+} from "@/device-access/hub-capabilities";
 
 interface HubAccountContextValue {
+  googleSignInLabel?: string;
+  connection?: HubDeviceCapabilities | null;
   enabled: boolean;
+  /** Stable scope for existing caches and managed relationships; may be hub://<id>. */
   origin: string | null;
+  /** HTTP connection route for enrollment links; null for a relay-only Hub. */
+  connectionOrigin?: string | null;
   signInKind: "password" | "system-browser" | null;
   state: HubAccountState | null;
   signedIn: HubSignedInState | null;
@@ -117,23 +131,91 @@ const disabledValue: HubAccountContextValue = {
 };
 
 const HubAccountContext = createContext<HubAccountContextValue>(disabledValue);
+const unconfiguredHub = { origin: "hub://unconfigured" };
+const disabledTransport: HubTransport = {
+  signInKind: "password",
+  request: async () => {
+    throw new Error("Pair a Hub first.");
+  },
+  signIn: disabledValue.signIn,
+  signOut: disabledValue.signOut,
+};
 
 export function HubAccountProvider({ children }: { children: ReactNode }) {
-  const configuration = useMemo(() => getHubConfiguration(), []);
-  if (configuration === null) return children;
+  const registry = useHubProfiles();
+  const configuration = useMemo(() => {
+    const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
+    // The logical origin keeps caches and managed relationships stable when routes change.
+    return profile
+      ? { origin: `hub://${profile.hubId}`, deviceProfile: profile }
+      : getHubConfiguration();
+  }, [registry]);
+  const scope = configuration?.origin ?? unconfiguredHub.origin;
+  const selection = useRef({ scope, generation: 0 });
+  if (selection.current.scope !== scope)
+    selection.current = { scope, generation: selection.current.generation + 1 };
+  const generation = selection.current.generation;
+  const [published, setPublished] = useState<{
+    generation: number;
+    value: HubAccountContextValue;
+  } | null>(null);
+  const publish = useCallback(
+    (value: HubAccountContextValue) => {
+      if (selection.current.generation !== generation || value.origin !== scope) return;
+      setPublished({ generation, value });
+    },
+    [generation, scope],
+  );
+  // Account state is isolated by a keyed controller, while the navigation tree
+  // remains mounted when saved profiles hydrate or a user changes Hub.
+  const value = useMemo(() => {
+    if (configuration === null) return disabledValue;
+    if (published?.generation === generation) return published.value;
+    return {
+      ...disabledValue,
+      enabled: true,
+      loading: true,
+      origin: scope,
+      connectionOrigin: configuration.deviceProfile
+        ? (configuration.deviceProfile.origin ?? null)
+        : configuration.origin,
+    };
+  }, [configuration, generation, published, scope]);
   return (
-    <EnabledHubAccountProvider configuration={configuration}>{children}</EnabledHubAccountProvider>
+    <>
+      <HubAccountController
+        key={`${generation}:${scope}`}
+        configuration={configuration ?? unconfiguredHub}
+        enabled={configuration !== null}
+        publish={publish}
+      />
+      <HubAccountContext.Provider value={value}>{children}</HubAccountContext.Provider>
+    </>
   );
 }
 
-function EnabledHubAccountProvider({
+const HubAccountController = memo(EnabledHubAccountController);
+
+function EnabledHubAccountController({
   configuration,
-  children,
+  enabled,
+  publish,
 }: {
   configuration: HubConfiguration;
-  children: ReactNode;
+  enabled: boolean;
+  publish(value: HubAccountContextValue): void;
 }) {
-  const transport = useMemo(() => createHubTransport(configuration), [configuration]);
+  const transport = useMemo<HubTransport>(() => {
+    if (!enabled) return disabledTransport;
+    if (configuration.deviceProfile) return new PairedHubTransport(configuration.deviceProfile);
+    return createHubTransport(configuration);
+  }, [configuration, enabled]);
+  useEffect(
+    () => () => {
+      if (transport instanceof PairedHubTransport) transport.close();
+    },
+    [transport],
+  );
   const router = useRouter();
   const queryClient = useQueryClient();
   const currentUrl = Linking.useURL();
@@ -151,26 +233,38 @@ function EnabledHubAccountProvider({
   const account = useFetchQuery({
     queryKey: ["clisbot", "hub", configuration.origin, "account", invitationId],
     queryFn: () => readAccountState(transport, invitationId),
+    enabled,
+    dataShape: "value",
+    retry: false,
+    staleTimeMs: 15_000,
+  });
+  const connection = useFetchQuery({
+    queryKey: ["clisbot", "hub", configuration.origin, "device-capabilities"],
+    queryFn: () => readHubDeviceCapabilities(transport),
+    enabled: Boolean(configuration.deviceProfile),
     dataShape: "value",
     retry: false,
     staleTimeMs: 15_000,
   });
   const refresh = useCallback(async () => {
-    await account.refetch();
-  }, [account]);
+    await Promise.all([
+      account.refetch(),
+      ...(configuration.deviceProfile ? [connection.refetch()] : []),
+    ]);
+  }, [account, configuration.deviceProfile, connection]);
   const run = useCallback(
     async (operation: () => Promise<void>) => {
       setMutationError(null);
       try {
         await operation();
-        await account.refetch();
+        await refresh();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Hub request failed.";
         setMutationError(message);
         throw error;
       }
     },
-    [account],
+    [refresh],
   );
   const signIn = useCallback(
     (input?: { email: string; password: string }) =>
@@ -209,32 +303,57 @@ function EnabledHubAccountProvider({
     },
     [account, dismissRegistration, transport],
   );
+  const recoverOwnerSetup = useCallback(
+    async (error: unknown) => {
+      if (!needsOwnerSetupRecovery(error)) return;
+      if (transport instanceof PairedHubTransport) {
+        const identity = await transport.identity();
+        const metadata = await identity.json();
+        if (identity.ok && metadata.hubId === configuration.deviceProfile?.hubId) {
+          await updateHubProfile(metadata.hubId, {
+            entry: metadata.entry,
+            setupStatus: metadata.setupStatus,
+          });
+        }
+      }
+      await refresh();
+    },
+    [transport, configuration.deviceProfile, refresh],
+  );
   const signInWithGoogle = useMemo(() => {
     const start = transport.signInWithGoogle?.bind(transport);
     if (start === undefined) return undefined;
     return (options?: { claimInstance?: boolean; returnPath?: string }) =>
-      run(() =>
-        start({
-          ...(invitationId === null ? {} : { invitationId }),
-          ...(options?.claimInstance === true ? { claimInstance: true } : {}),
-          ...(options?.returnPath === undefined ? {} : { returnPath: options.returnPath }),
-        }),
-      );
-  }, [invitationId, run, transport]);
+      run(async () => {
+        try {
+          await start({
+            ...(invitationId === null ? {} : { invitationId }),
+            ...(options?.claimInstance === true ? { claimInstance: true } : {}),
+            ...(options?.returnPath === undefined ? {} : { returnPath: options.returnPath }),
+          });
+        } catch (error) {
+          if (options?.claimInstance) await recoverOwnerSetup(error);
+          throw error;
+        }
+      });
+  }, [invitationId, run, transport, recoverOwnerSetup]);
   const claimInstance = useCallback(
     (input: { email: string; password: string }) =>
       run(async () => {
-        const response = await accountCommand<{ state: "claimed" | "unavailable" }>(
-          transport,
-          "/api/auth/clisbot/claim-instance",
-          input,
-        );
-        if (response.state === "unavailable") {
-          throw new Error("This Hub has already been set up. Sign in with an existing account.");
+        try {
+          const response = await accountCommand<{
+            state: "claimed" | "unavailable";
+          }>(transport, "/api/auth/clisbot/claim-instance", input);
+          if (response.state === "unavailable")
+            throw new HubAccountRequestError("setup_unavailable", 409);
+        } catch (error) {
+          await recoverOwnerSetup(error);
+          throw error;
         }
       }),
-    [run, transport],
+    [run, transport, recoverOwnerSetup],
   );
+
   const changePassword = useCallback(
     (input: { currentPassword: string; newPassword: string }) =>
       run(() => accountCommand(transport, "/api/auth/change-password", input)),
@@ -264,7 +383,18 @@ function EnabledHubAccountProvider({
       }),
     [configuration.origin, currentUrl, queryClient, router, run, transport],
   );
-  const signOut = useCallback(() => run(() => transport.signOut()), [run, transport]);
+  const signOut = useCallback(
+    () =>
+      run(async () => {
+        try {
+          await transport.signOut();
+        } catch (error) {
+          await refresh();
+          throw error;
+        }
+      }),
+    [run, transport, refresh],
+  );
   const updateProfile = useCallback(
     (input: { name?: string; image?: string | null }) =>
       run(() => updateProfileRequest(transport, input)),
@@ -288,13 +418,19 @@ function EnabledHubAccountProvider({
   const selectOrganization = useCallback(
     (organizationId: string) =>
       run(() =>
-        accountCommand(transport, "/api/auth/clisbot/select-organization", { organizationId }),
+        accountCommand(transport, "/api/auth/clisbot/select-organization", {
+          organizationId,
+        }),
       ),
     [run, transport],
   );
   const createOrganization = useCallback(
     (name: string) =>
-      run(() => accountCommand(transport, "/api/auth/clisbot/create-organization", { name })),
+      run(() =>
+        accountCommand(transport, "/api/auth/clisbot/create-organization", {
+          name,
+        }),
+      ),
     [run, transport],
   );
   const inviteMember = useCallback(
@@ -318,7 +454,11 @@ function EnabledHubAccountProvider({
   );
   const removeMember = useCallback(
     (memberId: string) =>
-      run(() => accountCommand(transport, "/api/auth/clisbot/remove-member", { memberId })),
+      run(() =>
+        accountCommand(transport, "/api/auth/clisbot/remove-member", {
+          memberId,
+        }),
+      ),
     [run, transport],
   );
   const state = account.data ?? null;
@@ -331,12 +471,20 @@ function EnabledHubAccountProvider({
   const accountError = accountErrorMessage(account.error, account.isError);
   const value = useMemo<HubAccountContextValue>(
     () => ({
-      enabled: true,
+      enabled,
       origin: configuration.origin,
+      connectionOrigin: configuration.deviceProfile
+        ? (configuration.deviceProfile.origin ?? null)
+        : configuration.origin,
       signInKind: transport.signInKind,
+      googleSignInLabel:
+        transport instanceof PairedHubTransport ? transport.googleSignInLabel : undefined,
       state,
       signedIn,
-      loading: account.isPending,
+      connection: configuration.deviceProfile ? (connection.data ?? null) : null,
+      loading:
+        enabled &&
+        (account.isPending || Boolean(configuration.deviceProfile && connection.isPending)),
       error: mutationError ?? accountError ?? signInRedirectError(currentUrl),
       signIn,
       signUp,
@@ -363,8 +511,12 @@ function EnabledHubAccountProvider({
       api,
     }),
     [
+      enabled,
       accountError,
       account.isPending,
+      connection.data,
+      connection.isPending,
+      configuration.deviceProfile,
       api,
       acceptInvitation,
       configuration.origin,
@@ -393,10 +545,13 @@ function EnabledHubAccountProvider({
       signOut,
       signedIn,
       state,
-      transport.signInKind,
+      transport,
     ],
   );
-  return <HubAccountContext.Provider value={value}>{children}</HubAccountContext.Provider>;
+  useLayoutEffect(() => {
+    publish(value);
+  }, [publish, value]);
+  return null;
 }
 
 function accountErrorMessage(error: unknown, isError: boolean): string | null {
@@ -417,7 +572,13 @@ async function readAccountState(
       ? "/api/auth/clisbot/state"
       : `/api/auth/clisbot/state?invitation=${encodeURIComponent(invitationId)}`;
   const response = await transport.request(path);
-  if (!response.ok) throw new Error(`Hub account request failed (${response.status}).`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new HubAccountRequestError(
+      typeof body?.error === "string" ? body.error : "request_failed",
+      response.status,
+    );
+  }
   return HubAccountStateSchema.parse(await response.json());
 }
 
@@ -431,7 +592,13 @@ async function accountCommand<Result = void>(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`Hub account request failed (${response.status}).`);
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    throw new HubAccountRequestError(
+      typeof failure?.error === "string" ? failure.error : "request_failed",
+      response.status,
+    );
+  }
   return (await response.json().catch(() => undefined)) as Result;
 }
 

@@ -14,7 +14,9 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFetchQuery } from "@/data/query";
 import { daemonPairingOfferQueryKey } from "@/data/daemon-pairing";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { useHostRuntimeClient, useHostRuntimeSnapshot } from "@/runtime/host-runtime";
+import { useHostRuntimeClient, useHostRuntimeSnapshot, useHosts } from "@/runtime/host-runtime";
+import { useHubProfiles } from "@/device-access/hub-profiles";
+import { appDevicePairingOffer } from "@/device-access/pairing-offer";
 import type { Theme } from "@/styles/theme";
 import {
   EditingTextInput as TextInput,
@@ -39,6 +41,8 @@ export interface PairDeviceSectionProps {
 export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps) {
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
+  const hosts = useHosts();
+  const hubProfiles = useHubProfiles();
   const runtimeSnapshot = useHostRuntimeSnapshot(serverId);
   const isConnected = runtimeSnapshot?.connectionStatus === "online";
   const isDisconnected =
@@ -54,7 +58,11 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
     queryKey: daemonPairingOfferQueryKey(serverId),
     queryFn: async () => {
       if (!client) throw new Error(t("workspace.terminal.hostDisconnected"));
-      return client.getDaemonPairingOffer();
+      return appDevicePairingOffer(
+        client,
+        hubProfiles.profiles,
+        hosts.find((host) => host.serverId === serverId)?.management?.hubOrigin,
+      );
     },
     enabled: supportsPairingRpc && Boolean(client && isConnected),
     dataShape: "value",
@@ -157,10 +165,10 @@ function PairDeviceBody(props: PairDeviceBodyProps) {
   if (props.error) {
     return <OfferLoadError message={props.error.message} onRetry={props.onRetry} />;
   }
-  if (!props.offer?.relayEnabled) {
+  if (!props.offer?.url && !props.offer?.relayEnabled) {
     return <RelayConsent {...props} />;
   }
-  if (!props.offer.url) {
+  if (!props.offer?.url) {
     return <Text style={styles.stateLine}>{t("pairing.device.unavailable")}</Text>;
   }
   return <PairingOffer {...props} offer={props.offer} />;

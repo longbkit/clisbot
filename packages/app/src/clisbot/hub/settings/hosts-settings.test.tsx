@@ -19,6 +19,7 @@ const adapters = vi.hoisted(() => ({
   role: "owner",
   accountId: "owner",
   hubEnabled: true,
+  connectionOrigin: undefined as string | null | undefined,
   signedIn: true,
   accountError: null as string | null,
   refresh: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     enabled: adapters.hubEnabled,
     origin: "https://hub.example.test",
+    connectionOrigin: adapters.connectionOrigin,
     state: null,
     error: adapters.accountError,
     refresh: adapters.refresh,
@@ -142,6 +144,7 @@ beforeEach(() => {
   adapters.role = "owner";
   adapters.accountId = "owner";
   adapters.hubEnabled = true;
+  adapters.connectionOrigin = undefined;
   adapters.signedIn = true;
   adapters.accountError = null;
   adapters.refresh.mockReset().mockResolvedValue(undefined);
@@ -629,6 +632,22 @@ describe("Hosts shared rename", () => {
 });
 
 describe("Host administration", () => {
+  it("uses the mutable HTTP connection route rather than the Hub identity in enrollment commands", async () => {
+    adapters.connectionOrigin = "https://personal.tailnet.ts.net:8443";
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    renderSection();
+    await screen.findByText("clisbot hub connect https://personal.tailnet.ts.net:8443");
+    expect(screen.queryByText("clisbot hub connect https://hub.example.test")).toBeNull();
+  });
+
+  it("keeps management usable over relay without inventing an HTTP enrollment endpoint", async () => {
+    adapters.connectionOrigin = null;
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    renderSection();
+    await screen.findByText(/Add a Tailscale or HTTPS endpoint in Hub connections/);
+    expect(screen.queryByRole("button", { name: "Copy command" })).toBeNull();
+    expect(screen.getByText("Manage access")).toBeTruthy();
+  });
   it("disconnects a Host only after confirming, and never twice", async () => {
     adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
     adapters.confirm.mockResolvedValueOnce(false).mockResolvedValue(true);

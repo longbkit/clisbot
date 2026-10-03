@@ -9,6 +9,7 @@ import { EmptyRow } from "../resource-rows";
 import { teamRoleOf, type TeamRole } from "./team-admin";
 import type { HubMember, HubTeam, TeamResources } from "./types";
 import type { useTeamAdminAction } from "./use-people-actions";
+import { withEmail } from "@/clisbot/hub/account-email";
 
 const TEAM_ROLE_OPTIONS: SelectFieldOption<TeamRole>[] = [
   { id: "member", value: "member", label: "Member" },
@@ -89,9 +90,9 @@ function TeamMemberRow({
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{member.name}</Text>
-        <Text
-          style={settingsStyles.rowHint}
-        >{`${member.email} · ${capitalizeLabel(member.role)}`}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {withEmail(capitalizeLabel(member.role), member.email)}
+        </Text>
       </View>
       {canManage ? (
         <View style={styles.trailing}>

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Sign in to your Hub · Clisbot</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        max-width: 26rem;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      p {
+        line-height: 1.6;
+      }
+      #google {
+        margin: 1.5rem 0;
+      }
+      #status {
+        color: #737373;
+      }
+    </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Sign in to your Hub</h1>
+      <p>Continue with Google, then return to Clisbot. Your Hub decides your access.</p>
+      <div id="google"></div>
+      <p id="status" role="status">Preparing secure sign-in…</p>
+    </main>
+    <script>
+      (() => {
+        const params = new URLSearchParams(location.hash.slice(1));
+        // Parameters and credentials never enter an HTTP query or analytics event.
+        history.replaceState(null, "", location.pathname);
+        const transactionId = params.get("transactionId");
+        const nonce = params.get("nonce");
+        const clientId = params.get("clientId");
+        const mode = params.get("mode");
+        const status = document.getElementById("status");
+        let destination;
+        try {
+          if (
+            !transactionId ||
+            !/^[A-Za-z0-9_-]{16,128}$/.test(transactionId) ||
+            !nonce ||
+            !/^[A-Za-z0-9_-]{22,128}$/.test(nonce) ||
+            !clientId ||
+            !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(clientId)
+          )
+            throw new Error("This sign-in request is invalid. Return to Clisbot and try again.");
+          if (mode === "popup") {
+            destination = new URL(params.get("returnOrigin"));
+            // A managed Google origin must not become an ID-token forwarding proxy
+            // for arbitrary websites. Self-hosted clients continue in official web.
+            if (
+              destination.origin !== "https://app.clisbot.com" ||
+              destination.origin !== params.get("returnOrigin") ||
+              !window.opener
+            )
+              throw new Error("Open this sign-in from the Clisbot app.");
+          } else if (mode === "redirect") {
+            destination = new URL(params.get("redirectUri"));
+            const native =
+              destination.protocol === "clisbot:" &&
+              ((destination.host === "hub-google" && ["", "/"].includes(destination.pathname)) ||
+                (destination.host === "" && destination.pathname === "/hub-google"));
+            const loopback =
+              destination.protocol === "http:" &&
+              destination.hostname === "127.0.0.1" &&
+              /^\/hub-google\/callback\/[A-Za-z0-9_-]{32,128}$/.test(destination.pathname) &&
+              destination.port !== "";
+            if (
+              (!native && !loopback) ||
+              destination.username ||
+              destination.password ||
+              destination.search ||
+              destination.hash
+            )
+              throw new Error("This sign-in return address is invalid.");
+          } else throw new Error("Open this sign-in from the Clisbot app.");
+        } catch (error) {
+          status.textContent = error.message;
+          return;
+        }
+        let finished = false;
+        const complete = (idToken) => {
+          if (finished || typeof idToken !== "string" || idToken.length > 16384) return;
+          finished = true;
+          if (mode === "popup") {
+            window.opener.postMessage(
+              { type: "clisbot.google.id-token", transactionId, idToken },
+              destination.origin,
+            );
+            status.textContent = "Sign-in complete. You can close this window.";
+            window.close();
+          } else {
+            destination.hash = new URLSearchParams({
+              transactionId,
+              idToken,
+            }).toString();
+            location.replace(destination.href);
+          }
+        };
+        let attempts = 0;
+        const wait = setInterval(() => {
+          if (window.google?.accounts?.id) {
+            clearInterval(wait);
+            google.accounts.id.initialize({
+              client_id: clientId,
+              nonce,
+              callback: (response) => complete(response.credential),
+              auto_select: false,
+              ux_mode: "popup",
+            });
+            google.accounts.id.renderButton(document.getElementById("google"), {
+              type: "standard",
+              theme: "outline",
+              size: "large",
+            });
+            status.textContent = "Choose your Google account to continue.";
+          } else if (++attempts > 100) {
+            clearInterval(wait);
+            status.textContent =
+              "Google sign-in could not load. Check your connection and retry from Clisbot.";
+          }
+        }, 100);
+      })();
+    </script>
+  </body>
+</html>

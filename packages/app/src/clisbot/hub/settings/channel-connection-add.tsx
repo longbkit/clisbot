@@ -1,3 +1,4 @@
+import { useHubEditLock } from "@/device-access/hub-edit-lock";
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -37,6 +38,7 @@ export function AddChannelConnection({
   create(body: Record<string, unknown>): Promise<void>;
   onCancel?: (() => void) | undefined;
 }) {
+  useHubEditLock();
   const catalog = useChannelCatalog();
   const entries = useMemo(
     () => connectableChannelEntries(catalog.entries, { allowProviderApplications }),

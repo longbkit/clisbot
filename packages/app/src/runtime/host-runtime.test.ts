@@ -11,7 +11,7 @@ import type {
   FetchAgentsOptions,
 } from "@clisbot/client/internal/daemon-client";
 import { DaemonAuthenticationError } from "@clisbot/client/internal/daemon-client";
-import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import type { ConnectionOfferV2 } from "@clisbot/protocol/connection-offer";
 import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
 import type { HostConnection, HostProfile, HubHostManagement } from "@/types/host-connection";
@@ -424,7 +424,7 @@ function makeHost(input: Partial<HostProfile> = {}): HostProfile {
   };
 }
 
-function makeOffer(input?: Partial<ConnectionOffer>): ConnectionOffer {
+function makeOffer(input?: Partial<ConnectionOfferV2>): ConnectionOfferV2 {
   return {
     v: 2,
     serverId: input?.serverId ?? "srv_offer",

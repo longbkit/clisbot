@@ -26,13 +26,14 @@ import { useHubResource } from "./hub-resource";
 import { capitalizeLabel } from "./labels";
 import { EmptyRow, ResourceFeedback } from "./resource-rows";
 import { RowActionsMenu } from "./team/row-actions-menu";
+import { SettingsLinkRow } from "./settings-link-row";
 
 type Connections = z.infer<typeof HubConnectionsSchema>;
 type Connection = Connections["connections"][number];
 type ProviderApplication = Connections["providerApplications"][number];
 
 const INFO =
-  "Apps your organization is connected to, such as a GitHub App install that starts Automations, and the API keys scripts use. A Channel bot is a Connection under Channels.";
+  "Apps your organization is connected to, such as a GitHub App install that starts Automations. Slack and Telegram bots that chat are Connections under Channels.";
 
 export function IntegrationsSettings() {
   const hub = useHubAccount();
@@ -59,13 +60,13 @@ export function IntegrationsSettings() {
   return (
     <View>
       <HubConnectionResultNotice />
-      <SettingsSection title="Integrations" info={INFO} trailing={connectButton}>
+      <SettingsSection title="Connected apps" info={INFO} trailing={connectButton}>
         {error ? <Alert variant="error" title={error} /> : null}
         <ResourceFeedback query={connections} />
         {connections.data === undefined ? null : (
           <View style={settingsStyles.card}>
             {listed.length === 0 ? (
-              <EmptyRow message="No apps are connected yet." />
+              <EmptyRow message={emptyMessage(applications.length > 0)} />
             ) : (
               listed.map((connection, index) => (
                 <IntegrationRow
@@ -77,16 +78,27 @@ export function IntegrationsSettings() {
                 />
               ))
             )}
+            <View style={settingsStyles.rowBorder}>
+              <SettingsLinkRow
+                label="Slack and Telegram chat bots"
+                hint="Set up in Channels"
+                onPress={openChannels}
+              />
+            </View>
           </View>
         )}
-        <Button size="sm" variant="ghost" onPress={openChannels}>
-          Channel bots are under Channels
-        </Button>
       </SettingsSection>
       {canManage ? <ApiKeySettings /> : null}
       {choosing ? <ConnectSheet applications={applications} close={closeChooser} /> : null}
     </View>
   );
+}
+
+/** What an empty list says next: Connect when an app is offered, else where apps come from. */
+function emptyMessage(canConnect: boolean): string {
+  return canConnect
+    ? "No apps connected. Use Connect to add one."
+    : "No apps connected. The Hub operator adds GitHub, Slack, Discord or Linear apps in Instance settings.";
 }
 
 /** Listed here unless a Channel Route uses it: that one is managed with its Channel. */

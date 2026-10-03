@@ -4,20 +4,29 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubAccountProvider, useHubAccount } from "./account-provider";
+import { HubAccountRequestError } from "@/device-access/hub-account-error";
 import { hubClientAuthorizationContinuation } from "./account-entry-route";
 
 const testState = vi.hoisted(() => ({
   url: "https://hub.example.test/settings/hub/account?invitation=invite&client_id=clisbot-client&redirect_uri=clisbot%3A%2F%2Fhub-auth%2Fcallback&state=pkce-state&code_challenge=challenge",
   request: vi.fn(),
   setParams: vi.fn(),
+  configured: true,
+  google: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock("expo-linking", () => ({ useURL: () => testState.url }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ setParams: testState.setParams }) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ setParams: testState.setParams }),
+}));
 vi.mock("./config", () => ({
-  getHubConfiguration: () => ({ origin: "https://hub.example.test" }),
+  getHubConfiguration: () => (testState.configured ? { origin: "https://hub.example.test" } : null),
 }));
 vi.mock("./transport/create", () => ({
-  createHubTransport: () => ({ signInKind: "password", request: testState.request }),
+  createHubTransport: () => ({
+    signInKind: "password",
+    request: testState.request,
+    signInWithGoogle: testState.google,
+  }),
 }));
 const account = { id: "member", name: "Member", email: "member@example.test" };
 const invitation = {
@@ -40,9 +49,18 @@ function active(organizationId: string) {
         role: "member",
       },
     ],
-    organization: { id: organizationId, name: "Organization", slug: organizationId },
+    organization: {
+      id: organizationId,
+      name: "Organization",
+      slug: organizationId,
+    },
     membership: { id: "membership", role: "member" },
-    capabilities: { view: true, manageMembers: false, manageOwners: false, manageResources: false },
+    capabilities: {
+      view: true,
+      manageMembers: false,
+      manageOwners: false,
+      manageResources: false,
+    },
     isInstanceOperator: false,
     team: { members: [] },
     canCreateOrganization: false,
@@ -56,7 +74,9 @@ const pendingInvitation = {
   invitation,
 };
 function setup() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   client.setQueryData(
     ["clisbot", "hub", "https://hub.example.test", "account", null],
     active("previous-org"),
@@ -71,8 +91,20 @@ function setup() {
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.resetAllMocks();
+  testState.configured = true;
+  testState.google = undefined;
 });
 afterEach(cleanup);
+
+it("daemon-only clients do not advertise Hub sign-in or start disabled account requests", async () => {
+  testState.configured = false;
+  const { result } = setup();
+  await act(async () => Promise.resolve());
+  expect(result.current.enabled).toBe(false);
+  expect(result.current.loading).toBe(false);
+  expect(result.current.signedIn).toBeNull();
+  expect(testState.request).not.toHaveBeenCalled();
+});
 
 describe("invitation consumption", () => {
   it("consumes only a successful invitation and waits for fresh membership before OAuth resumes", async () => {
@@ -94,7 +126,9 @@ describe("invitation consumption", () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.state?.status).toBe("organizationRequired"));
     await act(() => result.current.acceptInvitation("invite"));
-    expect(testState.setParams).toHaveBeenCalledExactlyOnceWith({ invitation: undefined });
+    expect(testState.setParams).toHaveBeenCalledExactlyOnceWith({
+      invitation: undefined,
+    });
     await waitFor(() => expect(result.current.loading).toBe(true));
     expect(result.current.signedIn).toBeNull();
     await act(async () => finishAccountRead(Response.json(active("new-org"))));
@@ -120,7 +154,9 @@ describe("invitation consumption", () => {
       await expect(result.current.acceptInvitation("invite")).rejects.toThrow();
     });
     expect(testState.setParams).not.toHaveBeenCalled();
-    expect(result.current.state).toMatchObject({ invitation: { id: "invite" } });
+    expect(result.current.state).toMatchObject({
+      invitation: { id: "invite" },
+    });
     expect(result.current.error).toContain("400");
   });
 });
@@ -149,4 +185,73 @@ describe("email self-registration", () => {
     expect(outcomes).toEqual(["sent", "domainNotAllowed", "rateLimited", "unavailable"]);
     expect(result.current.state).toMatchObject({ googleSignIn: true });
   });
+});
+
+it("an unavailable owner approval preserves pairing while reporting approved setup recovery", async () => {
+  testState.request.mockImplementation(async (path: string) =>
+    path === "/api/auth/clisbot/claim-instance"
+      ? Response.json({ error: "owner_setup_approval_required" }, { status: 403 })
+      : Response.json({ status: "instanceSetupRequired" }),
+  );
+  const { result } = setup();
+  await waitFor(() => expect(result.current.state?.status).toBe("instanceSetupRequired"));
+  await act(async () => {
+    await expect(
+      result.current.claimInstance({
+        email: "owner@example.test",
+        password: "long enough password",
+      }),
+    ).rejects.toThrow("new setup QR or link");
+  });
+  expect(result.current.state?.status).toBe("instanceSetupRequired");
+  expect(result.current.error).toContain("approval is unavailable");
+});
+
+it("owner setup claimed elsewhere refreshes into ordinary account sign-in instead of retaining the create-owner form", async () => {
+  let claimed = false;
+  testState.request.mockImplementation(async (path: string) => {
+    if (path === "/api/auth/clisbot/claim-instance") {
+      claimed = true;
+      return Response.json({ state: "unavailable" });
+    }
+    return Response.json(
+      claimed
+        ? { status: "signedOut", registration: "invite_only" }
+        : { status: "instanceSetupRequired" },
+    );
+  });
+  const { result } = setup();
+  await waitFor(() => expect(result.current.state?.status).toBe("instanceSetupRequired"));
+  await act(async () => {
+    await expect(
+      result.current.claimInstance({
+        email: "owner@example.test",
+        password: "long enough password",
+      }),
+    ).rejects.toThrow("sign in with an approved account");
+  });
+  await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
+});
+
+it("Google owner setup claimed elsewhere uses the same account-entry recovery", async () => {
+  let claimed = false;
+  testState.google = async () => {
+    claimed = true;
+    throw new HubAccountRequestError("owner_setup_unavailable", 409);
+  };
+  testState.request.mockImplementation(async () =>
+    Response.json(
+      claimed
+        ? { status: "signedOut", registration: "invite_only" }
+        : { status: "instanceSetupRequired", googleSignIn: true },
+    ),
+  );
+  const { result } = setup();
+  await waitFor(() => expect(result.current.state?.status).toBe("instanceSetupRequired"));
+  await act(async () => {
+    await expect(result.current.signInWithGoogle?.({ claimInstance: true })).rejects.toThrow(
+      "sign in with an approved account",
+    );
+  });
+  await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
 });

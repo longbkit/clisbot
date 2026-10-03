@@ -106,6 +106,7 @@ import {
   useWorkspaceSetupStore,
 } from "@/stores/workspace-setup-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
+import { forgetMissingWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceTerminalSessionRetention } from "@/terminal/hooks/use-workspace-terminal-session-retention";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -1262,6 +1263,20 @@ function useWorkspaceRouteActions(normalizedServerId: string): {
   };
 }
 
+/** A workspace its connected Host proved missing stops being the startup restore target. */
+function useForgetMissingWorkspace(
+  routeStateKind: WorkspaceRouteState["kind"],
+  serverId: string,
+  workspaceId: string,
+) {
+  useEffect(() => {
+    if (routeStateKind !== "missing" || !serverId || !workspaceId) {
+      return;
+    }
+    forgetMissingWorkspace({ serverId, workspaceId });
+  }, [routeStateKind, serverId, workspaceId]);
+}
+
 function useResolvedWorkspaceRouteState(input: {
   serverId: string;
   workspace: WorkspaceDescriptor | null;
@@ -1761,6 +1776,7 @@ function WorkspaceScreenContent({
     hasHydratedWorkspaces,
     recovery: workspaceRecovery.state,
   });
+  useForgetMissingWorkspace(workspaceRouteState.kind, normalizedServerId, normalizedWorkspaceId);
   const workspaceHeaderCheckoutState = buildWorkspaceHeaderCheckoutState({
     isCheckoutStatusLoading,
     isError: checkoutQuery.isError,

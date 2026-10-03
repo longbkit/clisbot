@@ -11,7 +11,7 @@ import {
   View,
   type PressableStateCallbackType,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -58,6 +58,9 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
+import { HubPicker } from "@/device-access/hub-picker";
+import { SettingsPageTitleContext } from "@/components/settings/headings/settings-section";
+import { useHubSwitchLocked } from "@/device-access/hub-edit-lock";
 import { ProductAnalyticsSettings } from "@/clisbot/analytics/settings";
 import {
   useAppSettings,
@@ -769,6 +772,7 @@ interface SidebarSectionButtonProps<Section extends string> {
   testID?: string;
   icon: ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   isSelected: boolean;
+  disabled?: boolean;
   onSelect: (section: Section) => void;
 }
 
@@ -782,19 +786,24 @@ function SidebarSectionButton<Section extends string>({
   testID,
   icon: IconComponent,
   isSelected,
+  disabled,
   onSelect,
 }: SidebarSectionButtonProps<Section>) {
   const { theme } = useUnistyles();
   const handlePress = useCallback(() => {
     onSelect(itemId);
   }, [onSelect, itemId]);
-  const accessibilityState = useMemo(() => ({ selected: isSelected }), [isSelected]);
+  const accessibilityState = useMemo(
+    () => ({ selected: isSelected, disabled }),
+    [isSelected, disabled],
+  );
   const labelStyle = useMemo(
     () => [sidebarStyles.label, isSelected && { color: theme.colors.foreground }],
     [isSelected, theme.colors.foreground],
   );
   return (
     <Pressable
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityState={accessibilityState}
       testID={testID}
@@ -1028,6 +1037,7 @@ function SettingsSidebar({
     staleTimeMs: 15_000,
   });
   const hubItems = hubSettingsNavigationItems({
+    deviceAccess: hub.origin?.startsWith("hub://") === true,
     signedIn: hub.signedIn !== null,
     canManage: canManageHub,
     isInstanceOperator: hub.state?.status === "active" && hub.state.isInstanceOperator,
@@ -1050,6 +1060,10 @@ function SettingsSidebar({
   );
   const selectedSectionId = view.kind === "section" ? view.section : null;
   const selectedHubSection = view.kind === "hub" ? view.section : null;
+  const hubSwitchLocked = useHubSwitchLocked();
+  const openHubs = useCallback(() => {
+    if (!hubSwitchLocked) onSelectHubSection("hubs");
+  }, [hubSwitchLocked, onSelectHubSection]);
   let selectedHostSection: HostSectionSlug | null = null;
   if (view.kind === "host") selectedHostSection = view.section;
   if (view.kind === "project") selectedHostSection = "projects";
@@ -1070,21 +1084,38 @@ function SettingsSidebar({
           />
         ))}
       </View>
-      {hub.enabled ? (
-        <View style={sidebarStyles.list}>
-          <Text style={sidebarStyles.groupLabel}>Hub</Text>
-          {hubItems.map((item) => (
-            <SidebarSectionButton
-              key={item.section}
-              itemId={item.section}
-              label={item.label}
-              icon={item.icon}
-              isSelected={selectedHubSection === item.section}
-              onSelect={onSelectHubSection}
-            />
-          ))}
-        </View>
-      ) : null}
+      <View style={sidebarStyles.list}>
+        <Text style={sidebarStyles.groupLabel}>Hub &amp; Channel connect</Text>
+        <SidebarSectionButton
+          itemId="hubs"
+          label="Hubs"
+          icon={Network}
+          disabled={hubSwitchLocked}
+          isSelected={selectedHubSection === "hubs"}
+          onSelect={openHubs}
+        />
+        <HubPicker />
+        {hub.enabled
+          ? hubItems
+              .filter(
+                (item) =>
+                  !(
+                    item.section === "account" &&
+                    hub.connection?.accountAuthentication === "personal"
+                  ),
+              )
+              .map((item) => (
+                <SidebarSectionButton
+                  key={item.section}
+                  itemId={item.section}
+                  label={item.label}
+                  icon={item.icon}
+                  isSelected={selectedHubSection === item.section}
+                  onSelect={onSelectHubSection}
+                />
+              ))
+          : null}
+      </View>
       <View style={sidebarStyles.list}>
         <Text style={sidebarStyles.groupLabel}>{t("settings.groups.host")}</Text>
         <SidebarSectionButton
@@ -1204,7 +1235,10 @@ export interface SettingsScreenProps {
 export default function SettingsScreen({ view, openAddHostIntent = null }: SettingsScreenProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const hub = useHubAccount();
+  const hubPickerAccessory = useMemo(
+    () => (view.kind === "hub" && view.section !== "hubs" ? <HubPicker compact /> : null),
+    [view],
+  );
   const voiceAudioEngine = useVoiceAudioEngineOptional();
   const { settings, isLoading: settingsLoading, updateSettings } = useAppSettings();
   const [isAddHostMethodVisible, setIsAddHostMethodVisible] = useState(false);
@@ -1444,6 +1478,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   }, []);
 
   const installedPlugins = useInstalledPlugins();
+  const hubDetailParams = useLocalSearchParams<{ hubPanel?: string; hubIntent?: string }>();
   const detailHeader = ((): {
     title: string;
     titleAccessory?: ReactNode;
@@ -1466,8 +1501,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     }
     if (view.kind === "hub") {
       const item = hubSettingsSection(view.section);
+      if (view.section === "hubs" && hubDetailParams.hubIntent) return { title: "Add Hub" };
       return {
-        title: view.section === "account" && hub.signedIn ? hub.signedIn.account.name : item.label,
+        title:
+          view.section === "overview" && hubDetailParams.hubPanel === "devices"
+            ? "Paired devices"
+            : item.label,
       };
     }
     if (view.kind === "project") {
@@ -1526,7 +1565,9 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     })();
 
   content = (
-    <HostSettingsAccess serverId={routedSettingsHostServerId}>{content}</HostSettingsAccess>
+    <SettingsPageTitleContext.Provider value={detailHeader?.title ?? null}>
+      <HostSettingsAccess serverId={routedSettingsHostServerId}>{content}</HostSettingsAccess>
+    </SettingsPageTitleContext.Provider>
   );
 
   if (settingsLoading) {
@@ -1543,6 +1584,9 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         {detailHeader.title}
       </Text>
       {detailHeader.titleAccessory}
+      {hubPickerAccessory ? (
+        <View style={styles.hubTitleAccessory}>{hubPickerAccessory}</View>
+      ) : null}
     </View>
   ) : null;
 
@@ -1606,6 +1650,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         <BackHeader
           title={detailHeader?.title}
           titleAccessory={detailHeader?.titleAccessory}
+          rightContent={hubPickerAccessory}
           onBack={handleBackFromDetail}
         />
         <ScrollView
@@ -1718,6 +1763,9 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
   },
+  hubTitleAccessory: {
+    marginLeft: "auto",
+  },
   brandHeader: {
     marginBottom: theme.spacing[8],
   },
@@ -1817,8 +1865,9 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    minHeight: 28,
-    paddingVertical: theme.spacing[1],
+    height: { xs: 44, md: 28 },
+    minHeight: { xs: 44, md: 28 },
+    paddingVertical: { xs: 0, md: theme.spacing[1] },
     paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
   },
