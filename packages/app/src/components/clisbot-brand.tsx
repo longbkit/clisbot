@@ -1,17 +1,24 @@
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
-import { baseColors, SPACING } from "@/styles/theme";
+import { SPACING, type Theme } from "@/styles/theme";
 
-/** The same Ocean mark on settings pages and beside the sidebar account control. */
+const BrandLogo = withUnistyles(ClisbotLogo);
+const brandLogoColor = (theme: Theme) => ({
+  color:
+    theme.colorScheme === "dark"
+      ? theme.colors.palette.brand.seafoam
+      : theme.colors.palette.brand.ocean,
+});
+
+/** A transparent Flow mark shared by settings and the sidebar account row. */
 export function ClisbotBrand({ iconOnly = false }: { iconOnly?: boolean }) {
   const size = iconOnly ? SPACING[8] : SPACING[12];
 
   return (
     <View style={styles.lockup}>
       <View style={[styles.mark, iconOnly && styles.compactMark]}>
-        {/* The SVG has its own inset; the artwork fills 62% of the brand tile. */}
-        <ClisbotLogo size={(size * 62) / 72} color={baseColors.brand.seafoam} />
+        <BrandLogo size={size} uniProps={brandLogoColor} />
       </View>
       {!iconOnly ? <Text style={styles.name}>Clisbot</Text> : null}
     </View>
@@ -27,8 +34,6 @@ const styles = StyleSheet.create((theme) => ({
   mark: {
     width: theme.spacing[12],
     height: theme.spacing[12],
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.palette.brand.ocean,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -36,7 +41,6 @@ const styles = StyleSheet.create((theme) => ({
   compactMark: {
     width: theme.spacing[8],
     height: theme.spacing[8],
-    borderRadius: theme.borderRadius.lg,
   },
   name: {
     color: theme.colors.foreground,

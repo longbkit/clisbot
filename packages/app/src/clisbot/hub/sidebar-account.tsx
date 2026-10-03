@@ -1,8 +1,7 @@
-import { UserRound } from "lucide-react-native";
 import { router } from "expo-router";
 import { useCallback } from "react";
 import { Pressable, Text, type PressableStateCallbackType } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePanelStore } from "@/stores/panel-store";
@@ -12,8 +11,6 @@ import {
   resolveHubSidebarAccountPresentation,
   type HubSidebarAccountPresentation,
 } from "./sidebar-account-presentation";
-
-const AccountIcon = withUnistyles(UserRound);
 
 function triggerStyle({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) {
   return [styles.trigger, Boolean(hovered || pressed) && styles.triggerHovered];
@@ -69,10 +66,7 @@ function SignedInHubSidebarAccountButton({
               {presentation.initials}
             </Text>
           ) : (
-            <>
-              <AccountIcon size={20} uniProps={accountIconColor} />
-              <Text style={styles.signInLabel}>Sign in</Text>
-            </>
+            <Text style={styles.signInLabel}>Sign in</Text>
           )}
         </Pressable>
       </TooltipTrigger>
@@ -96,8 +90,7 @@ const styles = StyleSheet.create((theme) => ({
     width: "auto",
     flexDirection: "row",
     justifyContent: "flex-start",
-    gap: theme.spacing[3],
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: theme.spacing[1],
     borderRadius: theme.borderRadius.md,
   },
   signInLabel: {
@@ -130,6 +123,3 @@ const signedOutPresentation = {
   initials: "",
   tooltip: "Sign in to your account",
 };
-const accountIconColor = (theme: import("@/styles/theme").Theme) => ({
-  color: theme.colors.foregroundMuted,
-});
